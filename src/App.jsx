@@ -389,6 +389,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, llevaEntrante,
     tieneBrindisCava, mesVerano, tieneCongelador, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    llevaArmarioCaliente, llevaPalomitera,
   } = opts;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -410,6 +411,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Abridores", "2"],
     ["Bandeja camareros", opts.numCamareros > 0 ? String(opts.numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
     ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
+    ...(llevaPalomitera ? [["Carrito palomitera (Alquiler)", "1"]] : []),
   ]});
 
   const cocinaItems = [
@@ -418,6 +420,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
   cocinaItems.push(["Microondas", "1"], ["Batidora / Túrmix", "1"], ["Vitro", "1"], ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"]);
+  if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Paravientos", "1"]);
   if (llevaPaella) {
@@ -475,7 +478,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
 // Eventos corporativos / producciones — fiel a "Checklist de Carga – Producciones"
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
-  const { llevaPaella, tieneFrituras, tipoCafetera, dobleServicio, hayDesayuno } = opts;
+  const {
+    llevaPaella, tieneFrituras, tipoCafetera, dobleServicio, hayDesayuno,
+    llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
+    llevaEntrante, personasPorPlatoEntrante,
+  } = opts;
   const totalPax = pax + ninos;
   const cats = [];
 
@@ -491,6 +498,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
+    ...(llevaPalomitera ? [["Carrito palomitera (Alquiler)", "1"]] : []),
   ]});
 
   cats.push({ nombre: "Cocina y sala", items: [
@@ -499,6 +507,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vitro", "1"], ["Butano", "1"], ["Trípode", "1"], ["Termos con tapa", "—"],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
     ["Neveras playa pequeñas", "2"], ["Chafers", String(Math.max(2, Math.ceil(pax / 40)))],
+    ...(llevaArmarioCaliente ? [["Armario caliente (alquiler Dealde)", "1", true]] : []),
   ]});
 
   cats.push({ nombre: "Menaje y Utensilios", items: [
@@ -520,6 +529,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
     ["Cucharas postre", String(totalPax)],
     ["Bandejas metálicas y madera", "—"], ["Jarras de cristal", "—"], ["Abridores", "2"],
+    ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
+    ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
@@ -532,7 +543,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos de cartón (L/M/S)", `${Math.ceil(totalPax / 20)} paq.`], ["Bolsas grandes de papel", "1 paq."],
     ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
     ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
-    ["Aguas (2L / pequeñas)", `${Math.round(totalPax * 0.5)} packs`], ["Agua con gas", String(Math.round(totalPax * 0.15))],
+    ["Aguas (2L / pequeñas)", `${Math.round(totalPax * 0.5)} packs`],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
+    ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
   ]});
 
