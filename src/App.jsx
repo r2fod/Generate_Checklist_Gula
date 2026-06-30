@@ -219,7 +219,7 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     ["Platos de café", String(totalPax)],
     ["Infusiones (té variado + descafeinado)", `${Math.ceil(totalPax / 30)} caja`],
     ["Azucarillos y edulcorantes", `${Math.ceil(totalPax / 50)} caja`],
-    ["Leches variadas (entera/desnatada/sin lactosa/avena)", "4"],
+    [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 15 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / 40)))],
   );
   return { nombre: "Café", items };
