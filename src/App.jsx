@@ -101,7 +101,11 @@ function parseValor(raw, tipo) {
       if (v.includes("plata"))  return "Plata";
       return "Mixto";
     }
-    case "cafetera": return v.includes("nespresso") ? "Nespresso" : "Grande";
+    case "cafetera": {
+      if (v.includes("nespresso")) return "Nespresso";
+      if (v.includes("bar"))       return "Bar";
+      return "Grande";
+    }
     default: return raw;
   }
 }
@@ -185,12 +189,18 @@ function calcMesasTotal(evtKey, pax) {
 }
 
 // Categoría de Café, compartida por los 3 tipos de evento
+// Las 3 cafeteras son propiedad de la empresa (no alquiler):
+// - Nespresso: cápsulas, cantidad calculada para cubrir el pax.
+// - Bar: cafetera tipo bar (espresso/portafiltro), café molido por taza.
+// - Grande: cafetera industrial, hace cargas de ~100 cafés con café molido.
 function calcCafe(totalPax, tipoCafetera) {
   const items = [];
   if (tipoCafetera === "Grande") {
-    items.push(["Cafetera grande (Alquiler)", "1"], ["Café molido", `${Math.max(1, Math.ceil(totalPax / 60))} paq.`]);
+    items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
+  } else if (tipoCafetera === "Bar") {
+    items.push(["Cafetera de bar", "1"], ["Café molido (cafetera de bar)", `${Math.ceil(totalPax / 50)} paq.`]);
   } else {
-    items.push(["Cafetera Nespresso", "1"], ["Cápsulas café (estándar/descafeinado)", String(Math.ceil(totalPax * 1.5))], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * 1.5))], ["Cuencos para calentar leche", "2"]);
   }
   items.push(
     ["Tazas café con leche e infusiones", String(Math.round(totalPax * 0.6))],
@@ -1029,7 +1039,7 @@ export default function App() {
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
               <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
               <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
-              <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Grande"]} />
+              <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
             </div>
             <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
           </div>
