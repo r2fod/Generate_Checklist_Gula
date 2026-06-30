@@ -1042,6 +1042,7 @@ export default function App() {
   const [importedTag, setImportedTag]   = useState("");
   const [importedAlquiler, setImportedAlquiler] = useState(false);
   const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
+  const [overridesManuales, setOverridesManuales] = useState({}); // { "categoria::label": "cantidad editada a mano" }
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
@@ -1077,8 +1078,25 @@ export default function App() {
       }
       destino.items.push([it.label, it.cantidad, idx]);
     });
+    // Aplica las cantidades editadas a mano (clave: categoría + etiqueta del item)
+    cats.forEach(cat => {
+      cat.items = cat.items.map(([label, qty, idx]) => {
+        const key = `${cat.nombre}::${label}`;
+        return overridesManuales[key] !== undefined ? [label, overridesManuales[key], idx] : [label, qty, idx];
+      });
+    });
     return cats;
-  }, [baseChecklist, itemsManuales]);
+  }, [baseChecklist, itemsManuales, overridesManuales]);
+
+  const handleEditarCantidad = (categoria, label, valor) => {
+    const key = `${categoria}::${label}`;
+    setOverridesManuales(prev => {
+      const next = { ...prev };
+      if (valor.trim() === "") delete next[key];
+      else next[key] = valor;
+      return next;
+    });
+  };
 
   const handleLabelItemManual = (value) => {
     setNuevoItemLabel(value);
@@ -1404,13 +1422,24 @@ export default function App() {
                 <div className="item-list">
                   {cat.items.map(([label, qty, manualIdx], i) => {
                     const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+                    const displayQty = String(qty && qty.u ? qty.u : qty);
+                    const editado = overridesManuales[`${cat.nombre}::${label}`] !== undefined;
                     return (
                       <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
                         <div className="item-name">
                           {label}
                           {alq && <span className="tag-alquiler">ALQUILER</span>}
+                          {editado && <span title="Cantidad editada a mano" style={{ color: "#9ca3af", fontSize: "0.7rem" }}>✎</span>}
                         </div>
-                        <div className="item-qty">{qty.u ? qty.u : qty}</div>
+                        <input
+                          type="text"
+                          className="item-qty-input"
+                          value={displayQty}
+                          title="Click para editar la cantidad"
+                          onChange={e => handleEditarCantidad(cat.nombre, label, e.target.value)}
+                          onFocus={e => e.target.select()}
+                          size={Math.max(2, displayQty.length)}
+                        />
                         {esManual && (
                           <button
                             onClick={() => handleRemoveItemManual(manualIdx)}
