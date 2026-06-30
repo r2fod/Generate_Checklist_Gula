@@ -224,6 +224,14 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 15 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / 40)))],
   );
+  // Coffee break / desayuno: bollería, fruta y zumos (habitual en eventos corporativos y desayunos)
+  if (hayDesayuno) {
+    items.push(
+      ["Bollería variada (mini)", `${Math.ceil(totalPax * 1.5)} uds.`],
+      ["Fruta fresca (brocheta/macedonia)", String(totalPax)],
+      ["Zumos naturales", `${Math.ceil(totalPax / 10)} packs`],
+    );
+  }
   return { nombre: "Café", items };
 }
 
