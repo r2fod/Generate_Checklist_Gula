@@ -713,49 +713,77 @@ function ModalVistaPrevia({ checklist, evtKey, pax, ninos, onClose }) {
   );
 }
 
+// Extrae el listado real de pestañas (nombre + gid) de la vista pública htmlview de un Sheet.
+// Google incrusta esto en un <script> como items.push({name: "...", pageUrl: "...", gid: "..."})
+// una vez por pestaña, y el endpoint responde con CORS abierto, así que es fetcheable desde el navegador.
+function parsePestanas(html) {
+  const regex = /items\.push\(\{name:\s*"((?:\\.|[^"\\])*)"\s*,\s*pageUrl:\s*"(?:\\.|[^"\\])*"\s*,\s*gid:\s*"(-?\d+)"/g;
+  const out = [];
+  let m;
+  while ((m = regex.exec(html))) {
+    out.push({ name: m[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\"), gid: m[2] });
+  }
+  return out;
+}
+
 // ─── MODAL IMPORTAR SHEET ─────────────────────────────────────────────────────
 function ModalImportSheet({ onClose, onImport }) {
   const [url, setUrl]               = useState("");
   const [cargando, setCargando]     = useState(false);
   const [error, setError]           = useState("");
+  const [sheetId, setSheetId]       = useState(null);
+  const [pestanas, setPestanas]     = useState([]); // [{name, gid}]
+  const [pestanaUsada, setPestanaUsada] = useState(null); // nombre de la pestaña ya cargada
   const [sheetData, setSheetData]   = useState(null); // { headers, rows }
   const [filaIdx, setFilaIdx]       = useState(0);
   const [mapeo, setMapeo]           = useState({}); // campo.key → nombre columna del sheet
-  const [paso, setPaso]             = useState(1); // 1=URL, 2=mapeo, 3=fila
-  const [pestanaNombre, setPestanaNombre] = useState("");
-  const [pestanaUsada, setPestanaUsada] = useState(null);
+  const [mostrarMapeoManual, setMostrarMapeoManual] = useState(false);
+  const [paso, setPaso]             = useState("url"); // url → pestana (solo si hay varias) → fila
 
   const extractSheetId = (u) => {
     const m = u.match(/\/spreadsheets\/d\/([\w-]+)/);
     return m ? m[1] : null;
   };
 
-  const extractGid = (u) => {
-    const m = u.match(/[#&]gid=(\d+)/);
-    return m ? m[1] : null;
+  const cargarPestana = async (id, gid, nombre) => {
+    setError(""); setCargando(true);
+    try {
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${gid != null ? `&gid=${gid}` : ""}`;
+      const res = await fetch(csvUrl);
+      if (!res.ok) throw new Error("No se pudo leer esa pestaña del Sheet.");
+      const text = await res.text();
+      const data = parseCSV(text);
+      if (data.headers.length === 0) throw new Error("Esa pestaña parece estar vacía.");
+      setSheetData(data);
+      setMapeo(autoMapearColumnas(data.headers, CAMPOS_LOGISTICA));
+      setPestanaUsada(nombre || null);
+      setPaso("fila");
+    } catch (e) {
+      setError(e.message);
+    }
+    setCargando(false);
   };
 
-  const fetchSheet = async () => {
+  // Paso 1: analiza el Sheet — detecta automáticamente sus pestañas
+  const conectar = async () => {
     setError(""); setCargando(true);
     const id = extractSheetId(url);
     if (!id) { setError("URL inválida. Asegúrate de pegar el link completo del Google Sheet."); setCargando(false); return; }
-    const gid = extractGid(url);
-    const nombrePestana = pestanaNombre.trim();
-    // Prioridad: nombre de pestaña escrito a mano > gid detectado en la URL pegada > primera pestaña
-    const refPestana = nombrePestana
-      ? `&sheet=${encodeURIComponent(nombrePestana)}`
-      : gid ? `&gid=${gid}` : "";
-    setPestanaUsada(nombrePestana || (gid ? `gid=${gid}` : null));
+    setSheetId(id);
     try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${refPestana}`;
-      const res = await fetch(csvUrl);
-      if (!res.ok) throw new Error("No se pudo acceder al sheet. ¿Está compartido con 'Cualquier persona con el link puede ver' y el nombre de pestaña es correcto?");
-      const text = await res.text();
-      const data = parseCSV(text);
-      if (data.headers.length === 0) throw new Error("El archivo parece estar vacío.");
-      setSheetData(data);
-      setMapeo(autoMapearColumnas(data.headers, CAMPOS_LOGISTICA));
-      setPaso(2);
+      const res = await fetch(`https://docs.google.com/spreadsheets/d/${id}/htmlview`);
+      if (!res.ok) throw new Error("No se pudo acceder al Sheet. ¿Está compartido con 'Cualquier persona con el link puede ver'?");
+      const html = await res.text();
+      const detectadas = parsePestanas(html);
+      if (detectadas.length > 1) {
+        setPestanas(detectadas);
+        setCargando(false);
+        setPaso("pestana");
+        return;
+      }
+      // Una sola pestaña (o no se pudo detectar el listado): cargar directamente
+      await cargarPestana(id, detectadas[0]?.gid ?? null, detectadas[0]?.name ?? null);
+      return;
     } catch (e) {
       setError(e.message);
     }
@@ -780,6 +808,8 @@ function ModalImportSheet({ onClose, onImport }) {
     background: "white", color: "#374151", width: "100%", cursor: "pointer",
   };
 
+  const tituloPaso = { url: "Pega el link del Sheet", pestana: "Elige la pestaña", fila: "Elige el evento a importar" }[paso];
+
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 680, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
@@ -788,21 +818,20 @@ function ModalImportSheet({ onClose, onImport }) {
         <div style={{ background: "#1f314d", color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📊 Importar desde Google Sheets</div>
-            <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>
-              Paso {paso} de 3: {paso === 1 ? "Pega el link del Sheet" : paso === 2 ? "Mapea las columnas" : "Elige el evento a importar"}
-            </div>
+            <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>{tituloPaso}</div>
           </div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
         </div>
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* PASO 1: URL */}
-          {paso === 1 && (
+          {/* PASO URL */}
+          {paso === "url" && (
             <>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
                 ℹ️ El Google Sheet debe estar <strong>compartido con "Cualquier persona con el link puede ver"</strong>.<br/>
-                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.
+                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.<br/><br/>
+                Pega el link principal del Sheet (no hace falta que sea de una pestaña concreta): si tiene varias, te las mostraré para que elijas.
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Link del Google Sheet</label>
@@ -811,71 +840,46 @@ function ModalImportSheet({ onClose, onImport }) {
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   value={url}
                   onChange={e => setUrl(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && fetchSheet()}
+                  onKeyDown={e => e.key === "Enter" && conectar()}
                   style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.95rem" }}
                 />
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>¿Qué pestaña quieres importar? <span style={{ fontWeight: 400, color: "#9ca3af" }}>(opcional, si tu Sheet tiene varias)</span></label>
-                <input
-                  type="text"
-                  placeholder="Ej: Junio, Eventos 2026, Hoja2..."
-                  value={pestanaNombre}
-                  onChange={e => setPestanaNombre(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && fetchSheet()}
-                  style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.95rem" }}
-                />
-                <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
-                  Escribe el nombre exacto de la pestaña tal como aparece en las solapas de Google Sheets. Déjalo en blanco para usar la primera pestaña
-                  {extractGid(url) ? <> (o pega una URL con <code>#gid=...</code> de una pestaña concreta, como ya hiciste aquí: gid={extractGid(url)})</> : "."}
-                </span>
               </div>
               {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
-              <button onClick={fetchSheet} disabled={cargando || !url.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: cargando || !url.trim() ? 0.6 : 1 }}>
-                {cargando ? "Cargando..." : "Conectar con el Sheet →"}
+              <button onClick={conectar} disabled={cargando || !url.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: cargando || !url.trim() ? 0.6 : 1 }}>
+                {cargando ? "Analizando el Sheet..." : "Analizar Sheet →"}
               </button>
             </>
           )}
 
-          {/* PASO 2: MAPEO DE COLUMNAS */}
-          {paso === 2 && sheetData && (
+          {/* PASO PESTAÑA: solo aparece si el Sheet tiene más de una */}
+          {paso === "pestana" && (
             <>
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
-                ✓ Sheet cargado correctamente{pestanaUsada ? ` (pestaña: ${pestanaUsada})` : " (primera pestaña)"} — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. He intentado mapear automáticamente las columnas comparando sus nombres con cada campo logístico. Revisa y ajusta las que no coincidan.
-              </div>
-              <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>Para cada campo logístico, elige qué columna del Sheet lo contiene. Deja en "— Sin mapear" los que no apliquen.</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {CAMPOS_LOGISTICA.map(campo => (
-                  <div key={campo.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.3px" }}>{campo.label}</label>
-                    <select
-                      style={selectStyle}
-                      value={mapeo[campo.key] || ""}
-                      onChange={e => setMapeo(prev => ({ ...prev, [campo.key]: e.target.value || undefined }))}
-                    >
-                      <option value="">— Sin mapear</option>
-                      {sheetData.headers.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                    {mapeo[campo.key] && sheetData.rows[0] && (
-                      <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontStyle: "italic" }}>
-                        Ej: {sheetData.rows[0][mapeo[campo.key]]}
-                      </span>
-                    )}
-                  </div>
+              <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>Este Sheet tiene {pestanas.length} pestañas. Elige cuál quieres importar:</p>
+              {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto" }}>
+                {pestanas.map(p => (
+                  <button
+                    key={p.gid}
+                    disabled={cargando}
+                    onClick={() => cargarPestana(sheetId, p.gid, p.name)}
+                    style={{ textAlign: "left", padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "white", cursor: cargando ? "default" : "pointer", fontWeight: 600, color: "#1f314d", opacity: cargando ? 0.6 : 1 }}
+                  >
+                    📑 {p.name}
+                  </button>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 12 }}>
-                <button onClick={() => setPaso(1)} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
-                <button onClick={() => setPaso(3)} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", flex: 1 }}>Continuar →</button>
-              </div>
+              <button onClick={() => setPaso("url")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
             </>
           )}
 
-          {/* PASO 3: ELEGIR FILA */}
-          {paso === 3 && sheetData && (
+          {/* PASO FILA: elegir el evento a importar, con mapeo automático ya aplicado */}
+          {paso === "fila" && sheetData && (
             <>
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
+                ✓ Pestaña "{pestanaUsada || "primera"}" cargada — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. Las columnas se han mapeado automáticamente a la checklist.
+              </div>
               <p style={{ fontWeight: 600, color: "#374151" }}>Elige el evento a importar ({sheetData.rows.length} filas disponibles):</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
                 {sheetData.rows.map((fila, idx) => {
                   const etiqueta = mapeo.evento ? fila[mapeo.evento] : "";
                   const paxLabel = mapeo.pax ? fila[mapeo.pax] : "";
@@ -888,8 +892,33 @@ function ModalImportSheet({ onClose, onImport }) {
                   );
                 })}
               </div>
+
+              <button
+                onClick={() => setMostrarMapeoManual(v => !v)}
+                style={{ alignSelf: "flex-start", background: "none", border: "none", color: "#1f314d", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0 }}
+              >
+                {mostrarMapeoManual ? "Ocultar" : "Ajustar mapeo de columnas manualmente (avanzado)"}
+              </button>
+              {mostrarMapeoManual && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
+                  {CAMPOS_LOGISTICA.map(campo => (
+                    <div key={campo.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.3px" }}>{campo.label}</label>
+                      <select
+                        style={selectStyle}
+                        value={mapeo[campo.key] || ""}
+                        onChange={e => setMapeo(prev => ({ ...prev, [campo.key]: e.target.value || undefined }))}
+                      >
+                        <option value="">— Sin mapear</option>
+                        {sheetData.headers.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                <button onClick={() => setPaso(2)} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
+                <button onClick={() => setPaso(pestanas.length > 1 ? "pestana" : "url")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
                 <button onClick={aplicarImportacion} style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", flex: 1 }}>
                   ✓ Importar y generar checklist
                 </button>
