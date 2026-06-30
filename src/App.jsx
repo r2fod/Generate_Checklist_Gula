@@ -285,7 +285,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Bandeja camarero", numCamareros > 0 ? String(numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
     ["Nevera pequeña", "—"], ["Congelador", "—"], ["Nevera roja", "—"],
-    ...(llevaPalomitera ? [["Carrito palomitera (Alquiler)", "1"]] : []),
+    ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
 
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
@@ -421,7 +421,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Abridores", "2"],
     ["Bandeja camareros", opts.numCamareros > 0 ? String(opts.numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
     ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
-    ...(llevaPalomitera ? [["Carrito palomitera (Alquiler)", "1"]] : []),
+    ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
   ]});
 
   const cocinaItems = [
@@ -508,7 +508,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
-    ...(llevaPalomitera ? [["Carrito palomitera (Alquiler)", "1"]] : []),
+    ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
   ]});
 
   cats.push({ nombre: "Cocina y sala", items: [
@@ -1069,7 +1069,7 @@ export default function App() {
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             "sartén parisiene"],
               [tieneBrindisCava,     setTieneBrindisCava,     "Brindis con cava",         "dobla copas de cava"],
-              [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de chuches/palomitas, alquiler"],
+              [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33/50cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
