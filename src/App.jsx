@@ -9,6 +9,7 @@ const EVENTOS = {
   comunion:    { label: "Comunión / Bautizo", icon: "✚" },
   cumpleanos:  { label: "Cumpleaños",         icon: "✦" },
   corporativo: { label: "Evento corporativo", icon: "▣" },
+  produccion:  { label: "Producción / Shooting", icon: "▶" },
 };
 
 // Campos logísticos que se pueden mapear desde el Sheet
@@ -91,6 +92,7 @@ function parseValor(raw, tipo) {
       if (v.includes("boda"))            return "boda";
       if (v.includes("comun") || v.includes("bautizo")) return "comunion";
       if (v.includes("cumplea"))         return "cumpleanos";
+      if (v.includes("produ") || v.includes("shooting") || v.includes("rodaje")) return "produccion";
       if (v.includes("corp") || v.includes("empresa")) return "corporativo";
       return null;
     }
@@ -227,9 +229,9 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
 
 // ─── BUILD CHECKLIST ──────────────────────────────────────────────────────────
 function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
-  if (evtKey === "cumpleanos")  return buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts);
-  if (evtKey === "corporativo") return buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts);
-  return buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts); // boda y comunión
+  if (evtKey === "cumpleanos") return buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts);
+  if (evtKey === "produccion") return buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts);
+  return buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts); // boda, comunión y evento corporativo
 }
 
 // Boda y comunión — fiel a "Checklist de Carga – BODA"
@@ -1063,7 +1065,7 @@ export default function App() {
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33/50cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
-              ...((evento === "boda" || evento === "comunion")
+              ...(evento !== "cumpleanos" && evento !== "produccion"
                 ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
                 : []),
             ].map(([val, fn, lab, sub]) => (
