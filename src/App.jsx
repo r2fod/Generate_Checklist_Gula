@@ -220,6 +220,7 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     ["Infusiones (té variado + descafeinado)", `${Math.ceil(totalPax / 30)} caja`],
     ["Azucarillos y edulcorantes", `${Math.ceil(totalPax / 50)} caja`],
     ["Leches variadas (entera/desnatada/sin lactosa/avena)", "4"],
+    ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / 40)))],
   );
   return { nombre: "Café", items };
 }
