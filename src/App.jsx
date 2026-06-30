@@ -63,23 +63,41 @@ const DEFAULTS = {
 };
 
 // ─── PARSE CSV ────────────────────────────────────────────────────────────────
+// Parser de una sola pasada sobre todo el texto (no separa por "\n" de antemano):
+// las celdas de un Google Sheet pueden contener saltos de línea entre comillas
+// (notas, observaciones...), y partir por líneas primero desplazaba las columnas
+// de todas las filas siguientes a esa celda, corrompiendo la importación entera.
 function parseCSV(text) {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const parseRow = (line) => {
-    const result = [];
-    let cur = "", inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      if (line[i] === '"') { inQuotes = !inQuotes; }
-      else if (line[i] === "," && !inQuotes) { result.push(cur.trim()); cur = ""; }
-      else { cur += line[i]; }
+  const filas = [];
+  let fila = [], celda = "", enComillas = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (enComillas) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { celda += '"'; i++; } // comilla escapada ""
+        else enComillas = false;
+      } else {
+        celda += c;
+      }
+    } else if (c === '"') {
+      enComillas = true;
+    } else if (c === ",") {
+      fila.push(celda.trim()); celda = "";
+    } else if (c === "\r") {
+      // ignorar, lo gestiona el \n siguiente
+    } else if (c === "\n") {
+      fila.push(celda.trim()); celda = "";
+      filas.push(fila); fila = [];
+    } else {
+      celda += c;
     }
-    result.push(cur.trim());
-    return result;
-  };
-  const headers = parseRow(lines[0]);
-  const rows = lines.slice(1).map(l => {
-    const vals = parseRow(l);
+  }
+  if (celda !== "" || fila.length > 0) { fila.push(celda.trim()); filas.push(fila); }
+
+  const noVacias = filas.filter(f => f.some(v => v !== ""));
+  if (noVacias.length < 2) return { headers: [], rows: [] };
+  const headers = noVacias[0];
+  const rows = noVacias.slice(1).map(vals => {
     const obj = {};
     headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
     return obj;
@@ -274,6 +292,12 @@ function calcMesasServicio(pax) {
   return { total: 13 };
 }
 
+// Personal de sala: usa el nº de camareros importado del Excel si lo hay,
+// si no lo calcula automáticamente por pax (1 camarero cada 20 pax aprox.)
+function personalSala(pax, numCamareros) {
+  return numCamareros > 0 ? numCamareros : Math.max(2, Math.ceil(pax / 20));
+}
+
 function calcMesasComensales(evtKey, pax) {
   return evtKey === "boda" || evtKey === "comunion" ? Math.ceil(pax / 7) : 0;
 }
@@ -367,7 +391,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cubo basura cocina", "2"], ["Champanera metálica grande", "4"],
     ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
-    ["Bandeja camarero", numCamareros > 0 ? String(numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
+    ["Bandeja camarero", String(personalSala(pax, numCamareros))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
     [`Nevera (${tipoNevera})`, "1"], [`Congelador (${tipoCongelador})`, "1"], ["Nevera roja", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
@@ -414,7 +438,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", "5"],
+    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
     [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax / 40)} paq.`],
     ["Servilletas cocktail", `${Math.ceil(totalPax / 100)} paq. (100)`],
   ]});
@@ -507,7 +531,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Champanera metálica / Cubiteras + pinza", "2"],
     ["Abridores", "2"],
-    ["Bandeja camareros", opts.numCamareros > 0 ? String(opts.numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
+    ["Bandeja camareros", String(personalSala(pax, opts.numCamareros))],
     ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
@@ -538,7 +562,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ["Manteles beige", String(calcMesasServicio(pax).total + 1)], ["Delantales / Bayetas / Trapos", "4"],
+    ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
+    ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
     [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax / 40)} paq.`],
   ]});
 
@@ -582,7 +607,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
-    tipoPaella,
+    tipoPaella, numCamareros,
   } = opts;
   const totalPax = pax + ninos;
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
@@ -601,6 +626,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
+    ["Bandeja camareros", String(personalSala(pax, numCamareros))],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
   ]});
 
@@ -623,7 +649,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ["Manteles negros", String(calcMesasServicio(pax).total + 1)], ["Delantales", "5"], ["Bayetas / Trapos", "4"],
+    ["Manteles negros", String(calcMesasServicio(pax).total + 1)],
+    ["Delantales", String(personalSala(pax, numCamareros) + 2)], ["Bayetas / Trapos", "4"],
   ]});
 
   cats.push({ nombre: "Vajilla y Cubertería", items: [
