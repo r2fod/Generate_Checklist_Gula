@@ -139,6 +139,41 @@ body {
   transform: translateY(-2px);
 }
 
+/* Outline button for use on light/white backgrounds (cards), as opposed to .btn-outline (dark header) */
+.btn-navy-outline {
+  background: transparent;
+  border-color: var(--primary-navy);
+  color: var(--primary-navy);
+}
+
+.btn-navy-outline:hover {
+  background: var(--primary-navy);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.btn-navy-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Add custom item row */
+.add-item-card {
+  padding: 16px 24px;
+}
+
+.add-item-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.add-item-btn {
+  white-space: nowrap;
+}
+
 /* Config Card */
 .config-card {
   background: var(--card-bg);
@@ -262,6 +297,24 @@ body {
   font-size: 0.9rem;
   min-width: 24px;
   text-align: right;
+}
+
+/* Equipment controls row (bandejas, nevera, horno, cafetera...) */
+.controls-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.controls-row {
+  display: flex;
+  gap: 24px 32px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.controls-mini {
+  max-width: 140px;
 }
 
 /* Segmented Controls */
@@ -520,10 +573,69 @@ hr {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .btn {
     flex: 1;
     text-align: center;
     padding: 10px;
+  }
+
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .controls-mini {
+    max-width: none;
+  }
+
+  .add-item-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .add-item-btn {
+    width: 100%;
+  }
+
+  .config-card {
+    padding: 16px;
+  }
+
+  .item-row {
+    padding: 12px 14px;
+  }
+
+  .item-row:hover {
+    padding-left: 14px;
+  }
+
+  .category-header {
+    padding: 12px 14px;
+    font-size: 0.8rem;
+  }
+
+  .header-info h1 {
+    font-size: 1.05rem;
+  }
+
+  .header-icon {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .item-name {
+    font-size: 0.85rem;
+  }
+
+  .item-qty {
+    font-size: 0.9rem;
+  }
+
+  .header-actions .btn {
+    font-size: 0.8rem;
+    padding: 8px;
   }
 }

@@ -125,6 +125,36 @@ function autoMapearColumnas(headers, campos) {
   return mapeo;
 }
 
+// Sugiere a qué categoría de la checklist pertenece un item escrito a mano,
+// buscando palabras clave del nombre y emparejándolas con un fragmento del
+// nombre real de categoría (que varía según el tipo de evento: "Cocina y fuego",
+// "Cocina y Electro", "Cocina y sala"... por eso se busca por fragmento, no por nombre exacto).
+const PISTAS_CATEGORIA = [
+  { fragmento: "electric", palabras: ["cable", "regleta", "alargador", "enchufe", "foco", "luz", "generador", "electricidad"] },
+  { fragmento: "mobiliario", palabras: ["mesa", "silla", "decoracion", "vela", "flor", "centro de mesa", "photocall", "carpa", "taburete", "nevera", "congelador", "lona"] },
+  { fragmento: "cocina", palabras: ["horno", "cocina", "sarten", "olla", "fuego", "gas", "plancha", "parrilla", "barbacoa", "paella", "bombona"] },
+  { fragmento: "menaje", palabras: ["cuchillo", "cuchara", "tenedor", "utensilio", "bol", "colador", "cucharon"] },
+  { fragmento: "cristal", palabras: ["copa", "vaso", "cristal"] },
+  { fragmento: "mantel", palabras: ["mantel", "servilleta", "delantal", "textil"] },
+  { fragmento: "vajilla", palabras: ["plato", "vajilla", "cubierto"] },
+  { fragmento: "limpieza", palabras: ["limpieza", "fairy", "basura", "trapo", "bayeta", "papel"] },
+  { fragmento: "cafe", palabras: ["cafe", "te", "infusion", "azucar", "edulcorante"] },
+  { fragmento: "bebida", palabras: ["bebida", "agua", "refresco", "cerveza", "vino", "cola", "fanta", "tonica", "zumo", "hielo"] },
+  { fragmento: "alcohol", palabras: ["alcohol", "licor", "ron", "vodka", "ginebra", "whisky", "vermut"] },
+];
+
+function sugerirCategoria(label, categoriasDisponibles) {
+  const norm = normalizar(label);
+  if (!norm) return null;
+  for (const pista of PISTAS_CATEGORIA) {
+    if (pista.palabras.some(p => norm.includes(p))) {
+      const encontrada = categoriasDisponibles.find(c => normalizar(c).includes(pista.fragmento));
+      if (encontrada) return encontrada;
+    }
+  }
+  return null;
+}
+
 // Convierte un valor raw del Sheet al tipo esperado
 function parseValor(raw, tipo) {
   if (!raw) return null;
@@ -972,9 +1002,11 @@ export default function App() {
   const [compartirMsg, setCompartirMsg] = useState("");
   const [importedTag, setImportedTag]   = useState("");
   const [importedAlquiler, setImportedAlquiler] = useState(false);
-  const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad }] — añadidos a mano por el usuario
+  const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
+  const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
+  const [categoriaTocada, setCategoriaTocada] = useState(false);
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneCongelador, tieneBrindisCava,
@@ -986,21 +1018,39 @@ export default function App() {
     tipoNevera, tipoCongelador,
   };
 
-  const checklist = useMemo(() => {
-    const cats = buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, opts);
-    if (itemsManuales.length > 0) {
-      // El 3er elemento (índice real en itemsManuales) viaja en la tupla para poder borrar
-      // el item correcto aunque el buscador esté filtrando la lista visible.
-      cats.push({ nombre: CATEGORIA_MANUAL, items: itemsManuales.map((it, idx) => [it.label, it.cantidad, idx]) });
-    }
-    return cats;
-  }, [evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts, itemsManuales]);
+  // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
+  // disponibles a la hora de elegir dónde encajar un item añadido a mano.
+  const baseChecklist = useMemo(() =>
+    buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, opts),
+    [evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts]
+  );
+  const categoriasDisponibles = useMemo(() => baseChecklist.map(c => c.nombre), [baseChecklist]);
 
+  const checklist = useMemo(() => {
+    const cats = baseChecklist.map(c => ({ ...c, items: [...c.items] }));
+    // El 3er elemento de la tupla (índice real en itemsManuales) permite borrar el item
+    // correcto luego, aunque el buscador esté filtrando la lista visible.
+    itemsManuales.forEach((it, idx) => {
+      let destino = cats.find(c => c.nombre === it.categoria);
+      if (!destino) {
+        destino = cats.find(c => c.nombre === CATEGORIA_MANUAL);
+        if (!destino) { destino = { nombre: CATEGORIA_MANUAL, items: [] }; cats.push(destino); }
+      }
+      destino.items.push([it.label, it.cantidad, idx]);
+    });
+    return cats;
+  }, [baseChecklist, itemsManuales]);
+
+  const handleLabelItemManual = (value) => {
+    setNuevoItemLabel(value);
+    if (!categoriaTocada) setNuevoItemCategoria(sugerirCategoria(value, categoriasDisponibles) || CATEGORIA_MANUAL);
+  };
   const handleAddItemManual = () => {
     const label = nuevoItemLabel.trim();
     if (!label) return;
-    setItemsManuales(prev => [...prev, { label, cantidad: nuevoItemCantidad.trim() || "1" }]);
-    setNuevoItemLabel(""); setNuevoItemCantidad("");
+    const categoria = nuevoItemCategoria || sugerirCategoria(label, categoriasDisponibles) || CATEGORIA_MANUAL;
+    setItemsManuales(prev => [...prev, { label, cantidad: nuevoItemCantidad.trim() || "1", categoria }]);
+    setNuevoItemLabel(""); setNuevoItemCantidad(""); setNuevoItemCategoria(""); setCategoriaTocada(false);
   };
   const handleRemoveItemManual = (idx) => setItemsManuales(prev => prev.filter((_, i) => i !== idx));
 
@@ -1224,14 +1274,14 @@ export default function App() {
             </div>
           )}
           <hr />
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div className="controls-stack">
+            <div className="controls-row">
               <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
-              <div className="form-group" style={{ maxWidth: 160 }}>
+              <div className="form-group controls-mini">
                 <span className="form-label">Madera extra</span>
                 <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(parseInt(e.target.value) || 0)} />
               </div>
-              <div className="form-group" style={{ maxWidth: 160 }}>
+              <div className="form-group controls-mini">
                 <span className="form-label">Plata extra</span>
                 <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
               </div>
@@ -1256,30 +1306,43 @@ export default function App() {
         </div>
 
         {/* AÑADIR ITEM PERSONALIZADO */}
-        <div className="config-card animate-entrance" style={{ animationDelay: "0.22s", display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div className="form-group" style={{ flex: 2, minWidth: 200 }}>
-            <span className="form-label">Añadir item personalizado</span>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Ej: Vela aromática"
-              value={nuevoItemLabel}
-              onChange={e => setNuevoItemLabel(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
-            />
+        <div className="config-card animate-entrance add-item-card" style={{ animationDelay: "0.22s" }}>
+          <div className="add-item-row">
+            <div className="form-group" style={{ flex: 2 }}>
+              <span className="form-label">Añadir item personalizado</span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ej: Vela aromática"
+                value={nuevoItemLabel}
+                onChange={e => handleLabelItemManual(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 1 }}>
+              <span className="form-label">Cantidad</span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="1"
+                value={nuevoItemCantidad}
+                onChange={e => setNuevoItemCantidad(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
+              />
+            </div>
+            <div className="form-group" style={{ flex: 2 }}>
+              <span className="form-label">Categoría</span>
+              <select
+                className="form-select"
+                value={nuevoItemCategoria || CATEGORIA_MANUAL}
+                onChange={e => { setNuevoItemCategoria(e.target.value); setCategoriaTocada(true); }}
+              >
+                {categoriasDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value={CATEGORIA_MANUAL}>{CATEGORIA_MANUAL}</option>
+              </select>
+            </div>
+            <button className="btn btn-navy-outline add-item-btn" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
           </div>
-          <div className="form-group" style={{ maxWidth: 140 }}>
-            <span className="form-label">Cantidad</span>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="1"
-              value={nuevoItemCantidad}
-              onChange={e => setNuevoItemCantidad(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
-            />
-          </div>
-          <button className="btn btn-outline" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
         </div>
 
         {/* CATEGORÍAS */}
