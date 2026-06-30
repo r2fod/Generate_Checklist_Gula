@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -881,6 +881,7 @@ export default function App() {
   const [modalSheet, setModalSheet]     = useState(false);
   const [compartirMsg, setCompartirMsg] = useState("");
   const [importedTag, setImportedTag]   = useState("");
+  const [importedAlquiler, setImportedAlquiler] = useState(false);
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneCongelador, tieneBrindisCava,
@@ -907,26 +908,40 @@ export default function App() {
 
   // Aplicar datos importados del Sheet, sin pisar campos que el usuario ya tocó a mano
   // (solo se aplica el valor del Sheet si el campo sigue en su valor por defecto)
-  const handleImport = useCallback((data) => {
+  const handleImport = (data) => {
+    const valorActual = {
+      evento, pax, ninos, horasCoctel, horasCopas, dobleServicio, llevaEntrante, llevaPaella,
+      llevaArmarioCaliente, numCamareros, tipoBandejas, tipoHorno, tipoBBQ, mesVerano,
+      tieneCongelador, tieneBrindisCava, tieneFrituras, fuerzaTextilTela, llevaPalomitera,
+      llevaJarrasCristal, tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero,
+      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    };
+    const alquilerImportado = [];
     const importarSi = (campo, valor, setter) => {
-      if (valor == null) return;
-      setter(prev => (prev === DEFAULTS[campo] ? valor : prev));
+      if (valor == null) return false;
+      if (valorActual[campo] !== DEFAULTS[campo]) return false;
+      setter(valor);
+      return true;
     };
     if (data.evento) importarSi("evento", data.evento, setEvento);
     importarSi("pax", data.pax, setPax);
     importarSi("ninos", data.ninos, setNinos);
     if (data.horasCoctel != null) {
       importarSi("horasCoctel", data.horasCoctel || 2, setHorasCoctel);
-      setBarraCoctel(prev => (prev === true ? prev : data.horasCoctel > 0));
+      if (!barraCoctel) setBarraCoctel(data.horasCoctel > 0);
     }
     if (data.horasCopas != null) {
       importarSi("horasCopas", data.horasCopas || 4, setHorasCopas);
-      setBarraCopas(prev => (prev === false ? data.horasCopas > 0 : prev));
+      if (!barraCopas) setBarraCopas(data.horasCopas > 0);
     }
     importarSi("llevaPaella", data.llevaPaella, setLlevaPaella);
-    importarSi("tipoHorno", data.tipoHorno, setTipoHorno);
+    if (importarSi("tipoHorno", data.tipoHorno, setTipoHorno) && (data.tipoHorno === "Grande" || data.tipoHorno === "Ambos")) {
+      alquilerImportado.push("Horno grande (Alquiler Dealde)");
+    }
     importarSi("tipoBBQ", data.tipoBBQ, setTipoBBQ);
-    importarSi("llevaArmarioCaliente", data.llevaArmarioCaliente, setLlevaArmarioCaliente);
+    if (importarSi("llevaArmarioCaliente", data.llevaArmarioCaliente, setLlevaArmarioCaliente) && data.llevaArmarioCaliente) {
+      alquilerImportado.push("Armario caliente (alquiler Dealde)");
+    }
     importarSi("tieneFrituras", data.tieneFrituras, setTieneFrituras);
     importarSi("llevaEntrante", data.llevaEntrante, setLlevaEntrante);
     importarSi("mesVerano", data.mesVerano, setMesVerano);
@@ -945,9 +960,12 @@ export default function App() {
     importarSi("personasPorPlatoEntrante", data.personasPorPlatoEntrante, setPersonasPorPlatoEntrante);
     importarSi("llevaAguasPequenas", data.llevaAguasPequenas, setLlevaAguasPequenas);
     importarSi("hayDesayuno", data.hayDesayuno, setHayDesayuno);
-    setImportedTag("✓ Datos importados del Sheet");
-    setTimeout(() => setImportedTag(""), 3000);
-  }, []);
+    setImportedTag(alquilerImportado.length > 0
+      ? `✓ Importado · ⚠ Incluye alquiler: ${alquilerImportado.join(", ")}`
+      : "✓ Datos importados del Sheet");
+    setImportedAlquiler(alquilerImportado.length > 0);
+    setTimeout(() => { setImportedTag(""); setImportedAlquiler(false); }, alquilerImportado.length > 0 ? 6000 : 3000);
+  };
 
   const handleDescargar = () => {
     const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist);
@@ -1002,7 +1020,13 @@ export default function App() {
         {/* IMPORT SHEET BANNER */}
         <button
           className="add-material-btn animate-entrance"
-          style={{ animationDelay: "0.05s", background: importedTag ? "#f0fdf4" : "white", borderColor: importedTag ? "#bbf7d0" : undefined, color: importedTag ? "#16a34a" : undefined }}
+          style={{
+            animationDelay: "0.05s",
+            background: importedAlquiler ? "#fdf6e3" : importedTag ? "#f0fdf4" : "white",
+            borderColor: importedAlquiler ? "#f59e0b" : importedTag ? "#bbf7d0" : undefined,
+            color: importedAlquiler ? "#b45309" : importedTag ? "#16a34a" : undefined,
+            fontWeight: importedAlquiler ? 700 : undefined,
+          }}
           onClick={() => setModalSheet(true)}
         >
           <span>📊 {importedTag || "Importar datos desde Google Sheets"}</span>
@@ -1068,7 +1092,9 @@ export default function App() {
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             "sartén parisiene"],
-              [tieneBrindisCava,     setTieneBrindisCava,     "Brindis con cava",         "dobla copas de cava"],
+              ...(evento !== "produccion"
+                ? [[tieneBrindisCava, setTieneBrindisCava, "Brindis con cava", "dobla copas de cava"]]
+                : []),
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33/50cl"],
@@ -1091,19 +1117,25 @@ export default function App() {
           <hr />
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
-              <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
-              <div className="form-group" style={{ maxWidth: 160 }}>
-                <span className="form-label">Madera extra</span>
-                <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(parseInt(e.target.value) || 0)} />
-              </div>
-              <div className="form-group" style={{ maxWidth: 160 }}>
-                <span className="form-label">Plata extra</span>
-                <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
-              </div>
+              {evento !== "cumpleanos" && evento !== "produccion" && (
+                <>
+                  <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
+                  <div className="form-group" style={{ maxWidth: 160 }}>
+                    <span className="form-label">Madera extra</span>
+                    <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(parseInt(e.target.value) || 0)} />
+                  </div>
+                  <div className="form-group" style={{ maxWidth: 160 }}>
+                    <span className="form-label">Plata extra</span>
+                    <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
+                  </div>
+                </>
+              )}
               <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
               <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
             </div>
-            <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
+            {evento !== "cumpleanos" && evento !== "produccion" && (
+              <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
+            )}
           </div>
         </div>
 
