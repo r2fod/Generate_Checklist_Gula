@@ -403,7 +403,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
   const numFritura = tieneFrituras ? 1 : 0;
-  const bombonas   = numPaella + numFritura + 2;
+  const bombonas   = numPaella + numFritura; // 1 bombona por paella + 1 extra si hay frituras
   const cocinaItems = [];
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella);
@@ -415,7 +415,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro eléctrica", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
-  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Difusor extra (frituras)", "1"], ["Trípode extra (frituras)", "1"], ["Espumadera grande", "2"]);
+  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Difusor pequeño (frituras)", "1"], ["Trípode (frituras)", "1"], ["Espumadera grande", "2"]);
   if (tipoBBQ !== "no lleva") {
     cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"], ["Gastros extra", "—"]);
   }
@@ -541,14 +541,15 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   const cocinaItems = [
-    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
+    // 1 bombona por paella + 1 extra si hay frituras
+    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0))],
   ];
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
   cocinaItems.push(["Microondas", "1"], ["Batidora / Túrmix", "1"], ["Vitro", "1"], ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
-  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Paravientos", "1"]);
+  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Difusor pequeño (frituras)", "1"], ["Trípode (frituras)", "1"], ["Paravientos", "1"]);
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella);
     cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Trípodes", String(p.n)], ["Descansadores paella", "2"]);
@@ -634,7 +635,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Cocina y sala", items: [
-    ["Plancha de gas", "1"], ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
+    ["Plancha de gas", "1"],
+    // 1 bombona por paella + 1 extra si hay frituras
+    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0))],
     ["Horno pequeño / Microondas", "1"], ["Batidora / Túrmix", "1"], ["Mesas calientes", "—"],
     ["Vitro", "1"], ["Butano", "1"], ["Trípode", "1"], ["Termos con tapa", "—"],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
@@ -648,7 +651,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Paravientos", "—"], ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
     ["Servilleteros madera", "2"], ["Gastros", "—"], ["Caja cocina (varios)", "1"],
     ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"], ["Caja salsas / Arroces", "1"],
-    ...(tieneFrituras ? [["Sartén Parisiene (frituras)", "1"]] : []),
+    ...(tieneFrituras ? [["Sartén Parisiene (frituras)", "1"], ["Difusor pequeño (frituras)", "1"], ["Trípode (frituras)", "1"]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
