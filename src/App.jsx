@@ -403,7 +403,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, llevaEntrante,
     tieneBrindisCava, mesVerano, tieneCongelador, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-    llevaArmarioCaliente, llevaPalomitera,
+    llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
   } = opts;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -411,6 +411,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, tieneCongelador);
   const cristal = calcCristaleria(pax, hayBarra ? horasBarraTotal : 2, dobleServicio, tieneBrindisCava, llevaEntrante);
+  const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
+  const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -426,6 +428,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Bandeja camareros", opts.numCamareros > 0 ? String(opts.numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
     ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
+    ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
+    ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
   ]});
 
   const cocinaItems = [
@@ -495,9 +499,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     llevaPaella, tieneFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
-    llevaEntrante, personasPorPlatoEntrante,
+    llevaEntrante, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
   } = opts;
   const totalPax = pax + ninos;
+  const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
+  const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -542,7 +548,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
     ["Cucharas postre", String(totalPax)],
-    ["Bandejas metálicas y madera", "—"], ["Jarras de cristal", "—"], ["Abridores", "2"],
+    ["Jarras de cristal", "—"], ["Abridores", "2"],
+    ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
+    ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
@@ -1126,17 +1134,17 @@ export default function App() {
           <hr />
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap", alignItems: "flex-end" }}>
+              <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
+              <div className="form-group" style={{ maxWidth: 160 }}>
+                <span className="form-label">Madera extra</span>
+                <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(parseInt(e.target.value) || 0)} />
+              </div>
+              <div className="form-group" style={{ maxWidth: 160 }}>
+                <span className="form-label">Plata extra</span>
+                <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
+              </div>
               {evento !== "cumpleanos" && evento !== "produccion" && (
                 <>
-                  <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
-                  <div className="form-group" style={{ maxWidth: 160 }}>
-                    <span className="form-label">Madera extra</span>
-                    <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(parseInt(e.target.value) || 0)} />
-                  </div>
-                  <div className="form-group" style={{ maxWidth: 160 }}>
-                    <span className="form-label">Plata extra</span>
-                    <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
-                  </div>
                   <SegmentedControl label="Nevera" value={tipoNevera} onChange={setTipoNevera} options={["Mediana", "Grande"]} />
                   <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["Mediana", "Grande"]} />
                 </>
