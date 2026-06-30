@@ -12,37 +12,39 @@ const EVENTOS = {
   produccion:  { label: "Producción / Shooting", icon: "▶" },
 };
 
-// Campos logísticos que se pueden mapear desde el Sheet
+// Campos logísticos que se pueden mapear desde el Sheet.
+// "sinonimos" alimenta el mapeo automático: cuantas más palabras tenga un sinónimo,
+// más específico y prioritario es a la hora de reservar una columna del Sheet.
 const CAMPOS_LOGISTICA = [
-  { key: "pax",              label: "PAX adultos",             tipo: "numero" },
-  { key: "ninos",            label: "Niños",                   tipo: "numero" },
-  { key: "evento",           label: "Tipo de evento",          tipo: "evento" },
-  { key: "horasCoctel",      label: "Horas barra cóctel",      tipo: "numero" },
-  { key: "horasCopas",       label: "Horas barra copas",       tipo: "numero" },
-  { key: "llevaPaella",      label: "Lleva paella",            tipo: "bool" },
-  { key: "tipoHorno",        label: "Tipo de horno",           tipo: "horno" },
-  { key: "tipoBBQ",          label: "Barbacoa",                tipo: "bbq" },
-  { key: "llevaArmarioCaliente", label: "Armario caliente (Alquiler)", tipo: "bool" },
-  { key: "tieneFrituras",    label: "Frituras",                tipo: "bool" },
-  { key: "llevaEntrante",    label: "Lleva entrante (chupito)", tipo: "bool" },
-  { key: "mesVerano",        label: "Temporada verano",        tipo: "bool" },
-  { key: "tieneCongelador",  label: "Finca con congelador",    tipo: "bool" },
-  { key: "tieneBrindisCava", label: "Brindis con cava",        tipo: "bool" },
-  { key: "dobleServicio",    label: "Doble servicio",          tipo: "bool" },
-  { key: "tipoBandejas",     label: "Tipo de bandejas",        tipo: "bandejas" },
-  { key: "fuerzaTextilTela", label: "Servilletas de tela",     tipo: "bool" },
-  { key: "numCamareros",     label: "Nº camareros / personal sala", tipo: "numero" },
-  { key: "llevaPalomitera",  label: "Lleva palomitera/carrito", tipo: "bool" },
-  { key: "llevaJarrasCristal", label: "Jarras de cristal",     tipo: "bool" },
-  { key: "tipoCafetera",     label: "Tipo de cafetera",        tipo: "cafetera" },
-  { key: "extraBandejasMadera", label: "Bandejas de madera extra", tipo: "numero" },
-  { key: "extraBandejasPlata",  label: "Bandejas de plata extra",  tipo: "numero" },
-  { key: "llevaJamonero",    label: "Hay jamonero",            tipo: "bool" },
-  { key: "personasPorPlatoEntrante", label: "Personas por plato de entrante", tipo: "numero" },
-  { key: "llevaAguasPequenas", label: "Aguas pequeñas",        tipo: "bool" },
-  { key: "hayDesayuno",      label: "Hay desayuno",            tipo: "bool" },
-  { key: "tipoNevera",       label: "Tamaño de nevera",        tipo: "tamano" },
-  { key: "tipoCongelador",   label: "Tamaño de congelador",    tipo: "tamano" },
+  { key: "pax",              label: "PAX adultos",             tipo: "numero", sinonimos: ["pax adultos", "numero de adultos", "nº adultos", "adultos", "invitados", "comensales", "asistentes", "pax"] },
+  { key: "ninos",            label: "Niños",                   tipo: "numero", sinonimos: ["numero de ninos", "ninos", "menores"] },
+  { key: "evento",           label: "Tipo de evento",          tipo: "evento", sinonimos: ["tipo de evento", "tipo evento", "clase de evento", "evento"] },
+  { key: "horasCoctel",      label: "Horas barra cóctel",      tipo: "numero", sinonimos: ["horas barra coctel", "horas de coctel", "barra coctel", "horas aperitivo", "coctel"] },
+  { key: "horasCopas",       label: "Horas barra copas",       tipo: "numero", sinonimos: ["horas barra copas", "horas de copas", "barra libre copas", "copas"] },
+  { key: "llevaPaella",      label: "Lleva paella",            tipo: "bool", sinonimos: ["lleva paella", "hay paella", "paella"] },
+  { key: "tipoHorno",        label: "Tipo de horno",           tipo: "horno", sinonimos: ["tipo de horno", "tamano de horno", "horno"] },
+  { key: "tipoBBQ",          label: "Barbacoa",                tipo: "bbq", sinonimos: ["tipo de barbacoa", "barbacoa", "bbq", "parrilla"] },
+  { key: "llevaArmarioCaliente", label: "Armario caliente (Alquiler)", tipo: "bool", sinonimos: ["armario caliente", "armario"] },
+  { key: "tieneFrituras",    label: "Frituras",                tipo: "bool", sinonimos: ["hay frituras", "frituras", "fritos"] },
+  { key: "llevaEntrante",    label: "Lleva entrante (chupito)", tipo: "bool", sinonimos: ["lleva entrante", "entrante", "chupito"] },
+  { key: "mesVerano",        label: "Temporada verano",        tipo: "bool", sinonimos: ["temporada verano", "temporada", "epoca del ano", "mes del evento", "verano"] },
+  { key: "tieneCongelador",  label: "Finca con congelador",    tipo: "bool", sinonimos: ["finca con congelador", "finca congelador", "tiene congelador"] },
+  { key: "tieneBrindisCava", label: "Brindis con cava",        tipo: "bool", sinonimos: ["brindis con cava", "brindis", "hay cava"] },
+  { key: "dobleServicio",    label: "Doble servicio",          tipo: "bool", sinonimos: ["doble servicio", "servicio doble"] },
+  { key: "tipoBandejas",     label: "Tipo de bandejas",        tipo: "bandejas", sinonimos: ["tipo de bandejas", "bandejas de servicio", "bandejas"] },
+  { key: "fuerzaTextilTela", label: "Servilletas de tela",     tipo: "bool", sinonimos: ["servilletas de tela", "servilletas tela"] },
+  { key: "numCamareros",     label: "Nº camareros / personal sala", tipo: "numero", sinonimos: ["numero de camareros", "nº camareros", "personal de sala", "camareros"] },
+  { key: "llevaPalomitera",  label: "Lleva palomitera/carrito", tipo: "bool", sinonimos: ["lleva palomitera", "carrito de palomitas", "palomitera", "palomitas"] },
+  { key: "llevaJarrasCristal", label: "Jarras de cristal",     tipo: "bool", sinonimos: ["jarras de cristal", "jarras"] },
+  { key: "tipoCafetera",     label: "Tipo de cafetera",        tipo: "cafetera", sinonimos: ["tipo de cafetera", "cafetera"] },
+  { key: "extraBandejasMadera", label: "Bandejas de madera extra", tipo: "numero", sinonimos: ["bandejas de madera extra", "bandejas de madera", "madera extra"] },
+  { key: "extraBandejasPlata",  label: "Bandejas de plata extra",  tipo: "numero", sinonimos: ["bandejas de plata extra", "bandejas de plata", "plata extra"] },
+  { key: "llevaJamonero",    label: "Hay jamonero",            tipo: "bool", sinonimos: ["hay jamonero", "jamonero", "corte de jamon"] },
+  { key: "personasPorPlatoEntrante", label: "Personas por plato de entrante", tipo: "numero", sinonimos: ["personas por plato de entrante", "personas por plato", "plato de entrante compartido"] },
+  { key: "llevaAguasPequenas", label: "Aguas pequeñas",        tipo: "bool", sinonimos: ["aguas pequenas", "agua pequena", "botellines de agua"] },
+  { key: "hayDesayuno",      label: "Hay desayuno",            tipo: "bool", sinonimos: ["hay desayuno", "desayuno", "coffee break"] },
+  { key: "tipoNevera",       label: "Tamaño de nevera",        tipo: "tamano", sinonimos: ["tamano de nevera", "tipo de nevera", "nevera"] },
+  { key: "tipoCongelador",   label: "Tamaño de congelador",    tipo: "tamano", sinonimos: ["tamano de congelador", "tipo de congelador", "congelador"] },
 ];
 
 // Valores por defecto del formulario — se usan para no pisar campos ya editados a mano al importar
@@ -81,6 +83,45 @@ function parseCSV(text) {
     return obj;
   }).filter(r => Object.values(r).some(v => v.trim() !== ""));
   return { headers, rows };
+}
+
+// Quita acentos, pasa a minúsculas y limpia puntuación para comparar cabeceras de forma robusta
+function normalizar(s) {
+  return s.toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9ñ\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// Mapeo automático columna del Sheet → campo logístico.
+// Compara por palabras completas (no substring suelto) para evitar falsos positivos
+// como "Junio Evento" matcheando el campo "Tipo de evento" solo por contener "evento",
+// prioriza sinónimos más largos/específicos, y nunca reutiliza la misma columna dos veces.
+function autoMapearColumnas(headers, campos) {
+  const cabeceras = headers.map(h => ({ original: h, norm: normalizar(h), palabras: normalizar(h).split(" ").filter(Boolean) }));
+  const usadas = new Set();
+  const mapeo = {};
+  const ordenados = [...campos].sort((a, b) => {
+    const maxA = Math.max(...a.sinonimos.map(s => s.split(" ").length));
+    const maxB = Math.max(...b.sinonimos.map(s => s.split(" ").length));
+    return maxB - maxA;
+  });
+  ordenados.forEach(campo => {
+    let mejor = null, mejorScore = 0;
+    cabeceras.forEach(h => {
+      if (usadas.has(h.original)) return;
+      campo.sinonimos.forEach(syn => {
+        const synNorm = normalizar(syn);
+        if (h.norm === synNorm) { mejorScore = 1000; mejor = h; return; }
+        const synPalabras = synNorm.split(" ").filter(Boolean);
+        const todasPresentes = synPalabras.every(p => h.palabras.includes(p));
+        if (todasPresentes) {
+          const score = synPalabras.length * 10 + (synPalabras.length === h.palabras.length ? 5 : 0);
+          if (score > mejorScore) { mejorScore = score; mejor = h; }
+        }
+      });
+    });
+    if (mejor && mejorScore > 0) { mapeo[campo.key] = mejor.original; usadas.add(mejor.original); }
+  });
+  return mapeo;
 }
 
 // Convierte un valor raw del Sheet al tipo esperado
@@ -681,7 +722,8 @@ function ModalImportSheet({ onClose, onImport }) {
   const [filaIdx, setFilaIdx]       = useState(0);
   const [mapeo, setMapeo]           = useState({}); // campo.key → nombre columna del sheet
   const [paso, setPaso]             = useState(1); // 1=URL, 2=mapeo, 3=fila
-  const [gidDetectado, setGidDetectado] = useState(null);
+  const [pestanaNombre, setPestanaNombre] = useState("");
+  const [pestanaUsada, setPestanaUsada] = useState(null);
 
   const extractSheetId = (u) => {
     const m = u.match(/\/spreadsheets\/d\/([\w-]+)/);
@@ -698,26 +740,21 @@ function ModalImportSheet({ onClose, onImport }) {
     const id = extractSheetId(url);
     if (!id) { setError("URL inválida. Asegúrate de pegar el link completo del Google Sheet."); setCargando(false); return; }
     const gid = extractGid(url);
-    setGidDetectado(gid);
+    const nombrePestana = pestanaNombre.trim();
+    // Prioridad: nombre de pestaña escrito a mano > gid detectado en la URL pegada > primera pestaña
+    const refPestana = nombrePestana
+      ? `&sheet=${encodeURIComponent(nombrePestana)}`
+      : gid ? `&gid=${gid}` : "";
+    setPestanaUsada(nombrePestana || (gid ? `gid=${gid}` : null));
     try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${gid ? `&gid=${gid}` : ""}`;
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${refPestana}`;
       const res = await fetch(csvUrl);
-      if (!res.ok) throw new Error("No se pudo acceder al sheet. ¿Está compartido con 'Cualquier persona con el link puede ver'?");
+      if (!res.ok) throw new Error("No se pudo acceder al sheet. ¿Está compartido con 'Cualquier persona con el link puede ver' y el nombre de pestaña es correcto?");
       const text = await res.text();
       const data = parseCSV(text);
       if (data.headers.length === 0) throw new Error("El archivo parece estar vacío.");
       setSheetData(data);
-      // Mapeo automático inteligente: busca coincidencias por nombre
-      const autoMapeo = {};
-      CAMPOS_LOGISTICA.forEach(campo => {
-        const found = data.headers.find(h => {
-          const hn = h.toLowerCase();
-          const kw = campo.label.toLowerCase();
-          return hn.includes(kw.split(" ")[0]) || hn.includes(campo.key.toLowerCase());
-        });
-        if (found) autoMapeo[campo.key] = found;
-      });
-      setMapeo(autoMapeo);
+      setMapeo(autoMapearColumnas(data.headers, CAMPOS_LOGISTICA));
       setPaso(2);
     } catch (e) {
       setError(e.message);
@@ -765,8 +802,7 @@ function ModalImportSheet({ onClose, onImport }) {
             <>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
                 ℹ️ El Google Sheet debe estar <strong>compartido con "Cualquier persona con el link puede ver"</strong>.<br/>
-                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.<br/><br/>
-                📑 <strong>¿Tu Sheet tiene varias pestañas?</strong> Abre la pestaña que quieres importar dentro de Google Sheets (la URL cambiará a algo como <code>.../edit#gid=123456789</code>) y pega esa URL exacta aquí. Si pegas la URL sin pestaña concreta, se leerá la primera.
+                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Link del Google Sheet</label>
@@ -778,11 +814,21 @@ function ModalImportSheet({ onClose, onImport }) {
                   onKeyDown={e => e.key === "Enter" && fetchSheet()}
                   style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.95rem" }}
                 />
-                {extractGid(url) && (
-                  <span style={{ alignSelf: "flex-start", background: "#eef2ff", color: "#4338ca", fontSize: "0.75rem", fontWeight: 700, padding: "3px 8px", borderRadius: 999 }}>
-                    Pestaña detectada: gid={extractGid(url)}
-                  </span>
-                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>¿Qué pestaña quieres importar? <span style={{ fontWeight: 400, color: "#9ca3af" }}>(opcional, si tu Sheet tiene varias)</span></label>
+                <input
+                  type="text"
+                  placeholder="Ej: Junio, Eventos 2026, Hoja2..."
+                  value={pestanaNombre}
+                  onChange={e => setPestanaNombre(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && fetchSheet()}
+                  style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.95rem" }}
+                />
+                <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
+                  Escribe el nombre exacto de la pestaña tal como aparece en las solapas de Google Sheets. Déjalo en blanco para usar la primera pestaña
+                  {extractGid(url) ? <> (o pega una URL con <code>#gid=...</code> de una pestaña concreta, como ya hiciste aquí: gid={extractGid(url)})</> : "."}
+                </span>
               </div>
               {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
               <button onClick={fetchSheet} disabled={cargando || !url.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: cargando || !url.trim() ? 0.6 : 1 }}>
@@ -795,7 +841,7 @@ function ModalImportSheet({ onClose, onImport }) {
           {paso === 2 && sheetData && (
             <>
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
-                ✓ Sheet cargado correctamente{gidDetectado ? ` (pestaña gid=${gidDetectado})` : " (primera pestaña)"} — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. He intentado mapear automáticamente las columnas. Ajusta las que sean incorrectas.
+                ✓ Sheet cargado correctamente{pestanaUsada ? ` (pestaña: ${pestanaUsada})` : " (primera pestaña)"} — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. He intentado mapear automáticamente las columnas comparando sus nombres con cada campo logístico. Revisa y ajusta las que no coincidan.
               </div>
               <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>Para cada campo logístico, elige qué columna del Sheet lo contiene. Deja en "— Sin mapear" los que no apliquen.</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
