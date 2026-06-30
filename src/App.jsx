@@ -31,7 +31,21 @@ const CAMPOS_LOGISTICA = [
   { key: "tipoBandejas",     label: "Tipo de bandejas",        tipo: "bandejas" },
   { key: "fuerzaTextilTela", label: "Servilletas de tela",     tipo: "bool" },
   { key: "numCamareros",     label: "Nº camareros / personal sala", tipo: "numero" },
+  { key: "llevaPalomitera",  label: "Lleva palomitera/carrito", tipo: "bool" },
+  { key: "llevaJarrasCristal", label: "Jarras de cristal",     tipo: "bool" },
+  { key: "tipoCafetera",     label: "Tipo de cafetera",        tipo: "cafetera" },
 ];
+
+// Valores por defecto del formulario — se usan para no pisar campos ya editados a mano al importar
+const DEFAULTS = {
+  evento: "boda", pax: 80, ninos: 0, horasCoctel: 2, horasCopas: 4,
+  dobleServicio: false, llevaEntrante: false, llevaPaella: false,
+  llevaArmarioCaliente: false, numCamareros: 0, tipoBandejas: "Mixto",
+  tipoHorno: "Pequeño", tipoBBQ: "No lleva", mesVerano: true,
+  tieneCongelador: false, tieneBrindisCava: false, tieneFrituras: false,
+  fuerzaTextilTela: false, llevaPalomitera: false, llevaJarrasCristal: false,
+  tipoCafetera: "Nespresso",
+};
 
 // ─── PARSE CSV ────────────────────────────────────────────────────────────────
 function parseCSV(text) {
@@ -87,6 +101,7 @@ function parseValor(raw, tipo) {
       if (v.includes("plata"))  return "Plata";
       return "Mixto";
     }
+    case "cafetera": return v.includes("nespresso") ? "Nespresso" : "Grande";
     default: return raw;
   }
 }
@@ -169,12 +184,39 @@ function calcMesasTotal(evtKey, pax) {
   return calcMesasServicio(pax).total + calcMesasComensales(evtKey, pax);
 }
 
+// Categoría de Café, compartida por los 3 tipos de evento
+function calcCafe(totalPax, tipoCafetera) {
+  const items = [];
+  if (tipoCafetera === "Grande") {
+    items.push(["Cafetera grande (Alquiler)", "1"], ["Café molido", `${Math.max(1, Math.ceil(totalPax / 60))} paq.`]);
+  } else {
+    items.push(["Cafetera Nespresso", "1"], ["Cápsulas café (estándar/descafeinado)", String(Math.ceil(totalPax * 1.5))], ["Cuencos para calentar leche", "2"]);
+  }
+  items.push(
+    ["Tazas café con leche e infusiones", String(Math.round(totalPax * 0.6))],
+    ["Tazas café solo y cortado", String(Math.round(totalPax * 0.4))],
+    ["Platos de café", String(totalPax)],
+    ["Infusiones (té variado + descafeinado)", `${Math.ceil(totalPax / 30)} caja`],
+    ["Azucarillos y edulcorantes", `${Math.ceil(totalPax / 50)} caja`],
+    ["Leches variadas (entera/desnatada/sin lactosa/avena)", "4"],
+  );
+  return { nombre: "Café", items };
+}
+
 // ─── BUILD CHECKLIST ──────────────────────────────────────────────────────────
 function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
+  if (evtKey === "cumpleanos")  return buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts);
+  if (evtKey === "corporativo") return buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts);
+  return buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts); // boda y comunión
+}
+
+// Boda y comunión — fiel a "Checklist de Carga – BODA"
+function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneCongelador, tieneBrindisCava, fuerzaTextilTela,
     tieneFrituras, llevaEntrante, llevaArmarioCaliente, numCamareros,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera,
   } = opts;
 
   const horasBarraTotal = horasCoctel + horasCopas;
@@ -199,11 +241,17 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
     ["Sillas (alquiler)", String(totalPax), true],
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
+    ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", "—"], ["Taburetes", "—"],
+    ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
+    ["Cajas de madera para alturas", "—"],
+    ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax).n)]] : []),
     ["Cubo basura cocina", "2"], ["Champanera metálica grande", "4"],
     ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
     ["Bandeja camarero", numCamareros > 0 ? String(numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
+    ["Nevera pequeña", "—"], ["Congelador", "—"], ["Nevera roja", "—"],
+    ...(llevaPalomitera ? [["Carrito palomitera (Alquiler)", "1"]] : []),
 
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
@@ -217,20 +265,21 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     const p = calcPaella(pax);
     cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Difusores", String(p.n)], ["Trípode", String(p.n)], ["Paravientos", String(p.n)]);
   }
-  cocinaItems.push(["Bombonas llenas", String(bombonas)]);
+  cocinaItems.push(["Bombonas llenas", String(bombonas)], ["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño (con bandejas)", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
-  cocinaItems.push(["Microondas", "1"], ["Vitro eléctrica", "1"]);
+  cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro eléctrica", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Difusor extra (frituras)", "1"], ["Trípode extra (frituras)", "1"], ["Espumadera grande", "2"]);
   if (tipoBBQ !== "no lleva") {
-    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
+    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"], ["Gastros extra", "—"]);
   }
   cats.push({ nombre: "Cocina y fuego", items: cocinaItems });
 
   cats.push({ nombre: "Menaje y utensilios", items: [
-    ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"], ["Ollas (mediana y grande)", "1"],
-    ["Sartenes", "1"], ["Colador", "1"], ["Boles metálicos", "4"], ["Cucharones grandes", "3"], ["Pinzas largas", "2"],
+    ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"], ["Aceiteras de cristal", "—"], ["Saleros y pimenteros", "6"],
+    ["Ollas (mediana y grande)", "1"], ["Sartenes", "1"], ["Colador", "1"], ["Boles metálicos", "4"],
+    ["Cucharones grandes", "3"], ["Pinzas largas", "2"], ["Copas metálicas", "Todas"],
     ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax).n)]] : []),
   ]});
 
@@ -239,18 +288,25 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos de cubata",                                   `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Copas de cava",                                     `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
+    ["Copa martini", "—"], ["Vaso whiskey", "—"],
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
+    ...(llevaJarrasCristal ? [["Jarras de cristal", "—"]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", "5"],
+    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", "5"],
     [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax / 40)} paq.`],
     ["Servilletas cocktail", `${Math.ceil(totalPax / 100)} paq. (100)`],
   ]});
 
   cats.push({ nombre: "Vajilla", items: [
-    ["Platos trinchero (principal)", String(totalPax)], ["Platos postre", String(totalPax)],
-    ["Cubertería (juego completo)", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Platos trinchero blancos (principal)", String(totalPax)], ["Platos relieve blancos", "—"], ["Platos verdes", "—"],
+    ["Platos hondos", "—"], ["Plato pan", "—"], ["Platos metálicos", "—"], ["Boles negros y blancos", "—"],
+    ["Platos postre blancos", String(totalPax)], ["Platos verde postre", "—"],
+    ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Cuchillos grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Cucharas postre", String(totalPax)],
     ["Cucharas café", String(Math.round(totalPax * 0.8))],
     ...(evtKey === "boda" ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))], ["Platos extra para Tarta nupcial", String(totalPax)]] : []),
   ]});
@@ -259,6 +315,8 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", "—"],
   ]});
+
+  cats.push(calcCafe(totalPax, tipoCafetera));
 
   cats.push({ nombre: "Bebidas frías", items: [
     ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
@@ -284,6 +342,7 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Jagger", String(destilados.jagger)], ["Peach", String(destilados.peach)],
       ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
       ["Orujo de hierbas", String(destilados.orujoHierbas)],
+      ["Ballantines", "1"], ["Barceló", "1"], ["Martini", "1"], ["Crema de arroz", "1"],
       ["Otros licores marca blanca (Smirnoff)", String(destilados.marcaBlanca)],
     ]});
   }
@@ -291,6 +350,163 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Logística y retorno", items: [
     ["Cajas extra platos sucios", "1"], ["Cajas extra cubiertos sucios", "1"],
     ["Caja azul extra", "1"], ["Taxis comida", "—"],
+  ]});
+
+  return cats;
+}
+
+// Cumpleaños — fiel a "Checklist de Carga – cumpleaños"
+function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
+  const {
+    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, llevaEntrante,
+    tieneBrindisCava, mesVerano, tieneCongelador, fuerzaTextilTela, tipoCafetera,
+  } = opts;
+  const horasBarraTotal = horasCoctel + horasCopas;
+  const hayBarra = horasBarraTotal > 0;
+  const totalPax = pax + ninos;
+
+  const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, tieneCongelador);
+  const cristal = calcCristaleria(pax, hayBarra ? horasBarraTotal : 2, dobleServicio, tieneBrindisCava, llevaEntrante);
+  const cats = [];
+
+  cats.push({ nombre: "Electricidad y otros", items: [
+    ["Regletas, alargadores y caja cables", "Sí"], ["Cinta aislante / Bridas / Rulos", "1"], ["Walkies", "2"],
+  ]});
+
+  cats.push({ nombre: "Mobiliario", items: [
+    ["Mesas totales", String(calcMesasServicio(pax).total)],
+    ["Sillas", String(totalPax)],
+    ["Cubos basura (reciclaje + cocina)", "2"],
+    ["Champanera metálica / Cubiteras + pinza", "2"],
+    ["Abridores", "2"],
+    ["Bandeja camareros", opts.numCamareros > 0 ? String(opts.numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
+    ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
+  ]});
+
+  const cocinaItems = [
+    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
+  ];
+  if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
+  if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
+  cocinaItems.push(["Microondas", "1"], ["Batidora / Túrmix", "1"], ["Vitro", "1"], ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"]);
+  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Paravientos", "1"]);
+  if (llevaPaella) {
+    const p = calcPaella(pax);
+    cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Trípodes", String(p.n)], ["Descansadores paella", "2"]);
+  }
+  cats.push({ nombre: "Cocina y Electro", items: cocinaItems });
+
+  cats.push({ nombre: "Menaje y Utensilios", items: [
+    ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
+    ["Caja salsas / Arroces", "1"], ["Boles metálicos / Cucharones", "4"], ["Servilleteros madera", "2"],
+    ["Caja cocina (varios)", "1"],
+    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax).n)]] : []),
+  ]});
+
+  const usaTela = fuerzaTextilTela;
+  cats.push({ nombre: "Mantelería y Textiles", items: [
+    ["Manteles beige", String(calcMesasServicio(pax).total + 1)], ["Delantales / Bayetas / Trapos", "4"],
+    [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax / 40)} paq.`],
+  ]});
+
+  cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
+    ["Platos trinchero blancos", String(totalPax)], ["Platos metálicos", "—"], ["Platos postre", String(totalPax)],
+    ["Jarras de cristal", "—"],
+    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Cucharas postre", String(totalPax)],
+    [`Copas cristal${dobleServicio ? " (doble)" : ""}`, `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
+    ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
+    ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
+    ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
+    ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
+  ]});
+
+  cats.push(calcCafe(totalPax, tipoCafetera));
+
+  cats.push({ nombre: "Bebidas", items: [
+    ["Coca Cola (Normal / Zero)", String(bebidas.cocaNormal + bebidas.cocaZero)],
+    ["Fanta (Limón / Naranja / Aquarius / Nestea)", String(bebidas.fanta + bebidas.nestea)],
+    ["Aguas (2L)", `${bebidas.agua15} packs`], ["Agua con gas", String(bebidas.aguaConGas)],
+    ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
+    ["Hielo", `${bebidas.taxisHielo} ${tieneCongelador ? "cajas almacén" : "taxis"}`],
+  ]});
+
+  cats.push({ nombre: "Limpieza", items: [
+    ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
+    ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", "—"],
+  ]});
+
+  return cats;
+}
+
+// Eventos corporativos / producciones — fiel a "Checklist de Carga – Producciones"
+function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
+  const { llevaPaella, tieneFrituras, tipoCafetera, dobleServicio } = opts;
+  const totalPax = pax + ninos;
+  const cats = [];
+
+  cats.push({ nombre: "Electricidad y otros", items: [
+    ["Focos de luz / Trípodes", "—"], ["Regletas, alargadores y caja cables", "Sí"],
+    ["Cinta aislante / Bridas / Rulos", "1"], ["Generador + garrafa gasolina (llena)", "1"],
+    ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
+  ]});
+
+  cats.push({ nombre: "Mobiliario", items: [
+    ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
+    ["Sillas", String(totalPax)], ["Cubos basura (reciclaje + cocina)", "2"],
+    ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
+    ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
+    ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
+  ]});
+
+  cats.push({ nombre: "Cocina y sala", items: [
+    ["Plancha de gas", "1"], ["Bombonas llenas", String((llevaPaella ? calcPaella(pax).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
+    ["Horno pequeño / Microondas", "1"], ["Batidora / Túrmix", "1"], ["Mesas calientes", "—"],
+    ["Vitro", "1"], ["Butano", "1"], ["Trípode", "1"], ["Termos con tapa", "—"],
+    ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
+    ["Neveras playa pequeñas", "2"], ["Chafers", String(Math.max(2, Math.ceil(pax / 40)))],
+  ]});
+
+  cats.push({ nombre: "Menaje y Utensilios", items: [
+    ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
+    ...(llevaPaella ? [["Paella (mediana) / Paletas", String(calcPaella(pax).n)]] : []),
+    ["Paravientos", "—"], ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
+    ["Servilleteros madera", "2"], ["Gastros", "—"], ["Caja cocina (varios)", "1"],
+    ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"], ["Caja salsas / Arroces", "1"],
+    ...(tieneFrituras ? [["Sartén Parisiene (frituras)", "1"]] : []),
+  ]});
+
+  cats.push({ nombre: "Mantelería y Textiles", items: [
+    ["Manteles negros", String(calcMesasServicio(pax).total + 1)], ["Delantales", "5"], ["Bayetas / Trapos", "4"],
+  ]});
+
+  cats.push({ nombre: "Vajilla y Cubertería", items: [
+    ["Platos trinchero blancos", String(totalPax)], ["Platos postre (negro/gris)", String(totalPax)],
+    ["Platos metálicos", "—"], ["Platos hondos", "—"],
+    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Cucharas postre", String(totalPax)],
+    ["Bandejas metálicas y madera", "—"], ["Jarras de cristal", "—"], ["Abridores", "2"],
+  ]});
+
+  cats.push({ nombre: "Desechables y Bebidas", items: [
+    ["Servilletas (grandes / cocktail)", `${Math.ceil(totalPax / 40)} paq.`],
+    ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
+    ["Platitos de cartón / Envase bocadillos", String(totalPax)],
+    ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
+    ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", "1 caja"],
+    ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", "1"], ["Leche condensada", "1"],
+    ["Vasos de cartón (L/M/S)", `${Math.ceil(totalPax / 20)} paq.`], ["Bolsas grandes de papel", "1 paq."],
+    ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
+    ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
+    ["Aguas (2L / pequeñas)", `${Math.round(totalPax * 0.5)} packs`], ["Agua con gas", String(Math.round(totalPax * 0.15))],
+    ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
+  ]});
+
+  cats.push(calcCafe(totalPax, tipoCafetera));
+
+  cats.push({ nombre: "Limpieza y Despensa", items: [
+    ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
+    ["Cajas vacías", "2"], ["Ceniceros", "—"],
   ]});
 
   return cats;
@@ -396,9 +612,15 @@ function ModalImportSheet({ onClose, onImport }) {
   const [filaIdx, setFilaIdx]       = useState(0);
   const [mapeo, setMapeo]           = useState({}); // campo.key → nombre columna del sheet
   const [paso, setPaso]             = useState(1); // 1=URL, 2=mapeo, 3=fila
+  const [gidDetectado, setGidDetectado] = useState(null);
 
   const extractSheetId = (u) => {
     const m = u.match(/\/spreadsheets\/d\/([\w-]+)/);
+    return m ? m[1] : null;
+  };
+
+  const extractGid = (u) => {
+    const m = u.match(/[#&]gid=(\d+)/);
     return m ? m[1] : null;
   };
 
@@ -406,8 +628,10 @@ function ModalImportSheet({ onClose, onImport }) {
     setError(""); setCargando(true);
     const id = extractSheetId(url);
     if (!id) { setError("URL inválida. Asegúrate de pegar el link completo del Google Sheet."); setCargando(false); return; }
+    const gid = extractGid(url);
+    setGidDetectado(gid);
     try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${gid ? `&gid=${gid}` : ""}`;
       const res = await fetch(csvUrl);
       if (!res.ok) throw new Error("No se pudo acceder al sheet. ¿Está compartido con 'Cualquier persona con el link puede ver'?");
       const text = await res.text();
@@ -472,7 +696,8 @@ function ModalImportSheet({ onClose, onImport }) {
             <>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
                 ℹ️ El Google Sheet debe estar <strong>compartido con "Cualquier persona con el link puede ver"</strong>.<br/>
-                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.
+                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.<br/><br/>
+                📑 <strong>¿Tu Sheet tiene varias pestañas?</strong> Abre la pestaña que quieres importar dentro de Google Sheets (la URL cambiará a algo como <code>.../edit#gid=123456789</code>) y pega esa URL exacta aquí. Si pegas la URL sin pestaña concreta, se leerá la primera.
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Link del Google Sheet</label>
@@ -484,6 +709,11 @@ function ModalImportSheet({ onClose, onImport }) {
                   onKeyDown={e => e.key === "Enter" && fetchSheet()}
                   style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.95rem" }}
                 />
+                {extractGid(url) && (
+                  <span style={{ alignSelf: "flex-start", background: "#eef2ff", color: "#4338ca", fontSize: "0.75rem", fontWeight: 700, padding: "3px 8px", borderRadius: 999 }}>
+                    Pestaña detectada: gid={extractGid(url)}
+                  </span>
+                )}
               </div>
               {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
               <button onClick={fetchSheet} disabled={cargando || !url.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: cargando || !url.trim() ? 0.6 : 1 }}>
@@ -496,7 +726,7 @@ function ModalImportSheet({ onClose, onImport }) {
           {paso === 2 && sheetData && (
             <>
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
-                ✓ Sheet cargado correctamente — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. He intentado mapear automáticamente las columnas. Ajusta las que sean incorrectas.
+                ✓ Sheet cargado correctamente{gidDetectado ? ` (pestaña gid=${gidDetectado})` : " (primera pestaña)"} — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. He intentado mapear automáticamente las columnas. Ajusta las que sean incorrectas.
               </div>
               <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>Para cada campo logístico, elige qué columna del Sheet lo contiene. Deja en "— Sin mapear" los que no apliquen.</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -579,6 +809,9 @@ export default function App() {
   const [tieneBrindisCava, setTieneBrindisCava] = useState(false);
   const [tieneFrituras, setTieneFrituras]       = useState(false);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(false);
+  const [llevaPalomitera, setLlevaPalomitera]       = useState(false);
+  const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(false);
+  const [tipoCafetera, setTipoCafetera]             = useState("Nespresso");
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   const [modalPrevia, setModalPrevia]   = useState(false);
@@ -590,6 +823,7 @@ export default function App() {
     dobleServicio, llevaPaella, mesVerano, tieneCongelador, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaArmarioCaliente, numCamareros,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera,
   };
 
   const checklist = useMemo(() =>
@@ -606,26 +840,40 @@ export default function App() {
   const totalConceptos = checklist.reduce((acc, c) => acc + c.items.length, 0);
   const toggleCategory = (catName) => setOpenCategories(prev => ({ ...prev, [catName]: prev[catName] !== false ? false : true }));
 
-  // Aplicar datos importados del Sheet
+  // Aplicar datos importados del Sheet, sin pisar campos que el usuario ya tocó a mano
+  // (solo se aplica el valor del Sheet si el campo sigue en su valor por defecto)
   const handleImport = useCallback((data) => {
-    if (data.evento)           setEvento(data.evento);
-    if (data.pax != null)      setPax(data.pax);
-    if (data.ninos != null)    setNinos(data.ninos);
-    if (data.horasCoctel != null) { setBarraCoctel(data.horasCoctel > 0); setHorasCoctel(data.horasCoctel || 2); }
-    if (data.horasCopas  != null) { setBarraCopas(data.horasCopas > 0);   setHorasCopas(data.horasCopas  || 4); }
-    if (data.llevaPaella         != null) setLlevaPaella(data.llevaPaella);
-    if (data.tipoHorno           != null) setTipoHorno(data.tipoHorno);
-    if (data.tipoBBQ             != null) setTipoBBQ(data.tipoBBQ);
-    if (data.llevaArmarioCaliente!= null) setLlevaArmarioCaliente(data.llevaArmarioCaliente);
-    if (data.tieneFrituras       != null) setTieneFrituras(data.tieneFrituras);
-    if (data.llevaEntrante       != null) setLlevaEntrante(data.llevaEntrante);
-    if (data.mesVerano           != null) setMesVerano(data.mesVerano);
-    if (data.tieneCongelador     != null) setTieneCongelador(data.tieneCongelador);
-    if (data.tieneBrindisCava    != null) setTieneBrindisCava(data.tieneBrindisCava);
-    if (data.dobleServicio       != null) setDobleServicio(data.dobleServicio);
-    if (data.tipoBandejas        != null) setTipoBandejas(data.tipoBandejas);
-    if (data.fuerzaTextilTela    != null) setFuerzaTextilTela(data.fuerzaTextilTela);
-    if (data.numCamareros        != null) setNumCamareros(data.numCamareros);
+    const importarSi = (campo, valor, setter) => {
+      if (valor == null) return;
+      setter(prev => (prev === DEFAULTS[campo] ? valor : prev));
+    };
+    if (data.evento) importarSi("evento", data.evento, setEvento);
+    importarSi("pax", data.pax, setPax);
+    importarSi("ninos", data.ninos, setNinos);
+    if (data.horasCoctel != null) {
+      importarSi("horasCoctel", data.horasCoctel || 2, setHorasCoctel);
+      setBarraCoctel(prev => (prev === true ? prev : data.horasCoctel > 0));
+    }
+    if (data.horasCopas != null) {
+      importarSi("horasCopas", data.horasCopas || 4, setHorasCopas);
+      setBarraCopas(prev => (prev === false ? data.horasCopas > 0 : prev));
+    }
+    importarSi("llevaPaella", data.llevaPaella, setLlevaPaella);
+    importarSi("tipoHorno", data.tipoHorno, setTipoHorno);
+    importarSi("tipoBBQ", data.tipoBBQ, setTipoBBQ);
+    importarSi("llevaArmarioCaliente", data.llevaArmarioCaliente, setLlevaArmarioCaliente);
+    importarSi("tieneFrituras", data.tieneFrituras, setTieneFrituras);
+    importarSi("llevaEntrante", data.llevaEntrante, setLlevaEntrante);
+    importarSi("mesVerano", data.mesVerano, setMesVerano);
+    importarSi("tieneCongelador", data.tieneCongelador, setTieneCongelador);
+    importarSi("tieneBrindisCava", data.tieneBrindisCava, setTieneBrindisCava);
+    importarSi("dobleServicio", data.dobleServicio, setDobleServicio);
+    importarSi("tipoBandejas", data.tipoBandejas, setTipoBandejas);
+    importarSi("fuerzaTextilTela", data.fuerzaTextilTela, setFuerzaTextilTela);
+    importarSi("numCamareros", data.numCamareros, setNumCamareros);
+    importarSi("llevaPalomitera", data.llevaPalomitera, setLlevaPalomitera);
+    importarSi("llevaJarrasCristal", data.llevaJarrasCristal, setLlevaJarrasCristal);
+    importarSi("tipoCafetera", data.tipoCafetera, setTipoCafetera);
     setImportedTag("✓ Datos importados del Sheet");
     setTimeout(() => setImportedTag(""), 3000);
   }, []);
@@ -765,6 +1013,10 @@ export default function App() {
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             "sartén parisiene"],
               [tieneBrindisCava,     setTieneBrindisCava,     "Brindis con cava",         "dobla copas de cava"],
+              [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de chuches/palomitas, alquiler"],
+              ...((evento === "boda" || evento === "comunion")
+                ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
+                : []),
             ].map(([val, fn, lab, sub]) => (
               <label key={lab} className="checkbox-label-normal">
                 <input type="checkbox" checked={val} onChange={e => fn(e.target.checked)} />
@@ -777,6 +1029,7 @@ export default function App() {
             <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
               <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
               <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
+              <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Grande"]} />
             </div>
             <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
           </div>
