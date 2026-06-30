@@ -3,6 +3,7 @@ import React, { useState, useMemo } from "react";
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
+const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
 
 const EVENTOS = {
   boda:        { label: "Boda",              icon: "♥" },
@@ -971,6 +972,9 @@ export default function App() {
   const [compartirMsg, setCompartirMsg] = useState("");
   const [importedTag, setImportedTag]   = useState("");
   const [importedAlquiler, setImportedAlquiler] = useState(false);
+  const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad }] — añadidos a mano por el usuario
+  const [nuevoItemLabel, setNuevoItemLabel] = useState("");
+  const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneCongelador, tieneBrindisCava,
@@ -982,10 +986,23 @@ export default function App() {
     tipoNevera, tipoCongelador,
   };
 
-  const checklist = useMemo(() =>
-    buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, opts),
-    [evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts]
-  );
+  const checklist = useMemo(() => {
+    const cats = buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, opts);
+    if (itemsManuales.length > 0) {
+      // El 3er elemento (índice real en itemsManuales) viaja en la tupla para poder borrar
+      // el item correcto aunque el buscador esté filtrando la lista visible.
+      cats.push({ nombre: CATEGORIA_MANUAL, items: itemsManuales.map((it, idx) => [it.label, it.cantidad, idx]) });
+    }
+    return cats;
+  }, [evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts, itemsManuales]);
+
+  const handleAddItemManual = () => {
+    const label = nuevoItemLabel.trim();
+    if (!label) return;
+    setItemsManuales(prev => [...prev, { label, cantidad: nuevoItemCantidad.trim() || "1" }]);
+    setNuevoItemLabel(""); setNuevoItemCantidad("");
+  };
+  const handleRemoveItemManual = (idx) => setItemsManuales(prev => prev.filter((_, i) => i !== idx));
 
   const filtered = useMemo(() => {
     if (!filtro.trim()) return checklist;
@@ -1238,9 +1255,37 @@ export default function App() {
           <input type="text" className="search-input-main" placeholder="Buscar un material..." value={filtro} onChange={e => setFiltro(e.target.value)} />
         </div>
 
+        {/* AÑADIR ITEM PERSONALIZADO */}
+        <div className="config-card animate-entrance" style={{ animationDelay: "0.22s", display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div className="form-group" style={{ flex: 2, minWidth: 200 }}>
+            <span className="form-label">Añadir item personalizado</span>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Ej: Vela aromática"
+              value={nuevoItemLabel}
+              onChange={e => setNuevoItemLabel(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
+            />
+          </div>
+          <div className="form-group" style={{ maxWidth: 140 }}>
+            <span className="form-label">Cantidad</span>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="1"
+              value={nuevoItemCantidad}
+              onChange={e => setNuevoItemCantidad(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
+            />
+          </div>
+          <button className="btn btn-outline" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
+        </div>
+
         {/* CATEGORÍAS */}
         {filtered.map((cat, idx) => {
           const isOpen = openCategories[cat.nombre] !== false;
+          const esManual = cat.nombre === CATEGORIA_MANUAL;
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s` }}>
               <div className="category-header" onClick={() => toggleCategory(cat.nombre)}>
@@ -1249,7 +1294,7 @@ export default function App() {
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
-                  {cat.items.map(([label, qty], i) => {
+                  {cat.items.map(([label, qty, manualIdx], i) => {
                     const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                     return (
                       <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
@@ -1258,6 +1303,13 @@ export default function App() {
                           {alq && <span className="tag-alquiler">ALQUILER</span>}
                         </div>
                         <div className="item-qty">{qty.u ? qty.u : qty}</div>
+                        {esManual && (
+                          <button
+                            onClick={() => handleRemoveItemManual(manualIdx)}
+                            title="Quitar item"
+                            style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "1rem", marginLeft: 8, lineHeight: 1 }}
+                          >✕</button>
+                        )}
                       </div>
                     );
                   })}
