@@ -392,6 +392,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
     ["Bandeja camarero", String(personalSala(pax, numCamareros))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
     [`Nevera (${tipoNevera})`, "1"], [`Congelador (${tipoCongelador})`, "1"], ["Nevera roja", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
@@ -532,6 +533,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Champanera metálica / Cubiteras + pinza", "2"],
     ["Abridores", "2"],
     ["Bandeja camareros", String(personalSala(pax, opts.numCamareros))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, opts.numCamareros))],
     ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
@@ -627,6 +629,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
     ["Bandeja camareros", String(personalSala(pax, numCamareros))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
   ]});
 
