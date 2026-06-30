@@ -41,6 +41,8 @@ const CAMPOS_LOGISTICA = [
   { key: "personasPorPlatoEntrante", label: "Personas por plato de entrante", tipo: "numero" },
   { key: "llevaAguasPequenas", label: "Aguas pequeñas",        tipo: "bool" },
   { key: "hayDesayuno",      label: "Hay desayuno",            tipo: "bool" },
+  { key: "tipoNevera",       label: "Tamaño de nevera",        tipo: "tamano" },
+  { key: "tipoCongelador",   label: "Tamaño de congelador",    tipo: "tamano" },
 ];
 
 // Valores por defecto del formulario — se usan para no pisar campos ya editados a mano al importar
@@ -53,7 +55,7 @@ const DEFAULTS = {
   fuerzaTextilTela: false, llevaPalomitera: false, llevaJarrasCristal: false,
   tipoCafetera: "Nespresso", extraBandejasMadera: 0, extraBandejasPlata: 0,
   llevaJamonero: false, personasPorPlatoEntrante: 4, llevaAguasPequenas: false,
-  hayDesayuno: false,
+  hayDesayuno: false, tipoNevera: "Mediana", tipoCongelador: "Mediana",
 };
 
 // ─── PARSE CSV ────────────────────────────────────────────────────────────────
@@ -116,6 +118,7 @@ function parseValor(raw, tipo) {
       if (v.includes("bar"))       return "Bar";
       return "Grande";
     }
+    case "tamano": return v.includes("grande") ? "Grande" : "Mediana";
     default: return raw;
   }
 }
@@ -251,6 +254,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    tipoNevera, tipoCongelador,
   } = opts;
 
   const horasBarraTotal = horasCoctel + horasCopas;
@@ -284,7 +288,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
     ["Bandeja camarero", numCamareros > 0 ? String(numCamareros) : String(Math.max(2, Math.ceil(pax / 20)))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
-    ["Nevera pequeña", "—"], ["Congelador", "—"], ["Nevera roja", "—"],
+    [`Nevera (${tipoNevera})`, "1"], [`Congelador (${tipoCongelador})`, "1"], ["Nevera roja", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
 
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
@@ -875,6 +879,8 @@ export default function App() {
   const [personasPorPlatoEntrante, setPersonasPorPlatoEntrante] = useState(4);
   const [llevaAguasPequenas, setLlevaAguasPequenas]   = useState(false);
   const [hayDesayuno, setHayDesayuno]                 = useState(false);
+  const [tipoNevera, setTipoNevera]         = useState("Mediana");
+  const [tipoCongelador, setTipoCongelador] = useState("Mediana");
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   const [modalPrevia, setModalPrevia]   = useState(false);
@@ -890,6 +896,7 @@ export default function App() {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    tipoNevera, tipoCongelador,
   };
 
   const checklist = useMemo(() =>
@@ -914,7 +921,7 @@ export default function App() {
       llevaArmarioCaliente, numCamareros, tipoBandejas, tipoHorno, tipoBBQ, mesVerano,
       tieneCongelador, tieneBrindisCava, tieneFrituras, fuerzaTextilTela, llevaPalomitera,
       llevaJarrasCristal, tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero,
-      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, tipoNevera, tipoCongelador,
     };
     const alquilerImportado = [];
     const importarSi = (campo, valor, setter) => {
@@ -960,6 +967,8 @@ export default function App() {
     importarSi("personasPorPlatoEntrante", data.personasPorPlatoEntrante, setPersonasPorPlatoEntrante);
     importarSi("llevaAguasPequenas", data.llevaAguasPequenas, setLlevaAguasPequenas);
     importarSi("hayDesayuno", data.hayDesayuno, setHayDesayuno);
+    importarSi("tipoNevera", data.tipoNevera, setTipoNevera);
+    importarSi("tipoCongelador", data.tipoCongelador, setTipoCongelador);
     setImportedTag(alquilerImportado.length > 0
       ? `✓ Importado · ⚠ Incluye alquiler: ${alquilerImportado.join(", ")}`
       : "✓ Datos importados del Sheet");
@@ -1128,6 +1137,8 @@ export default function App() {
                     <span className="form-label">Plata extra</span>
                     <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
                   </div>
+                  <SegmentedControl label="Nevera" value={tipoNevera} onChange={setTipoNevera} options={["Mediana", "Grande"]} />
+                  <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["Mediana", "Grande"]} />
                 </>
               )}
               <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
