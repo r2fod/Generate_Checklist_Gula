@@ -46,6 +46,7 @@ const CAMPOS_LOGISTICA = [
   { key: "hayDesayuno",      label: "Hay desayuno",            tipo: "bool", sinonimos: ["hay desayuno", "desayuno", "coffee break"] },
   { key: "tipoNevera",       label: "Tamaño de nevera",        tipo: "tamano", sinonimos: ["tamano de nevera", "tipo de nevera", "nevera"] },
   { key: "tipoCongelador",   label: "Tamaño de congelador",    tipo: "tamano", sinonimos: ["tamano de congelador", "tipo de congelador", "congelador"] },
+  { key: "tipoPaella",       label: "Tamaño de paella",        tipo: "tamanoPaella", sinonimos: ["tamano de paella", "tipo de paella", "talla de paella"] },
 ];
 
 // Valores por defecto del formulario — se usan para no pisar campos ya editados a mano al importar
@@ -58,7 +59,7 @@ const DEFAULTS = {
   fuerzaTextilTela: false, llevaPalomitera: false, llevaJarrasCristal: false,
   tipoCafetera: "Nespresso", extraBandejasMadera: 0, extraBandejasPlata: 0,
   llevaJamonero: false, personasPorPlatoEntrante: 4, llevaAguasPequenas: false,
-  hayDesayuno: false, tipoNevera: "Mediana", tipoCongelador: "Mediana",
+  hayDesayuno: false, tipoNevera: "Mediana", tipoCongelador: "Mediana", tipoPaella: "Auto",
 };
 
 // ─── PARSE CSV ────────────────────────────────────────────────────────────────
@@ -191,6 +192,12 @@ function parseValor(raw, tipo) {
       return "Grande";
     }
     case "tamano": return v.includes("grande") ? "Grande" : "Mediana";
+    case "tamanoPaella": {
+      if (v.includes("pequeñ") || v.includes("pequen")) return "Pequeña";
+      if (v.includes("grande")) return "Grande";
+      if (v.includes("median")) return "Mediana";
+      return "Auto";
+    }
     default: return raw;
   }
 }
@@ -253,9 +260,11 @@ function calcCristaleria(pax, h, dobleCopa, tieneBrindisCava, llevaEntrante) {
   };
 }
 
-function calcPaella(pax) {
+function calcPaella(pax, tallaManual) {
   const n = Math.max(1, Math.ceil(pax / 30));
-  const talla = pax <= 40 ? "pequeña" : pax <= 80 ? "mediana" : "grande";
+  const talla = tallaManual && tallaManual !== "Auto"
+    ? tallaManual.toLowerCase()
+    : (pax <= 40 ? "pequeña" : pax <= 80 ? "mediana" : "grande");
   return { n, talla };
 }
 
@@ -326,7 +335,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-    tipoNevera, tipoCongelador,
+    tipoNevera, tipoCongelador, tipoPaella,
   } = opts;
 
   const horasBarraTotal = horasCoctel + horasCopas;
@@ -354,7 +363,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
     ["Cajas de madera para alturas", "—"],
-    ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax).n)]] : []),
+    ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
     ["Cubo basura cocina", "2"], ["Champanera metálica grande", "4"],
     ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
@@ -367,12 +376,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
   ]});
 
-  const numPaella  = llevaPaella ? calcPaella(pax).n : 0;
+  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
   const numFritura = tieneFrituras ? 1 : 0;
   const bombonas   = numPaella + numFritura + 2;
   const cocinaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax);
+    const p = calcPaella(pax, tipoPaella);
     cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Difusores", String(p.n)], ["Trípode", String(p.n)], ["Paravientos", String(p.n)]);
   }
   cocinaItems.push(["Bombonas llenas", String(bombonas)], ["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
@@ -391,7 +400,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"], ["Aceiteras de cristal", "—"], ["Saleros y pimenteros", "6"],
     ["Ollas (mediana y grande)", "1"], ["Sartenes", "1"], ["Colador", "1"], ["Boles metálicos", "4"],
     ["Cucharones grandes", "3"], ["Pinzas largas", "2"], ["Copas metálicas", "Todas"],
-    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax).n)]] : []),
+    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
@@ -476,6 +485,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tieneBrindisCava, mesVerano, tieneCongelador, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    tipoPaella,
   } = opts;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -505,7 +515,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   const cocinaItems = [
-    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
+    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
   ];
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
@@ -514,7 +524,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Paravientos", "1"]);
   if (llevaPaella) {
-    const p = calcPaella(pax);
+    const p = calcPaella(pax, tipoPaella);
     cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Trípodes", String(p.n)], ["Descansadores paella", "2"]);
   }
   cats.push({ nombre: "Cocina y Electro", items: cocinaItems });
@@ -523,7 +533,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
     ["Caja salsas / Arroces", "1"], ["Boles metálicos / Cucharones", "4"], ["Servilleteros madera", "2"],
     ["Caja cocina (varios)", "1"],
-    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax).n)]] : []),
+    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
   ]});
 
   const usaTela = fuerzaTextilTela;
@@ -572,6 +582,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    tipoPaella,
   } = opts;
   const totalPax = pax + ninos;
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
@@ -594,7 +605,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Cocina y sala", items: [
-    ["Plancha de gas", "1"], ["Bombonas llenas", String((llevaPaella ? calcPaella(pax).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
+    ["Plancha de gas", "1"], ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0) + 1)],
     ["Horno pequeño / Microondas", "1"], ["Batidora / Túrmix", "1"], ["Mesas calientes", "—"],
     ["Vitro", "1"], ["Butano", "1"], ["Trípode", "1"], ["Termos con tapa", "—"],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
@@ -604,7 +615,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Menaje y Utensilios", items: [
     ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
-    ...(llevaPaella ? [["Paella (mediana) / Paletas", String(calcPaella(pax).n)]] : []),
+    ...(llevaPaella ? [[`Paella ${calcPaella(pax, tipoPaella).talla} / Paletas`, String(calcPaella(pax, tipoPaella).n)]] : []),
     ["Paravientos", "—"], ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
     ["Servilleteros madera", "2"], ["Gastros", "—"], ["Caja cocina (varios)", "1"],
     ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"], ["Caja salsas / Arroces", "1"],
@@ -974,6 +985,7 @@ export default function App() {
   const [dobleServicio, setDobleServicio]             = useState(false);
   const [llevaEntrante, setLlevaEntrante]             = useState(false);
   const [llevaPaella, setLlevaPaella]                 = useState(false);
+  const [tipoPaella, setTipoPaella]                   = useState("Auto");
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(false);
   const [numCamareros, setNumCamareros]                 = useState(0);
   const [tipoBandejas, setTipoBandejas] = useState("Mixto");
@@ -1015,7 +1027,7 @@ export default function App() {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-    tipoNevera, tipoCongelador,
+    tipoNevera, tipoCongelador, tipoPaella,
   };
 
   // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
@@ -1071,7 +1083,7 @@ export default function App() {
       llevaArmarioCaliente, numCamareros, tipoBandejas, tipoHorno, tipoBBQ, mesVerano,
       tieneCongelador, tieneBrindisCava, tieneFrituras, fuerzaTextilTela, llevaPalomitera,
       llevaJarrasCristal, tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero,
-      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, tipoNevera, tipoCongelador,
+      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, tipoNevera, tipoCongelador, tipoPaella,
     };
     const alquilerImportado = [];
     const importarSi = (campo, valor, setter) => {
@@ -1092,6 +1104,7 @@ export default function App() {
       if (!barraCopas) setBarraCopas(data.horasCopas > 0);
     }
     importarSi("llevaPaella", data.llevaPaella, setLlevaPaella);
+    importarSi("tipoPaella", data.tipoPaella, setTipoPaella);
     if (importarSi("tipoHorno", data.tipoHorno, setTipoHorno) && (data.tipoHorno === "Grande" || data.tipoHorno === "Ambos")) {
       alquilerImportado.push("Horno grande (Alquiler Dealde)");
     }
@@ -1268,9 +1281,14 @@ export default function App() {
               </label>
             ))}
           </div>
-          {llevaEntrante && (
-            <div style={{ marginTop: 12 }}>
-              <SegmentedControl label="Plato de entrante compartido cada" value={personasPorPlatoEntrante} onChange={setPersonasPorPlatoEntrante} options={[3, 4]} />
+          {(llevaEntrante || llevaPaella) && (
+            <div className="controls-row" style={{ marginTop: 12 }}>
+              {llevaEntrante && (
+                <SegmentedControl label="Plato de entrante compartido cada" value={personasPorPlatoEntrante} onChange={setPersonasPorPlatoEntrante} options={[3, 4]} />
+              )}
+              {llevaPaella && (
+                <SegmentedControl label="Tamaño de paella" value={tipoPaella} onChange={setTipoPaella} options={["Auto", "Pequeña", "Mediana", "Grande"]} />
+              )}
             </div>
           )}
           <hr />
