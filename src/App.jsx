@@ -27,6 +27,7 @@ const CAMPOS_LOGISTICA = [
   { key: "tipoBBQ",          label: "Barbacoa",                tipo: "bbq", sinonimos: ["tipo de barbacoa", "barbacoa", "bbq", "parrilla"] },
   { key: "llevaArmarioCaliente", label: "Armario caliente (Alquiler)", tipo: "bool", sinonimos: ["armario caliente", "armario"] },
   { key: "tieneFrituras",    label: "Frituras",                tipo: "bool", sinonimos: ["hay frituras", "frituras", "fritos"] },
+  { key: "numFrituras",      label: "Nº de sartenes de fritura", tipo: "numero", sinonimos: ["numero de sartenes", "numero de frituras", "sartenes parisiene"] },
   { key: "llevaEntrante",    label: "Lleva entrante (chupito)", tipo: "bool", sinonimos: ["lleva entrante", "entrante", "chupito"] },
   { key: "mesVerano",        label: "Temporada verano",        tipo: "bool", sinonimos: ["temporada verano", "temporada", "epoca del ano", "mes del evento", "verano"] },
   { key: "tieneCongelador",  label: "Finca con congelador",    tipo: "bool", sinonimos: ["finca con congelador", "finca congelador", "tiene congelador"] },
@@ -55,7 +56,7 @@ const DEFAULTS = {
   dobleServicio: false, llevaEntrante: false, llevaPaella: false,
   llevaArmarioCaliente: false, numCamareros: 0, tipoBandejas: "Mixto",
   tipoHorno: "Pequeño", tipoBBQ: "No lleva", mesVerano: true,
-  tieneCongelador: false, tieneBrindisCava: false, tieneFrituras: false,
+  tieneCongelador: false, tieneBrindisCava: false, tieneFrituras: false, numFrituras: 1,
   fuerzaTextilTela: false, llevaPalomitera: false, llevaJarrasCristal: false,
   tipoCafetera: "Nespresso", extraBandejasMadera: 0, extraBandejasPlata: 0,
   llevaJamonero: false, personasPorPlatoEntrante: 4, llevaAguasPequenas: false,
@@ -332,12 +333,15 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 15 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / 40)))],
   );
-  // Coffee break / desayuno: bollería, fruta y zumos (habitual en eventos corporativos y desayunos)
+  // Coffee break / desayuno: bollería, fruta, zumos y vajilla extra de desayuno
   if (hayDesayuno) {
     items.push(
       ["Bollería variada (mini)", `${Math.ceil(totalPax * 1.5)} uds.`],
       ["Fruta fresca (brocheta/macedonia)", String(totalPax)],
       ["Zumos naturales", `${Math.ceil(totalPax / 10)} packs`],
+      ["Platos de desayuno", String(totalPax)],
+      ["Cubiertos de desayuno (cuchillo y cuchara)", String(totalPax)],
+      ["Vasos extra (agua/zumo)", String(Math.ceil(totalPax * 1.2))],
     );
   }
   return { nombre: "Café", items };
@@ -355,7 +359,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneCongelador, tieneBrindisCava, fuerzaTextilTela,
-    tieneFrituras, llevaEntrante, llevaArmarioCaliente, numCamareros,
+    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, numCamareros,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -402,7 +406,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
-  const numFritura = tieneFrituras ? 1 : 0;
+  const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const bombonas   = numPaella + numFritura; // 1 bombona por paella + 1 extra si hay frituras
   const cocinaItems = [];
   if (llevaPaella) {
@@ -415,7 +419,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro eléctrica", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
-  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Difusor pequeño (frituras)", "1"], ["Trípode (frituras)", "1"], ["Espumadera grande", "2"]);
+  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Trípode (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
   if (tipoBBQ !== "no lleva") {
     cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"], ["Gastros extra", "—"]);
   }
@@ -506,12 +510,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Cumpleaños — fiel a "Checklist de Carga – cumpleaños"
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, llevaEntrante,
+    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante,
     tieneBrindisCava, mesVerano, tieneCongelador, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella,
   } = opts;
+  const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
   const totalPax = pax + ninos;
@@ -541,15 +546,15 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   const cocinaItems = [
-    // 1 bombona por paella + 1 extra si hay frituras
-    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0))],
+    // 1 bombona por paella + 1 extra por cada sartén de fritura
+    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)],
   ];
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
   cocinaItems.push(["Microondas", "1"], ["Batidora / Túrmix", "1"], ["Vitro", "1"], ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
-  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", "1"], ["Difusor pequeño (frituras)", "1"], ["Trípode (frituras)", "1"], ["Paravientos", "1"]);
+  if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Trípode (frituras)", String(numFritura)], ["Paravientos", "1"]);
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella);
     cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Trípodes", String(p.n)], ["Descansadores paella", "2"]);
@@ -607,11 +612,12 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 // Eventos corporativos / producciones — fiel a "Checklist de Carga – Producciones"
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    llevaPaella, tieneFrituras, tipoCafetera, dobleServicio, hayDesayuno,
+    llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella, numCamareros,
   } = opts;
+  const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const totalPax = pax + ninos;
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
   const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
@@ -636,8 +642,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Cocina y sala", items: [
     ["Plancha de gas", "1"],
-    // 1 bombona por paella + 1 extra si hay frituras
-    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + (tieneFrituras ? 1 : 0))],
+    // 1 bombona por paella + 1 extra por cada sartén de fritura
+    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)],
     ["Horno pequeño / Microondas", "1"], ["Batidora / Túrmix", "1"], ["Mesas calientes", "—"],
     ["Vitro", "1"], ["Butano", "1"], ["Trípode", "1"], ["Termos con tapa", "—"],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
@@ -651,7 +657,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Paravientos", "—"], ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
     ["Servilleteros madera", "2"], ["Gastros", "—"], ["Caja cocina (varios)", "1"],
     ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"], ["Caja salsas / Arroces", "1"],
-    ...(tieneFrituras ? [["Sartén Parisiene (frituras)", "1"], ["Difusor pequeño (frituras)", "1"], ["Trípode (frituras)", "1"]] : []),
+    ...(tieneFrituras ? [["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Trípode (frituras)", String(numFritura)]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
@@ -698,7 +704,22 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 }
 
 // ─── WORD EXPORT ──────────────────────────────────────────────────────────────
-function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist) {
+// Un item sin cantidad real (vacío o solo "—", a decidir in situ) no aporta nada
+// impreso/exportado — se queda fuera de Vista previa y Descargar Word, pero sigue
+// editable en la checklist principal de la app por si se quiere rellenar a mano.
+function tieneCantidadVisible(qty) {
+  const v = String(qty && qty.u ? qty.u : qty).trim();
+  return v !== "" && v !== "—" && v !== "-";
+}
+
+function quitarItemsSinCantidad(checklist) {
+  return checklist
+    .map(cat => ({ ...cat, items: cat.items.filter(([, qty]) => tieneCantidadVisible(qty)) }))
+    .filter(cat => cat.items.length > 0);
+}
+
+function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta) {
+  const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   const cols = ["Concepto", "Cant.", "Sale ✓", "Vuelve ✓", "Roturas"];
   const tablaHTML = (items) => `
@@ -735,7 +756,8 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
 }
 
 // ─── MODAL VISTA PREVIA ───────────────────────────────────────────────────────
-function ModalVistaPrevia({ checklist, evtKey, pax, ninos, onClose }) {
+function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, onClose }) {
+  const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "24px 16px" }} onClick={onClose}>
@@ -1028,6 +1050,7 @@ export default function App() {
   const [tieneCongelador, setTieneCongelador]   = useState(false);
   const [tieneBrindisCava, setTieneBrindisCava] = useState(false);
   const [tieneFrituras, setTieneFrituras]       = useState(false);
+  const [numFrituras, setNumFrituras]           = useState(1);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(false);
   const [llevaPalomitera, setLlevaPalomitera]       = useState(false);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(false);
@@ -1056,7 +1079,7 @@ export default function App() {
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneCongelador, tieneBrindisCava,
-    fuerzaTextilTela, tieneFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
+    fuerzaTextilTela, tieneFrituras, numFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaArmarioCaliente, numCamareros,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -1132,7 +1155,7 @@ export default function App() {
     const valorActual = {
       evento, pax, ninos, horasCoctel, horasCopas, dobleServicio, llevaEntrante, llevaPaella,
       llevaArmarioCaliente, numCamareros, tipoBandejas, tipoHorno, tipoBBQ, mesVerano,
-      tieneCongelador, tieneBrindisCava, tieneFrituras, fuerzaTextilTela, llevaPalomitera,
+      tieneCongelador, tieneBrindisCava, tieneFrituras, numFrituras, fuerzaTextilTela, llevaPalomitera,
       llevaJarrasCristal, tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero,
       personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, tipoNevera, tipoCongelador, tipoPaella,
     };
@@ -1164,6 +1187,7 @@ export default function App() {
       alquilerImportado.push("Armario caliente (alquiler Dealde)");
     }
     importarSi("tieneFrituras", data.tieneFrituras, setTieneFrituras);
+    importarSi("numFrituras", data.numFrituras, setNumFrituras);
     importarSi("llevaEntrante", data.llevaEntrante, setLlevaEntrante);
     importarSi("mesVerano", data.mesVerano, setMesVerano);
     importarSi("tieneCongelador", data.tieneCongelador, setTieneCongelador);
@@ -1332,13 +1356,19 @@ export default function App() {
               </label>
             ))}
           </div>
-          {(llevaEntrante || llevaPaella) && (
+          {(llevaEntrante || llevaPaella || tieneFrituras) && (
             <div className="controls-row" style={{ marginTop: 12 }}>
               {llevaEntrante && (
                 <SegmentedControl label="Plato de entrante compartido cada" value={personasPorPlatoEntrante} onChange={setPersonasPorPlatoEntrante} options={[3, 4]} />
               )}
               {llevaPaella && (
                 <SegmentedControl label="Tamaño de paella" value={tipoPaella} onChange={setTipoPaella} options={["Auto", "Pequeña", "Mediana", "Grande"]} />
+              )}
+              {tieneFrituras && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº de sartenes parisiene</span>
+                  <input type="number" className="form-input" value={numFrituras} min="1" onChange={e => setNumFrituras(Math.max(1, parseInt(e.target.value) || 1))} />
+                </div>
               )}
             </div>
           )}
