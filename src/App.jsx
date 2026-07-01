@@ -1113,7 +1113,7 @@ export default function App() {
               [llevaEntrante,        setLlevaEntrante,        "Lleva entrante",           "chupito de cristal"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
-              [tieneFrituras,        setTieneFrituras,        "Hay frituras",             "sartén parisiene"],
+              [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
               ...(evento !== "produccion"
                 ? [[tieneBrindisCava, setTieneBrindisCava, "Brindis con cava", "dobla copas de cava"]]
                 : []),
@@ -1141,8 +1141,9 @@ export default function App() {
               )}
               {tieneFrituras && (
                 <div className="form-group controls-mini">
-                  <span className="form-label">Nº de sartenes parisiene</span>
+                  <span className="form-label">Nº sartenes parisiene (frituras)</span>
                   <input type="number" className="form-input" value={numFrituras} min="1" onChange={e => setNumFrituras(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Ajusta bombonas, difusor, trípode y espumadera</span>
                 </div>
               )}
             </div>
