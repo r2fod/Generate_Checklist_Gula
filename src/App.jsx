@@ -161,6 +161,17 @@ function personalSala(pax, numCamareros) {
   return numCamareros > 0 ? numCamareros : Math.max(2, Math.ceil(pax / 20));
 }
 
+// Consumibles para el propio personal de sala/cocina (no para los invitados)
+function calcPersonal(pax, numCamareros) {
+  const n = personalSala(pax, numCamareros);
+  return {
+    n,
+    vasosCarton: n * 2,
+    aguaVidaqua: Math.max(1, Math.ceil(n / 3)),
+    vasosPlastico: n * 2,
+  };
+}
+
 function calcMesasComensales(evtKey, pax) {
   return evtKey === "boda" || evtKey === "comunion" ? Math.ceil(pax / 7) : 0;
 }
@@ -217,7 +228,7 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
-    mesVerano, tieneCongelador, tieneBrindisCava, fuerzaTextilTela,
+    mesVerano, tieneBrindisCava, fuerzaTextilTela,
     tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, numCamareros,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -229,8 +240,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
   const totalPax = pax + ninos;
+  // Si se lleva congelador (propio o de la finca) se puede hacer/almacenar hielo in situ:
+  // solo hace falta pedir taxis de hielo cuando NO se lleva ninguno.
+  const hayCongelador = tipoCongelador !== "No lleva";
 
-  const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, tieneCongelador);
+  const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata dependen de las horas reales de barra libre (0 si no hay barra);
   // vino/agua/cava/chupito no dependen de esto, se calculan igual para el servicio de mesa.
@@ -261,8 +275,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
-    [tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"],
-    [`Congelador (${tipoCongelador})`, "1"],
+    ...(tipoNevera !== "No lleva" ? [[tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]] : []),
+    ...(hayCongelador ? [[`Congelador (${tipoCongelador})`, "1"]] : []),
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
 
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
@@ -299,6 +313,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Cristalería", items: [
     [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
     ["Vasos de cubata",                                   `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", String(Math.round(pax * 1.5))]] : []),
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Copas de cava",                                     `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
@@ -330,9 +345,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
+  const personal = calcPersonal(pax, numCamareros);
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
+    ["Vasos de cartón café (personal)", String(personal.vasosCarton)],
+    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaqua} botellas`],
+    ["Vasos de plástico (personal)", String(personal.vasosPlastico)],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -346,7 +365,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fanta / Aquarius", String(bebidas.fanta)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
-    ["Hielo", tieneCongelador ? "No hace falta (se hace en la finca)" : `${bebidas.taxisHielo} taxis`],
+    ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
     ...(hayBarra ? [["Redbull", String(bebidas.redbull)]] : []),
   ]});
 
@@ -456,6 +475,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
     ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", String(Math.round(pax * 1.5))]] : []),
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
@@ -472,9 +492,13 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Hielo", tieneCongelador ? "No hace falta (se hace en la finca)" : `${bebidas.taxisHielo} taxis`],
   ]});
 
+  const personal = calcPersonal(pax, opts.numCamareros);
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
     ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
+    ["Vasos de cartón café (personal)", String(personal.vasosCarton)],
+    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaqua} botellas`],
+    ["Vasos de plástico (personal)", String(personal.vasosPlastico)],
   ]});
 
   return cats;
@@ -490,6 +514,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   } = opts;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const totalPax = pax + ninos;
+  const hayBarra = (horasCoctel + horasCopas) > 0;
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
   const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
@@ -559,6 +584,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", "1 caja"],
     ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", "1"], ["Leche condensada", "1"],
     ["Vasos de cartón (L/M/S)", `${Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 20)} paq.`], ["Bolsas grandes de papel", "1 paq."],
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", String(Math.round(pax * 1.5))]] : []),
     ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
     ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
     ["Aguas (2L / pequeñas)", `${Math.round(totalPax * 0.5)} packs`],
@@ -569,9 +595,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
+  const personal = calcPersonal(pax, numCamareros);
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
+    ["Vasos de cartón café (personal)", String(personal.vasosCarton)],
+    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaqua} botellas`],
+    ["Vasos de plástico (personal)", String(personal.vasosPlastico)],
   ]});
 
   return cats;
@@ -1091,7 +1121,7 @@ export default function App() {
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33/50cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
-              ...(evento !== "produccion"
+              ...(evento === "cumpleanos"
                 ? [[tieneCongelador, setTieneCongelador, "Finca con congelador", "no hace falta traer hielo en taxis"]]
                 : []),
               ...(evento !== "cumpleanos" && evento !== "produccion"
@@ -1135,8 +1165,8 @@ export default function App() {
               </div>
               {evento !== "cumpleanos" && evento !== "produccion" && (
                 <>
-                  <SegmentedControl label="Nevera" value={tipoNevera} onChange={setTipoNevera} options={["Mediana", "Grande"]} />
-                  <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["Mediana", "Grande"]} />
+                  <SegmentedControl label="Nevera" value={tipoNevera} onChange={setTipoNevera} options={["No lleva", "Mediana", "Grande"]} />
+                  <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["No lleva", "Mediana", "Grande"]} />
                 </>
               )}
               <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
