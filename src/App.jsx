@@ -1040,6 +1040,9 @@ export default function App() {
           </div>
         </header>
 
+        <div className="main-layout">
+        <div className="config-sidebar">
+
         {/* AÑADIR VARIOS ITEMS (pegando texto) */}
         <button
           className="add-material-btn animate-entrance"
@@ -1194,6 +1197,9 @@ export default function App() {
           </div>
         </div>
 
+        </div>
+        <div className="checklist-main">
+
         {/* BUSCADOR */}
         <div className="animate-entrance" style={{ animationDelay: "0.2s" }}>
           <input type="text" className="search-input-main" placeholder="Buscar un material..." value={filtro} onChange={e => setFiltro(e.target.value)} />
@@ -1286,6 +1292,8 @@ export default function App() {
             </div>
           );
         })}
+        </div>
+        </div>
       </div>
     </>
   );

@@ -57,12 +57,61 @@ body {
 }
 
 .app-wrapper {
-  max-width: 980px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 20px 16px 48px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+/* Layout de dos columnas en escritorio: configuración fija a la izquierda,
+   checklist con scroll propio a la derecha. Aprovecha el ancho sobrante
+   que antes quedaba vacío a los lados de una única columna centrada. */
+.main-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 400px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.config-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: sticky;
+  top: 90px;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.checklist-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* Dentro de la barra lateral (más estrecha) el formulario de evento pasa a 2
+   columnas, pero los chips de extras van a 1 columna (el texto de la
+   descripción no cabe bien en 2 con tan poco ancho) y los controles de
+   equipamiento se apilan en vez de intentar caber en fila */
+.config-sidebar .form-row {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.config-sidebar .checkbox-grid {
+  grid-template-columns: 1fr;
+}
+
+.config-sidebar .controls-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.config-sidebar .controls-mini {
+  max-width: none;
 }
 
 /* Header — floating, light, sticky */
@@ -664,6 +713,19 @@ hr {
 }
 
 /* Responsiveness */
+@media (max-width: 1180px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .config-sidebar {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+}
+
 @media (max-width: 1024px) {
   .form-row, .checkbox-grid {
     grid-template-columns: repeat(2, 1fr);
