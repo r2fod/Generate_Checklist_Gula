@@ -108,14 +108,18 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const aguasPequenasCajas = Math.max(1, Math.ceil(aguasPequenasUds / 35));
   // Con congelador en la finca se hace/almacena el hielo in situ: no hace falta traerlo en taxis
   const taxisHielo = tieneCongelador ? 0 : Math.max(2, Math.ceil(pax / 30));
+  // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
+  // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas)
+  const vermutRojo = Math.max(2, Math.round(pax / 40));
+  const vermutBlanco = Math.max(2, Math.round(pax / 55));
   return {
     cerveza, vinoBlanco, vinoTinto, cava, tonica, agua15, redbull,
-    aguasPequenasCajas, aguasPequenasUds,
+    aguasPequenasCajas, aguasPequenasUds, vermutRojo, vermutBlanco,
     cocaNormal: Math.round(refrescoTotal * 0.25),
-    cocaZero:   Math.round(refrescoTotal * 0.20),
+    cocaZero:   Math.round(refrescoTotal * 0.15),
     fanta:      Math.round(refrescoTotal * 0.25),
     sprite:     Math.round(refrescoTotal * 0.1),
-    nestea:     Math.round(refrescoTotal * 0.05),
+    nestea:     Math.round(refrescoTotal * 0.025),
     aguaConGas: Math.round(pax * 0.15),
     cerveza00:  Math.round(pax * 0.15),
     sinGluten:  Math.round(pax * 0.2),
@@ -125,11 +129,12 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
 
 function calcDestilados(pax, h) {
   const f = h / 4;
-  const r = (base) => Math.max(1, Math.round(base * f));
+  // Mínimo 2 botellas de cada licor: para un evento real no se compra "1 sola" botella
+  const r = (base) => Math.max(2, Math.round(base * f));
   return {
     ginebraPremium: r(pax / 25), ginebraSabor: r(pax / 35), ron: r(pax / 30),
     ronBlanco: r(pax / 50), tequila: r(pax / 45), tequilaSabor: r(pax / 40),
-    vodka: r(pax / 40), vermutRojo: r(pax / 40), vermutBlanco: r(pax / 55),
+    vodka: r(pax / 40), ballantines: r(pax / 40), barcelo: r(pax / 40),
     mistela: 2, baileys: 1, tiaMaria: 1, limoncello: 1, jagger: 1, peach: 1,
     cremaOrujo: 1, cazalla: 1, orujoHierbas: 1, marcaBlanca: 1,
   };
@@ -378,6 +383,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fanta / Aquarius", String(bebidas.fanta)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
+    ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
     ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
     ...(hayBarra ? [["Redbull", String(bebidas.redbull)]] : []),
   ]});
@@ -388,13 +394,14 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Ginebra de sabor (Puerto de Indias)", String(destilados.ginebraSabor)],
       ["Ron (Bacardí)", String(destilados.ron)], ["Ron saborizado (Negrita)", String(destilados.ronBlanco)],
       ["Tequila", String(destilados.tequila)], ["Tequila Rosa", String(destilados.tequilaSabor)],
-      ["Vodka", String(destilados.vodka)], ["Vermut rojo", String(destilados.vermutRojo)], ["Vermut blanco", String(destilados.vermutBlanco)],
+      ["Vodka", String(destilados.vodka)],
       ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
       ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
       ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
       ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
       ["Orujo de hierbas", String(destilados.orujoHierbas)],
-      ["Ballantines", "1"], ["Barceló", "1"], ["Martini", "1"], ["Crema de arroz", "1"],
+      ["Ballantines", String(destilados.ballantines)], ["Barceló", String(destilados.barcelo)],
+      ["Martini", "1"], ["Crema de arroz", "1"],
       ["Otros licores marca blanca (Smirnoff)", String(destilados.marcaBlanca)],
     ]});
   }
