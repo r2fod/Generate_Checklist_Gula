@@ -123,11 +123,13 @@ function calcDestilados(pax, h) {
   };
 }
 
-function calcCristaleria(pax, h, dobleCopa, tieneBrindisCava, llevaEntrante) {
-  const copasBarraPorPax = h > 0 ? Math.min(5, 2 + Math.max(0, h - 1)) : 0;
+function calcCristaleria(pax, h, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
+  // 1 cubata/hora y pax (mínimo 1 si hay barra), sin techo artificial antes de las 4-5h:
+  // una barra libre de 8h debe servir notablemente más que una de 2h, no lo mismo.
+  const copasBarraPorPax = h > 0 ? Math.min(8, 1 + h) : 0;
   const mult = dobleCopa ? 2 : 1;
   const vino = Math.round(pax * 2.5 * mult);
-  const agua = Math.round(pax * 1.5 * mult);
+  const agua = Math.round(pax * 1.5 * mult) + extraAguaDesayuno;
   const cubata = Math.round(pax * copasBarraPorPax);
   const cavaCopas = Math.round(pax * (tieneBrindisCava ? 2.0 : 1.0));
   const fmt = (u, size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
@@ -231,7 +233,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata dependen de las horas reales de barra libre (0 si no hay barra);
   // vino/agua/cava/chupito no dependen de esto, se calculan igual para el servicio de mesa.
-  const cristal    = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante);
+  const cristal    = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -301,7 +303,6 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))]] : []),
-    ...(hayDesayuno ? [["Vasos extra (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
@@ -385,7 +386,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const totalPax = pax + ninos;
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, tieneCongelador);
-  const cristal = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante);
+  const cristal = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
   const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
@@ -450,7 +451,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Vasos extra (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -549,14 +550,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
     ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", "1 caja"],
     ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", "1"], ["Leche condensada", "1"],
-    ["Vasos de cartón (L/M/S)", `${Math.ceil(totalPax / 20)} paq.`], ["Bolsas grandes de papel", "1 paq."],
+    ["Vasos de cartón (L/M/S)", `${Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 20)} paq.`], ["Bolsas grandes de papel", "1 paq."],
     ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
     ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
     ["Aguas (2L / pequeñas)", `${Math.round(totalPax * 0.5)} packs`],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
-    ...(hayDesayuno ? [["Vasos extra de cartón (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -1130,15 +1130,25 @@ export default function App() {
               )}
               <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
               <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
+              {evento !== "cumpleanos" && evento !== "produccion" && (
+                <>
+                  <div className="form-group controls-mini">
+                    <span className="form-label">Estilo plato principal</span>
+                    <select className="form-select" value={estiloPlatoPrincipal} onChange={e => setEstiloPlatoPrincipal(e.target.value)}>
+                      {["Blanco liso", "Relieve blanco", "Verde", "Metálico"].map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group controls-mini">
+                    <span className="form-label">Estilo plato postre</span>
+                    <select className="form-select" value={estiloPlatoPostre} onChange={e => setEstiloPlatoPostre(e.target.value)}>
+                      {["Blanco", "Verde"].map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
             {evento !== "cumpleanos" && evento !== "produccion" && (
               <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
-            )}
-            {evento !== "cumpleanos" && evento !== "produccion" && (
-              <div className="controls-row">
-                <SegmentedControl label="Estilo plato principal" value={estiloPlatoPrincipal} onChange={setEstiloPlatoPrincipal} options={["Blanco liso", "Relieve blanco", "Verde", "Metálico"]} />
-                <SegmentedControl label="Estilo plato postre" value={estiloPlatoPostre} onChange={setEstiloPlatoPostre} options={["Blanco", "Verde"]} />
-              </div>
             )}
           </div>
         </div>
