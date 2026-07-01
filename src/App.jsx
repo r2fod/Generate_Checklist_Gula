@@ -638,9 +638,10 @@ function quitarItemsSinCantidad(checklist) {
     .filter(cat => cat.items.length > 0);
 }
 
-function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta) {
+function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta, meta = {}) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+  const fechaEventoFmt = meta.fechaEvento ? new Date(meta.fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null;
   const cols = ["Concepto", "Cant.", "Sale ✓", "Vuelve ✓", "Roturas"];
   const tablaHTML = (items) => `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
@@ -659,13 +660,17 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Checklist ${EVENTOS[evtKey]?.label} · ${pax} pax</title>
     <style>body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#222;}h1{color:#1f314d;font-size:18pt;}
-    .meta{display:flex;gap:32px;background:#f3f4f6;padding:12px 16px;border-radius:4px;margin:16px 0;font-size:10pt;}
+    .meta{display:flex;flex-wrap:wrap;gap:12px 32px;background:#f3f4f6;padding:12px 16px;border-radius:4px;margin:16px 0;font-size:10pt;}
     .ml{font-weight:bold;color:#555;font-size:9pt;text-transform:uppercase;display:block;}
     .notas{margin-top:24px;border:1px solid #ddd;padding:12px;min-height:80px;border-radius:4px;}
     @media print{body{margin:10px}}</style>
     </head><body>
-    <h1>CHECKLIST DE EVENTO — ${EVENTOS[evtKey]?.label?.toUpperCase()} · ${pax} PAX</h1>
+    <h1>${meta.nombreEvento ? meta.nombreEvento.toUpperCase() : `CHECKLIST DE EVENTO — ${EVENTOS[evtKey]?.label?.toUpperCase()}`} · ${pax} PAX</h1>
     <div class="meta">
+      ${meta.nombreEvento ? `<div><span class="ml">Tipo de evento</span>${EVENTOS[evtKey]?.label}</div>` : ""}
+      ${fechaEventoFmt ? `<div><span class="ml">Fecha del evento</span>${fechaEventoFmt}</div>` : ""}
+      ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${meta.horaInicio}h</div>` : ""}
+      ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${meta.ubicacion}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
       <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
       <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
@@ -676,16 +681,21 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
 }
 
 // ─── MODAL VISTA PREVIA ───────────────────────────────────────────────────────
-function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, onClose }) {
+function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, meta = {}, onClose }) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+  const fechaEventoFmt = meta.fechaEvento ? new Date(meta.fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null;
   return (
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header">
           <div>
-            <div className="preview-header-title">Checklist de evento</div>
-            <div className="preview-header-subtitle">{EVENTOS[evtKey]?.label} · {pax} pax{ninos > 0 ? ` · ${ninos} niños` : ""} · {fecha}</div>
+            <div className="preview-header-title">{meta.nombreEvento || "Checklist de evento"}</div>
+            <div className="preview-header-subtitle">
+              {EVENTOS[evtKey]?.label} · {pax} pax{ninos > 0 ? ` · ${ninos} niños` : ""} · {fechaEventoFmt || fecha}
+              {meta.horaInicio ? ` · ${meta.horaInicio}h` : ""}
+              {meta.ubicacion ? ` · ${meta.ubicacion}` : ""}
+            </div>
           </div>
           <button className="preview-close-btn" onClick={onClose}>✕ Cerrar</button>
         </div>
@@ -875,6 +885,10 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
   const [evento, setEvento]         = useState("boda");
+  const [nombreEvento, setNombreEvento] = useState("");
+  const [fechaEvento, setFechaEvento]   = useState("");
+  const [horaInicio, setHoraInicio]     = useState("");
+  const [ubicacion, setUbicacion]       = useState("");
   const [pax, setPax]               = useState(80);
   const [ninos, setNinos]           = useState(0);
   const [barraCoctel, setBarraCoctel] = useState(true);
@@ -1004,7 +1018,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist);
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1014,7 +1028,14 @@ export default function App() {
 
   const getTextoChecklist = () => {
     const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q]) => `  • ${l}: ${q.u ? q.u : q}`).join("\n")).join("\n");
-    return `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()} · ${pax} pax\n${texto}`;
+    const cabecera = [
+      nombreEvento ? nombreEvento.toUpperCase() : `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()}`,
+      `${pax} pax`,
+      fechaEvento ? new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null,
+      horaInicio ? `${horaInicio}h` : null,
+      ubicacion || null,
+    ].filter(Boolean).join(" · ");
+    return `${cabecera}\n${texto}`;
   };
 
   const handleCompartirWord = () => {
@@ -1023,7 +1044,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist);
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion });
     const ventana = window.open("", "_blank");
     ventana.document.write(html);
     ventana.document.close();
@@ -1058,7 +1079,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion }} onClose={() => setModalPrevia(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
 
       <div className="app-wrapper">
@@ -1067,14 +1088,19 @@ export default function App() {
           <div className="header-title-group">
             <div className="header-icon">{EVENTOS[evento]?.icon || "📋"}</div>
             <div className="header-info">
-              <h1>{EVENTOS[evento]?.label || "Generador Checklist"}</h1>
-              <p>{pax} pax · cóctel {barraCoctel ? horasCoctel : 0}h · {totalConceptos} conceptos</p>
+              <h1>{nombreEvento || EVENTOS[evento]?.label || "Generador Checklist"}</h1>
+              <p>
+                {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{pax} pax · cóctel {barraCoctel ? horasCoctel : 0}h · {totalConceptos} conceptos
+                {fechaEvento ? ` · ${new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}` : ""}
+                {horaInicio ? ` · ${horaInicio}h` : ""}
+                {ubicacion ? ` · ${ubicacion}` : ""}
+              </p>
             </div>
           </div>
           <div className="header-actions">
             <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
             <div className="compartir-menu-wrap">
-              <button className="btn btn-outline" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
+              <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
               {menuCompartir && (
                 <>
                   <div className="compartir-menu-backdrop" onClick={() => setMenuCompartir(false)} />
@@ -1087,7 +1113,6 @@ export default function App() {
                 </>
               )}
             </div>
-            <button className="btn btn-green" onClick={handleDescargar}>Descargar Word</button>
           </div>
         </header>
 
@@ -1130,6 +1155,24 @@ export default function App() {
             <div className="form-group">
               <span className="form-label">Nº CAMAREROS</span>
               <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(parseInt(e.target.value) || 0)} min="0" />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <span className="form-label">NOMBRE DEL EVENTO</span>
+              <input type="text" className="form-input" placeholder="Ej: Boda de Ana y Luis" value={nombreEvento} onChange={e => setNombreEvento(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <span className="form-label">FECHA</span>
+              <input type="date" className="form-input" value={fechaEvento} onChange={e => setFechaEvento(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <span className="form-label">HORA DE INICIO</span>
+              <input type="time" className="form-input" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <span className="form-label">UBICACIÓN</span>
+              <input type="text" className="form-input" placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
             </div>
           </div>
           <hr />
