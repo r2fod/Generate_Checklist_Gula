@@ -122,7 +122,7 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
     nestea:     Math.round(refrescoTotal * 0.025),
     aguaConGas: Math.round(pax * 0.15),
     cerveza00:  Math.round(pax * 0.15),
-    sinGluten:  Math.round(pax * 0.2),
+    sinGluten:  Math.round(pax * 0.3),
     taxisHielo,
   };
 }
