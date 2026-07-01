@@ -311,19 +311,22 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
   ]});
 
+  {/* Jamón, tarta y desayuno se sirven en plato pequeño (mismo estilo que el postre):
+     se suman al recuento de "Platos postre" en vez de generar una línea aparte.
+     El entrante sí se queda aparte porque suele llevar su propio plato de plato/bol distinto. */}
+  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0)
+    + (evtKey === "boda" ? totalPax : 0)
+    + (hayDesayuno ? totalPax : 0);
   cats.push({ nombre: "Vajilla", items: [
     [`Platos trinchero (${estiloPlatoPrincipal})`, String(totalPax)],
     ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros y blancos", "—"],
-    [`Platos postre (${estiloPlatoPostre})`, String(totalPax)],
-    ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    [`Platos postre (${estiloPlatoPostre})`, String(totalPax + platosPostreExtra)],
+    ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cuchillos grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     ["Cucharas café", String(Math.round(totalPax * 0.8))],
-    ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(evtKey === "boda" ? [["Platos extra para Tarta nupcial", String(totalPax)]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Servicio y limpieza", items: [
@@ -439,8 +442,12 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 5 / 50)} paq. (50)`],
   ]});
 
+  {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
+     al recuento de "Platos postre" en vez de generar una línea aparte. El entrante sí se
+     queda aparte porque suele llevar su propio plato/bol distinto. */}
+  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
-    ["Platos trinchero blancos", String(totalPax)], ["Platos metálicos", "—"], ["Platos postre", String(totalPax)],
+    ["Platos trinchero blancos", String(totalPax)], ["Platos metálicos", "—"], ["Platos postre", String(totalPax + platosPostreExtra)],
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
@@ -449,9 +456,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
-    ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -530,17 +535,19 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Delantales", String(personalSala(pax, numCamareros) + 2)], ["Bayetas / Trapos", "4"],
   ]});
 
+  {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
+     al recuento de "Platos postre" en vez de generar una línea aparte. El entrante sí se
+     queda aparte porque suele llevar su propio plato/bol distinto. */}
+  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
   cats.push({ nombre: "Vajilla y Cubertería", items: [
-    ["Platos trinchero blancos", String(totalPax)], ["Platos postre (negro/gris)", String(totalPax)],
+    ["Platos trinchero blancos", String(totalPax)], ["Platos postre (negro/gris)", String(totalPax + platosPostreExtra)],
     ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))], ["Abridores", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
-    ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
