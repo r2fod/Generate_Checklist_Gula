@@ -70,6 +70,8 @@ const CAMPOS_LOGISTICA = [
   { key: "tipoNevera",       label: "Tamaño de nevera",        tipo: "tamano", sinonimos: ["tamano de nevera", "tipo de nevera", "nevera"] },
   { key: "tipoCongelador",   label: "Tamaño de congelador",    tipo: "tamano", sinonimos: ["tamano de congelador", "tipo de congelador", "congelador"] },
   { key: "tipoPaella",       label: "Tamaño de paella",        tipo: "tamanoPaella", sinonimos: ["tamano de paella", "tipo de paella", "talla de paella"] },
+  { key: "estiloPlatoPrincipal", label: "Estilo de plato principal", tipo: "estiloPlato",  sinonimos: ["estilo de plato", "estilo de plato principal", "tipo de plato"] },
+  { key: "estiloPlatoPostre",    label: "Estilo de plato postre",    tipo: "estiloPostre", sinonimos: ["estilo de plato postre", "estilo plato postre", "tipo de plato postre"] },
 ];
 
 // Valores por defecto del formulario — se usan para no pisar campos ya editados a mano al importar
@@ -83,6 +85,7 @@ const DEFAULTS = {
   tipoCafetera: "Nespresso", extraBandejasMadera: 0, extraBandejasPlata: 0,
   llevaJamonero: false, personasPorPlatoEntrante: 4, llevaAguasPequenas: false,
   hayDesayuno: false, tipoNevera: "Mediana", tipoCongelador: "Mediana", tipoPaella: "Auto",
+  estiloPlatoPrincipal: "Blanco liso", estiloPlatoPostre: "Blanco",
 };
 
 // ─── PARSE CSV ────────────────────────────────────────────────────────────────
@@ -248,6 +251,13 @@ function parseValor(raw, tipo) {
       if (v.includes("median")) return "Mediana";
       return "Auto";
     }
+    case "estiloPlato": {
+      if (v.includes("relieve")) return "Relieve blanco";
+      if (v.includes("verde"))   return "Verde";
+      if (v.includes("metal") || v.includes("metál")) return "Metálico";
+      return "Blanco liso";
+    }
+    case "estiloPostre": return v.includes("verde") ? "Verde" : "Blanco";
     default: return raw;
   }
 }
@@ -392,6 +402,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, tipoPaella,
+    estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
   } = opts;
 
   const horasBarraTotal = horasCoctel + horasCopas;
@@ -482,9 +493,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Vajilla", items: [
-    ["Platos trinchero blancos (principal)", String(totalPax)], ["Platos relieve blancos", "—"], ["Platos verdes", "—"],
-    ["Platos hondos", "—"], ["Plato pan", "—"], ["Platos metálicos", "—"], ["Boles negros y blancos", "—"],
-    ["Platos postre blancos", String(totalPax)], ["Platos verde postre", "—"],
+    [`Platos trinchero (${estiloPlatoPrincipal})`, String(totalPax)],
+    ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros y blancos", "—"],
+    [`Platos postre (${estiloPlatoPostre})`, String(totalPax)],
     ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1))],
     ["Cuchillos grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
@@ -1009,6 +1020,8 @@ export default function App() {
   const [llevaEntrante, setLlevaEntrante]             = useState(false);
   const [llevaPaella, setLlevaPaella]                 = useState(false);
   const [tipoPaella, setTipoPaella]                   = useState("Auto");
+  const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState("Blanco liso");
+  const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState("Blanco");
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(false);
   const [numCamareros, setNumCamareros]                 = useState(0);
   const [tipoBandejas, setTipoBandejas] = useState("Mixto");
@@ -1053,6 +1066,7 @@ export default function App() {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, tipoPaella,
+    estiloPlatoPrincipal, estiloPlatoPostre,
   };
 
   // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
@@ -1126,6 +1140,7 @@ export default function App() {
       tieneCongelador, tieneBrindisCava, tieneFrituras, numFrituras, fuerzaTextilTela, llevaPalomitera,
       llevaJarrasCristal, tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero,
       personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, tipoNevera, tipoCongelador, tipoPaella,
+      estiloPlatoPrincipal, estiloPlatoPostre,
     };
     const alquilerImportado = [];
     const importarSi = (campo, valor, setter) => {
@@ -1175,6 +1190,8 @@ export default function App() {
     importarSi("hayDesayuno", data.hayDesayuno, setHayDesayuno);
     importarSi("tipoNevera", data.tipoNevera, setTipoNevera);
     importarSi("tipoCongelador", data.tipoCongelador, setTipoCongelador);
+    importarSi("estiloPlatoPrincipal", data.estiloPlatoPrincipal, setEstiloPlatoPrincipal);
+    importarSi("estiloPlatoPostre", data.estiloPlatoPostre, setEstiloPlatoPostre);
     setImportedTag(alquilerImportado.length > 0
       ? `✓ Importado · ⚠ Incluye alquiler: ${alquilerImportado.join(", ")}`
       : "✓ Datos importados del Sheet");
@@ -1367,6 +1384,12 @@ export default function App() {
             </div>
             {evento !== "cumpleanos" && evento !== "produccion" && (
               <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
+            )}
+            {evento !== "cumpleanos" && evento !== "produccion" && (
+              <div className="controls-row">
+                <SegmentedControl label="Estilo plato principal" value={estiloPlatoPrincipal} onChange={setEstiloPlatoPrincipal} options={["Blanco liso", "Relieve blanco", "Verde", "Metálico"]} />
+                <SegmentedControl label="Estilo plato postre" value={estiloPlatoPostre} onChange={setEstiloPlatoPostre} options={["Blanco", "Verde"]} />
+              </div>
             )}
           </div>
         </div>
