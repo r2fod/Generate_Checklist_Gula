@@ -92,12 +92,16 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const barFactor = h / 4;
   const cervezaFactor = mesVerano ? 2.0 : 1.5;
   const cerveza = Math.round((pax * cervezaFactor * barFactor) / 24) * 24;
-  const vinoTotal = Math.round(pax * 0.55);
-  const ratioBlanco = mesVerano ? 0.70 : 0.45;
+  // Vino: calibrado con datos reales (65 pax → 30 blanco, 16-17 tinto)
+  const vinoTotal = Math.round(pax * 0.72);
+  const ratioBlanco = mesVerano ? 0.65 : 0.45;
   const vinoBlanco = Math.round(vinoTotal * ratioBlanco);
   const vinoTinto = vinoTotal - vinoBlanco;
   const cava = Math.round(pax * 0.2);
-  const refrescoTotal = Math.round(pax * 2.5 * barFactor);
+  // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
+  // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
+  // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
+  const refrescoTotal = Math.round(pax * 7.4);
   const tonica = Math.max(6, Math.round(pax * 0.15 * barFactor));
   // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
   // Agua Vidaqua de personal, que se calcula aparte en calcPersonal()
@@ -109,9 +113,10 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   // Con congelador en la finca se hace/almacena el hielo in situ: no hace falta traerlo en taxis
   const taxisHielo = tieneCongelador ? 0 : Math.max(2, Math.ceil(pax / 30));
   // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
-  // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas)
-  const vermutRojo = Math.max(2, Math.round(pax / 40));
-  const vermutBlanco = Math.max(2, Math.round(pax / 55));
+  // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas).
+  // Calibrado con datos reales (65 pax → 6 rojo, 5 blanco).
+  const vermutRojo = Math.max(2, Math.round(pax / 11));
+  const vermutBlanco = Math.max(2, Math.round(pax / 13));
   return {
     cerveza, vinoBlanco, vinoTinto, cava, tonica, agua15, redbull,
     aguasPequenasCajas, aguasPequenasUds, vermutRojo, vermutBlanco,
@@ -120,8 +125,9 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
     fanta:      Math.round(refrescoTotal * 0.25),
     sprite:     Math.round(refrescoTotal * 0.1),
     nestea:     Math.round(refrescoTotal * 0.025),
-    aguaConGas: Math.round(pax * 0.15),
-    cerveza00:  Math.round(pax * 0.15),
+    // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
+    aguaConGas: Math.round(pax * 0.37),
+    cerveza00:  Math.round(pax * 0.37),
     sinGluten:  Math.round(pax * 0.3),
     taxisHielo,
   };
@@ -129,12 +135,15 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
 
 function calcDestilados(pax, h) {
   const f = h / 4;
-  // Mínimo 2 botellas de cada licor: para un evento real no se compra "1 sola" botella
-  const r = (base) => Math.max(2, Math.round(base * f));
+  const r  = (base) => Math.max(1, Math.round(base * f));
+  // Estos licores no se compran de uno en uno: mínimo 2 botellas
+  const r2 = (base) => Math.max(2, Math.round(base * f));
   return {
-    ginebraPremium: r(pax / 25), ginebraSabor: r(pax / 35), ron: r(pax / 30),
-    ronBlanco: r(pax / 50), tequila: r(pax / 45), tequilaSabor: r(pax / 40),
-    vodka: r(pax / 40), ballantines: r(pax / 40), barcelo: r(pax / 40),
+    // Calibrado con datos reales (65 pax, barra libre de copas 4h → Seagrams+Tanqueray 9,
+    // Bacardí 1, tequila 2, tequila rosa 2-3, Ballantines 4, Barceló 4)
+    ginebraPremium: r2(pax / 7.2), ginebraSabor: r(pax / 35), ron: r(pax / 60),
+    ronBlanco: r2(pax / 50), tequila: r2(pax / 33), tequilaSabor: r2(pax / 26),
+    vodka: r(pax / 40), ballantines: r2(pax / 16), barcelo: r2(pax / 16),
     mistela: 2, baileys: 1, tiaMaria: 1, limoncello: 1, jagger: 1, peach: 1,
     cremaOrujo: 1, cazalla: 1, orujoHierbas: 1, marcaBlanca: 1,
   };
@@ -208,9 +217,9 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 2.2 : 1.5)))], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 4.5 : 3.1)))], ["Cuencos para calentar leche", "2"]);
   } else {
-    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 2.2 : 1.5)))], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 4.5 : 3.1)))], ["Cuencos para calentar leche", "2"]);
   }
   // Con desayuno se sirve más café por persona (todos toman, no solo parte de los pax)
   const factorLeche = hayDesayuno ? 0.9 : 0.6;
