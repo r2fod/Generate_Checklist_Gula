@@ -343,7 +343,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     + (evtKey === "boda" ? totalPax : 0)
     + (hayDesayuno ? totalPax : 0);
   cats.push({ nombre: "Vajilla", items: [
-    [`Platos trinchero (${estiloPlatoPrincipal})`, String(totalPax)],
+    [`Platos trinchero (${estiloPlatoPrincipal})`, String(totalPax * (dobleServicio ? 2 : 1))],
     ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros y blancos", "—"],
     [`Platos postre (${estiloPlatoPostre})`, String(totalPax + platosPostreExtra)],
     ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
@@ -483,7 +483,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
      queda aparte porque suele llevar su propio plato/bol distinto. */}
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
-    ["Platos trinchero blancos", String(totalPax)], ["Platos metálicos", "—"], ["Platos postre", String(totalPax + platosPostreExtra)],
+    ["Platos trinchero blancos", String(totalPax * (dobleServicio ? 2 : 1))], ["Platos metálicos", "—"], ["Platos postre", String(totalPax + platosPostreExtra)],
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
@@ -582,7 +582,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
      queda aparte porque suele llevar su propio plato/bol distinto. */}
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
   cats.push({ nombre: "Vajilla y Cubertería", items: [
-    ["Platos trinchero blancos", String(totalPax)], ["Platos postre (negro/gris)", String(totalPax + platosPostreExtra)],
+    ["Platos trinchero blancos", String(totalPax * (dobleServicio ? 2 : 1))], ["Platos postre (negro/gris)", String(totalPax + platosPostreExtra)],
     ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
