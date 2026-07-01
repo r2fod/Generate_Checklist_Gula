@@ -356,15 +356,19 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0)
     + (evtKey === "boda" ? totalPax : 0)
     + (hayDesayuno ? totalPax : 0);
+  // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
+  // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
+  const platosDoble = dobleServicio ? totalPax * 2 + 50 : totalPax;
+  const cubiertosDoble = dobleServicio ? totalPax * 2 + 70 : totalPax;
   cats.push({ nombre: "Vajilla", items: [
     ...(!llevaCanapes ? [
-      [`Platos trinchero (${estiloPlatoPrincipal})`, String(totalPax * (dobleServicio ? 2 : 1))],
+      [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)],
       ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros y blancos", "—"],
-      [`Platos postre (${estiloPlatoPostre})`, String(totalPax + platosPostreExtra)],
+      [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)],
     ] : []),
-    ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
-    ["Cuchillos grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
-    ["Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
+    ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
+    ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
+    ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     ["Cucharas café", String(Math.round(totalPax * 0.8))],
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
@@ -508,12 +512,16 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
      al recuento de "Platos postre" en vez de generar una línea aparte. El entrante sí se
      queda aparte porque suele llevar su propio plato/bol distinto. */}
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
+  // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
+  // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
+  const platosDoble = dobleServicio ? totalPax * 2 + 50 : totalPax;
+  const cubiertosDoble = dobleServicio ? totalPax * 2 + 70 : totalPax;
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
     ...(!llevaCanapes ? [
-      ["Platos trinchero blancos", String(totalPax * (dobleServicio ? 2 : 1))], ["Platos metálicos", "—"], ["Platos postre", String(totalPax + platosPostreExtra)],
+      ["Platos trinchero blancos", String(platosDoble)], ["Platos metálicos", "—"], ["Platos postre", String(platosDoble + platosPostreExtra)],
     ] : []),
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))],
-    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
+    ["Tenedores / Cuchillos / Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     [`Copas cristal${dobleServicio ? " (doble)" : ""}`, `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
@@ -614,12 +622,16 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
      al recuento de "Platos postre" en vez de generar una línea aparte. El entrante sí se
      queda aparte porque suele llevar su propio plato/bol distinto. */}
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
+  // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
+  // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
+  const platosDoble = dobleServicio ? totalPax * 2 + 50 : totalPax;
+  const cubiertosDoble = dobleServicio ? totalPax * 2 + 70 : totalPax;
   cats.push({ nombre: "Vajilla y Cubertería", items: [
     ...(!llevaCanapes ? [
-      ["Platos trinchero blancos", String(totalPax * (dobleServicio ? 2 : 1))], ["Platos postre (negro/gris)", String(totalPax + platosPostreExtra)],
+      ["Platos trinchero blancos", String(platosDoble)], ["Platos postre (negro/gris)", String(platosDoble + platosPostreExtra)],
       ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ] : []),
-    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
+    ["Tenedores / Cuchillos / Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))], ["Abridores", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
