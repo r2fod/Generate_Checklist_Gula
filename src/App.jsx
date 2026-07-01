@@ -35,65 +35,8 @@ function iconoCategoria(nombre) {
   return ICONOS_CATEGORIA.find(i => n.includes(i.fragmento))?.icono || "📋";
 }
 
-// Campos logísticos que se pueden mapear desde el Sheet.
-// "sinonimos" alimenta el mapeo automático: cuantas más palabras tenga un sinónimo,
-// más específico y prioritario es a la hora de reservar una columna del Sheet.
-const CAMPOS_LOGISTICA = [
-  { key: "pax",              label: "PAX adultos",             tipo: "numero", sinonimos: ["pax adultos", "numero de adultos", "nº adultos", "adultos", "invitados", "comensales", "asistentes", "pax"] },
-  { key: "ninos",            label: "Niños",                   tipo: "numero", sinonimos: ["numero de ninos", "ninos", "menores"] },
-  { key: "evento",           label: "Tipo de evento",          tipo: "evento", sinonimos: ["tipo de evento", "tipo evento", "clase de evento", "evento"] },
-  { key: "horasCoctel",      label: "Horas barra cóctel",      tipo: "numero", sinonimos: ["horas barra coctel", "horas de coctel", "barra coctel", "horas aperitivo", "coctel"] },
-  { key: "horasCopas",       label: "Horas barra copas",       tipo: "numero", sinonimos: ["horas barra copas", "horas de copas", "barra libre copas", "copas"] },
-  { key: "llevaPaella",      label: "Lleva paella",            tipo: "bool", sinonimos: ["lleva paella", "hay paella", "paella"] },
-  { key: "tipoHorno",        label: "Tipo de horno",           tipo: "horno", sinonimos: ["tipo de horno", "tamano de horno", "horno"] },
-  { key: "tipoBBQ",          label: "Barbacoa",                tipo: "bbq", sinonimos: ["tipo de barbacoa", "barbacoa", "bbq", "parrilla"] },
-  { key: "llevaArmarioCaliente", label: "Armario caliente (Alquiler)", tipo: "bool", sinonimos: ["armario caliente", "armario"] },
-  { key: "tieneFrituras",    label: "Frituras",                tipo: "bool", sinonimos: ["hay frituras", "frituras", "fritos"] },
-  { key: "numFrituras",      label: "Nº de sartenes de fritura", tipo: "numero", sinonimos: ["numero de sartenes", "numero de frituras", "sartenes parisiene"] },
-  { key: "llevaEntrante",    label: "Lleva entrante (chupito)", tipo: "bool", sinonimos: ["lleva entrante", "entrante", "chupito"] },
-  { key: "mesVerano",        label: "Temporada verano",        tipo: "bool", sinonimos: ["temporada verano", "temporada", "epoca del ano", "mes del evento", "verano"] },
-  { key: "tieneCongelador",  label: "Finca con congelador",    tipo: "bool", sinonimos: ["finca con congelador", "finca congelador", "tiene congelador"] },
-  { key: "tieneBrindisCava", label: "Brindis con cava",        tipo: "bool", sinonimos: ["brindis con cava", "brindis", "hay cava"] },
-  { key: "dobleServicio",    label: "Doble servicio",          tipo: "bool", sinonimos: ["doble servicio", "servicio doble"] },
-  { key: "tipoBandejas",     label: "Tipo de bandejas",        tipo: "bandejas", sinonimos: ["tipo de bandejas", "bandejas de servicio", "bandejas"] },
-  { key: "fuerzaTextilTela", label: "Servilletas de tela",     tipo: "bool", sinonimos: ["servilletas de tela", "servilletas tela"] },
-  { key: "numCamareros",     label: "Nº camareros / personal sala", tipo: "numero", sinonimos: ["numero de camareros", "nº camareros", "personal de sala", "camareros"] },
-  { key: "llevaPalomitera",  label: "Lleva palomitera/carrito", tipo: "bool", sinonimos: ["lleva palomitera", "carrito de palomitas", "palomitera", "palomitas"] },
-  { key: "llevaJarrasCristal", label: "Jarras de cristal",     tipo: "bool", sinonimos: ["jarras de cristal", "jarras"] },
-  { key: "tipoCafetera",     label: "Tipo de cafetera",        tipo: "cafetera", sinonimos: ["tipo de cafetera", "cafetera"] },
-  { key: "extraBandejasMadera", label: "Bandejas de madera extra", tipo: "numero", sinonimos: ["bandejas de madera extra", "bandejas de madera", "madera extra"] },
-  { key: "extraBandejasPlata",  label: "Bandejas de plata extra",  tipo: "numero", sinonimos: ["bandejas de plata extra", "bandejas de plata", "plata extra"] },
-  { key: "llevaJamonero",    label: "Hay jamonero",            tipo: "bool", sinonimos: ["hay jamonero", "jamonero", "corte de jamon"] },
-  { key: "personasPorPlatoEntrante", label: "Personas por plato de entrante", tipo: "numero", sinonimos: ["personas por plato de entrante", "personas por plato", "plato de entrante compartido"] },
-  { key: "llevaAguasPequenas", label: "Aguas pequeñas",        tipo: "bool", sinonimos: ["aguas pequenas", "agua pequena", "botellines de agua"] },
-  { key: "hayDesayuno",      label: "Hay desayuno",            tipo: "bool", sinonimos: ["hay desayuno", "desayuno", "coffee break"] },
-  { key: "tipoNevera",       label: "Tamaño de nevera",        tipo: "tamano", sinonimos: ["tamano de nevera", "tipo de nevera", "nevera"] },
-  { key: "tipoCongelador",   label: "Tamaño de congelador",    tipo: "tamano", sinonimos: ["tamano de congelador", "tipo de congelador", "congelador"] },
-  { key: "tipoPaella",       label: "Tamaño de paella",        tipo: "tamanoPaella", sinonimos: ["tamano de paella", "tipo de paella", "talla de paella"] },
-  { key: "estiloPlatoPrincipal", label: "Estilo de plato principal", tipo: "estiloPlato",  sinonimos: ["estilo de plato", "estilo de plato principal", "tipo de plato"] },
-  { key: "estiloPlatoPostre",    label: "Estilo de plato postre",    tipo: "estiloPostre", sinonimos: ["estilo de plato postre", "estilo plato postre", "tipo de plato postre"] },
-];
 
-// Valores por defecto del formulario — se usan para no pisar campos ya editados a mano al importar
-const DEFAULTS = {
-  evento: "boda", pax: 80, ninos: 0, horasCoctel: 2, horasCopas: 4,
-  dobleServicio: false, llevaEntrante: false, llevaPaella: false,
-  llevaArmarioCaliente: false, numCamareros: 0, tipoBandejas: "Mixto",
-  tipoHorno: "Pequeño", tipoBBQ: "No lleva", mesVerano: true,
-  tieneCongelador: false, tieneBrindisCava: false, tieneFrituras: false, numFrituras: 1,
-  fuerzaTextilTela: false, llevaPalomitera: false, llevaJarrasCristal: false,
-  tipoCafetera: "Nespresso", extraBandejasMadera: 0, extraBandejasPlata: 0,
-  llevaJamonero: false, personasPorPlatoEntrante: 4, llevaAguasPequenas: false,
-  hayDesayuno: false, tipoNevera: "Mediana", tipoCongelador: "Mediana", tipoPaella: "Auto",
-  estiloPlatoPrincipal: "Blanco liso", estiloPlatoPostre: "Blanco",
-};
-
-// ─── PARSE CSV ────────────────────────────────────────────────────────────────
-// Parser de una sola pasada sobre todo el texto (no separa por "\n" de antemano):
-// las celdas de un Google Sheet pueden contener saltos de línea entre comillas
-// (notas, observaciones...), y partir por líneas primero desplazaba las columnas
-// de todas las filas siguientes a esa celda, corrompiendo la importación entera.
-// Detecta si el texto pegado usa tabulador (copiado de Excel/Sheets) o coma (CSV) como separador
+// Detecta si un texto pegado usa tabulador (copiado de Excel/Sheets) o coma como separador de columnas
 function detectarDelimitador(text) {
   const primeraLinea = text.split("\n")[0] || "";
   const tabs = (primeraLinea.match(/\t/g) || []).length;
@@ -101,82 +44,10 @@ function detectarDelimitador(text) {
   return tabs > comas ? "\t" : ",";
 }
 
-function parseCSV(text, delimitador) {
-  const delim = delimitador || detectarDelimitador(text);
-  const filas = [];
-  let fila = [], celda = "", enComillas = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (enComillas) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { celda += '"'; i++; } // comilla escapada ""
-        else enComillas = false;
-      } else {
-        celda += c;
-      }
-    } else if (c === '"') {
-      enComillas = true;
-    } else if (c === delim) {
-      fila.push(celda.trim()); celda = "";
-    } else if (c === "\r") {
-      // ignorar, lo gestiona el \n siguiente
-    } else if (c === "\n") {
-      fila.push(celda.trim()); celda = "";
-      filas.push(fila); fila = [];
-    } else {
-      celda += c;
-    }
-  }
-  if (celda !== "" || fila.length > 0) { fila.push(celda.trim()); filas.push(fila); }
-
-  const noVacias = filas.filter(f => f.some(v => v !== ""));
-  if (noVacias.length < 2) return { headers: [], rows: [] };
-  const headers = noVacias[0];
-  const rows = noVacias.slice(1).map(vals => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] || ""; });
-    return obj;
-  }).filter(r => Object.values(r).some(v => v.trim() !== ""));
-  return { headers, rows };
-}
-
 // Quita acentos, pasa a minúsculas y limpia puntuación para comparar cabeceras de forma robusta
 function normalizar(s) {
   return s.toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9ñ\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-// Mapeo automático columna del Sheet → campo logístico.
-// Compara por palabras completas (no substring suelto) para evitar falsos positivos
-// como "Junio Evento" matcheando el campo "Tipo de evento" solo por contener "evento",
-// prioriza sinónimos más largos/específicos, y nunca reutiliza la misma columna dos veces.
-function autoMapearColumnas(headers, campos) {
-  const cabeceras = headers.map(h => ({ original: h, norm: normalizar(h), palabras: normalizar(h).split(" ").filter(Boolean) }));
-  const usadas = new Set();
-  const mapeo = {};
-  const ordenados = [...campos].sort((a, b) => {
-    const maxA = Math.max(...a.sinonimos.map(s => s.split(" ").length));
-    const maxB = Math.max(...b.sinonimos.map(s => s.split(" ").length));
-    return maxB - maxA;
-  });
-  ordenados.forEach(campo => {
-    let mejor = null, mejorScore = 0;
-    cabeceras.forEach(h => {
-      if (usadas.has(h.original)) return;
-      campo.sinonimos.forEach(syn => {
-        const synNorm = normalizar(syn);
-        if (h.norm === synNorm) { mejorScore = 1000; mejor = h; return; }
-        const synPalabras = synNorm.split(" ").filter(Boolean);
-        const todasPresentes = synPalabras.every(p => h.palabras.includes(p));
-        if (todasPresentes) {
-          const score = synPalabras.length * 10 + (synPalabras.length === h.palabras.length ? 5 : 0);
-          if (score > mejorScore) { mejorScore = score; mejor = h; }
-        }
-      });
-    });
-    if (mejor && mejorScore > 0) { mapeo[campo.key] = mejor.original; usadas.add(mejor.original); }
-  });
-  return mapeo;
 }
 
 // Sugiere a qué categoría de la checklist pertenece un item escrito a mano,
@@ -207,59 +78,6 @@ function sugerirCategoria(label, categoriasDisponibles) {
     }
   }
   return null;
-}
-
-// Convierte un valor raw del Sheet al tipo esperado
-function parseValor(raw, tipo) {
-  if (!raw) return null;
-  const v = raw.toString().trim().toLowerCase();
-  switch (tipo) {
-    case "numero": return parseFloat(v.replace(",", ".")) || null;
-    case "bool":   return ["sí", "si", "yes", "true", "1", "x", "✓"].includes(v);
-    case "evento": {
-      if (v.includes("boda"))            return "boda";
-      if (v.includes("comun") || v.includes("bautizo")) return "comunion";
-      if (v.includes("cumplea"))         return "cumpleanos";
-      if (v.includes("produ") || v.includes("shooting") || v.includes("rodaje")) return "produccion";
-      if (v.includes("corp") || v.includes("empresa")) return "corporativo";
-      return null;
-    }
-    case "horno":   {
-      if (v.includes("grande"))  return "Grande";
-      if (v.includes("ambos") || v.includes("los dos")) return "Ambos";
-      return "Pequeño";
-    }
-    case "bbq": {
-      if (v.includes("no") || v === "") return "No lleva";
-      if (v.includes("grand"))           return "Grande";
-      return "Pequeña";
-    }
-    case "bandejas": {
-      if (v.includes("madera")) return "Madera";
-      if (v.includes("plata"))  return "Plata";
-      return "Mixto";
-    }
-    case "cafetera": {
-      if (v.includes("nespresso")) return "Nespresso";
-      if (v.includes("bar"))       return "Bar";
-      return "Grande";
-    }
-    case "tamano": return v.includes("grande") ? "Grande" : "Mediana";
-    case "tamanoPaella": {
-      if (v.includes("pequeñ") || v.includes("pequen")) return "Pequeña";
-      if (v.includes("grande")) return "Grande";
-      if (v.includes("median")) return "Mediana";
-      return "Auto";
-    }
-    case "estiloPlato": {
-      if (v.includes("relieve")) return "Relieve blanco";
-      if (v.includes("verde"))   return "Verde";
-      if (v.includes("metal") || v.includes("metál")) return "Metálico";
-      return "Blanco liso";
-    }
-    case "estiloPostre": return v.includes("verde") ? "Verde" : "Blanco";
-    default: return raw;
-  }
 }
 
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
@@ -865,50 +683,68 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, on
   );
 }
 
-// ─── MODAL IMPORTAR SHEET ─────────────────────────────────────────────────────
-function ModalImportSheet({ onClose, onImport }) {
+// ─── MODAL AÑADIR VARIOS ITEMS (pegando texto) ────────────────────────────────
+// Cada línea pegada se interpreta como "nombre" o "nombre <tab/2 espacios/":"/"-"> cantidad".
+// Antes de tocar la checklist se normaliza cada nombre y se compara con lo que ya existe
+// (categorías actuales + items ya añadidos a mano) para no duplicar nada, y se muestra
+// una pantalla de confirmación con lo que se va a añadir/omitir antes de aplicar el cambio.
+function parseItemsPegados(texto) {
+  const delim = detectarDelimitador(texto);
+  return texto.split("\n").map(l => l.trim()).filter(Boolean).map(linea => {
+    if (delim !== "," && linea.includes(delim)) {
+      const [nombre, cantidad] = linea.split(delim).map(p => p.trim());
+      return { label: nombre, qty: cantidad || "1" };
+    }
+    const m = linea.match(/^(.*\S)\s*[:\-–]\s*(\d+(?:[.,]\d+)?)\s*$/) || linea.match(/^(.*\S)\s{2,}(\d+(?:[.,]\d+)?)\s*$/);
+    if (m) return { label: m[1].trim(), qty: m[2].replace(",", ".") };
+    return { label: linea, qty: "1" };
+  }).filter(it => it.label);
+}
+
+function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfirm }) {
   const [texto, setTexto]           = useState("");
   const [error, setError]           = useState("");
-  const [sheetData, setSheetData]   = useState(null); // { headers, rows }
-  const [filaIdx, setFilaIdx]       = useState(0);
-  const [mapeo, setMapeo]           = useState({}); // campo.key → nombre columna del sheet
-  const [mostrarMapeoManual, setMostrarMapeoManual] = useState(false);
-  const [paso, setPaso]             = useState("pegar"); // pegar → fila
+  const [propuestos, setPropuestos] = useState([]); // [{label, qty, categoria, duplicado, incluir}]
+  const [paso, setPaso]             = useState("pegar"); // pegar → confirmar
 
-  // Paso 1: procesa el contenido pegado (copiado directamente de Excel/Google Sheets)
-  const procesarPegado = () => {
+  const analizar = () => {
     setError("");
-    if (!texto.trim()) { setError("Pega primero el contenido de la hoja (selecciona las celdas en Excel/Sheets y cópialas con Ctrl+C / Cmd+C)."); return; }
-    const data = parseCSV(texto);
-    if (data.headers.length === 0 || data.rows.length === 0) {
-      setError("No he podido interpretar el contenido pegado. Asegúrate de copiar también la fila de cabeceras y al menos una fila de datos.");
-      return;
-    }
-    setSheetData(data);
-    setMapeo(autoMapearColumnas(data.headers, CAMPOS_LOGISTICA));
-    setFilaIdx(0);
-    setPaso("fila");
+    if (!texto.trim()) { setError("Pega primero los items que quieras añadir, uno por línea."); return; }
+    const items = parseItemsPegados(texto);
+    if (items.length === 0) { setError("No he podido interpretar ningún item en el texto pegado."); return; }
+    const existentes = new Set();
+    checklist.forEach(cat => cat.items.forEach(([label]) => existentes.add(normalizar(label))));
+    const vistos = new Set();
+    const props = items.map(it => {
+      const norm = normalizar(it.label);
+      const duplicado = existentes.has(norm) || vistos.has(norm);
+      vistos.add(norm);
+      return {
+        ...it,
+        categoria: sugerirCategoria(it.label, categoriasDisponibles) || CATEGORIA_MANUAL,
+        duplicado,
+        incluir: !duplicado,
+      };
+    });
+    setPropuestos(props);
+    setPaso("confirmar");
   };
 
-  const aplicarImportacion = () => {
-    const fila = sheetData.rows[filaIdx];
-    const resultado = {};
-    CAMPOS_LOGISTICA.forEach(campo => {
-      const col = mapeo[campo.key];
-      if (col && fila[col] !== undefined && fila[col] !== "") {
-        resultado[campo.key] = parseValor(fila[col], campo.tipo);
-      }
-    });
-    onImport(resultado);
+  const toggleIncluir = (idx) => setPropuestos(prev => prev.map((p, i) => i === idx ? { ...p, incluir: !p.incluir } : p));
+
+  const confirmar = () => {
+    onConfirm(propuestos.filter(p => p.incluir));
     onClose();
   };
+
+  const nInclu = propuestos.filter(p => p.incluir).length;
 
   const selectStyle = {
     padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: "0.85rem",
     background: "white", color: "#374151", width: "100%", cursor: "pointer",
   };
 
-  const tituloPaso = { pegar: "Pega el contenido de tu hoja", fila: "Elige el evento a importar" }[paso];
+  const tituloPaso = { pegar: "Pega los items que quieras añadir", confirmar: "Revisa antes de añadir" }[paso];
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
@@ -917,7 +753,7 @@ function ModalImportSheet({ onClose, onImport }) {
         {/* Header */}
         <div style={{ background: "#1f314d", color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📋 Importar desde Excel / Google Sheets</div>
+            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📋 Añadir varios items</div>
             <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>{tituloPaso}</div>
           </div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
@@ -925,16 +761,16 @@ function ModalImportSheet({ onClose, onImport }) {
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* PASO PEGAR: pegar directamente el contenido copiado de la hoja, sin depender de red/CORS */}
+          {/* PASO PEGAR */}
           {paso === "pegar" && (
             <>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
-                ℹ️ Abre tu Excel o Google Sheets, <strong>selecciona las celdas</strong> (incluyendo la fila de cabeceras) y cópialas con <strong>Ctrl+C</strong> (Cmd+C en Mac). Luego pégalas aquí abajo con <strong>Ctrl+V</strong>.
+                ℹ️ Pega una lista de items, uno por línea. Puedes incluir la cantidad separada por tabulador, dos puntos o guion (ej. <em>"Vasos de tubo: 50"</em>); si no pones cantidad se añade con "1".
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Contenido pegado</label>
+                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Items a añadir</label>
                 <textarea
-                  placeholder="Pega aquí el contenido copiado de tu hoja de cálculo..."
+                  placeholder={"Vasos de tubo: 50\nManteles negros\nFocos led - 4"}
                   value={texto}
                   onChange={e => setTexto(e.target.value)}
                   rows={10}
@@ -942,61 +778,36 @@ function ModalImportSheet({ onClose, onImport }) {
                 />
               </div>
               {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
-              <button onClick={procesarPegado} disabled={!texto.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: !texto.trim() ? 0.6 : 1 }}>
-                Analizar contenido →
+              <button onClick={analizar} disabled={!texto.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: !texto.trim() ? 0.6 : 1 }}>
+                Analizar →
               </button>
             </>
           )}
 
-          {/* PASO FILA: elegir el evento a importar, con mapeo automático ya aplicado */}
-          {paso === "fila" && sheetData && (
+          {/* PASO CONFIRMAR: aviso previo — qué se añade, qué se omite por estar ya en la checklist */}
+          {paso === "confirmar" && (
             <>
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
-                ✓ Contenido interpretado — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. Las columnas se han mapeado automáticamente a la checklist.
+                ✓ {propuestos.length} items interpretados. Desmarca los que no quieras añadir — los ya presentes en la checklist aparecen desmarcados por defecto para no duplicar.
               </div>
-              <p style={{ fontWeight: 600, color: "#374151" }}>Elige el evento a importar ({sheetData.rows.length} filas disponibles):</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
-                {sheetData.rows.map((fila, idx) => {
-                  const etiqueta = mapeo.evento ? fila[mapeo.evento] : "";
-                  const paxLabel = mapeo.pax ? fila[mapeo.pax] : "";
-                  const cols = sheetData.headers.slice(0, 3).map(h => `${h}: ${fila[h]}`).join(" · ");
-                  return (
-                    <button key={idx} onClick={() => setFilaIdx(idx)} style={{ textAlign: "left", padding: "12px 16px", border: `2px solid ${filaIdx === idx ? "#1f314d" : "#e5e7eb"}`, borderRadius: 8, background: filaIdx === idx ? "#f0f4ff" : "white", cursor: "pointer", transition: "all 0.15s" }}>
-                      <div style={{ fontWeight: 600, color: "#1f314d", fontSize: "0.9rem" }}>Fila {idx + 1} {etiqueta ? `· ${etiqueta}` : ""} {paxLabel ? `· ${paxLabel} pax` : ""}</div>
-                      <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 3 }}>{cols}</div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setMostrarMapeoManual(v => !v)}
-                style={{ alignSelf: "flex-start", background: "none", border: "none", color: "#1f314d", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", textDecoration: "underline", padding: 0 }}
-              >
-                {mostrarMapeoManual ? "Ocultar" : "Ajustar mapeo de columnas manualmente (avanzado)"}
-              </button>
-              {mostrarMapeoManual && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
-                  {CAMPOS_LOGISTICA.map(campo => (
-                    <div key={campo.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.3px" }}>{campo.label}</label>
-                      <select
-                        style={selectStyle}
-                        value={mapeo[campo.key] || ""}
-                        onChange={e => setMapeo(prev => ({ ...prev, [campo.key]: e.target.value || undefined }))}
-                      >
-                        <option value="">— Sin mapear</option>
-                        {sheetData.headers.map(h => <option key={h} value={h}>{h}</option>)}
-                      </select>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
+                {propuestos.map((p, idx) => (
+                  <label key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: `1px solid ${p.duplicado ? "#fde68a" : "#e5e7eb"}`, borderRadius: 8, background: p.duplicado ? "#fffbeb" : "white", cursor: "pointer" }}>
+                    <input type="checkbox" checked={p.incluir} onChange={() => toggleIncluir(idx)} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: "#1f314d", fontSize: "0.9rem" }}>{p.label} <span style={{ fontWeight: 700, color: "#16a34a" }}>· {p.qty}</span></div>
+                      <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>
+                        {p.duplicado ? "⚠ Ya existe en la checklist (se omite)" : `Se añadirá a: ${p.categoria}`}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </label>
+                ))}
+              </div>
 
               <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
                 <button onClick={() => setPaso("pegar")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
-                <button onClick={aplicarImportacion} style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", flex: 1 }}>
-                  ✓ Importar y generar checklist
+                <button onClick={confirmar} disabled={nInclu === 0} style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", flex: 1, opacity: nInclu === 0 ? 0.6 : 1 }}>
+                  ✓ Añadir {nInclu} item{nInclu === 1 ? "" : "s"}
                 </button>
               </div>
             </>
@@ -1047,10 +858,9 @@ export default function App() {
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   const [modalPrevia, setModalPrevia]   = useState(false);
-  const [modalSheet, setModalSheet]     = useState(false);
+  const [modalAgregar, setModalAgregar] = useState(false);
   const [compartirMsg, setCompartirMsg] = useState("");
-  const [importedTag, setImportedTag]   = useState("");
-  const [importedAlquiler, setImportedAlquiler] = useState(false);
+  const [agregadosTag, setAgregadosTag] = useState("");
   const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
   const [overridesManuales, setOverridesManuales] = useState({}); // { "categoria::label": "cantidad editada a mano" }
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
@@ -1131,72 +941,12 @@ export default function App() {
   const totalConceptos = checklist.reduce((acc, c) => acc + c.items.length, 0);
   const toggleCategory = (catName) => setOpenCategories(prev => ({ ...prev, [catName]: prev[catName] !== false ? false : true }));
 
-  // Aplicar datos importados del Sheet, sin pisar campos que el usuario ya tocó a mano
-  // (solo se aplica el valor del Sheet si el campo sigue en su valor por defecto)
-  const handleImport = (data) => {
-    const valorActual = {
-      evento, pax, ninos, horasCoctel, horasCopas, dobleServicio, llevaEntrante, llevaPaella,
-      llevaArmarioCaliente, numCamareros, tipoBandejas, tipoHorno, tipoBBQ, mesVerano,
-      tieneCongelador, tieneBrindisCava, tieneFrituras, numFrituras, fuerzaTextilTela, llevaPalomitera,
-      llevaJarrasCristal, tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero,
-      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, tipoNevera, tipoCongelador, tipoPaella,
-      estiloPlatoPrincipal, estiloPlatoPostre,
-    };
-    const alquilerImportado = [];
-    const importarSi = (campo, valor, setter) => {
-      if (valor == null) return false;
-      if (valorActual[campo] !== DEFAULTS[campo]) return false;
-      setter(valor);
-      return true;
-    };
-    if (data.evento) importarSi("evento", data.evento, setEvento);
-    importarSi("pax", data.pax, setPax);
-    importarSi("ninos", data.ninos, setNinos);
-    if (data.horasCoctel != null) {
-      importarSi("horasCoctel", data.horasCoctel || 2, setHorasCoctel);
-      if (!barraCoctel) setBarraCoctel(data.horasCoctel > 0);
-    }
-    if (data.horasCopas != null) {
-      importarSi("horasCopas", data.horasCopas || 4, setHorasCopas);
-      if (!barraCopas) setBarraCopas(data.horasCopas > 0);
-    }
-    importarSi("llevaPaella", data.llevaPaella, setLlevaPaella);
-    importarSi("tipoPaella", data.tipoPaella, setTipoPaella);
-    if (importarSi("tipoHorno", data.tipoHorno, setTipoHorno) && (data.tipoHorno === "Grande" || data.tipoHorno === "Ambos")) {
-      alquilerImportado.push("Horno grande (Alquiler Dealde)");
-    }
-    importarSi("tipoBBQ", data.tipoBBQ, setTipoBBQ);
-    if (importarSi("llevaArmarioCaliente", data.llevaArmarioCaliente, setLlevaArmarioCaliente) && data.llevaArmarioCaliente) {
-      alquilerImportado.push("Armario caliente (alquiler Dealde)");
-    }
-    importarSi("tieneFrituras", data.tieneFrituras, setTieneFrituras);
-    importarSi("numFrituras", data.numFrituras, setNumFrituras);
-    importarSi("llevaEntrante", data.llevaEntrante, setLlevaEntrante);
-    importarSi("mesVerano", data.mesVerano, setMesVerano);
-    importarSi("tieneCongelador", data.tieneCongelador, setTieneCongelador);
-    importarSi("tieneBrindisCava", data.tieneBrindisCava, setTieneBrindisCava);
-    importarSi("dobleServicio", data.dobleServicio, setDobleServicio);
-    importarSi("tipoBandejas", data.tipoBandejas, setTipoBandejas);
-    importarSi("fuerzaTextilTela", data.fuerzaTextilTela, setFuerzaTextilTela);
-    importarSi("numCamareros", data.numCamareros, setNumCamareros);
-    importarSi("llevaPalomitera", data.llevaPalomitera, setLlevaPalomitera);
-    importarSi("llevaJarrasCristal", data.llevaJarrasCristal, setLlevaJarrasCristal);
-    importarSi("tipoCafetera", data.tipoCafetera, setTipoCafetera);
-    importarSi("extraBandejasMadera", data.extraBandejasMadera, setExtraBandejasMadera);
-    importarSi("extraBandejasPlata", data.extraBandejasPlata, setExtraBandejasPlata);
-    importarSi("llevaJamonero", data.llevaJamonero, setLlevaJamonero);
-    importarSi("personasPorPlatoEntrante", data.personasPorPlatoEntrante, setPersonasPorPlatoEntrante);
-    importarSi("llevaAguasPequenas", data.llevaAguasPequenas, setLlevaAguasPequenas);
-    importarSi("hayDesayuno", data.hayDesayuno, setHayDesayuno);
-    importarSi("tipoNevera", data.tipoNevera, setTipoNevera);
-    importarSi("tipoCongelador", data.tipoCongelador, setTipoCongelador);
-    importarSi("estiloPlatoPrincipal", data.estiloPlatoPrincipal, setEstiloPlatoPrincipal);
-    importarSi("estiloPlatoPostre", data.estiloPlatoPostre, setEstiloPlatoPostre);
-    setImportedTag(alquilerImportado.length > 0
-      ? `✓ Importado · ⚠ Incluye alquiler: ${alquilerImportado.join(", ")}`
-      : "✓ Datos importados del Sheet");
-    setImportedAlquiler(alquilerImportado.length > 0);
-    setTimeout(() => { setImportedTag(""); setImportedAlquiler(false); }, alquilerImportado.length > 0 ? 6000 : 3000);
+  // Añade en bloque los items confirmados en ModalAgregarItems (ya filtrados de duplicados)
+  const handleAgregarItems = (nuevos) => {
+    if (nuevos.length === 0) return;
+    setItemsManuales(prev => [...prev, ...nuevos.map(n => ({ label: n.label, cantidad: n.qty, categoria: n.categoria }))]);
+    setAgregadosTag(`✓ ${nuevos.length} item${nuevos.length === 1 ? "" : "s"} añadido${nuevos.length === 1 ? "" : "s"}`);
+    setTimeout(() => setAgregadosTag(""), 3000);
   };
 
   const handleDescargar = () => {
@@ -1229,8 +979,8 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} onClose={() => setModalPrevia(false)} />}
-      {modalSheet  && <ModalImportSheet onClose={() => setModalSheet(false)} onImport={handleImport} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} onClose={() => setModalPrevia(false)} />}
+      {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
 
       <div className="app-wrapper">
         {/* HEADER */}
@@ -1249,19 +999,18 @@ export default function App() {
           </div>
         </header>
 
-        {/* IMPORT SHEET BANNER */}
+        {/* AÑADIR VARIOS ITEMS (pegando texto) */}
         <button
           className="add-material-btn animate-entrance"
           style={{
             animationDelay: "0.05s",
-            background: importedAlquiler ? "#fdf6e3" : importedTag ? "#f0fdf4" : "white",
-            borderColor: importedAlquiler ? "#f59e0b" : importedTag ? "#bbf7d0" : undefined,
-            color: importedAlquiler ? "#b45309" : importedTag ? "#16a34a" : undefined,
-            fontWeight: importedAlquiler ? 700 : undefined,
+            background: agregadosTag ? "#f0fdf4" : "white",
+            borderColor: agregadosTag ? "#bbf7d0" : undefined,
+            color: agregadosTag ? "#16a34a" : undefined,
           }}
-          onClick={() => setModalSheet(true)}
+          onClick={() => setModalAgregar(true)}
         >
-          <span>📋 {importedTag || "Importar desde Excel / Google Sheets"}</span>
+          <span>📋 {agregadosTag || "Añadir varios items pegando texto"}</span>
           <span style={{ fontSize: 12 }}>→</span>
         </button>
 
