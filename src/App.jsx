@@ -486,14 +486,14 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Platos hondos", "—"], ["Plato pan", "—"], ["Platos metálicos", "—"], ["Boles negros y blancos", "—"],
     ["Platos postre blancos", String(totalPax)], ["Platos verde postre", "—"],
     ["Tenedores grandes", String(totalPax * (dobleServicio ? 2 : 1))],
-    ["Cuchillos grandes", String(totalPax * (dobleServicio ? 2 : 1))],
-    ["Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Cuchillos grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
+    ["Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     ["Cucharas café", String(Math.round(totalPax * 0.8))],
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
     ...(evtKey === "boda" ? [["Platos extra para Tarta nupcial", String(totalPax)]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Servicio y limpieza", items: [
@@ -612,7 +612,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
     ["Platos trinchero blancos", String(totalPax)], ["Platos metálicos", "—"], ["Platos postre", String(totalPax)],
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))],
-    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     [`Copas cristal${dobleServicio ? " (doble)" : ""}`, `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
@@ -621,7 +621,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)], ["Vasos extra (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Vasos extra (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -703,14 +703,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Vajilla y Cubertería", items: [
     ["Platos trinchero blancos", String(totalPax)], ["Platos postre (negro/gris)", String(totalPax)],
     ["Platos metálicos", "—"], ["Platos hondos", "—"],
-    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
+    ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1) + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(totalPax)],
     ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))], ["Abridores", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
