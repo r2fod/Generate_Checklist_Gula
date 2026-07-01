@@ -13,6 +13,28 @@ const EVENTOS = {
   produccion:  { label: "Producción / Shooting", icon: "▶" },
 };
 
+// Icono decorativo por categoría, buscado por fragmento del nombre (varía según el tipo de evento)
+const ICONOS_CATEGORIA = [
+  { fragmento: "electric", icono: "🔌" },
+  { fragmento: "mobiliario", icono: "🪑" },
+  { fragmento: "cocina", icono: "🍳" },
+  { fragmento: "menaje", icono: "🔪" },
+  { fragmento: "cristal", icono: "🥂" },
+  { fragmento: "mantel", icono: "🧺" },
+  { fragmento: "vajilla", icono: "🍽️" },
+  { fragmento: "limpieza", icono: "🧹" },
+  { fragmento: "café", icono: "☕" },
+  { fragmento: "bebida", icono: "🥤" },
+  { fragmento: "alcohol", icono: "🥃" },
+  { fragmento: "logística", icono: "📦" },
+  { fragmento: "desechable", icono: "🥡" },
+  { fragmento: "otros", icono: "✨" },
+];
+function iconoCategoria(nombre) {
+  const n = nombre.toLowerCase();
+  return ICONOS_CATEGORIA.find(i => n.includes(i.fragmento))?.icono || "📋";
+}
+
 // Campos logísticos que se pueden mapear desde el Sheet.
 // "sinonimos" alimenta el mapeo automático: cuantas más palabras tenga un sinónimo,
 // más específico y prioritario es a la hora de reservar una columna del Sheet.
@@ -761,7 +783,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, on
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "24px 16px" }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 820, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", animation: "slideUpFade 0.3s ease both" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 820, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", animation: "slideUpFade 0.3s ease both" }} onClick={e => e.stopPropagation()}>
         <div style={{ background: "#1f314d", color: "white", padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: "1.2rem" }}>CHECKLIST DE EVENTO</div>
@@ -909,7 +931,7 @@ function ModalImportSheet({ onClose, onImport }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 680, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 680, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div style={{ background: "#1f314d", color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1282,6 +1304,7 @@ export default function App() {
 
         {/* CONFIG */}
         <div className="config-card animate-entrance" style={{ animationDelay: "0.1s" }}>
+          <div className="section-title">Evento</div>
           <div className="form-row">
             <div className="form-group">
               <span className="form-label">TIPO DE EVENTO</span>
@@ -1309,6 +1332,7 @@ export default function App() {
             }
           </div>
           <hr />
+          <div className="section-title">Barra libre</div>
           <div className="form-row">
             <div className="range-group">
               <label className="checkbox-label">
@@ -1332,7 +1356,8 @@ export default function App() {
             </div>
           </div>
           <hr />
-          <div className="checkbox-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="section-title">Extras</div>
+          <div className="checkbox-grid">
             {[
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
               [llevaEntrante,        setLlevaEntrante,        "Lleva entrante",           "chupito de cristal"],
@@ -1373,6 +1398,7 @@ export default function App() {
             </div>
           )}
           <hr />
+          <div className="section-title">Equipamiento</div>
           <div className="controls-stack">
             <div className="controls-row">
               <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
@@ -1451,8 +1477,8 @@ export default function App() {
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s` }}>
               <div className="category-header" onClick={() => toggleCategory(cat.nombre)}>
-                {cat.nombre}
-                <span className="cat-count">{cat.items.length} ▼</span>
+                <span className="cat-name"><span className="cat-icon">{iconoCategoria(cat.nombre)}</span>{cat.nombre}</span>
+                <span className="cat-count">{cat.items.length}<span className="arrow">▼</span></span>
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
