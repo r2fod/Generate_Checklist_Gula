@@ -271,11 +271,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
   const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
+  const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
     ["Sillas (alquiler)", String(totalPax), true],
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
-    ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", "—"], ["Taburetes", "—"],
+    ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
     ["Cajas de madera para alturas", "—"],
     ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
@@ -337,7 +339,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
+    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
     ...(usaTela
       ? [["Servilletas de tela", String(totalPax)], ["Servilletas de papel (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
       : [["Servilletas de papel", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
