@@ -269,8 +269,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Carros de servicio/transporte", "2"],
   ]});
 
-  const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
+  // sea cual sea el tipo de bandeja elegido para el resto del servicio
+  const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
+  const bandejasPl     = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
@@ -362,7 +366,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cucharas postre", String(totalPax)],
     ["Cucharas café", String(Math.round(totalPax * 0.8))],
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
+    ...(!llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
   ]});
 
   const personal = calcPersonal(pax, numCamareros);
@@ -434,8 +438,12 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
-  const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
+  // sea cual sea el tipo de bandeja elegido para el resto del servicio
+  const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
+  const bandejasPl     = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -511,7 +519,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
+    ...(!llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -550,8 +558,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const usaTela = fuerzaTextilTela;
   const totalPax = pax + ninos;
   const hayBarra = (horasCoctel + horasCopas) > 0;
-  const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
+  // sea cual sea el tipo de bandeja elegido para el resto del servicio
+  const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
+  const bandejasPl     = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -609,7 +621,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
+    ...(!llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
@@ -1288,7 +1300,7 @@ export default function App() {
             {[
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
               [llevaEntrante,        setLlevaEntrante,        "Lleva entrante",           "chupito de cristal"],
-              [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "añade platos de canapés"],
+              [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "bandejas en vez de platos"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
