@@ -341,14 +341,14 @@ function calcMesasTotal(evtKey, pax) {
 // Categoría de Café, compartida por los 3 tipos de evento
 // Las 3 cafeteras son propiedad de la empresa (no alquiler):
 // - Nespresso: cápsulas, cantidad calculada para cubrir el pax.
-// - Bar: cafetera tipo bar (espresso/portafiltro), café molido por taza.
-// - Grande: cafetera industrial, hace cargas de ~100 cafés con café molido.
+// - Bar: cafetera tipo bar (portátil), también funciona con cápsulas, no café molido.
+// - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
 function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
   const items = [];
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], ["Café molido (cafetera de bar)", `${Math.ceil(totalPax / 50)} paq.`]);
+    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 2.2 : 1.5)))], ["Cuencos para calentar leche", "2"]);
   } else {
     items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 2.2 : 1.5)))], ["Cuencos para calentar leche", "2"]);
   }
@@ -364,13 +364,12 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 15 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / 40)))],
   );
-  // Coffee break / desayuno: bollería, fruta, zumos y vajilla extra de desayuno
+  // Coffee break / desayuno: bollería, fruta y zumos (los vasos extra van en Cristalería)
   if (hayDesayuno) {
     items.push(
       ["Bollería variada (mini)", `${Math.ceil(totalPax * 1.5)} uds.`],
       ["Fruta fresca (brocheta/macedonia)", String(totalPax)],
       ["Zumos naturales", `${Math.ceil(totalPax / 10)} packs`],
-      ["Vasos extra (agua/zumo)", String(Math.ceil(totalPax * 1.2))],
     );
   }
   return { nombre: "Café", items };
@@ -454,7 +453,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (tieneFrituras) cocinaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Trípode (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
   if (tipoBBQ !== "no lleva") {
-    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"], ["Gastros extra", "—"]);
+    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
   }
   cats.push({ nombre: "Cocina y fuego", items: cocinaItems });
 
@@ -473,12 +472,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))]] : []),
+    ...(hayDesayuno ? [["Vasos extra (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
-    [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax / 40)} paq.`],
-    ["Servilletas cocktail", `${Math.ceil(totalPax / 100)} paq. (100)`],
+    [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 3 / 50)} paq. (50)`],
+    ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
   ]});
 
   cats.push({ nombre: "Vajilla", items: [
@@ -525,7 +525,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Vodka", String(destilados.vodka)], ["Vermut rojo", String(destilados.vermut)],
       ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
       ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
-      ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peach (licor de melocotón)", String(destilados.peach)],
+      ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
       ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
       ["Orujo de hierbas", String(destilados.orujoHierbas)],
       ["Ballantines", "1"], ["Barceló", "1"], ["Martini", "1"], ["Crema de arroz", "1"],
@@ -606,7 +606,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
-    [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax / 40)} paq.`],
+    [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 5 / 50)} paq. (50)`],
   ]});
 
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
@@ -621,7 +621,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
-    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)], ["Vasos extra (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -714,7 +714,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
-    ["Servilletas (grandes / cocktail)", `${Math.ceil(totalPax / 40)} paq.`],
+    ["Servilletas (grandes / cocktail)", `${Math.ceil(totalPax * 5 / 50)} paq. (50)`],
     ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
@@ -727,6 +727,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
+    ...(hayDesayuno ? [["Vasos extra de cartón (agua/zumo desayuno)", String(Math.ceil(totalPax * 1.2))]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
