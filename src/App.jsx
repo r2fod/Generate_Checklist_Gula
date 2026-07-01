@@ -332,7 +332,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mantelería y textiles", items: [
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
-    [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 6 / 50)} paq. (50)`],
+    ...(usaTela
+      ? [["Servilletas de tela", String(totalPax)], ["Servilletas de papel (extra)", `${Math.ceil(totalPax * 2 / 50)} paq. (50)`]]
+      : [["Servilletas de papel", `${Math.ceil(totalPax * 6 / 50)} paq. (50)`]]),
     ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
   ]});
 
@@ -475,7 +477,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
-    [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 7 / 50)} paq. (50)`],
+    ...(usaTela
+      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax * 2 / 50)} paq. (50)`]]
+      : [["Servilletas grandes", `${Math.ceil(totalPax * 7 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -526,9 +531,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
-    tipoPaella, numCamareros,
+    tipoPaella, numCamareros, fuerzaTextilTela,
   } = opts;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
+  const usaTela = fuerzaTextilTela;
   const totalPax = pax + ninos;
   const hayBarra = (horasCoctel + horasCopas) > 0;
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
@@ -593,7 +599,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
-    ["Servilletas (grandes / cocktail)", `${Math.ceil(totalPax * 7 / 50)} paq. (50)`],
+    ...(usaTela
+      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax * 2 / 50)} paq. (50)`]]
+      : [["Servilletas grandes", `${Math.ceil(totalPax * 7 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
     ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
@@ -1274,6 +1283,9 @@ export default function App() {
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
+              ...(evento !== "boda"
+                ? [[fuerzaTextilTela, setFuerzaTextilTela, "Servilletas de tela", "añade tela y reduce las de papel grandes"]]
+                : []),
               ...(evento !== "cumpleanos" && evento !== "produccion"
                 ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
                 : []),
