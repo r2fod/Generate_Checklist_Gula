@@ -402,10 +402,12 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .range-slider {
   flex: 1;
+  min-width: 0;
   accent-color: var(--accent);
   cursor: pointer;
   transition: var(--transition-smooth);
