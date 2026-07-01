@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -935,6 +935,60 @@ export default function App() {
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
   const [categoriaTocada, setCategoriaTocada] = useState(false);
+  const [linkAbierto, setLinkAbierto] = useState(false);
+
+  // Snapshot completo del estado configurable, para generar un link que reabra
+  // la misma checklist en cualquier dispositivo (sin backend: todo va en la URL)
+  const ESTADO_SETTERS = {
+    evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
+    horaInicio: setHoraInicio, ubicacion: setUbicacion, pax: setPax, ninos: setNinos,
+    barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
+    dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
+    estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, tipoBandejas: setTipoBandejas,
+    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
+    tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
+    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
+    extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
+    personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
+    tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador,
+    itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
+  };
+
+  // Al abrir un link generado (?c=...), restaura el estado guardado en la URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("c");
+    if (!c) return;
+    try {
+      const estado = JSON.parse(decodeURIComponent(c));
+      Object.entries(estado).forEach(([k, v]) => { if (ESTADO_SETTERS[k]) ESTADO_SETTERS[k](v); });
+      setLinkAbierto(true);
+    } catch (e) { /* link corrupto o antiguo: se ignora y se queda en los valores por defecto */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleGenerarLink = () => {
+    const estado = {
+      evento, nombreEvento, fechaEvento, horaInicio, ubicacion, pax, ninos,
+      barraCoctel, horasCoctel, barraCopas, horasCopas,
+      dobleServicio, llevaEntrante, llevaPaella, tipoPaella,
+      estiloPlatoPrincipal, estiloPlatoPostre,
+      llevaArmarioCaliente, numCamareros, tipoBandejas,
+      tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
+      tieneFrituras, numFrituras, fuerzaTextilTela,
+      llevaPalomitera, llevaJarrasCristal, tipoCafetera,
+      extraBandejasMadera, extraBandejasPlata, llevaJamonero,
+      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+      tipoNevera, tipoCongelador, itemsManuales, overridesManuales,
+    };
+    const url = `${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(estado))}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCompartirMsg("¡Link copiado! ✓");
+      setTimeout(() => setCompartirMsg(""), 3000);
+    });
+    setMenuCompartir(false);
+  };
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
@@ -1105,6 +1159,7 @@ export default function App() {
                 <>
                   <div className="compartir-menu-backdrop" onClick={() => setMenuCompartir(false)} />
                   <div className="compartir-menu">
+                    <button onClick={handleGenerarLink}>🔗 Link para el móvil</button>
                     <button onClick={handleCompartirWord}>📄 Word</button>
                     <button onClick={handleCompartirPDF}>🖨️ PDF</button>
                     <button onClick={handleCompartirWhatsapp}>💬 WhatsApp (texto)</button>
@@ -1115,6 +1170,10 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {linkAbierto && fechaEvento && fechaEvento < new Date().toISOString().slice(0, 10) && (
+          <div className="archivado-banner">📦 Este evento ya pasó — checklist archivada, solo para consulta.</div>
+        )}
 
         <div className="main-layout">
         <div className="config-sidebar">
