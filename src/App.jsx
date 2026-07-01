@@ -308,7 +308,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     if (!llevaPaella) cocinaItems.push(["Difusores", String(numFritura)], ["Trípode", String(numFritura)]);
   }
   if (tipoBBQ !== "no lleva") {
-    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
+    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
   }
   cats.push({ nombre: "Cocina y fuego", items: cocinaItems });
 
@@ -332,7 +332,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mantelería y textiles", items: [
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
-    [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 3 / 50)} paq. (50)`],
+    [usaTela ? "Servilletas de tela" : "Servilletas de papel", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 6 / 50)} paq. (50)`],
     ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
   ]});
 
@@ -369,7 +369,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
     ["Vino blanco", `${bebidas.vinoBlanco} botellas`], ["Vino tinto", `${bebidas.vinoTinto} botellas`],
     ["Cava", `${bebidas.cava} botellas`], ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta / Aquarius", String(bebidas.fanta)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
@@ -475,7 +475,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
-    [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 5 / 50)} paq. (50)`],
+    [usaTela ? "Servilletas de tela" : "Servilletas (grandes / cocktail)", usaTela ? String(totalPax) : `${Math.ceil(totalPax * 7 / 50)} paq. (50)`],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -502,7 +502,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Coca Cola (Normal / Zero)", String(bebidas.cocaNormal + bebidas.cocaZero)],
     ["Fanta (Limón / Naranja / Aquarius / Nestea)", String(bebidas.fanta + bebidas.nestea)],
     ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
     ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
     ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
@@ -593,7 +593,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
-    ["Servilletas (grandes / cocktail)", `${Math.ceil(totalPax * 5 / 50)} paq. (50)`],
+    ["Servilletas (grandes / cocktail)", `${Math.ceil(totalPax * 7 / 50)} paq. (50)`],
     ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
@@ -604,7 +604,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
     ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
     ["Agua 1,5L (Solán de Cabras, cliente)", `${Math.round(totalPax * 0.8)} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", `${Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35))} cajas (35 uds)`]] : []),
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35))} cajas (35 uds)`]] : []),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
   ]});
@@ -1138,19 +1138,19 @@ export default function App() {
             <div className="range-group">
               <label className="checkbox-label">
                 <input type="checkbox" checked={barraCoctel} onChange={e => setBarraCoctel(e.target.checked)} />
-                BARRA LIBRE CÓCTEL / APERITIVO
+                Cóctel / aperitivo
               </label>
               <div className="range-slider-container">
                 <input type="range" min="0" max="6" step="0.5" className="range-slider" value={horasCoctel} onChange={e => setHorasCoctel(parseFloat(e.target.value))} disabled={!barraCoctel} />
                 <span className="range-value">{horasCoctel}h</span>
               </div>
             </div>
-            <div className="range-group" style={{ gridColumn: "span 2" }}>
+            <div className="range-group">
               <label className="checkbox-label">
                 <input type="checkbox" checked={barraCopas} onChange={e => setBarraCopas(e.target.checked)} />
-                BARRA LIBRE COPAS
+                Copas
               </label>
-              <div className="range-slider-container" style={{ maxWidth: "50%" }}>
+              <div className="range-slider-container">
                 <input type="range" min="0" max="12" step="1" className="range-slider" value={horasCopas} onChange={e => setHorasCopas(parseFloat(e.target.value))} disabled={!barraCopas} />
                 <span className="range-value">{horasCopas}h</span>
               </div>
@@ -1170,7 +1170,7 @@ export default function App() {
                 : []),
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
-              [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33/50cl"],
+              [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
               ...(evento !== "cumpleanos" && evento !== "produccion"
                 ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
