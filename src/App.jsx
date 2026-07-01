@@ -394,7 +394,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, tieneCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
-  const cristal    = calcCristaleria(pax, hayBarra ? horasBarraTotal : 2, dobleServicio, tieneBrindisCava, llevaEntrante);
+  // Los vasos de cubata dependen de las horas reales de barra libre (0 si no hay barra);
+  // vino/agua/cava/chupito no dependen de esto, se calculan igual para el servicio de mesa.
+  const cristal    = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -420,7 +422,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Bandeja camarero", String(personalSala(pax, numCamareros))],
     ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
-    [`Nevera (${tipoNevera})`, "1"], [`Congelador (${tipoCongelador})`, "1"], ["Nevera roja", "—"],
+    // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
+    [tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"],
+    [`Congelador (${tipoCongelador})`, "1"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
 
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
@@ -461,7 +465,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Copas de cava",                                     `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
-    ...(llevaJarrasCristal ? [["Jarras de cristal", "—"]] : []),
+    ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
@@ -513,7 +517,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Vodka", String(destilados.vodka)], ["Vermut rojo", String(destilados.vermut)],
       ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
       ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
-      ["Jagger", String(destilados.jagger)], ["Peach", String(destilados.peach)],
+      ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peach (licor de melocotón)", String(destilados.peach)],
       ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
       ["Orujo de hierbas", String(destilados.orujoHierbas)],
       ["Ballantines", "1"], ["Barceló", "1"], ["Martini", "1"], ["Crema de arroz", "1"],
@@ -544,7 +548,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const totalPax = pax + ninos;
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, tieneCongelador);
-  const cristal = calcCristaleria(pax, hayBarra ? horasBarraTotal : 2, dobleServicio, tieneBrindisCava, llevaEntrante);
+  const cristal = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante);
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
   const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
@@ -599,7 +603,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
     ["Platos trinchero blancos", String(totalPax)], ["Platos metálicos", "—"], ["Platos postre", String(totalPax)],
-    ["Jarras de cristal", "—"],
+    ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
     ["Cucharas postre", String(totalPax)],
     [`Copas cristal${dobleServicio ? " (doble)" : ""}`, `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
@@ -692,7 +696,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ["Tenedores / Cuchillos / Cucharas grandes", String(totalPax * (dobleServicio ? 2 : 1))],
     ["Cucharas postre", String(totalPax)],
-    ["Jarras de cristal", "—"], ["Abridores", "2"],
+    ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))], ["Abridores", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
