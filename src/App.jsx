@@ -1076,16 +1076,10 @@ export default function App() {
               <span className="form-label">NIÑOS</span>
               <input type="number" className="form-input" value={ninos} onChange={e => setNinos(parseInt(e.target.value) || 0)} min="0" />
             </div>
-          </div>
-          <div className="form-row">
-            {numCamareros > 0
-              ? <div style={{ padding: "10px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, fontSize: "0.85rem", color: "#16a34a" }}>
-                  ✓ Nº camareros importado del Excel → <strong>{numCamareros} unidades</strong> de bandeja camarero
-                </div>
-              : <div style={{ padding: "10px 12px", background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: "0.85rem", color: "#9ca3af" }}>
-                  Bandeja camarero → se calculará automáticamente por pax (importa el Excel para fijar el nº de camareros)
-                </div>
-            }
+            <div className="form-group">
+              <span className="form-label">Nº CAMAREROS</span>
+              <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(parseInt(e.target.value) || 0)} min="0" />
+            </div>
           </div>
           <hr />
           <div className="section-title">Barra libre</div>

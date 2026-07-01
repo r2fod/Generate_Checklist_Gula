@@ -255,10 +255,10 @@ body {
   background: var(--card-bg);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
-  padding: 26px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
   box-shadow: var(--shadow-md);
   transition: var(--transition-smooth);
 }
@@ -275,14 +275,14 @@ body {
 /* Form Grid */
 .form-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
 }
 
 .form-label {
@@ -318,11 +318,11 @@ body {
 .range-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   background: var(--bg-color);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  padding: 10px 14px;
 }
 
 .checkbox-label {
@@ -376,12 +376,12 @@ body {
 .controls-stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .controls-row {
   display: flex;
-  gap: 20px 28px;
+  gap: 14px 20px;
   flex-wrap: wrap;
   align-items: flex-end;
 }
@@ -447,18 +447,18 @@ body {
 .checkbox-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 
 .checkbox-label-normal {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: 0.86rem;
+  gap: 8px;
+  font-size: 0.84rem;
   color: var(--text-main);
   cursor: pointer;
   transition: var(--transition-smooth);
-  padding: 12px 14px;
+  padding: 9px 11px;
   border: 1.5px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: white;
