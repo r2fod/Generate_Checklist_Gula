@@ -96,7 +96,8 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const tonica = Math.max(6, Math.round(pax * 0.15 * barFactor));
   const agua15 = Math.round(pax * 0.5);
   const redbull = h > 0 ? Math.max(12, Math.round(pax * 0.12 * barFactor)) : 0;
-  const taxisHielo = tieneCongelador ? Math.max(1, Math.ceil(pax / 80)) : Math.max(2, Math.ceil(pax / 30));
+  // Con congelador en la finca se hace/almacena el hielo in situ: no hace falta traerlo en taxis
+  const taxisHielo = tieneCongelador ? 0 : Math.max(2, Math.ceil(pax / 30));
   return {
     cerveza, vinoBlanco, vinoTinto, cava, tonica, agua15, redbull,
     cocaNormal: Math.round(refrescoTotal * 0.25),
@@ -345,7 +346,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fanta / Aquarius", String(bebidas.fanta)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
-    ["Hielo", `${bebidas.taxisHielo} ${tieneCongelador ? "cajas almacén" : "taxis"}`],
+    ["Hielo", tieneCongelador ? "No hace falta (se hace en la finca)" : `${bebidas.taxisHielo} taxis`],
     ...(hayBarra ? [["Redbull", String(bebidas.redbull)]] : []),
   ]});
 
@@ -468,7 +469,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
     ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
-    ["Hielo", `${bebidas.taxisHielo} ${tieneCongelador ? "cajas almacén" : "taxis"}`],
+    ["Hielo", tieneCongelador ? "No hace falta (se hace en la finca)" : `${bebidas.taxisHielo} taxis`],
   ]});
 
   cats.push({ nombre: "Limpieza", items: [
@@ -1090,6 +1091,9 @@ export default function App() {
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33/50cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
+              ...(evento !== "produccion"
+                ? [[tieneCongelador, setTieneCongelador, "Finca con congelador", "no hace falta traer hielo en taxis"]]
+                : []),
               ...(evento !== "cumpleanos" && evento !== "produccion"
                 ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
                 : []),
