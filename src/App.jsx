@@ -90,7 +90,16 @@ const DEFAULTS = {
 // las celdas de un Google Sheet pueden contener saltos de línea entre comillas
 // (notas, observaciones...), y partir por líneas primero desplazaba las columnas
 // de todas las filas siguientes a esa celda, corrompiendo la importación entera.
-function parseCSV(text) {
+// Detecta si el texto pegado usa tabulador (copiado de Excel/Sheets) o coma (CSV) como separador
+function detectarDelimitador(text) {
+  const primeraLinea = text.split("\n")[0] || "";
+  const tabs = (primeraLinea.match(/\t/g) || []).length;
+  const comas = (primeraLinea.match(/,/g) || []).length;
+  return tabs > comas ? "\t" : ",";
+}
+
+function parseCSV(text, delimitador) {
+  const delim = delimitador || detectarDelimitador(text);
   const filas = [];
   let fila = [], celda = "", enComillas = false;
   for (let i = 0; i < text.length; i++) {
@@ -104,7 +113,7 @@ function parseCSV(text) {
       }
     } else if (c === '"') {
       enComillas = true;
-    } else if (c === ",") {
+    } else if (c === delim) {
       fila.push(celda.trim()); celda = "";
     } else if (c === "\r") {
       // ignorar, lo gestiona el \n siguiente
@@ -361,8 +370,6 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
       ["Bollería variada (mini)", `${Math.ceil(totalPax * 1.5)} uds.`],
       ["Fruta fresca (brocheta/macedonia)", String(totalPax)],
       ["Zumos naturales", `${Math.ceil(totalPax / 10)} packs`],
-      ["Platos de desayuno", String(totalPax)],
-      ["Cubiertos de desayuno (cuchillo y cuchara)", String(totalPax)],
       ["Vasos extra (agua/zumo)", String(Math.ceil(totalPax * 1.2))],
     );
   }
@@ -486,11 +493,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
     ...(evtKey === "boda" ? [["Platos extra para Tarta nupcial", String(totalPax)]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
-    ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", "—"],
+    ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -613,6 +621,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -629,7 +638,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
-    ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", "—"],
+    ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
   ]});
 
   return cats;
@@ -701,6 +710,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaJamonero ? [["Platos extra para Jamón", String(Math.ceil(pax * 0.3))]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(hayDesayuno ? [["Platos extra de desayuno", String(totalPax)], ["Cubiertos extra de desayuno (cuchillo y cuchara)", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
@@ -723,7 +733,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
-    ["Cajas vacías", "2"], ["Ceniceros", "—"],
+    ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
   ]});
 
   return cats;
@@ -786,49 +796,56 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, on
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", overflowY: "auto", padding: "24px 16px" }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 820, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", animation: "slideUpFade 0.3s ease both" }} onClick={e => e.stopPropagation()}>
-        <div style={{ background: "#1f314d", color: "white", padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={e => e.stopPropagation()}>
+        <div className="preview-header">
           <div>
-            <div style={{ fontWeight: 700, fontSize: "1.2rem" }}>CHECKLIST DE EVENTO</div>
-            <div style={{ fontSize: "0.85rem", opacity: 0.7, marginTop: 2 }}>{EVENTOS[evtKey]?.label?.toUpperCase()} · {pax} PAX · {fecha}</div>
+            <div className="preview-header-title">Checklist de evento</div>
+            <div className="preview-header-subtitle">{EVENTOS[evtKey]?.label} · {pax} pax{ninos > 0 ? ` · ${ninos} niños` : ""} · {fecha}</div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: "1rem" }}>✕ Cerrar</button>
+          <button className="preview-close-btn" onClick={onClose}>✕ Cerrar</button>
         </div>
-        <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="preview-body">
           {checklist.map(cat => (
-            <div key={cat.nombre}>
-              <div style={{ background: "#1f314d", color: "white", padding: "8px 12px", fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>{cat.nombre}</div>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
-                <thead>
-                  <tr style={{ background: "#f3f4f6" }}>
-                    {["Concepto", "Cant.", "Sale ✓", "Vuelve ✓", "Roturas"].map(h => (
-                      <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, fontSize: "0.75rem", textTransform: "uppercase", color: "#6b7280" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {cat.items.map(([label, qty], i) => {
-                    const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
-                    return (
-                      <tr key={i} style={{ background: alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#fafafa", borderBottom: "1px solid #f0f0f0" }}>
-                        <td style={{ padding: "8px 10px" }}>
-                          {label}
-                          {alq && <span style={{ background: "#f59e0b", color: "white", fontSize: "0.65rem", fontWeight: 800, padding: "1px 5px", borderRadius: 3, marginLeft: 6 }}>ALQUILER</span>}
-                        </td>
-                        <td style={{ padding: "8px 10px", fontWeight: 700, color: "#16a34a" }}>{qty.u ? qty.u : qty}</td>
-                        <td style={{ padding: "8px 10px", width: 50 }}></td>
-                        <td style={{ padding: "8px 10px", width: 50 }}></td>
-                        <td style={{ padding: "8px 10px", width: 50 }}></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="preview-category" key={cat.nombre}>
+              <div className="preview-category-header">
+                <span>{iconoCategoria(cat.nombre)}</span>
+                <span>{cat.nombre}</span>
+              </div>
+              <div className="preview-table-wrap">
+                <table className="preview-table">
+                  <thead>
+                    <tr>
+                      <th>Concepto</th>
+                      <th>Cant.</th>
+                      <th className="preview-check-cell">Sale</th>
+                      <th className="preview-check-cell">Vuelve</th>
+                      <th className="preview-check-cell">Roturas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cat.items.map(([label, qty], i) => {
+                      const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+                      return (
+                        <tr key={i} className={alq ? "is-rental" : ""}>
+                          <td>
+                            {label}
+                            {alq && <span className="preview-rental-badge">ALQUILER</span>}
+                          </td>
+                          <td className="preview-qty-cell">{qty.u ? qty.u : qty}</td>
+                          <td className="preview-check-cell"></td>
+                          <td className="preview-check-cell"></td>
+                          <td className="preview-check-cell"></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ))}
-          <div style={{ border: "1px solid #e5e7eb", padding: 16, borderRadius: 8, minHeight: 80 }}>
-            <strong style={{ fontSize: "0.8rem", textTransform: "uppercase", color: "#6b7280" }}>NOTAS</strong>
+          <div className="preview-notes">
+            <strong>Notas</strong>
           </div>
         </div>
       </div>
@@ -836,81 +853,29 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, on
   );
 }
 
-// Extrae el listado real de pestañas (nombre + gid) de la vista pública htmlview de un Sheet.
-// Google incrusta esto en un <script> como items.push({name: "...", pageUrl: "...", gid: "..."})
-// una vez por pestaña, y el endpoint responde con CORS abierto, así que es fetcheable desde el navegador.
-function parsePestanas(html) {
-  const regex = /items\.push\(\{name:\s*"((?:\\.|[^"\\])*)"\s*,\s*pageUrl:\s*"(?:\\.|[^"\\])*"\s*,\s*gid:\s*"(-?\d+)"/g;
-  const out = [];
-  let m;
-  while ((m = regex.exec(html))) {
-    out.push({ name: m[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\"), gid: m[2] });
-  }
-  return out;
-}
-
 // ─── MODAL IMPORTAR SHEET ─────────────────────────────────────────────────────
 function ModalImportSheet({ onClose, onImport }) {
-  const [url, setUrl]               = useState("");
-  const [cargando, setCargando]     = useState(false);
+  const [texto, setTexto]           = useState("");
   const [error, setError]           = useState("");
-  const [sheetId, setSheetId]       = useState(null);
-  const [pestanas, setPestanas]     = useState([]); // [{name, gid}]
-  const [pestanaUsada, setPestanaUsada] = useState(null); // nombre de la pestaña ya cargada
   const [sheetData, setSheetData]   = useState(null); // { headers, rows }
   const [filaIdx, setFilaIdx]       = useState(0);
   const [mapeo, setMapeo]           = useState({}); // campo.key → nombre columna del sheet
   const [mostrarMapeoManual, setMostrarMapeoManual] = useState(false);
-  const [paso, setPaso]             = useState("url"); // url → pestana (solo si hay varias) → fila
+  const [paso, setPaso]             = useState("pegar"); // pegar → fila
 
-  const extractSheetId = (u) => {
-    const m = u.match(/\/spreadsheets\/d\/([\w-]+)/);
-    return m ? m[1] : null;
-  };
-
-  const cargarPestana = async (id, gid, nombre) => {
-    setError(""); setCargando(true);
-    try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${gid != null ? `&gid=${gid}` : ""}`;
-      const res = await fetch(csvUrl);
-      if (!res.ok) throw new Error("No se pudo leer esa pestaña del Sheet.");
-      const text = await res.text();
-      const data = parseCSV(text);
-      if (data.headers.length === 0) throw new Error("Esa pestaña parece estar vacía.");
-      setSheetData(data);
-      setMapeo(autoMapearColumnas(data.headers, CAMPOS_LOGISTICA));
-      setPestanaUsada(nombre || null);
-      setPaso("fila");
-    } catch (e) {
-      setError(e.message);
-    }
-    setCargando(false);
-  };
-
-  // Paso 1: analiza el Sheet — detecta automáticamente sus pestañas
-  const conectar = async () => {
-    setError(""); setCargando(true);
-    const id = extractSheetId(url);
-    if (!id) { setError("URL inválida. Asegúrate de pegar el link completo del Google Sheet."); setCargando(false); return; }
-    setSheetId(id);
-    try {
-      const res = await fetch(`https://docs.google.com/spreadsheets/d/${id}/htmlview`);
-      if (!res.ok) throw new Error("No se pudo acceder al Sheet. ¿Está compartido con 'Cualquier persona con el link puede ver'?");
-      const html = await res.text();
-      const detectadas = parsePestanas(html);
-      if (detectadas.length > 1) {
-        setPestanas(detectadas);
-        setCargando(false);
-        setPaso("pestana");
-        return;
-      }
-      // Una sola pestaña (o no se pudo detectar el listado): cargar directamente
-      await cargarPestana(id, detectadas[0]?.gid ?? null, detectadas[0]?.name ?? null);
+  // Paso 1: procesa el contenido pegado (copiado directamente de Excel/Google Sheets)
+  const procesarPegado = () => {
+    setError("");
+    if (!texto.trim()) { setError("Pega primero el contenido de la hoja (selecciona las celdas en Excel/Sheets y cópialas con Ctrl+C / Cmd+C)."); return; }
+    const data = parseCSV(texto);
+    if (data.headers.length === 0 || data.rows.length === 0) {
+      setError("No he podido interpretar el contenido pegado. Asegúrate de copiar también la fila de cabeceras y al menos una fila de datos.");
       return;
-    } catch (e) {
-      setError(e.message);
     }
-    setCargando(false);
+    setSheetData(data);
+    setMapeo(autoMapearColumnas(data.headers, CAMPOS_LOGISTICA));
+    setFilaIdx(0);
+    setPaso("fila");
   };
 
   const aplicarImportacion = () => {
@@ -931,7 +896,7 @@ function ModalImportSheet({ onClose, onImport }) {
     background: "white", color: "#374151", width: "100%", cursor: "pointer",
   };
 
-  const tituloPaso = { url: "Pega el link del Sheet", pestana: "Elige la pestaña", fila: "Elige el evento a importar" }[paso];
+  const tituloPaso = { pegar: "Pega el contenido de tu hoja", fila: "Elige el evento a importar" }[paso];
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
@@ -940,7 +905,7 @@ function ModalImportSheet({ onClose, onImport }) {
         {/* Header */}
         <div style={{ background: "#1f314d", color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📊 Importar desde Google Sheets</div>
+            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📋 Importar desde Excel / Google Sheets</div>
             <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>{tituloPaso}</div>
           </div>
           <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
@@ -948,50 +913,26 @@ function ModalImportSheet({ onClose, onImport }) {
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* PASO URL */}
-          {paso === "url" && (
+          {/* PASO PEGAR: pegar directamente el contenido copiado de la hoja, sin depender de red/CORS */}
+          {paso === "pegar" && (
             <>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
-                ℹ️ El Google Sheet debe estar <strong>compartido con "Cualquier persona con el link puede ver"</strong>.<br/>
-                Ve a tu Sheet → Compartir → Cambiar a cualquier persona con el vínculo → Solo lectura.<br/><br/>
-                Pega el link principal del Sheet (no hace falta que sea de una pestaña concreta): si tiene varias, te las mostraré para que elijas.
+                ℹ️ Abre tu Excel o Google Sheets, <strong>selecciona las celdas</strong> (incluyendo la fila de cabeceras) y cópialas con <strong>Ctrl+C</strong> (Cmd+C en Mac). Luego pégalas aquí abajo con <strong>Ctrl+V</strong>.
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Link del Google Sheet</label>
-                <input
-                  type="url"
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && conectar()}
-                  style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.95rem" }}
+                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Contenido pegado</label>
+                <textarea
+                  placeholder="Pega aquí el contenido copiado de tu hoja de cálculo..."
+                  value={texto}
+                  onChange={e => setTexto(e.target.value)}
+                  rows={10}
+                  style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.85rem", fontFamily: "monospace", cursor: "text", resize: "vertical" }}
                 />
               </div>
               {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
-              <button onClick={conectar} disabled={cargando || !url.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: cargando || !url.trim() ? 0.6 : 1 }}>
-                {cargando ? "Analizando el Sheet..." : "Analizar Sheet →"}
+              <button onClick={procesarPegado} disabled={!texto.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: !texto.trim() ? 0.6 : 1 }}>
+                Analizar contenido →
               </button>
-            </>
-          )}
-
-          {/* PASO PESTAÑA: solo aparece si el Sheet tiene más de una */}
-          {paso === "pestana" && (
-            <>
-              <p style={{ fontSize: "0.85rem", color: "#6b7280" }}>Este Sheet tiene {pestanas.length} pestañas. Elige cuál quieres importar:</p>
-              {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto" }}>
-                {pestanas.map(p => (
-                  <button
-                    key={p.gid}
-                    disabled={cargando}
-                    onClick={() => cargarPestana(sheetId, p.gid, p.name)}
-                    style={{ textAlign: "left", padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: 8, background: "white", cursor: cargando ? "default" : "pointer", fontWeight: 600, color: "#1f314d", opacity: cargando ? 0.6 : 1 }}
-                  >
-                    📑 {p.name}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setPaso("url")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
             </>
           )}
 
@@ -999,7 +940,7 @@ function ModalImportSheet({ onClose, onImport }) {
           {paso === "fila" && sheetData && (
             <>
               <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
-                ✓ Pestaña "{pestanaUsada || "primera"}" cargada — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. Las columnas se han mapeado automáticamente a la checklist.
+                ✓ Contenido interpretado — {sheetData.headers.length} columnas, {sheetData.rows.length} filas. Las columnas se han mapeado automáticamente a la checklist.
               </div>
               <p style={{ fontWeight: 600, color: "#374151" }}>Elige el evento a importar ({sheetData.rows.length} filas disponibles):</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 280, overflowY: "auto" }}>
@@ -1041,7 +982,7 @@ function ModalImportSheet({ onClose, onImport }) {
               )}
 
               <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                <button onClick={() => setPaso(pestanas.length > 1 ? "pestana" : "url")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
+                <button onClick={() => setPaso("pegar")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
                 <button onClick={aplicarImportacion} style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", flex: 1 }}>
                   ✓ Importar y generar checklist
                 </button>
@@ -1302,7 +1243,7 @@ export default function App() {
           }}
           onClick={() => setModalSheet(true)}
         >
-          <span>📊 {importedTag || "Importar datos desde Google Sheets"}</span>
+          <span>📋 {importedTag || "Importar desde Excel / Google Sheets"}</span>
           <span style={{ fontSize: 12 }}>→</span>
         </button>
 
