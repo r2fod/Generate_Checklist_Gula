@@ -166,9 +166,10 @@ function calcPersonal(pax, numCamareros) {
   const n = personalSala(pax, numCamareros);
   return {
     n,
-    vasosCarton: n * 2,
-    aguaVidaqua: Math.max(1, Math.ceil(n / 3)),
-    vasosPlastico: n * 2,
+    // Los vasos de café son "mini" (tamaño espresso/cortado): siempre se llevan 3 packs
+    vasosCartonPacks: 3,
+    aguaVidaquaPacks: Math.max(1, Math.ceil(n / 6)),
+    vasosPlasticoPacks: Math.max(1, Math.ceil(n / 6)),
   };
 }
 
@@ -245,7 +246,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const cats       = [];
 
   cats.push({ nombre: "Electricidad y camión", items: [
-    ["Regletas y alargadores", "Sí"], ["Caja cables", "1"], ["Cinta aislante", "1"],
+    ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"], ["Cinta aislante", "1"],
     ["Bridas", "1 bolsa"], ["Rulos cable", "2"], ["Imperdibles", "1 paquete"],
     ["Carros de servicio/transporte", "2"],
   ]});
@@ -345,9 +346,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café (personal)", String(personal.vasosCarton)],
-    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaqua} botellas`],
-    ["Vasos de plástico (personal)", String(personal.vasosPlastico)],
+    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (6 uds)`],
+    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
+    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (6 uds)`],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -412,7 +413,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
-    ["Regletas, alargadores y caja cables", "Sí"], ["Cinta aislante / Bridas / Rulos", "1"], ["Walkies", "2"],
+    ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"], ["Cinta aislante / Bridas / Rulos", "1"], ["Walkies", "2"],
   ]});
 
   cats.push({ nombre: "Mobiliario", items: [
@@ -499,9 +500,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
     ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café (personal)", String(personal.vasosCarton)],
-    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaqua} botellas`],
-    ["Vasos de plástico (personal)", String(personal.vasosPlastico)],
+    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (6 uds)`],
+    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
+    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (6 uds)`],
   ]});
 
   return cats;
@@ -523,7 +524,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
-    ["Focos de luz / Trípodes", "—"], ["Regletas, alargadores y caja cables", "Sí"],
+    ["Focos de luz / Trípodes", "—"], ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
     ["Cinta aislante / Bridas / Rulos", "1"], ["Generador + garrafa gasolina (llena)", "1"],
     ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
@@ -602,9 +603,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café (personal)", String(personal.vasosCarton)],
-    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaqua} botellas`],
-    ["Vasos de plástico (personal)", String(personal.vasosPlastico)],
+    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (6 uds)`],
+    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
+    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (6 uds)`],
   ]});
 
   return cats;

@@ -337,6 +337,10 @@ body {
   align-items: flex-end;
 }
 
+.controls-row > * {
+  flex: 0 0 auto;
+}
+
 .controls-mini {
   max-width: 140px;
 }
