@@ -234,7 +234,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
-    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, numCamareros,
+    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -334,9 +334,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y textiles", items: [
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
     ...(usaTela
-      ? [["Servilletas de tela", String(totalPax)], ["Servilletas de papel (extra)", `${Math.ceil(totalPax * 2 / 50)} paq. (50)`]]
-      : [["Servilletas de papel", `${Math.ceil(totalPax * 6 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(totalPax)], ["Servilletas de papel (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
+      : [["Servilletas de papel", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${Math.ceil(totalPax * 3 / 100)} paq. (100)`],
   ]});
 
   {/* Jamón, tarta y desayuno se sirven en plato pequeño (mismo estilo que el postre):
@@ -355,6 +355,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cucharas postre", String(totalPax)],
     ["Cucharas café", String(Math.round(totalPax * 0.8))],
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
   ]});
 
   const personal = calcPersonal(pax, numCamareros);
@@ -409,7 +410,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Cumpleaños — fiel a "Checklist de Carga – cumpleaños"
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante,
+    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
@@ -480,9 +481,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
     ...(usaTela
-      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax * 2 / 50)} paq. (50)`]]
-      : [["Servilletas grandes", `${Math.ceil(totalPax * 7 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
+      : [["Servilletas grandes", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${Math.ceil(totalPax * 3 / 100)} paq. (100)`],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -501,6 +502,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -532,7 +534,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
-    llevaEntrante, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella, numCamareros, fuerzaTextilTela,
   } = opts;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -598,13 +600,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(llevaCanapes ? [["Platos de canapés", String(totalPax)]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
     ...(usaTela
-      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax * 2 / 50)} paq. (50)`]]
-      : [["Servilletas grandes", `${Math.ceil(totalPax * 7 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${Math.ceil(totalPax * 2 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
+      : [["Servilletas grandes", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${Math.ceil(totalPax * 3 / 100)} paq. (100)`],
     ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
@@ -908,6 +911,7 @@ export default function App() {
   const [horasCopas, setHorasCopas]   = useState(4);
   const [dobleServicio, setDobleServicio]             = useState(false);
   const [llevaEntrante, setLlevaEntrante]             = useState(false);
+  const [llevaCanapes, setLlevaCanapes]               = useState(false);
   const [llevaPaella, setLlevaPaella]                 = useState(false);
   const [tipoPaella, setTipoPaella]                   = useState("Auto");
   const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState("Blanco liso");
@@ -954,7 +958,7 @@ export default function App() {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
-    dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
+    dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes, llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
@@ -983,7 +987,7 @@ export default function App() {
     const estado = {
       evento, nombreEvento, fechaEvento, horaInicio, ubicacion, pax, ninos,
       barraCoctel, horasCoctel, barraCopas, horasCopas,
-      dobleServicio, llevaEntrante, llevaPaella, tipoPaella,
+      dobleServicio, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
       estiloPlatoPrincipal, estiloPlatoPostre,
       llevaArmarioCaliente, numCamareros, tipoBandejas,
       tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
@@ -1004,7 +1008,7 @@ export default function App() {
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaArmarioCaliente, numCamareros,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -1275,6 +1279,7 @@ export default function App() {
             {[
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
               [llevaEntrante,        setLlevaEntrante,        "Lleva entrante",           "chupito de cristal"],
+              [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "añade platos de canapés"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
