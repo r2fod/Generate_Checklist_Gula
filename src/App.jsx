@@ -251,9 +251,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
-  // Los vasos de cubata dependen de las horas reales de barra libre (0 si no hay barra);
-  // vino/agua/cava/chupito no dependen de esto, se calculan igual para el servicio de mesa.
-  const cristal    = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
+  // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito no dependen de esto,
+  // se calculan igual para el servicio de mesa.
+  const cristal    = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -421,7 +422,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const hayCongelador = tipoCongelador !== "No lleva";
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
-  const cristal = calcCristaleria(pax, horasBarraTotal, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
+  const cristal = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const bandejasMadera = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
   const bandejasPl     = (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
