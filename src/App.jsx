@@ -13,26 +13,31 @@ const EVENTOS = {
   produccion:  { label: "Producción / Shooting", icon: "▶" },
 };
 
-// Icono decorativo por categoría, buscado por fragmento del nombre (varía según el tipo de evento)
+// Icono decorativo + color pastel por categoría, buscado por fragmento del nombre
+// (varía según el tipo de evento: "Cocina y fuego", "Cocina y Electro"...)
 const ICONOS_CATEGORIA = [
-  { fragmento: "electric", icono: "🔌" },
-  { fragmento: "mobiliario", icono: "🪑" },
-  { fragmento: "cocina", icono: "🍳" },
-  { fragmento: "menaje", icono: "🔪" },
-  { fragmento: "cristal", icono: "🥂" },
-  { fragmento: "mantel", icono: "🧺" },
-  { fragmento: "vajilla", icono: "🍽️" },
-  { fragmento: "limpieza", icono: "🧹" },
-  { fragmento: "café", icono: "☕" },
-  { fragmento: "bebida", icono: "🥤" },
-  { fragmento: "alcohol", icono: "🥃" },
-  { fragmento: "logística", icono: "📦" },
-  { fragmento: "desechable", icono: "🥡" },
-  { fragmento: "otros", icono: "✨" },
+  { fragmento: "electric", icono: "🔌", color: "#fef3c7", texto: "#92400e" },
+  { fragmento: "mobiliario", icono: "🪑", color: "#fce7f3", texto: "#9d174d" },
+  { fragmento: "cocina", icono: "🍳", color: "#ffedd5", texto: "#9a3412" },
+  { fragmento: "menaje", icono: "🔪", color: "#e0e7ff", texto: "#3730a3" },
+  { fragmento: "cristal", icono: "🥂", color: "#cffafe", texto: "#155e75" },
+  { fragmento: "mantel", icono: "🧺", color: "#fae8ff", texto: "#86198f" },
+  { fragmento: "vajilla", icono: "🍽️", color: "#dbeafe", texto: "#1e40af" },
+  { fragmento: "limpieza", icono: "🧹", color: "#d1fae5", texto: "#065f46" },
+  { fragmento: "café", icono: "☕", color: "#f3e8d2", texto: "#78350f" },
+  { fragmento: "bebida", icono: "🥤", color: "#e0f2fe", texto: "#075985" },
+  { fragmento: "alcohol", icono: "🥃", color: "#fee2e2", texto: "#991b1b" },
+  { fragmento: "logística", icono: "📦", color: "#ede9fe", texto: "#5b21b6" },
+  { fragmento: "desechable", icono: "🥡", color: "#fef9c3", texto: "#854d0e" },
+  { fragmento: "otros", icono: "✨", color: "#f1f5f9", texto: "#334155" },
 ];
-function iconoCategoria(nombre) {
+const CATEGORIA_DEFAULT = { icono: "📋", color: "#f1f5f9", texto: "#334155" };
+function infoCategoria(nombre) {
   const n = nombre.toLowerCase();
-  return ICONOS_CATEGORIA.find(i => n.includes(i.fragmento))?.icono || "📋";
+  return ICONOS_CATEGORIA.find(i => n.includes(i.fragmento)) || CATEGORIA_DEFAULT;
+}
+function iconoCategoria(nombre) {
+  return infoCategoria(nombre).icono;
 }
 
 
@@ -94,17 +99,23 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const cava = Math.round(pax * 0.2);
   const refrescoTotal = Math.round(pax * 2.5 * barFactor);
   const tonica = Math.max(6, Math.round(pax * 0.15 * barFactor));
-  const agua15 = Math.round(pax * 0.5);
-  const redbull = h > 0 ? Math.max(12, Math.round(pax * 0.12 * barFactor)) : 0;
+  // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
+  // Agua Vidaqua de personal, que se calcula aparte en calcPersonal()
+  const agua15 = Math.round(pax * 0.8);
+  const redbull = h > 0 ? Math.max(6, Math.round(pax * 0.06 * barFactor)) : 0;
+  // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
+  const aguasPequenasUds = Math.round(pax * 3);
+  const aguasPequenasCajas = Math.max(1, Math.ceil(aguasPequenasUds / 35));
   // Con congelador en la finca se hace/almacena el hielo in situ: no hace falta traerlo en taxis
   const taxisHielo = tieneCongelador ? 0 : Math.max(2, Math.ceil(pax / 30));
   return {
     cerveza, vinoBlanco, vinoTinto, cava, tonica, agua15, redbull,
+    aguasPequenasCajas, aguasPequenasUds,
     cocaNormal: Math.round(refrescoTotal * 0.25),
     cocaZero:   Math.round(refrescoTotal * 0.20),
     fanta:      Math.round(refrescoTotal * 0.25),
     sprite:     Math.round(refrescoTotal * 0.1),
-    nestea:     Math.round(refrescoTotal * 0.1),
+    nestea:     Math.round(refrescoTotal * 0.05),
     aguaConGas: Math.round(pax * 0.15),
     cerveza00:  Math.round(pax * 0.15),
     sinGluten:  Math.round(pax * 0.2),
@@ -118,7 +129,7 @@ function calcDestilados(pax, h) {
   return {
     ginebraPremium: r(pax / 25), ginebraSabor: r(pax / 35), ron: r(pax / 30),
     ronBlanco: r(pax / 50), tequila: r(pax / 45), tequilaSabor: r(pax / 40),
-    vodka: r(pax / 40), vermut: r(pax / 40),
+    vodka: r(pax / 40), vermutRojo: r(pax / 40), vermutBlanco: r(pax / 55),
     mistela: 2, baileys: 1, tiaMaria: 1, limoncello: 1, jagger: 1, peach: 1,
     cremaOrujo: 1, cazalla: 1, orujoHierbas: 1, marcaBlanca: 1,
   };
@@ -162,6 +173,7 @@ function personalSala(pax, numCamareros) {
 }
 
 // Consumibles para el propio personal de sala/cocina (no para los invitados)
+// Los packs de vasos de cartón y plástico vienen de 50 unidades
 function calcPersonal(pax, numCamareros) {
   const n = personalSala(pax, numCamareros);
   return {
@@ -169,7 +181,7 @@ function calcPersonal(pax, numCamareros) {
     // Los vasos de café son "mini" (tamaño espresso/cortado): siempre se llevan 3 packs
     vasosCartonPacks: 3,
     aguaVidaquaPacks: Math.max(1, Math.ceil(n / 6)),
-    vasosPlasticoPacks: Math.max(1, Math.ceil(n / 6)),
+    vasosPlasticoPacks: Math.max(1, Math.ceil(n / 50)),
   };
 }
 
@@ -310,7 +322,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Cristalería", items: [
     [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
     ["Vasos de cubata",                                   `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", String(Math.round(pax * 1.5))]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Copas de cava",                                     `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
@@ -346,9 +358,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (6 uds)`],
+    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (50 uds)`],
     ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
-    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (6 uds)`],
+    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (50 uds)`],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -356,8 +368,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Bebidas frías", items: [
     ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
     ["Vino blanco", `${bebidas.vinoBlanco} botellas`], ["Vino tinto", `${bebidas.vinoTinto} botellas`],
-    ["Cava", `${bebidas.cava} botellas`], ["Agua 1,5L", `${bebidas.agua15} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
+    ["Cava", `${bebidas.cava} botellas`], ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta / Aquarius", String(bebidas.fanta)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
@@ -372,7 +384,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Ginebra de sabor (Puerto de Indias)", String(destilados.ginebraSabor)],
       ["Ron (Bacardí)", String(destilados.ron)], ["Ron saborizado (Negrita)", String(destilados.ronBlanco)],
       ["Tequila", String(destilados.tequila)], ["Tequila Rosa", String(destilados.tequilaSabor)],
-      ["Vodka", String(destilados.vodka)], ["Vermut rojo", String(destilados.vermut)],
+      ["Vodka", String(destilados.vodka)], ["Vermut rojo", String(destilados.vermutRojo)], ["Vermut blanco", String(destilados.vermutBlanco)],
       ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
       ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
       ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
@@ -479,7 +491,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
     ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", String(Math.round(pax * 1.5))]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
@@ -489,8 +501,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Bebidas", items: [
     ["Coca Cola (Normal / Zero)", String(bebidas.cocaNormal + bebidas.cocaZero)],
     ["Fanta (Limón / Naranja / Aquarius / Nestea)", String(bebidas.fanta + bebidas.nestea)],
-    ["Aguas (2L)", `${bebidas.agua15} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
+    ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
     ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
     ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
@@ -500,9 +512,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
     ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (6 uds)`],
+    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (50 uds)`],
     ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
-    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (6 uds)`],
+    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (50 uds)`],
   ]});
 
   return cats;
@@ -587,12 +599,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
     ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", "1 caja"],
     ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", "1"], ["Leche condensada", "1"],
-    ["Vasos de cartón (L/M/S)", `${Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 20)} paq.`], ["Bolsas grandes de papel", "1 paq."],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", String(Math.round(pax * 1.5))]] : []),
+    ["Vasos de cartón (L/M/S)", `${Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50)} paq. (50 uds)`], ["Bolsas grandes de papel", "1 paq."],
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
     ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
-    ["Aguas (2L / pequeñas)", `${Math.round(totalPax * 0.5)} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", String(Math.round(totalPax * 1))]] : []),
+    ["Agua 1,5L (Solán de Cabras, cliente)", `${Math.round(totalPax * 0.8)} packs`],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33/50cl)", `${Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35))} cajas (35 uds)`]] : []),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
   ]});
@@ -603,9 +615,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (6 uds)`],
+    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (50 uds)`],
     ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
-    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (6 uds)`],
+    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (50 uds)`],
   ]});
 
   return cats;
@@ -901,6 +913,7 @@ export default function App() {
   const [modalPrevia, setModalPrevia]   = useState(false);
   const [modalAgregar, setModalAgregar] = useState(false);
   const [compartirMsg, setCompartirMsg] = useState("");
+  const [menuCompartir, setMenuCompartir] = useState(false);
   const [agregadosTag, setAgregadosTag] = useState("");
   const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
   const [overridesManuales, setOverridesManuales] = useState({}); // { "categoria::label": "cantidad editada a mano" }
@@ -999,12 +1012,37 @@ export default function App() {
     a.click();
   };
 
-  const handleCompartir = () => {
+  const getTextoChecklist = () => {
     const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q]) => `  • ${l}: ${q.u ? q.u : q}`).join("\n")).join("\n");
-    navigator.clipboard.writeText(`CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()} · ${pax} pax\n${texto}`).then(() => {
+    return `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()} · ${pax} pax\n${texto}`;
+  };
+
+  const handleCompartirWord = () => {
+    handleDescargar();
+    setMenuCompartir(false);
+  };
+
+  const handleCompartirPDF = () => {
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist);
+    const ventana = window.open("", "_blank");
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.onload = () => ventana.print();
+    setMenuCompartir(false);
+  };
+
+  const handleCompartirWhatsapp = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(getTextoChecklist())}`;
+    window.open(url, "_blank");
+    setMenuCompartir(false);
+  };
+
+  const handleCompartirTexto = () => {
+    navigator.clipboard.writeText(getTextoChecklist()).then(() => {
       setCompartirMsg("¡Copiado! ✓");
       setTimeout(() => setCompartirMsg(""), 2500);
     });
+    setMenuCompartir(false);
   };
 
   const SegmentedControl = ({ value, onChange, options, label }) => (
@@ -1035,7 +1073,20 @@ export default function App() {
           </div>
           <div className="header-actions">
             <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
-            <button className="btn btn-outline" onClick={handleCompartir}>{compartirMsg || "Compartir"}</button>
+            <div className="compartir-menu-wrap">
+              <button className="btn btn-outline" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
+              {menuCompartir && (
+                <>
+                  <div className="compartir-menu-backdrop" onClick={() => setMenuCompartir(false)} />
+                  <div className="compartir-menu">
+                    <button onClick={handleCompartirWord}>📄 Word</button>
+                    <button onClick={handleCompartirPDF}>🖨️ PDF</button>
+                    <button onClick={handleCompartirWhatsapp}>💬 WhatsApp (texto)</button>
+                    <button onClick={handleCompartirTexto}>📋 Copiar texto</button>
+                  </div>
+                </>
+              )}
+            </div>
             <button className="btn btn-green" onClick={handleDescargar}>Descargar Word</button>
           </div>
         </header>
@@ -1244,10 +1295,11 @@ export default function App() {
         {filtered.map((cat, idx) => {
           const isOpen = openCategories[cat.nombre] !== false;
           const esManual = cat.nombre === CATEGORIA_MANUAL;
+          const infoCat = infoCategoria(cat.nombre);
           return (
-            <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s` }}>
+            <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
               <div className="category-header" onClick={() => toggleCategory(cat.nombre)}>
-                <span className="cat-name"><span className="cat-icon">{iconoCategoria(cat.nombre)}</span>{cat.nombre}</span>
+                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.icono}</span>{cat.nombre}</span>
                 <span className="cat-count">{cat.items.length}<span className="arrow">▼</span></span>
               </div>
               <div className="item-list-wrapper">
