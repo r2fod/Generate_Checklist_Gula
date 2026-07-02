@@ -1500,7 +1500,7 @@ export default function App() {
             ].map(([val, fn, lab, sub]) => (
               <label key={lab} className="checkbox-label-normal">
                 <input type="checkbox" checked={val} onChange={e => fn(e.target.checked)} />
-                {lab} <span>· {sub}</span>
+                <span className="checkbox-texto">{lab} <span className="checkbox-sub">· {sub}</span></span>
               </label>
             ))}
           </div>

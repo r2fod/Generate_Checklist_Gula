@@ -550,7 +550,14 @@ body {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
-.checkbox-label-normal span {
+/* El texto del chip fluye como una sola frase (nombre + descripción en línea),
+   sin partirse en dos columnas irregulares al estrecharse la tarjeta */
+.checkbox-label-normal .checkbox-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.checkbox-label-normal .checkbox-sub {
   color: var(--text-muted);
   transition: color 0.2s;
   font-weight: 400;
@@ -1033,7 +1040,18 @@ hr {
   }
 
   .item-row {
-    padding: 13px 16px;
+    padding: 13px 14px;
+  }
+
+  /* Cantidades de texto largo ("No hace falta (se lleva congelador)") no deben
+     empujar los botones ✎/✕ fuera de la pantalla: el campo puede encoger */
+  .item-qty-input {
+    flex-shrink: 1;
+    max-width: 42vw;
+  }
+
+  .item-actions {
+    gap: 0;
   }
 
   .category-header {
@@ -1271,9 +1289,25 @@ hr {
 
   .preview-table th, .preview-table td {
     padding: 8px 6px;
-    /* Nombres largos ("Cápsulas café (estándar/descafeinado)...") se parten en
-       varias líneas en vez de desbordar la pantalla estrecha */
-    word-break: break-word;
+  }
+
+  /* Solo el nombre del concepto se parte en varias líneas si es largo */
+  .preview-table td:first-child {
+    overflow-wrap: break-word;
+  }
+
+  /* Las cabeceras no se parten letra a letra: Concepto/Cant. quedan en una
+     línea y Sale/Vuelve/Roturas giran en vertical para ocupar casi nada */
+  .preview-table thead th {
+    white-space: nowrap;
+    font-size: 0.6rem;
+  }
+
+  .preview-table th.preview-check-cell {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    padding: 8px 2px;
+    vertical-align: bottom;
   }
 
   .preview-table th:first-child, .preview-table td:first-child {
@@ -1281,7 +1315,13 @@ hr {
   }
 
   .preview-check-cell {
-    width: 30px;
+    width: 26px;
+  }
+
+  /* Cantidades largas ("No hace falta (se lleva congelador)") pueden partirse
+     en vez de forzar scroll horizontal */
+  .preview-qty-cell {
+    white-space: normal;
   }
 }
 
