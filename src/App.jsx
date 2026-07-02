@@ -1027,6 +1027,14 @@ export default function App() {
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
   const [categoriaTocada, setCategoriaTocada] = useState(false);
   const [linkAbierto, setLinkAbierto] = useState(linkAbiertoInicial ?? false);
+  // Plantillas guardadas con nombre: configuración reutilizable entre eventos
+  const [plantillas, setPlantillas] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gula_plantillas")) || {}; } catch (e) { return {}; }
+  });
+  // Historial para deshacer cambios manuales (cantidad editada o item quitado).
+  // Se guarda un snapshot al EMPEZAR a editar cada item (no por cada tecla).
+  const [historial, setHistorial] = useState([]);
+  const ultimaClaveEditadaRef = React.useRef(null);
 
   // Snapshot de todo el estado configurable — lo usan tanto el link para el móvil
   // como el guardado automático en localStorage
@@ -1072,6 +1080,34 @@ export default function App() {
     window.location.href = window.location.origin + window.location.pathname;
   };
 
+  // ─── PLANTILLAS GUARDADAS ─────────────────────────────────────────────────
+  const guardarPlantillas = (obj) => {
+    setPlantillas(obj);
+    try { localStorage.setItem("gula_plantillas", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
+  };
+  const handleGuardarPlantilla = () => {
+    const nombre = window.prompt('Nombre de la plantilla (ej: "Boda estándar 100 pax"):', "");
+    if (!nombre || !nombre.trim()) return;
+    // La plantilla guarda la configuración reutilizable, no los datos del evento
+    // concreto (nombre, fecha, hora, ubicación), que cambian en cada evento
+    const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u, ...config } = getEstadoActual();
+    guardarPlantillas({ ...plantillas, [nombre.trim()]: config });
+  };
+  const handleAplicarPlantilla = (nombre) => {
+    if (!plantillas[nombre]) return;
+    if (!window.confirm(`¿Cargar la plantilla "${nombre}"? Se sustituirá la configuración actual (nombre, fecha, hora y ubicación del evento se mantienen).`)) return;
+    // Se escribe el estado combinado en localStorage y se recarga: el arranque
+    // síncrono (leerEstadoGuardado) lo restaura igual que tras cerrar el navegador
+    try { localStorage.setItem("gula_checklist_estado", JSON.stringify({ ...getEstadoActual(), ...plantillas[nombre] })); } catch (e) { /* localStorage no disponible */ }
+    window.location.href = window.location.origin + window.location.pathname;
+  };
+  const handleBorrarPlantilla = (nombre) => {
+    if (!window.confirm(`¿Borrar la plantilla "${nombre}"?`)) return;
+    const next = { ...plantillas };
+    delete next[nombre];
+    guardarPlantillas(next);
+  };
+
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
@@ -1115,12 +1151,27 @@ export default function App() {
 
   const handleEditarCantidad = (categoria, label, valor) => {
     const key = `${categoria}::${label}`;
+    // Snapshot al empezar a editar este item (no por cada tecla): así "Deshacer"
+    // recupera la cantidad que había antes de tocar el item, de una vez
+    if (ultimaClaveEditadaRef.current !== key) {
+      ultimaClaveEditadaRef.current = key;
+      setHistorial(prev => [...prev.slice(-19), { overridesManuales, itemsManuales }]);
+    }
     setOverridesManuales(prev => {
       const next = { ...prev };
       if (valor.trim() === "") delete next[key];
       else next[key] = valor;
       return next;
     });
+  };
+
+  const handleDeshacer = () => {
+    if (historial.length === 0) return;
+    const ultimo = historial[historial.length - 1];
+    setOverridesManuales(ultimo.overridesManuales);
+    setItemsManuales(ultimo.itemsManuales);
+    setHistorial(prev => prev.slice(0, -1));
+    ultimaClaveEditadaRef.current = null;
   };
 
   const handleLabelItemManual = (value) => {
@@ -1134,7 +1185,11 @@ export default function App() {
     setItemsManuales(prev => [...prev, { label, cantidad: nuevoItemCantidad.trim() || "1", categoria }]);
     setNuevoItemLabel(""); setNuevoItemCantidad(""); setNuevoItemCategoria(""); setCategoriaTocada(false);
   };
-  const handleRemoveItemManual = (idx) => setItemsManuales(prev => prev.filter((_, i) => i !== idx));
+  const handleRemoveItemManual = (idx) => {
+    ultimaClaveEditadaRef.current = null;
+    setHistorial(prev => [...prev.slice(-19), { overridesManuales, itemsManuales }]);
+    setItemsManuales(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const filtered = useMemo(() => {
     if (!filtro.trim()) return checklist;
@@ -1282,6 +1337,26 @@ export default function App() {
           <span>📋 {agregadosTag || "Añadir varios items pegando texto"}</span>
           <span style={{ fontSize: 12 }}>→</span>
         </button>
+
+        {/* PLANTILLAS GUARDADAS */}
+        <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.08s" }}>
+          <div className="plantillas-header">
+            <span className="section-title" style={{ marginBottom: 0 }}>Plantillas</span>
+            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarPlantilla} title="Guarda la configuración actual (pax, extras, equipamiento...) como plantilla reutilizable">💾 Guardar actual</button>
+          </div>
+          {Object.keys(plantillas).length === 0 ? (
+            <p className="plantillas-vacio">Guarda configuraciones que repites (ej: "Boda estándar 100 pax") y cárgalas con un click en el próximo evento.</p>
+          ) : (
+            <div className="plantillas-lista">
+              {Object.keys(plantillas).map(n => (
+                <div className="plantilla-row" key={n}>
+                  <button className="plantilla-nombre" onClick={() => handleAplicarPlantilla(n)} title={`Cargar la plantilla "${n}"`}>📁 {n}</button>
+                  <button className="plantilla-borrar" onClick={() => handleBorrarPlantilla(n)} aria-label={`Borrar plantilla ${n}`} title="Borrar plantilla">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* CONFIG */}
         <div className="config-card animate-entrance" style={{ animationDelay: "0.1s" }}>
@@ -1442,9 +1517,12 @@ export default function App() {
         </div>
         <div className="checklist-main">
 
-        {/* BUSCADOR */}
-        <div className="animate-entrance" style={{ animationDelay: "0.2s" }}>
+        {/* BUSCADOR + DESHACER */}
+        <div className="animate-entrance search-row" style={{ animationDelay: "0.2s" }}>
           <input type="text" className="search-input-main" placeholder="Buscar un material..." value={filtro} onChange={e => setFiltro(e.target.value)} />
+          {historial.length > 0 && (
+            <button className="btn btn-outline btn-deshacer" onClick={handleDeshacer} title="Deshace el último cambio manual (cantidad editada o item quitado)">↩ Deshacer</button>
+          )}
         </div>
 
         {/* AÑADIR ITEM PERSONALIZADO */}
