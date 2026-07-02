@@ -266,9 +266,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-    tipoNevera, tipoCongelador, tipoPaella,
+    tipoNevera, tipoCongelador, tipoPaella, origenSillas = "Dealde",
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
   } = opts;
+  // El origen de las sillas (alquiler Dealde/Carvillo o propias) se refleja en el
+  // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre
+  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
 
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -302,7 +305,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
-    ["Sillas (alquiler)", String(totalPax), true],
+    [labelSillas, String(totalPax), true],
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
@@ -455,8 +458,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
-    tipoPaella, tipoNevera, tipoCongelador,
+    tipoPaella, tipoNevera, tipoCongelador, origenSillas = "Dealde",
   } = opts;
+  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -480,7 +484,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas totales", String(calcMesasServicio(pax).total)],
-    ["Sillas", String(totalPax)],
+    [labelSillas, String(totalPax)],
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Champanera metálica / Cubiteras + pinza", "2"],
     ["Abridores", "2"],
@@ -585,8 +589,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
-    tipoPaella, numCamareros, fuerzaTextilTela,
+    tipoPaella, numCamareros, fuerzaTextilTela, origenSillas = "Dealde",
   } = opts;
+  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
   const totalPax = pax + ninos;
@@ -607,7 +612,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
-    ["Sillas", String(totalPax)], ["Cubos basura (reciclaje + cocina)", "2"],
+    [labelSillas, String(totalPax)], ["Cubos basura (reciclaje + cocina)", "2"],
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
@@ -1013,6 +1018,7 @@ export default function App() {
   const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
+  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   const [modalPrevia, setModalPrevia]   = useState(false);
@@ -1053,7 +1059,7 @@ export default function App() {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-    tipoNevera, tipoCongelador, itemsManuales, overridesManuales,
+    tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -1120,7 +1126,7 @@ export default function App() {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-    tipoNevera, tipoCongelador, tipoPaella,
+    tipoNevera, tipoCongelador, tipoPaella, origenSillas,
     estiloPlatoPrincipal, estiloPlatoPostre,
   };
 
@@ -1525,6 +1531,7 @@ export default function App() {
           <div className="section-title">Equipamiento</div>
           <div className="controls-stack">
             <div className="controls-row">
+              <SegmentedControl label="Sillas" value={origenSillas} onChange={setOrigenSillas} options={["Dealde", "Carvillo", "Nuestras"]} />
               <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
               <div className="form-group controls-mini">
                 <span className="form-label">Madera extra</span>
