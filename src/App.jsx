@@ -770,7 +770,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
               {meta.ubicacion ? ` · ${meta.ubicacion}` : ""}
             </div>
           </div>
-          <button className="preview-close-btn" onClick={onClose}>✕ Cerrar</button>
+          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa">✕ Cerrar</button>
         </div>
         <div className="preview-body">
           {checklist.map(cat => (
@@ -1059,6 +1059,9 @@ export default function App() {
     navigator.clipboard.writeText(url).then(() => {
       setCompartirMsg("¡Link copiado! ✓");
       setTimeout(() => setCompartirMsg(""), 3000);
+    }).catch(() => {
+      // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a mano
+      window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
     });
     setMenuCompartir(false);
   };
@@ -1179,6 +1182,10 @@ export default function App() {
   const handleCompartirPDF = () => {
     const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion });
     const ventana = window.open("", "_blank");
+    if (!ventana) {
+      window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
+      return;
+    }
     ventana.document.write(html);
     ventana.document.close();
     ventana.onload = () => ventana.print();
@@ -1194,6 +1201,9 @@ export default function App() {
   const handleCompartirTexto = () => {
     navigator.clipboard.writeText(getTextoChecklist()).then(() => {
       setCompartirMsg("¡Copiado! ✓");
+      setTimeout(() => setCompartirMsg(""), 2500);
+    }).catch(() => {
+      setCompartirMsg("No se pudo copiar ✗");
       setTimeout(() => setCompartirMsg(""), 2500);
     });
     setMenuCompartir(false);
@@ -1285,15 +1295,15 @@ export default function App() {
             </div>
             <div className="form-group">
               <span className="form-label">PAX ADULTOS</span>
-              <input type="number" className="form-input" value={pax} onChange={e => setPax(parseInt(e.target.value) || 0)} min="0" />
+              <input type="number" className="form-input" value={pax} onChange={e => setPax(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
             </div>
             <div className="form-group">
               <span className="form-label">NIÑOS</span>
-              <input type="number" className="form-input" value={ninos} onChange={e => setNinos(parseInt(e.target.value) || 0)} min="0" />
+              <input type="number" className="form-input" value={ninos} onChange={e => setNinos(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
             </div>
             <div className="form-group">
               <span className="form-label">Nº CAMAREROS</span>
-              <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(parseInt(e.target.value) || 0)} min="0" />
+              <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
             </div>
           </div>
           <div className="form-row">
@@ -1392,11 +1402,11 @@ export default function App() {
               <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
               <div className="form-group controls-mini">
                 <span className="form-label">Madera extra</span>
-                <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(parseInt(e.target.value) || 0)} />
+                <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(Math.max(0, parseInt(e.target.value) || 0))} />
               </div>
               <div className="form-group controls-mini">
                 <span className="form-label">Plata extra</span>
-                <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(parseInt(e.target.value) || 0)} />
+                <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(Math.max(0, parseInt(e.target.value) || 0))} />
               </div>
               {evento !== "produccion" && (
                 <>

@@ -1127,6 +1127,9 @@ hr {
 
   .preview-table th, .preview-table td {
     padding: 8px 6px;
+    /* Nombres largos ("Cápsulas café (estándar/descafeinado)...") se parten en
+       varias líneas en vez de desbordar la pantalla estrecha */
+    word-break: break-word;
   }
 
   .preview-table th:first-child, .preview-table td:first-child {
