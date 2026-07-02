@@ -305,7 +305,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
-    [labelSillas, String(totalPax), true],
+    ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax), true]] : []),
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
@@ -484,7 +484,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas totales", String(calcMesasServicio(pax).total)],
-    [labelSillas, String(totalPax)],
+    ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Champanera metálica / Cubiteras + pinza", "2"],
     ["Abridores", "2"],
@@ -612,7 +612,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
-    [labelSillas, String(totalPax)], ["Cubos basura (reciclaje + cocina)", "2"],
+    ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
+    ["Cubos basura (reciclaje + cocina)", "2"],
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
@@ -749,6 +750,8 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${fechaEventoFmt ? `<div><span class="ml">Fecha del evento</span>${fechaEventoFmt}</div>` : ""}
       ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${meta.horaInicio}h</div>` : ""}
       ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${meta.ubicacion}</div>` : ""}
+      ${meta.logisticaInicio || meta.logisticaFin ? `<div><span class="ml">Horario logística</span>${meta.logisticaInicio || "?"} – ${meta.logisticaFin || "?"}</div>` : ""}
+      ${meta.logisticaQuien ? `<div><span class="ml">Equipo logística</span>${meta.logisticaQuien}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
       <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
       <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
@@ -774,6 +777,12 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
               {meta.horaInicio ? ` · ${meta.horaInicio}h` : ""}
               {meta.ubicacion ? ` · ${meta.ubicacion}` : ""}
             </div>
+            {(meta.logisticaInicio || meta.logisticaFin || meta.logisticaQuien) && (
+              <div className="preview-header-subtitle">
+                🚚 Logística{meta.logisticaInicio || meta.logisticaFin ? `: ${meta.logisticaInicio || "?"} – ${meta.logisticaFin || "?"}` : ""}
+                {meta.logisticaQuien ? ` · ${meta.logisticaQuien}` : ""}
+              </div>
+            )}
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa">✕ Cerrar</button>
         </div>
@@ -1018,7 +1027,13 @@ export default function App() {
   const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
-  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras
+  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras | No llevan
+  // Horario y responsables de la logística (montaje/desmontaje) del evento
+  const [logisticaInicio, setLogisticaInicio] = useState(estadoInicial.logisticaInicio ?? "");
+  const [logisticaFin, setLogisticaFin]       = useState(estadoInicial.logisticaFin ?? "");
+  const [logisticaQuien, setLogisticaQuien]   = useState(estadoInicial.logisticaQuien ?? "");
+  // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
+  const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   const [modalPrevia, setModalPrevia]   = useState(false);
@@ -1060,7 +1075,8 @@ export default function App() {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales,
+    itemsOcultos, nombresManuales, categoriasRenombradas,
+    logisticaInicio, logisticaFin, logisticaQuien,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1100,8 +1116,9 @@ export default function App() {
     const nombre = window.prompt('Nombre de la plantilla (ej: "Boda estándar 100 pax"):', "");
     if (!nombre || !nombre.trim()) return;
     // La plantilla guarda la configuración reutilizable, no los datos del evento
-    // concreto (nombre, fecha, hora, ubicación), que cambian en cada evento
-    const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u, ...config } = getEstadoActual();
+    // concreto (nombre, fecha, hora, ubicación, horario de logística), que cambian en cada evento
+    const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
+            logisticaInicio: _li, logisticaFin: _lf, logisticaQuien: _lq, ...config } = getEstadoActual();
     guardarPlantillas({ ...plantillas, [nombre.trim()]: config });
   };
   const handleAplicarPlantilla = (nombre) => {
@@ -1136,18 +1153,24 @@ export default function App() {
     buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, opts),
     [evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts]
   );
-  const categoriasDisponibles = useMemo(() => baseChecklist.map(c => c.nombre), [baseChecklist]);
+  const categoriasDisponibles = useMemo(() => {
+    const base = baseChecklist.map(c => categoriasRenombradas[c.nombre] ?? c.nombre);
+    // Las categorías creadas por el usuario (vía items añadidos) también están disponibles
+    const propias = [...new Set(itemsManuales.map(it => it.categoria))]
+      .filter(c => c && c !== CATEGORIA_MANUAL && !base.includes(c));
+    return [...base, ...propias];
+  }, [baseChecklist, categoriasRenombradas, itemsManuales]);
 
   const checklist = useMemo(() => {
-    const cats = baseChecklist.map(c => ({ ...c, items: [...c.items] }));
+    // Las categorías renombradas por el usuario se aplican sobre el nombre base:
+    // el nuevo nombre pasa a ser la identidad (las claves de ajustes se migran al renombrar)
+    const cats = baseChecklist.map(c => ({ ...c, nombre: categoriasRenombradas[c.nombre] ?? c.nombre, items: [...c.items] }));
     // El 3er elemento de la tupla (índice real en itemsManuales) permite borrar el item
     // correcto luego, aunque el buscador esté filtrando la lista visible.
+    // Si la categoría del item no existe se crea (así el usuario puede crear categorías nuevas).
     itemsManuales.forEach((it, idx) => {
       let destino = cats.find(c => c.nombre === it.categoria);
-      if (!destino) {
-        destino = cats.find(c => c.nombre === CATEGORIA_MANUAL);
-        if (!destino) { destino = { nombre: CATEGORIA_MANUAL, items: [] }; cats.push(destino); }
-      }
+      if (!destino) { destino = { nombre: it.categoria || CATEGORIA_MANUAL, items: [] }; cats.push(destino); }
       destino.items.push([it.label, it.cantidad, idx]);
     });
     // Aplica los ajustes manuales (clave: categoría + etiqueta ORIGINAL del item):
@@ -1165,10 +1188,10 @@ export default function App() {
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
     return cats.filter(c => c.items.length > 0);
-  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales]);
+  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas]);
 
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
-  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales });
+  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
 
   const handleEditarCantidad = (categoria, labelOriginal, valor) => {
@@ -1227,8 +1250,36 @@ export default function App() {
     setItemsManuales(ultimo.itemsManuales);
     setItemsOcultos(ultimo.itemsOcultos);
     setNombresManuales(ultimo.nombresManuales);
+    setCategoriasRenombradas(ultimo.categoriasRenombradas);
     setHistorial(prev => prev.slice(0, -1));
     ultimaClaveEditadaRef.current = null;
+  };
+
+  // Renombra una categoría (botón ✎ de la cabecera). El nuevo nombre pasa a ser la
+  // identidad: se migran las claves de todos los ajustes manuales de esa categoría
+  // y los items añadidos a mano se mueven con ella.
+  const handleRenombrarCategoria = (nombreActual) => {
+    const nuevo = window.prompt("Nuevo nombre de la categoría:", nombreActual);
+    if (!nuevo || !nuevo.trim() || nuevo.trim() === nombreActual) return;
+    const nuevoNombre = nuevo.trim();
+    ultimaClaveEditadaRef.current = null;
+    pushHistorial();
+    // Si es una categoría base (o una base ya renombrada) el renombre se guarda
+    // sobre el nombre ORIGINAL del generador, para sobrevivir a los recálculos
+    const original = Object.keys(categoriasRenombradas).find(k => categoriasRenombradas[k] === nombreActual)
+      ?? (baseChecklist.some(c => c.nombre === nombreActual) ? nombreActual : null);
+    if (original) setCategoriasRenombradas(prev => ({ ...prev, [original]: nuevoNombre }));
+    setItemsManuales(prev => prev.map(it => it.categoria === nombreActual ? { ...it, categoria: nuevoNombre } : it));
+    const migraClaves = (obj) => {
+      const next = {};
+      Object.entries(obj).forEach(([k, v]) => {
+        next[k.startsWith(`${nombreActual}::`) ? `${nuevoNombre}::${k.slice(nombreActual.length + 2)}` : k] = v;
+      });
+      return next;
+    };
+    setOverridesManuales(migraClaves);
+    setItemsOcultos(migraClaves);
+    setNombresManuales(migraClaves);
   };
 
   const handleLabelItemManual = (value) => {
@@ -1266,7 +1317,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaInicio, logisticaFin, logisticaQuien });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1282,6 +1333,8 @@ export default function App() {
       fechaEvento ? new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null,
       horaInicio ? `${horaInicio}h` : null,
       ubicacion || null,
+      logisticaInicio || logisticaFin ? `Logística ${logisticaInicio || "?"}–${logisticaFin || "?"}` : null,
+      logisticaQuien ? `Equipo logística: ${logisticaQuien}` : null,
     ].filter(Boolean).join(" · ");
     return `${cabecera}\n${texto}`;
   };
@@ -1292,7 +1345,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaInicio, logisticaFin, logisticaQuien });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -1334,7 +1387,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaInicio, logisticaFin, logisticaQuien }} onClose={() => setModalPrevia(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
 
       <div className="app-wrapper">
@@ -1456,6 +1509,20 @@ export default function App() {
               <input type="text" className="form-input" placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
             </div>
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <span className="form-label">LOGÍSTICA · INICIO</span>
+              <input type="time" className="form-input" value={logisticaInicio} onChange={e => setLogisticaInicio(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <span className="form-label">LOGÍSTICA · FIN</span>
+              <input type="time" className="form-input" value={logisticaFin} onChange={e => setLogisticaFin(e.target.value)} />
+            </div>
+            <div className="form-group form-group-ancho">
+              <span className="form-label">EQUIPO DE LOGÍSTICA</span>
+              <input type="text" className="form-input" placeholder="Ej: Juan, Pedro y Marta" value={logisticaQuien} onChange={e => setLogisticaQuien(e.target.value)} />
+            </div>
+          </div>
           <hr />
           <div className="section-title">Barra libre</div>
           <div className="form-row">
@@ -1529,45 +1596,45 @@ export default function App() {
           )}
           <hr />
           <div className="section-title">Equipamiento</div>
-          <div className="controls-stack">
-            <div className="controls-row">
-              <SegmentedControl label="Sillas" value={origenSillas} onChange={setOrigenSillas} options={["Dealde", "Carvillo", "Nuestras"]} />
-              <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
-              <div className="form-group controls-mini">
+          <div className="equip-grid">
+            <SegmentedControl label="Sillas" value={origenSillas} onChange={setOrigenSillas} options={["Dealde", "Carvillo", "Nuestras", "No llevan"]} />
+            <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
+            <div className="equip-pareja">
+              <div className="form-group">
                 <span className="form-label">Madera extra</span>
                 <input type="number" className="form-input" value={extraBandejasMadera || ""} placeholder="0" min="0" onChange={e => setExtraBandejasMadera(Math.max(0, parseInt(e.target.value) || 0))} />
               </div>
-              <div className="form-group controls-mini">
+              <div className="form-group">
                 <span className="form-label">Plata extra</span>
                 <input type="number" className="form-input" value={extraBandejasPlata || ""} placeholder="0" min="0" onChange={e => setExtraBandejasPlata(Math.max(0, parseInt(e.target.value) || 0))} />
               </div>
-              {evento !== "produccion" && (
-                <>
-                  <SegmentedControl label="Nevera" value={tipoNevera} onChange={setTipoNevera} options={["No lleva", "Mediana", "Grande"]} />
-                  <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["No lleva", "Mediana", "Grande"]} />
-                </>
-              )}
-              <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
-              <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
-              {evento !== "cumpleanos" && evento !== "produccion" && (
-                <>
-                  <div className="form-group controls-mini">
+            </div>
+            {evento !== "produccion" && (
+              <>
+                <SegmentedControl label="Nevera" value={tipoNevera} onChange={setTipoNevera} options={["No lleva", "Mediana", "Grande"]} />
+                <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["No lleva", "Mediana", "Grande"]} />
+              </>
+            )}
+            <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
+            <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
+            {evento !== "cumpleanos" && evento !== "produccion" && (
+              <>
+                <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
+                <div className="equip-pareja">
+                  <div className="form-group">
                     <span className="form-label">Estilo plato principal</span>
                     <select className="form-select" value={estiloPlatoPrincipal} onChange={e => setEstiloPlatoPrincipal(e.target.value)}>
                       {["Blanco liso", "Relieve blanco", "Verde", "Metálico"].map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </div>
-                  <div className="form-group controls-mini">
+                  <div className="form-group">
                     <span className="form-label">Estilo plato postre</span>
                     <select className="form-select" value={estiloPlatoPostre} onChange={e => setEstiloPlatoPostre(e.target.value)}>
                       {["Blanco", "Verde"].map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </div>
-                </>
-              )}
-            </div>
-            {evento !== "cumpleanos" && evento !== "produccion" && (
-              <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -1613,10 +1680,21 @@ export default function App() {
               <select
                 className="form-select"
                 value={nuevoItemCategoria || CATEGORIA_MANUAL}
-                onChange={e => { setNuevoItemCategoria(e.target.value); setCategoriaTocada(true); }}
+                onChange={e => {
+                  if (e.target.value === "__nueva__") {
+                    const nueva = window.prompt("Nombre de la categoría nueva:");
+                    if (nueva && nueva.trim()) { setNuevoItemCategoria(nueva.trim()); setCategoriaTocada(true); }
+                    return;
+                  }
+                  setNuevoItemCategoria(e.target.value); setCategoriaTocada(true);
+                }}
               >
                 {categoriasDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
+                {nuevoItemCategoria && !categoriasDisponibles.includes(nuevoItemCategoria) && nuevoItemCategoria !== CATEGORIA_MANUAL && (
+                  <option value={nuevoItemCategoria}>{nuevoItemCategoria}</option>
+                )}
                 <option value={CATEGORIA_MANUAL}>{CATEGORIA_MANUAL}</option>
+                <option value="__nueva__">➕ Nueva categoría…</option>
               </select>
             </div>
             <button className="btn btn-navy-outline add-item-btn" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
@@ -1629,9 +1707,12 @@ export default function App() {
           const infoCat = infoCategoria(cat.nombre);
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
-              <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
+              <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
                 <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.icono}</span>{cat.nombre}</span>
-                <span className="cat-count">{cat.items.length}<span className="arrow">▼</span></span>
+                <span className="cat-count">
+                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleRenombrarCategoria(cat.nombre); }} title="Renombrar categoría" aria-label={`Renombrar categoría ${cat.nombre}`}>✎</button>
+                  {cat.items.length}<span className="arrow">▼</span>
+                </span>
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">

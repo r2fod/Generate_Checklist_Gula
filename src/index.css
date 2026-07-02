@@ -518,6 +518,51 @@ body {
   transform: scale(0.95);
 }
 
+/* Equipamiento — rejilla ordenada: cada control con su etiqueta encima y el
+   selector a ancho completo, en columnas iguales según el espacio disponible */
+.equip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px 20px;
+  align-items: end;
+}
+
+.equip-grid .segment-group {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.equip-grid .segment-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-label);
+}
+
+.equip-grid .segmented-control {
+  width: 100%;
+}
+
+.equip-grid .segment-btn {
+  flex: 1;
+  text-align: center;
+  padding: 7px 6px;
+  white-space: nowrap;
+}
+
+.equip-pareja {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Campo que ocupa toda la fila del formulario (ej: equipo de logística) */
+.form-group-ancho {
+  grid-column: 1 / -1;
+}
+
 /* Checkbox Grid — selectable chip cards */
 .checkbox-grid {
   display: grid;
@@ -776,6 +821,23 @@ body {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+/* Botón ✎ para renombrar la categoría, dentro de la píldora del contador */
+.cat-edit-btn {
+  background: none;
+  border: none;
+  color: #c6cbd4;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 999px;
+  transition: var(--transition-smooth);
+}
+
+.cat-edit-btn:hover {
+  color: var(--accent);
 }
 
 .category-header .cat-count .arrow {
