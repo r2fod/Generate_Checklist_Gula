@@ -260,6 +260,17 @@ body {
   transform: translateY(-1px);
 }
 
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-color);
+  color: var(--text-main);
+}
+
 .btn-green {
   background-color: var(--green-btn);
   color: white;
@@ -1107,6 +1118,24 @@ hr {
   .preview-header {
     padding: 14px 16px;
   }
+
+  /* Sin min-width forzado: que la tabla encoja y "Concepto" pueda partirse en
+     2 líneas en vez de obligar a hacer scroll horizontal para ver Vuelve/Roturas */
+  .preview-table {
+    min-width: 0;
+  }
+
+  .preview-table th, .preview-table td {
+    padding: 8px 6px;
+  }
+
+  .preview-table th:first-child, .preview-table td:first-child {
+    padding-left: 12px;
+  }
+
+  .preview-check-cell {
+    width: 30px;
+  }
 }
 
 @media (max-width: 420px) {
@@ -1119,6 +1148,10 @@ hr {
   }
 
   .preview-table {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
+  }
+
+  .preview-table thead th {
+    font-size: 0.62rem;
   }
 }

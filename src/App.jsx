@@ -4,6 +4,11 @@ import React, { useState, useMemo, useEffect } from "react";
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
+// Margen de seguridad del 10% sobre consumibles (bebidas, licores, vajilla, servilletas...)
+// para no quedarse corto en el evento — está en línea con lo que usan otros caterings
+// como buffer estándar sobre servicio emplatado.
+const MARGEN_SEGURIDAD = 1.1;
+const conMargen = (n) => Math.ceil(n * MARGEN_SEGURIDAD);
 
 const EVENTOS = {
   boda:        { label: "Boda",              icon: "♥" },
@@ -118,17 +123,21 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const vermutRojo = Math.max(2, Math.round(pax / 11));
   const vermutBlanco = Math.max(2, Math.round(pax / 13));
   return {
-    cerveza, vinoBlanco, vinoTinto, cava, tonica, agua15, redbull,
-    aguasPequenasCajas, aguasPequenasUds, vermutRojo, vermutBlanco,
-    cocaNormal: Math.round(refrescoTotal * 0.25),
-    cocaZero:   Math.round(refrescoTotal * 0.15),
-    fanta:      Math.round(refrescoTotal * 0.25),
-    sprite:     Math.round(refrescoTotal * 0.1),
-    nestea:     Math.round(refrescoTotal * 0.025),
+    // Margen de seguridad del 10% en todo lo consumible (no en los taxis de hielo,
+    // que son viajes de logística, no una cantidad que se pueda quedar corta)
+    cerveza: conMargen(cerveza), vinoBlanco: conMargen(vinoBlanco), vinoTinto: conMargen(vinoTinto),
+    cava: conMargen(cava), tonica: conMargen(tonica), agua15: conMargen(agua15), redbull: conMargen(redbull),
+    aguasPequenasCajas: conMargen(aguasPequenasCajas), aguasPequenasUds: conMargen(aguasPequenasUds),
+    vermutRojo: conMargen(vermutRojo), vermutBlanco: conMargen(vermutBlanco),
+    cocaNormal: conMargen(refrescoTotal * 0.25),
+    cocaZero:   conMargen(refrescoTotal * 0.15),
+    fanta:      conMargen(refrescoTotal * 0.25),
+    sprite:     conMargen(refrescoTotal * 0.1),
+    nestea:     conMargen(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
-    aguaConGas: Math.round(pax * 0.37),
-    cerveza00:  Math.round(pax * 0.37),
-    sinGluten:  Math.round(pax * 0.3),
+    aguaConGas: conMargen(pax * 0.37),
+    cerveza00:  conMargen(pax * 0.37),
+    sinGluten:  conMargen(pax * 0.3),
     taxisHielo,
   };
 }
@@ -140,10 +149,13 @@ function calcDestilados(pax, h) {
   const r2 = (base) => Math.max(2, Math.round(base * f));
   return {
     // Calibrado con datos reales (65 pax, barra libre de copas 4h → Seagrams+Tanqueray 9,
-    // Bacardí 1, tequila 2, tequila rosa 2-3, Ballantines 4, Barceló 4)
-    ginebraPremium: r2(pax / 7.2), ginebraSabor: r(pax / 35), ron: r(pax / 60),
-    ronBlanco: r2(pax / 50), tequila: r2(pax / 33), tequilaSabor: r2(pax / 26),
-    vodka: r(pax / 40), ballantines: r2(pax / 16), barcelo: r2(pax / 16),
+    // Bacardí 1, tequila 2, tequila rosa 2-3, Ballantines 4, Barceló 4), con un 10% extra
+    // de margen de seguridad por encima de ese mínimo real
+    ginebraPremium: conMargen(r2(pax / 7.2)), ginebraSabor: conMargen(r(pax / 35)), ron: conMargen(r(pax / 60)),
+    ronBlanco: conMargen(r2(pax / 50)), tequila: conMargen(r2(pax / 33)), tequilaSabor: conMargen(r2(pax / 26)),
+    vodka: conMargen(r(pax / 40)), ballantines: conMargen(r2(pax / 16)), barcelo: conMargen(r2(pax / 16)),
+    // Estos licores curiosos se piden fijos, sin escalar con el pax (no tiene sentido
+    // aplicarles margen: ya son la cantidad mínima de compra)
     mistela: 2, baileys: 1, tiaMaria: 1, limoncello: 1, jagger: 1, peach: 1,
     cremaOrujo: 1, cazalla: 1, orujoHierbas: 1, marcaBlanca: 1,
   };
@@ -154,15 +166,16 @@ function calcCristaleria(pax, h, dobleCopa, tieneBrindisCava, llevaEntrante, ext
   // una barra libre de 8h debe servir notablemente más que una de 2h, no lo mismo.
   const copasBarraPorPax = h > 0 ? Math.min(8, 1 + h) : 0;
   const mult = dobleCopa ? 2 : 1;
-  const vino = Math.round(pax * 2.5 * mult);
-  const agua = Math.round(pax * 1.5 * mult) + extraAguaDesayuno;
-  const cubata = Math.round(pax * copasBarraPorPax);
-  const cavaCopas = Math.round(pax * (tieneBrindisCava ? 2.0 : 1.0));
+  // Margen de seguridad del 10% para cubrir roturas/pérdidas de cristalería durante el servicio
+  const vino = conMargen(pax * 2.5 * mult);
+  const agua = conMargen(pax * 1.5 * mult) + extraAguaDesayuno;
+  const cubata = conMargen(pax * copasBarraPorPax);
+  const cavaCopas = conMargen(pax * (tieneBrindisCava ? 2.0 : 1.0));
   const fmt = (u, size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
   return {
     agua: fmt(agua, BATEA.agua), cubata: fmt(cubata, BATEA.cubata),
     vino: fmt(vino, BATEA.vino), cava: fmt(cavaCopas, BATEA.cava),
-    chupito: llevaEntrante ? fmt(pax, BATEA.chupito) : null,
+    chupito: llevaEntrante ? fmt(conMargen(pax), BATEA.chupito) : null,
   };
 }
 
@@ -214,20 +227,21 @@ function calcMesasTotal(evtKey, pax) {
 // - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
 function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
   const items = [];
+  const capsulas = conMargen(totalPax * (hayDesayuno ? 4.5 : 3.1));
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 4.5 : 3.1)))], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
   } else {
-    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(Math.ceil(totalPax * (hayDesayuno ? 4.5 : 3.1)))], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
   }
   // Con desayuno se sirve más café por persona (todos toman, no solo parte de los pax)
   const factorLeche = hayDesayuno ? 0.9 : 0.6;
   const factorSolo  = hayDesayuno ? 0.7 : 0.4;
   items.push(
-    [`Tazas café con leche e infusiones${hayDesayuno ? " (desayuno)" : ""}`, String(Math.round(totalPax * factorLeche))],
-    [`Tazas café solo y cortado${hayDesayuno ? " (desayuno)" : ""}`, String(Math.round(totalPax * factorSolo))],
-    ["Platos de café", String(totalPax)],
+    [`Tazas café con leche e infusiones${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorLeche))],
+    [`Tazas café solo y cortado${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorSolo))],
+    ["Platos de café", String(conMargen(totalPax))],
     ["Infusiones (té variado + descafeinado)", `${Math.ceil(totalPax / 30)} caja`],
     ["Azucarillos y edulcorantes", `${Math.ceil(totalPax / 50)} caja`],
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 8 : 40))))],
@@ -343,20 +357,20 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Cristalería", items: [
     [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
     ["Vasos de cubata",                                   `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Copas de cava",                                     `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
-    ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))]] : []),
+    ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]] : []),
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
     ...(usaTela
-      ? [["Servilletas de tela", String(totalPax)], ["Servilletas de papel (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
-      : [["Servilletas de papel", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${Math.ceil(totalPax * 3 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas de papel (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
+      : [["Servilletas de papel", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${conMargen(totalPax * 3.5 / 100)} paq. (100)`],
   ]});
 
   {/* Jamón, tarta y desayuno se sirven en plato pequeño (mismo estilo que el postre):
@@ -367,8 +381,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     + (hayDesayuno ? totalPax : 0);
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
-  const platosDoble = dobleServicio ? totalPax * 2 + 50 : totalPax;
-  const cubiertosDoble = dobleServicio ? totalPax * 2 + 70 : totalPax;
+  const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
+  const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla", items: [
     ...(!llevaCanapes ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)],
@@ -378,8 +392,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-    ["Cucharas postre", String(totalPax)],
-    ["Cucharas café", String(Math.round(totalPax * 0.8))],
+    ["Cucharas postre", String(conMargen(totalPax))],
+    ["Cucharas café", String(conMargen(totalPax * 0.8))],
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
@@ -512,9 +526,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
     ...(usaTela
-      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
-      : [["Servilletas grandes", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${Math.ceil(totalPax * 3 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
+      : [["Servilletas grandes", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${conMargen(totalPax * 3.5 / 100)} paq. (100)`],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -523,20 +537,20 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
-  const platosDoble = dobleServicio ? totalPax * 2 + 50 : totalPax;
-  const cubiertosDoble = dobleServicio ? totalPax * 2 + 70 : totalPax;
+  const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
+  const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
     ...(!llevaCanapes ? [
       ["Platos trinchero blancos", String(platosDoble)], ["Platos metálicos", "—"], ["Platos postre", String(platosDoble + platosPostreExtra)],
     ] : []),
-    ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))],
+    ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))],
     ["Tenedores / Cuchillos / Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-    ["Cucharas postre", String(totalPax)],
+    ["Cucharas postre", String(conMargen(totalPax))],
     [`Copas cristal${dobleServicio ? " (doble)" : ""}`, `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
     ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
     ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
@@ -633,16 +647,16 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
-  const platosDoble = dobleServicio ? totalPax * 2 + 50 : totalPax;
-  const cubiertosDoble = dobleServicio ? totalPax * 2 + 70 : totalPax;
+  const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
+  const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla y Cubertería", items: [
     ...(!llevaCanapes ? [
       ["Platos trinchero blancos", String(platosDoble)], ["Platos postre (negro/gris)", String(platosDoble + platosPostreExtra)],
       ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ] : []),
     ["Tenedores / Cuchillos / Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-    ["Cucharas postre", String(totalPax)],
-    ["Jarras de cristal", String(Math.max(2, Math.ceil(totalPax / 8)))], ["Abridores", "2"],
+    ["Cucharas postre", String(conMargen(totalPax))],
+    ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))], ["Abridores", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
@@ -650,16 +664,16 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
     ...(usaTela
-      ? [["Servilletas de tela", String(totalPax)], ["Servilletas grandes (extra)", `${Math.ceil(totalPax / 50)} paq. (50)`]]
-      : [["Servilletas grandes", `${Math.ceil(totalPax * 3 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${Math.ceil(totalPax * 3 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
+      : [["Servilletas grandes", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
+    ["Servilletas cocktail", `${conMargen(totalPax * 3.5 / 100)} paq. (100)`],
     ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
     ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
     ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", "1 caja"],
     ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", "1"], ["Leche condensada", "1"],
     ["Vasos de cartón (L/M/S)", `${Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50)} paq. (50 uds)`], ["Bolsas grandes de papel", "1 paq."],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, Math.ceil(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
     ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
     ["Agua 1,5L (Solán de Cabras, cliente)", `${Math.round(totalPax * 0.8)} packs`],
@@ -879,7 +893,7 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
             <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📋 Añadir varios items</div>
             <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>{tituloPaso}</div>
           </div>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} aria-label="Cerrar" style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
         </div>
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -941,47 +955,64 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
   );
 }
 
+// Lee el estado guardado (link ?c=... o localStorage) de forma síncrona, ANTES del primer
+// render, para que cada useState arranque ya con el valor correcto. Hacerlo en un efecto
+// (después del montaje) provoca una carrera con el guardado automático: en StrictMode,
+// donde React ejecuta los efectos del montaje dos veces, el efecto de guardado puede
+// escribir los valores por defecto en localStorage antes de que el de carga los restaure.
+function leerEstadoGuardado() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("c");
+    if (c) return { estado: JSON.parse(decodeURIComponent(c)), desdeLink: true };
+    const guardado = localStorage.getItem("gula_checklist_estado");
+    if (guardado) return { estado: JSON.parse(guardado), desdeLink: false };
+  } catch (e) { /* link corrupto, localStorage no disponible, o JSON inválido: se ignora */ }
+  return { estado: {}, desdeLink: false };
+}
+
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App() {
-  const [evento, setEvento]         = useState("boda");
-  const [nombreEvento, setNombreEvento] = useState("");
-  const [fechaEvento, setFechaEvento]   = useState("");
-  const [horaInicio, setHoraInicio]     = useState("");
-  const [ubicacion, setUbicacion]       = useState("");
-  const [pax, setPax]               = useState(80);
-  const [ninos, setNinos]           = useState(0);
-  const [barraCoctel, setBarraCoctel] = useState(true);
-  const [horasCoctel, setHorasCoctel] = useState(2);
-  const [barraCopas, setBarraCopas]   = useState(false);
-  const [horasCopas, setHorasCopas]   = useState(4);
-  const [dobleServicio, setDobleServicio]             = useState(false);
-  const [llevaEntrante, setLlevaEntrante]             = useState(false);
-  const [llevaCanapes, setLlevaCanapes]               = useState(false);
-  const [llevaPaella, setLlevaPaella]                 = useState(false);
-  const [tipoPaella, setTipoPaella]                   = useState("Auto");
-  const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState("Blanco liso");
-  const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState("Blanco");
-  const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(false);
-  const [numCamareros, setNumCamareros]                 = useState(0);
-  const [tipoBandejas, setTipoBandejas] = useState("Mixto");
-  const [tipoHorno, setTipoHorno]       = useState("Pequeño");
-  const [tipoBBQ, setTipoBBQ]           = useState("No lleva");
-  const [mesVerano, setMesVerano]               = useState(true);
-  const [tieneBrindisCava, setTieneBrindisCava] = useState(false);
-  const [tieneFrituras, setTieneFrituras]       = useState(false);
-  const [numFrituras, setNumFrituras]           = useState(1);
-  const [fuerzaTextilTela, setFuerzaTextilTela] = useState(false);
-  const [llevaPalomitera, setLlevaPalomitera]       = useState(false);
-  const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(false);
-  const [tipoCafetera, setTipoCafetera]             = useState("Nespresso");
-  const [extraBandejasMadera, setExtraBandejasMadera] = useState(0);
-  const [extraBandejasPlata, setExtraBandejasPlata]   = useState(0);
-  const [llevaJamonero, setLlevaJamonero]             = useState(false);
-  const [personasPorPlatoEntrante, setPersonasPorPlatoEntrante] = useState(4);
-  const [llevaAguasPequenas, setLlevaAguasPequenas]   = useState(false);
-  const [hayDesayuno, setHayDesayuno]                 = useState(false);
-  const [tipoNevera, setTipoNevera]         = useState("Mediana");
-  const [tipoCongelador, setTipoCongelador] = useState("Mediana");
+  const [{ estado: estadoInicial, desdeLink: linkAbiertoInicial }] = useState(leerEstadoGuardado);
+  const [evento, setEvento]         = useState(estadoInicial.evento ?? "boda");
+  const [nombreEvento, setNombreEvento] = useState(estadoInicial.nombreEvento ?? "");
+  const [fechaEvento, setFechaEvento]   = useState(estadoInicial.fechaEvento ?? "");
+  const [horaInicio, setHoraInicio]     = useState(estadoInicial.horaInicio ?? "");
+  const [ubicacion, setUbicacion]       = useState(estadoInicial.ubicacion ?? "");
+  const [pax, setPax]               = useState(estadoInicial.pax ?? 80);
+  const [ninos, setNinos]           = useState(estadoInicial.ninos ?? 0);
+  const [barraCoctel, setBarraCoctel] = useState(estadoInicial.barraCoctel ?? true);
+  const [horasCoctel, setHorasCoctel] = useState(estadoInicial.horasCoctel ?? 2);
+  const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
+  const [horasCopas, setHorasCopas]   = useState(estadoInicial.horasCopas ?? 4);
+  const [dobleServicio, setDobleServicio]             = useState(estadoInicial.dobleServicio ?? false);
+  const [llevaEntrante, setLlevaEntrante]             = useState(estadoInicial.llevaEntrante ?? false);
+  const [llevaCanapes, setLlevaCanapes]               = useState(estadoInicial.llevaCanapes ?? false);
+  const [llevaPaella, setLlevaPaella]                 = useState(estadoInicial.llevaPaella ?? false);
+  const [tipoPaella, setTipoPaella]                   = useState(estadoInicial.tipoPaella ?? "Auto");
+  const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState(estadoInicial.estiloPlatoPrincipal ?? "Blanco liso");
+  const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState(estadoInicial.estiloPlatoPostre ?? "Blanco");
+  const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
+  const [numCamareros, setNumCamareros]                 = useState(estadoInicial.numCamareros ?? 0);
+  const [tipoBandejas, setTipoBandejas] = useState(estadoInicial.tipoBandejas ?? "Mixto");
+  const [tipoHorno, setTipoHorno]       = useState(estadoInicial.tipoHorno ?? "Pequeño");
+  const [tipoBBQ, setTipoBBQ]           = useState(estadoInicial.tipoBBQ ?? "No lleva");
+  const [mesVerano, setMesVerano]               = useState(estadoInicial.mesVerano ?? true);
+  const [tieneBrindisCava, setTieneBrindisCava] = useState(estadoInicial.tieneBrindisCava ?? false);
+  const [tieneFrituras, setTieneFrituras]       = useState(estadoInicial.tieneFrituras ?? false);
+  const [numFrituras, setNumFrituras]           = useState(estadoInicial.numFrituras ?? 1);
+  const [fuerzaTextilTela, setFuerzaTextilTela] = useState(estadoInicial.fuerzaTextilTela ?? false);
+  const [llevaPalomitera, setLlevaPalomitera]       = useState(estadoInicial.llevaPalomitera ?? false);
+  const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
+  const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
+  const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
+  const [extraBandejasPlata, setExtraBandejasPlata]   = useState(estadoInicial.extraBandejasPlata ?? 0);
+  const [llevaJamonero, setLlevaJamonero]             = useState(estadoInicial.llevaJamonero ?? false);
+  const [personasPorPlatoEntrante, setPersonasPorPlatoEntrante] = useState(estadoInicial.personasPorPlatoEntrante ?? 4);
+  const [llevaAguasPequenas, setLlevaAguasPequenas]   = useState(estadoInicial.llevaAguasPequenas ?? false);
+  const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
+  const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
+  const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   const [modalPrevia, setModalPrevia]   = useState(false);
@@ -989,65 +1020,53 @@ export default function App() {
   const [compartirMsg, setCompartirMsg] = useState("");
   const [menuCompartir, setMenuCompartir] = useState(false);
   const [agregadosTag, setAgregadosTag] = useState("");
-  const [itemsManuales, setItemsManuales] = useState([]); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
-  const [overridesManuales, setOverridesManuales] = useState({}); // { "categoria::label": "cantidad editada a mano" }
+  const [itemsManuales, setItemsManuales] = useState(estadoInicial.itemsManuales ?? []); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
+  const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
   const [categoriaTocada, setCategoriaTocada] = useState(false);
-  const [linkAbierto, setLinkAbierto] = useState(false);
+  const [linkAbierto, setLinkAbierto] = useState(linkAbiertoInicial ?? false);
 
-  // Snapshot completo del estado configurable, para generar un link que reabra
-  // la misma checklist en cualquier dispositivo (sin backend: todo va en la URL)
-  const ESTADO_SETTERS = {
-    evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
-    horaInicio: setHoraInicio, ubicacion: setUbicacion, pax: setPax, ninos: setNinos,
-    barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
-    dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes, llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
-    estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, tipoBandejas: setTipoBandejas,
-    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
-    tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
-    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
-    extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
-    personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
-    tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador,
-    itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
-  };
+  // Snapshot de todo el estado configurable — lo usan tanto el link para el móvil
+  // como el guardado automático en localStorage
+  const getEstadoActual = () => ({
+    evento, nombreEvento, fechaEvento, horaInicio, ubicacion, pax, ninos,
+    barraCoctel, horasCoctel, barraCopas, horasCopas,
+    dobleServicio, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
+    estiloPlatoPrincipal, estiloPlatoPostre,
+    llevaArmarioCaliente, numCamareros, tipoBandejas,
+    tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
+    tieneFrituras, numFrituras, fuerzaTextilTela,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera,
+    extraBandejasMadera, extraBandejasPlata, llevaJamonero,
+    personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    tipoNevera, tipoCongelador, itemsManuales, overridesManuales,
+  });
+  const estadoActualJSON = JSON.stringify(getEstadoActual());
 
-  // Al abrir un link generado (?c=...), restaura el estado guardado en la URL
+  // Guarda automáticamente en este navegador cada vez que cambia algo, para no perder
+  // la configuración si se recarga la página o se cierra sin querer. El estado inicial
+  // ya se restauró de forma síncrona (ver leerEstadoGuardado/estadoInicial arriba), así
+  // que no hace falta guardia de "carga completada": no hay carrera con StrictMode.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const c = params.get("c");
-    if (!c) return;
-    try {
-      const estado = JSON.parse(decodeURIComponent(c));
-      Object.entries(estado).forEach(([k, v]) => { if (ESTADO_SETTERS[k]) ESTADO_SETTERS[k](v); });
-      setLinkAbierto(true);
-    } catch (e) { /* link corrupto o antiguo: se ignora y se queda en los valores por defecto */ }
+    try { localStorage.setItem("gula_checklist_estado", estadoActualJSON); } catch (e) { /* localStorage lleno o no disponible */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [estadoActualJSON]);
 
   const handleGenerarLink = () => {
-    const estado = {
-      evento, nombreEvento, fechaEvento, horaInicio, ubicacion, pax, ninos,
-      barraCoctel, horasCoctel, barraCopas, horasCopas,
-      dobleServicio, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
-      estiloPlatoPrincipal, estiloPlatoPostre,
-      llevaArmarioCaliente, numCamareros, tipoBandejas,
-      tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
-      tieneFrituras, numFrituras, fuerzaTextilTela,
-      llevaPalomitera, llevaJarrasCristal, tipoCafetera,
-      extraBandejasMadera, extraBandejasPlata, llevaJamonero,
-      personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
-      tipoNevera, tipoCongelador, itemsManuales, overridesManuales,
-    };
-    const url = `${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(estado))}`;
+    const url = `${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`;
     navigator.clipboard.writeText(url).then(() => {
       setCompartirMsg("¡Link copiado! ✓");
       setTimeout(() => setCompartirMsg(""), 3000);
     });
     setMenuCompartir(false);
+  };
+
+  const handleNuevoEvento = () => {
+    if (!window.confirm("¿Empezar un evento nuevo? Se borrará la configuración guardada de este navegador (pax, extras, items añadidos a mano...).")) return;
+    try { localStorage.removeItem("gula_checklist_estado"); } catch (e) { /* localStorage no disponible */ }
+    window.location.href = window.location.origin + window.location.pathname;
   };
 
   const opts = {
@@ -1212,6 +1231,7 @@ export default function App() {
             </div>
           </div>
           <div className="header-actions">
+            <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
             <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
@@ -1464,7 +1484,7 @@ export default function App() {
           const infoCat = infoCategoria(cat.nombre);
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
-              <div className="category-header" onClick={() => toggleCategory(cat.nombre)}>
+              <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
                 <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.icono}</span>{cat.nombre}</span>
                 <span className="cat-count">{cat.items.length}<span className="arrow">▼</span></span>
               </div>
@@ -1494,6 +1514,7 @@ export default function App() {
                           <button
                             onClick={() => handleRemoveItemManual(manualIdx)}
                             title="Quitar item"
+                            aria-label={`Quitar ${label}`}
                             style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "1rem", marginLeft: 8, lineHeight: 1 }}
                           >✕</button>
                         )}
