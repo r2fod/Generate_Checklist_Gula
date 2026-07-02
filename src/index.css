@@ -829,6 +829,55 @@ body {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Edición del nombre del item en el sitio (botón ✎) */
+.item-name-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  padding: 5px 10px;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.item-name-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* Botones ✎ (editar nombre) y ✕ (quitar) de cada item */
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.item-action-btn {
+  background: none;
+  border: none;
+  color: #c6cbd4;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 6px 7px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-smooth);
+}
+
+.item-action-btn:hover {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.item-action-borrar:hover {
+  color: #dc2626;
+  background: #fee2e2;
 }
 
 .tag-alquiler {

@@ -1022,6 +1022,10 @@ export default function App() {
   const [agregadosTag, setAgregadosTag] = useState("");
   const [itemsManuales, setItemsManuales] = useState(estadoInicial.itemsManuales ?? []); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
+  const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
+  const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
+  const [editandoNombre, setEditandoNombre] = useState(null); // clave "categoria::label" del item cuyo nombre se está editando
+  const [nombreTemporal, setNombreTemporal] = useState("");
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
@@ -1050,6 +1054,7 @@ export default function App() {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, itemsManuales, overridesManuales,
+    itemsOcultos, nombresManuales,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1139,23 +1144,34 @@ export default function App() {
       }
       destino.items.push([it.label, it.cantidad, idx]);
     });
-    // Aplica las cantidades editadas a mano (clave: categoría + etiqueta del item)
+    // Aplica los ajustes manuales (clave: categoría + etiqueta ORIGINAL del item):
+    // quita los items ocultos, aplica cantidades editadas y nombres corregidos.
+    // La tupla resultante es [nombreMostrado, cantidad, idxManual, labelOriginal] —
+    // el label original se conserva como identidad estable del item aunque se renombre.
     cats.forEach(cat => {
-      cat.items = cat.items.map(([label, qty, idx]) => {
-        const key = `${cat.nombre}::${label}`;
-        return overridesManuales[key] !== undefined ? [label, overridesManuales[key], idx] : [label, qty, idx];
-      });
+      cat.items = cat.items
+        .filter(([label]) => !itemsOcultos[`${cat.nombre}::${label}`])
+        .map(([label, qty, idx]) => {
+          const key = `${cat.nombre}::${label}`;
+          const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : qty;
+          return [nombresManuales[key] ?? label, cantidad, idx, label];
+        });
     });
-    return cats;
-  }, [baseChecklist, itemsManuales, overridesManuales]);
+    // Si se ocultan todos los items de una categoría, la categoría desaparece también
+    return cats.filter(c => c.items.length > 0);
+  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales]);
 
-  const handleEditarCantidad = (categoria, label, valor) => {
-    const key = `${categoria}::${label}`;
+  // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
+  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales });
+  const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
+
+  const handleEditarCantidad = (categoria, labelOriginal, valor) => {
+    const key = `${categoria}::${labelOriginal}`;
     // Snapshot al empezar a editar este item (no por cada tecla): así "Deshacer"
     // recupera la cantidad que había antes de tocar el item, de una vez
     if (ultimaClaveEditadaRef.current !== key) {
       ultimaClaveEditadaRef.current = key;
-      setHistorial(prev => [...prev.slice(-19), { overridesManuales, itemsManuales }]);
+      pushHistorial();
     }
     setOverridesManuales(prev => {
       const next = { ...prev };
@@ -1165,11 +1181,46 @@ export default function App() {
     });
   };
 
+  // Quita de la lista un item calculado (los manuales se borran de itemsManuales)
+  const handleOcultarItem = (categoria, labelOriginal) => {
+    ultimaClaveEditadaRef.current = null;
+    pushHistorial();
+    setItemsOcultos(prev => ({ ...prev, [`${categoria}::${labelOriginal}`]: true }));
+  };
+
+  // Corrige el nombre de un item en el sitio. En los calculados se guarda como
+  // "nombre corregido" sobre el label original (que sigue siendo la identidad del
+  // item, así la cantidad se sigue recalculando sola); en los manuales se edita
+  // el item directamente.
+  const handleRenombrarItem = (categoria, labelOriginal, manualIdx, labelMostrado, nuevo) => {
+    setEditandoNombre(null);
+    const nuevoLabel = nuevo.trim();
+    if (!nuevoLabel || nuevoLabel === labelMostrado) return;
+    ultimaClaveEditadaRef.current = null;
+    pushHistorial();
+    if (manualIdx !== undefined) {
+      setItemsManuales(prev => prev.map((it, i) => i === manualIdx ? { ...it, label: nuevoLabel } : it));
+      // La cantidad editada a mano de un item manual va ligada a su nombre: se migra la clave
+      const oldKey = `${categoria}::${labelOriginal}`;
+      setOverridesManuales(prev => {
+        if (prev[oldKey] === undefined) return prev;
+        const next = { ...prev };
+        next[`${categoria}::${nuevoLabel}`] = next[oldKey];
+        delete next[oldKey];
+        return next;
+      });
+    } else {
+      setNombresManuales(prev => ({ ...prev, [`${categoria}::${labelOriginal}`]: nuevoLabel }));
+    }
+  };
+
   const handleDeshacer = () => {
     if (historial.length === 0) return;
     const ultimo = historial[historial.length - 1];
     setOverridesManuales(ultimo.overridesManuales);
     setItemsManuales(ultimo.itemsManuales);
+    setItemsOcultos(ultimo.itemsOcultos);
+    setNombresManuales(ultimo.nombresManuales);
     setHistorial(prev => prev.slice(0, -1));
     ultimaClaveEditadaRef.current = null;
   };
@@ -1187,7 +1238,7 @@ export default function App() {
   };
   const handleRemoveItemManual = (idx) => {
     ultimaClaveEditadaRef.current = null;
-    setHistorial(prev => [...prev.slice(-19), { overridesManuales, itemsManuales }]);
+    pushHistorial();
     setItemsManuales(prev => prev.filter((_, i) => i !== idx));
   };
 
@@ -1568,7 +1619,6 @@ export default function App() {
         {/* CATEGORÍAS */}
         {filtered.map((cat, idx) => {
           const isOpen = openCategories[cat.nombre] !== false;
-          const esManual = cat.nombre === CATEGORIA_MANUAL;
           const infoCat = infoCategoria(cat.nombre);
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
@@ -1578,34 +1628,58 @@ export default function App() {
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
-                  {cat.items.map(([label, qty, manualIdx], i) => {
+                  {cat.items.map(([label, qty, manualIdx, labelOriginal], i) => {
                     const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                     const displayQty = String(qty && qty.u ? qty.u : qty);
-                    const editado = overridesManuales[`${cat.nombre}::${label}`] !== undefined;
+                    const keyId = `${cat.nombre}::${labelOriginal ?? label}`;
+                    const editado = overridesManuales[keyId] !== undefined;
+                    const renombrado = manualIdx === undefined && nombresManuales[keyId] !== undefined;
+                    const esItemManual = manualIdx !== undefined;
                     return (
                       <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
-                        <div className="item-name">
-                          {label}
-                          {alq && <span className="tag-alquiler">ALQUILER</span>}
-                          {editado && <span title="Cantidad editada a mano" style={{ color: "#9ca3af", fontSize: "0.7rem" }}>✎</span>}
-                        </div>
+                        {editandoNombre === keyId ? (
+                          <input
+                            type="text"
+                            className="item-name-input"
+                            value={nombreTemporal}
+                            autoFocus
+                            onChange={e => setNombreTemporal(e.target.value)}
+                            onBlur={() => handleRenombrarItem(cat.nombre, labelOriginal ?? label, manualIdx, label, nombreTemporal)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") e.target.blur();
+                              if (e.key === "Escape") { setNombreTemporal(label); e.target.blur(); }
+                            }}
+                          />
+                        ) : (
+                          <div className="item-name">
+                            {label}
+                            {alq && <span className="tag-alquiler">ALQUILER</span>}
+                            {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} style={{ color: "#9ca3af", fontSize: "0.7rem" }}>✎</span>}
+                          </div>
+                        )}
                         <input
                           type="text"
                           className="item-qty-input"
                           value={displayQty}
                           title="Click para editar la cantidad"
-                          onChange={e => handleEditarCantidad(cat.nombre, label, e.target.value)}
+                          onChange={e => handleEditarCantidad(cat.nombre, labelOriginal ?? label, e.target.value)}
                           onFocus={e => e.target.select()}
                           size={Math.max(2, displayQty.length)}
                         />
-                        {esManual && (
+                        <div className="item-actions">
                           <button
-                            onClick={() => handleRemoveItemManual(manualIdx)}
-                            title="Quitar item"
+                            className="item-action-btn"
+                            onClick={() => { setEditandoNombre(keyId); setNombreTemporal(label); }}
+                            title="Editar el nombre"
+                            aria-label={`Editar nombre de ${label}`}
+                          >✎</button>
+                          <button
+                            className="item-action-btn item-action-borrar"
+                            onClick={() => esItemManual ? handleRemoveItemManual(manualIdx) : handleOcultarItem(cat.nombre, labelOriginal ?? label)}
+                            title="Quitar de la lista"
                             aria-label={`Quitar ${label}`}
-                            style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: "1rem", marginLeft: 8, lineHeight: 1 }}
                           >✕</button>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
