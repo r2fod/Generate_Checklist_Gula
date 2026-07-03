@@ -1145,6 +1145,11 @@ export default function App() {
   const [plantillas, setPlantillas] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gula_plantillas")) || {}; } catch (e) { return {}; }
   });
+  // Eventos guardados completos (con nombre, fecha, logística...): archivo de checklists
+  // que se pueden recargar o compartir por link en cualquier momento
+  const [eventosGuardados, setEventosGuardados] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("gula_eventos_guardados")) || {}; } catch (e) { return {}; }
+  });
   // Historial para deshacer cambios manuales (cantidad editada o item quitado).
   // Se guarda un snapshot al EMPEZAR a editar cada item (no por cada tecla).
   const [historial, setHistorial] = useState([]);
@@ -1236,6 +1241,58 @@ export default function App() {
       },
     });
   };
+  // ─── EVENTOS GUARDADOS (checklist completa con nombre, fecha, logística...) ──
+  const guardarEventos = (obj) => {
+    setEventosGuardados(obj);
+    try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
+  };
+  const handleGuardarEvento = () => setDialogo({
+    tipo: "prompt",
+    titulo: "Guardar evento",
+    mensaje: "Guarda esta checklist completa (con nombre, fecha y logística) para volver a abrirla o compartir su link cuando quieras.",
+    placeholder: "Ej: Boda Ana y Luis · 15 agosto",
+    valorInicial: nombreEvento || "",
+    textoConfirmar: "Guardar",
+    onConfirm: (nombre) => guardarEventos({ ...eventosGuardados, [nombre]: getEstadoActual() }),
+  });
+  const handleCargarEvento = (nombre) => {
+    if (!eventosGuardados[nombre]) return;
+    setDialogo({
+      tipo: "confirm",
+      titulo: `¿Abrir el evento "${nombre}"?`,
+      mensaje: "Se sustituirá todo lo que hay ahora en pantalla por la checklist guardada.",
+      textoConfirmar: "Abrir evento",
+      onConfirm: () => {
+        try { localStorage.setItem("gula_checklist_estado", JSON.stringify(eventosGuardados[nombre])); } catch (e) { /* localStorage no disponible */ }
+        window.location.href = window.location.origin + window.location.pathname;
+      },
+    });
+  };
+  // Copia el link público del evento guardado: quien lo abra ve la checklist
+  // en la web (GitHub Pages) sin necesitar nada instalado
+  const handleLinkEvento = (nombre) => {
+    if (!eventosGuardados[nombre]) return;
+    const url = `${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(eventosGuardados[nombre]))}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCompartirMsg("¡Link copiado! ✓");
+      setTimeout(() => setCompartirMsg(""), 3000);
+    }).catch(() => {
+      window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
+    });
+  };
+  const handleBorrarEvento = (nombre) => setDialogo({
+    tipo: "confirm",
+    titulo: `¿Borrar el evento guardado "${nombre}"?`,
+    mensaje: "Los links que ya hayas compartido seguirán funcionando (llevan la checklist dentro).",
+    textoConfirmar: "Borrar",
+    peligro: true,
+    onConfirm: () => {
+      const next = { ...eventosGuardados };
+      delete next[nombre];
+      guardarEventos(next);
+    },
+  });
+
   const handleBorrarPlantilla = (nombre) => setDialogo({
     tipo: "confirm",
     titulo: `¿Borrar la plantilla "${nombre}"?`,
@@ -1581,6 +1638,27 @@ export default function App() {
                 <div className="plantilla-row" key={n}>
                   <button className="plantilla-nombre" onClick={() => handleAplicarPlantilla(n)} title={`Cargar la plantilla "${n}"`}>📁 {n}</button>
                   <button className="plantilla-borrar" onClick={() => handleBorrarPlantilla(n)} aria-label={`Borrar plantilla ${n}`} title="Borrar plantilla">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* EVENTOS GUARDADOS */}
+        <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
+          <div className="plantillas-header">
+            <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
+            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist completa para reabrirla o compartir su link">💾 Guardar evento</button>
+          </div>
+          {Object.keys(eventosGuardados).length === 0 ? (
+            <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
+          ) : (
+            <div className="plantillas-lista">
+              {Object.keys(eventosGuardados).map(n => (
+                <div className="plantilla-row" key={n}>
+                  <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>📋 {n}</button>
+                  <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}>🔗</button>
+                  <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado">✕</button>
                 </div>
               ))}
             </div>

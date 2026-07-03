@@ -917,6 +917,22 @@ body {
   background: var(--accent-soft);
 }
 
+/* Botón 🔗 de copiar el link de un evento guardado */
+.plantilla-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 6px;
+  line-height: 1;
+  border-radius: var(--radius-sm, 6px);
+  transition: var(--transition-smooth);
+}
+
+.plantilla-link:hover {
+  background: var(--accent-soft);
+}
+
 .plantilla-borrar {
   background: none;
   border: none;
