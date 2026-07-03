@@ -28,4 +28,11 @@
 //   }
 // }
 
-export const firebaseConfig = null;
+export const firebaseConfig = {
+  apiKey: "AIzaSyB12RMvRIn_ijoBD2QBhRTae7EMozMrXpQ",
+  authDomain: "gula-checklist.firebaseapp.com",
+  projectId: "gula-checklist",
+  storageBucket: "gula-checklist.firebasestorage.app",
+  messagingSenderId: "157739109937",
+  appId: "1:157739109937:web:f9436e49089e61efd00f10",
+};
