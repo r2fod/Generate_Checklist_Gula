@@ -612,6 +612,8 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  /* Si una etiqueta ocupa 2 líneas, los campos quedan alineados por abajo */
+  align-items: end;
 }
 
 /* Checkbox 🚐 de furgoneta por persona */
