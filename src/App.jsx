@@ -4,9 +4,11 @@ import React, { useState, useMemo, useEffect } from "react";
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
-// Margen de seguridad del 10% sobre consumibles (bebidas, licores, vajilla, servilletas...)
-// para no quedarse corto en el evento — está en línea con lo que usan otros caterings
-// como buffer estándar sobre servicio emplatado.
+// Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas:
+// es el buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan
+// pedir un 10-20% extra de copas y platos). Las bebidas, licores y cápsulas NO llevan
+// margen extra: sus ratios ya están calibrados con eventos reales por encima de los
+// rangos del sector (ej: vino 0,72 bot/pax frente al estándar de 0,33-0,5).
 const MARGEN_SEGURIDAD = 1.1;
 const conMargen = (n) => Math.ceil(n * MARGEN_SEGURIDAD);
 
@@ -123,21 +125,22 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const vermutRojo = Math.max(2, Math.round(pax / 11));
   const vermutBlanco = Math.max(2, Math.round(pax / 13));
   return {
-    // Margen de seguridad del 10% en todo lo consumible (no en los taxis de hielo,
-    // que son viajes de logística, no una cantidad que se pueda quedar corta)
-    cerveza: conMargen(cerveza), vinoBlanco: conMargen(vinoBlanco), vinoTinto: conMargen(vinoTinto),
-    cava: conMargen(cava), tonica: conMargen(tonica), agua15: conMargen(agua15), redbull: conMargen(redbull),
-    aguasPequenasCajas: conMargen(aguasPequenasCajas), aguasPequenasUds: conMargen(aguasPequenasUds),
-    vermutRojo: conMargen(vermutRojo), vermutBlanco: conMargen(vermutBlanco),
-    cocaNormal: conMargen(refrescoTotal * 0.25),
-    cocaZero:   conMargen(refrescoTotal * 0.15),
-    fanta:      conMargen(refrescoTotal * 0.25),
-    sprite:     conMargen(refrescoTotal * 0.1),
-    nestea:     conMargen(refrescoTotal * 0.025),
+    // Sin margen extra: los ratios ya están calibrados con eventos reales por encima
+    // de los rangos del sector (vino 0,72 bot/pax vs 0,33-0,5 estándar; cerveza en el
+    // techo de 1,5-2/pax; cava 0,2 vs 0,17). Añadir un 10% encima era pasarse.
+    cerveza, vinoBlanco, vinoTinto,
+    cava, tonica, agua15, redbull,
+    aguasPequenasCajas, aguasPequenasUds,
+    vermutRojo, vermutBlanco,
+    cocaNormal: Math.round(refrescoTotal * 0.25),
+    cocaZero:   Math.round(refrescoTotal * 0.15),
+    fanta:      Math.round(refrescoTotal * 0.25),
+    sprite:     Math.round(refrescoTotal * 0.1),
+    nestea:     Math.round(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
-    aguaConGas: conMargen(pax * 0.37),
-    cerveza00:  conMargen(pax * 0.37),
-    sinGluten:  conMargen(pax * 0.3),
+    aguaConGas: Math.round(pax * 0.37),
+    cerveza00:  Math.round(pax * 0.37),
+    sinGluten:  Math.round(pax * 0.3),
     taxisHielo,
   };
 }
@@ -149,11 +152,11 @@ function calcDestilados(pax, h) {
   const r2 = (base) => Math.max(2, Math.round(base * f));
   return {
     // Calibrado con datos reales (65 pax, barra libre de copas 4h → Seagrams+Tanqueray 9,
-    // Bacardí 1, tequila 2, tequila rosa 2-3, Ballantines 4, Barceló 4), con un 10% extra
-    // de margen de seguridad por encima de ese mínimo real
-    ginebraPremium: conMargen(r2(pax / 7.2)), ginebraSabor: conMargen(r(pax / 35)), ron: conMargen(r(pax / 60)),
-    ronBlanco: conMargen(r2(pax / 50)), tequila: conMargen(r2(pax / 33)), tequilaSabor: conMargen(r2(pax / 26)),
-    vodka: conMargen(r(pax / 40)), ballantines: conMargen(r2(pax / 16)), barcelo: conMargen(r2(pax / 16)),
+    // Bacardí 1, tequila 2, tequila rosa 2-3, Ballantines 4, Barceló 4). Sin margen extra:
+    // los mínimos de 2 botellas y el redondeo ya cubren de sobra el rango del sector.
+    ginebraPremium: r2(pax / 7.2), ginebraSabor: r(pax / 35), ron: r(pax / 60),
+    ronBlanco: r2(pax / 50), tequila: r2(pax / 33), tequilaSabor: r2(pax / 26),
+    vodka: r(pax / 40), ballantines: r2(pax / 16), barcelo: r2(pax / 16),
     // Estos licores curiosos se piden fijos, sin escalar con el pax (no tiene sentido
     // aplicarles margen: ya son la cantidad mínima de compra)
     mistela: 2, baileys: 1, tiaMaria: 1, limoncello: 1, jagger: 1, peach: 1,
@@ -227,7 +230,8 @@ function calcMesasTotal(evtKey, pax) {
 // - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
 function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
   const items = [];
-  const capsulas = conMargen(totalPax * (hayDesayuno ? 4.5 : 3.1));
+  // Cápsulas calibradas con evento real (65 pax → 200): sin margen extra
+  const capsulas = Math.ceil(totalPax * (hayDesayuno ? 4.5 : 3.1));
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
   } else if (tipoCafetera === "Bar") {
@@ -717,12 +721,40 @@ function quitarItemsSinCantidad(checklist) {
     .filter(cat => cat.items.length > 0);
 }
 
-// "Juan 08:00–13:30 · Pedro 09:00–14:00" — cada persona de logística con su horario
-function fmtLogistica(equipo = []) {
+// Horas trabajadas entre dos horas "HH:MM" (si acaba pasada la medianoche, suma 24h)
+function horasLogistica(inicio, fin) {
+  if (!inicio || !fin) return null;
+  const [hi, mi] = inicio.split(":").map(Number);
+  const [hf, mf] = fin.split(":").map(Number);
+  let h = (hf + mf / 60) - (hi + mi / 60);
+  if (h < 0) h += 24;
+  return Math.round(h * 4) / 4; // redondeo al cuarto de hora
+}
+
+// Importe de una persona de logística: horas × tarifa + plus de furgoneta si lo lleva
+function importeLogistica(p, tarifa, plusFurgo) {
+  const h = horasLogistica(p.inicio, p.fin);
+  if (h === null) return null;
+  return Math.round((h * (tarifa || 0) + (p.furgoneta ? (plusFurgo || 0) : 0)) * 100) / 100;
+}
+
+// "Juan 08:00–13:30 (5,5h · 55€) · Pedro 09:00–14:00 (5h · 70€ con furgo)"
+function fmtLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
   return equipo
     .filter(p => p.nombre || p.inicio || p.fin)
-    .map(p => `${p.nombre || "¿?"}${p.inicio || p.fin ? ` ${p.inicio || "?"}–${p.fin || "?"}` : ""}`)
+    .map(p => {
+      const h = horasLogistica(p.inicio, p.fin);
+      const imp = importeLogistica(p, tarifa, plusFurgo);
+      const horario = p.inicio || p.fin ? ` ${p.inicio || "?"}–${p.fin || "?"}` : "";
+      const detalle = h !== null ? ` (${String(h).replace(".", ",")}h · ${String(imp).replace(".", ",")}€${p.furgoneta ? " con furgo" : ""})` : "";
+      return `${p.nombre || "¿?"}${horario}${detalle}`;
+    })
     .join(" · ");
+}
+
+// Total en € de todo el equipo de logística (solo personas con horario completo)
+function totalLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
+  return Math.round(equipo.reduce((acc, p) => acc + (importeLogistica(p, tarifa, plusFurgo) || 0), 0) * 100) / 100;
 }
 
 function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta, meta = {}) {
@@ -758,7 +790,7 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${fechaEventoFmt ? `<div><span class="ml">Fecha del evento</span>${fechaEventoFmt}</div>` : ""}
       ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${meta.horaInicio}h</div>` : ""}
       ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${meta.ubicacion}</div>` : ""}
-      ${fmtLogistica(meta.logisticaEquipo) ? `<div><span class="ml">Equipo logística</span>${fmtLogistica(meta.logisticaEquipo)}</div>` : ""}
+      ${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) ? `<div><span class="ml">Equipo logística</span>${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}${totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€` : ""}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
       <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
       <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
@@ -784,8 +816,11 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
               {meta.horaInicio ? ` · ${meta.horaInicio}h` : ""}
               {meta.ubicacion ? ` · ${meta.ubicacion}` : ""}
             </div>
-            {fmtLogistica(meta.logisticaEquipo) && (
-              <div className="preview-header-subtitle">🚚 Logística: {fmtLogistica(meta.logisticaEquipo)}</div>
+            {fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) && (
+              <div className="preview-header-subtitle">
+                🚚 Logística: {fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}
+                {totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 && ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€`}
+              </div>
             )}
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa">✕ Cerrar</button>
@@ -1038,7 +1073,9 @@ export default function App() {
     estadoInicial.logisticaQuien || estadoInicial.logisticaInicio || estadoInicial.logisticaFin
       ? [{ nombre: estadoInicial.logisticaQuien || "", inicio: estadoInicial.logisticaInicio || "", fin: estadoInicial.logisticaFin || "" }]
       : []
-  )); // [{ nombre, inicio, fin }]
+  )); // [{ nombre, inicio, fin, furgoneta }]
+  const [tarifaLogistica, setTarifaLogistica] = useState(estadoInicial.tarifaLogistica ?? 10); // €/hora
+  const [plusFurgoneta, setPlusFurgoneta]     = useState(estadoInicial.plusFurgoneta ?? 20);   // € por llevar furgoneta
   // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
@@ -1083,7 +1120,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas,
-    logisticaEquipo,
+    logisticaEquipo, tarifaLogistica, plusFurgoneta,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1324,7 +1361,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1340,7 +1377,9 @@ export default function App() {
       fechaEvento ? new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null,
       horaInicio ? `${horaInicio}h` : null,
       ubicacion || null,
-      fmtLogistica(logisticaEquipo) ? `Logística: ${fmtLogistica(logisticaEquipo)}` : null,
+      fmtLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)
+        ? `Logística: ${fmtLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)}${totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€` : ""}`
+        : null,
     ].filter(Boolean).join(" · ");
     return `${cabecera}\n${texto}`;
   };
@@ -1351,7 +1390,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -1393,7 +1432,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta }} onClose={() => setModalPrevia(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
 
       <div className="app-wrapper">
@@ -1517,42 +1556,74 @@ export default function App() {
           </div>
           <div className="logistica-block">
             <span className="form-label">EQUIPO DE LOGÍSTICA (cada uno con su horario)</span>
-            {logisticaEquipo.map((p, i) => (
-              <div className="logistica-row" key={i}>
-                <input
-                  type="text"
-                  className="form-input logistica-nombre"
-                  placeholder="Nombre"
-                  value={p.nombre}
-                  onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, nombre: e.target.value } : x))}
-                />
-                <input
-                  type="time"
-                  className="form-input logistica-hora"
-                  value={p.inicio}
-                  title="Hora de inicio"
-                  onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, inicio: e.target.value } : x))}
-                />
-                <span className="logistica-sep">–</span>
-                <input
-                  type="time"
-                  className="form-input logistica-hora"
-                  value={p.fin}
-                  title="Hora de fin"
-                  onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, fin: e.target.value } : x))}
-                />
-                <button
-                  className="item-action-btn item-action-borrar"
-                  onClick={() => setLogisticaEquipo(prev => prev.filter((_, idx) => idx !== i))}
-                  title="Quitar persona"
-                  aria-label={`Quitar ${p.nombre || "persona"} de logística`}
-                >✕</button>
+            {logisticaEquipo.length > 0 && (
+              <div className="logistica-tarifas">
+                <div className="form-group">
+                  <span className="form-label">€ / hora</span>
+                  <input type="number" className="form-input" min="0" step="0.5" value={tarifaLogistica} onChange={e => setTarifaLogistica(Math.max(0, parseFloat(e.target.value) || 0))} />
+                </div>
+                <div className="form-group">
+                  <span className="form-label">Plus furgoneta (€)</span>
+                  <input type="number" className="form-input" min="0" step="1" value={plusFurgoneta} onChange={e => setPlusFurgoneta(Math.max(0, parseFloat(e.target.value) || 0))} />
+                </div>
               </div>
-            ))}
-            <button
-              className="btn-add-logistica"
-              onClick={() => setLogisticaEquipo(prev => [...prev, { nombre: "", inicio: "", fin: "" }])}
-            >+ Añadir persona</button>
+            )}
+            {logisticaEquipo.map((p, i) => {
+              const horas = horasLogistica(p.inicio, p.fin);
+              const importe = importeLogistica(p, tarifaLogistica, plusFurgoneta);
+              return (
+                <div className="logistica-row" key={i}>
+                  <input
+                    type="text"
+                    className="form-input logistica-nombre"
+                    placeholder="Nombre"
+                    value={p.nombre}
+                    onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, nombre: e.target.value } : x))}
+                  />
+                  <input
+                    type="time"
+                    className="form-input logistica-hora"
+                    value={p.inicio}
+                    title="Hora de inicio"
+                    onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, inicio: e.target.value } : x))}
+                  />
+                  <span className="logistica-sep">–</span>
+                  <input
+                    type="time"
+                    className="form-input logistica-hora"
+                    value={p.fin}
+                    title="Hora de fin"
+                    onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, fin: e.target.value } : x))}
+                  />
+                  <label className="logistica-furgo" title="Plus por llevar furgoneta">
+                    <input
+                      type="checkbox"
+                      checked={p.furgoneta || false}
+                      onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, furgoneta: e.target.checked } : x))}
+                    />
+                    🚐
+                  </label>
+                  {horas !== null && (
+                    <span className="logistica-info">{String(horas).replace(".", ",")}h · <strong>{String(importe).replace(".", ",")}€</strong></span>
+                  )}
+                  <button
+                    className="item-action-btn item-action-borrar"
+                    onClick={() => setLogisticaEquipo(prev => prev.filter((_, idx) => idx !== i))}
+                    title="Quitar persona"
+                    aria-label={`Quitar ${p.nombre || "persona"} de logística`}
+                  >✕</button>
+                </div>
+              );
+            })}
+            <div className="logistica-footer">
+              <button
+                className="btn-add-logistica"
+                onClick={() => setLogisticaEquipo(prev => [...prev, { nombre: "", inicio: "", fin: "", furgoneta: false }])}
+              >+ Añadir persona</button>
+              {totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 && (
+                <span className="logistica-total">Total: <strong>{String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€</strong></span>
+              )}
+            </div>
           </div>
           <hr />
           <div className="section-title">Barra libre</div>

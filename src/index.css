@@ -607,6 +607,58 @@ body {
   background: var(--accent-soft);
 }
 
+/* Tarifa €/hora y plus de furgoneta, editables */
+.logistica-tarifas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Checkbox 🚐 de furgoneta por persona */
+.logistica-furgo {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.logistica-furgo input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Horas e importe calculados de cada persona */
+.logistica-info {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.logistica-info strong {
+  color: var(--green-qty);
+}
+
+.logistica-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.logistica-total {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.logistica-total strong {
+  color: var(--green-qty);
+  font-size: 0.95rem;
+}
+
 /* En pantallas estrechas el nombre ocupa su línea y el horario va debajo,
    en vez de partirse la fila por un sitio irregular */
 @media (max-width: 560px) {
