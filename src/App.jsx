@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube } from "./nube.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -1136,6 +1137,10 @@ export default function App() {
   const [nombreTemporal, setNombreTemporal] = useState("");
   // Diálogo propio activo (confirmaciones y campos de texto con la estética de la app)
   const [dialogo, setDialogo] = useState(null); // { tipo, titulo, mensaje, placeholder, valorInicial, textoConfirmar, peligro, onConfirm }
+  // Id del evento en la nube (edición compartida): si existe, los cambios se
+  // sincronizan con Firestore y el link es corto (?evento=id)
+  const [eventoNubeId, setEventoNubeId] = useState(estadoInicial.eventoNubeId ?? null);
+  const [hayCambiosRemotos, setHayCambiosRemotos] = useState(false);
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
@@ -1170,7 +1175,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas,
-    logisticaEquipo, tarifaLogistica, plusFurgoneta,
+    logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1183,8 +1188,42 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON]);
 
-  const handleGenerarLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`;
+  // ─── SINCRONIZACIÓN EN LA NUBE (si hay configuración de Firebase) ──────────
+  // Referencias para distinguir nuestros propios guardados de los de otra persona
+  const estadoActualJSONRef = React.useRef(estadoActualJSON);
+  estadoActualJSONRef.current = estadoActualJSON;
+  const ultimoGuardadoNubeRef = React.useRef(null);
+
+  // Cada cambio local se sube a la nube con un pequeño retardo (evita subir por cada tecla)
+  useEffect(() => {
+    if (!nubeActiva() || !eventoNubeId) return;
+    const t = setTimeout(() => {
+      ultimoGuardadoNubeRef.current = estadoActualJSON;
+      guardarEventoNube(eventoNubeId, getEstadoActual()).catch(() => { /* sin conexión: quedará en local */ });
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoActualJSON, eventoNubeId]);
+
+  // Escucha los guardados de otras personas en este evento: si llega uno que no
+  // es nuestro, se avisa con un banner para cargar los cambios
+  useEffect(() => {
+    if (!nubeActiva() || !eventoNubeId) return;
+    const unsub = suscribirEventoNube(eventoNubeId, (remotoJSON) => {
+      if (remotoJSON !== estadoActualJSONRef.current && remotoJSON !== ultimoGuardadoNubeRef.current) {
+        setHayCambiosRemotos(true);
+      }
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventoNubeId]);
+
+  const handleCargarCambiosRemotos = () => {
+    // Recargar pasando por ?evento=id trae la última versión de la nube
+    window.location.href = `${window.location.origin}${window.location.pathname}?evento=${eventoNubeId}`;
+  };
+
+  const copiarLink = (url) => {
     navigator.clipboard.writeText(url).then(() => {
       setCompartirMsg("¡Link copiado! ✓");
       setTimeout(() => setCompartirMsg(""), 3000);
@@ -1192,6 +1231,22 @@ export default function App() {
       // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a mano
       window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
     });
+  };
+
+  const handleGenerarLink = () => {
+    if (nubeActiva()) {
+      // Link corto con edición compartida: la checklist vive en la nube y los
+      // cambios de cualquiera con el link se sincronizan
+      const id = eventoNubeId || nuevoIdEvento();
+      if (!eventoNubeId) setEventoNubeId(id);
+      const estado = { ...getEstadoActual(), eventoNubeId: id };
+      ultimoGuardadoNubeRef.current = JSON.stringify(estado);
+      guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`);
+    } else {
+      // Sin nube: el link lleva la checklist dentro (solo lectura/copia local)
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`);
+    }
     setMenuCompartir(false);
   };
 
@@ -1222,7 +1277,7 @@ export default function App() {
       // La plantilla guarda la configuración reutilizable, no los datos del evento
       // concreto (nombre, fecha, hora, ubicación, equipo de logística), que cambian en cada evento
       const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
-              logisticaEquipo: _le, ...config } = getEstadoActual();
+              logisticaEquipo: _le, eventoNubeId: _id, ...config } = getEstadoActual();
       guardarPlantillas({ ...plantillas, [nombre]: config });
     },
   });
@@ -1269,16 +1324,20 @@ export default function App() {
     });
   };
   // Copia el link público del evento guardado: quien lo abra ve la checklist
-  // en la web (GitHub Pages) sin necesitar nada instalado
+  // en la web (GitHub Pages) sin necesitar nada instalado. Con la nube activa
+  // el link es corto y con edición compartida.
   const handleLinkEvento = (nombre) => {
-    if (!eventosGuardados[nombre]) return;
-    const url = `${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(eventosGuardados[nombre]))}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCompartirMsg("¡Link copiado! ✓");
-      setTimeout(() => setCompartirMsg(""), 3000);
-    }).catch(() => {
-      window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
-    });
+    const guardado = eventosGuardados[nombre];
+    if (!guardado) return;
+    if (nubeActiva()) {
+      const id = guardado.eventoNubeId || nuevoIdEvento();
+      const estado = { ...guardado, eventoNubeId: id };
+      guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
+      if (!guardado.eventoNubeId) guardarEventos({ ...eventosGuardados, [nombre]: estado });
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`);
+    } else {
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`);
+    }
   };
   const handleBorrarEvento = (nombre) => setDialogo({
     tipo: "confirm",
@@ -1604,6 +1663,13 @@ export default function App() {
 
         {linkAbierto && fechaEvento && fechaEvento < new Date().toISOString().slice(0, 10) && (
           <div className="archivado-banner">📦 Este evento ya pasó — checklist archivada, solo para consulta.</div>
+        )}
+
+        {hayCambiosRemotos && (
+          <div className="cambios-remotos-banner">
+            <span>🔄 Alguien ha actualizado esta checklist desde otro dispositivo.</span>
+            <button className="btn btn-green" onClick={handleCargarCambiosRemotos}>Cargar cambios</button>
+          </div>
         )}
 
         <div className="main-layout">
