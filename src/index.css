@@ -283,6 +283,72 @@ body {
   transform: translateY(-2px);
 }
 
+/* Botón de acción destructiva (borrar, empezar de cero) en los diálogos */
+.btn-peligro {
+  background-color: #dc2626;
+  color: white;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.btn-peligro:hover {
+  background-color: #b91c1c;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Diálogo propio: confirmaciones y campos de texto con la estética de la app */
+.dialogo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: overlay-fade 0.15s ease-out;
+}
+
+.dialogo-modal {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px -16px rgba(15, 23, 42, 0.35);
+  padding: 22px 24px;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: modal-pop 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dialogo-titulo {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.dialogo-mensaje {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.dialogo-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.dialogo-acciones .btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Outline button for use on light/white backgrounds (cards) */
 .btn-navy-outline {
   background: transparent;
@@ -1110,6 +1176,16 @@ body {
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
+/* Parpadeo verde al editar una cantidad: confirma visualmente el cambio */
+@keyframes qty-flash-anim {
+  0% { box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.35); }
+  100% { box-shadow: 0 0 0 4px var(--accent-soft); }
+}
+
+.item-qty-input.qty-flash {
+  animation: qty-flash-anim 0.5s ease-out;
+}
+
 hr {
   border: none;
   border-top: 1px solid var(--border-color);
@@ -1281,6 +1357,21 @@ hr {
 }
 
 /* ─── Vista previa ────────────────────────────────────────────────────── */
+@keyframes overlay-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-pop {
+  from { transform: translateY(14px) scale(0.985); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes modal-slide-up {
+  from { transform: translateY(60px); opacity: 0.5; }
+  to { transform: none; opacity: 1; }
+}
+
 .preview-overlay {
   position: fixed;
   inset: 0;
@@ -1292,7 +1383,9 @@ hr {
   justify-content: center;
   overflow-y: auto;
   padding: 32px 16px;
+  animation: overlay-fade 0.2s ease-out;
 }
+
 
 .preview-modal {
   background: var(--bg-color);
@@ -1517,5 +1610,20 @@ hr {
 
   .preview-table thead th {
     font-size: 0.62rem;
+  }
+}
+
+/* En móvil la Vista previa entra deslizándose desde abajo, como una hoja nativa.
+   margin-top:auto la ancla abajo cuando es corta sin romper el scroll cuando es larga */
+@media (max-width: 768px) {
+  .preview-overlay {
+    padding: 24px 10px 0;
+  }
+
+  .preview-modal {
+    margin-top: auto;
+    animation: modal-slide-up 0.3s cubic-bezier(0.32, 0.72, 0.35, 1);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
   }
 }

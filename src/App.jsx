@@ -800,6 +800,47 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
     </body></html>`;
 }
 
+// ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
+function Dialogo({ config, onCerrar }) {
+  const [valor, setValor] = useState(config.valorInicial || "");
+  const esPrompt = config.tipo === "prompt";
+  const confirmar = () => {
+    if (esPrompt && !valor.trim()) return;
+    onCerrar();
+    config.onConfirm(esPrompt ? valor.trim() : undefined);
+  };
+  return (
+    <div className="dialogo-overlay" onClick={onCerrar}>
+      <div className="dialogo-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={config.titulo}>
+        <div className="dialogo-titulo">{config.titulo}</div>
+        {config.mensaje && <p className="dialogo-mensaje">{config.mensaje}</p>}
+        {esPrompt && (
+          <input
+            type="text"
+            className="form-input"
+            placeholder={config.placeholder || ""}
+            value={valor}
+            autoFocus
+            onChange={e => setValor(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") confirmar();
+              if (e.key === "Escape") onCerrar();
+            }}
+          />
+        )}
+        <div className="dialogo-acciones">
+          <button className="btn btn-ghost" onClick={onCerrar}>Cancelar</button>
+          <button
+            className={`btn ${config.peligro ? "btn-peligro" : "btn-green"}`}
+            onClick={confirmar}
+            disabled={esPrompt && !valor.trim()}
+          >{config.textoConfirmar || "Aceptar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MODAL VISTA PREVIA ───────────────────────────────────────────────────────
 function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, meta = {}, onClose }) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
@@ -1093,6 +1134,8 @@ export default function App() {
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
   const [editandoNombre, setEditandoNombre] = useState(null); // clave "categoria::label" del item cuyo nombre se está editando
   const [nombreTemporal, setNombreTemporal] = useState("");
+  // Diálogo propio activo (confirmaciones y campos de texto con la estética de la app)
+  const [dialogo, setDialogo] = useState(null); // { tipo, titulo, mensaje, placeholder, valorInicial, textoConfirmar, peligro, onConfirm }
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
@@ -1147,40 +1190,63 @@ export default function App() {
     setMenuCompartir(false);
   };
 
-  const handleNuevoEvento = () => {
-    if (!window.confirm("¿Empezar un evento nuevo? Se borrará la configuración guardada de este navegador (pax, extras, items añadidos a mano...).")) return;
-    try { localStorage.removeItem("gula_checklist_estado"); } catch (e) { /* localStorage no disponible */ }
-    window.location.href = window.location.origin + window.location.pathname;
-  };
+  const handleNuevoEvento = () => setDialogo({
+    tipo: "confirm",
+    titulo: "¿Empezar un evento nuevo?",
+    mensaje: "Se borrará la configuración guardada de este navegador (pax, extras, items añadidos a mano...).",
+    textoConfirmar: "Empezar de cero",
+    peligro: true,
+    onConfirm: () => {
+      try { localStorage.removeItem("gula_checklist_estado"); } catch (e) { /* localStorage no disponible */ }
+      window.location.href = window.location.origin + window.location.pathname;
+    },
+  });
 
   // ─── PLANTILLAS GUARDADAS ─────────────────────────────────────────────────
   const guardarPlantillas = (obj) => {
     setPlantillas(obj);
     try { localStorage.setItem("gula_plantillas", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
   };
-  const handleGuardarPlantilla = () => {
-    const nombre = window.prompt('Nombre de la plantilla (ej: "Boda estándar 100 pax"):', "");
-    if (!nombre || !nombre.trim()) return;
-    // La plantilla guarda la configuración reutilizable, no los datos del evento
-    // concreto (nombre, fecha, hora, ubicación, equipo de logística), que cambian en cada evento
-    const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
-            logisticaEquipo: _le, ...config } = getEstadoActual();
-    guardarPlantillas({ ...plantillas, [nombre.trim()]: config });
-  };
+  const handleGuardarPlantilla = () => setDialogo({
+    tipo: "prompt",
+    titulo: "Guardar plantilla",
+    mensaje: "Guarda la configuración actual (pax, extras, equipamiento...) para reutilizarla en otro evento.",
+    placeholder: 'Ej: Boda estándar 100 pax',
+    textoConfirmar: "Guardar",
+    onConfirm: (nombre) => {
+      // La plantilla guarda la configuración reutilizable, no los datos del evento
+      // concreto (nombre, fecha, hora, ubicación, equipo de logística), que cambian en cada evento
+      const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
+              logisticaEquipo: _le, ...config } = getEstadoActual();
+      guardarPlantillas({ ...plantillas, [nombre]: config });
+    },
+  });
   const handleAplicarPlantilla = (nombre) => {
     if (!plantillas[nombre]) return;
-    if (!window.confirm(`¿Cargar la plantilla "${nombre}"? Se sustituirá la configuración actual (nombre, fecha, hora y ubicación del evento se mantienen).`)) return;
-    // Se escribe el estado combinado en localStorage y se recarga: el arranque
-    // síncrono (leerEstadoGuardado) lo restaura igual que tras cerrar el navegador
-    try { localStorage.setItem("gula_checklist_estado", JSON.stringify({ ...getEstadoActual(), ...plantillas[nombre] })); } catch (e) { /* localStorage no disponible */ }
-    window.location.href = window.location.origin + window.location.pathname;
+    setDialogo({
+      tipo: "confirm",
+      titulo: `¿Cargar la plantilla "${nombre}"?`,
+      mensaje: "Se sustituirá la configuración actual (nombre, fecha, hora y ubicación del evento se mantienen).",
+      textoConfirmar: "Cargar plantilla",
+      onConfirm: () => {
+        // Se escribe el estado combinado en localStorage y se recarga: el arranque
+        // síncrono (leerEstadoGuardado) lo restaura igual que tras cerrar el navegador
+        try { localStorage.setItem("gula_checklist_estado", JSON.stringify({ ...getEstadoActual(), ...plantillas[nombre] })); } catch (e) { /* localStorage no disponible */ }
+        window.location.href = window.location.origin + window.location.pathname;
+      },
+    });
   };
-  const handleBorrarPlantilla = (nombre) => {
-    if (!window.confirm(`¿Borrar la plantilla "${nombre}"?`)) return;
-    const next = { ...plantillas };
-    delete next[nombre];
-    guardarPlantillas(next);
-  };
+  const handleBorrarPlantilla = (nombre) => setDialogo({
+    tipo: "confirm",
+    titulo: `¿Borrar la plantilla "${nombre}"?`,
+    textoConfirmar: "Borrar",
+    peligro: true,
+    onConfirm: () => {
+      const next = { ...plantillas };
+      delete next[nombre];
+      guardarPlantillas(next);
+    },
+  });
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
@@ -1304,10 +1370,15 @@ export default function App() {
   // Renombra una categoría (botón ✎ de la cabecera). El nuevo nombre pasa a ser la
   // identidad: se migran las claves de todos los ajustes manuales de esa categoría
   // y los items añadidos a mano se mueven con ella.
-  const handleRenombrarCategoria = (nombreActual) => {
-    const nuevo = window.prompt("Nuevo nombre de la categoría:", nombreActual);
-    if (!nuevo || !nuevo.trim() || nuevo.trim() === nombreActual) return;
-    const nuevoNombre = nuevo.trim();
+  const handleRenombrarCategoria = (nombreActual) => setDialogo({
+    tipo: "prompt",
+    titulo: "Renombrar categoría",
+    valorInicial: nombreActual,
+    textoConfirmar: "Renombrar",
+    onConfirm: (nuevoNombre) => aplicarRenombreCategoria(nombreActual, nuevoNombre),
+  });
+  const aplicarRenombreCategoria = (nombreActual, nuevoNombre) => {
+    if (!nuevoNombre || nuevoNombre === nombreActual) return;
     ultimaClaveEditadaRef.current = null;
     pushHistorial();
     // Si es una categoría base (o una base ya renombrada) el renombre se guarda
@@ -1436,6 +1507,7 @@ export default function App() {
     <>
       {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta }} onClose={() => setModalPrevia(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
+      {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
 
       <div className="app-wrapper">
         {/* HEADER */}
@@ -1786,8 +1858,13 @@ export default function App() {
                 value={nuevoItemCategoria || CATEGORIA_MANUAL}
                 onChange={e => {
                   if (e.target.value === "__nueva__") {
-                    const nueva = window.prompt("Nombre de la categoría nueva:");
-                    if (nueva && nueva.trim()) { setNuevoItemCategoria(nueva.trim()); setCategoriaTocada(true); }
+                    setDialogo({
+                      tipo: "prompt",
+                      titulo: "Nueva categoría",
+                      placeholder: "Ej: Atrezzo photocall",
+                      textoConfirmar: "Crear",
+                      onConfirm: (nueva) => { setNuevoItemCategoria(nueva); setCategoriaTocada(true); },
+                    });
                     return;
                   }
                   setNuevoItemCategoria(e.target.value); setCategoriaTocada(true);
@@ -1854,7 +1931,14 @@ export default function App() {
                           className="item-qty-input"
                           value={displayQty}
                           title="Click para editar la cantidad"
-                          onChange={e => handleEditarCantidad(cat.nombre, labelOriginal ?? label, e.target.value)}
+                          onChange={e => {
+                            handleEditarCantidad(cat.nombre, labelOriginal ?? label, e.target.value);
+                            // Parpadeo verde de confirmación: se reinicia la animación en cada tecla
+                            e.target.classList.remove("qty-flash");
+                            void e.target.offsetWidth;
+                            e.target.classList.add("qty-flash");
+                          }}
+                          onAnimationEnd={e => e.target.classList.remove("qty-flash")}
                           onFocus={e => e.target.select()}
                           size={Math.max(2, displayQty.length)}
                         />
