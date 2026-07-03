@@ -864,7 +864,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
               </div>
             )}
           </div>
-          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa">✕ Cerrar</button>
+          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar">✕</button>
         </div>
         <div className="preview-body">
           {checklist.map(cat => (
