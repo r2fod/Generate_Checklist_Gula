@@ -1075,7 +1075,9 @@ export default function App() {
       : []
   )); // [{ nombre, inicio, fin, furgoneta }]
   const [tarifaLogistica, setTarifaLogistica] = useState(estadoInicial.tarifaLogistica ?? 10); // €/hora
-  const [plusFurgoneta, setPlusFurgoneta]     = useState(estadoInicial.plusFurgoneta ?? 20);   // € por llevar furgoneta
+  // Plus por poner furgoneta propia: 25€ por defecto (rango habitual 20-30€/evento,
+  // por encima del kilometraje oficial de 0,26€/km para que compense). Modificable.
+  const [plusFurgoneta, setPlusFurgoneta]     = useState(estadoInicial.plusFurgoneta ?? 25);
   // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
@@ -1563,7 +1565,7 @@ export default function App() {
                   <input type="number" className="form-input" min="0" step="0.5" value={tarifaLogistica} onChange={e => setTarifaLogistica(Math.max(0, parseFloat(e.target.value) || 0))} />
                 </div>
                 <div className="form-group">
-                  <span className="form-label">Plus furgoneta (€)</span>
+                  <span className="form-label">Plus furgoneta propia (€)</span>
                   <input type="number" className="form-input" min="0" step="1" value={plusFurgoneta} onChange={e => setPlusFurgoneta(Math.max(0, parseFloat(e.target.value) || 0))} />
                 </div>
               </div>
