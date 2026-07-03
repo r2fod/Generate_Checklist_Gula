@@ -558,9 +558,70 @@ body {
   gap: 10px;
 }
 
-/* Campo que ocupa toda la fila del formulario (ej: equipo de logística) */
-.form-group-ancho {
-  grid-column: 1 / -1;
+/* Equipo de logística: una fila por persona con nombre y su horario */
+.logistica-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.logistica-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.logistica-nombre {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.logistica-hora {
+  flex: 0 0 auto;
+  width: 102px;
+}
+
+.logistica-sep {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.btn-add-logistica {
+  align-self: flex-start;
+  background: none;
+  border: 1.5px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-add-logistica:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* En pantallas estrechas el nombre ocupa su línea y el horario va debajo,
+   en vez de partirse la fila por un sitio irregular */
+@media (max-width: 560px) {
+  .logistica-nombre {
+    flex-basis: 100%;
+  }
+}
+
+/* En móviles pequeños los selectores con 4 opciones ("No llevan" en Sillas)
+   necesitan letra algo menor para no recortarse */
+@media (max-width: 420px) {
+  .equip-grid .segment-btn {
+    font-size: 0.72rem;
+    padding: 7px 3px;
+  }
 }
 
 /* Checkbox Grid — selectable chip cards */

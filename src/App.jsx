@@ -717,6 +717,14 @@ function quitarItemsSinCantidad(checklist) {
     .filter(cat => cat.items.length > 0);
 }
 
+// "Juan 08:00–13:30 · Pedro 09:00–14:00" — cada persona de logística con su horario
+function fmtLogistica(equipo = []) {
+  return equipo
+    .filter(p => p.nombre || p.inicio || p.fin)
+    .map(p => `${p.nombre || "¿?"}${p.inicio || p.fin ? ` ${p.inicio || "?"}–${p.fin || "?"}` : ""}`)
+    .join(" · ");
+}
+
 function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta, meta = {}) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
@@ -750,8 +758,7 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${fechaEventoFmt ? `<div><span class="ml">Fecha del evento</span>${fechaEventoFmt}</div>` : ""}
       ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${meta.horaInicio}h</div>` : ""}
       ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${meta.ubicacion}</div>` : ""}
-      ${meta.logisticaInicio || meta.logisticaFin ? `<div><span class="ml">Horario logística</span>${meta.logisticaInicio || "?"} – ${meta.logisticaFin || "?"}</div>` : ""}
-      ${meta.logisticaQuien ? `<div><span class="ml">Equipo logística</span>${meta.logisticaQuien}</div>` : ""}
+      ${fmtLogistica(meta.logisticaEquipo) ? `<div><span class="ml">Equipo logística</span>${fmtLogistica(meta.logisticaEquipo)}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
       <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
       <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
@@ -777,11 +784,8 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
               {meta.horaInicio ? ` · ${meta.horaInicio}h` : ""}
               {meta.ubicacion ? ` · ${meta.ubicacion}` : ""}
             </div>
-            {(meta.logisticaInicio || meta.logisticaFin || meta.logisticaQuien) && (
-              <div className="preview-header-subtitle">
-                🚚 Logística{meta.logisticaInicio || meta.logisticaFin ? `: ${meta.logisticaInicio || "?"} – ${meta.logisticaFin || "?"}` : ""}
-                {meta.logisticaQuien ? ` · ${meta.logisticaQuien}` : ""}
-              </div>
+            {fmtLogistica(meta.logisticaEquipo) && (
+              <div className="preview-header-subtitle">🚚 Logística: {fmtLogistica(meta.logisticaEquipo)}</div>
             )}
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa">✕ Cerrar</button>
@@ -1028,10 +1032,13 @@ export default function App() {
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
   const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras | No llevan
-  // Horario y responsables de la logística (montaje/desmontaje) del evento
-  const [logisticaInicio, setLogisticaInicio] = useState(estadoInicial.logisticaInicio ?? "");
-  const [logisticaFin, setLogisticaFin]       = useState(estadoInicial.logisticaFin ?? "");
-  const [logisticaQuien, setLogisticaQuien]   = useState(estadoInicial.logisticaQuien ?? "");
+  // Equipo de logística (montaje/desmontaje): cada persona con su propio horario.
+  // Si hay un estado guardado con el formato antiguo (horario general) se migra a una fila.
+  const [logisticaEquipo, setLogisticaEquipo] = useState(estadoInicial.logisticaEquipo ?? (
+    estadoInicial.logisticaQuien || estadoInicial.logisticaInicio || estadoInicial.logisticaFin
+      ? [{ nombre: estadoInicial.logisticaQuien || "", inicio: estadoInicial.logisticaInicio || "", fin: estadoInicial.logisticaFin || "" }]
+      : []
+  )); // [{ nombre, inicio, fin }]
   // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
@@ -1076,7 +1083,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas,
-    logisticaInicio, logisticaFin, logisticaQuien,
+    logisticaEquipo,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1116,9 +1123,9 @@ export default function App() {
     const nombre = window.prompt('Nombre de la plantilla (ej: "Boda estándar 100 pax"):', "");
     if (!nombre || !nombre.trim()) return;
     // La plantilla guarda la configuración reutilizable, no los datos del evento
-    // concreto (nombre, fecha, hora, ubicación, horario de logística), que cambian en cada evento
+    // concreto (nombre, fecha, hora, ubicación, equipo de logística), que cambian en cada evento
     const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
-            logisticaInicio: _li, logisticaFin: _lf, logisticaQuien: _lq, ...config } = getEstadoActual();
+            logisticaEquipo: _le, ...config } = getEstadoActual();
     guardarPlantillas({ ...plantillas, [nombre.trim()]: config });
   };
   const handleAplicarPlantilla = (nombre) => {
@@ -1317,7 +1324,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaInicio, logisticaFin, logisticaQuien });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1333,8 +1340,7 @@ export default function App() {
       fechaEvento ? new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null,
       horaInicio ? `${horaInicio}h` : null,
       ubicacion || null,
-      logisticaInicio || logisticaFin ? `Logística ${logisticaInicio || "?"}–${logisticaFin || "?"}` : null,
-      logisticaQuien ? `Equipo logística: ${logisticaQuien}` : null,
+      fmtLogistica(logisticaEquipo) ? `Logística: ${fmtLogistica(logisticaEquipo)}` : null,
     ].filter(Boolean).join(" · ");
     return `${cabecera}\n${texto}`;
   };
@@ -1345,7 +1351,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaInicio, logisticaFin, logisticaQuien });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -1387,7 +1393,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaInicio, logisticaFin, logisticaQuien }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo }} onClose={() => setModalPrevia(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
 
       <div className="app-wrapper">
@@ -1509,19 +1515,44 @@ export default function App() {
               <input type="text" className="form-input" placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
             </div>
           </div>
-          <div className="form-row">
-            <div className="form-group">
-              <span className="form-label">LOGÍSTICA · INICIO</span>
-              <input type="time" className="form-input" value={logisticaInicio} onChange={e => setLogisticaInicio(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <span className="form-label">LOGÍSTICA · FIN</span>
-              <input type="time" className="form-input" value={logisticaFin} onChange={e => setLogisticaFin(e.target.value)} />
-            </div>
-            <div className="form-group form-group-ancho">
-              <span className="form-label">EQUIPO DE LOGÍSTICA</span>
-              <input type="text" className="form-input" placeholder="Ej: Juan, Pedro y Marta" value={logisticaQuien} onChange={e => setLogisticaQuien(e.target.value)} />
-            </div>
+          <div className="logistica-block">
+            <span className="form-label">EQUIPO DE LOGÍSTICA (cada uno con su horario)</span>
+            {logisticaEquipo.map((p, i) => (
+              <div className="logistica-row" key={i}>
+                <input
+                  type="text"
+                  className="form-input logistica-nombre"
+                  placeholder="Nombre"
+                  value={p.nombre}
+                  onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, nombre: e.target.value } : x))}
+                />
+                <input
+                  type="time"
+                  className="form-input logistica-hora"
+                  value={p.inicio}
+                  title="Hora de inicio"
+                  onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, inicio: e.target.value } : x))}
+                />
+                <span className="logistica-sep">–</span>
+                <input
+                  type="time"
+                  className="form-input logistica-hora"
+                  value={p.fin}
+                  title="Hora de fin"
+                  onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, fin: e.target.value } : x))}
+                />
+                <button
+                  className="item-action-btn item-action-borrar"
+                  onClick={() => setLogisticaEquipo(prev => prev.filter((_, idx) => idx !== i))}
+                  title="Quitar persona"
+                  aria-label={`Quitar ${p.nombre || "persona"} de logística`}
+                >✕</button>
+              </div>
+            ))}
+            <button
+              className="btn-add-logistica"
+              onClick={() => setLogisticaEquipo(prev => [...prev, { nombre: "", inicio: "", fin: "" }])}
+            >+ Añadir persona</button>
           </div>
           <hr />
           <div className="section-title">Barra libre</div>
