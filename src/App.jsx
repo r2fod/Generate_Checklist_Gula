@@ -731,7 +731,7 @@ const ETIQUETAS_CAMPO = {
   evento: "Tipo de evento", nombreEvento: "Nombre del evento", fechaEvento: "Fecha",
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
-  dobleServicio: "Doble servicio", llevaEntrante: "Lleva entrante", llevaCanapes: "Lleva canapés",
+  dobleServicio: "Doble servicio", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", tipoBandejas: "Bandejas",
@@ -1957,7 +1957,7 @@ export default function App() {
           <div className="checkbox-grid">
             {[
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
-              [llevaEntrante,        setLlevaEntrante,        "Lleva entrante",           "chupito de cristal"],
+              [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "vaso de cristal + plato"],
               [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "bandejas en vez de platos"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
