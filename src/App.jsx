@@ -1937,7 +1937,7 @@ export default function App() {
                 Cóctel / aperitivo
               </label>
               <div className="range-slider-container">
-                <input type="range" min="0" max="6" step="0.5" className="range-slider" value={horasCoctel} onChange={e => setHorasCoctel(parseFloat(e.target.value))} disabled={!barraCoctel} />
+                <input type="range" min="0" max="12" step="0.5" className="range-slider" value={horasCoctel} onChange={e => setHorasCoctel(parseFloat(e.target.value))} disabled={!barraCoctel} />
                 <span className="range-value">{horasCoctel}h</span>
               </div>
             </div>
@@ -1947,7 +1947,7 @@ export default function App() {
                 Copas
               </label>
               <div className="range-slider-container">
-                <input type="range" min="0" max="12" step="1" className="range-slider" value={horasCopas} onChange={e => setHorasCopas(parseFloat(e.target.value))} disabled={!barraCopas} />
+                <input type="range" min="0" max="24" step="1" className="range-slider" value={horasCopas} onChange={e => setHorasCopas(parseFloat(e.target.value))} disabled={!barraCopas} />
                 <span className="range-value">{horasCopas}h</span>
               </div>
             </div>
