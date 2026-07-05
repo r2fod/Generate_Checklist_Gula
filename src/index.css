@@ -247,8 +247,33 @@ body {
   flex-wrap: wrap;
 }
 
-.cambios-remotos-banner .btn {
+.cambios-remotos-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cambios-remotos-detalle span {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-main);
+}
+
+.cambios-remotos-cerrar {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 6px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
+}
+
+.cambios-remotos-cerrar:hover {
+  background: white;
 }
 
 .btn {

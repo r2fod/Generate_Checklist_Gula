@@ -722,6 +722,50 @@ function quitarItemsSinCantidad(checklist) {
     .filter(cat => cat.items.length > 0);
 }
 
+// ─── RESUMEN DE CAMBIOS REMOTOS (para el aviso de sincronización) ──────────────
+const ETIQUETAS_CAMPO = {
+  evento: "Tipo de evento", nombreEvento: "Nombre del evento", fechaEvento: "Fecha",
+  horaInicio: "Hora de inicio", ubicacion: "Ubicación", pax: "Pax adultos", ninos: "Niños",
+  barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
+  dobleServicio: "Doble servicio", llevaEntrante: "Lleva entrante", llevaCanapes: "Lleva canapés",
+  llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
+  estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
+  llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", tipoBandejas: "Bandejas",
+  tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
+  tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
+  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
+  extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
+  llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
+  llevaAguasPequenas: "Aguas pequeñas", hayDesayuno: "Desayuno",
+  tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
+  logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
+  itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
+  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
+};
+
+// Compara el estado anterior y el recibido y devuelve frases cortas ("Pax adultos: 65 → 88")
+function resumirCambios(prev, nuevo) {
+  const cambios = [];
+  const claves = new Set([...Object.keys(prev || {}), ...Object.keys(nuevo || {})]);
+  claves.forEach(k => {
+    if (k === "eventoNubeId") return;
+    const a = prev?.[k], b = nuevo?.[k];
+    if (JSON.stringify(a) === JSON.stringify(b)) return;
+    const etiqueta = ETIQUETAS_CAMPO[k] || k;
+    if (typeof b === "boolean" || typeof a === "boolean") {
+      cambios.push(`${etiqueta}: ${b ? "sí" : "no"}`);
+    } else if (Array.isArray(a) || Array.isArray(b) || typeof a === "object" || typeof b === "object") {
+      const na = Array.isArray(a) ? a.length : Object.keys(a || {}).length;
+      const nb = Array.isArray(b) ? b.length : Object.keys(b || {}).length;
+      cambios.push(na !== nb ? `${etiqueta}: ${na} → ${nb}` : `${etiqueta} (modificado)`);
+    } else {
+      const fmt = (v) => (v === "" || v === null || v === undefined) ? "—" : v;
+      cambios.push(`${etiqueta}: ${fmt(a)} → ${fmt(b)}`);
+    }
+  });
+  return cambios;
+}
+
 // Horas trabajadas entre dos horas "HH:MM" (si acaba pasada la medianoche, suma 24h)
 function horasLogistica(inicio, fin) {
   if (!inicio || !fin) return null;
@@ -1140,7 +1184,8 @@ export default function App() {
   // Id del evento en la nube (edición compartida): si existe, los cambios se
   // sincronizan con Firestore y el link es corto (?evento=id)
   const [eventoNubeId, setEventoNubeId] = useState(estadoInicial.eventoNubeId ?? null);
-  const [hayCambiosRemotos, setHayCambiosRemotos] = useState(false);
+  // Lista de frases con lo que acaba de cambiar desde otro dispositivo (null = sin aviso)
+  const [hayCambiosRemotos, setHayCambiosRemotos] = useState(null);
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
@@ -1205,23 +1250,53 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON, eventoNubeId]);
 
-  // Escucha los guardados de otras personas en este evento: si llega uno que no
-  // es nuestro, se avisa con un banner para cargar los cambios
+  // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página
+  const SETTERS_SYNC = {
+    evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
+    horaInicio: setHoraInicio, ubicacion: setUbicacion, pax: setPax, ninos: setNinos,
+    barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
+    dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
+    llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
+    estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, tipoBandejas: setTipoBandejas,
+    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
+    tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
+    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
+    extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
+    personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
+    tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
+    logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta,
+    itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
+    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
+    eventoNubeId: setEventoNubeId,
+  };
+  const settersSyncRef = React.useRef(SETTERS_SYNC);
+  settersSyncRef.current = SETTERS_SYNC;
+
+  // Escucha los guardados de otras personas en este evento: cuando llega uno que
+  // no es nuestro se aplica AL INSTANTE (sin recargar) y se muestra un aviso con
+  // el detalle de lo que ha cambiado
   useEffect(() => {
     if (!nubeActiva() || !eventoNubeId) return;
     const unsub = suscribirEventoNube(eventoNubeId, (remotoJSON) => {
-      if (remotoJSON !== estadoActualJSONRef.current && remotoJSON !== ultimoGuardadoNubeRef.current) {
-        setHayCambiosRemotos(true);
+      if (remotoJSON === estadoActualJSONRef.current || remotoJSON === ultimoGuardadoNubeRef.current) return;
+      let remoto, previo;
+      try { remoto = JSON.parse(remotoJSON); previo = JSON.parse(estadoActualJSONRef.current); }
+      catch (e) { return; /* estado remoto corrupto: se ignora */ }
+      const cambios = resumirCambios(previo, remoto);
+      // Marcar ANTES de aplicar: así el guardado automático que provocará este
+      // cambio de estado no se re-detecta como "cambio de otra persona"
+      ultimoGuardadoNubeRef.current = remotoJSON;
+      Object.entries(remoto).forEach(([k, v]) => { if (settersSyncRef.current[k]) settersSyncRef.current[k](v); });
+      if (cambios.length > 0) {
+        setHayCambiosRemotos(cambios);
+        clearTimeout(window.__avisoSyncTimer);
+        window.__avisoSyncTimer = setTimeout(() => setHayCambiosRemotos(null), 10000);
       }
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoNubeId]);
-
-  const handleCargarCambiosRemotos = () => {
-    // Recargar pasando por ?evento=id trae la última versión de la nube
-    window.location.href = `${window.location.origin}${window.location.pathname}?evento=${eventoNubeId}`;
-  };
 
   const copiarLink = (url) => {
     navigator.clipboard.writeText(url).then(() => {
@@ -1667,8 +1742,14 @@ export default function App() {
 
         {hayCambiosRemotos && (
           <div className="cambios-remotos-banner">
-            <span>🔄 Alguien ha actualizado esta checklist desde otro dispositivo.</span>
-            <button className="btn btn-green" onClick={handleCargarCambiosRemotos}>Cargar cambios</button>
+            <div className="cambios-remotos-detalle">
+              <strong>🔄 Actualizado desde otro dispositivo:</strong>
+              <span>
+                {hayCambiosRemotos.slice(0, 4).join(" · ")}
+                {hayCambiosRemotos.length > 4 ? ` · y ${hayCambiosRemotos.length - 4} cambios más` : ""}
+              </span>
+            </div>
+            <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso">✕</button>
           </div>
         )}
 
