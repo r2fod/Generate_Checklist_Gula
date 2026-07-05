@@ -166,9 +166,10 @@ function calcDestilados(pax, h) {
 }
 
 function calcCristaleria(pax, h, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
-  // 1 cubata/hora y pax (mínimo 1 si hay barra), sin techo artificial antes de las 4-5h:
-  // una barra libre de 8h debe servir notablemente más que una de 2h, no lo mismo.
-  const copasBarraPorPax = h > 0 ? Math.min(8, 1 + h) : 0;
+  // Vasos de cubata calibrados con el estándar del sector: ~4 vasos/pax para una
+  // barra de 4h (los alquileres recomiendan 3-4/pax porque los camareros friegan
+  // y reutilizan durante el servicio), escalando con las horas y con techo en 6.
+  const copasBarraPorPax = h > 0 ? Math.min(6, 1 + h * 0.75) : 0;
   const mult = dobleCopa ? 2 : 1;
   // Margen de seguridad del 10% para cubrir roturas/pérdidas de cristalería durante el servicio
   const vino = conMargen(pax * 2.5 * mult);
