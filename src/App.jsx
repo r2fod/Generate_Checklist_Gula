@@ -376,6 +376,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mantelería y textiles", items: [
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
+    ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas de papel (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
       : [["Servilletas de papel", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
@@ -534,6 +535,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
+    ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
@@ -561,7 +563,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
     ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
-    ...(cristal.chupito ? [["Chupito (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
+    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
     ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
@@ -650,6 +652,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
     ["Manteles negros", String(calcMesasServicio(pax).total + 1)],
+    ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, numCamareros) + 2)], ["Bayetas / Trapos", "4"],
   ]});
 
