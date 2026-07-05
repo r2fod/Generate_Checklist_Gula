@@ -272,6 +272,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    entranteCompartido, numEntrantesCompartir = 1,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas = "Dealde",
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
   } = opts;
@@ -404,7 +405,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(conMargen(totalPax))],
     ["Cucharas café", String(conMargen(totalPax * 0.8))],
-    ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
   const personal = calcPersonal(pax, numCamareros);
@@ -464,6 +465,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella, tipoNevera, tipoCongelador, origenSillas = "Dealde",
   } = opts;
@@ -564,7 +566,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
-    ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -597,6 +599,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, fuerzaTextilTela, origenSillas = "Dealde",
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
@@ -674,7 +677,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))], ["Abridores", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
-    ...(llevaEntrante ? [[`Platos extra entrante (1 cada ${personasPorPlatoEntrante} pax)`, String(Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
@@ -740,6 +743,7 @@ const ETIQUETAS_CAMPO = {
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
+  entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
   llevaAguasPequenas: "Aguas pequeñas", hayDesayuno: "Desayuno",
   tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
@@ -1130,6 +1134,10 @@ export default function App() {
   const [horasCopas, setHorasCopas]   = useState(estadoInicial.horasCopas ?? 4);
   const [dobleServicio, setDobleServicio]             = useState(estadoInicial.dobleServicio ?? false);
   const [llevaEntrante, setLlevaEntrante]             = useState(estadoInicial.llevaEntrante ?? false);
+  // Entrante compartido en plato (independiente del chupito): cuántas personas
+  // comparten cada plato y cuántos entrantes distintos se reparten
+  const [entranteCompartido, setEntranteCompartido] = useState(estadoInicial.entranteCompartido ?? false);
+  const [numEntrantesCompartir, setNumEntrantesCompartir] = useState(estadoInicial.numEntrantesCompartir ?? 1);
   const [llevaCanapes, setLlevaCanapes]               = useState(estadoInicial.llevaCanapes ?? false);
   const [llevaPaella, setLlevaPaella]                 = useState(estadoInicial.llevaPaella ?? false);
   const [tipoPaella, setTipoPaella]                   = useState(estadoInicial.tipoPaella ?? "Auto");
@@ -1222,6 +1230,7 @@ export default function App() {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas,
     logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
@@ -1268,6 +1277,7 @@ export default function App() {
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
+    entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
@@ -1450,6 +1460,7 @@ export default function App() {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas,
     estiloPlatoPrincipal, estiloPlatoPostre,
   };
@@ -1957,7 +1968,8 @@ export default function App() {
           <div className="checkbox-grid">
             {[
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
-              [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "vaso de cristal + plato"],
+              [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
+              [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
               [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "bandejas en vez de platos"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
@@ -1982,10 +1994,16 @@ export default function App() {
               </label>
             ))}
           </div>
-          {(llevaEntrante || llevaPaella || tieneFrituras) && (
+          {(entranteCompartido || llevaPaella || tieneFrituras) && (
             <div className="controls-row" style={{ marginTop: 12 }}>
-              {llevaEntrante && (
-                <SegmentedControl label="Plato de entrante compartido cada" value={personasPorPlatoEntrante} onChange={setPersonasPorPlatoEntrante} options={[3, 4]} />
+              {entranteCompartido && (
+                <>
+                  <SegmentedControl label="Se comparte cada" value={personasPorPlatoEntrante} onChange={setPersonasPorPlatoEntrante} options={[3, 4]} />
+                  <div className="form-group controls-mini">
+                    <span className="form-label">Nº de entrantes a compartir</span>
+                    <input type="number" className="form-input" value={numEntrantesCompartir} min="1" onChange={e => setNumEntrantesCompartir(Math.max(1, parseInt(e.target.value) || 1))} />
+                  </div>
+                </>
               )}
               {llevaPaella && (
                 <SegmentedControl label="Tamaño de paella" value={tipoPaella} onChange={setTipoPaella} options={["Auto", "Pequeña", "Mediana", "Grande"]} />
