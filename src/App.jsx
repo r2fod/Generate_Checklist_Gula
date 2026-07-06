@@ -26,6 +26,26 @@ function conBateas(label, qtyTexto) {
   if (!size || isNaN(num)) return qtyTexto;
   return `${qtyTexto} (${Math.ceil(num / size)} bateas de ${size})`;
 }
+// Mismo mecanismo que las bateas, para bebidas que se piden en cajas de tamaño fijo:
+// cerveza (24 tercios/caja), vino y tinto de verano (6 botellas/caja) y refrescos
+// (24 uds/caja). El nº de cajas se recalcula en vivo igual que las bateas.
+const CAJA_POR_LABEL = [
+  { fragmento: "cerveza alhambra", size: 24 },
+  { fragmento: "vino blanco", size: 6 }, { fragmento: "vino tinto", size: 6 }, { fragmento: "tinto de verano", size: 6 },
+  { fragmento: "coca-cola", size: 24 }, { fragmento: "fanta", size: 24 }, { fragmento: "aquarius", size: 24 },
+  { fragmento: "sprite", size: 24 }, { fragmento: "nestea", size: 24 },
+];
+function cajaSizeDe(label) {
+  const norm = label.toLowerCase();
+  const m = CAJA_POR_LABEL.find(c => norm.includes(c.fragmento));
+  return m ? m.size : null;
+}
+function conCajas(label, qtyTexto) {
+  const size = cajaSizeDe(label);
+  const num = parseFloat(String(qtyTexto).replace(",", "."));
+  if (!size || isNaN(num)) return qtyTexto;
+  return `${qtyTexto} (${Math.ceil(num / size)} cajas de ${size})`;
+}
 // Empareja un número editable con el texto fijo del envase (packs, cajas, paq.,
 // cargas...), para que al corregir la cantidad a mano no haya que retocar también
 // ese texto — se guarda aparte y no se pierde ni queda desincronizado al editar.
@@ -36,6 +56,8 @@ function conSufijo(u, sufijo) { return { u, sufijo }; }
 function fmtCantidadCompleta(label, qtyTexto, sufijo) {
   const conBatea = conBateas(label, qtyTexto);
   if (conBatea !== qtyTexto) return conBatea;
+  const conCaja = conCajas(label, qtyTexto);
+  if (conCaja !== qtyTexto) return conCaja;
   return sufijo ? `${qtyTexto} ${sufijo}` : qtyTexto;
 }
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
@@ -247,10 +269,12 @@ function personalSala(pax, numCamareros, divisor = 20) {
   return numCamareros > 0 ? numCamareros : Math.max(2, Math.ceil(pax / divisor));
 }
 
-// Consumibles para el propio personal de sala/cocina (no para los invitados)
+// Consumibles para el propio personal de sala/cocina (no para los invitados). El
+// "staff" extra (cocina, producción, refuerzo...) se suma a los camareros de sala,
+// porque también bebe agua y usa vasos aunque no sirva mesas.
 // Los packs de vasos de cartón y plástico vienen de 50 unidades
-function calcPersonal(pax, numCamareros, divisor = 20) {
-  const n = personalSala(pax, numCamareros, divisor);
+function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20) {
+  const n = personalSala(pax, numCamareros, divisor) + numStaff;
   return {
     n,
     // Los vasos de café son "mini" (tamaño espresso/cortado): siempre se llevan 3 packs
@@ -315,7 +339,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
-    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros,
+    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff = 0,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -344,7 +368,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const cats       = [];
 
   cats.push({ nombre: "Electricidad y camión", items: [
-    ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"], ["Cinta aislante", "1"],
+    ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"], ["Cinta aislante", "1"],
     ["Bridas", "1 bolsa"], ["Rulos cable", "2"], ["Imperdibles", "1 paquete"],
     ["Carros de servicio/transporte", "2"],
   ]});
@@ -360,6 +384,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
     ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax), true]] : []),
+    ...(origenSillas !== "No llevan" && evtKey === "boda" ? [["Cojines para sillas", "—"]] : []),
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
@@ -453,14 +478,14 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
-  const personal = calcPersonal(pax, numCamareros, 15);
+  const personal = calcPersonal(pax, numCamareros, numStaff, 15);
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
-    ["Bandeja camarero", String(personal.n)],
-    ["Litos (paño bandeja camarero)", String(personal.n)],
+    ["Bandeja camarero", String(personalSala(pax, numCamareros, 15))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 15))],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -468,7 +493,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Bebidas frías", items: [
     ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
-    ["Tinto de verano", conSufijo(bebidas.tintoVerano, "botellas")],
+    ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
     ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
@@ -618,7 +643,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
-  const personal = calcPersonal(pax, opts.numCamareros);
+  const personal = calcPersonal(pax, opts.numCamareros, opts.numStaff);
   cats.push({ nombre: "Bebidas", items: [
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
@@ -650,14 +675,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
     llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoPaella, numCamareros, fuerzaTextilTela, origenSillas = "Dealde",
+    tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
   const totalPax = pax + ninos;
   const hayBarra = (horasCoctel + horasCopas) > 0;
-  const personal = calcPersonal(pax, numCamareros);
+  const personal = calcPersonal(pax, numCamareros, numStaff);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
   const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
@@ -758,7 +783,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
   cats.push({ nombre: "Limpieza y Despensa", items: [
-    ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
+    ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", conSufijo(3, "rollo")],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
@@ -790,7 +815,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
@@ -1199,6 +1224,9 @@ export default function App() {
   const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState(estadoInicial.estiloPlatoPostre ?? "Blanco");
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
   const [numCamareros, setNumCamareros]                 = useState(estadoInicial.numCamareros ?? 0);
+  // Staff extra (cocina, producción, refuerzo...) que no sirve mesas pero también
+  // consume agua/vasos: se suma a los camareros para calcular esos consumibles
+  const [numStaff, setNumStaff]                         = useState(estadoInicial.numStaff ?? 0);
   const [tipoBandejas, setTipoBandejas] = useState(estadoInicial.tipoBandejas ?? "Mixto");
   const [tipoHorno, setTipoHorno]       = useState(estadoInicial.tipoHorno ?? "Pequeño");
   const [tipoBBQ, setTipoBBQ]           = useState(estadoInicial.tipoBBQ ?? "No lleva");
@@ -1284,7 +1312,7 @@ export default function App() {
     barraCoctel, horasCoctel, barraCopas, horasCopas,
     dobleServicio, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, numCamareros, tipoBandejas,
+    llevaArmarioCaliente, numCamareros, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -1331,7 +1359,7 @@ export default function App() {
     dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
@@ -1517,7 +1545,7 @@ export default function App() {
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -1934,6 +1962,10 @@ export default function App() {
               <span className="form-label">Nº CAMAREROS</span>
               <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
             </div>
+            <div className="form-group">
+              <span className="form-label">Nº STAFF (cocina, otros)</span>
+              <input type="number" className="form-input" placeholder="0" value={numStaff || ""} onChange={e => setNumStaff(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
+            </div>
           </div>
           <div className="form-row">
             <div className="form-group">
@@ -2244,6 +2276,10 @@ export default function App() {
                     // mostrando (aunque la cantidad se edite a mano), no de un texto fijado
                     const bateaSize = bateaSizeDe(label);
                     const bateaCount = bateaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / bateaSize) : null;
+                    // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza,
+                    // vino, refrescos): recalculado en vivo a partir de la cantidad mostrada
+                    const cajaSize = bateaSize ? null : cajaSizeDe(label);
+                    const cajaCount = cajaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / cajaSize) : null;
                     return (
                       <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
                         {editandoNombre === keyId ? (
@@ -2295,6 +2331,8 @@ export default function App() {
                         />
                         {bateaCount !== null ? (
                           <span className="item-batea-info" title="Bateas recalculadas automáticamente según la cantidad">{bateaCount} bateas de {bateaSize}</span>
+                        ) : cajaCount !== null ? (
+                          <span className="item-batea-info" title="Cajas recalculadas automáticamente según la cantidad">{cajaCount} cajas de {cajaSize}</span>
                         ) : sufijo ? (
                           <span className="item-batea-info" title="Envase fijo: no cambia aunque edites la cantidad">{sufijo}</span>
                         ) : null}
