@@ -340,7 +340,7 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Boda y comunión — fiel a "Checklist de Carga – BODA"
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, formatoCerveza = "Botellín", llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
+    dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
     tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff = 0,
     llevaChillOut, numChillOut = 1,
@@ -499,12 +499,19 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
+  // El barril de cerveza (30L/50L) descuenta esos litros de los tercios necesarios en
+  // vez de sustituirlos del todo: puede haber tercios + barril (el barril cubre parte
+  // y el resto se completa con botellín), solo barril (si cubre todo lo necesario) o
+  // solo tercios (si no se lleva barril) — nunca se piden de más ni de menos.
+  const litrosBarrilUd = tamanoBarril === "30L" ? 30 : tamanoBarril === "50L" ? 50 : 0;
+  const litrosBarrilTotal = litrosBarrilUd * Math.max(1, numBarriles);
+  const litrosCervezaNecesarios = bebidas.cerveza * 0.33;
+  const litrosRestantes = Math.max(0, litrosCervezaNecesarios - litrosBarrilTotal);
+  // Se redondea a cajas de 24 tercios, igual que el cálculo original
+  const tercerosRestantes = Math.ceil(litrosRestantes / 0.33 / 24) * 24;
   cats.push({ nombre: "Bebidas frías", items: [
-    ...(formatoCerveza === "Barril 50L"
-      // El barril sustituye a los tercios: mismo volumen total de cerveza (tercios × 0,33L),
-      // repartido en barriles de 50L, más el tirador para servirla
-      ? [["Barril de cerveza (50L)", String(Math.max(1, Math.ceil((bebidas.cerveza * 0.33) / 50)))], ["Tirador de cerveza", "1"]]
-      : [["Cerveza Alhambra (tercios)", String(bebidas.cerveza)]]),
+    ...(litrosBarrilUd > 0 ? [[`Barril de cerveza (${tamanoBarril})`, String(Math.max(1, numBarriles))], ["Tirador de cerveza", "1"]] : []),
+    ...(tercerosRestantes > 0 ? [["Cerveza Alhambra (tercios)", String(tercerosRestantes)]] : []),
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
     ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
     ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
@@ -549,7 +556,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Cumpleaños — fiel a "Checklist de Carga – cumpleaños"
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, formatoCerveza = "Botellín", llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
+    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -835,7 +842,7 @@ const ETIQUETAS_CAMPO = {
   evento: "Tipo de evento", nombreEvento: "Nombre del evento", fechaEvento: "Fecha",
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
-  dobleServicio: "Doble servicio", formatoCerveza: "Formato cerveza", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
+  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", numStaff: "Nº staff", tipoBandejas: "Bandejas",
@@ -1238,9 +1245,12 @@ export default function App() {
   const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
   const [horasCopas, setHorasCopas]   = useState(estadoInicial.horasCopas ?? 4);
   const [dobleServicio, setDobleServicio]             = useState(estadoInicial.dobleServicio ?? false);
-  // Formato de la cerveza: botellín (tercios) o barril de 50L con tirador — el barril
-  // sustituye a los tercios, no se piden ambos a la vez
-  const [formatoCerveza, setFormatoCerveza] = useState(estadoInicial.formatoCerveza ?? "Botellín");
+  // Barril de cerveza (30L/50L, con tirador): descuenta esos litros de los tercios
+  // necesarios en vez de sustituirlos del todo — puede haber tercios y barril a la
+  // vez (el barril cubre parte y el resto se completa con botellín), solo barril
+  // (si cubre todo lo necesario) o solo tercios (si no se lleva barril)
+  const [tamanoBarril, setTamanoBarril] = useState(estadoInicial.tamanoBarril ?? "No lleva");
+  const [numBarriles, setNumBarriles]   = useState(estadoInicial.numBarriles ?? 1);
   const [llevaEntrante, setLlevaEntrante]             = useState(estadoInicial.llevaEntrante ?? false);
   // Entrante compartido en plato (independiente del chupito): cuántas personas
   // comparten cada plato y cuántos entrantes distintos se reparten
@@ -1345,7 +1355,7 @@ export default function App() {
   const getEstadoActual = () => ({
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas,
-    dobleServicio, formatoCerveza, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
+    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, numCamareros, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
@@ -1391,7 +1401,7 @@ export default function App() {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
-    dobleServicio: setDobleServicio, formatoCerveza: setFormatoCerveza, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
+    dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
@@ -1612,7 +1622,7 @@ export default function App() {
   });
 
   const opts = {
-    dobleServicio, formatoCerveza, llevaPaella, mesVerano, tieneBrindisCava,
+    dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -2162,9 +2172,15 @@ export default function App() {
               </div>
             </div>
           </div>
-          {evento !== "produccion" && (
-            <div className="form-row" style={{ marginTop: 12 }}>
-              <SegmentedControl label="Formato cerveza" value={formatoCerveza} onChange={setFormatoCerveza} options={["Botellín", "Barril 50L"]} />
+          {evento !== "produccion" && evento !== "cumpleanos" && (
+            <div className="form-row" style={{ marginTop: 12, alignItems: "flex-end" }}>
+              <SegmentedControl label="Barril de cerveza" value={tamanoBarril} onChange={setTamanoBarril} options={["No lleva", "30L", "50L"]} />
+              {tamanoBarril !== "No lleva" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº barriles</span>
+                  <input type="number" className="form-input" value={numBarriles} min="1" onChange={e => setNumBarriles(Math.max(1, parseInt(e.target.value) || 1))} />
+                </div>
+              )}
             </div>
           )}
           <hr />
