@@ -1523,12 +1523,20 @@ export default function App() {
     });
   };
   // ─── EVENTOS GUARDADOS (checklist completa con nombre, fecha, logística...) ──
+  // Recuerda el último JSON que ENVIAMOS nosotros a la nube: cuando la suscripción en
+  // tiempo real nos devuelve el eco de nuestra propia escritura, lo ignoramos en vez de
+  // "fusionarlo" contra una referencia local que aún no se ha actualizado — si no, ese
+  // eco podía resucitar un evento recién borrado justo antes de que React re-renderizase.
+  const ultimoIndiceEnviadoRef = React.useRef(null);
   const guardarEventos = (obj) => {
     setEventosGuardados(obj);
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
     // Con la nube activa el archivo de eventos guardados se sincroniza: se ve igual
     // desde cualquier dispositivo, no solo en el navegador donde se guardaron
-    if (nubeActiva()) guardarIndiceEventosNube(obj).catch(() => { /* sin conexión: queda en local */ });
+    if (nubeActiva()) {
+      ultimoIndiceEnviadoRef.current = JSON.stringify(obj);
+      guardarIndiceEventosNube(obj).catch(() => { /* sin conexión: queda en local */ });
+    }
   };
 
   // Al arrancar (con nube activa) se FUSIONA el archivo local con el de la nube, nunca
@@ -1542,11 +1550,15 @@ export default function App() {
     let cancelado = false;
     const fusionar = (mapaNube) => {
       if (!mapaNube || cancelado) return;
+      // Eco de nuestra propia escritura (borrado, guardado...): ya está aplicado, no
+      // hay que fusionar nada ni reescribir de nuevo
+      if (JSON.stringify(mapaNube) === ultimoIndiceEnviadoRef.current) return;
       // Local manda en caso de choque de nombres; nada que solo esté en la nube se pierde
       const fusion = { ...mapaNube, ...eventosGuardadosRef.current };
       if (JSON.stringify(fusion) === JSON.stringify(mapaNube) && JSON.stringify(fusion) === JSON.stringify(eventosGuardadosRef.current)) return;
       setEventosGuardados(fusion);
       try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(fusion)); } catch (e) { /* localStorage lleno o no disponible */ }
+      ultimoIndiceEnviadoRef.current = JSON.stringify(fusion);
       guardarIndiceEventosNube(fusion).catch(() => { /* sin conexión: queda en local, se reintentará al guardar algo */ });
     };
     cargarIndiceEventosNube().then(fusionar).catch(() => {});
