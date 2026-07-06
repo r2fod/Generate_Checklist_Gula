@@ -135,7 +135,10 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
     vermutRojo, vermutBlanco,
     cocaNormal: Math.round(refrescoTotal * 0.25),
     cocaZero:   Math.round(refrescoTotal * 0.15),
-    fanta:      Math.round(refrescoTotal * 0.25),
+    // Antes iban juntos en una sola línea "Fanta / Aquarius" (0.25 combinado);
+    // se reparte en dos bebidas separadas manteniendo el mismo volumen total
+    fanta:      Math.round(refrescoTotal * 0.15),
+    aquarius:   Math.round(refrescoTotal * 0.1),
     sprite:     Math.round(refrescoTotal * 0.1),
     nestea:     Math.round(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
@@ -431,7 +434,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cava", `${bebidas.cava} botellas`], ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
-    ["Fanta / Aquarius", String(bebidas.fanta)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
+    ["Fanta (limón/naranja)", String(bebidas.fanta)], ["Aquarius", String(bebidas.aquarius)],
+    ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
@@ -579,7 +583,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Bebidas", items: [
     ["Coca Cola (Normal / Zero)", String(bebidas.cocaNormal + bebidas.cocaZero)],
-    ["Fanta (Limón / Naranja / Aquarius / Nestea)", String(bebidas.fanta + bebidas.nestea)],
+    ["Fanta (Limón / Naranja / Aquarius / Nestea)", String(bebidas.fanta + bebidas.aquarius + bebidas.nestea)],
     ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
