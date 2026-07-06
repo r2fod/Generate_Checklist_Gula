@@ -340,6 +340,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
     tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff = 0,
+    llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -384,7 +385,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
     ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax), true]] : []),
-    ...(origenSillas !== "No llevan" && evtKey === "boda" ? [["Cojines para sillas", "—"]] : []),
+    // Los cojines solo hacen falta con sillas de alquiler (Dealde/Carvillo): las
+    // propias ya suelen venir con su cojín o no llevarlo
+    ...((origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda" ? [["Cojines para sillas", "—"]] : []),
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
@@ -395,6 +398,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(tipoNevera !== "No lleva" ? [[tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]] : []),
     ...(hayCongelador ? [[`Congelador (${tipoCongelador})`, "1"]] : []),
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
+    ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
 
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
@@ -542,6 +546,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella, tipoNevera, tipoCongelador, origenSillas = "Dealde",
+    llevaChillOut, numChillOut = 1,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -570,6 +575,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
     ["Cubos basura (reciclaje + cocina)", "2"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
+    ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(tipoNevera !== "No lleva" ? [[`Nevera (${tipoNevera})`, "1"]] : []),
@@ -676,6 +682,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
+    llevaChillOut, numChillOut = 1,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -704,6 +711,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
+    ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
   ]});
 
   cats.push({ nombre: "Cocina y sala", items: [
@@ -818,6 +826,7 @@ const ETIQUETAS_CAMPO = {
   llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
+  llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
@@ -1234,6 +1243,8 @@ export default function App() {
   const [tieneBrindisCava, setTieneBrindisCava] = useState(estadoInicial.tieneBrindisCava ?? false);
   const [tieneFrituras, setTieneFrituras]       = useState(estadoInicial.tieneFrituras ?? false);
   const [numFrituras, setNumFrituras]           = useState(estadoInicial.numFrituras ?? 1);
+  const [llevaChillOut, setLlevaChillOut]       = useState(estadoInicial.llevaChillOut ?? false);
+  const [numChillOut, setNumChillOut]           = useState(estadoInicial.numChillOut ?? 1);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(estadoInicial.fuerzaTextilTela ?? false);
   const [llevaPalomitera, setLlevaPalomitera]       = useState(estadoInicial.llevaPalomitera ?? false);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
@@ -1314,7 +1325,7 @@ export default function App() {
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, numCamareros, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
-    tieneFrituras, numFrituras, fuerzaTextilTela,
+    tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -1362,6 +1373,7 @@ export default function App() {
     llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
+    llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
@@ -1544,7 +1556,7 @@ export default function App() {
 
   const opts = {
     dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
-    fuerzaTextilTela, tieneFrituras, numFrituras, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
+    fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -2095,6 +2107,7 @@ export default function App() {
                 ? [[tieneBrindisCava, setTieneBrindisCava, "Brindis con cava", "dobla copas de cava"]]
                 : []),
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
+              [llevaChillOut,        setLlevaChillOut,        "Lleva chill out",          llevaChillOut ? `${numChillOut} (ajusta abajo)` : "sofás/zona chill out"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33cl"],
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
@@ -2111,7 +2124,7 @@ export default function App() {
               </label>
             ))}
           </div>
-          {(entranteCompartido || llevaPaella || tieneFrituras) && (
+          {(entranteCompartido || llevaPaella || tieneFrituras || llevaChillOut) && (
             <div className="controls-row" style={{ marginTop: 12 }}>
               {entranteCompartido && (
                 <>
@@ -2130,6 +2143,12 @@ export default function App() {
                   <span className="form-label">Nº sartenes parisiene (frituras)</span>
                   <input type="number" className="form-input" value={numFrituras} min="1" onChange={e => setNumFrituras(Math.max(1, parseInt(e.target.value) || 1))} />
                   <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Ajusta bombonas, difusor, trípode y espumadera</span>
+                </div>
+              )}
+              {llevaChillOut && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº chill out</span>
+                  <input type="number" className="form-input" value={numChillOut} min="1" onChange={e => setNumChillOut(Math.max(1, parseInt(e.target.value) || 1))} />
                 </div>
               )}
             </div>
