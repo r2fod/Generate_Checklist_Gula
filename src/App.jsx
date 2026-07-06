@@ -821,7 +821,7 @@ function quitarItemsSinCantidad(checklist) {
 // ─── RESUMEN DE CAMBIOS REMOTOS (para el aviso de sincronización) ──────────────
 const ETIQUETAS_CAMPO = {
   evento: "Tipo de evento", nombreEvento: "Nombre del evento", fechaEvento: "Fecha",
-  horaInicio: "Hora de inicio", ubicacion: "Ubicación", pax: "Pax adultos", ninos: "Niños",
+  horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   dobleServicio: "Doble servicio", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
@@ -940,7 +940,7 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
     </div>
     ${secciones}
-    <div class="notas"><strong>NOTAS:</strong><br/><br/></div>
+    <div class="notas"><strong>NOTAS:</strong><br/>${meta.notasEvento ? `<p style="white-space:pre-wrap;margin:6px 0;">${meta.notasEvento}</p>` : "<br/>"}</div>
     </body></html>`;
 }
 
@@ -1051,6 +1051,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
           ))}
           <div className="preview-notes">
             <strong>Notas</strong>
+            {meta.notasEvento && <p style={{ whiteSpace: "pre-wrap", margin: "6px 0 0", fontSize: "0.88rem" }}>{meta.notasEvento}</p>}
           </div>
         </div>
       </div>
@@ -1217,6 +1218,7 @@ export default function App() {
   const [fechaEvento, setFechaEvento]   = useState(estadoInicial.fechaEvento ?? "");
   const [horaInicio, setHoraInicio]     = useState(estadoInicial.horaInicio ?? "");
   const [ubicacion, setUbicacion]       = useState(estadoInicial.ubicacion ?? "");
+  const [notasEvento, setNotasEvento]   = useState(estadoInicial.notasEvento ?? "");
   const [pax, setPax]               = useState(estadoInicial.pax ?? 80);
   const [ninos, setNinos]           = useState(estadoInicial.ninos ?? 0);
   const [barraCoctel, setBarraCoctel] = useState(estadoInicial.barraCoctel ?? true);
@@ -1326,7 +1328,7 @@ export default function App() {
   // Snapshot de todo el estado configurable — lo usan tanto el link para el móvil
   // como el guardado automático en localStorage
   const getEstadoActual = () => ({
-    evento, nombreEvento, fechaEvento, horaInicio, ubicacion, pax, ninos,
+    evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas,
     dobleServicio, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
@@ -1372,7 +1374,7 @@ export default function App() {
   // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página
   const SETTERS_SYNC = {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
-    horaInicio: setHoraInicio, ubicacion: setUbicacion, pax: setPax, ninos: setNinos,
+    horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
     dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
@@ -1473,7 +1475,7 @@ export default function App() {
     onConfirm: (nombre) => {
       // La plantilla guarda la configuración reutilizable, no los datos del evento
       // concreto (nombre, fecha, hora, ubicación, equipo de logística), que cambian en cada evento
-      const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
+      const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u, notasEvento: _no,
               logisticaEquipo: _le, eventoNubeId: _id, ...config } = getEstadoActual();
       guardarPlantillas({ ...plantillas, [nombre]: config });
       setGuardadoPlantillaMsg(`✓ Guardada como PLANTILLA: "${nombre}"`);
@@ -1792,7 +1794,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1812,7 +1814,8 @@ export default function App() {
         ? `Logística: ${fmtLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)}${totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€` : ""}`
         : null,
     ].filter(Boolean).join(" · ");
-    return `${cabecera}\n${texto}`;
+    const notas = notasEvento ? `\n\n📝 NOTAS: ${notasEvento}` : "";
+    return `${cabecera}\n${texto}${notas}`;
   };
 
   const handleCompartirWord = () => {
@@ -1821,7 +1824,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -1863,7 +1866,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, logisticaEquipo, tarifaLogistica, plusFurgoneta }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta }} onClose={() => setModalPrevia(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
 
@@ -2025,6 +2028,16 @@ export default function App() {
               <span className="form-label">UBICACIÓN</span>
               <input type="text" className="form-input" placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
             </div>
+          </div>
+          <div className="form-group notas-group">
+            <span className="form-label">NOTAS DEL EVENTO</span>
+            <textarea
+              className="form-input notas-textarea"
+              placeholder="Ej: alergias, peticiones especiales, incidencias a tener en cuenta..."
+              value={notasEvento}
+              onChange={e => setNotasEvento(e.target.value)}
+              rows={3}
+            />
           </div>
           <div className="logistica-block">
             <span className="form-label">EQUIPO DE LOGÍSTICA (cada uno con su horario)</span>

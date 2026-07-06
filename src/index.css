@@ -516,6 +516,17 @@ body {
   color: var(--text-label);
 }
 
+.notas-group {
+  margin-top: 14px;
+}
+
+.notas-textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
 /* Ranges */
 .range-group {
   display: flex;
