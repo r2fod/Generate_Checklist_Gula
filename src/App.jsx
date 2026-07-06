@@ -26,6 +26,18 @@ function conBateas(label, qtyTexto) {
   if (!size || isNaN(num)) return qtyTexto;
   return `${qtyTexto} (${Math.ceil(num / size)} bateas de ${size})`;
 }
+// Empareja un número editable con el texto fijo del envase (packs, cajas, paq.,
+// cargas...), para que al corregir la cantidad a mano no haya que retocar también
+// ese texto — se guarda aparte y no se pierde ni queda desincronizado al editar.
+function conSufijo(u, sufijo) { return { u, sufijo }; }
+// Añade la info de bateas (cristalería) o el sufijo de envase (packs/cajas/paq.) a
+// la cantidad mostrada, para Word/Vista previa/texto — en la lista principal esa
+// info se muestra aparte, no mezclada en el campo editable.
+function fmtCantidadCompleta(label, qtyTexto, sufijo) {
+  const conBatea = conBateas(label, qtyTexto);
+  if (conBatea !== qtyTexto) return conBatea;
+  return sufijo ? `${qtyTexto} ${sufijo}` : qtyTexto;
+}
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas:
@@ -158,10 +170,11 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
     vermutRojo, vermutBlanco,
     cocaNormal: Math.round(refrescoTotal * 0.25),
     cocaZero:   Math.round(refrescoTotal * 0.15),
-    // Antes iban juntos en una sola línea "Fanta / Aquarius" (0.25 combinado);
-    // se reparte en dos bebidas separadas manteniendo el mismo volumen total
-    fanta:      Math.round(refrescoTotal * 0.15),
-    aquarius:   Math.round(refrescoTotal * 0.1),
+    // Cada refresco por separado, sin unificar (datos reales: Fanta naranja y limón
+    // se piden como productos distintos, no combinados en una sola línea)
+    fantaNaranja: Math.round(refrescoTotal * 0.08),
+    fantaLimon:   Math.round(refrescoTotal * 0.07),
+    aquarius:     Math.round(refrescoTotal * 0.1),
     sprite:     Math.round(refrescoTotal * 0.1),
     nestea:     Math.round(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
@@ -267,7 +280,7 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
   // tazas realmente calculadas más abajo: 0,6+0,4 = 1 taza/pax)
   const capsulas = Math.ceil(totalPax * (hayDesayuno ? 3.2 : 2.2));
   if (tipoCafetera === "Grande") {
-    items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
+    items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(totalPax / 100)), "carga(s)")]);
   } else if (tipoCafetera === "Bar") {
     items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
   } else {
@@ -280,8 +293,8 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     [`Tazas café con leche e infusiones${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorLeche))],
     [`Tazas café solo y cortado${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorSolo))],
     ["Platos de café", String(conMargen(totalPax))],
-    ["Infusiones (té variado + descafeinado)", `${Math.ceil(totalPax / 30)} caja`],
-    ["Azucarillos y edulcorantes", `${Math.ceil(totalPax / 50)} caja`],
+    ["Infusiones (té variado + descafeinado)", conSufijo(Math.ceil(totalPax / 30), "caja")],
+    ["Azucarillos y edulcorantes", conSufijo(Math.ceil(totalPax / 50), "caja")],
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 8 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / (hayDesayuno ? 20 : 40))))],
   );
@@ -399,7 +412,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Cristalería", items: [
     [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)],
     ["Vasos de cubata",                                   String(cristal.cubata.u)],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)],
     ["Copas de cava",                                     String(cristal.cava.u)],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
@@ -411,9 +424,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros, 15) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
-      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas de papel (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
-      : [["Servilletas de papel", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${conMargen(totalPax * 3.5 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas de papel (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
+      : [["Servilletas de papel", conSufijo(conMargen(totalPax * 3 / 50), "paq. (50)")]]),
+    ["Servilletas cocktail", conSufijo(conMargen(totalPax * 3.5 / 100), "paq. (100)")],
   ]});
 
   {/* Jamón, tarta y desayuno se sirven en plato pequeño (mismo estilo que el postre):
@@ -444,22 +457,22 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (50 uds)`],
-    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
-    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (50 uds)`],
+    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
+    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
   cats.push({ nombre: "Bebidas frías", items: [
     ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
-    ["Vino blanco", `${bebidas.vinoBlanco} botellas`], ["Vino tinto", `${bebidas.vinoTinto} botellas`],
-    ["Cava", `${bebidas.cava} botellas`], ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
+    ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
+    ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
-    ["Fanta (limón/naranja)", String(bebidas.fanta)], ["Aquarius", String(bebidas.aquarius)],
+    ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)], ["Aquarius", String(bebidas.aquarius)],
     ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
-    ["Tónica", `${bebidas.tonica} botellas`], ["Agua con gas", String(bebidas.aguaConGas)],
+    ["Tónica", conSufijo(bebidas.tonica, "botellas")], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
     ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
@@ -573,9 +586,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas / Trapos", "4"],
     ...(usaTela
-      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
-      : [["Servilletas grandes", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${conMargen(totalPax * 3.5 / 100)} paq. (100)`],
+      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
+      : [["Servilletas grandes", conSufijo(conMargen(totalPax * 3 / 50), "paq. (50)")]]),
+    ["Servilletas cocktail", conSufijo(conMargen(totalPax * 3.5 / 100), "paq. (100)")],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -597,7 +610,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos cristal", String(cristal.agua.u)],
     ["Copa cava", String(cristal.cava.u)],
     ["Vaso cubata", String(cristal.cubata.u)],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
     ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
@@ -605,10 +618,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
   cats.push({ nombre: "Bebidas", items: [
-    ["Coca Cola (Normal / Zero)", String(bebidas.cocaNormal + bebidas.cocaZero)],
-    ["Fanta (Limón / Naranja / Aquarius / Nestea)", String(bebidas.fanta + bebidas.aquarius + bebidas.nestea)],
-    ["Agua 1,5L (Solán de Cabras, cliente)", `${bebidas.agua15} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${bebidas.aguasPequenasCajas} cajas (35 uds)`]] : []),
+    ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
+    ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
+    ["Aquarius", String(bebidas.aquarius)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
+    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
     ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
     ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
@@ -618,9 +632,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
     ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (50 uds)`],
-    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
-    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (50 uds)`],
+    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
+    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
   ]});
 
   return cats;
@@ -715,20 +729,23 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
     ...(usaTela
-      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
-      : [["Servilletas grandes", `${conMargen(totalPax * 3 / 50)} paq. (50)`]]),
-    ["Servilletas cocktail", `${conMargen(totalPax * 3.5 / 100)} paq. (100)`],
-    ["Bandejas de cartón blancas + blondas", `${Math.ceil(totalPax / 20)} paq.`],
+      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
+      : [["Servilletas grandes", conSufijo(conMargen(totalPax * 3 / 50), "paq. (50)")]]),
+    ["Servilletas cocktail", conSufijo(conMargen(totalPax * 3.5 / 100), "paq. (100)")],
+    ["Bandejas de cartón blancas + blondas", conSufijo(Math.ceil(totalPax / 20), "paq.")],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
-    ["Palitos brocheta", `${Math.ceil(totalPax / 20)} paq.`], ["Palitos café", `${Math.ceil(totalPax / 30)} paq.`],
+    ["Palitos brocheta", conSufijo(Math.ceil(totalPax / 20), "paq.")], ["Palitos café", conSufijo(Math.ceil(totalPax / 30), "paq.")],
     ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", "1 caja"],
     ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", "1"], ["Leche condensada", "1"],
-    ["Vasos de cartón (L/M/S)", `${Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50)} paq. (50 uds)`], ["Bolsas grandes de papel", "1 paq."],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
-    ["Coca-Cola (Normal / Zero)", String(Math.round(totalPax * 1.5))],
-    ["Fanta (Limón / Naranja / Aquarius)", String(Math.round(totalPax * 0.8))],
-    ["Agua 1,5L (Solán de Cabras, cliente)", `${Math.round(totalPax * 0.8)} packs`],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", `${Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35))} cajas (35 uds)`]] : []),
+    ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
+    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
+    // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
+    // en cada bebida por separado en vez de en dos líneas combinadas
+    ["Coca-Cola normal", String(Math.round(totalPax * 0.94))], ["Coca-Cola Zero", String(Math.round(totalPax * 0.56))],
+    ["Fanta naranja", String(Math.round(totalPax * 0.24))], ["Fanta limón", String(Math.round(totalPax * 0.2))],
+    ["Aquarius", String(Math.round(totalPax * 0.24))], ["Sprite", String(Math.round(totalPax * 0.12))],
+    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(totalPax * 0.8), "packs")],
+    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")]] : []),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
   ]});
@@ -739,9 +756,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", `${personal.vasosCartonPacks} packs (50 uds)`],
-    ["Agua Vidaqua 1,5L (personal)", `${personal.aguaVidaquaPacks} packs (6 uds)`],
-    ["Vasos de plástico (personal)", `${personal.vasosPlasticoPacks} packs (50 uds)`],
+    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
+    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
   ]});
 
   return cats;
@@ -852,11 +869,11 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
   const tablaHTML = (items) => `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
       <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
-      <tbody>${items.map(([label, qty, , , esAlquilerManual], i) => {
+      <tbody>${items.map(([label, qty, , , esAlquilerManual, sufijo], i) => {
         const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
         return `<tr style="background:${alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#f9fafb"};">
           <td style="padding:5px 6px;">${label}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
-          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${conBateas(label, qty.u ? qty.u : qty)}</td>
+          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
           <td style="width:60px;"></td><td style="width:60px;"></td><td style="width:60px;"></td>
         </tr>`;
       }).join("")}</tbody>
@@ -972,7 +989,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                     </tr>
                   </thead>
                   <tbody>
-                    {cat.items.map(([label, qty, , , esAlquilerManual], i) => {
+                    {cat.items.map(([label, qty, , , esAlquilerManual, sufijo], i) => {
                       const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                       return (
                         <tr key={i} className={alq ? "is-rental" : ""}>
@@ -980,7 +997,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                             {label}
                             {alq && <span className="preview-rental-badge">ALQUILER</span>}
                           </td>
-                          <td className="preview-qty-cell">{conBateas(label, qty.u ? qty.u : qty)}</td>
+                          <td className="preview-qty-cell">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
                           <td className="preview-check-cell"></td>
                           <td className="preview-check-cell"></td>
                           <td className="preview-check-cell"></td>
@@ -1229,6 +1246,7 @@ export default function App() {
   const [itemsAlquilerManual, setItemsAlquilerManual] = useState(estadoInicial.itemsAlquilerManual ?? {}); // { "categoria::labelOriginal": true }
   const [editandoNombre, setEditandoNombre] = useState(null); // clave "categoria::label" del item cuyo nombre se está editando
   const [nombreTemporal, setNombreTemporal] = useState("");
+  const [alquilerTemporal, setAlquilerTemporal] = useState(false); // checkbox "alquiler proveedor" mientras se edita un item
   // Diálogo propio activo (confirmaciones y campos de texto con la estética de la app)
   const [dialogo, setDialogo] = useState(null); // { tipo, titulo, mensaje, placeholder, valorInicial, textoConfirmar, peligro, onConfirm }
   // Id del evento en la nube (edición compartida): si existe, los cambios se
@@ -1239,6 +1257,7 @@ export default function App() {
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
+  const [nuevoItemAlquiler, setNuevoItemAlquiler] = useState(false);
   const [categoriaTocada, setCategoriaTocada] = useState(false);
   const [linkAbierto, setLinkAbierto] = useState(linkAbiertoInicial ?? false);
   // Plantillas guardadas con nombre: configuración reutilizable entre eventos
@@ -1539,8 +1558,13 @@ export default function App() {
         .filter(([label]) => !itemsOcultos[`${cat.nombre}::${label}`])
         .map(([label, qty, idx]) => {
           const key = `${cat.nombre}::${label}`;
-          const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : qty;
-          return [nombresManuales[key] ?? label, cantidad, idx, label, !!itemsAlquilerManual[key]];
+          // qty puede venir como { u, sufijo } (conSufijo): se separa el número editable
+          // del texto fijo del envase, que se conserva aparte aunque se edite el número
+          const esObjetoConSufijo = qty && typeof qty === "object";
+          const valorBase = esObjetoConSufijo ? qty.u : qty;
+          const sufijo = esObjetoConSufijo ? qty.sufijo : undefined;
+          const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
+          return [nombresManuales[key] ?? label, cantidad, idx, label, !!itemsAlquilerManual[key], sufijo];
         });
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
@@ -1578,29 +1602,41 @@ export default function App() {
   // "nombre corregido" sobre el label original (que sigue siendo la identidad del
   // item, así la cantidad se sigue recalculando sola); en los manuales se edita
   // el item directamente.
-  const handleRenombrarItem = (categoria, labelOriginal, manualIdx, labelMostrado, nuevo) => {
+  // Confirma la edición de un item: nombre (si cambió) y el tag de alquiler proveedor,
+  // ambos desde el mismo modo de edición (✎) — no hay un botón aparte por fila.
+  const handleConfirmarEdicionItem = (categoria, labelOriginal, manualIdx, labelMostrado, nuevo, esAlquilerNuevo) => {
     setEditandoNombre(null);
-    const nuevoLabel = nuevo.trim();
-    if (!nuevoLabel || nuevoLabel === labelMostrado) return;
+    const nuevoLabel = nuevo.trim() || labelMostrado;
+    const cambiaNombre = nuevoLabel !== labelMostrado;
+    const key = `${categoria}::${labelOriginal}`;
+    const cambiaAlquiler = esAlquilerNuevo !== !!itemsAlquilerManual[key];
+    if (!cambiaNombre && !cambiaAlquiler) return;
     ultimaClaveEditadaRef.current = null;
     pushHistorial();
-    if (manualIdx !== undefined) {
-      setItemsManuales(prev => prev.map((it, i) => i === manualIdx ? { ...it, label: nuevoLabel } : it));
-      // La cantidad editada a mano y el tag de alquiler de un item manual van ligados
-      // a su nombre: se migran las claves
-      const oldKey = `${categoria}::${labelOriginal}`;
-      const newKey = `${categoria}::${nuevoLabel}`;
-      const migra = (setFn) => setFn(prev => {
-        if (prev[oldKey] === undefined) return prev;
+    let keyFinal = key;
+    if (cambiaNombre) {
+      if (manualIdx !== undefined) {
+        setItemsManuales(prev => prev.map((it, i) => i === manualIdx ? { ...it, label: nuevoLabel } : it));
+        // La cantidad editada a mano de un item manual va ligada a su nombre: se migra la clave
+        const newKey = `${categoria}::${nuevoLabel}`;
+        setOverridesManuales(prev => {
+          if (prev[key] === undefined) return prev;
+          const next = { ...prev };
+          next[newKey] = next[key];
+          delete next[key];
+          return next;
+        });
+        keyFinal = newKey;
+      } else {
+        setNombresManuales(prev => ({ ...prev, [key]: nuevoLabel }));
+      }
+    }
+    if (cambiaAlquiler) {
+      setItemsAlquilerManual(prev => {
         const next = { ...prev };
-        next[newKey] = next[oldKey];
-        delete next[oldKey];
+        if (esAlquilerNuevo) next[keyFinal] = true; else delete next[keyFinal];
         return next;
       });
-      migra(setOverridesManuales);
-      migra(setItemsAlquilerManual);
-    } else {
-      setNombresManuales(prev => ({ ...prev, [`${categoria}::${labelOriginal}`]: nuevoLabel }));
     }
   };
 
@@ -1615,20 +1651,6 @@ export default function App() {
     setItemsAlquilerManual(ultimo.itemsAlquilerManual);
     setHistorial(prev => prev.slice(0, -1));
     ultimaClaveEditadaRef.current = null;
-  };
-
-  // Marca/desmarca un item (calculado o manual) como "alquiler proveedor": para lo
-  // que no lleva Dealde/Carvillo/Novelda/alquiler en el nombre y por eso no sale
-  // etiquetado solo, pero en este evento concreto sí hay que alquilarlo aparte.
-  const handleToggleAlquiler = (categoria, labelOriginal) => {
-    ultimaClaveEditadaRef.current = null;
-    pushHistorial();
-    const key = `${categoria}::${labelOriginal}`;
-    setItemsAlquilerManual(prev => {
-      const next = { ...prev };
-      if (next[key]) delete next[key]; else next[key] = true;
-      return next;
-    });
   };
 
   // Renombra una categoría (botón ✎ de la cabecera). El nuevo nombre pasa a ser la
@@ -1673,7 +1695,8 @@ export default function App() {
     if (!label) return;
     const categoria = nuevoItemCategoria || sugerirCategoria(label, categoriasDisponibles) || CATEGORIA_MANUAL;
     setItemsManuales(prev => [...prev, { label, cantidad: nuevoItemCantidad.trim() || "1", categoria }]);
-    setNuevoItemLabel(""); setNuevoItemCantidad(""); setNuevoItemCategoria(""); setCategoriaTocada(false);
+    if (nuevoItemAlquiler) setItemsAlquilerManual(prev => ({ ...prev, [`${categoria}::${label}`]: true }));
+    setNuevoItemLabel(""); setNuevoItemCantidad(""); setNuevoItemCategoria(""); setCategoriaTocada(false); setNuevoItemAlquiler(false);
   };
   const handleRemoveItemManual = (idx) => {
     ultimaClaveEditadaRef.current = null;
@@ -1708,7 +1731,7 @@ export default function App() {
   };
 
   const getTextoChecklist = () => {
-    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q]) => `  • ${l}: ${conBateas(l, q.u ? q.u : q)}`).join("\n")).join("\n");
+    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q, , , , sufijo]) => `  • ${l}: ${fmtCantidadCompleta(l, q.u ? q.u : q, sufijo)}`).join("\n")).join("\n");
     const cabecera = [
       nombreEvento ? nombreEvento.toUpperCase() : `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()}`,
       `${pax} pax`,
@@ -2184,6 +2207,10 @@ export default function App() {
                 <option value="__nueva__">➕ Nueva categoría…</option>
               </select>
             </div>
+            <label className="add-item-alquiler-check" title="Marcar como alquiler proveedor (si no está incluido)">
+              <input type="checkbox" checked={nuevoItemAlquiler} onChange={e => setNuevoItemAlquiler(e.target.checked)} />
+              🏷 Alquiler proveedor
+            </label>
             <button className="btn btn-navy-outline add-item-btn" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
           </div>
         </div>
@@ -2203,7 +2230,7 @@ export default function App() {
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
-                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual], i) => {
+                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual, sufijo], i) => {
                     const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                     const displayQty = String(qty && qty.u ? qty.u : qty);
                     const keyId = `${cat.nombre}::${labelOriginal ?? label}`;
@@ -2217,18 +2244,29 @@ export default function App() {
                     return (
                       <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
                         {editandoNombre === keyId ? (
-                          <input
-                            type="text"
-                            className="item-name-input"
-                            value={nombreTemporal}
-                            autoFocus
-                            onChange={e => setNombreTemporal(e.target.value)}
-                            onBlur={() => handleRenombrarItem(cat.nombre, labelOriginal ?? label, manualIdx, label, nombreTemporal)}
-                            onKeyDown={e => {
-                              if (e.key === "Enter") e.target.blur();
-                              if (e.key === "Escape") { setNombreTemporal(label); e.target.blur(); }
-                            }}
-                          />
+                          <div className="item-edit-row">
+                            <input
+                              type="text"
+                              className="item-name-input"
+                              value={nombreTemporal}
+                              autoFocus
+                              onChange={e => setNombreTemporal(e.target.value)}
+                              onBlur={() => handleConfirmarEdicionItem(cat.nombre, labelOriginal ?? label, manualIdx, label, nombreTemporal, alquilerTemporal)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter") e.target.blur();
+                                if (e.key === "Escape") { setNombreTemporal(label); setAlquilerTemporal(esAlquilerManual); e.target.blur(); }
+                              }}
+                            />
+                            <label className="item-edit-alquiler-check" title="Marcar como alquiler proveedor (si no está incluido)">
+                              <input
+                                type="checkbox"
+                                checked={alquilerTemporal}
+                                onMouseDown={e => e.preventDefault()}
+                                onChange={e => setAlquilerTemporal(e.target.checked)}
+                              />
+                              🏷 Alquiler
+                            </label>
+                          </div>
                         ) : (
                           <div className="item-name">
                             {label}
@@ -2252,21 +2290,17 @@ export default function App() {
                           onFocus={e => e.target.select()}
                           size={Math.max(2, displayQty.length)}
                         />
-                        {bateaCount !== null && (
+                        {bateaCount !== null ? (
                           <span className="item-batea-info" title="Bateas recalculadas automáticamente según la cantidad">{bateaCount} bateas de {bateaSize}</span>
-                        )}
+                        ) : sufijo ? (
+                          <span className="item-batea-info" title="Envase fijo: no cambia aunque edites la cantidad">{sufijo}</span>
+                        ) : null}
                         <div className="item-actions">
                           <button
-                            className={`item-action-btn ${esAlquilerManual ? "item-action-alquiler-activo" : ""}`}
-                            onClick={() => handleToggleAlquiler(cat.nombre, labelOriginal ?? label)}
-                            title={alq ? "Quitar el tag de alquiler proveedor" : "Marcar como alquiler proveedor (si no está incluido)"}
-                            aria-label={`${esAlquilerManual ? "Quitar" : "Marcar"} alquiler proveedor en ${label}`}
-                          >🏷</button>
-                          <button
                             className="item-action-btn"
-                            onClick={() => { setEditandoNombre(keyId); setNombreTemporal(label); }}
-                            title="Editar el nombre"
-                            aria-label={`Editar nombre de ${label}`}
+                            onClick={() => { setEditandoNombre(keyId); setNombreTemporal(label); setAlquilerTemporal(esAlquilerManual); }}
+                            title="Editar el nombre / marcar alquiler proveedor"
+                            aria-label={`Editar ${label}`}
                           >✎</button>
                           <button
                             className="item-action-btn item-action-borrar"

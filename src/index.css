@@ -429,6 +429,25 @@ body {
   white-space: nowrap;
 }
 
+.add-item-alquiler-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b45309;
+  white-space: nowrap;
+  cursor: pointer;
+  padding-bottom: 9px;
+}
+
+.add-item-alquiler-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #b45309;
+  cursor: pointer;
+}
+
 /* Config Card */
 .config-card {
   background: var(--card-bg);
@@ -1144,7 +1163,15 @@ body {
   min-width: 0;
 }
 
-/* Edición del nombre del item en el sitio (botón ✎) */
+/* Edición del nombre del item en el sitio (botón ✎): input + checkbox de alquiler */
+.item-edit-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .item-name-input {
   flex: 1;
   min-width: 0;
@@ -1159,6 +1186,25 @@ body {
 .item-name-input:focus {
   outline: none;
   box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.item-edit-alquiler-check {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #b45309;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.item-edit-alquiler-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: #b45309;
+  cursor: pointer;
 }
 
 /* Nº de bateas, recalculado siempre a partir de la cantidad mostrada (no editable
@@ -1198,17 +1244,6 @@ body {
 .item-action-borrar:hover {
   color: #dc2626;
   background: #fee2e2;
-}
-
-/* Botón 🏷 activo: el item está marcado a mano como alquiler proveedor */
-.item-action-alquiler-activo {
-  color: #b45309;
-  background: #fdf6e3;
-}
-
-.item-action-alquiler-activo:hover {
-  color: #b45309;
-  background: #fce8b8;
 }
 
 .tag-alquiler {
