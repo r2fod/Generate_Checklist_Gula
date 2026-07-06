@@ -1191,6 +1191,17 @@ body {
   background: #fee2e2;
 }
 
+/* Botón 🏷 activo: el item está marcado a mano como alquiler proveedor */
+.item-action-alquiler-activo {
+  color: #b45309;
+  background: #fdf6e3;
+}
+
+.item-action-alquiler-activo:hover {
+  color: #b45309;
+  background: #fce8b8;
+}
+
 .tag-alquiler {
   background: #f59e0b;
   color: white;

@@ -755,6 +755,7 @@ const ETIQUETAS_CAMPO = {
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
+  itemsAlquilerManual: "Items marcados como alquiler proveedor",
 };
 
 // Compara el estado anterior y el recibido y devuelve frases cortas ("Pax adultos: 65 → 88")
@@ -824,8 +825,8 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
   const tablaHTML = (items) => `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
       <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
-      <tbody>${items.map(([label, qty], i) => {
-        const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+      <tbody>${items.map(([label, qty, , , esAlquilerManual], i) => {
+        const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
         return `<tr style="background:${alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#f9fafb"};">
           <td style="padding:5px 6px;">${label}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
           <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${qty.u ? qty.u : qty}</td>
@@ -944,8 +945,8 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                     </tr>
                   </thead>
                   <tbody>
-                    {cat.items.map(([label, qty], i) => {
-                      const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+                    {cat.items.map(([label, qty, , , esAlquilerManual], i) => {
+                      const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                       return (
                         <tr key={i} className={alq ? "is-rental" : ""}>
                           <td>
@@ -1195,6 +1196,10 @@ export default function App() {
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
+  // Items marcados a mano como "alquiler proveedor", para los que no llevan Dealde/Carvillo/
+  // Novelda/alquiler en el nombre y por tanto no se detectan solos (ej. algo puntual que no
+  // está incluido y hay que alquilar aparte)
+  const [itemsAlquilerManual, setItemsAlquilerManual] = useState(estadoInicial.itemsAlquilerManual ?? {}); // { "categoria::labelOriginal": true }
   const [editandoNombre, setEditandoNombre] = useState(null); // clave "categoria::label" del item cuyo nombre se está editando
   const [nombreTemporal, setNombreTemporal] = useState("");
   // Diálogo propio activo (confirmaciones y campos de texto con la estética de la app)
@@ -1238,7 +1243,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas,
+    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual,
     logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -1288,6 +1293,7 @@ export default function App() {
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
+    itemsAlquilerManual: setItemsAlquilerManual,
     eventoNubeId: setEventoNubeId,
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
@@ -1499,7 +1505,7 @@ export default function App() {
     });
     // Aplica los ajustes manuales (clave: categoría + etiqueta ORIGINAL del item):
     // quita los items ocultos, aplica cantidades editadas y nombres corregidos.
-    // La tupla resultante es [nombreMostrado, cantidad, idxManual, labelOriginal] —
+    // La tupla resultante es [nombreMostrado, cantidad, idxManual, labelOriginal, esAlquilerManual] —
     // el label original se conserva como identidad estable del item aunque se renombre.
     cats.forEach(cat => {
       cat.items = cat.items
@@ -1507,15 +1513,15 @@ export default function App() {
         .map(([label, qty, idx]) => {
           const key = `${cat.nombre}::${label}`;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : qty;
-          return [nombresManuales[key] ?? label, cantidad, idx, label];
+          return [nombresManuales[key] ?? label, cantidad, idx, label, !!itemsAlquilerManual[key]];
         });
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
     return cats.filter(c => c.items.length > 0);
-  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas]);
+  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual]);
 
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
-  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas });
+  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
 
   const handleEditarCantidad = (categoria, labelOriginal, valor) => {
@@ -1553,15 +1559,19 @@ export default function App() {
     pushHistorial();
     if (manualIdx !== undefined) {
       setItemsManuales(prev => prev.map((it, i) => i === manualIdx ? { ...it, label: nuevoLabel } : it));
-      // La cantidad editada a mano de un item manual va ligada a su nombre: se migra la clave
+      // La cantidad editada a mano y el tag de alquiler de un item manual van ligados
+      // a su nombre: se migran las claves
       const oldKey = `${categoria}::${labelOriginal}`;
-      setOverridesManuales(prev => {
+      const newKey = `${categoria}::${nuevoLabel}`;
+      const migra = (setFn) => setFn(prev => {
         if (prev[oldKey] === undefined) return prev;
         const next = { ...prev };
-        next[`${categoria}::${nuevoLabel}`] = next[oldKey];
+        next[newKey] = next[oldKey];
         delete next[oldKey];
         return next;
       });
+      migra(setOverridesManuales);
+      migra(setItemsAlquilerManual);
     } else {
       setNombresManuales(prev => ({ ...prev, [`${categoria}::${labelOriginal}`]: nuevoLabel }));
     }
@@ -1575,8 +1585,23 @@ export default function App() {
     setItemsOcultos(ultimo.itemsOcultos);
     setNombresManuales(ultimo.nombresManuales);
     setCategoriasRenombradas(ultimo.categoriasRenombradas);
+    setItemsAlquilerManual(ultimo.itemsAlquilerManual);
     setHistorial(prev => prev.slice(0, -1));
     ultimaClaveEditadaRef.current = null;
+  };
+
+  // Marca/desmarca un item (calculado o manual) como "alquiler proveedor": para lo
+  // que no lleva Dealde/Carvillo/Novelda/alquiler en el nombre y por eso no sale
+  // etiquetado solo, pero en este evento concreto sí hay que alquilarlo aparte.
+  const handleToggleAlquiler = (categoria, labelOriginal) => {
+    ultimaClaveEditadaRef.current = null;
+    pushHistorial();
+    const key = `${categoria}::${labelOriginal}`;
+    setItemsAlquilerManual(prev => {
+      const next = { ...prev };
+      if (next[key]) delete next[key]; else next[key] = true;
+      return next;
+    });
   };
 
   // Renombra una categoría (botón ✎ de la cabecera). El nuevo nombre pasa a ser la
@@ -1609,6 +1634,7 @@ export default function App() {
     setOverridesManuales(migraClaves);
     setItemsOcultos(migraClaves);
     setNombresManuales(migraClaves);
+    setItemsAlquilerManual(migraClaves);
   };
 
   const handleLabelItemManual = (value) => {
@@ -2150,8 +2176,8 @@ export default function App() {
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
-                  {cat.items.map(([label, qty, manualIdx, labelOriginal], i) => {
-                    const alq = PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual], i) => {
+                    const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                     const displayQty = String(qty && qty.u ? qty.u : qty);
                     const keyId = `${cat.nombre}::${labelOriginal ?? label}`;
                     const editado = overridesManuales[keyId] !== undefined;
@@ -2196,6 +2222,12 @@ export default function App() {
                           size={Math.max(2, displayQty.length)}
                         />
                         <div className="item-actions">
+                          <button
+                            className={`item-action-btn ${esAlquilerManual ? "item-action-alquiler-activo" : ""}`}
+                            onClick={() => handleToggleAlquiler(cat.nombre, labelOriginal ?? label)}
+                            title={alq ? "Quitar el tag de alquiler proveedor" : "Marcar como alquiler proveedor (si no está incluido)"}
+                            aria-label={`${esAlquilerManual ? "Quitar" : "Marcar"} alquiler proveedor en ${label}`}
+                          >🏷</button>
                           <button
                             className="item-action-btn"
                             onClick={() => { setEditandoNombre(keyId); setNombreTemporal(label); }}
