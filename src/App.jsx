@@ -198,16 +198,18 @@ function calcMesasServicio(pax) {
   return { total: 13 };
 }
 
-// Personal de sala: usa el nº de camareros importado del Excel si lo hay,
-// si no lo calcula automáticamente por pax (1 camarero cada 20 pax aprox.)
-function personalSala(pax, numCamareros) {
-  return numCamareros > 0 ? numCamareros : Math.max(2, Math.ceil(pax / 20));
+// Personal de sala: usa el nº de camareros importado del Excel si lo hay; si no,
+// lo calcula automáticamente por pax. El ratio del sector es 1 camarero cada 10-15
+// pax en banquete sentado (boda/comunión/corporativo) y 1 cada 20 en formato buffet
+// más informal (cumpleaños/producción) — de ahí el divisor configurable.
+function personalSala(pax, numCamareros, divisor = 20) {
+  return numCamareros > 0 ? numCamareros : Math.max(2, Math.ceil(pax / divisor));
 }
 
 // Consumibles para el propio personal de sala/cocina (no para los invitados)
 // Los packs de vasos de cartón y plástico vienen de 50 unidades
-function calcPersonal(pax, numCamareros) {
-  const n = personalSala(pax, numCamareros);
+function calcPersonal(pax, numCamareros, divisor = 20) {
+  const n = personalSala(pax, numCamareros, divisor);
   return {
     n,
     // Los vasos de café son "mini" (tamaño espresso/cortado): siempre se llevan 3 packs
@@ -232,8 +234,12 @@ function calcMesasTotal(evtKey, pax) {
 // - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
 function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
   const items = [];
-  // Cápsulas calibradas con evento real (65 pax → 200): sin margen extra
-  const capsulas = Math.ceil(totalPax * (hayDesayuno ? 4.5 : 3.1));
+  // El estándar del sector es 1-1,5 tazas/pax (una boda real de 116 invitados usó 100
+  // cafés, 0,86/pax); aquí se sube a ~2,2/3,2 para cubrir varios momentos de café en
+  // una boda española (sobremesa, tarta, recogida) sin llegar a triplicar lo que de
+  // verdad se sirve, como pasaba con el ratio anterior (3,1/4,5, sin relación con las
+  // tazas realmente calculadas más abajo: 0,6+0,4 = 1 taza/pax)
+  const capsulas = Math.ceil(totalPax * (hayDesayuno ? 3.2 : 2.2));
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", `${Math.max(1, Math.ceil(totalPax / 100))} carga(s)`]);
   } else if (tipoCafetera === "Bar") {
@@ -321,8 +327,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cubo basura cocina", "2"], ["Champanera metálica grande", "4"],
     ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
-    ["Bandeja camarero", String(personalSala(pax, numCamareros))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
+    ["Bandeja camarero", String(personalSala(pax, numCamareros, 15))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 15))],
     ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
     ...(tipoNevera !== "No lleva" ? [[tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]] : []),
@@ -344,7 +350,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   }
   cocinaItems.push(["Bombonas llenas", String(bombonas)], ["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño (con bandejas)", "1"]);
-  if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
+  if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro eléctrica", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
@@ -376,7 +382,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros) + 2)],
+    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales cocina y sala", String(personalSala(pax, numCamareros, 15) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas de papel (extra)", `${conMargen(totalPax / 50)} paq. (50)`]]
@@ -408,7 +414,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
-  const personal = calcPersonal(pax, numCamareros);
+  const personal = calcPersonal(pax, numCamareros, 15);
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
@@ -512,7 +518,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)],
   ];
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
-  if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande (Alquiler Dealde)", "1", true]);
+  if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora / Túrmix", "1"], ["Vitro", "1"], ["Aceiteras / Saleros / Pimenteros", "1/2 de cada"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
