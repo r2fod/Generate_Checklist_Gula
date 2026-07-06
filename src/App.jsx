@@ -160,6 +160,8 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   // Calibrado con datos reales (65 pax → 6 rojo, 5 blanco).
   const vermutRojo = Math.max(2, Math.round(pax / 11));
   const vermutBlanco = Math.max(2, Math.round(pax / 13));
+  // Tinto de verano: bebida de verano habitual, más presente en meses cálidos
+  const tintoVerano = Math.max(2, Math.round(pax * (mesVerano ? 0.25 : 0.12)));
   return {
     // Sin margen extra: los ratios ya están calibrados con eventos reales por encima
     // de los rangos del sector (vino 0,72 bot/pax vs 0,33-0,5 estándar; cerveza en el
@@ -167,7 +169,7 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
     cerveza, vinoBlanco, vinoTinto,
     cava, tonica, agua15, redbull,
     aguasPequenasCajas, aguasPequenasUds,
-    vermutRojo, vermutBlanco,
+    vermutRojo, vermutBlanco, tintoVerano,
     cocaNormal: Math.round(refrescoTotal * 0.25),
     cocaZero:   Math.round(refrescoTotal * 0.15),
     // Cada refresco por separado, sin unificar (datos reales: Fanta naranja y limón
@@ -363,12 +365,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
     ["Cajas de madera para alturas", "—"],
     ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
-    ["Cubo basura cocina", "2"], ["Champanera metálica grande", "4"],
-    ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
-    ["Sacacorchos", "2"], ["Abridores cerveza", "2"],
-    ["Bandeja camarero", String(personalSala(pax, numCamareros, 15))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 15))],
-    ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
+    ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
     ...(tipoNevera !== "No lleva" ? [[tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]] : []),
     ...(hayCongelador ? [[`Congelador (${tipoCongelador})`, "1"]] : []),
@@ -418,6 +415,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
     ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]] : []),
+    // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
+    ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
+    ["Sacacorchos", "2"], ["Abridores cerveza", "2"], ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
@@ -458,8 +458,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fairy", "1"], ["Estropajo", "1"], ["Papel plata", "1"], ["Film", "1"],
     ["Bayetas y trapos de horno", "4"], ["Papel Chemine", "2"], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
-    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
+    ["Bandeja camarero", String(personal.n)],
+    ["Litos (paño bandeja camarero)", String(personal.n)],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -467,7 +468,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Bebidas frías", items: [
     ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
+    ["Tinto de verano", conSufijo(bebidas.tintoVerano, "botellas")],
     ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)], ["Aquarius", String(bebidas.aquarius)],
@@ -541,11 +544,6 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesas totales", String(calcMesasServicio(pax).total)],
     ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
     ["Cubos basura (reciclaje + cocina)", "2"],
-    ["Champanera metálica / Cubiteras + pinza", "2"],
-    ["Abridores", "2"],
-    ["Bandeja camareros", String(personalSala(pax, opts.numCamareros))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, opts.numCamareros))],
-    ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
@@ -613,28 +611,33 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
     ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
     ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
+    ["Champanera metálica / Cubiteras + pinza", "2"], ["Abridores", "2"],
+    ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
+  const personal = calcPersonal(pax, opts.numCamareros);
   cats.push({ nombre: "Bebidas", items: [
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
     ["Aquarius", String(bebidas.aquarius)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
     ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
     ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
   ]});
 
-  const personal = calcPersonal(pax, opts.numCamareros);
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "2"],
     ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
-    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
+    ["Bandeja camareros", String(personalSala(pax, opts.numCamareros))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, opts.numCamareros))],
   ]});
 
   return cats;
@@ -654,6 +657,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const usaTela = fuerzaTextilTela;
   const totalPax = pax + ninos;
   const hayBarra = (horasCoctel + horasCopas) > 0;
+  const personal = calcPersonal(pax, numCamareros);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
   const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
@@ -672,11 +676,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
     ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
     ["Cubos basura (reciclaje + cocina)", "2"],
-    ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
-    ["Bandeja camareros", String(personalSala(pax, numCamareros))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
   ]});
 
@@ -704,6 +705,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Manteles negros", String(calcMesasServicio(pax).total + 1)],
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, numCamareros) + 2)], ["Bayetas / Trapos", "4"],
+    ["Bandeja camareros", String(personalSala(pax, numCamareros))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -722,6 +725,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Tenedores / Cuchillos / Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(conMargen(totalPax))],
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))], ["Abridores", "2"],
+    ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
     ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
     ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
@@ -745,6 +749,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fanta naranja", String(Math.round(totalPax * 0.24))], ["Fanta limón", String(Math.round(totalPax * 0.2))],
     ["Aquarius", String(Math.round(totalPax * 0.24))], ["Sprite", String(Math.round(totalPax * 0.12))],
     ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(totalPax * 0.8), "packs")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")]] : []),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
@@ -752,12 +757,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
-  const personal = calcPersonal(pax, numCamareros);
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", "3 rollo"],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
-    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
   ]});
 
