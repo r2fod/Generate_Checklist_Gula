@@ -374,7 +374,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Electricidad y camión", items: [
     ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"], ["Cinta aislante", "1"],
     ["Bridas", "1 bolsa"], ["Rulos cable", "2"], ["Imperdibles", "1 paquete"],
-    ["Carros de servicio/transporte", "2"],
+    ["Carros de servicio/transporte", "2"], ["Walkies", "2"],
   ]});
 
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
@@ -493,6 +493,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
     ["Bandeja camarero", String(personalSala(pax, numCamareros, 15))],
     ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 15))],
+    ["Hojas de fichaje", "1"],
   ]});
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
@@ -672,6 +673,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
     ["Bandeja camareros", String(personalSala(pax, opts.numCamareros))],
     ["Litos (paño bandeja camarero)", String(personalSala(pax, opts.numCamareros))],
+    ["Hojas de fichaje", "1"],
   ]});
 
   return cats;
@@ -798,6 +800,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
+    ["Hojas de fichaje", "1"],
   ]});
 
   return cats;
