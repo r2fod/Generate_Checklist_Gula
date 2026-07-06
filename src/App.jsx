@@ -1523,46 +1523,37 @@ export default function App() {
     });
   };
   // ─── EVENTOS GUARDADOS (checklist completa con nombre, fecha, logística...) ──
-  // Recuerda el último JSON que ENVIAMOS nosotros a la nube: cuando la suscripción en
-  // tiempo real nos devuelve el eco de nuestra propia escritura, lo ignoramos en vez de
-  // "fusionarlo" contra una referencia local que aún no se ha actualizado — si no, ese
-  // eco podía resucitar un evento recién borrado justo antes de que React re-renderizase.
-  const ultimoIndiceEnviadoRef = React.useRef(null);
+  // La nube es la fuente de verdad: gana la escritura más reciente por timestamp.
+  // NO se "fusiona" el mapa local con el de la nube (una fusión aditiva nunca puede
+  // representar un borrado: si faltaba una clave en un lado solo significa "no tocada",
+  // así que un evento recién borrado localmente resucitaba en cuanto llegaba cualquier
+  // snapshot -aunque fuera uno viejo, en caché, de antes del borrado- de la nube).
+  const ultimaEscrituraLocalRef = React.useRef(0);
   const guardarEventos = (obj) => {
     setEventosGuardados(obj);
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
     // Con la nube activa el archivo de eventos guardados se sincroniza: se ve igual
     // desde cualquier dispositivo, no solo en el navegador donde se guardaron
     if (nubeActiva()) {
-      ultimoIndiceEnviadoRef.current = JSON.stringify(obj);
+      ultimaEscrituraLocalRef.current = Date.now();
       guardarIndiceEventosNube(obj).catch(() => { /* sin conexión: queda en local */ });
     }
   };
 
-  // Al arrancar (con nube activa) se FUSIONA el archivo local con el de la nube, nunca
-  // se sustituye sin más: si la nube estuviera vacía o incompleta (ej. por un fallo de
-  // permisos) esto evita que tape/borre eventos que sí están guardados en local.
-  // El resultado fusionado se vuelve a guardar en ambos sitios para dejarlos igualados.
-  const eventosGuardadosRef = React.useRef(eventosGuardados);
-  eventosGuardadosRef.current = eventosGuardados;
   useEffect(() => {
     if (!nubeActiva()) return;
     let cancelado = false;
-    const fusionar = (mapaNube) => {
-      if (!mapaNube || cancelado) return;
-      // Eco de nuestra propia escritura (borrado, guardado...): ya está aplicado, no
-      // hay que fusionar nada ni reescribir de nuevo
-      if (JSON.stringify(mapaNube) === ultimoIndiceEnviadoRef.current) return;
-      // Local manda en caso de choque de nombres; nada que solo esté en la nube se pierde
-      const fusion = { ...mapaNube, ...eventosGuardadosRef.current };
-      if (JSON.stringify(fusion) === JSON.stringify(mapaNube) && JSON.stringify(fusion) === JSON.stringify(eventosGuardadosRef.current)) return;
-      setEventosGuardados(fusion);
-      try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(fusion)); } catch (e) { /* localStorage lleno o no disponible */ }
-      ultimoIndiceEnviadoRef.current = JSON.stringify(fusion);
-      guardarIndiceEventosNube(fusion).catch(() => { /* sin conexión: queda en local, se reintentará al guardar algo */ });
+    const aplicarSiEsMasReciente = ({ mapa, actualizado }) => {
+      if (!mapa || cancelado) return;
+      // Si ya hicimos una escritura local igual o más reciente, esto es un eco de
+      // nuestro propio cambio (o un snapshot viejo en caché): se ignora sin más.
+      if (actualizado <= ultimaEscrituraLocalRef.current) return;
+      ultimaEscrituraLocalRef.current = actualizado;
+      setEventosGuardados(mapa);
+      try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(mapa)); } catch (e) { /* localStorage lleno o no disponible */ }
     };
-    cargarIndiceEventosNube().then(fusionar).catch(() => {});
-    const unsub = suscribirIndiceEventosNube(fusionar);
+    cargarIndiceEventosNube().then(aplicarSiEsMasReciente).catch(() => {});
+    const unsub = suscribirIndiceEventosNube(aplicarSiEsMasReciente);
     return () => { cancelado = true; unsub(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

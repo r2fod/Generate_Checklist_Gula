@@ -81,10 +81,14 @@ export async function cargarIndiceEventosNube() {
   if (!conexion) return null;
   const { db, fs } = conexion;
   const snap = await fs.getDoc(fs.doc(db, DOC_INDICE));
-  return snap.exists() ? JSON.parse(snap.data().mapa) : null;
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  return { mapa: JSON.parse(d.mapa), actualizado: d.actualizado ?? 0 };
 }
 
-// Avisa (cb) cada vez que alguien (en cualquier dispositivo) guarda/borra un evento
+// Avisa (cb) cada vez que alguien (en cualquier dispositivo) guarda/borra un evento.
+// cb recibe { mapa, actualizado } para poder decidir por timestamp qué versión manda
+// (un borrado no se puede "fusionar", solo sustituir por la más reciente).
 export function suscribirIndiceEventosNube(cb) {
   let unsub = () => {};
   let cancelado = false;
@@ -94,7 +98,11 @@ export function suscribirIndiceEventosNube(cb) {
     const { db, fs } = conexion;
     unsub = fs.onSnapshot(
       fs.doc(db, DOC_INDICE),
-      (snap) => { if (snap.exists()) cb(JSON.parse(snap.data().mapa)); },
+      (snap) => {
+        if (!snap.exists()) return;
+        const d = snap.data();
+        cb({ mapa: JSON.parse(d.mapa), actualizado: d.actualizado ?? 0 });
+      },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
     );
   })();
