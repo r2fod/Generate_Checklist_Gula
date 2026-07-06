@@ -3,6 +3,29 @@ import { nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube } fro
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
+// Qué tamaño de batea corresponde a cada tipo de vaso/copa, detectado por el nombre
+// del item. Así el nº de bateas se recalcula siempre en vivo a partir de la cantidad
+// que se esté mostrando (aunque se edite a mano), en vez de quedar fijado en un texto.
+const BATEA_POR_LABEL = [
+  { fragmento: "chupito cristal", size: BATEA.chupito },
+  { fragmento: "vasos de agua", size: BATEA.agua }, { fragmento: "vasos cristal", size: BATEA.agua },
+  { fragmento: "copas de vino", size: BATEA.vino }, { fragmento: "copas cristal", size: BATEA.vino },
+  { fragmento: "vasos de cubata", size: BATEA.cubata }, { fragmento: "vaso cubata", size: BATEA.cubata },
+  { fragmento: "copas de cava", size: BATEA.cava }, { fragmento: "copa cava", size: BATEA.cava },
+];
+function bateaSizeDe(label) {
+  const norm = label.toLowerCase();
+  const m = BATEA_POR_LABEL.find(b => norm.includes(b.fragmento));
+  return m ? m.size : null;
+}
+// "200" + tamaño 25 → "200 (8 bateas de 25)"; si la cantidad no es un número
+// (ej. "—") o el item no es de cristalería, se muestra tal cual sin más.
+function conBateas(label, qtyTexto) {
+  const size = bateaSizeDe(label);
+  const num = parseFloat(String(qtyTexto).replace(",", "."));
+  if (!size || isNaN(num)) return qtyTexto;
+  return `${qtyTexto} (${Math.ceil(num / size)} bateas de ${size})`;
+}
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas:
@@ -374,13 +397,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
-    [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
-    ["Vasos de cubata",                                   `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
+    [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)],
+    ["Vasos de cubata",                                   String(cristal.cubata.u)],
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
-    [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
-    ["Copas de cava",                                     `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
+    [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)],
+    ["Copas de cava",                                     String(cristal.cava.u)],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
-    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
+    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
     ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]] : []),
   ]});
 
@@ -570,12 +593,12 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))],
     ["Tenedores / Cuchillos / Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(conMargen(totalPax))],
-    [`Copas cristal${dobleServicio ? " (doble)" : ""}`, `${cristal.vino.u} (${cristal.vino.b} bateas de ${cristal.vino.size})`],
-    ["Vasos cristal", `${cristal.agua.u} (${cristal.agua.b} bateas de ${cristal.agua.size})`],
-    ["Copa cava", `${cristal.cava.u} (${cristal.cava.b} bateas de ${cristal.cava.size})`],
-    ["Vaso cubata", `${cristal.cubata.u} (${cristal.cubata.b} bateas de ${cristal.cubata.size})`],
+    [`Copas cristal${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)],
+    ["Vasos cristal", String(cristal.agua.u)],
+    ["Copa cava", String(cristal.cava.u)],
+    ["Vaso cubata", String(cristal.cubata.u)],
     ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", `${Math.max(1, conMargen(pax * 1.5 / 80))} paq. (80 uds)`]] : []),
-    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", `${cristal.chupito.u} (${cristal.chupito.b} bateas de ${cristal.chupito.size})`]] : []),
+    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
     ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
   ]});
 
@@ -833,7 +856,7 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
         const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
         return `<tr style="background:${alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#f9fafb"};">
           <td style="padding:5px 6px;">${label}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
-          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${qty.u ? qty.u : qty}</td>
+          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${conBateas(label, qty.u ? qty.u : qty)}</td>
           <td style="width:60px;"></td><td style="width:60px;"></td><td style="width:60px;"></td>
         </tr>`;
       }).join("")}</tbody>
@@ -957,7 +980,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                             {label}
                             {alq && <span className="preview-rental-badge">ALQUILER</span>}
                           </td>
-                          <td className="preview-qty-cell">{qty.u ? qty.u : qty}</td>
+                          <td className="preview-qty-cell">{conBateas(label, qty.u ? qty.u : qty)}</td>
                           <td className="preview-check-cell"></td>
                           <td className="preview-check-cell"></td>
                           <td className="preview-check-cell"></td>
@@ -1685,7 +1708,7 @@ export default function App() {
   };
 
   const getTextoChecklist = () => {
-    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q]) => `  • ${l}: ${q.u ? q.u : q}`).join("\n")).join("\n");
+    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q]) => `  • ${l}: ${conBateas(l, q.u ? q.u : q)}`).join("\n")).join("\n");
     const cabecera = [
       nombreEvento ? nombreEvento.toUpperCase() : `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()}`,
       `${pax} pax`,
@@ -2187,6 +2210,10 @@ export default function App() {
                     const editado = overridesManuales[keyId] !== undefined;
                     const renombrado = manualIdx === undefined && nombresManuales[keyId] !== undefined;
                     const esItemManual = manualIdx !== undefined;
+                    // Nº de bateas recalculado siempre en vivo a partir de lo que se esté
+                    // mostrando (aunque la cantidad se edite a mano), no de un texto fijado
+                    const bateaSize = bateaSizeDe(label);
+                    const bateaCount = bateaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / bateaSize) : null;
                     return (
                       <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
                         {editandoNombre === keyId ? (
@@ -2225,6 +2252,9 @@ export default function App() {
                           onFocus={e => e.target.select()}
                           size={Math.max(2, displayQty.length)}
                         />
+                        {bateaCount !== null && (
+                          <span className="item-batea-info" title="Bateas recalculadas automáticamente según la cantidad">{bateaCount} bateas de {bateaSize}</span>
+                        )}
                         <div className="item-actions">
                           <button
                             className={`item-action-btn ${esAlquilerManual ? "item-action-alquiler-activo" : ""}`}

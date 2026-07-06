@@ -1161,6 +1161,15 @@ body {
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
+/* Nº de bateas, recalculado siempre a partir de la cantidad mostrada (no editable
+   directamente: cambia solo si se edita la cantidad de al lado) */
+.item-batea-info {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* Botones ✎ (editar nombre) y ✕ (quitar) de cada item */
 .item-actions {
   display: flex;
