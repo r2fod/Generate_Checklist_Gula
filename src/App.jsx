@@ -340,7 +340,7 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Boda y comunión — fiel a "Checklist de Carga – BODA"
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
+    dobleServicio, formatoCerveza = "Botellín", llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
     tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff = 0,
     llevaChillOut, numChillOut = 1,
@@ -394,7 +394,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
-    ["Cajas de madera para alturas", "—"],
+    ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
@@ -500,7 +500,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
   cats.push({ nombre: "Bebidas frías", items: [
-    ["Cerveza Alhambra (tercios)", String(bebidas.cerveza)],
+    ...(formatoCerveza === "Barril 50L"
+      // El barril sustituye a los tercios: mismo volumen total de cerveza (tercios × 0,33L),
+      // repartido en barriles de 50L, más el tirador para servirla
+      ? [["Barril de cerveza (50L)", String(Math.max(1, Math.ceil((bebidas.cerveza * 0.33) / 50)))], ["Tirador de cerveza", "1"]]
+      : [["Cerveza Alhambra (tercios)", String(bebidas.cerveza)]]),
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
     ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
     ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
@@ -545,7 +549,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Cumpleaños — fiel a "Checklist de Carga – cumpleaños"
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
+    dobleServicio, formatoCerveza = "Botellín", llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -579,6 +583,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesas totales", String(calcMesasServicio(pax).total)],
     ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
     ["Cubos basura (reciclaje + cocina)", "2"],
+    ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
     ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
     ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
@@ -717,6 +722,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
+    ["Cestas de mimbre", "—"],
     ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
     ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
   ]});
@@ -829,7 +835,7 @@ const ETIQUETAS_CAMPO = {
   evento: "Tipo de evento", nombreEvento: "Nombre del evento", fechaEvento: "Fecha",
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
-  dobleServicio: "Doble servicio", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
+  dobleServicio: "Doble servicio", formatoCerveza: "Formato cerveza", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", numStaff: "Nº staff", tipoBandejas: "Bandejas",
@@ -1232,6 +1238,9 @@ export default function App() {
   const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
   const [horasCopas, setHorasCopas]   = useState(estadoInicial.horasCopas ?? 4);
   const [dobleServicio, setDobleServicio]             = useState(estadoInicial.dobleServicio ?? false);
+  // Formato de la cerveza: botellín (tercios) o barril de 50L con tirador — el barril
+  // sustituye a los tercios, no se piden ambos a la vez
+  const [formatoCerveza, setFormatoCerveza] = useState(estadoInicial.formatoCerveza ?? "Botellín");
   const [llevaEntrante, setLlevaEntrante]             = useState(estadoInicial.llevaEntrante ?? false);
   // Entrante compartido en plato (independiente del chupito): cuántas personas
   // comparten cada plato y cuántos entrantes distintos se reparten
@@ -1336,7 +1345,7 @@ export default function App() {
   const getEstadoActual = () => ({
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas,
-    dobleServicio, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
+    dobleServicio, formatoCerveza, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, numCamareros, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
@@ -1382,7 +1391,7 @@ export default function App() {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
-    dobleServicio: setDobleServicio, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
+    dobleServicio: setDobleServicio, formatoCerveza: setFormatoCerveza, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
@@ -1512,13 +1521,26 @@ export default function App() {
     if (nubeActiva()) guardarIndiceEventosNube(obj).catch(() => { /* sin conexión: queda en local */ });
   };
 
-  // Al arrancar (con nube activa) se trae el archivo compartido de eventos guardados
-  // y se queda escuchando cambios de otros dispositivos en tiempo real
+  // Al arrancar (con nube activa) se FUSIONA el archivo local con el de la nube, nunca
+  // se sustituye sin más: si la nube estuviera vacía o incompleta (ej. por un fallo de
+  // permisos) esto evita que tape/borre eventos que sí están guardados en local.
+  // El resultado fusionado se vuelve a guardar en ambos sitios para dejarlos igualados.
+  const eventosGuardadosRef = React.useRef(eventosGuardados);
+  eventosGuardadosRef.current = eventosGuardados;
   useEffect(() => {
     if (!nubeActiva()) return;
     let cancelado = false;
-    cargarIndiceEventosNube().then(mapa => { if (mapa && !cancelado) setEventosGuardados(mapa); }).catch(() => {});
-    const unsub = suscribirIndiceEventosNube(mapa => { if (!cancelado) setEventosGuardados(mapa); });
+    const fusionar = (mapaNube) => {
+      if (!mapaNube || cancelado) return;
+      // Local manda en caso de choque de nombres; nada que solo esté en la nube se pierde
+      const fusion = { ...mapaNube, ...eventosGuardadosRef.current };
+      if (JSON.stringify(fusion) === JSON.stringify(mapaNube) && JSON.stringify(fusion) === JSON.stringify(eventosGuardadosRef.current)) return;
+      setEventosGuardados(fusion);
+      try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(fusion)); } catch (e) { /* localStorage lleno o no disponible */ }
+      guardarIndiceEventosNube(fusion).catch(() => { /* sin conexión: queda en local, se reintentará al guardar algo */ });
+    };
+    cargarIndiceEventosNube().then(fusionar).catch(() => {});
+    const unsub = suscribirIndiceEventosNube(fusionar);
     return () => { cancelado = true; unsub(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1590,7 +1612,7 @@ export default function App() {
   });
 
   const opts = {
-    dobleServicio, llevaPaella, mesVerano, tieneBrindisCava,
+    dobleServicio, formatoCerveza, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -2140,6 +2162,11 @@ export default function App() {
               </div>
             </div>
           </div>
+          {evento !== "produccion" && (
+            <div className="form-row" style={{ marginTop: 12 }}>
+              <SegmentedControl label="Formato cerveza" value={formatoCerveza} onChange={setFormatoCerveza} options={["Botellín", "Barril 50L"]} />
+            </div>
+          )}
           <hr />
           <div className="section-title">Extras</div>
           <div className="checkbox-grid">
