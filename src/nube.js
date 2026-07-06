@@ -62,3 +62,41 @@ export function suscribirEventoNube(id, cb) {
   })();
   return () => { cancelado = true; unsub(); };
 }
+
+// ─── ÍNDICE COMPARTIDO DE "EVENTOS GUARDADOS" ──────────────────────────────────
+// Un único documento fijo con la lista completa { nombre: estado }, para que el
+// archivo de eventos guardados se vea igual desde cualquier dispositivo/navegador
+// en vez de vivir solo en el localStorage de quien los guardó.
+const DOC_INDICE = "indice/eventosGuardados";
+
+export async function guardarIndiceEventosNube(mapa) {
+  const conexion = await getDb();
+  if (!conexion) return;
+  const { db, fs } = conexion;
+  await fs.setDoc(fs.doc(db, DOC_INDICE), { mapa: JSON.stringify(mapa), actualizado: Date.now() });
+}
+
+export async function cargarIndiceEventosNube() {
+  const conexion = await getDb();
+  if (!conexion) return null;
+  const { db, fs } = conexion;
+  const snap = await fs.getDoc(fs.doc(db, DOC_INDICE));
+  return snap.exists() ? JSON.parse(snap.data().mapa) : null;
+}
+
+// Avisa (cb) cada vez que alguien (en cualquier dispositivo) guarda/borra un evento
+export function suscribirIndiceEventosNube(cb) {
+  let unsub = () => {};
+  let cancelado = false;
+  (async () => {
+    const conexion = await getDb();
+    if (!conexion || cancelado) return;
+    const { db, fs } = conexion;
+    unsub = fs.onSnapshot(
+      fs.doc(db, DOC_INDICE),
+      (snap) => { if (snap.exists()) cb(JSON.parse(snap.data().mapa)); },
+      () => { /* sin conexión: se ignora, la app sigue en local */ },
+    );
+  })();
+  return () => { cancelado = true; unsub(); };
+}

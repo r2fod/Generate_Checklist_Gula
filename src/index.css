@@ -945,6 +945,14 @@ body {
   line-height: 1.45;
 }
 
+/* Confirmación de qué se acaba de guardar (plantilla o evento) */
+.guardado-confirm {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--green-qty);
+}
+
 .plantillas-lista {
   display: flex;
   flex-direction: column;

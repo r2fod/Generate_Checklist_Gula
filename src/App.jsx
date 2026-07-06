@@ -1,5 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube } from "./nube.js";
+import {
+  nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
+  guardarIndiceEventosNube, cargarIndiceEventosNube, suscribirIndiceEventosNube,
+} from "./nube.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -1278,6 +1281,10 @@ export default function App() {
   const [compartirMsg, setCompartirMsg] = useState("");
   const [menuCompartir, setMenuCompartir] = useState(false);
   const [agregadosTag, setAgregadosTag] = useState("");
+  // Confirmación temporal de qué se acaba de guardar (plantilla o evento), para que
+  // quede claro cuál de los dos botones se pulsó
+  const [guardadoPlantillaMsg, setGuardadoPlantillaMsg] = useState("");
+  const [guardadoEventoMsg, setGuardadoEventoMsg] = useState("");
   const [itemsManuales, setItemsManuales] = useState(estadoInicial.itemsManuales ?? []); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
@@ -1459,16 +1466,18 @@ export default function App() {
   };
   const handleGuardarPlantilla = () => setDialogo({
     tipo: "prompt",
-    titulo: "Guardar plantilla",
-    mensaje: "Guarda la configuración actual (pax, extras, equipamiento...) para reutilizarla en otro evento.",
+    titulo: "💾 Guardar como PLANTILLA",
+    mensaje: "Guarda solo la configuración reutilizable (pax, extras, equipamiento...), SIN nombre/fecha/ubicación del evento. Útil para reutilizar en futuros eventos parecidos.",
     placeholder: 'Ej: Boda estándar 100 pax',
-    textoConfirmar: "Guardar",
+    textoConfirmar: "Guardar plantilla",
     onConfirm: (nombre) => {
       // La plantilla guarda la configuración reutilizable, no los datos del evento
       // concreto (nombre, fecha, hora, ubicación, equipo de logística), que cambian en cada evento
       const { nombreEvento: _n, fechaEvento: _f, horaInicio: _h, ubicacion: _u,
               logisticaEquipo: _le, eventoNubeId: _id, ...config } = getEstadoActual();
       guardarPlantillas({ ...plantillas, [nombre]: config });
+      setGuardadoPlantillaMsg(`✓ Guardada como PLANTILLA: "${nombre}"`);
+      setTimeout(() => setGuardadoPlantillaMsg(""), 3500);
     },
   });
   const handleAplicarPlantilla = (nombre) => {
@@ -1490,15 +1499,33 @@ export default function App() {
   const guardarEventos = (obj) => {
     setEventosGuardados(obj);
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
+    // Con la nube activa el archivo de eventos guardados se sincroniza: se ve igual
+    // desde cualquier dispositivo, no solo en el navegador donde se guardaron
+    if (nubeActiva()) guardarIndiceEventosNube(obj).catch(() => { /* sin conexión: queda en local */ });
   };
+
+  // Al arrancar (con nube activa) se trae el archivo compartido de eventos guardados
+  // y se queda escuchando cambios de otros dispositivos en tiempo real
+  useEffect(() => {
+    if (!nubeActiva()) return;
+    let cancelado = false;
+    cargarIndiceEventosNube().then(mapa => { if (mapa && !cancelado) setEventosGuardados(mapa); }).catch(() => {});
+    const unsub = suscribirIndiceEventosNube(mapa => { if (!cancelado) setEventosGuardados(mapa); });
+    return () => { cancelado = true; unsub(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const handleGuardarEvento = () => setDialogo({
     tipo: "prompt",
-    titulo: "Guardar evento",
-    mensaje: "Guarda esta checklist completa (con nombre, fecha y logística) para volver a abrirla o compartir su link cuando quieras.",
+    titulo: "💾 Guardar como EVENTO",
+    mensaje: "Guarda esta checklist COMPLETA (con nombre, fecha, ubicación y logística) para volver a abrirla o compartir su link cuando quieras.",
     placeholder: "Ej: Boda Ana y Luis · 15 agosto",
     valorInicial: nombreEvento || "",
-    textoConfirmar: "Guardar",
-    onConfirm: (nombre) => guardarEventos({ ...eventosGuardados, [nombre]: getEstadoActual() }),
+    textoConfirmar: "Guardar evento",
+    onConfirm: (nombre) => {
+      guardarEventos({ ...eventosGuardados, [nombre]: getEstadoActual() });
+      setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
+      setTimeout(() => setGuardadoEventoMsg(""), 3500);
+    },
   });
   const handleCargarEvento = (nombre) => {
     if (!eventosGuardados[nombre]) return;
@@ -1915,8 +1942,9 @@ export default function App() {
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.08s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Plantillas</span>
-            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarPlantilla} title="Guarda la configuración actual (pax, extras, equipamiento...) como plantilla reutilizable">💾 Guardar actual</button>
+            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarPlantilla} title="Guarda solo la configuración (pax, extras, equipamiento...) como plantilla reutilizable, SIN nombre/fecha/ubicación">💾 Guardar actual</button>
           </div>
+          {guardadoPlantillaMsg && <p className="guardado-confirm">{guardadoPlantillaMsg}</p>}
           {Object.keys(plantillas).length === 0 ? (
             <p className="plantillas-vacio">Guarda configuraciones que repites (ej: "Boda estándar 100 pax") y cárgalas con un click en el próximo evento.</p>
           ) : (
@@ -1935,8 +1963,9 @@ export default function App() {
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
-            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist completa para reabrirla o compartir su link">💾 Guardar evento</button>
+            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link">💾 Guardar evento</button>
           </div>
+          {guardadoEventoMsg && <p className="guardado-confirm">{guardadoEventoMsg}</p>}
           {Object.keys(eventosGuardados).length === 0 ? (
             <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
           ) : (
