@@ -73,6 +73,16 @@ const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
 const MARGEN_SEGURIDAD = 1.1;
 const conMargen = (n) => Math.ceil(n * MARGEN_SEGURIDAD);
 
+// Item "opcional": SIEMPRE ocupa su sitio en el array (nunca se quita del todo con un
+// spread condicional), aunque la condición sea falsa — con cantidad null en ese caso.
+// Así el orden natural de la categoría no depende de qué esté activo: si luego alguien
+// edita a mano ese item y la condición deja de cumplirse, sigue en su misma posición en
+// vez de "resucitar" al final de la lista (el render se encarga de ocultarlo salvo que
+// haya una edición manual, ver el useMemo de "checklist").
+function opt(condicion, tupla) {
+  return condicion ? tupla : [tupla[0], null, ...tupla.slice(2)];
+}
+
 const EVENTOS = {
   boda:        { label: "Boda",              icon: "♥" },
   comunion:    { label: "Comunión / Bautizo", icon: "✚" },
@@ -399,25 +409,24 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
-    ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax), true]] : []),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), true]),
     // Los cojines solo hacen falta con sillas de alquiler (Dealde/Carvillo): las
     // propias ya suelen venir con su cojín o no llevarlo
-    ...((origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda" ? [["Cojines para sillas", "—"]] : []),
-    ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
+    opt((origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda", ["Cojines para sillas", "—"]),
+    opt(evtKey === "boda", ["Mesa redonda especial para Tarta", "1"]),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
     ["Guirnaldas de luces", "—"],
     ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
-    ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
+    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
-    ...(tipoNevera !== "No lleva" ? [[tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]] : []),
-    ...(hayCongelador ? [[`Congelador (${tipoCongelador})`, "1"]] : []),
-    ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
-    ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
-
-    ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
-    ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
+    opt(tipoNevera !== "No lleva", [tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]),
+    opt(hayCongelador, [`Congelador (${tipoCongelador})`, "1"]),
+    opt(llevaPalomitera, ["Carrito palomitera", "1"]),
+    opt(llevaChillOut, ["Chill out", String(numChillOut)]),
+    opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
+    opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
   ]});
 
   const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
@@ -448,18 +457,18 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"], ["Aceiteras de cristal", "—"], ["Saleros y pimenteros", "6"],
     ["Ollas (mediana y grande)", "1"], ["Sartenes", "1"], ["Colador", "1"], ["Boles metálicos", "4"],
     ["Cucharones grandes", "3"], ["Pinzas largas", "2"], ["Copas metálicas", "Todas"],
-    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
+    opt(llevaPaella, ["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]),
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
     [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)],
     ["Vasos de cubata",                                   String(cristal.cubata.u)],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
+    opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)],
     ["Copas de cava",                                     String(cristal.cava.u)],
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
-    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
-    ...(llevaJarrasCristal ? [["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]] : []),
+    opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
+    opt(llevaJarrasCristal, ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]),
     // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
     ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores cerveza", "2"], ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
@@ -495,7 +504,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(conMargen(totalPax))],
     ["Cucharas café", String(conMargen(totalPax * 0.8))],
-    ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
   ]});
 
   const personal = calcPersonal(pax, numCamareros, numStaff, 15);
@@ -529,21 +538,22 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Se redondea a cajas de 24 tercios, igual que el cálculo original
   const tercerosRestantes = Math.ceil(litrosRestantes / 0.33 / 24) * 24;
   cats.push({ nombre: "Bebidas frías", items: [
-    ...(litrosBarrilUd > 0 ? [[`Barril de cerveza (${tamanoBarril})`, String(Math.max(1, numBarriles))], ["Tirador de cerveza", "1"]] : []),
-    ...(tercerosRestantes > 0 ? [["Cerveza Alhambra (tercios)", String(tercerosRestantes)]] : []),
+    opt(litrosBarrilUd > 0, [`Barril de cerveza (${tamanoBarril})`, String(Math.max(1, numBarriles))]),
+    opt(litrosBarrilUd > 0, ["Tirador de cerveza", "1"]),
+    opt(tercerosRestantes > 0, ["Cerveza Alhambra (tercios)", String(tercerosRestantes)]),
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
     ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
     ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
+    opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)], ["Aquarius", String(bebidas.aquarius)],
     ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Tónica", conSufijo(bebidas.tonica, "botellas")], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
-    ...(!hayCongelador ? [["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]] : []),
-    ...(hayBarra ? [["Redbull", String(bebidas.redbull)]] : []),
+    opt(!hayCongelador, ["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]),
+    opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
   if (destilados) {
@@ -608,15 +618,15 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas totales", String(calcMesasServicio(pax).total)],
-    ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
-    ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
-    ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
-    ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
-    ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
-    ...(tipoNevera !== "No lleva" ? [[`Nevera (${tipoNevera})`, "1"]] : []),
-    ...(hayCongelador ? [[`Congelador (${tipoCongelador})`, "1"]] : []),
+    opt(llevaPalomitera, ["Carrito palomitera", "1"]),
+    opt(llevaChillOut, ["Chill out", String(numChillOut)]),
+    opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
+    opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
+    opt(tipoNevera !== "No lleva", [`Nevera (${tipoNevera})`, "1"]),
+    opt(hayCongelador, [`Congelador (${tipoCongelador})`, "1"]),
   ]});
 
   const cocinaItems = [
@@ -643,7 +653,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
     ["Caja salsas / Arroces", "1"], ["Boles metálicos / Cucharones", "4"], ["Servilleteros madera", "2"],
     ["Caja cocina (varios)", "1"],
-    ...(llevaPaella ? [["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
+    opt(llevaPaella, ["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]),
   ]});
 
   const usaTela = fuerzaTextilTela;
@@ -676,9 +686,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos cristal", String(cristal.agua.u)],
     ["Copa cava", String(cristal.cava.u)],
     ["Vaso cubata", String(cristal.cubata.u)],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
-    ...(cristal.chupito ? [["Vasos chupito cristal (entrante)", String(cristal.chupito.u)]] : []),
-    ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
+    opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
+    opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
     // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Abridores", "2"],
     ["Pinzas", "2"], ["Copas metálicas y conchas", "—"],
@@ -693,9 +703,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Aquarius", String(bebidas.aquarius)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
     ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
+    opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
-    ...(!hayCongelador ? [["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]] : []),
+    opt(!hayCongelador, ["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]),
   ]});
 
   if (destilados) {
@@ -761,13 +771,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
-    ...(origenSillas !== "No llevan" ? [[labelSillas, String(totalPax)]] : []),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
-    ...(llevaPalomitera ? [["Carrito palomitera", "1"]] : []),
-    ...(llevaChillOut ? [["Chill out", String(numChillOut)]] : []),
+    opt(llevaPalomitera, ["Carrito palomitera", "1"]),
+    opt(llevaChillOut, ["Chill out", String(numChillOut)]),
   ]});
 
   cats.push({ nombre: "Cocina y sala", items: [
@@ -778,16 +788,17 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vitro", "1"], ["Butano", "1"], ["Trípode", String(1 + numFritura)], ["Termos con tapa", "—"],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
     ["Neveras playa pequeñas", "2"], ["Chafers", String(Math.max(2, Math.ceil(pax / 40)))],
-    ...(llevaArmarioCaliente ? [["Armario caliente (alquiler Dealde)", "1", true]] : []),
+    opt(llevaArmarioCaliente, ["Armario caliente (alquiler Dealde)", "1", true]),
   ]});
 
   cats.push({ nombre: "Menaje y Utensilios", items: [
     ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
-    ...(llevaPaella ? [[`Paella ${calcPaella(pax, tipoPaella).talla} / Paletas`, String(calcPaella(pax, tipoPaella).n)]] : []),
+    opt(llevaPaella, [`Paella ${calcPaella(pax, tipoPaella).talla} / Paletas`, String(calcPaella(pax, tipoPaella).n)]),
     ["Paravientos", "—"], ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
     ["Servilleteros madera", "2"], ["Gastros", "—"], ["Caja cocina (varios)", "1"],
     ["Aceiteras de cristal", "—"], ["Saleros y pimenteros", "6"], ["Caja salsas / Arroces", "1"],
-    ...(tieneFrituras ? [["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)]] : []),
+    opt(tieneFrituras, ["Sartén Parisiene (frituras)", String(numFritura)]),
+    opt(tieneFrituras, ["Difusor pequeño (frituras)", String(numFritura)]),
   ]});
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
@@ -815,9 +826,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cucharas postre", String(conMargen(totalPax))],
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))], ["Abridores", "2"],
     ["Champanera metálica / Cubiteras + pinza", "2"], ["Pinzas madera y metálicas", "2"],
-    ...(bandejasMadera > 0 ? [["Bandejas de madera", String(bandejasMadera)]] : []),
-    ...(bandejasPl > 0     ? [["Bandejas de plata",  String(bandejasPl)]]     : []),
-    ...(entranteCompartido ? [[`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]] : []),
+    opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
+    opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
+    opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
   ]});
 
   cats.push({ nombre: "Desechables y Bebidas", items: [
@@ -831,7 +842,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", conSufijo(1, "caja")],
     ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", conSufijo(1, "bote")], ["Leche condensada", conSufijo(1, "lata")],
     ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
-    ...(hayBarra ? [["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]] : []),
+    opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
     // en cada bebida por separado en vez de en dos líneas combinadas
     ["Coca-Cola normal", String(Math.round(totalPax * 0.94))], ["Coca-Cola Zero", String(Math.round(totalPax * 0.56))],
@@ -839,7 +850,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Aquarius", String(Math.round(totalPax * 0.24))], ["Sprite", String(Math.round(totalPax * 0.12))],
     ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(totalPax * 0.8), "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
-    ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")]] : []),
+    opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")]),
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
   ]});
@@ -1955,6 +1966,7 @@ export default function App() {
     baseChecklist.forEach(cat => {
       const nombreCat = categoriasRenombradas[cat.nombre] ?? cat.nombre;
       cat.items.forEach(([label, qty]) => {
+        if (qty === null) return; // item "opcional" no activo ahora mismo: nada que comparar
         const esObjetoConSufijo = qty && typeof qty === "object";
         mapa[`${nombreCat}::${label}`] = String(esObjetoConSufijo ? qty.u : qty);
       });
@@ -1988,6 +2000,12 @@ export default function App() {
     cats.forEach(cat => {
       cat.items = cat.items
         .filter(([label]) => !itemsOcultos[`${cat.nombre}::${label}`])
+        // Los items "opcionales" (ver opt() en los builders) SIEMPRE ocupan su sitio en
+        // el array, con cantidad null si su condición no se cumple ahora mismo — así el
+        // orden nunca depende de qué esté activo. Se ocultan aquí salvo que haya una
+        // edición manual fijada, en cuyo caso se mantienen EN SU MISMA POSICIÓN natural
+        // en vez de "resucitar" al final de la categoría como pasaba antes.
+        .filter(([label, qty]) => qty !== null || overridesManuales[`${cat.nombre}::${label}`] !== undefined)
         .map(([label, qty, idx]) => {
           const key = `${cat.nombre}::${label}`;
           // qty puede venir como { u, sufijo } (conSufijo): se separa el número editable
@@ -1998,25 +2016,6 @@ export default function App() {
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
           return [nombresManuales[key] ?? label, cantidad, idx, label, !!itemsAlquilerManual[key], sufijo];
         });
-    });
-    // Reinserta items condicionales editados a mano que la fórmula actual ya no genera.
-    // Muchos items solo se calculan "si hace falta" (ej. "Cerveza Alhambra (tercios)"
-    // solo aparece si sobra demanda tras el barril, "Congelador" solo si se eligió uno...).
-    // Si el usuario fijó una cantidad a mano para uno de esos items y luego la condición
-    // deja de cumplirse (cambia el nº de barriles, se quita el congelador...), el item
-    // desaparecía sin más y la edición manual quedaba huérfana e invisible, aunque seguía
-    // guardada. Se le devuelve su fila (con el valor editado) mientras exista la edición.
-    const clavesExistentes = new Set();
-    cats.forEach(cat => cat.items.forEach(item => clavesExistentes.add(`${cat.nombre}::${item[3] ?? item[0]}`)));
-    Object.keys(overridesManuales).forEach(key => {
-      if (clavesExistentes.has(key) || itemsOcultos[key]) return;
-      const idx = key.indexOf("::");
-      if (idx === -1) return;
-      const catNombre = key.slice(0, idx);
-      const label = key.slice(idx + 2);
-      const destino = cats.find(c => c.nombre === catNombre);
-      if (!destino) return; // la categoría no existe en este tipo de evento
-      destino.items.push([nombresManuales[key] ?? label, overridesManuales[key], undefined, label, !!itemsAlquilerManual[key], undefined]);
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
     return cats.filter(c => c.items.length > 0);
