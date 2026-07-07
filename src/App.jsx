@@ -523,7 +523,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Tónica", conSufijo(bebidas.tonica, "botellas")], ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
-    ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
+    ...(!hayCongelador ? [["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]] : []),
     ...(hayBarra ? [["Redbull", String(bebidas.redbull)]] : []),
   ]});
 
@@ -676,7 +676,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
     ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
-    ["Hielo", hayCongelador ? "No hace falta (se lleva congelador)" : `${bebidas.taxisHielo} taxis`],
+    ...(!hayCongelador ? [["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]] : []),
   ]});
 
   cats.push({ nombre: "Limpieza", items: [
