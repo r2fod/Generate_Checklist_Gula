@@ -581,6 +581,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const hayCongelador = tipoCongelador !== "No lleva";
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
+  const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
@@ -684,9 +685,25 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     ...(llevaAguasPequenas ? [["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]] : []),
     ["Agua con gas", String(bebidas.aguaConGas)],
-    ...(hayBarra ? [["Alcohol (barra libre)", "Ver Alcoholes"]] : []),
     ...(!hayCongelador ? [["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]] : []),
   ]});
+
+  if (destilados) {
+    cats.push({ nombre: "Alcoholes y licores", items: [
+      ["Ginebra (Seagrams/Tanqueray)", String(destilados.ginebraPremium)],
+      ["Ginebra de sabor (Puerto de Indias)", String(destilados.ginebraSabor)],
+      ["Ron (Bacardí)", String(destilados.ron)], ["Ron saborizado (Negrita)", String(destilados.ronBlanco)],
+      ["Tequila", String(destilados.tequila)], ["Tequila Rosa", String(destilados.tequilaSabor)],
+      ["Vodka", String(destilados.vodka)],
+      ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
+      ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
+      ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
+      ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
+      ["Orujo de hierbas", String(destilados.orujoHierbas)],
+      ["Ballantines", String(destilados.ballantines)], ["Barceló", String(destilados.barcelo)],
+      ["Otros licores marca blanca (Smirnoff)", String(destilados.marcaBlanca)],
+    ]});
+  }
 
   cats.push({ nombre: "Limpieza", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", conSufijo(2, "rollo")],
