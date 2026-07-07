@@ -231,17 +231,25 @@ function calcDestilados(pax, h) {
   };
 }
 
-function calcCristaleria(pax, h, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
+function calcCristaleria(pax, horasCoctel, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
   // Vasos de cubata calibrados con el estándar del sector: ~4 vasos/pax para una
   // barra de 4h (los alquileres recomiendan 3-4/pax porque los camareros friegan
   // y reutilizan durante el servicio), escalando con las horas y con techo en 6.
-  const copasBarraPorPax = h > 0 ? Math.min(6, 1 + h * 0.75) : 0;
+  // Solo depende de las horas de COPAS: el cóctel/aperitivo no sirve cubatas.
+  const copasBarraPorPax = horasCopas > 0 ? Math.min(6, 1 + horasCopas * 0.75) : 0;
   const mult = dobleCopa ? 2 : 1;
+  // Copas de vino/agua/cava: cuantas más horas de barra libre (cóctel + copas
+  // sumadas), más rondas y más roturas/pérdidas hay que cubrir — igual que otros
+  // caterings calculan la cristalería sobre el total de horas de servicio, no
+  // sobre el pax en seco. Se calibra con 4h de barra total = factor 1 (mismos
+  // ratios de antes), con suelo en eventos breves y techo en eventos muy largos.
+  const horasBarraTotal = horasCoctel + horasCopas;
+  const barFactor = Math.min(1.75, Math.max(0.65, horasBarraTotal / 4));
   // Margen de seguridad del 10% para cubrir roturas/pérdidas de cristalería durante el servicio
-  const vino = conMargen(pax * 2.5 * mult);
-  const agua = conMargen(pax * 1.5 * mult) + extraAguaDesayuno;
+  const vino = conMargen(pax * 2.5 * barFactor * mult);
+  const agua = conMargen(pax * 1.5 * barFactor * mult) + extraAguaDesayuno;
   const cubata = conMargen(pax * copasBarraPorPax);
-  const cavaCopas = conMargen(pax * (tieneBrindisCava ? 2.0 : 1.0));
+  const cavaCopas = conMargen(pax * (tieneBrindisCava ? 2.0 : 1.0) * barFactor);
   const fmt = (u, size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
   return {
     agua: fmt(agua, BATEA.agua), cubata: fmt(cubata, BATEA.cubata),
@@ -365,9 +373,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
-  // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito no dependen de esto,
-  // se calculan igual para el servicio de mesa.
-  const cristal    = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito sí escalan con el total
+  // de horas de barra libre (cóctel + copas), igual que otros caterings.
+  const cristal    = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -574,7 +582,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
-  const cristal = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
   const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
