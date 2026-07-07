@@ -1916,6 +1916,25 @@ export default function App() {
           return [nombresManuales[key] ?? label, cantidad, idx, label, !!itemsAlquilerManual[key], sufijo];
         });
     });
+    // Reinserta items condicionales editados a mano que la fórmula actual ya no genera.
+    // Muchos items solo se calculan "si hace falta" (ej. "Cerveza Alhambra (tercios)"
+    // solo aparece si sobra demanda tras el barril, "Congelador" solo si se eligió uno...).
+    // Si el usuario fijó una cantidad a mano para uno de esos items y luego la condición
+    // deja de cumplirse (cambia el nº de barriles, se quita el congelador...), el item
+    // desaparecía sin más y la edición manual quedaba huérfana e invisible, aunque seguía
+    // guardada. Se le devuelve su fila (con el valor editado) mientras exista la edición.
+    const clavesExistentes = new Set();
+    cats.forEach(cat => cat.items.forEach(item => clavesExistentes.add(`${cat.nombre}::${item[3] ?? item[0]}`)));
+    Object.keys(overridesManuales).forEach(key => {
+      if (clavesExistentes.has(key) || itemsOcultos[key]) return;
+      const idx = key.indexOf("::");
+      if (idx === -1) return;
+      const catNombre = key.slice(0, idx);
+      const label = key.slice(idx + 2);
+      const destino = cats.find(c => c.nombre === catNombre);
+      if (!destino) return; // la categoría no existe en este tipo de evento
+      destino.items.push([nombresManuales[key] ?? label, overridesManuales[key], undefined, label, !!itemsAlquilerManual[key], undefined]);
+    });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
     return cats.filter(c => c.items.length > 0);
   }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual]);
