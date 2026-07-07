@@ -1367,7 +1367,11 @@ hr {
     border-radius: var(--radius-md);
   }
 
-  .form-row, .checkbox-grid {
+  /* El selector .config-sidebar .form-row (arriba, para el layout de 2 columnas en
+     escritorio) tiene más especificidad que ".form-row" a secas: sin repetirlo aquí,
+     esa regla de escritorio "ganaba" incluso dentro de este breakpoint móvil y dejaba
+     controles complejos (segmented control, checkboxes) apretados a media columna. */
+  .form-row, .checkbox-grid, .config-sidebar .form-row {
     grid-template-columns: 1fr;
     gap: 12px;
   }
@@ -1389,13 +1393,28 @@ hr {
     min-height: 40px;
   }
 
+  /* Grid de 2 columnas en vez de flex-wrap: con 3 o 4 botones de cabecera
+     (Nuevo evento / Vista previa / Modo carga / Compartir) un flex-wrap con
+     flex:1 los reparte de forma desigual entre filas (ej. 3+1, el último
+     estirado a todo el ancho). El grid los deja siempre en parejas iguales. */
   .header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
     width: 100%;
-    justify-content: space-between;
+  }
+
+  .header-actions > .btn,
+  .header-actions > .compartir-menu-wrap {
+    width: 100%;
+  }
+
+  .compartir-menu-wrap > .btn {
+    width: 100%;
   }
 
   .btn {
-    flex: 1;
+    flex: none;
     text-align: center;
     padding: 11px 10px;
     min-height: 44px;
