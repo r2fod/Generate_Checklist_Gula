@@ -884,7 +884,7 @@ const ETIQUETAS_CAMPO = {
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
-  itemsAlquilerManual: "Items marcados como alquiler proveedor",
+  itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
 };
 
 // Compara el estado anterior y el recibido y devuelve frases cortas ("Pax adultos: 65 → 88")
@@ -1098,6 +1098,54 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
             <strong>Notas</strong>
             {meta.notasEvento && <p style={{ whiteSpace: "pre-wrap", margin: "6px 0 0", fontSize: "0.88rem" }}>{meta.notasEvento}</p>}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODO CARGA (check interactivo, sincronizado por el link del evento) ──────
+// Pantalla simple pensada para el móvil mientras se carga el camión: solo nombre +
+// cantidad + una casilla grande, sin controles de edición. El check se guarda en el
+// mismo estado del evento que ya se sincroniza en tiempo real (eventoNubeId), así que
+// si varias personas abren el link a la vez ven los checks de las demás al momento.
+function ModalModoCarga({ checklist, checkeados, onToggle, onClose, meta = {} }) {
+  const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
+  const totalChecados = checklist.reduce((acc, c) => acc + c.items.filter(([, , , labelOriginal]) => checkeados[`${c.nombre}::${labelOriginal}`]).length, 0);
+  const pct = totalItems > 0 ? Math.round((totalChecados / totalItems) * 100) : 0;
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <div className="preview-header-title">📦 Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
+            <div className="preview-header-subtitle">{totalChecados} de {totalItems} cargados</div>
+            <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
+          </div>
+          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar">✕</button>
+        </div>
+        <div className="preview-body">
+          {checklist.map(cat => (
+            <div className="preview-category" key={cat.nombre}>
+              <div className="preview-category-header">
+                <span>{iconoCategoria(cat.nombre)}</span>
+                <span>{cat.nombre}</span>
+              </div>
+              <div className="carga-lista">
+                {cat.items.map(([label, qty, , labelOriginal, , sufijo], i) => {
+                  const key = `${cat.nombre}::${labelOriginal}`;
+                  const marcado = !!checkeados[key];
+                  return (
+                    <label className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
+                      <input type="checkbox" checked={marcado} onChange={() => onToggle(key)} />
+                      <span className="carga-nombre">{label}</span>
+                      <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -1342,6 +1390,8 @@ export default function App() {
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
+  const [checkeados, setCheckeados] = useState(estadoInicial.checkeados ?? {}); // { "categoria::label": true } — marcados como cargados en "Modo carga"
+  const [modoCarga, setModoCarga] = useState(false);
   // Items marcados a mano como "alquiler proveedor", para los que no llevan Dealde/Carvillo/
   // Novelda/alquiler en el nombre y por tanto no se detectan solos (ej. algo puntual que no
   // está incluido y hay que alquilar aparte)
@@ -1391,7 +1441,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual,
+    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados,
     logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -1442,7 +1492,7 @@ export default function App() {
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
-    itemsAlquilerManual: setItemsAlquilerManual,
+    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados,
     eventoNubeId: setEventoNubeId,
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
@@ -1728,7 +1778,16 @@ export default function App() {
       else next[key] = valor;
       return next;
     });
+    // Si la cantidad cambia, el check de "Modo carga" (si estaba marcado) deja de ser
+    // fiable — se desmarca para que se revise de nuevo antes de darlo por cargado
+    setCheckeados(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
+  const handleToggleCheckCarga = (key) => setCheckeados(prev => ({ ...prev, [key]: !prev[key] }));
 
   // Quita de la lista un item calculado (los manuales se borran de itemsManuales)
   const handleOcultarItem = (categoria, labelOriginal) => {
@@ -1952,6 +2011,7 @@ export default function App() {
   return (
     <>
       {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta }} onClose={() => setModalPrevia(false)} />}
+      {modoCarga && <ModalModoCarga checklist={checklist} checkeados={checkeados} onToggle={handleToggleCheckCarga} meta={{ nombreEvento }} onClose={() => setModoCarga(false)} />}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
 
@@ -1973,6 +2033,7 @@ export default function App() {
           <div className="header-actions">
             <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
             <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
+            <button className="btn btn-outline" onClick={() => setModoCarga(true)}>📦 Modo carga</button>
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
               {menuCompartir && (

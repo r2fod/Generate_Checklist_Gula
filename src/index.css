@@ -1685,6 +1685,94 @@ hr {
   color: var(--text-label);
 }
 
+/* ─── Modo carga ─────────────────────────────────────────────────────── */
+.carga-progreso {
+  margin-top: 8px;
+  width: 220px;
+  max-width: 60vw;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-color);
+  overflow: hidden;
+}
+
+.carga-progreso-fill {
+  height: 100%;
+  background: var(--green-btn);
+  border-radius: 999px;
+  transition: width 0.25s ease-out;
+}
+
+.carga-lista {
+  display: flex;
+  flex-direction: column;
+}
+
+.carga-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.carga-row:last-child {
+  border-bottom: none;
+}
+
+.carga-row:hover {
+  background-color: var(--bg-color);
+}
+
+.carga-row input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  accent-color: var(--green-btn);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.carga-nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+
+.carga-cantidad {
+  font-weight: 700;
+  color: var(--green-qty);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.carga-row.is-marcado {
+  background-color: rgba(34, 197, 94, 0.06);
+}
+
+.carga-row.is-marcado .carga-nombre,
+.carga-row.is-marcado .carga-cantidad {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .carga-row {
+    padding: 15px 14px;
+    min-height: 44px;
+  }
+
+  .carga-row input[type="checkbox"] {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+  }
+}
+
 @media (max-width: 768px) {
   .preview-body {
     padding: 16px 14px 22px;
