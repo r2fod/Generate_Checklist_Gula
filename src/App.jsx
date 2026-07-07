@@ -512,10 +512,16 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // vez de sustituirlos del todo: puede haber tercios + barril (el barril cubre parte
   // y el resto se completa con botellín), solo barril (si cubre todo lo necesario) o
   // solo tercios (si no se lleva barril) — nunca se piden de más ni de menos.
+  // El litraje nominal del barril NO es todo aprovechable: purgado del grifo/línea al
+  // conectar, espuma y los restos que quedan sin servir al final suponen ~10-15% de
+  // merma real en barra (estándar del sector para barriles de cerveza de barril). Se
+  // calcula con un 85% de rendimiento útil para no quedarnos cortos de tercios de
+  // repuesto si el barril rinde menos de lo nominal.
+  const RENDIMIENTO_BARRIL = 0.85;
   const litrosBarrilUd = tamanoBarril === "30L" ? 30 : tamanoBarril === "50L" ? 50 : 0;
-  const litrosBarrilTotal = litrosBarrilUd * Math.max(1, numBarriles);
+  const litrosBarrilUtil = litrosBarrilUd * Math.max(1, numBarriles) * RENDIMIENTO_BARRIL;
   const litrosCervezaNecesarios = bebidas.cerveza * 0.33;
-  const litrosRestantes = Math.max(0, litrosCervezaNecesarios - litrosBarrilTotal);
+  const litrosRestantes = Math.max(0, litrosCervezaNecesarios - litrosBarrilUtil);
   // Se redondea a cajas de 24 tercios, igual que el cálculo original
   const tercerosRestantes = Math.ceil(litrosRestantes / 0.33 / 24) * 24;
   cats.push({ nombre: "Bebidas frías", items: [
