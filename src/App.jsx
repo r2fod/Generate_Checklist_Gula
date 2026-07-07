@@ -1739,6 +1739,11 @@ export default function App() {
   };
 
   const handleGenerarLink = () => {
+    // Si no se ha puesto nombre de evento todavía, se usa el tipo + pax como
+    // identificador de respaldo (ej. "Boda 80 pax") — así el link nunca sale pelado
+    // y se puede distinguir de otros al pegarlo en WhatsApp, aunque no le hayas
+    // puesto nombre aún.
+    const etiquetaLink = nombreEvento || `${EVENTOS[evento]?.label} ${pax} pax`;
     if (nubeActiva()) {
       // Link corto con edición compartida: la checklist vive en la nube y los
       // cambios de cualquiera con el link se sincronizan
@@ -1747,10 +1752,10 @@ export default function App() {
       const estado = { ...getEstadoActual(), eventoNubeId: id };
       ultimoGuardadoNubeRef.current = JSON.stringify(estado);
       guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, nombreEvento);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, etiquetaLink);
     } else {
       // Sin nube: el link lleva la checklist dentro (solo lectura/copia local)
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`, nombreEvento);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`, etiquetaLink);
     }
     setMenuCompartir(false);
   };
