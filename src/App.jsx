@@ -1028,10 +1028,24 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
 // ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
 // Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
 // campo de texto para escribir un valor que no esté en la lista (ej. un estilo de
-// plato puntual que no se pide siempre). El valor guardado, si es distinto de los
-// fijos, se muestra igualmente seleccionado en el desplegable la próxima vez.
+// plato puntual que no se pide siempre). Los valores nuevos que se escriben se
+// guardan en este navegador (localStorage, independiente del evento) para que la
+// próxima vez ya aparezcan como una opción más de la lista, en cualquier evento.
+function leerExtrasGuardados(clave) {
+  try { return JSON.parse(localStorage.getItem(`gula_opciones_extra::${clave}`) || "[]"); }
+  catch (e) { return []; }
+}
+function guardarExtra(clave, valor) {
+  if (!valor || !valor.trim()) return;
+  try {
+    const actuales = leerExtrasGuardados(clave);
+    if (!actuales.includes(valor)) localStorage.setItem(`gula_opciones_extra::${clave}`, JSON.stringify([...actuales, valor]));
+  } catch (e) { /* localStorage no disponible */ }
+}
 function SelectConOtro({ label, value, onChange, options }) {
-  const esPersonalizado = value && !options.includes(value);
+  const [extras] = useState(() => leerExtrasGuardados(label));
+  const opcionesCompletas = [...options, ...extras.filter(e => !options.includes(e))];
+  const esPersonalizado = value && !opcionesCompletas.includes(value);
   const [modoOtro, setModoOtro] = useState(false);
   const [texto, setTexto] = useState(esPersonalizado ? value : "");
   if (modoOtro || esPersonalizado) {
@@ -1046,7 +1060,8 @@ function SelectConOtro({ label, value, onChange, options }) {
             placeholder="Ej: Relieve grande"
             value={modoOtro ? texto : value}
             onChange={e => { setTexto(e.target.value); onChange(e.target.value); }}
-            onBlur={() => { if (!texto.trim()) setModoOtro(false); }}
+            onBlur={() => { if (!texto.trim()) setModoOtro(false); else guardarExtra(label, texto); }}
+            onKeyDown={e => { if (e.key === "Enter") { guardarExtra(label, e.target.value); e.target.blur(); } }}
           />
           <button
             type="button"
@@ -1066,7 +1081,7 @@ function SelectConOtro({ label, value, onChange, options }) {
         value={value}
         onChange={e => { if (e.target.value === "__otro__") { setModoOtro(true); setTexto(""); } else onChange(e.target.value); }}
       >
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        {opcionesCompletas.map(o => <option key={o} value={o}>{o}</option>)}
         <option value="__otro__">+ Otro...</option>
       </select>
     </div>
