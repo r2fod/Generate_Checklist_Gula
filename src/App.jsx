@@ -885,6 +885,7 @@ const ETIQUETAS_CAMPO = {
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
   itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
+  vueltos: "Items marcados como vueltos", roturas: "Roturas contadas",
 };
 
 // Compara el estado anterior y el recibido y devuelve frases cortas ("Pax adultos: 65 → 88")
@@ -950,21 +951,30 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   const fechaEventoFmt = meta.fechaEvento ? new Date(meta.fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const checkeados = meta.checkeados || {};
+  const vueltos = meta.vueltos || {};
+  const roturas = meta.roturas || {};
   const cols = ["Concepto", "Cant.", "Sale ✓", "Vuelve ✓", "Roturas"];
-  const tablaHTML = (items) => `
+  const tablaHTML = (items, catNombre) => `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
       <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
-      <tbody>${items.map(([label, qty, , , esAlquilerManual, sufijo], i) => {
+      <tbody>${items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo], i) => {
         const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+        const key = `${catNombre}::${labelOriginal ?? label}`;
+        const sale = checkeados[key] ? "✓" : "";
+        const vuelve = vueltos[key] ? "✓" : "";
+        const rot = roturas[key] || "";
         return `<tr style="background:${alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#f9fafb"};">
           <td style="padding:5px 6px;">${label}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
           <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
-          <td style="width:60px;"></td><td style="width:60px;"></td><td style="width:60px;"></td>
+          <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${sale}</td>
+          <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${vuelve}</td>
+          <td style="width:60px;text-align:center;font-weight:bold;color:#dc2626;">${rot}</td>
         </tr>`;
       }).join("")}</tbody>
     </table>`;
   const secciones = checklist.map(cat => `
-    <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${cat.nombre}</h3>${tablaHTML(cat.items)}`).join("");
+    <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${cat.nombre}</h3>${tablaHTML(cat.items, cat.nombre)}`).join("");
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Checklist ${EVENTOS[evtKey]?.label} · ${pax} pax</title>
     <style>body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#222;}h1{color:#1f314d;font-size:18pt;}
@@ -1074,8 +1084,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                     </tr>
                   </thead>
                   <tbody>
-                    {cat.items.map(([label, qty, , , esAlquilerManual, sufijo], i) => {
+                    {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo], i) => {
                       const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+                      const key = `${cat.nombre}::${labelOriginal ?? label}`;
                       return (
                         <tr key={i} className={alq ? "is-rental" : ""}>
                           <td>
@@ -1083,9 +1094,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                             {alq && <span className="preview-rental-badge">ALQUILER</span>}
                           </td>
                           <td className="preview-qty-cell">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
-                          <td className="preview-check-cell"></td>
-                          <td className="preview-check-cell"></td>
-                          <td className="preview-check-cell"></td>
+                          <td className="preview-check-cell">{(meta.checkeados || {})[key] ? "✓" : ""}</td>
+                          <td className="preview-check-cell">{(meta.vueltos || {})[key] ? "✓" : ""}</td>
+                          <td className="preview-check-cell">{(meta.roturas || {})[key] || ""}</td>
                         </tr>
                       );
                     })}
@@ -1105,24 +1116,38 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 }
 
 // ─── MODO CARGA (check interactivo, sincronizado por el link del evento) ──────
-// Pantalla simple pensada para el móvil mientras se carga el camión: solo nombre +
-// cantidad + una casilla grande, sin controles de edición. El check se guarda en el
-// mismo estado del evento que ya se sincroniza en tiempo real (eventoNubeId), así que
-// si varias personas abren el link a la vez ven los checks de las demás al momento.
-function ModalModoCarga({ checklist, checkeados, onToggle, onClose, meta = {} }) {
+// Pantalla simple pensada para el móvil mientras se carga/descarga el camión. Dos
+// modos: "Salida" (marcar lo que sale, antes del evento) y "Vuelta" (marcar lo que
+// vuelve + contar roturas/pérdidas, al recoger). Todo se guarda en el mismo estado
+// del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
+// abren el link a la vez ven los checks de las demás al momento, y queda guardado en
+// la nube para poder consultarlo o exportarlo cuando haga falta.
+function ModalModoCarga({ checklist, checkeados, vueltos, roturas, onToggleSale, onToggleVuelve, onRoturas, onClose, meta = {} }) {
+  const [modo, setModo] = useState("salida"); // salida | vuelta
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
-  const totalChecados = checklist.reduce((acc, c) => acc + c.items.filter(([, , , labelOriginal]) => checkeados[`${c.nombre}::${labelOriginal}`]).length, 0);
-  const pct = totalItems > 0 ? Math.round((totalChecados / totalItems) * 100) : 0;
+  const marcadosMapa = modo === "salida" ? checkeados : vueltos;
+  const totalMarcados = checklist.reduce((acc, c) => acc + c.items.filter(([, , , labelOriginal]) => marcadosMapa[`${c.nombre}::${labelOriginal}`]).length, 0);
+  const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
+  const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
   return (
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header">
           <div>
             <div className="preview-header-title">📦 Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
-            <div className="preview-header-subtitle">{totalChecados} de {totalItems} cargados</div>
+            <div className="preview-header-subtitle">
+              {totalMarcados} de {totalItems} {modo === "salida" ? "cargados" : "vueltos"}
+              {totalRoturas > 0 ? ` · ${totalRoturas} roturas` : ""}
+            </div>
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar">✕</button>
+        </div>
+        <div className="carga-modo-toggle">
+          <div className="segmented-control">
+            <button className={`segment-btn ${modo === "salida" ? "active" : ""}`} onClick={() => setModo("salida")}>🚚 Salida</button>
+            <button className={`segment-btn ${modo === "vuelta" ? "active" : ""}`} onClick={() => setModo("vuelta")}>↩️ Vuelta</button>
+          </div>
         </div>
         <div className="preview-body">
           {checklist.map(cat => (
@@ -1134,13 +1159,33 @@ function ModalModoCarga({ checklist, checkeados, onToggle, onClose, meta = {} })
               <div className="carga-lista">
                 {cat.items.map(([label, qty, , labelOriginal, , sufijo], i) => {
                   const key = `${cat.nombre}::${labelOriginal}`;
-                  const marcado = !!checkeados[key];
+                  const marcado = modo === "salida" ? !!checkeados[key] : !!vueltos[key];
                   return (
-                    <label className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
-                      <input type="checkbox" checked={marcado} onChange={() => onToggle(key)} />
-                      <span className="carga-nombre">{label}</span>
-                      <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
-                    </label>
+                    <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
+                      <label className="carga-row-principal">
+                        <input
+                          type="checkbox"
+                          checked={marcado}
+                          onChange={() => (modo === "salida" ? onToggleSale(key) : onToggleVuelve(key))}
+                        />
+                        <span className="carga-nombre">{label}</span>
+                        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+                      </label>
+                      {modo === "vuelta" && (
+                        <div className="carga-roturas">
+                          <span>💥 roturas</span>
+                          <input
+                            type="number"
+                            min="0"
+                            className="carga-roturas-input"
+                            value={roturas[key] || ""}
+                            placeholder="0"
+                            onChange={e => onRoturas(key, e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                          />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -1390,7 +1435,9 @@ export default function App() {
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
-  const [checkeados, setCheckeados] = useState(estadoInicial.checkeados ?? {}); // { "categoria::label": true } — marcados como cargados en "Modo carga"
+  const [checkeados, setCheckeados] = useState(estadoInicial.checkeados ?? {}); // { "categoria::label": true } — marcados como "Sale" (cargado) en "Modo carga"
+  const [vueltos, setVueltos] = useState(estadoInicial.vueltos ?? {}); // { "categoria::label": true } — marcados como "Vuelve" (devuelto tras el evento)
+  const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [modoCarga, setModoCarga] = useState(false);
   // Items marcados a mano como "alquiler proveedor", para los que no llevan Dealde/Carvillo/
   // Novelda/alquiler en el nombre y por tanto no se detectan solos (ej. algo puntual que no
@@ -1441,7 +1488,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados,
+    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas,
     logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -1492,7 +1539,7 @@ export default function App() {
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
-    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados,
+    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas,
     eventoNubeId: setEventoNubeId,
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
@@ -1778,9 +1825,16 @@ export default function App() {
       else next[key] = valor;
       return next;
     });
-    // Si la cantidad cambia, el check de "Modo carga" (si estaba marcado) deja de ser
-    // fiable — se desmarca para que se revise de nuevo antes de darlo por cargado
+    // Si la cantidad cambia, el check de "Modo carga" (Sale/Vuelve, si estaba marcado)
+    // deja de ser fiable — se desmarca para que se revise de nuevo. Las roturas no se
+    // tocan: son un hecho ya ocurrido, no dependen de la cantidad pedida.
     setCheckeados(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setVueltos(prev => {
       if (!prev[key]) return prev;
       const next = { ...prev };
       delete next[key];
@@ -1788,6 +1842,13 @@ export default function App() {
     });
   };
   const handleToggleCheckCarga = (key) => setCheckeados(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleToggleVuelveCarga = (key) => setVueltos(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleRoturasCarga = (key, valor) => setRoturas(prev => {
+    const next = { ...prev };
+    if (!valor || valor === "0") delete next[key];
+    else next[key] = valor;
+    return next;
+  });
 
   // Quita de la lista un item calculado (los manuales se borran de itemsManuales)
   const handleOcultarItem = (categoria, labelOriginal) => {
@@ -1938,7 +1999,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, checkeados, vueltos, roturas });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -1968,7 +2029,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, checkeados, vueltos, roturas });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -2010,8 +2071,20 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta }} onClose={() => setModalPrevia(false)} />}
-      {modoCarga && <ModalModoCarga checklist={checklist} checkeados={checkeados} onToggle={handleToggleCheckCarga} meta={{ nombreEvento }} onClose={() => setModoCarga(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
+      {modoCarga && (
+        <ModalModoCarga
+          checklist={checklist}
+          checkeados={checkeados}
+          vueltos={vueltos}
+          roturas={roturas}
+          onToggleSale={handleToggleCheckCarga}
+          onToggleVuelve={handleToggleVuelveCarga}
+          onRoturas={handleRoturasCarga}
+          meta={{ nombreEvento }}
+          onClose={() => setModoCarga(false)}
+        />
+      )}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
 
