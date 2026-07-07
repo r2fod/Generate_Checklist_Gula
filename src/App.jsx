@@ -394,6 +394,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...(evtKey === "boda" ? [["Mesa redonda especial para Tarta", "1"]] : []),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
+    ["Guirnaldas de luces", "—"],
     ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     ...(llevaPaella ? [["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]] : []),
     ["Cubo basura cocina", "2"],
@@ -1803,13 +1804,31 @@ export default function App() {
     setNuevoItemLabel(value);
     if (!categoriaTocada) setNuevoItemCategoria(sugerirCategoria(value, categoriasDisponibles) || CATEGORIA_MANUAL);
   };
-  const handleAddItemManual = () => {
+  // Normaliza para comparar nombres ignorando mayúsculas, acentos y espacios de sobra
+  const normalizarNombreItem = (s) => s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const insertarItemManual = () => {
     const label = nuevoItemLabel.trim();
-    if (!label) return;
     const categoria = nuevoItemCategoria || sugerirCategoria(label, categoriasDisponibles) || CATEGORIA_MANUAL;
     setItemsManuales(prev => [...prev, { label, cantidad: nuevoItemCantidad.trim() || "1", categoria }]);
     if (nuevoItemAlquiler) setItemsAlquilerManual(prev => ({ ...prev, [`${categoria}::${label}`]: true }));
     setNuevoItemLabel(""); setNuevoItemCantidad(""); setNuevoItemCategoria(""); setCategoriaTocada(false); setNuevoItemAlquiler(false);
+  };
+  const handleAddItemManual = () => {
+    const label = nuevoItemLabel.trim();
+    if (!label) return;
+    const objetivo = normalizarNombreItem(label);
+    const yaExiste = checklist.some(cat => cat.items.some(([nombre]) => normalizarNombreItem(nombre) === objetivo));
+    if (yaExiste) {
+      setDialogo({
+        tipo: "confirm",
+        titulo: "Ese item ya existe",
+        mensaje: `Ya hay un item llamado "${label}" en la checklist. ¿Quieres añadirlo igualmente como uno nuevo (quedará duplicado)?`,
+        textoConfirmar: "Añadir igualmente",
+        onConfirm: insertarItemManual,
+      });
+      return;
+    }
+    insertarItemManual();
   };
   const handleRemoveItemManual = (idx) => {
     ultimaClaveEditadaRef.current = null;
