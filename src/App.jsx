@@ -1570,13 +1570,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoNubeId]);
 
-  const copiarLink = (url) => {
-    navigator.clipboard.writeText(url).then(() => {
+  // Si hay nombre de evento, se antepone al link copiado ("Boda Ana y Luis: https://...")
+  // para poder distinguir de qué evento es al pegarlo en WhatsApp u otro chat.
+  const copiarLink = (url, nombre) => {
+    const texto = nombre ? `${nombre}: ${url}` : url;
+    navigator.clipboard.writeText(texto).then(() => {
       setCompartirMsg("¡Link copiado! ✓");
       setTimeout(() => setCompartirMsg(""), 3000);
     }).catch(() => {
       // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a mano
-      window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
+      window.prompt("No se pudo copiar automáticamente. Copia el link:", texto);
     });
   };
 
@@ -1589,10 +1592,10 @@ export default function App() {
       const estado = { ...getEstadoActual(), eventoNubeId: id };
       ultimoGuardadoNubeRef.current = JSON.stringify(estado);
       guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, nombreEvento);
     } else {
       // Sin nube: el link lleva la checklist dentro (solo lectura/copia local)
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`, nombreEvento);
     }
     setMenuCompartir(false);
   };
@@ -1717,9 +1720,9 @@ export default function App() {
       const estado = { ...guardado, eventoNubeId: id };
       guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
       if (!guardado.eventoNubeId) guardarEventos({ ...eventosGuardados, [nombre]: estado });
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, nombre);
     } else {
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`, nombre);
     }
   };
   const handleBorrarEvento = (nombre) => setDialogo({
