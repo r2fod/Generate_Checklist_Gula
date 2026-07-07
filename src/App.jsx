@@ -896,6 +896,7 @@ const ETIQUETAS_CAMPO = {
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
   itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
   vueltos: "Items marcados como vueltos", roturas: "Roturas contadas",
+  valoresCalculados: "Foto de cantidades automáticas",
 };
 
 // Compara el estado anterior y el recibido y devuelve frases cortas ("Pax adultos: 65 → 88")
@@ -1225,6 +1226,48 @@ function parseItemsPegados(texto) {
   }).filter(it => it.label);
 }
 
+// ─── MODAL RECALCULAR ──────────────────────────────────────────────────────────
+// Lista los items cuya cantidad automática ha cambiado desde el último "Guardar
+// evento" (por ejemplo, tras un ajuste de fórmula) y deja elegir, uno a uno, si se
+// mantiene el valor de antes (se fija como edición manual) o se acepta el nuevo.
+function ModalRecalcular({ cambios, onClose, onAplicar }) {
+  const [decisiones, setDecisiones] = useState(() => Object.fromEntries(cambios.map(c => [c.key, "mantener"])));
+  const elegir = (key, valor) => setDecisiones(prev => ({ ...prev, [key]: valor }));
+  return (
+    <div className="dialogo-overlay" onClick={onClose}>
+      <div className="dialogo-modal recalcular-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="dialogo-titulo">🔄 Recalcular cantidades</div>
+        <p className="dialogo-mensaje">
+          Estas {cambios.length} cantidades automáticas han cambiado desde el último "Guardar evento"
+          (seguramente por un ajuste en la app). Elige para cada una si prefieres mantener el valor de
+          siempre (se fija como edición manual, no volverá a moverse solo) o usar el nuevo cálculo.
+        </p>
+        <div className="recalcular-lista">
+          {cambios.map(c => (
+            <div className="recalcular-row" key={c.key}>
+              <div className="recalcular-nombre">{c.label}<span className="recalcular-categoria">{c.categoria}</span></div>
+              <div className="recalcular-opciones">
+                <button
+                  className={`btn btn-outline recalcular-opcion ${decisiones[c.key] === "mantener" ? "active" : ""}`}
+                  onClick={() => elegir(c.key, "mantener")}
+                >Mantener {c.anterior}</button>
+                <button
+                  className={`btn btn-outline recalcular-opcion ${decisiones[c.key] === "nuevo" ? "active" : ""}`}
+                  onClick={() => elegir(c.key, "nuevo")}
+                >Usar {c.nuevo}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="dialogo-acciones">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-green" onClick={() => onAplicar(decisiones)}>Aplicar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfirm }) {
   const [texto, setTexto]           = useState("");
   const [error, setError]           = useState("");
@@ -1446,6 +1489,13 @@ export default function App() {
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
   const [checkeados, setCheckeados] = useState(estadoInicial.checkeados ?? {}); // { "categoria::label": true } — marcados como "Sale" (cargado) en "Modo carga"
+  // Foto de las cantidades AUTOMÁTICAS (sin edición manual) tal como estaban la última vez
+  // que se guardó el evento. Sirve para que "Recalcular" pueda detectar si alguna cantidad
+  // cambió de valor por un ajuste de fórmula (como este mismo) desde entonces, sin que el
+  // usuario tenga que fiarse de la memoria — los items editados a mano nunca se tocan solos.
+  const [valoresCalculados, setValoresCalculados] = useState(estadoInicial.valoresCalculados ?? {});
+  const [modalRecalcular, setModalRecalcular] = useState(null); // [{ key, label, categoria, anterior, nuevo }] o null
+  const [recalcularMsg, setRecalcularMsg] = useState("");
   const [vueltos, setVueltos] = useState(estadoInicial.vueltos ?? {}); // { "categoria::label": true } — marcados como "Vuelve" (devuelto tras el evento)
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [modoCarga, setModoCarga] = useState(false);
@@ -1499,7 +1549,7 @@ export default function App() {
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas,
-    logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
+    valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1550,6 +1600,7 @@ export default function App() {
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
     itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas,
+    valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
@@ -1701,11 +1752,46 @@ export default function App() {
     valorInicial: nombreEvento || "",
     textoConfirmar: "Guardar evento",
     onConfirm: (nombre) => {
-      guardarEventos({ ...eventosGuardados, [nombre]: getEstadoActual() });
+      // Se actualiza la foto de cantidades automáticas al guardar: a partir de ahora
+      // "Recalcular" comparará contra los valores de ESTE guardado, no de uno anterior
+      setValoresCalculados(valoresBaseActuales);
+      guardarEventos({ ...eventosGuardados, [nombre]: { ...getEstadoActual(), valoresCalculados: valoresBaseActuales } });
       setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3500);
     },
   });
+  const handleRecalcular = () => {
+    const cambios = [];
+    Object.keys(valoresBaseActuales).forEach(key => {
+      if (overridesManuales[key] !== undefined) return; // ya fijado a mano, no se toca ni se pregunta
+      const anterior = valoresCalculados[key];
+      const nuevo = valoresBaseActuales[key];
+      if (anterior === undefined || anterior === nuevo) return; // nunca guardado, o sin cambios
+      const [categoria, ...resto] = key.split("::");
+      cambios.push({ key, categoria, label: resto.join("::"), anterior, nuevo });
+    });
+    if (cambios.length === 0) {
+      setRecalcularMsg("✓ Nada ha cambiado desde el último guardado");
+      setTimeout(() => setRecalcularMsg(""), 3500);
+      return;
+    }
+    setModalRecalcular(cambios);
+  };
+  const handleAplicarRecalculo = (decisiones) => {
+    const nuevosOverrides = { ...overridesManuales };
+    const nuevoSnapshot = { ...valoresCalculados };
+    modalRecalcular.forEach(c => {
+      if (decisiones[c.key] === "mantener") {
+        nuevosOverrides[c.key] = c.anterior;
+        nuevoSnapshot[c.key] = c.anterior;
+      } else {
+        nuevoSnapshot[c.key] = c.nuevo;
+      }
+    });
+    setOverridesManuales(nuevosOverrides);
+    setValoresCalculados(nuevoSnapshot);
+    setModalRecalcular(null);
+  };
   const handleCargarEvento = (nombre) => {
     if (!eventosGuardados[nombre]) return;
     setDialogo({
@@ -1778,6 +1864,20 @@ export default function App() {
     buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, opts),
     [evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts]
   );
+  // Cantidad automática "de verdad" de cada item calculado ahora mismo, ignorando
+  // cualquier edición manual — es lo que compara "Recalcular" contra la foto guardada
+  // (valoresCalculados) para detectar cambios de fórmula desde el último guardado.
+  const valoresBaseActuales = useMemo(() => {
+    const mapa = {};
+    baseChecklist.forEach(cat => {
+      const nombreCat = categoriasRenombradas[cat.nombre] ?? cat.nombre;
+      cat.items.forEach(([label, qty]) => {
+        const esObjetoConSufijo = qty && typeof qty === "object";
+        mapa[`${nombreCat}::${label}`] = String(esObjetoConSufijo ? qty.u : qty);
+      });
+    });
+    return mapa;
+  }, [baseChecklist, categoriasRenombradas]);
   const categoriasDisponibles = useMemo(() => {
     const base = baseChecklist.map(c => categoriasRenombradas[c.nombre] ?? c.nombre);
     // Las categorías creadas por el usuario (vía items añadidos) también están disponibles
@@ -2100,6 +2200,7 @@ export default function App() {
       )}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
+      {modalRecalcular && <ModalRecalcular cambios={modalRecalcular} onClose={() => setModalRecalcular(null)} onAplicar={handleAplicarRecalculo} />}
 
       <div className="app-wrapper">
         {/* HEADER */}
@@ -2198,8 +2299,12 @@ export default function App() {
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
-            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link">💾 Guardar evento</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar">🔄 Recalcular</button>
+              <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link">💾 Guardar evento</button>
+            </div>
           </div>
+          {recalcularMsg && <p className="guardado-confirm">{recalcularMsg}</p>}
           {guardadoEventoMsg && <p className="guardado-confirm">{guardadoEventoMsg}</p>}
           {Object.keys(eventosGuardados).length === 0 ? (
             <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
