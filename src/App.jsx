@@ -892,6 +892,7 @@ const ETIQUETAS_CAMPO = {
   llevaAguasPequenas: "Aguas pequeñas", hayDesayuno: "Desayuno",
   tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
+  recogidas: "Recogidas",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
   itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
@@ -958,6 +959,18 @@ function totalLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
   return Math.round(equipo.reduce((acc, p) => acc + (importeLogistica(p, tarifa, plusFurgo) || 0), 0) * 100) / 100;
 }
 
+// Recogidas: alquileres/equipo de otros proveedores a devolver o recoger en fecha/hora concreta
+function fmtRecogidas(recogidas = []) {
+  return recogidas
+    .filter(r => r.concepto)
+    .map(r => {
+      const fechaFmt = r.fecha ? new Date(r.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+      const cuando = [fechaFmt, r.hora].filter(Boolean).join(" ");
+      return cuando ? `${r.concepto} (${cuando})` : r.concepto;
+    })
+    .join(" · ");
+}
+
 function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta, meta = {}) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
@@ -1001,6 +1014,7 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${meta.horaInicio}h</div>` : ""}
       ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${meta.ubicacion}</div>` : ""}
       ${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) ? `<div><span class="ml">Equipo logística</span>${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}${totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€` : ""}</div>` : ""}
+      ${fmtRecogidas(meta.recogidas) ? `<div><span class="ml">Recogidas</span>${fmtRecogidas(meta.recogidas)}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
       <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
       <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
@@ -1072,6 +1086,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                 🚚 Logística: {fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}
                 {totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 && ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€`}
               </div>
+            )}
+            {fmtRecogidas(meta.recogidas) && (
+              <div className="preview-header-subtitle">📦 Recogidas: {fmtRecogidas(meta.recogidas)}</div>
             )}
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar">✕</button>
@@ -1471,6 +1488,9 @@ export default function App() {
   // Plus por poner furgoneta propia: 25€ por defecto (rango habitual 20-30€/evento,
   // por encima del kilometraje oficial de 0,26€/km para que compense). Modificable.
   const [plusFurgoneta, setPlusFurgoneta]     = useState(estadoInicial.plusFurgoneta ?? 25);
+  // Recogidas: alquileres/equipo de otros proveedores que hay que devolver o recoger en
+  // una fecha/hora concreta (camión plataforma, furgonetas, flores, armario caliente...)
+  const [recogidas, setRecogidas] = useState(estadoInicial.recogidas ?? []); // [{ concepto, fecha, hora, notas }]
   // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
@@ -1549,7 +1569,7 @@ export default function App() {
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas,
-    valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, eventoNubeId,
+    valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1596,7 +1616,7 @@ export default function App() {
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
-    logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta,
+    logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
     itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas,
@@ -2131,7 +2151,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, checkeados, vueltos, roturas });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, checkeados, vueltos, roturas });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -2150,6 +2170,7 @@ export default function App() {
       fmtLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)
         ? `Logística: ${fmtLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)}${totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€` : ""}`
         : null,
+      fmtRecogidas(recogidas) ? `Recogidas: ${fmtRecogidas(recogidas)}` : null,
     ].filter(Boolean).join(" · ");
     const notas = notasEvento ? `\n\n📝 NOTAS: ${notasEvento}` : "";
     return `${cabecera}\n${texto}${notas}`;
@@ -2161,7 +2182,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, checkeados, vueltos, roturas });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, checkeados, vueltos, roturas });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -2203,7 +2224,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
       {modoCarga && (
         <ModalModoCarga
           checklist={checklist}
@@ -2465,6 +2486,44 @@ export default function App() {
                 <span className="logistica-total">Total: <strong>{String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€</strong></span>
               )}
             </div>
+          </div>
+          <div className="logistica-block">
+            <span className="form-label">RECOGIDAS (alquileres/equipo de otros a devolver o recoger)</span>
+            {recogidas.map((r, i) => (
+              <div className="logistica-row" key={i}>
+                <input
+                  type="text"
+                  className="form-input logistica-nombre"
+                  placeholder="Ej: Camión plataforma (Albácar)"
+                  value={r.concepto}
+                  onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
+                />
+                <input
+                  type="date"
+                  className="form-input logistica-hora"
+                  value={r.fecha}
+                  title="Fecha de recogida"
+                  onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fecha: e.target.value } : x))}
+                />
+                <input
+                  type="time"
+                  className="form-input logistica-hora"
+                  value={r.hora}
+                  title="Hora de recogida"
+                  onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, hora: e.target.value } : x))}
+                />
+                <button
+                  className="item-action-btn item-action-borrar"
+                  onClick={() => setRecogidas(prev => prev.filter((_, idx) => idx !== i))}
+                  title="Quitar recogida"
+                  aria-label={`Quitar recogida ${r.concepto || ""}`}
+                >✕</button>
+              </div>
+            ))}
+            <button
+              className="btn-add-logistica"
+              onClick={() => setRecogidas(prev => [...prev, { concepto: "", fecha: "", hora: "" }])}
+            >+ Añadir recogida</button>
           </div>
           <hr />
           <div className="section-title">Barra libre</div>
