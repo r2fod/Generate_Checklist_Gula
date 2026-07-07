@@ -1291,6 +1291,20 @@ body {
   cursor: pointer;
 }
 
+/* En móvil, nombre + checkbox de alquiler + cantidad + botones no caben en una sola
+   fila sin apretar el campo de texto a casi nada. Al editar, el campo de nombre pasa
+   a ocupar su propia línea completa y el resto (cantidad, ✎/✕) baja a la siguiente. */
+@media (max-width: 768px) {
+  .item-row:has(.item-edit-row) {
+    flex-wrap: wrap;
+  }
+
+  .item-edit-row {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
 /* Nº de bateas, recalculado siempre a partir de la cantidad mostrada (no editable
    directamente: cambia solo si se edita la cantidad de al lado) */
 .item-batea-info {
