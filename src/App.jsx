@@ -1025,6 +1025,54 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
 }
 
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
+// ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
+// Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
+// campo de texto para escribir un valor que no esté en la lista (ej. un estilo de
+// plato puntual que no se pide siempre). El valor guardado, si es distinto de los
+// fijos, se muestra igualmente seleccionado en el desplegable la próxima vez.
+function SelectConOtro({ label, value, onChange, options }) {
+  const esPersonalizado = value && !options.includes(value);
+  const [modoOtro, setModoOtro] = useState(false);
+  const [texto, setTexto] = useState(esPersonalizado ? value : "");
+  if (modoOtro || esPersonalizado) {
+    return (
+      <div className="form-group">
+        <span className="form-label">{label}</span>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input
+            type="text"
+            className="form-input"
+            autoFocus={modoOtro}
+            placeholder="Ej: Relieve grande"
+            value={modoOtro ? texto : value}
+            onChange={e => { setTexto(e.target.value); onChange(e.target.value); }}
+            onBlur={() => { if (!texto.trim()) setModoOtro(false); }}
+          />
+          <button
+            type="button"
+            className="item-action-btn"
+            title="Volver a elegir de la lista"
+            onClick={() => { setModoOtro(false); setTexto(""); onChange(options[0]); }}
+          >↺</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="form-group">
+      <span className="form-label">{label}</span>
+      <select
+        className="form-select"
+        value={value}
+        onChange={e => { if (e.target.value === "__otro__") { setModoOtro(true); setTexto(""); } else onChange(e.target.value); }}
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        <option value="__otro__">+ Otro...</option>
+      </select>
+    </div>
+  );
+}
+
 function Dialogo({ config, onCerrar }) {
   const [valor, setValor] = useState(config.valorInicial || "");
   const esPrompt = config.tipo === "prompt";
@@ -2648,18 +2696,8 @@ export default function App() {
               <>
                 <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
                 <div className="equip-pareja">
-                  <div className="form-group">
-                    <span className="form-label">Estilo plato principal</span>
-                    <select className="form-select" value={estiloPlatoPrincipal} onChange={e => setEstiloPlatoPrincipal(e.target.value)}>
-                      {["Blanco liso", "Relieve blanco", "Verde", "Metálico"].map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <span className="form-label">Estilo plato postre</span>
-                    <select className="form-select" value={estiloPlatoPostre} onChange={e => setEstiloPlatoPostre(e.target.value)}>
-                      {["Blanco", "Verde"].map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </div>
+                  <SelectConOtro label="Estilo plato principal" value={estiloPlatoPrincipal} onChange={setEstiloPlatoPrincipal} options={["Blanco liso", "Relieve blanco", "Verde", "Metálico"]} />
+                  <SelectConOtro label="Estilo plato postre" value={estiloPlatoPostre} onChange={setEstiloPlatoPostre} options={["Blanco", "Verde"]} />
                 </div>
               </>
             )}
