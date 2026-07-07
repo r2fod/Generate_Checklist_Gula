@@ -159,7 +159,11 @@ function bateas(units, size) { return Math.ceil(units / size); }
 function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const barFactor = h / 4;
   const cervezaFactor = mesVerano ? 2.0 : 1.5;
-  const cerveza = Math.round((pax * cervezaFactor * barFactor) / 24) * 24;
+  // El consumo de cerveza por pax no crece sin límite cuanto más dura la barra: a partir
+  // de las 4h de referencia el consumo por persona se estabiliza (nadie bebe el doble de
+  // cerveza solo porque la barra esté abierta el doble de horas). Se limita el factor a 1
+  // para no superar el techo real del sector (1,5-2 tercios/pax) en eventos largos.
+  const cerveza = Math.round((pax * cervezaFactor * Math.min(1, barFactor)) / 24) * 24;
   // Vino: calibrado con datos reales (65 pax → 30 blanco, 16-17 tinto)
   const vinoTotal = Math.round(pax * 0.72);
   const ratioBlanco = mesVerano ? 0.65 : 0.45;
