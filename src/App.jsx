@@ -979,7 +979,9 @@ function fmtRecogidas(recogidas = []) {
     .map(r => {
       const fechaFmt = r.fecha ? new Date(r.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
       const cuando = [fechaFmt, r.hora].filter(Boolean).join(" ");
-      return cuando ? `${r.concepto} (${cuando})` : r.concepto;
+      const devFmt = r.fechaDevolucion ? new Date(r.fechaDevolucion + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+      const partes = [cuando, devFmt ? `devuelve ${devFmt}` : ""].filter(Boolean).join(", ");
+      return partes ? `${r.concepto} (${partes})` : r.concepto;
     })
     .join(" · ");
 }
@@ -1762,6 +1764,23 @@ export default function App() {
   const [eventosGuardados, setEventosGuardados] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gula_eventos_guardados")) || {}; } catch (e) { return {}; }
   });
+  // Avisos de recogidas/devoluciones pendientes (hoy o ya pasadas), mirando TODOS los
+  // eventos guardados, no solo el que está abierto — para no olvidar recoger/devolver
+  // alquileres (camión plataforma, armario caliente, flores...) de ningún evento.
+  const [avisosOcultos, setAvisosOcultos] = useState(false);
+  const avisosRecogidas = useMemo(() => {
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const avisos = [];
+    Object.entries(eventosGuardados).forEach(([nombreEvt, datos]) => {
+      (datos.recogidas || []).forEach(r => {
+        if (!r.concepto) return;
+        if (r.fecha && r.fecha <= hoyISO) avisos.push({ evento: nombreEvt, concepto: r.concepto, fecha: r.fecha, tipo: "Recogida" });
+        if (r.fechaDevolucion && r.fechaDevolucion <= hoyISO) avisos.push({ evento: nombreEvt, concepto: r.concepto, fecha: r.fechaDevolucion, tipo: "Devolución" });
+      });
+    });
+    avisos.sort((a, b) => a.fecha.localeCompare(b.fecha));
+    return avisos;
+  }, [eventosGuardados]);
   // Historial para deshacer cambios manuales (cantidad editada o item quitado).
   // Se guarda un snapshot al EMPEZAR a editar cada item (no por cada tecla).
   const [historial, setHistorial] = useState([]);
@@ -2503,6 +2522,19 @@ export default function App() {
           </div>
         )}
 
+        {avisosRecogidas.length > 0 && !avisosOcultos && (
+          <div className="avisos-recogidas-banner">
+            <div className="cambios-remotos-detalle">
+              <strong>⏰ Recogidas/devoluciones pendientes:</strong>
+              <span>
+                {avisosRecogidas.slice(0, 4).map((a, i) => `${a.tipo} "${a.concepto}" (${a.evento})`).join(" · ")}
+                {avisosRecogidas.length > 4 ? ` · y ${avisosRecogidas.length - 4} más` : ""}
+              </span>
+            </div>
+            <button className="cambios-remotos-cerrar" onClick={() => setAvisosOcultos(true)} aria-label="Cerrar aviso">✕</button>
+          </div>
+        )}
+
         <div className="main-layout">
         <div className="config-sidebar">
 
@@ -2697,39 +2729,58 @@ export default function App() {
           <div className="logistica-block">
             <span className="form-label">RECOGIDAS (alquileres/equipo de otros a devolver o recoger)</span>
             {recogidas.map((r, i) => (
-              <div className="logistica-row" key={i}>
-                <input
-                  type="text"
-                  className="form-input logistica-nombre"
-                  placeholder="Ej: Camión plataforma (Albácar)"
-                  value={r.concepto}
-                  onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
-                />
-                <input
-                  type="date"
-                  className="form-input logistica-hora"
-                  value={r.fecha}
-                  title="Fecha de recogida"
-                  onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fecha: e.target.value } : x))}
-                />
-                <input
-                  type="time"
-                  className="form-input logistica-hora"
-                  value={r.hora}
-                  title="Hora de recogida"
-                  onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, hora: e.target.value } : x))}
-                />
-                <button
-                  className="item-action-btn item-action-borrar"
-                  onClick={() => setRecogidas(prev => prev.filter((_, idx) => idx !== i))}
-                  title="Quitar recogida"
-                  aria-label={`Quitar recogida ${r.concepto || ""}`}
-                >✕</button>
+              <div className="recogida-card" key={i}>
+                <div className="recogida-card-top">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ej: Camión plataforma (Albácar)"
+                    value={r.concepto}
+                    onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
+                  />
+                  <button
+                    className="item-action-btn item-action-borrar"
+                    onClick={() => setRecogidas(prev => prev.filter((_, idx) => idx !== i))}
+                    title="Quitar recogida"
+                    aria-label={`Quitar recogida ${r.concepto || ""}`}
+                  >✕</button>
+                </div>
+                <div className="recogida-card-fechas">
+                  <div className="form-group">
+                    <span className="form-label">Recogida</span>
+                    <div className="recogida-fecha-hora">
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={r.fecha}
+                        title="Fecha de recogida"
+                        onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fecha: e.target.value } : x))}
+                      />
+                      <input
+                        type="time"
+                        className="form-input"
+                        value={r.hora}
+                        title="Hora de recogida"
+                        onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, hora: e.target.value } : x))}
+                      />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <span className="form-label">Devolución</span>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={r.fechaDevolucion || ""}
+                      title="Fecha de devolución"
+                      onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fechaDevolucion: e.target.value } : x))}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
             <button
               className="btn-add-logistica"
-              onClick={() => setRecogidas(prev => [...prev, { concepto: "", fecha: "", hora: "" }])}
+              onClick={() => setRecogidas(prev => [...prev, { concepto: "", fecha: "", hora: "", fechaDevolucion: "" }])}
             >+ Añadir recogida</button>
           </div>
           <hr />
