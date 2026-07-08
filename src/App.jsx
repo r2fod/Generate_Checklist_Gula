@@ -1224,7 +1224,10 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-function ModalModoCarga({ checklist, checkeados, vueltos, roturas, onToggleSale, onToggleVuelve, onRoturas, onClose, meta = {} }) {
+function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onToggleVuelve, onRoturas, onClose, meta = {} }) {
+  // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
+  // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
+  const checklist = quitarItemsSinCantidad(checklistCompleta);
   const [modo, setModo] = useState("salida"); // salida | vuelta
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
   const marcadosMapa = modo === "salida" ? checkeados : vueltos;
