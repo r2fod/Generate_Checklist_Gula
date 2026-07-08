@@ -871,12 +871,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 }
 
 // ─── WORD EXPORT ──────────────────────────────────────────────────────────────
-// Un item sin cantidad real (vacío o solo "—", a decidir in situ) no aporta nada
-// impreso/exportado — se queda fuera de Vista previa y Descargar Word, pero sigue
-// editable en la checklist principal de la app por si se quiere rellenar a mano.
+// Un item sin cantidad real (vacío, solo "—" a decidir in situ, o en 0 porque no
+// hace falta ninguno) no aporta nada a la hora de cargar el camión ni de imprimir
+// — se queda fuera de Modo carga, Vista previa y Word/PDF, pero sigue editable en
+// la checklist principal de la app por si se quiere rellenar a mano.
 function tieneCantidadVisible(qty) {
   const v = String(qty && qty.u ? qty.u : qty).trim();
-  return v !== "" && v !== "—" && v !== "-";
+  return v !== "" && v !== "—" && v !== "-" && v !== "0";
 }
 
 function quitarItemsSinCantidad(checklist) {
