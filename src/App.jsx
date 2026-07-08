@@ -374,8 +374,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
   } = opts;
   // El origen de las sillas (alquiler Dealde/Carvillo o propias) se refleja en el
-  // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
+  // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre.
+  // Los cojines vienen incluidos con la silla de alquiler en bodas (no es un item
+  // aparte que se pueda pedir por separado), así que se anota en el propio nombre
+  // en vez de generar una línea "Cojines para sillas" suelta.
+  const incluyeCojines = (origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda";
+  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`;
 
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -410,9 +414,6 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m (total)", String(calcMesasTotal(evtKey, pax))],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), true]),
-    // Los cojines solo hacen falta con sillas de alquiler (Dealde/Carvillo): las
-    // propias ya suelen venir con su cojín o no llevarlo
-    opt((origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda", ["Cojines para sillas", "—"]),
     opt(evtKey === "boda", ["Mesa redonda especial para Tarta", "1"]),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
