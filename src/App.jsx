@@ -1251,7 +1251,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onToggleVuelve, onRoturas, onClose, meta = {} }) {
+function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onVuelve, onRoturas, onClose, meta = {} }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   const checklist = quitarItemsSinCantidad(checklistCompleta);
@@ -1260,43 +1260,45 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const [precios, setPrecios] = useState(() => leerPrecios());
   const [editandoPrecios, setEditandoPrecios] = useState(false);
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
-  const marcadosMapa = modo === "salida" ? checkeados : vueltos;
-  const totalMarcados = checklist.reduce((acc, c) => acc + c.items.filter(([, , , labelOriginal]) => marcadosMapa[`${c.nombre}::${labelOriginal}`]).length, 0);
+  const totalMarcados = modo === "salida"
+    ? checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => checkeados[`${c.nombre}::${lo}`]).length, 0)
+    : checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => {
+        const v = vueltos[`${c.nombre}::${lo}`];
+        return v !== undefined && v !== "";
+      }).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
-  // Resumen de consumo/roturas: "consumido" = lo que no ha vuelto (asume que se ha
-  // gastado/perdido, típico de bebida y desechables); solo cuenta items con cantidad
-  // numérica real. Roturas ya viene como cantidad directa por item. Si el item tiene
-  // precio guardado en el catálogo, se calcula el coste (cantidad × precio).
-  const datosConsumo = [];
-  const datosRoturas = [];
-  checklist.forEach(cat => {
-    cat.items.forEach(([label, qty, , labelOriginal, , sufijo]) => {
+  // Resumen tipo hoja de cálculo: Carga Inicial / Vuelta / Consumo Real, agrupado por
+  // categoría, igual que la plantilla en la que ya llevaban el control. "Vuelta" solo
+  // se conoce si se ha registrado un valor en la pestaña Vuelta (número o, por datos
+  // antiguos, el booleano de la versión previa: true = volvió todo).
+  const fmtEur = (n) => `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
+  const filasPorCategoria = checklist.map(cat => {
+    const filas = cat.items.map(([label, qty, , labelOriginal, , sufijo]) => {
       const key = `${cat.nombre}::${labelOriginal}`;
       const valor = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
-      if (isNaN(valor)) return;
-      const precio = precios[label];
-      if (!vueltos[key]) datosConsumo.push({ key, label, categoria: cat.nombre, valor, sufijo, precio, coste: precio !== undefined ? valor * precio : null });
+      const cargaInicial = isNaN(valor) ? null : valor;
+      const raw = vueltos[key];
+      let vuelta = null;
+      if (raw === true) vuelta = cargaInicial;
+      else if (raw !== undefined && raw !== "") vuelta = parseFloat(String(raw).replace(",", ".")) || 0;
+      const consumoReal = (cargaInicial !== null && vuelta !== null) ? Math.max(0, cargaInicial - vuelta) : null;
       const rot = parseInt(roturas[key], 10) || 0;
-      if (rot > 0) datosRoturas.push({ key, label, categoria: cat.nombre, valor: rot, precio, coste: precio !== undefined ? rot * precio : null });
+      const precio = precios[label];
+      const costeTotal = (precio !== undefined && consumoReal !== null) ? (consumoReal + rot) * precio : null;
+      return { key, label, sufijo, cargaInicial, vuelta, consumoReal, roturas: rot, precio, costeTotal };
     });
-  });
-  datosConsumo.sort((a, b) => b.valor - a.valor);
-  datosRoturas.sort((a, b) => b.valor - a.valor);
-  const topConsumo = datosConsumo.slice(0, 10);
-  const topRoturas = datosRoturas.slice(0, 10);
-  // El total de coste suma TODOS los items con precio conocido, no solo el top 10 de barras
-  const costeConsumoTotal = datosConsumo.reduce((acc, d) => acc + (d.coste || 0), 0);
-  const costeRoturasTotal = datosRoturas.reduce((acc, d) => acc + (d.coste || 0), 0);
-  const fmtEur = (n) => `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
+    const subtotal = filas.reduce((acc, f) => acc + (f.costeTotal || 0), 0);
+    return { nombre: cat.nombre, filas, subtotal };
+  }).filter(c => c.filas.length > 0);
+  const granTotal = filasPorCategoria.reduce((acc, c) => acc + c.subtotal, 0);
+  const porPax = meta.totalPax > 0 ? granTotal / meta.totalPax : null;
   const handleGuardarPrecios = (texto) => {
     const nuevos = { ...precios, ...parsePreciosPegados(texto) };
     setPrecios(nuevos);
     guardarPrecios(nuevos);
     setEditandoPrecios(false);
   };
-  const maxConsumo = Math.max(1, ...topConsumo.map(d => d.valor));
-  const maxRoturas = Math.max(1, ...topRoturas.map(d => d.valor));
   return (
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
@@ -1322,8 +1324,11 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           <div className="preview-body">
             <div className="resumen-precios-bar">
               <button className="btn btn-outline" onClick={() => setEditandoPrecios(v => !v)}>💶 {editandoPrecios ? "Cerrar precios" : "Precios"}</button>
-              {(costeConsumoTotal > 0 || costeRoturasTotal > 0) && (
-                <span className="resumen-coste-total">Coste estimado: <strong>{fmtEur(costeConsumoTotal + costeRoturasTotal)}</strong></span>
+              {granTotal > 0 && (
+                <span className="resumen-coste-total">
+                  Coste estimado: <strong>{fmtEur(granTotal)}</strong>
+                  {porPax !== null && <> · {fmtEur(porPax)}/pax</>}
+                </span>
               )}
             </div>
             {editandoPrecios && (
@@ -1342,54 +1347,53 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                 />
               </div>
             )}
-            <div className="resumen-bloque">
-              <div className="resumen-titulo">
-                Consumo real (no ha vuelto)
-                {costeConsumoTotal > 0 && <span className="resumen-titulo-coste">{fmtEur(costeConsumoTotal)}</span>}
-              </div>
-              {topConsumo.length === 0 ? (
-                <p className="resumen-vacio">Todavía no hay datos: marca en "Vuelta" lo que va volviendo para ver aquí lo que de verdad se ha gastado.</p>
-              ) : (
-                <div className="resumen-barras">
-                  {topConsumo.map(d => (
-                    <div className="resumen-fila" key={d.key}>
-                      <div className="resumen-etiqueta" title={d.label}>{d.label}</div>
-                      <div className="resumen-barra-pista">
-                        <div className="resumen-barra resumen-barra-consumo" style={{ width: `${Math.max(4, (d.valor / maxConsumo) * 100)}%` }} />
-                      </div>
-                      <div className="resumen-valor">
-                        {d.valor}{d.sufijo ? ` ${d.sufijo}` : ""}
-                        {d.coste !== null && <span className="resumen-valor-coste">{fmtEur(d.coste)}</span>}
-                      </div>
-                    </div>
+            {filasPorCategoria.length === 0 ? (
+              <p className="resumen-vacio">No hay items con cantidad para resumir.</p>
+            ) : (
+              <div className="resumen-tabla-wrap">
+                <table className="resumen-tabla">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Carga inicial</th>
+                      <th>Vuelta</th>
+                      <th>Consumo real</th>
+                      <th>Roturas</th>
+                      <th>Coste ud.</th>
+                      <th>Coste total</th>
+                    </tr>
+                  </thead>
+                  {filasPorCategoria.map(cat => (
+                    <tbody key={cat.nombre}>
+                      <tr className="resumen-cat-header">
+                        <td colSpan={7}>{iconoCategoria(cat.nombre)} {cat.nombre}</td>
+                      </tr>
+                      {cat.filas.map(f => (
+                        <tr key={f.key}>
+                          <td className="resumen-tabla-producto" title={f.label}>{f.label}</td>
+                          <td>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</td>
+                          <td>{f.vuelta ?? "—"}</td>
+                          <td>{f.consumoReal ?? "—"}</td>
+                          <td>{f.roturas > 0 ? f.roturas : "—"}</td>
+                          <td>{f.precio !== undefined ? fmtEur(f.precio) : "—"}</td>
+                          <td>{f.costeTotal !== null ? fmtEur(f.costeTotal) : "—"}</td>
+                        </tr>
+                      ))}
+                      <tr className="resumen-subtotal-row">
+                        <td colSpan={6}>Subtotal {cat.nombre}</td>
+                        <td>{fmtEur(cat.subtotal)}</td>
+                      </tr>
+                    </tbody>
                   ))}
-                </div>
-              )}
-            </div>
-            <div className="resumen-bloque">
-              <div className="resumen-titulo">
-                💥 Roturas
-                {costeRoturasTotal > 0 && <span className="resumen-titulo-coste">{fmtEur(costeRoturasTotal)}</span>}
+                  <tfoot>
+                    <tr className="resumen-total-row">
+                      <td colSpan={6}>TOTAL</td>
+                      <td>{fmtEur(granTotal)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-              {topRoturas.length === 0 ? (
-                <p className="resumen-vacio">Sin roturas apuntadas todavía.</p>
-              ) : (
-                <div className="resumen-barras">
-                  {topRoturas.map(d => (
-                    <div className="resumen-fila" key={d.key}>
-                      <div className="resumen-etiqueta" title={d.label}>{d.label}</div>
-                      <div className="resumen-barra-pista">
-                        <div className="resumen-barra resumen-barra-roturas" style={{ width: `${Math.max(4, (d.valor / maxRoturas) * 100)}%` }} />
-                      </div>
-                      <div className="resumen-valor">
-                        {d.valor}
-                        {d.coste !== null && <span className="resumen-valor-coste">{fmtEur(d.coste)}</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
         ) : (
         <div className="preview-body">
@@ -1402,32 +1406,57 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
               <div className="carga-lista">
                 {cat.items.map(([label, qty, , labelOriginal, , sufijo], i) => {
                   const key = `${cat.nombre}::${labelOriginal}`;
-                  const marcado = modo === "salida" ? !!checkeados[key] : !!vueltos[key];
+                  if (modo === "salida") {
+                    const marcado = !!checkeados[key];
+                    return (
+                      <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
+                        <label className="carga-row-principal">
+                          <input
+                            type="checkbox"
+                            checked={marcado}
+                            onChange={() => onToggleSale(key)}
+                          />
+                          <span className="carga-nombre">{label}</span>
+                          <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+                        </label>
+                      </div>
+                    );
+                  }
+                  const valorVuelta = vueltos[key];
+                  const marcado = valorVuelta !== undefined && valorVuelta !== "";
+                  const vueltaTexto = valorVuelta === true
+                    ? String(parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", ".")) || "")
+                    : (valorVuelta ?? "");
                   return (
                     <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
-                      <label className="carga-row-principal">
-                        <input
-                          type="checkbox"
-                          checked={marcado}
-                          onChange={() => (modo === "salida" ? onToggleSale(key) : onToggleVuelve(key))}
-                        />
+                      <div className="carga-row-principal carga-row-vuelta">
                         <span className="carga-nombre">{label}</span>
-                        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
-                      </label>
-                      {modo === "vuelta" && (
-                        <div className="carga-roturas">
-                          <span>💥 roturas</span>
-                          <input
-                            type="number"
-                            min="0"
-                            className="carga-roturas-input"
-                            value={roturas[key] || ""}
-                            placeholder="0"
-                            onChange={e => onRoturas(key, e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                          />
-                        </div>
-                      )}
+                        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+                      </div>
+                      <div className="carga-roturas carga-vuelve-cantidad">
+                        <span>↩️ vuelve</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="carga-roturas-input"
+                          value={vueltaTexto}
+                          placeholder="0"
+                          onChange={e => onVuelve(key, e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </div>
+                      <div className="carga-roturas">
+                        <span>💥 roturas</span>
+                        <input
+                          type="number"
+                          min="0"
+                          className="carga-roturas-input"
+                          value={roturas[key] || ""}
+                          placeholder="0"
+                          onChange={e => onRoturas(key, e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -2220,7 +2249,15 @@ export default function App() {
     });
   };
   const handleToggleCheckCarga = (key) => setCheckeados(prev => ({ ...prev, [key]: !prev[key] }));
-  const handleToggleVuelveCarga = (key) => setVueltos(prev => ({ ...prev, [key]: !prev[key] }));
+  // A diferencia de roturas, "0" en vuelve es un dato real (confirmado: no ha vuelto
+  // nada), distinto de "todavía no se ha revisado" (sin entrada) — solo se borra la
+  // clave si se deja el campo vacío del todo.
+  const handleVuelveCarga = (key, valor) => setVueltos(prev => {
+    const next = { ...prev };
+    if (valor === "") delete next[key];
+    else next[key] = valor;
+    return next;
+  });
   const handleRoturasCarga = (key, valor) => setRoturas(prev => {
     const next = { ...prev };
     if (!valor || valor === "0") delete next[key];
@@ -2458,9 +2495,9 @@ export default function App() {
           vueltos={vueltos}
           roturas={roturas}
           onToggleSale={handleToggleCheckCarga}
-          onToggleVuelve={handleToggleVuelveCarga}
+          onVuelve={handleVuelveCarga}
           onRoturas={handleRoturasCarga}
-          meta={{ nombreEvento }}
+          meta={{ nombreEvento, totalPax: pax + ninos }}
           onClose={() => setModoCarga(false)}
         />
       )}

@@ -1983,65 +1983,78 @@ hr {
   margin: 0;
 }
 
-.resumen-barras {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.resumen-tabla-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: #fff;
 }
 
-.resumen-fila {
-  display: grid;
-  grid-template-columns: minmax(90px, 140px) 1fr auto;
-  align-items: center;
-  gap: 10px;
-}
-
-.resumen-etiqueta {
+.resumen-tabla {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.82rem;
-  color: var(--text-main);
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.resumen-barra-pista {
-  height: 16px;
-  background: var(--bg-color);
-  border-radius: 4px;
+.resumen-tabla th,
+.resumen-tabla td {
+  padding: 9px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.resumen-tabla th:first-child,
+.resumen-tabla td:first-child {
+  text-align: left;
+}
+
+.resumen-tabla th {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  background: #fff;
+}
+
+.resumen-tabla-producto {
+  max-width: 220px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-main);
 }
 
-.resumen-barra {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease-out;
+.resumen-tabla td {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
 }
 
-.resumen-barra-consumo {
-  background: var(--accent);
-}
-
-.resumen-barra-roturas {
-  background: #dc2626;
-}
-
-.resumen-valor {
-  font-size: 0.82rem;
+.resumen-cat-header td {
+  background: var(--bg-color);
+  text-align: left;
   font-weight: 700;
   color: var(--text-main);
-  min-width: 2ch;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  white-space: normal;
 }
 
-.resumen-valor-coste {
-  font-size: 0.72rem;
-  font-weight: 600;
+.resumen-subtotal-row td {
+  text-align: right;
+  font-weight: 700;
   color: var(--text-muted);
+  background: var(--bg-color);
+}
+
+.resumen-total-row td {
+  text-align: right;
+  font-weight: 800;
+  color: var(--text-main);
+  font-size: 0.92rem;
+  border-top: 2px solid var(--border-color);
+  border-bottom: none;
 }
 
 .resumen-precios-bar {
@@ -2077,12 +2090,37 @@ hr {
 }
 
 @media (max-width: 480px) {
-  .resumen-fila {
-    grid-template-columns: 84px 1fr auto;
+  .resumen-tabla {
+    font-size: 0.76rem;
   }
 
-  .resumen-etiqueta {
-    font-size: 0.76rem;
+  .resumen-tabla-producto {
+    max-width: 140px;
+  }
+}
+
+.carga-row-vuelta {
+  cursor: default;
+}
+
+.carga-vuelve-cantidad {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.carga-vuelve-cantidad .carga-roturas-input {
+  border-color: var(--accent);
+}
+
+@media (max-width: 480px) {
+  .carga-row-principal.carga-row-vuelta {
+    flex-wrap: wrap;
+    padding-bottom: 8px;
+  }
+
+  .carga-roturas.carga-vuelve-cantidad,
+  .carga-row .carga-roturas {
+    padding-left: 16px;
   }
 }
 
