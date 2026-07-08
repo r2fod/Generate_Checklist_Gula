@@ -1886,6 +1886,95 @@ hr {
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
+/* ─── Resumen de consumo/roturas (Modo carga) ───────────────────────────── */
+.resumen-bloque {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+}
+
+.resumen-bloque + .resumen-bloque {
+  margin-top: 16px;
+}
+
+.resumen-titulo {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 12px;
+}
+
+.resumen-vacio {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.resumen-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.resumen-fila {
+  display: grid;
+  grid-template-columns: minmax(90px, 140px) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.resumen-etiqueta {
+  font-size: 0.82rem;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resumen-barra-pista {
+  height: 16px;
+  background: var(--bg-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.resumen-barra {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease-out;
+}
+
+.resumen-barra-consumo {
+  background: var(--accent);
+}
+
+.resumen-barra-roturas {
+  background: #dc2626;
+}
+
+.resumen-valor {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 480px) {
+  .resumen-fila {
+    grid-template-columns: 84px 1fr auto;
+  }
+
+  .resumen-etiqueta {
+    font-size: 0.76rem;
+  }
+}
+
 .carga-nombre {
   flex: 1;
   min-width: 0;

@@ -1231,11 +1231,33 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const [modo, setModo] = useState("salida"); // salida | vuelta
+  const [verResumen, setVerResumen] = useState(false);
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
   const marcadosMapa = modo === "salida" ? checkeados : vueltos;
   const totalMarcados = checklist.reduce((acc, c) => acc + c.items.filter(([, , , labelOriginal]) => marcadosMapa[`${c.nombre}::${labelOriginal}`]).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
+  // Resumen de consumo/roturas: "consumido" = lo que no ha vuelto (asume que se ha
+  // gastado/perdido, típico de bebida y desechables); solo cuenta items con cantidad
+  // numérica real. Roturas ya viene como cantidad directa por item.
+  const datosConsumo = [];
+  const datosRoturas = [];
+  checklist.forEach(cat => {
+    cat.items.forEach(([label, qty, , labelOriginal, , sufijo]) => {
+      const key = `${cat.nombre}::${labelOriginal}`;
+      const valor = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
+      if (isNaN(valor)) return;
+      if (!vueltos[key]) datosConsumo.push({ key, label, categoria: cat.nombre, valor, sufijo });
+      const rot = parseInt(roturas[key], 10) || 0;
+      if (rot > 0) datosRoturas.push({ key, label, categoria: cat.nombre, valor: rot });
+    });
+  });
+  datosConsumo.sort((a, b) => b.valor - a.valor);
+  datosRoturas.sort((a, b) => b.valor - a.valor);
+  const topConsumo = datosConsumo.slice(0, 10);
+  const topRoturas = datosRoturas.slice(0, 10);
+  const maxConsumo = Math.max(1, ...topConsumo.map(d => d.valor));
+  const maxRoturas = Math.max(1, ...topRoturas.map(d => d.valor));
   return (
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
@@ -1252,10 +1274,51 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
         </div>
         <div className="carga-modo-toggle">
           <div className="segmented-control">
-            <button className={`segment-btn ${modo === "salida" ? "active" : ""}`} onClick={() => setModo("salida")}>🚚 Salida</button>
-            <button className={`segment-btn ${modo === "vuelta" ? "active" : ""}`} onClick={() => setModo("vuelta")}>↩️ Vuelta</button>
+            <button className={`segment-btn ${modo === "salida" && !verResumen ? "active" : ""}`} onClick={() => { setModo("salida"); setVerResumen(false); }}>🚚 Salida</button>
+            <button className={`segment-btn ${modo === "vuelta" && !verResumen ? "active" : ""}`} onClick={() => { setModo("vuelta"); setVerResumen(false); }}>↩️ Vuelta</button>
+            <button className={`segment-btn ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}>📊 Resumen</button>
           </div>
         </div>
+        {verResumen ? (
+          <div className="preview-body">
+            <div className="resumen-bloque">
+              <div className="resumen-titulo">Consumo real (no ha vuelto)</div>
+              {topConsumo.length === 0 ? (
+                <p className="resumen-vacio">Todavía no hay datos: marca en "Vuelta" lo que va volviendo para ver aquí lo que de verdad se ha gastado.</p>
+              ) : (
+                <div className="resumen-barras">
+                  {topConsumo.map(d => (
+                    <div className="resumen-fila" key={d.key}>
+                      <div className="resumen-etiqueta" title={d.label}>{d.label}</div>
+                      <div className="resumen-barra-pista">
+                        <div className="resumen-barra resumen-barra-consumo" style={{ width: `${Math.max(4, (d.valor / maxConsumo) * 100)}%` }} />
+                      </div>
+                      <div className="resumen-valor">{d.valor}{d.sufijo ? ` ${d.sufijo}` : ""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="resumen-bloque">
+              <div className="resumen-titulo">💥 Roturas</div>
+              {topRoturas.length === 0 ? (
+                <p className="resumen-vacio">Sin roturas apuntadas todavía.</p>
+              ) : (
+                <div className="resumen-barras">
+                  {topRoturas.map(d => (
+                    <div className="resumen-fila" key={d.key}>
+                      <div className="resumen-etiqueta" title={d.label}>{d.label}</div>
+                      <div className="resumen-barra-pista">
+                        <div className="resumen-barra resumen-barra-roturas" style={{ width: `${Math.max(4, (d.valor / maxRoturas) * 100)}%` }} />
+                      </div>
+                      <div className="resumen-valor">{d.valor}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className="preview-body">
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
@@ -1299,6 +1362,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );
