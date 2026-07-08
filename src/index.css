@@ -1963,6 +1963,48 @@ hr {
   min-width: 2ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.resumen-valor-coste {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.resumen-precios-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.resumen-coste-total {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.resumen-coste-total strong {
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.resumen-titulo-coste {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--green-qty);
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 @media (max-width: 480px) {

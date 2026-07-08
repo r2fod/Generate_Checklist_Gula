@@ -1037,6 +1037,29 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
     </body></html>`;
 }
 
+// ─── CATÁLOGO DE PRECIOS (para el coste estimado en Modo carga → Resumen) ──────
+// Precio por unidad de cada item, guardado en este navegador y compartido entre
+// TODOS los eventos (el precio de "Copas de vino" es el mismo en cualquier boda,
+// no depende del evento) — se busca por el nombre exacto del item.
+function leerPrecios() {
+  try { return JSON.parse(localStorage.getItem("gula_precios_items") || "{}"); }
+  catch (e) { return {}; }
+}
+function guardarPrecios(precios) {
+  try { localStorage.setItem("gula_precios_items", JSON.stringify(precios)); }
+  catch (e) { /* localStorage no disponible */ }
+}
+// Pega líneas "Item: 1,50" o "Item 1.50" (mismo formato que "Añadir varios items") y
+// las fusiona con el catálogo existente sin perder precios que no se han vuelto a pegar
+function parsePreciosPegados(texto) {
+  const precios = {};
+  texto.split("\n").map(l => l.trim()).filter(Boolean).forEach(linea => {
+    const m = linea.match(/^(.*\S)\s*[:\-–]\s*(\d+(?:[.,]\d+)?)\s*€?\s*$/) || linea.match(/^(.*\S)\s{2,}(\d+(?:[.,]\d+)?)\s*€?\s*$/);
+    if (m) precios[m[1].trim()] = parseFloat(m[2].replace(",", "."));
+  });
+  return precios;
+}
+
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
 // ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
 // Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
@@ -1232,6 +1255,8 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const [modo, setModo] = useState("salida"); // salida | vuelta
   const [verResumen, setVerResumen] = useState(false);
+  const [precios, setPrecios] = useState(() => leerPrecios());
+  const [editandoPrecios, setEditandoPrecios] = useState(false);
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
   const marcadosMapa = modo === "salida" ? checkeados : vueltos;
   const totalMarcados = checklist.reduce((acc, c) => acc + c.items.filter(([, , , labelOriginal]) => marcadosMapa[`${c.nombre}::${labelOriginal}`]).length, 0);
@@ -1239,7 +1264,8 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
   // Resumen de consumo/roturas: "consumido" = lo que no ha vuelto (asume que se ha
   // gastado/perdido, típico de bebida y desechables); solo cuenta items con cantidad
-  // numérica real. Roturas ya viene como cantidad directa por item.
+  // numérica real. Roturas ya viene como cantidad directa por item. Si el item tiene
+  // precio guardado en el catálogo, se calcula el coste (cantidad × precio).
   const datosConsumo = [];
   const datosRoturas = [];
   checklist.forEach(cat => {
@@ -1247,15 +1273,26 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       const key = `${cat.nombre}::${labelOriginal}`;
       const valor = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
       if (isNaN(valor)) return;
-      if (!vueltos[key]) datosConsumo.push({ key, label, categoria: cat.nombre, valor, sufijo });
+      const precio = precios[label];
+      if (!vueltos[key]) datosConsumo.push({ key, label, categoria: cat.nombre, valor, sufijo, precio, coste: precio !== undefined ? valor * precio : null });
       const rot = parseInt(roturas[key], 10) || 0;
-      if (rot > 0) datosRoturas.push({ key, label, categoria: cat.nombre, valor: rot });
+      if (rot > 0) datosRoturas.push({ key, label, categoria: cat.nombre, valor: rot, precio, coste: precio !== undefined ? rot * precio : null });
     });
   });
   datosConsumo.sort((a, b) => b.valor - a.valor);
   datosRoturas.sort((a, b) => b.valor - a.valor);
   const topConsumo = datosConsumo.slice(0, 10);
   const topRoturas = datosRoturas.slice(0, 10);
+  // El total de coste suma TODOS los items con precio conocido, no solo el top 10 de barras
+  const costeConsumoTotal = datosConsumo.reduce((acc, d) => acc + (d.coste || 0), 0);
+  const costeRoturasTotal = datosRoturas.reduce((acc, d) => acc + (d.coste || 0), 0);
+  const fmtEur = (n) => `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
+  const handleGuardarPrecios = (texto) => {
+    const nuevos = { ...precios, ...parsePreciosPegados(texto) };
+    setPrecios(nuevos);
+    guardarPrecios(nuevos);
+    setEditandoPrecios(false);
+  };
   const maxConsumo = Math.max(1, ...topConsumo.map(d => d.valor));
   const maxRoturas = Math.max(1, ...topRoturas.map(d => d.valor));
   return (
@@ -1281,8 +1318,33 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
         </div>
         {verResumen ? (
           <div className="preview-body">
+            <div className="resumen-precios-bar">
+              <button className="btn btn-outline" onClick={() => setEditandoPrecios(v => !v)}>💶 {editandoPrecios ? "Cerrar precios" : "Precios"}</button>
+              {(costeConsumoTotal > 0 || costeRoturasTotal > 0) && (
+                <span className="resumen-coste-total">Coste estimado: <strong>{fmtEur(costeConsumoTotal + costeRoturasTotal)}</strong></span>
+              )}
+            </div>
+            {editandoPrecios && (
+              <div className="resumen-bloque">
+                <div className="resumen-titulo">Precios por unidad</div>
+                <p className="resumen-vacio">
+                  Pega una línea por item, "Nombre: precio" (ej. "Copas de vino: 0,60"). Se guarda en
+                  este navegador y se usa en cualquier evento — pega solo lo que quieras actualizar,
+                  el resto del catálogo no se toca.
+                </p>
+                <textarea
+                  className="form-input notas-textarea"
+                  rows={5}
+                  placeholder={"Copas de vino: 0,60\nVino blanco: 6,50\nRegletas y alargadores: 2"}
+                  onBlur={e => { if (e.target.value.trim()) { handleGuardarPrecios(e.target.value); e.target.value = ""; } }}
+                />
+              </div>
+            )}
             <div className="resumen-bloque">
-              <div className="resumen-titulo">Consumo real (no ha vuelto)</div>
+              <div className="resumen-titulo">
+                Consumo real (no ha vuelto)
+                {costeConsumoTotal > 0 && <span className="resumen-titulo-coste">{fmtEur(costeConsumoTotal)}</span>}
+              </div>
               {topConsumo.length === 0 ? (
                 <p className="resumen-vacio">Todavía no hay datos: marca en "Vuelta" lo que va volviendo para ver aquí lo que de verdad se ha gastado.</p>
               ) : (
@@ -1293,14 +1355,20 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                       <div className="resumen-barra-pista">
                         <div className="resumen-barra resumen-barra-consumo" style={{ width: `${Math.max(4, (d.valor / maxConsumo) * 100)}%` }} />
                       </div>
-                      <div className="resumen-valor">{d.valor}{d.sufijo ? ` ${d.sufijo}` : ""}</div>
+                      <div className="resumen-valor">
+                        {d.valor}{d.sufijo ? ` ${d.sufijo}` : ""}
+                        {d.coste !== null && <span className="resumen-valor-coste">{fmtEur(d.coste)}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
             <div className="resumen-bloque">
-              <div className="resumen-titulo">💥 Roturas</div>
+              <div className="resumen-titulo">
+                💥 Roturas
+                {costeRoturasTotal > 0 && <span className="resumen-titulo-coste">{fmtEur(costeRoturasTotal)}</span>}
+              </div>
               {topRoturas.length === 0 ? (
                 <p className="resumen-vacio">Sin roturas apuntadas todavía.</p>
               ) : (
@@ -1311,7 +1379,10 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                       <div className="resumen-barra-pista">
                         <div className="resumen-barra resumen-barra-roturas" style={{ width: `${Math.max(4, (d.valor / maxRoturas) * 100)}%` }} />
                       </div>
-                      <div className="resumen-valor">{d.valor}</div>
+                      <div className="resumen-valor">
+                        {d.valor}
+                        {d.coste !== null && <span className="resumen-valor-coste">{fmtEur(d.coste)}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
