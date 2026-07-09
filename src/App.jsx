@@ -1043,9 +1043,49 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
 // Precio por unidad de cada item, guardado en este navegador y compartido entre
 // TODOS los eventos (el precio de "Copas de vino" es el mismo en cualquier boda,
 // no depende del evento) — se busca por el nombre exacto del item.
+// Precios de partida sacados de "Resumen Eventos.xlsx" (coste unitario estimado,
+// consistente en las ~24 hojas de eventos reales). Cualquier precio pegado en
+// "💶 Precios" pisa al de aquí y queda guardado en el navegador.
+const PRECIOS_BASE = {
+  // Bebidas y hielo
+  "Cerveza Alhambra (tercios)": 0.49, // caja de 24 a 11,76€
+  "Vino blanco": 4.1,                 // Nebla blanco
+  "Vino tinto": 5.22,                 // Nebla tinto
+  "Cava": 3.99,                       // El Miracle
+  "Agua 1,5L (Solán de Cabras, cliente)": 4.06, // pack de 6 a 0,68€/botella
+  "Coca-Cola normal": 0.6,
+  "Coca-Cola Zero": 0.58,
+  "Fanta naranja": 0.54,
+  "Fanta limón": 0.54,
+  "Aquarius": 0.68,
+  "Nestea": 0.74,
+  "Tónica": 1.51,
+  "Agua con gas": 1.18,
+  "Cerveza 0,0": 0.95,
+  "Redbull": 1.0,
+  "Vermut rojo": 6.3,
+  "Vermut blanco": 4.1,
+  // Alcoholes y licores
+  "Ginebra (Seagrams/Tanqueray)": 13.05,
+  "Ginebra de sabor (Puerto de Indias)": 11.24,
+  "Ron (Bacardí)": 14.85,
+  "Ron saborizado (Negrita)": 8,
+  "Tequila": 12.87,
+  "Tequila Rosa": 6.7,
+  "Vodka": 10.9, // Absolut
+  "Baileys": 10.26,
+  "Limoncello": 5.99,
+  "Peche (licor de melocotón)": 5.99,
+  "Cazalla": 8.45,
+  "Orujo de hierbas": 7.8,
+  "Ballantines": 9.25,
+  "Barceló": 12.48,
+  "Martini": 8.05,
+  "Otros licores marca blanca (Smirnoff)": 11.15,
+};
 function leerPrecios() {
-  try { return JSON.parse(localStorage.getItem("gula_precios_items") || "{}"); }
-  catch (e) { return {}; }
+  try { return { ...PRECIOS_BASE, ...JSON.parse(localStorage.getItem("gula_precios_items") || "{}") }; }
+  catch (e) { return { ...PRECIOS_BASE }; }
 }
 function guardarPrecios(precios) {
   try { localStorage.setItem("gula_precios_items", JSON.stringify(precios)); }
