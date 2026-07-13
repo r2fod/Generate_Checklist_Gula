@@ -744,7 +744,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
-    llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaAguasPequenas,
+    llevaArmarioCaliente, llevaPalomitera, llevaJamonero,
     llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
@@ -754,7 +754,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
   const totalPax = pax + ninos;
-  const hayBarra = (horasCoctel + horasCopas) > 0;
+  // En producciones no hay barra libre (ni cóctel ni copas): solo refrescos, agua
+  // con gas y aguas (cajas de 33cl y botellas de 1,5L) — nada de alcohol ni cristalería
   const personal = calcPersonal(pax, numCamareros, numStaff);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
@@ -843,7 +844,6 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Calentador de agua", "1"], ["Kit té matcha", "1"],
     ["Cacao y canela", conSufijo(1, "bote")], ["Leche condensada", conSufijo(1, "lata")],
     ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
-    opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
     // en cada bebida por separado en vez de en dos líneas combinadas
     ["Coca-Cola normal", String(Math.round(totalPax * 0.94))], ["Coca-Cola Zero", String(Math.round(totalPax * 0.56))],
@@ -851,7 +851,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Aquarius", String(Math.round(totalPax * 0.24))], ["Sprite", String(Math.round(totalPax * 0.12))],
     ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(totalPax * 0.8), "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
-    opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")]),
+    // En producción las aguas de 33cl van siempre (cajas), junto con las de 1,5L
+    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")],
     ["Agua con gas", String(Math.round(totalPax * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
   ]});
@@ -1035,7 +1036,7 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${fmtRecogidas(meta.recogidas) ? `<div><span class="ml">Recogidas</span>${fmtRecogidas(meta.recogidas)}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
       <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
-      <div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>
+      ${evtKey !== "produccion" ? `<div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>` : ""}
     </div>
     ${secciones}
     <div class="notas"><strong>NOTAS:</strong><br/>${meta.notasEvento ? `<p style="white-space:pre-wrap;margin:6px 0;">${meta.notasEvento}</p>` : "<br/>"}</div>
@@ -2576,7 +2577,7 @@ export default function App() {
             <div className="header-info">
               <h1>{nombreEvento || EVENTOS[evento]?.label || "Generador Checklist"}</h1>
               <p>
-                {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{pax} pax · cóctel {barraCoctel ? horasCoctel : 0}h · {totalConceptos} conceptos
+                {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{pax} pax{evento !== "produccion" ? ` · cóctel ${barraCoctel ? horasCoctel : 0}h` : ""} · {totalConceptos} conceptos
                 {fechaEvento ? ` · ${new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}` : ""}
                 {horaInicio ? ` · ${horaInicio}h` : ""}
                 {ubicacion ? ` · ${ubicacion}` : ""}
@@ -2911,6 +2912,7 @@ export default function App() {
               onClick={() => setRecogidas(prev => [...prev, { concepto: "", fecha: "", hora: "", fechaDevolucion: "" }])}
             >+ Añadir recogida</button>
           </div>
+          {evento !== "produccion" && (<>
           <hr />
           <div className="section-title">Barra libre</div>
           <div className="form-row">
@@ -2935,6 +2937,7 @@ export default function App() {
               </div>
             </div>
           </div>
+          </>)}
           {evento !== "produccion" && evento !== "cumpleanos" && (
             <div className="form-row" style={{ marginTop: 12, alignItems: "flex-end" }}>
               <SegmentedControl label="Barril de cerveza" value={tamanoBarril} onChange={setTamanoBarril} options={["No lleva", "30L", "50L"]} />
@@ -2963,7 +2966,9 @@ export default function App() {
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaChillOut,        setLlevaChillOut,        "Lleva chill out",          llevaChillOut ? `${numChillOut} (ajusta abajo)` : "sofás/zona chill out"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
-              [llevaAguasPequenas,   setLlevaAguasPequenas,   "Aguas pequeñas",           "botellas individuales 33cl"],
+              ...(evento !== "produccion"
+                ? [[llevaAguasPequenas, setLlevaAguasPequenas, "Aguas pequeñas", "botellas individuales 33cl"]]
+                : []),
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
               ...(evento !== "boda"
                 ? [[fuerzaTextilTela, setFuerzaTextilTela, "Servilletas de tela", "añade tela y reduce las de papel grandes"]]
