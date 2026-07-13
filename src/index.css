@@ -317,6 +317,24 @@ body {
   max-width: 110px;
 }
 
+.dia-produccion-numdias {
+  margin-bottom: 12px;
+}
+
+.dia-produccion-numdias .form-label {
+  margin: 0;
+}
+
+.dia-produccion-numdias .form-input {
+  max-width: 80px;
+}
+
+.dia-produccion-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .dias-produccion-resumen {
   margin: 8px 0 0;
   font-size: 0.78rem;

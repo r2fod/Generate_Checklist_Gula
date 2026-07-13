@@ -2770,7 +2770,25 @@ export default function App() {
           </div>
           {evento === "produccion" && (
             <div className="logistica-block">
-              <span className="form-label">DÍAS DE PRODUCCIÓN (pax de cada día)</span>
+              <div className="dia-produccion-row dia-produccion-numdias">
+                <span className="form-label">DÍAS DE PRODUCCIÓN</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="7"
+                  className="form-input"
+                  placeholder="1"
+                  value={diasProduccion.length || ""}
+                  onChange={e => {
+                    // Máximo una semana (más días seguidos no tiene sentido). Al cambiar
+                    // el número se conservan los pax ya escritos de los primeros días y
+                    // solo se añaden/quitan huecos por el final.
+                    const n = Math.min(7, Math.max(0, parseInt(e.target.value, 10) || 0));
+                    setDiasProduccion(prev => n <= prev.length ? prev.slice(0, n) : [...prev, ...Array(n - prev.length).fill("")]);
+                  }}
+                />
+                <span className="dia-produccion-hint">máx. 7</span>
+              </div>
               {diasProduccion.map((d, i) => (
                 <div className="dia-produccion-row" key={i}>
                   <span className="dia-produccion-label">Día {i + 1}</span>
@@ -2782,21 +2800,14 @@ export default function App() {
                     value={d}
                     onChange={e => setDiasProduccion(prev => prev.map((x, idx) => idx === i ? e.target.value : x))}
                   />
-                  <button
-                    className="item-action-btn item-action-borrar"
-                    onClick={() => setDiasProduccion(prev => prev.filter((_, idx) => idx !== i))}
-                    title={`Quitar día ${i + 1}`}
-                    aria-label={`Quitar día ${i + 1}`}
-                  >✕</button>
                 </div>
               ))}
-              <button className="btn-add-logistica" onClick={() => setDiasProduccion(prev => [...prev, ""])}>+ Añadir día</button>
               {diasPaxValidos.length > 0 ? (
                 <p className="dias-produccion-resumen">
                   {diasPaxValidos.join(" + ")} pax en {diasPaxValidos.length} días → equipo para el día de {Math.max(...diasPaxValidos)} pax, consumibles para {diasPaxValidos.reduce((a, b) => a + b, 0)} raciones
                 </p>
               ) : (
-                <p className="dias-produccion-resumen">Sin días definidos se calcula como un solo día con los PAX de arriba.</p>
+                <p className="dias-produccion-resumen">Pon cuántos días es la producción (máx. 7) y el pax de cada día. Sin días se calcula un solo día con los PAX de arriba.</p>
               )}
             </div>
           )}
