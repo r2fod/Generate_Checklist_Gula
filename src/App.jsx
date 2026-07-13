@@ -765,8 +765,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
-    ["Focos de luz / Trípodes", "—"], ["Regletas y alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
-    ["Cinta aislante / Bridas", "1"], ["Generador + garrafa gasolina (llena)", "1"],
+    ["Focos de luz / Trípodes", "—"], ["Regletas, alargadores y caja cables", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
+    ["Cinta aislante / Bridas / Rulos", "1"], ["Generador + garrafa gasolina (llena)", "1"],
     ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
 
@@ -840,8 +840,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Bandejas de cartón blancas + blondas", conSufijo(Math.ceil(totalPax / 20), "paq.")],
     ["Platitos de cartón / Envase bocadillos", String(totalPax)],
     ["Palitos brocheta", conSufijo(Math.ceil(totalPax / 20), "paq.")], ["Palitos café", conSufijo(Math.ceil(totalPax / 30), "paq.")],
-    ["Calentador de agua", "1"], ["Kit té matcha", "1"], ["Infusiones varias", conSufijo(1, "caja")],
-    ["Leches variadas (sin/normal/avena)", "4"], ["Cacao y canela", conSufijo(1, "bote")], ["Leche condensada", conSufijo(1, "lata")],
+    ["Calentador de agua", "1"], ["Kit té matcha", "1"],
+    ["Cacao y canela", conSufijo(1, "bote")], ["Leche condensada", conSufijo(1, "lata")],
     ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
