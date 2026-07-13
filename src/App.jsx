@@ -322,20 +322,23 @@ function calcMesasTotal(evtKey, pax) {
 // - Nespresso: cápsulas, cantidad calculada para cubrir el pax.
 // - Bar: cafetera tipo bar (portátil), también funciona con cápsulas, no café molido.
 // - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
-function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
+function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax) {
   const items = [];
+  // paxConsumo ≠ totalPax solo en producciones de varios días: lo que se gasta
+  // (cápsulas, café, infusiones, azúcar, leches) se calcula sobre la suma de pax
+  // de todos los días; lo reutilizable (tazas, platos, jarras) sobre el día mayor.
   // El estándar del sector es 1-1,5 tazas/pax (una boda real de 116 invitados usó 100
   // cafés, 0,86/pax); aquí se sube a ~2,2/3,2 para cubrir varios momentos de café en
   // una boda española (sobremesa, tarta, recogida) sin llegar a triplicar lo que de
   // verdad se sirve, como pasaba con el ratio anterior (3,1/4,5, sin relación con las
   // tazas realmente calculadas más abajo: 0,6+0,4 = 1 taza/pax)
-  const capsulas = Math.ceil(totalPax * (hayDesayuno ? 3.2 : 2.2));
+  const capsulas = Math.ceil(paxConsumo * (hayDesayuno ? 3.2 : 2.2));
   if (tipoCafetera === "Grande") {
-    items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(totalPax / 100)), "carga(s)")]);
+    items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(paxConsumo / 100)), "carga(s)")]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${paxConsumo} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
   } else {
-    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${totalPax} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${paxConsumo} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
   }
   // Con desayuno se sirve más café por persona (todos toman, no solo parte de los pax)
   const factorLeche = hayDesayuno ? 0.9 : 0.6;
@@ -344,9 +347,9 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno) {
     [`Tazas café con leche e infusiones${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorLeche))],
     [`Tazas café solo y cortado${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorSolo))],
     ["Platos de café", String(conMargen(totalPax))],
-    ["Infusiones (té variado + descafeinado)", conSufijo(Math.ceil(totalPax / 30), "caja")],
-    ["Azucarillos y edulcorantes", conSufijo(Math.ceil(totalPax / 50), "caja")],
-    [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(totalPax / (hayDesayuno ? 8 : 40))))],
+    ["Infusiones (té variado + descafeinado)", conSufijo(Math.ceil(paxConsumo / 30), "caja")],
+    ["Azucarillos y edulcorantes", conSufijo(Math.ceil(paxConsumo / 50), "caja")],
+    [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(paxConsumo / (hayDesayuno ? 8 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / (hayDesayuno ? 20 : 40))))],
   );
   return { nombre: "Café", items };
@@ -753,7 +756,15 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
+  // Producción de varios días con pax distinto por día (ej. 12+17+12): el equipo
+  // reutilizable (mesas, plancha, vajilla...) se dimensiona para el día de MÁS pax,
+  // y lo consumible (refrescos, aguas, vasos, servilletas, cápsulas...) para la SUMA
+  // de todos los días. Sin días definidos funciona como siempre (un solo día).
+  const diasPax = (opts.diasProduccion || []).map(d => parseInt(d, 10)).filter(n => n > 0);
+  const nDias = Math.max(1, diasPax.length);
+  if (diasPax.length) { pax = Math.max(...diasPax); ninos = 0; }
   const totalPax = pax + ninos;
+  const paxConsumo = diasPax.length ? diasPax.reduce((a, b) => a + b, 0) : totalPax;
   // En producciones no hay barra libre (ni cóctel ni copas): solo refrescos, agua
   // con gas y aguas (cajas de 33cl y botellas de 1,5L) — nada de alcohol ni cristalería
   const personal = calcPersonal(pax, numCamareros, numStaff);
@@ -833,31 +844,33 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
   ]});
 
+  // Todo lo de esta categoría se gasta: con varios días se calcula sobre la suma
+  // de pax de todos los días (paxConsumo), no sobre el día más grande
   cats.push({ nombre: "Desechables y Bebidas", items: [
     ...(usaTela
-      ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
-      : [["Servilletas grandes", conSufijo(conMargen(totalPax * 3 / 50), "paq. (50)")]]),
-    ["Servilletas cocktail", conSufijo(conMargen(totalPax * 3.5 / 100), "paq. (100)")],
-    ["Bandejas de cartón blancas + blondas", conSufijo(Math.ceil(totalPax / 20), "paq.")],
-    ["Platitos de cartón / Envase bocadillos", String(totalPax)],
-    ["Palitos brocheta", conSufijo(Math.ceil(totalPax / 20), "paq.")], ["Palitos café", conSufijo(Math.ceil(totalPax / 30), "paq.")],
+      ? [["Servilletas de tela", String(conMargen(paxConsumo))], ["Servilletas grandes (extra)", conSufijo(conMargen(paxConsumo / 50), "paq. (50)")]]
+      : [["Servilletas grandes", conSufijo(conMargen(paxConsumo * 3 / 50), "paq. (50)")]]),
+    ["Servilletas cocktail", conSufijo(conMargen(paxConsumo * 3.5 / 100), "paq. (100)")],
+    ["Bandejas de cartón blancas + blondas", conSufijo(Math.ceil(paxConsumo / 20), "paq.")],
+    ["Platitos de cartón / Envase bocadillos", String(paxConsumo)],
+    ["Palitos brocheta", conSufijo(Math.ceil(paxConsumo / 20), "paq.")], ["Palitos café", conSufijo(Math.ceil(paxConsumo / 30), "paq.")],
     ["Calentador de agua", "1"], ["Kit té matcha", "1"],
     ["Cacao y canela", conSufijo(1, "bote")], ["Leche condensada", conSufijo(1, "lata")],
-    ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((totalPax + (hayDesayuno ? totalPax * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
+    ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((paxConsumo + (hayDesayuno ? paxConsumo * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
     // en cada bebida por separado en vez de en dos líneas combinadas
-    ["Coca-Cola normal", String(Math.round(totalPax * 0.94))], ["Coca-Cola Zero", String(Math.round(totalPax * 0.56))],
-    ["Fanta naranja", String(Math.round(totalPax * 0.24))], ["Fanta limón", String(Math.round(totalPax * 0.2))],
-    ["Aquarius", String(Math.round(totalPax * 0.24))], ["Sprite", String(Math.round(totalPax * 0.12))],
-    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(totalPax * 0.8), "packs")],
-    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
+    ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56))],
+    ["Fanta naranja", String(Math.round(paxConsumo * 0.24))], ["Fanta limón", String(Math.round(paxConsumo * 0.2))],
+    ["Aquarius", String(Math.round(paxConsumo * 0.24))], ["Sprite", String(Math.round(paxConsumo * 0.12))],
+    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(paxConsumo * 0.8), "packs")],
+    ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
     // En producción las aguas de 33cl van siempre (cajas), junto con las de 1,5L
-    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(totalPax * 3) / 35)), "cajas (35 uds)")],
-    ["Agua con gas", String(Math.round(totalPax * 0.15))],
-    ["Hielo", `${Math.max(2, Math.ceil(totalPax / 30))} taxis`],
+    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(paxConsumo * 3) / 35)), "cajas (35 uds)")],
+    ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
+    ["Hielo", `${Math.max(2, Math.ceil(paxConsumo / 30))} taxis`],
   ]});
 
-  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
+  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo));
 
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Caja limpieza (Fairy, estropajo, film, etc.)", "1"], ["Papel Chemine", conSufijo(3, "rollo")],
@@ -892,6 +905,7 @@ const ETIQUETAS_CAMPO = {
   evento: "Tipo de evento", nombreEvento: "Nombre del evento", fechaEvento: "Fecha",
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
+  diasProduccion: "Días de producción",
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
@@ -1035,7 +1049,10 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) ? `<div><span class="ml">Equipo logística</span>${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}${totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€` : ""}</div>` : ""}
       ${fmtRecogidas(meta.recogidas) ? `<div><span class="ml">Recogidas</span>${fmtRecogidas(meta.recogidas)}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
-      <div><span class="ml">PAX total</span>${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})</div>
+      <div><span class="ml">PAX total</span>${(() => {
+        const dias = evtKey === "produccion" ? (meta.diasProduccion || []).map(d => parseInt(d, 10)).filter(n => n > 0) : [];
+        return dias.length ? `${dias.join(" + ")} pax (${dias.length} días de producción)` : `${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})`;
+      })()}</div>
       ${evtKey !== "produccion" ? `<div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>` : ""}
     </div>
     ${secciones}
@@ -1718,6 +1735,10 @@ export default function App() {
   const [notasEvento, setNotasEvento]   = useState(estadoInicial.notasEvento ?? "");
   const [pax, setPax]               = useState(estadoInicial.pax ?? 80);
   const [ninos, setNinos]           = useState(estadoInicial.ninos ?? 0);
+  // Solo producción: pax de cada día de rodaje/producción (ej. [12, 17, 12]). Lo
+  // reutilizable se calcula para el día de MÁS pax y lo consumible para la SUMA.
+  const [diasProduccion, setDiasProduccion] = useState(estadoInicial.diasProduccion ?? []);
+  const diasPaxValidos = evento === "produccion" ? diasProduccion.map(d => parseInt(d, 10)).filter(n => n > 0) : [];
   const [barraCoctel, setBarraCoctel] = useState(estadoInicial.barraCoctel ?? true);
   const [horasCoctel, setHorasCoctel] = useState(estadoInicial.horasCoctel ?? 2);
   const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
@@ -1883,7 +1904,7 @@ export default function App() {
   // como el guardado automático en localStorage
   const getEstadoActual = () => ({
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
-    barraCoctel, horasCoctel, barraCopas, horasCopas,
+    barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, numCamareros, numStaff, tipoBandejas,
@@ -1929,7 +1950,7 @@ export default function App() {
   const SETTERS_SYNC = {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
-    barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas,
+    barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas, diasProduccion: setDiasProduccion,
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
@@ -2106,7 +2127,10 @@ export default function App() {
       // Se actualiza la foto de cantidades automáticas al guardar: a partir de ahora
       // "Recalcular" comparará contra los valores de ESTE guardado, no de uno anterior
       setValoresCalculados(valoresBaseActuales);
-      guardarEventos({ ...eventosGuardados, [nombre]: { ...getEstadoActual(), valoresCalculados: valoresBaseActuales } });
+      // El campo "Nombre del evento" se sincroniza con el nombre elegido al guardar:
+      // así el siguiente "Guardar evento" ya viene precargado sin volver a escribirlo
+      setNombreEvento(nombre);
+      guardarEventos({ ...eventosGuardados, [nombre]: { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales } });
       setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3500);
     },
@@ -2151,7 +2175,11 @@ export default function App() {
       mensaje: "Se sustituirá todo lo que hay ahora en pantalla por la checklist guardada.",
       textoConfirmar: "Abrir evento",
       onConfirm: () => {
-        try { localStorage.setItem("gula_checklist_estado", JSON.stringify(eventosGuardados[nombre])); } catch (e) { /* localStorage no disponible */ }
+        // Si el evento se guardó con el campo "Nombre del evento" vacío (se puso el
+        // nombre solo en el diálogo de guardar), al abrirlo se usa el nombre con el
+        // que está archivado — así el próximo guardado ya viene con nombre puesto
+        const estado = { ...eventosGuardados[nombre], nombreEvento: eventosGuardados[nombre].nombreEvento || nombre };
+        try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); } catch (e) { /* localStorage no disponible */ }
         window.location.href = window.location.origin + window.location.pathname;
       },
     });
@@ -2206,7 +2234,7 @@ export default function App() {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas,
-    estiloPlatoPrincipal, estiloPlatoPostre,
+    estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
   };
 
   // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
@@ -2478,7 +2506,7 @@ export default function App() {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, checkeados, vueltos, roturas });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -2509,7 +2537,7 @@ export default function App() {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, checkeados, vueltos, roturas });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -2551,7 +2579,7 @@ export default function App() {
 
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
       {modoCarga && (
         <ModalModoCarga
           checklist={checklist}
@@ -2577,7 +2605,7 @@ export default function App() {
             <div className="header-info">
               <h1>{nombreEvento || EVENTOS[evento]?.label || "Generador Checklist"}</h1>
               <p>
-                {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{pax} pax{evento !== "produccion" ? ` · cóctel ${barraCoctel ? horasCoctel : 0}h` : ""} · {totalConceptos} conceptos
+                {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{diasPaxValidos.length > 0 ? `${diasPaxValidos.join("+")} pax · ${diasPaxValidos.length} días` : `${pax} pax`}{evento !== "produccion" ? ` · cóctel ${barraCoctel ? horasCoctel : 0}h` : ""} · {totalConceptos} conceptos
                 {fechaEvento ? ` · ${new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}` : ""}
                 {horaInicio ? ` · ${horaInicio}h` : ""}
                 {ubicacion ? ` · ${ubicacion}` : ""}
@@ -2721,6 +2749,7 @@ export default function App() {
                 {Object.entries(EVENTOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
+            {diasPaxValidos.length === 0 && (<>
             <div className="form-group">
               <span className="form-label">PAX ADULTOS</span>
               <input type="number" className="form-input" value={pax} onChange={e => setPax(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
@@ -2729,6 +2758,7 @@ export default function App() {
               <span className="form-label">NIÑOS</span>
               <input type="number" className="form-input" value={ninos} onChange={e => setNinos(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
             </div>
+            </>)}
             <div className="form-group">
               <span className="form-label">Nº CAMAREROS</span>
               <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
@@ -2738,6 +2768,38 @@ export default function App() {
               <input type="number" className="form-input" placeholder="0" value={numStaff || ""} onChange={e => setNumStaff(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
             </div>
           </div>
+          {evento === "produccion" && (
+            <div className="logistica-block">
+              <span className="form-label">DÍAS DE PRODUCCIÓN (pax de cada día)</span>
+              {diasProduccion.map((d, i) => (
+                <div className="dia-produccion-row" key={i}>
+                  <span className="dia-produccion-label">Día {i + 1}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    className="form-input"
+                    placeholder="pax"
+                    value={d}
+                    onChange={e => setDiasProduccion(prev => prev.map((x, idx) => idx === i ? e.target.value : x))}
+                  />
+                  <button
+                    className="item-action-btn item-action-borrar"
+                    onClick={() => setDiasProduccion(prev => prev.filter((_, idx) => idx !== i))}
+                    title={`Quitar día ${i + 1}`}
+                    aria-label={`Quitar día ${i + 1}`}
+                  >✕</button>
+                </div>
+              ))}
+              <button className="btn-add-logistica" onClick={() => setDiasProduccion(prev => [...prev, ""])}>+ Añadir día</button>
+              {diasPaxValidos.length > 0 ? (
+                <p className="dias-produccion-resumen">
+                  {diasPaxValidos.join(" + ")} pax en {diasPaxValidos.length} días → equipo para el día de {Math.max(...diasPaxValidos)} pax, consumibles para {diasPaxValidos.reduce((a, b) => a + b, 0)} raciones
+                </p>
+              ) : (
+                <p className="dias-produccion-resumen">Sin días definidos se calcula como un solo día con los PAX de arriba.</p>
+              )}
+            </div>
+          )}
           <div className="form-row">
             <div className="form-group">
               <span className="form-label">NOMBRE DEL EVENTO</span>

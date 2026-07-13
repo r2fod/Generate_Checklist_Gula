@@ -297,6 +297,33 @@ body {
   background: #15803d;
 }
 
+/* Días de producción (pax por día, solo evento Producción) */
+.dia-produccion-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.dia-produccion-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 44px;
+}
+
+.dia-produccion-row .form-input {
+  max-width: 110px;
+}
+
+.dias-produccion-resumen {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 /* Estado (recogido/devuelto) dentro de la tarjeta de recogida */
 .recogida-estado {
   display: flex;
