@@ -75,6 +75,13 @@ body {
   align-items: start;
 }
 
+/* Sin esto, un hijo con contenido ancho (input largo, fila que no parte...) fuerza
+   a la columna del grid a crecer más que el viewport y toda la página desborda en
+   móvil ("grid blowout": 1fr no encoge por debajo del min-content de sus hijos) */
+.main-layout > * {
+  min-width: 0;
+}
+
 .config-sidebar {
   display: flex;
   flex-direction: column;
@@ -1132,6 +1139,9 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+  /* En pantallas muy estrechas (<360px) los botones no caben en una línea con el
+     título: se permite partir la fila en vez de desbordar la página */
+  flex-wrap: wrap;
 }
 
 .btn-plantilla {
