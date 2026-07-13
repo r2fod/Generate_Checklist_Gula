@@ -2665,22 +2665,29 @@ export default function App() {
 
         {avisosRecogidas.length > 0 && !avisosOcultos && (
           <div className="avisos-recogidas-banner">
-            <div className="cambios-remotos-detalle">
+            <div className="cambios-remotos-detalle avisos-recogidas-detalle">
               <strong>⏰ Recogidas/devoluciones pendientes:</strong>
-              <span className="avisos-recogidas-lista">
-                {avisosRecogidas.slice(0, 4).map((a) => (
-                  <span className="aviso-recogida-chip" key={`${a.evento}::${a.idx}::${a.tipo}`}>
-                    {a.tipo} "{a.concepto}" ({a.evento})
-                    <button
-                      className="aviso-recogida-hecho"
-                      onClick={() => marcarAvisoHecho(a)}
-                      title={`Marcar ${a.tipo.toLowerCase()} como hecha`}
-                      aria-label={`Marcar ${a.tipo} de ${a.concepto} como hecha`}
-                    >✓ Hecho</button>
+              {/* Agrupados por evento: cada evento con SUS recogidas debajo, que si no
+                  se mezclan todas en una línea y no se sabe qué es de qué evento */}
+              {[...new Set(avisosRecogidas.map(a => a.evento))].map(evt => (
+                <div className="aviso-evento-grupo" key={evt}>
+                  <span className="aviso-evento-nombre">📋 {evt}</span>
+                  <span className="avisos-recogidas-lista">
+                    {avisosRecogidas.filter(a => a.evento === evt).map(a => (
+                      <span className="aviso-recogida-chip" key={`${a.idx}::${a.tipo}`}>
+                        {a.tipo}: "{a.concepto}"
+                        {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })})` : ""}
+                        <button
+                          className="aviso-recogida-hecho"
+                          onClick={() => marcarAvisoHecho(a)}
+                          title={`Marcar ${a.tipo.toLowerCase()} como hecha`}
+                          aria-label={`Marcar ${a.tipo} de ${a.concepto} como hecha`}
+                        >✓ Hecho</button>
+                      </span>
+                    ))}
                   </span>
-                ))}
-                {avisosRecogidas.length > 4 ? ` · y ${avisosRecogidas.length - 4} más` : ""}
-              </span>
+                </div>
+              ))}
             </div>
             <button className="cambios-remotos-cerrar" onClick={() => setAvisosOcultos(true)} aria-label="Cerrar aviso">✕</button>
           </div>
@@ -2742,7 +2749,12 @@ export default function App() {
             <div className="plantillas-lista">
               {Object.keys(eventosGuardados).map(n => (
                 <div className="plantilla-row" key={n}>
-                  <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>📋 {n}</button>
+                  <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
+                    📋 {n}
+                    {avisosRecogidas.some(a => a.evento === n) && (
+                      <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes">⏰ {avisosRecogidas.filter(a => a.evento === n).length}</span>
+                    )}
+                  </button>
                   <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}>🔗</button>
                   <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado">✕</button>
                 </div>
