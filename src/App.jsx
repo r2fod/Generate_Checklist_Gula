@@ -1987,7 +1987,14 @@ export default function App() {
       // Marcar ANTES de aplicar: así el guardado automático que provocará este
       // cambio de estado no se re-detecta como "cambio de otra persona"
       ultimoGuardadoNubeRef.current = remotoJSON;
-      Object.entries(remoto).forEach(([k, v]) => { if (settersSyncRef.current[k]) settersSyncRef.current[k](v); });
+      Object.entries(remoto).forEach(([k, v]) => {
+        // Un doc remoto guardado sin nombre (típico: se puso el nombre solo en el
+        // diálogo de guardar, no en el campo) no debe borrar el nombre que ya
+        // tenemos: sin esto, al abrir ese evento el snapshot inicial de la nube
+        // vaciaba el campo nada más inyectarlo, y el diálogo salía vacío otra vez
+        if (k === "nombreEvento" && !v && previo.nombreEvento) return;
+        if (settersSyncRef.current[k]) settersSyncRef.current[k](v);
+      });
       if (cambios.length > 0) {
         setHayCambiosRemotos(cambios);
         clearTimeout(window.__avisoSyncTimer);
@@ -2179,6 +2186,11 @@ export default function App() {
         // nombre solo en el diálogo de guardar), al abrirlo se usa el nombre con el
         // que está archivado — así el próximo guardado ya viene con nombre puesto
         const estado = { ...eventosGuardados[nombre], nombreEvento: eventosGuardados[nombre].nombreEvento || nombre };
+        // El doc compartido de la nube también se actualiza con el nombre: si no, su
+        // snapshot (con nombre vacío) volvería a dejar el campo en blanco tras abrir
+        if (nubeActiva() && estado.eventoNubeId && !eventosGuardados[nombre].nombreEvento) {
+          guardarEventoNube(estado.eventoNubeId, estado).catch(() => { /* sin conexión */ });
+        }
         try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); } catch (e) { /* localStorage no disponible */ }
         window.location.href = window.location.origin + window.location.pathname;
       },
