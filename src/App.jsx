@@ -980,7 +980,10 @@ function fmtRecogidas(recogidas = []) {
       const fechaFmt = r.fecha ? new Date(r.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
       const cuando = [fechaFmt, r.hora].filter(Boolean).join(" ");
       const devFmt = r.fechaDevolucion ? new Date(r.fechaDevolucion + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
-      const partes = [cuando, devFmt ? `devuelve ${devFmt}` : ""].filter(Boolean).join(", ");
+      const partes = [
+        cuando ? `${cuando}${r.recogido ? " ✓" : ""}` : (r.recogido ? "recogido ✓" : ""),
+        devFmt ? `devuelve ${devFmt}${r.devuelto ? " ✓" : ""}` : "",
+      ].filter(Boolean).join(", ");
       return partes ? `${r.concepto} (${partes})` : r.concepto;
     })
     .join(" · ");
@@ -1841,15 +1844,35 @@ export default function App() {
     const hoyISO = new Date().toISOString().slice(0, 10);
     const avisos = [];
     Object.entries(eventosGuardados).forEach(([nombreEvt, datos]) => {
-      (datos.recogidas || []).forEach(r => {
+      (datos.recogidas || []).forEach((r, idx) => {
         if (!r.concepto) return;
-        if (r.fecha && r.fecha <= hoyISO) avisos.push({ evento: nombreEvt, concepto: r.concepto, fecha: r.fecha, tipo: "Recogida" });
-        if (r.fechaDevolucion && r.fechaDevolucion <= hoyISO) avisos.push({ evento: nombreEvt, concepto: r.concepto, fecha: r.fechaDevolucion, tipo: "Devolución" });
+        // Lo ya marcado como hecho desaparece del aviso: solo queda lo pendiente
+        if (r.fecha && r.fecha <= hoyISO && !r.recogido) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fecha, tipo: "Recogida" });
+        if (r.fechaDevolucion && r.fechaDevolucion <= hoyISO && !r.devuelto) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fechaDevolucion, tipo: "Devolución" });
       });
     });
     avisos.sort((a, b) => a.fecha.localeCompare(b.fecha));
     return avisos;
   }, [eventosGuardados]);
+  // Marca una recogida/devolución como hecha desde el propio aviso: se guarda en el
+  // evento afectado (nube incluida) y, si es el evento abierto, también en su estado vivo
+  const marcarAvisoHecho = (aviso) => {
+    const campo = aviso.tipo === "Recogida" ? "recogido" : "devuelto";
+    const datos = eventosGuardados[aviso.evento];
+    if (datos) {
+      const nuevoEstado = { ...datos, recogidas: (datos.recogidas || []).map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r) };
+      guardarEventos({ ...eventosGuardados, [aviso.evento]: nuevoEstado });
+      // El doc individual del link compartido también se actualiza si el evento tiene uno
+      if (nubeActiva() && nuevoEstado.eventoNubeId) guardarEventoNube(nuevoEstado.eventoNubeId, nuevoEstado).catch(() => {});
+    }
+    // Si el evento del aviso es el que está abierto en el formulario (mismo nombre o
+    // mismo id de nube), su estado vivo también se marca — así un "Guardar evento"
+    // posterior no pisa el hecho con el pendiente antiguo
+    const esElAbierto = aviso.evento === nombreEvento || (datos && datos.eventoNubeId && datos.eventoNubeId === eventoNubeId);
+    if (esElAbierto) {
+      setRecogidas(prev => prev.map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r));
+    }
+  };
   // Historial para deshacer cambios manuales (cantidad editada o item quitado).
   // Se guarda un snapshot al EMPEZAR a editar cada item (no por cada tecla).
   const [historial, setHistorial] = useState([]);
@@ -2603,8 +2626,18 @@ export default function App() {
           <div className="avisos-recogidas-banner">
             <div className="cambios-remotos-detalle">
               <strong>⏰ Recogidas/devoluciones pendientes:</strong>
-              <span>
-                {avisosRecogidas.slice(0, 4).map((a, i) => `${a.tipo} "${a.concepto}" (${a.evento})`).join(" · ")}
+              <span className="avisos-recogidas-lista">
+                {avisosRecogidas.slice(0, 4).map((a) => (
+                  <span className="aviso-recogida-chip" key={`${a.evento}::${a.idx}::${a.tipo}`}>
+                    {a.tipo} "{a.concepto}" ({a.evento})
+                    <button
+                      className="aviso-recogida-hecho"
+                      onClick={() => marcarAvisoHecho(a)}
+                      title={`Marcar ${a.tipo.toLowerCase()} como hecha`}
+                      aria-label={`Marcar ${a.tipo} de ${a.concepto} como hecha`}
+                    >✓ Hecho</button>
+                  </span>
+                ))}
                 {avisosRecogidas.length > 4 ? ` · y ${avisosRecogidas.length - 4} más` : ""}
               </span>
             </div>
@@ -2841,6 +2874,14 @@ export default function App() {
                         onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, hora: e.target.value } : x))}
                       />
                     </div>
+                    <label className={`recogida-estado ${r.recogido ? "is-hecho" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!r.recogido}
+                        onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, recogido: e.target.checked } : x))}
+                      />
+                      {r.recogido ? "✓ Recogido" : "Pendiente de recoger"}
+                    </label>
                   </div>
                   <div className="form-group">
                     <span className="form-label">Devolución</span>
@@ -2851,6 +2892,16 @@ export default function App() {
                       title="Fecha de devolución"
                       onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fechaDevolucion: e.target.value } : x))}
                     />
+                    {r.fechaDevolucion && (
+                      <label className={`recogida-estado ${r.devuelto ? "is-hecho" : ""}`}>
+                        <input
+                          type="checkbox"
+                          checked={!!r.devuelto}
+                          onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, devuelto: e.target.checked } : x))}
+                        />
+                        {r.devuelto ? "✓ Devuelto" : "Pendiente de devolver"}
+                      </label>
+                    )}
                   </div>
                 </div>
               </div>

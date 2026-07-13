@@ -256,6 +256,63 @@ body {
   color: #92400e;
 }
 
+.avisos-recogidas-lista {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.aviso-recogida-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  padding: 3px 6px 3px 12px;
+}
+
+.aviso-recogida-hecho {
+  border: none;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 24px;
+}
+
+.aviso-recogida-hecho:hover {
+  background: #15803d;
+}
+
+/* Estado (recogido/devuelto) dentro de la tarjeta de recogida */
+.recogida-estado {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #92400e;
+  cursor: pointer;
+}
+
+.recogida-estado input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+.recogida-estado.is-hecho {
+  color: #15803d;
+}
+
 /* Aviso de que otra persona ha guardado cambios en este evento (nube) */
 .cambios-remotos-banner {
   background: var(--accent-soft);
