@@ -186,8 +186,12 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const refrescoTotal = Math.round(pax * 7.4);
   const tonica = Math.max(6, Math.round(pax * 0.15 * barFactor));
   // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
-  // Agua Vidaqua de personal, que se calcula aparte en calcPersonal()
+  // Agua Vidaqua de personal, que se calcula aparte en calcPersonal(). El ratio es
+  // 0,8 BOTELLAS por pax (~1,2 L/pax, en el rango alto del sector: 0,5-1 L/pax);
+  // se sirve en packs de 6. Antes la cifra de botellas se etiquetaba como "packs"
+  // (64 packs = 384 botellas para 80 pax, 7 L/pax — un disparate multiplicado ×6).
   const agua15 = Math.round(pax * 0.8);
+  const agua15Packs = Math.max(2, Math.ceil(agua15 / 6));
   const redbull = h > 0 ? Math.max(6, Math.round(pax * 0.06 * barFactor)) : 0;
   // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
   const aguasPequenasUds = Math.round(pax * 3);
@@ -206,7 +210,7 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
     // de los rangos del sector (vino 0,72 bot/pax vs 0,33-0,5 estándar; cerveza en el
     // techo de 1,5-2/pax; cava 0,2 vs 0,17). Añadir un 10% encima era pasarse.
     cerveza, vinoBlanco, vinoTinto,
-    cava, tonica, agua15, redbull,
+    cava, tonica, agua15, agua15Packs, redbull,
     aguasPequenasCajas, aguasPequenasUds,
     vermutRojo, vermutBlanco, tintoVerano,
     cocaNormal: Math.round(refrescoTotal * 0.25),
@@ -547,7 +551,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(tercerosRestantes > 0, ["Cerveza Alhambra (tercios)", String(tercerosRestantes)]),
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
     ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
-    ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
+    ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15Packs, "packs (6 uds)")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
@@ -705,7 +709,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
     ["Aquarius", String(bebidas.aquarius)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
-    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15, "packs")],
+    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15Packs, "packs (6 uds)")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
@@ -862,10 +866,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56))],
     ["Fanta naranja", String(Math.round(paxConsumo * 0.24))], ["Fanta limón", String(Math.round(paxConsumo * 0.2))],
     ["Aquarius", String(Math.round(paxConsumo * 0.24))], ["Sprite", String(Math.round(paxConsumo * 0.12))],
-    ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(Math.round(paxConsumo * 0.8), "packs")],
+    // En producción el agua de beber son las CAJAS de 33cl (35 uds), a ~3,5 botellas
+    // por pax y día; la de 1,5L es solo un extra por si hace falta (paella, lavar,
+    // beber el personal), no va por pax — un par de packs por día es de sobra
+    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(paxConsumo * 3.5 / 35)), "cajas (35 uds)")],
+    ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
-    // En producción las aguas de 33cl van siempre (cajas), junto con las de 1,5L
-    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(Math.round(paxConsumo * 3) / 35)), "cajas (35 uds)")],
     ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
     ["Hielo", `${Math.max(2, Math.ceil(paxConsumo / 30))} taxis`],
   ]});
@@ -2663,35 +2669,56 @@ export default function App() {
           </div>
         )}
 
-        {avisosRecogidas.length > 0 && !avisosOcultos && (
-          <div className="avisos-recogidas-banner">
-            <div className="cambios-remotos-detalle avisos-recogidas-detalle">
-              <strong>⏰ Recogidas/devoluciones pendientes:</strong>
-              {/* Agrupados por evento: cada evento con SUS recogidas debajo, que si no
-                  se mezclan todas en una línea y no se sabe qué es de qué evento */}
-              {[...new Set(avisosRecogidas.map(a => a.evento))].map(evt => (
-                <div className="aviso-evento-grupo" key={evt}>
-                  <span className="aviso-evento-nombre">📋 {evt}</span>
-                  <span className="avisos-recogidas-lista">
-                    {avisosRecogidas.filter(a => a.evento === evt).map(a => (
-                      <span className="aviso-recogida-chip" key={`${a.idx}::${a.tipo}`}>
-                        {a.tipo}: "{a.concepto}"
-                        {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })})` : ""}
+        {avisosRecogidas.length > 0 && !avisosOcultos && (() => {
+          // Cada aviso vive en SU evento: el detalle completo (con botón ✓ Hecho) solo
+          // se enseña para el evento que está abierto ahora mismo; del resto de eventos
+          // solo una línea compacta por evento para abrirlo — así no se mezclan
+          const esAbierto = (evt) => evt === nombreEvento
+            || (!!eventoNubeId && eventosGuardados[evt]?.eventoNubeId === eventoNubeId);
+          const delAbierto = avisosRecogidas.filter(a => esAbierto(a.evento));
+          const otrosEventos = [...new Set(avisosRecogidas.filter(a => !esAbierto(a.evento)).map(a => a.evento))];
+          return (
+            <div className="avisos-recogidas-banner">
+              <div className="cambios-remotos-detalle avisos-recogidas-detalle">
+                {delAbierto.length > 0 && (
+                  <div className="aviso-evento-grupo">
+                    <strong>⏰ Pendiente en este evento ({delAbierto[0].evento}):</strong>
+                    <span className="avisos-recogidas-lista">
+                      {delAbierto.map(a => (
+                        <span className="aviso-recogida-chip" key={`${a.idx}::${a.tipo}`}>
+                          {a.tipo}: "{a.concepto}"
+                          {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })})` : ""}
+                          <button
+                            className="aviso-recogida-hecho"
+                            onClick={() => marcarAvisoHecho(a)}
+                            title={`Marcar ${a.tipo.toLowerCase()} como hecha`}
+                            aria-label={`Marcar ${a.tipo} de ${a.concepto} como hecha`}
+                          >✓ Hecho</button>
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                )}
+                {otrosEventos.length > 0 && (
+                  <div className="aviso-evento-grupo">
+                    <strong>⏰ Recogidas pendientes en otros eventos:</strong>
+                    <span className="avisos-recogidas-lista">
+                      {otrosEventos.map(evt => (
                         <button
-                          className="aviso-recogida-hecho"
-                          onClick={() => marcarAvisoHecho(a)}
-                          title={`Marcar ${a.tipo.toLowerCase()} como hecha`}
-                          aria-label={`Marcar ${a.tipo} de ${a.concepto} como hecha`}
-                        >✓ Hecho</button>
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              ))}
+                          className="aviso-otro-evento-btn"
+                          key={evt}
+                          onClick={() => handleCargarEvento(evt)}
+                          title={avisosRecogidas.filter(a => a.evento === evt).map(a => `${a.tipo}: ${a.concepto}`).join(" · ")}
+                        >📋 {evt} ({avisosRecogidas.filter(a => a.evento === evt).length}) →</button>
+                      ))}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <button className="cambios-remotos-cerrar" onClick={() => setAvisosOcultos(true)} aria-label="Cerrar aviso">✕</button>
             </div>
-            <button className="cambios-remotos-cerrar" onClick={() => setAvisosOcultos(true)} aria-label="Cerrar aviso">✕</button>
-          </div>
-        )}
+          );
+        })()}
 
         <div className="main-layout">
         <div className="config-sidebar">

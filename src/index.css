@@ -292,6 +292,23 @@ body {
   color: #78350f;
 }
 
+.aviso-otro-evento-btn {
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 26px;
+}
+
+.aviso-otro-evento-btn:hover {
+  background: #fef3c7;
+}
+
 .plantilla-aviso-badge {
   margin-left: 6px;
   font-size: 0.72rem;
