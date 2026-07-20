@@ -791,16 +791,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Sigue siendo editable a mano si el sitio ya tiene sombra o interior.
   const numCarpas = Math.max(1, Math.ceil(pax / 12));
   const numChafers = Math.max(2, Math.ceil(pax / 40));
-  // Además de las mesas de cocina/servicio van SIEMPRE: ~4 de buffet, 1 para el
-  // camión y 1 cuadrada (1x1) para la zona de cajas de las cosas sucias
+  // Las mesas de 1,8m van todas en un único total: cocina/servicio (por pax) + 4 de
+  // buffet + 1 para el camión. La cuadrada 1x1 de la zona de cajas sucias va aparte
+  // porque es otro tipo de mesa.
   const mesasServicio = calcMesasServicio(pax).total;
   const MESAS_BUFFET = 4;
+  const MESA_CAMION = 1;
   cats.push({ nombre: "Mobiliario", items: [
-    // El item se sigue llamando "Mesas" (no "Mesas (cocina/servicio)") para no dejar
-    // huérfanos los valores puestos a mano en eventos ya guardados con ese nombre
-    ["Mesas", String(mesasServicio)],
-    ["Mesas buffet", String(MESAS_BUFFET)],
-    ["Mesa para el camión", "1"],
+    ["Mesas", String(mesasServicio + MESAS_BUFFET + MESA_CAMION)],
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
     ["Mesa redonda", "—"], ["Mesa larga", "—"],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
