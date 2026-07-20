@@ -786,12 +786,17 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
 
+  // Carpas para la zona de comer/office del rodaje: una 3x3 cubre ~12 personas de
+  // pie (0,75 m²/pax, estándar de las alquiladoras de carpas) — para 65 pax salen 6.
+  // Sigue siendo editable a mano si el sitio ya tiene sombra o interior.
+  const numCarpas = Math.max(1, Math.ceil(pax / 12));
+  const numChafers = Math.max(2, Math.ceil(pax / 40));
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
-    ["Carpas con paredes y pesas", "—"], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
+    ["Carpas con paredes y pesas", String(numCarpas)], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     opt(llevaPalomitera, ["Carrito palomitera", "1"]),
     opt(llevaChillOut, ["Chill out", String(numChillOut)]),
@@ -801,18 +806,24 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Plancha de gas", "1"],
     // 1 bombona por paella + 1 extra por cada sartén de fritura
     ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)],
-    ["Horno pequeño / Microondas", "1"], ["Batidora / Túrmix", "1"], ["Mesas calientes", "—"],
-    ["Vitro", "1"], ["Butano", "1"], ["Trípode", String(1 + numFritura)], ["Termos con tapa", "—"],
+    // Mesa caliente para mantener el pase: 1 por cada ~40 pax del día grande
+    ["Horno pequeño / Microondas", "1"], ["Batidora / Túrmix", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
+    // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
+    ["Vitro", "1"], ["Butano", "1"], ["Trípode", String(1 + numFritura)], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
-    ["Neveras playa pequeñas", "2"], ["Chafers", String(Math.max(2, Math.ceil(pax / 40)))],
+    ["Neveras playa pequeñas", "2"], ["Chafers", String(numChafers)],
     opt(llevaArmarioCaliente, ["Armario caliente (alquiler Dealde)", "1", true]),
   ]});
 
+  // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco
+  const numParavientos = (llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura;
   cats.push({ nombre: "Menaje y Utensilios", items: [
     ["Maletín cuchillos / Tablas de corte", "1"], ["Ollas (mediana / grande)", "1"], ["Sartenes / Colador", "1"],
     opt(llevaPaella, [`Paella ${calcPaella(pax, tipoPaella).talla} / Paletas`, String(calcPaella(pax, tipoPaella).n)]),
-    ["Paravientos", "—"], ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
-    ["Servilleteros madera", "2"], ["Gastros", "—"], ["Caja cocina (varios)", "1"],
+    opt(numParavientos > 0, ["Paravientos", String(numParavientos)]),
+    ["Boles metálicos / Cucharones", "4"], ["Pinzas servicio (metal/madera)", "2"],
+    // Cada chafer trabaja con 2 gastros (el que está sirviendo + el de reposición)
+    ["Servilleteros madera", "2"], ["Gastros", String(numChafers * 2)], ["Caja cocina (varios)", "1"],
     ["Aceiteras de cristal", "—"], ["Saleros y pimenteros", "6"], ["Caja salsas / Arroces", "1"],
     opt(tieneFrituras, ["Sartén Parisiene (frituras)", String(numFritura)]),
     opt(tieneFrituras, ["Difusor pequeño (frituras)", String(numFritura)]),
