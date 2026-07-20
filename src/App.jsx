@@ -791,8 +791,18 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Sigue siendo editable a mano si el sitio ya tiene sombra o interior.
   const numCarpas = Math.max(1, Math.ceil(pax / 12));
   const numChafers = Math.max(2, Math.ceil(pax / 40));
+  // Además de las mesas de cocina/servicio van SIEMPRE: ~4 de buffet, 1 para el
+  // camión y 1 cuadrada (1x1) para la zona de cajas de las cosas sucias
+  const mesasServicio = calcMesasServicio(pax).total;
+  const MESAS_BUFFET = 4;
   cats.push({ nombre: "Mobiliario", items: [
-    ["Mesas", String(calcMesasServicio(pax).total)], ["Mesa redonda", "—"], ["Mesa larga", "—"],
+    // El item se sigue llamando "Mesas" (no "Mesas (cocina/servicio)") para no dejar
+    // huérfanos los valores puestos a mano en eventos ya guardados con ese nombre
+    ["Mesas", String(mesasServicio)],
+    ["Mesas buffet", String(MESAS_BUFFET)],
+    ["Mesa para el camión", "1"],
+    ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
+    ["Mesa redonda", "—"], ["Mesa larga", "—"],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
     ["Cubos basura (reciclaje + cocina)", "2"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
@@ -830,7 +840,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ["Manteles negros", String(calcMesasServicio(pax).total + 1)],
+    // Un mantel por mesa de servicio y de buffet (la del camión y la de cajas
+    // sucias van sin vestir) + 1 de repuesto
+    ["Manteles negros", String(mesasServicio + MESAS_BUFFET + 1)],
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, numCamareros) + 2)], ["Bayetas / Trapos", "4"],
     ["Bandeja camareros", String(personalSala(pax, numCamareros))],
