@@ -2413,93 +2413,205 @@ hr {
 
 /* ─── Pantalla de acceso (login del equipo) ─────────────────────────────────── */
 .login-pantalla {
+  position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+  background: linear-gradient(160deg, #f6f7fb 0%, #f1f3fb 55%, #eef0ff 100%);
+}
+
+/* Fondo con dos manchas de color que flotan despacio */
+.login-fondo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.55;
+}
+
+.login-blob-1 {
+  width: 340px;
+  height: 340px;
+  top: -80px;
+  right: -60px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.35), transparent 70%);
+  animation: login-flotar-1 15s ease-in-out infinite;
+}
+
+.login-blob-2 {
+  width: 300px;
+  height: 300px;
+  bottom: -90px;
+  left: -70px;
+  background: radial-gradient(circle, rgba(31, 49, 77, 0.20), transparent 70%);
+  animation: login-flotar-2 19s ease-in-out infinite;
+}
+
+@keyframes login-flotar-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-24px, 26px) scale(1.08); }
+}
+
+@keyframes login-flotar-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -20px) scale(1.1); }
 }
 
 .login-tarjeta {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 360px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: 32px 28px;
+  max-width: 380px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 28px;
+  box-shadow: 0 20px 60px -18px rgba(31, 49, 77, 0.28), 0 2px 8px rgba(31, 49, 77, 0.05);
+  padding: 40px 30px 34px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  animation: login-entrada 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.login-icono {
-  font-size: 40px;
-  text-align: center;
+@keyframes login-entrada {
+  0% { opacity: 0; transform: translateY(22px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.login-titulo {
-  text-align: center;
-  color: var(--primary-navy);
-  font-size: 22px;
+/* Logo de Gula: entra con un pequeño gesto y luego "respira" en bucle */
+.login-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.login-logo {
+  width: 150px;
+  max-width: 62%;
+  height: auto;
+  transform-origin: center bottom;
+  animation:
+    login-logo-entrada 0.9s cubic-bezier(0.16, 1, 0.3, 1) both,
+    login-logo-respira 5.5s ease-in-out 0.9s infinite;
+}
+
+@keyframes login-logo-entrada {
+  0% { opacity: 0; transform: translateY(10px) scale(0.9) rotate(-3deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+}
+
+@keyframes login-logo-respira {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.03); }
 }
 
 .login-sub {
   text-align: center;
   color: var(--text-muted);
-  margin-top: -6px;
-  margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin-top: -4px;
+  margin-bottom: 8px;
 }
 
 .login-campo {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .login-campo span {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-label);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
+  padding-left: 2px;
 }
 
 .login-campo input {
   width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--border-color-strong);
-  border-radius: var(--radius-sm);
-  font-size: 15px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border-color-strong);
+  border-radius: 14px;
+  font-size: 16px; /* 16px evita el zoom automático al enfocar en iOS */
   background: #fff;
   color: var(--text-main);
   transition: var(--transition-smooth);
 }
 
+.login-campo input::placeholder { color: #b6bccb; }
+
 .login-campo input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 .login-error {
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
-  border-radius: var(--radius-sm);
-  padding: 9px 12px;
+  border-radius: 12px;
+  padding: 10px 13px;
   font-size: 13px;
+  font-weight: 600;
   text-align: center;
+  animation: login-entrada 0.3s ease both;
 }
 
 .login-boton {
-  margin-top: 4px;
-  padding: 12px;
-  font-size: 15px;
+  margin-top: 6px;
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--green-btn), var(--green-btn-hover));
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 10px 24px -8px rgba(34, 197, 94, 0.45);
+  transition: var(--transition-smooth);
 }
 
+.login-boton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px -8px rgba(34, 197, 94, 0.5);
+}
+
+.login-boton:active:not(:disabled) { transform: translateY(0); }
+.login-boton:disabled { opacity: 0.65; cursor: default; }
+
 .login-cargando {
+  position: relative;
+  z-index: 1;
   color: var(--text-muted);
   font-size: 15px;
+  font-weight: 600;
+}
+
+@media (max-width: 420px) {
+  .login-tarjeta { padding: 34px 22px 28px; border-radius: 24px; }
+  .login-logo { width: 132px; }
+}
+
+/* Respeta a quien prefiere menos movimiento en pantalla */
+@media (prefers-reduced-motion: reduce) {
+  .login-blob-1, .login-blob-2, .login-logo { animation: none; }
 }

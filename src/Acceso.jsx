@@ -7,6 +7,7 @@
 import { useState, useEffect } from "react";
 import App from "./App.jsx";
 import { accesoActivo, iniciarSesion, cerrarSesion, observarSesion } from "./auth.js";
+import logoGula from "./assets/gula-logo.png";
 
 function esLinkDeEvento() {
   const p = new URLSearchParams(window.location.search);
@@ -53,10 +54,16 @@ function PantallaLogin() {
 
   return (
     <div className="login-pantalla">
-      <form className="login-tarjeta animate-entrance" onSubmit={entrar}>
-        <div className="login-icono">📋</div>
-        <h1 className="login-titulo">Checklist Gula</h1>
-        <p className="login-sub">Acceso del equipo</p>
+      <div className="login-fondo" aria-hidden="true">
+        <span className="login-blob login-blob-1" />
+        <span className="login-blob login-blob-2" />
+      </div>
+
+      <form className="login-tarjeta" onSubmit={entrar}>
+        <div className="login-logo-wrap">
+          <img src={logoGula} alt="Gula" className="login-logo" />
+        </div>
+        <p className="login-sub">Generador de checklist · Acceso del equipo</p>
 
         <label className="login-campo">
           <span>Correo</span>
@@ -84,7 +91,7 @@ function PantallaLogin() {
 
         {error && <div className="login-error">{error}</div>}
 
-        <button className="btn btn-green login-boton" type="submit" disabled={cargando}>
+        <button className="login-boton" type="submit" disabled={cargando}>
           {cargando ? "Entrando…" : "Entrar"}
         </button>
       </form>
