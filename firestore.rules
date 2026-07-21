@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Un evento concreto: se puede abrir y editar SOLO si conoces su ID (el link).
+    // No se permite "listar" todos los eventos de golpe.
+    match /eventos/{id} {
+      allow get, write: if true;
+      allow list: if false;
+    }
+
+    // El archivo con TODOS los eventos guardados: solo el equipo con sesión iniciada.
+    match /indice/{doc} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Todo lo demás: denegado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

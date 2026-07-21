@@ -1752,7 +1752,7 @@ function leerEstadoGuardado() {
 }
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ onCerrarSesion } = {}) {
   const [{ estado: estadoInicial, desdeLink: linkAbiertoInicial }] = useState(leerEstadoGuardado);
   const [evento, setEvento]         = useState(estadoInicial.evento ?? "boda");
   const [nombreEvento, setNombreEvento] = useState(estadoInicial.nombreEvento ?? "");
@@ -2653,6 +2653,9 @@ export default function App() {
           </div>
           <div className="header-actions">
             <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
+            {onCerrarSesion && (
+              <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>
+            )}
             <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
             <button className="btn btn-outline" onClick={() => setModoCarga(true)}>📦 Modo carga</button>
             <div className="compartir-menu-wrap">

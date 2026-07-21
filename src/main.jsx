@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { cargarEventoNube } from './nube.js'
-import App from './App.jsx'
+import Acceso from './Acceso.jsx'
 
 // Si el link es de la nube (?evento=id) se descarga la checklist ANTES de montar
 // la app y se deja en localStorage: así el arranque síncrono de App la restaura
@@ -21,7 +21,7 @@ async function arrancar() {
   }
   createRoot(document.getElementById('root')).render(
     <StrictMode>
-      <App />
+      <Acceso />
     </StrictMode>,
   )
 }

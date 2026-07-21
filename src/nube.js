@@ -2,6 +2,7 @@
 // El SDK de Firebase se carga con import() dinámico SOLO si hay configuración:
 // con firebaseConfig = null la app no descarga nada extra y funciona como siempre.
 import { firebaseConfig } from "./firebaseConfig.js";
+import { getFirebaseApp } from "./firebase.js";
 
 let dbPromise = null;
 
@@ -9,9 +10,9 @@ function getDb() {
   if (!firebaseConfig) return null;
   if (!dbPromise) {
     dbPromise = (async () => {
-      const { initializeApp } = await import("firebase/app");
+      const app = await getFirebaseApp();
       const fs = await import("firebase/firestore");
-      const db = fs.getFirestore(initializeApp(firebaseConfig));
+      const db = fs.getFirestore(app);
       return { db, fs };
     })();
   }
