@@ -1733,6 +1733,13 @@ hr {
     width: 100%;
   }
 
+  /* La acción principal (Compartir) ocupa toda la fila inferior: así los botones
+     secundarios quedan siempre en parejas y el CTA va a ancho completo, tanto con
+     4 botones como con 5 (cuando hay sesión iniciada y aparece "Cerrar sesión"). */
+  .header-actions > .compartir-menu-wrap {
+    grid-column: 1 / -1;
+  }
+
   .compartir-menu-wrap > .btn {
     width: 100%;
   }
