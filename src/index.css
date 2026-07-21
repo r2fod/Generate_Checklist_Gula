@@ -2421,7 +2421,7 @@ hr {
   justify-content: center;
   padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
   overflow: hidden;
-  background: linear-gradient(160deg, #fbfaf7 0%, #f4f5fb 55%, #eef0ff 100%);
+  background: linear-gradient(160deg, #f6f7fb 0%, #f1f3fb 55%, #eef0ff 100%);
 }
 
 /* Fondo con dos manchas de color que flotan despacio */
@@ -2453,7 +2453,7 @@ hr {
   height: 300px;
   bottom: -90px;
   left: -70px;
-  background: radial-gradient(circle, rgba(134, 59, 255, 0.28), transparent 70%);
+  background: radial-gradient(circle, rgba(31, 49, 77, 0.20), transparent 70%);
   animation: login-flotar-2 19s ease-in-out infinite;
 }
 
@@ -2580,19 +2580,19 @@ hr {
   padding: 15px;
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, #2a3f63, #1f314d);
+  background: linear-gradient(135deg, var(--green-btn), var(--green-btn-hover));
   color: #fff;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 10px 24px -8px rgba(31, 49, 77, 0.5);
+  box-shadow: 0 10px 24px -8px rgba(34, 197, 94, 0.45);
   transition: var(--transition-smooth);
 }
 
 .login-boton:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 14px 28px -8px rgba(31, 49, 77, 0.55);
+  box-shadow: 0 14px 28px -8px rgba(34, 197, 94, 0.5);
 }
 
 .login-boton:active:not(:disabled) { transform: translateY(0); }
