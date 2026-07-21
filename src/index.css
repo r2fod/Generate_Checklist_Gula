@@ -2410,3 +2410,96 @@ hr {
     border-bottom-right-radius: 0;
   }
 }
+
+/* ─── Pantalla de acceso (login del equipo) ─────────────────────────────────── */
+.login-pantalla {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-tarjeta {
+  width: 100%;
+  max-width: 360px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-icono {
+  font-size: 40px;
+  text-align: center;
+}
+
+.login-titulo {
+  text-align: center;
+  color: var(--primary-navy);
+  font-size: 22px;
+}
+
+.login-sub {
+  text-align: center;
+  color: var(--text-muted);
+  margin-top: -6px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.login-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-campo span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.login-campo input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border-color-strong);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  background: #fff;
+  color: var(--text-main);
+  transition: var(--transition-smooth);
+}
+
+.login-campo input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.login-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.login-boton {
+  margin-top: 4px;
+  padding: 12px;
+  font-size: 15px;
+}
+
+.login-cargando {
+  color: var(--text-muted);
+  font-size: 15px;
+}
