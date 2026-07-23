@@ -6,7 +6,7 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
-  BarChart3, AlertTriangle, Info, Archive, ArrowRight,
+  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
@@ -783,10 +783,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
     ["Cucharas postre", String(conMargen(totalPax))],
-    [`Copas cristal${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)],
-    ["Vasos cristal", String(cristal.agua.u)],
-    ["Copa cava", String(cristal.cava.u)],
-    ["Vaso cubata", String(cristal.cubata.u)],
+    [`Copas de vino${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)],
+    ["Vasos de agua", String(cristal.agua.u)],
+    ["Copas de cava", String(cristal.cava.u)],
+    ["Vasos de cubata", String(cristal.cubata.u)],
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
@@ -931,7 +931,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(llevaPaella, [`Paella ${calcPaella(pax, tipoPaella).talla}`, String(calcPaella(pax, tipoPaella).n)]),
     opt(llevaPaella, ["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]),
     opt(numParavientos > 0, ["Paravientos", String(numParavientos)]),
-    ["Boles metálicos", "4"], ["Cucharones grandes", "3"], ["Pinzas servicio (metal/madera)", "2"],
+    ["Boles metálicos", "4"], ["Cucharones grandes", "3"], ["Pinzas largas", "2"],
     // Cada chafer trabaja con 2 gastros (el que está sirviendo + el de reposición)
     ["Servilleteros de madera", "2"], ["Gastros", String(numChafers * 2)], ["Caja cocina (varios)", "1"],
     ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"], ["Caja salsas y arroces", "1"],
@@ -3484,7 +3484,7 @@ export default function App({ onCerrarSesion } = {}) {
                           <div className="item-name">
                             <span className="item-name-lead"><IconoItem label={label} /> {label}</span>
                             {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
-                            {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Pencil size={12} /></span>}
+                            {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
                           </div>
                         )}
                         <input

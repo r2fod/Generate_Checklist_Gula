@@ -2683,7 +2683,7 @@ hr {
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: inline-flex; align-items: center; gap: 7px; }
 .item-icon { color: var(--text-label); flex-shrink: 0; transition: transform 0.2s ease, color 0.2s ease; }
 .item-row:hover .item-icon { color: var(--accent); transform: scale(1.2) rotate(-5deg); }
-.item-edit-flag { color: #9ca3af; display: inline-flex; align-items: center; }
+.item-edit-flag { color: var(--accent, #c9a24b); display: inline-flex; align-items: center; opacity: 0.9; }
 .tag-alquiler { display: inline-flex; align-items: center; gap: 3px; }
 .item-edit-alquiler-check, .add-item-alquiler-check { display: inline-flex; align-items: center; gap: 5px; }
 
