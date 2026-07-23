@@ -536,11 +536,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella);
     // Difusor y trípode se comparten con las frituras (misma herramienta), se suman en vez de listar aparte
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusores", String(p.n + numFritura)], ["Trípode de quemador", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusor", String(p.n + numFritura)], ["Trípode", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
   }
   if (tieneFrituras) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
-    if (!llevaPaella) paellaItems.push(["Difusor pequeño (frituras)", String(numFritura)], ["Trípode de quemador", String(numFritura)]);
+    if (!llevaPaella) paellaItems.push(["Difusor", String(numFritura)], ["Trípode", String(numFritura)]);
   }
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
   paellaItems.push(["Bombonas llenas", String(bombonas)]);
@@ -749,11 +749,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella);
     // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode de quemador", String(p.n + numFritura)]);
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode", String(p.n + numFritura)]);
   }
   if (tieneFrituras) {
-    paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Paravientos", "1"]);
-    if (!llevaPaella) paellaItems.push(["Trípode de quemador", String(numFritura)]);
+    paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)], ["Paravientos", "1"]);
+    if (!llevaPaella) paellaItems.push(["Trípode", String(numFritura)]);
   }
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
@@ -899,7 +899,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Focos de luz", "1"],
     ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
     ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Generador", "1"], ["Garrafa gasolina (llena)", "1"],
-    ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
+    ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
 
   // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
@@ -942,9 +942,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     const p = calcPaella(pax, tipoPaella);
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
   }
-  paellaItems.push(["Trípode de quemador", String(1 + numFritura)]);
+  paellaItems.push(["Trípode", String(1 + numFritura)]);
   if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
-  if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)]);
+  if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)]);
   // En producción la plancha de gas va fija: se muestra aquí y suma 1 bombona
   paellaItems.push(["Plancha de gas", "1"]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 de la plancha de gas
