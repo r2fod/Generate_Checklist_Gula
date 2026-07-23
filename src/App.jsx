@@ -1737,6 +1737,16 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           {modo === "salida"
             ? renderCrono("carga", cargaMin, "Cronómetro de carga")
             : renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
+          {modo === "vuelta" && (
+            <button
+              className="btn btn-outline carga-todo-vuelto"
+              onClick={() => checklist.forEach(cat => cat.items.forEach(([, q, , lo]) => {
+                const n = parseFloat(String(q && q.u ? q.u : q).replace(",", "."));
+                if (!isNaN(n)) onVuelve(`${cat.nombre}::${lo}`, String(n));
+              }))}
+              title="Marca todos los items como que volvieron completos (luego ajustas los que falten y las roturas)"
+            ><Check size={15} /> Marcar todo como vuelto</button>
+          )}
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
               <div className="preview-category-header" style={{ borderLeftColor: infoCategoria(cat.nombre).color }}>
@@ -1764,15 +1774,28 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                   }
                   const valorVuelta = vueltos[key];
                   const marcado = valorVuelta !== undefined && valorVuelta !== "";
+                  const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
+                  const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
                   const vueltaTexto = valorVuelta === true
-                    ? String(parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", ".")) || "")
+                    ? String(cantidadCompleta || "")
                     : (valorVuelta ?? "");
+                  const vinoTodo = cantidadCompleta !== null && parseFloat(String(vueltaTexto).replace(",", ".")) === cantidadCompleta;
                   return (
-                    <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
+                    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`} key={i}>
                       <div className="carga-row-principal carga-row-vuelta">
                         <span className="carga-nombre">{label}</span>
                         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
                       </div>
+                      {cantidadCompleta !== null && (
+                        <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title="Vino todo: rellena la cantidad completa" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={vinoTodo}
+                            onChange={e => onVuelve(key, e.target.checked ? String(cantidadCompleta) : "")}
+                          />
+                          <Check size={12} /> todo
+                        </label>
+                      )}
                       <div className="carga-roturas carga-vuelve-cantidad">
                         <span><Undo2 size={12} /> vuelve</span>
                         <input
