@@ -162,10 +162,11 @@ body {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-  background: var(--primary-navy);
-  color: white;
+  background: linear-gradient(135deg, var(--accent-soft), #e7ecff);
+  color: var(--accent);
+  border: 1px solid #dfe3ff;
   border-radius: var(--radius-sm);
-  box-shadow: 0 4px 10px rgba(31, 49, 77, 0.3);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.14);
 }
 
 .header-info h1 {
@@ -1953,7 +1954,7 @@ hr {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #fff;
+  background: linear-gradient(135deg, var(--accent-soft), #fff 70%);
   border-bottom: 1px solid var(--border-color);
   padding: 18px 24px;
   display: flex;
@@ -2569,6 +2570,33 @@ hr {
   border-color: var(--accent);
 }
 
+/* Check "vino todo" en la pestaña Vuelta */
+.carga-vino-todo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: #fff;
+  border: 1px solid var(--border-color-strong);
+  border-radius: 999px;
+  padding: 4px 9px 4px 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.carga-vino-todo input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: #16a34a; }
+.carga-vino-todo.is-on { color: #15803d; background: #ecfdf3; border-color: #a7e3bf; }
+.carga-row.is-vino-todo { background: #f4fcf6; }
+.carga-todo-vuelto {
+  align-self: flex-start;
+  border-color: #a7e3bf;
+  color: #15803d;
+  background: #ecfdf3;
+}
+.carga-todo-vuelto:hover { background: #d9f7e3; }
+
 @media (max-width: 480px) {
   .carga-row-principal.carga-row-vuelta {
     flex-wrap: wrap;
@@ -2963,6 +2991,20 @@ hr {
 .header-icon svg, .cat-icon svg { display: block; }
 .cat-icon svg { transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .category-header:hover .cat-icon svg { transform: scale(1.18) rotate(-6deg); }
+
+/* Color pastel en los iconos que hasta ahora salían en gris/negro por toda la app.
+   Se excluyen los que ya llevan su color propio (botones de borrar, verdes, etc.). */
+.preview-header-title > svg { color: var(--accent); }
+.dialogo-titulo > svg { color: var(--accent); }
+.carga-nombre + .carga-cantidad, .carga-cantidad { color: var(--text-muted); }
+.section-title svg { color: inherit; }
+.form-label svg { color: var(--accent); }
+.range-value, .dias-produccion-resumen { color: var(--accent); }
+.add-item-card > span svg { color: var(--accent); }
+.empty-state svg, .filtro-vacio svg { color: var(--border-color-strong); }
+/* Iconos de botón que NO deben teñirse (mantienen el color del botón) */
+.btn svg, .item-action-btn svg, .segment-btn svg, .preview-close-btn svg,
+.aviso-recogida-hecho svg, .logistica-add-rec svg, .crono-btn svg { color: inherit; }
 /* Icono de la categoría abierta: latido suave para dar vida sin distraer */
 @keyframes cat-badge-breath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 .category-section.is-open .cat-icon { animation: cat-badge-breath 3s ease-in-out infinite; }
