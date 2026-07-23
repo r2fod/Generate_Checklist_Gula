@@ -2053,6 +2053,21 @@ hr {
   transition: width 0.25s ease-out;
 }
 
+/* Tiempo estimado de carga/descarga del camión */
+.carga-tiempos {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+}
+.carga-tiempos svg { color: var(--accent); flex-shrink: 0; }
+.carga-tiempos strong { font-weight: 700; }
+.carga-tiempos-sep { color: var(--text-muted); }
+.carga-tiempos-nota { color: var(--text-muted); font-size: 0.76rem; }
+
 .carga-modo-toggle {
   padding: 14px 24px 0;
 }

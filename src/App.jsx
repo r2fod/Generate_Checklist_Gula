@@ -1467,6 +1467,21 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       }).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
+  // Tiempo estimado de carga/descarga del camión. Criterio: el volumen de la lista
+  // (nº de ítems) marca el trabajo total, repartido entre el personal de logística.
+  // La carga (en almacén, comprobando la lista) es más lenta que la descarga in situ.
+  const CARGA_BASE_MIN = 20;      // preparar rampa, colocar y amarrar en el camión
+  const CARGA_MIN_POR_ITEM = 1.5; // localizar, empaquetar y tachar cada ítem
+  const CARGA_FACTOR_DESCARGA = 0.6; // la descarga va "a bulto", ~60% del tiempo de carga
+  const numLogistica = Math.max(1, meta.numLogistica || 1);
+  const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / numLogistica) : 0;
+  const descargaMin = Math.round(cargaMin * CARGA_FACTOR_DESCARGA);
+  const fmtMin = (m) => {
+    if (m <= 0) return "—";
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    return h > 0 ? (min > 0 ? `${h} h ${min} min` : `${h} h`) : `${min} min`;
+  };
   // Recordatorios del evento: cada línea de las notas se convierte en una tarea con
   // su propio check (coger comida del congelador, hielo, taxis, un material extra…).
   // Se marcan a mano según se van haciendo y todo queda guardado/sincronizado con el
@@ -1523,6 +1538,15 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
               {totalRoturas > 0 ? ` · ${totalRoturas} roturas` : ""}
             </div>
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
+            {totalItems > 0 && (
+              <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística. Carga = (20 min + ítems × 1,5 min) ÷ logística; descarga ≈ 60% de la carga.`}>
+                <Clock size={13} />
+                <span><strong>Carga</strong> ~{fmtMin(cargaMin)}</span>
+                <span className="carga-tiempos-sep">·</span>
+                <span><strong>Descarga</strong> ~{fmtMin(descargaMin)}</span>
+                <span className="carga-tiempos-nota">({numLogistica} logística)</span>
+              </div>
+            )}
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
         </div>
@@ -2836,7 +2860,7 @@ export default function App({ onCerrarSesion } = {}) {
           onRoturas={handleRoturasCarga}
           notasCheck={notasCheck}
           onToggleNota={handleToggleNotaCarga}
-          meta={{ nombreEvento, totalPax: pax + ninos, notasEvento }}
+          meta={{ nombreEvento, totalPax: pax + ninos, notasEvento, numLogistica: Math.max(1, Math.ceil(pax / 60)) }}
           onClose={() => setModoCarga(false)}
         />
       )}
