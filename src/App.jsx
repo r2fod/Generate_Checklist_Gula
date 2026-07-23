@@ -107,6 +107,8 @@ const ICONOS_CATEGORIA = [
   { fragmento: "electric", Comp: Plug, color: "#fef3c7", texto: "#92400e" },
   { fragmento: "personal", Comp: Users, color: "#e0e7ff", texto: "#3730a3" },
   { fragmento: "mobiliario", Comp: Armchair, color: "#fce7f3", texto: "#9d174d" },
+  { fragmento: "paella", Comp: Flame, color: "#ffe0cc", texto: "#9a3412" },
+  { fragmento: "fuego", Comp: Flame, color: "#ffe0cc", texto: "#9a3412" },
   { fragmento: "cocina", Comp: CookingPot, color: "#ffedd5", texto: "#9a3412" },
   { fragmento: "menaje", Comp: Utensils, color: "#e0e7ff", texto: "#3730a3" },
   { fragmento: "cristal", Comp: Wine, color: "#cffafe", texto: "#155e75" },
@@ -526,32 +528,37 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const bombonas   = numPaella + numFritura; // 1 bombona por paella + 1 extra si hay frituras
-  const cocinaItems = [];
+  // Paella y fuego: todo el equipo de fuego/paella junto (paella, difusores, trípode,
+  // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
+  const paellaItems = [];
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella);
     // Difusor y trípode se comparten con las frituras (misma herramienta), se suman en vez de listar aparte
-    cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Difusores", String(p.n + numFritura)], ["Trípode de quemador", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusores", String(p.n + numFritura)], ["Trípode de quemador", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
   }
-  cocinaItems.push(["Bombonas llenas", String(bombonas)], ["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
+  if (tieneFrituras) {
+    paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
+    if (!llevaPaella) paellaItems.push(["Difusor pequeño (frituras)", String(numFritura)], ["Trípode de quemador", String(numFritura)]);
+  }
+  paellaItems.push(["Bombonas llenas", String(bombonas)]);
+  if (tipoBBQ !== "no lleva") {
+    paellaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
+  }
+  cats.push({ nombre: "Paella y fuego", items: paellaItems });
+
+  const cocinaItems = [];
+  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
-  if (tieneFrituras) {
-    cocinaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
-    if (!llevaPaella) cocinaItems.push(["Difusor pequeño (frituras)", String(numFritura)], ["Trípode de quemador", String(numFritura)]);
-  }
-  if (tipoBBQ !== "no lleva") {
-    cocinaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
-  }
-  cats.push({ nombre: "Cocina y fuego", items: cocinaItems });
+  cats.push({ nombre: "Cocina", items: cocinaItems });
 
   cats.push({ nombre: "Menaje y utensilios", items: [
     ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"],
     ["Olla mediana", "1"], ["Olla grande", "1"], ["Sartenes", "1"], ["Colador", "1"], ["Boles metálicos", "4"],
     ["Cucharones grandes", "3"], ["Pinzas largas", "2"], ["Copas metálicas", "Todas"],
-    opt(llevaPaella, ["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]),
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
@@ -734,24 +741,27 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(hayCongelador, [`Congelador (${tipoCongelador})`, "1"]),
   ]});
 
-  const cocinaItems = [
-    // 1 bombona por paella + 1 extra por cada sartén de fritura
-    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)],
-  ];
+  // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo)
+  const paellaItems = [];
+  if (llevaPaella) {
+    const p = calcPaella(pax, tipoPaella);
+    // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode de quemador", String(p.n + numFritura)]);
+  }
+  if (tieneFrituras) {
+    paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Paravientos", "1"]);
+    if (!llevaPaella) paellaItems.push(["Trípode de quemador", String(numFritura)]);
+  }
+  // 1 bombona por paella + 1 extra por cada sartén de fritura
+  paellaItems.push(["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)]);
+  cats.push({ nombre: "Paella y fuego", items: paellaItems });
+
+  const cocinaItems = [];
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro", "1"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
-  if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella);
-    // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
-    cocinaItems.push([`Paella ${p.talla}`, String(p.n)], ["Trípode de quemador", String(p.n + numFritura)], ["Descansadores de paella", "2"]);
-  }
-  if (tieneFrituras) {
-    cocinaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Paravientos", "1"]);
-    if (!llevaPaella) cocinaItems.push(["Trípode de quemador", String(numFritura)]);
-  }
   cats.push({ nombre: "Cocina y Electro", items: cocinaItems });
 
   cats.push({ nombre: "Menaje y Utensilios", items: [
@@ -759,7 +769,6 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Olla mediana", "1"], ["Olla grande", "1"], ["Sartenes", "1"], ["Colador", "1"],
     ["Caja salsas y arroces", "1"], ["Boles metálicos", "4"], ["Cucharones grandes", "3"],
     ["Servilleteros de madera", "2"], ["Caja cocina (varios)", "1"],
-    opt(llevaPaella, ["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]),
   ]});
 
   const usaTela = fuerzaTextilTela;
@@ -920,33 +929,40 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(llevaChillOut, ["Chill out", String(numChillOut)]),
   ]});
 
+  // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo).
+  // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco.
+  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
+  const numParavientos = numPaellaProd + numFritura;
+  const paellaItems = [];
+  if (llevaPaella) {
+    const p = calcPaella(pax, tipoPaella);
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
+  }
+  paellaItems.push(["Trípode de quemador", String(1 + numFritura)]);
+  if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
+  if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)]);
+  // 1 bombona por paella + 1 extra por cada sartén de fritura
+  paellaItems.push(["Bombonas llenas", String(numPaellaProd + numFritura)]);
+  cats.push({ nombre: "Paella y fuego", items: paellaItems });
+
   cats.push({ nombre: "Cocina y sala", items: [
     ["Plancha de gas", "1"],
-    // 1 bombona por paella + 1 extra por cada sartén de fritura
-    ["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)],
     // Mesa caliente para mantener el pase: 1 por cada ~40 pax del día grande
     ["Horno pequeño", "1"], ["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
-    ["Vitro", "1"], ["Butano", "1"], ["Trípode de quemador", String(1 + numFritura)], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
+    ["Vitro", "1"], ["Butano", "1"], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
     ["Neveras playa pequeñas", "2"], ["Chafers", String(numChafers)],
     opt(llevaArmarioCaliente, ["Armario caliente (alquiler Dealde)", "1", true]),
   ]});
 
-  // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco
-  const numParavientos = (llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura;
   cats.push({ nombre: "Menaje y Utensilios", items: [
     ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"],
     ["Olla mediana", "1"], ["Olla grande", "1"], ["Sartenes", "1"], ["Colador", "1"],
-    opt(llevaPaella, [`Paella ${calcPaella(pax, tipoPaella).talla}`, String(calcPaella(pax, tipoPaella).n)]),
-    opt(llevaPaella, ["Paletas de paella", String(calcPaella(pax, tipoPaella).n)]),
-    opt(numParavientos > 0, ["Paravientos", String(numParavientos)]),
     ["Boles metálicos", "4"], ["Cucharones grandes", "3"], ["Pinzas largas", "2"],
     // Cada chafer trabaja con 2 gastros (el que está sirviendo + el de reposición)
     ["Servilleteros de madera", "2"], ["Gastros", String(numChafers * 2)], ["Caja cocina (varios)", "1"],
     ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"], ["Caja salsas y arroces", "1"],
-    opt(tieneFrituras, ["Sartén Parisiene (frituras)", String(numFritura)]),
-    opt(tieneFrituras, ["Difusor pequeño (frituras)", String(numFritura)]),
   ]});
 
   cats.push({ nombre: "Mantelería y Textiles", items: [
