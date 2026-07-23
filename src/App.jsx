@@ -157,7 +157,7 @@ const ICONOS_ITEM = [
   { f: ["regleta", "alargador", "cable", "generador", "garrafa", "foco", "luz", "guirnalda", "eléctric", "electric", "imperdible", "brida", "rulo", "cinta"], I: Zap },
   { f: ["walkie", "micrófono", "microfono", "atril", "señalética", "senaletica", "cartel", "pegatina", "photocall", "porta-nombres", "acreditaci", "producciones"], I: Radio },
   { f: ["carpa", "pared", "moqueta"], I: Tent },
-  { f: ["furgoneta", "camión", "camion", "taxi", "carro", "transporte", "flota"], I: Truck },
+  { f: ["furgoneta", "camión", "camion", "taxi", "carro", "transporte", "flota", "logístic", "logistic"], I: Truck },
   { f: ["camarero", "barman", "cocina", "personal", "staff", "office", "fichaje"], I: Users },
 ];
 function iconoItem(label) {
@@ -436,6 +436,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas = "Dealde",
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
+    paxPorCamarero = 0,
   } = opts;
   // El origen de las sillas (alquiler Dealde/Carvillo o propias) se refleja en el
   // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre.
@@ -456,8 +457,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const esComunion = evtKey === "comunion";
   const esCorporativo = evtKey === "corporativo";
   // Corporativo suele ser cóctel de pie (menos camareros que un banquete sentado):
-  // 1 cada 18 pax; boda y comunión (servicio en mesa) 1 cada 12.
-  const divisorCam = esCorporativo ? 18 : 12;
+  // 1 cada 18 pax; boda y comunión (servicio en mesa) 1 cada 12. Si el usuario fija
+  // su propio ratio (1 camarero cada X pax) en el formulario, manda ese.
+  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 18 : 12);
 
   const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
@@ -474,11 +476,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Carros de servicio/transporte", "2"], ["Walkies", "2"],
   ]});
 
-  // Personal (banquete emplatado): camareros 1:12, barman 1:60 (solo con barra),
-  // cocina ~3 cada 50 pax. Estándar del sector para servicio en mesa.
+  // Personal (banquete emplatado): camareros según el ratio configurado, logística
+  // 1 cada 60 pax (carga/transporte/montaje), cocina ~3 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, numCamareros, divisorCam))],
-    opt(hayBarra, ["Barman", String(Math.max(1, Math.ceil(pax / 60)))]),
+    ["Logística", String(Math.max(1, Math.ceil(pax / 60)))],
     ["Cocina", String(Math.max(2, Math.ceil(pax * 3 / 50)))],
   ]});
 
@@ -688,6 +690,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const hayBarra = horasBarraTotal > 0;
   const totalPax = pax + ninos;
   const hayCongelador = tipoCongelador !== "No lleva";
+  // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
+  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
 
   const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
@@ -706,11 +710,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Walkies", "2"],
   ]});
 
-  // Personal: en cumpleaños suele ser formato más informal (1:20); barman solo si hay
-  // barra, cocina ~2 cada 50 pax.
+  // Personal: en cumpleaños suele ser formato más informal (1:20); logística 1 cada
+  // 60 pax (carga/transporte), cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
-    ["Camareros", String(personalSala(pax, opts.numCamareros))],
-    opt(hayBarra, ["Barman", String(Math.max(1, Math.ceil(pax / 60)))]),
+    ["Camareros", String(personalSala(pax, opts.numCamareros, divisorCam))],
+    ["Logística", String(Math.max(1, Math.ceil(pax / 60)))],
     ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
   ]});
 
@@ -759,7 +763,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
     ["Plancha de vapor (manteles)", "1"],
-    ["Delantales", String(personalSala(pax, opts.numCamareros) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
+    ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
       : [["Servilletas grandes", conSufijo(conMargen(totalPax * 3 / 50), "paq. (50)")]]),
@@ -797,7 +801,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
-  const personal = calcPersonal(pax, opts.numCamareros, opts.numStaff);
+  const personal = calcPersonal(pax, opts.numCamareros, opts.numStaff, divisorCam);
   cats.push({ nombre: "Bebidas", items: [
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
@@ -832,8 +836,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cajas vacías", "2"], ["Caja azul", "1"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
-    ["Bandeja camareros", String(personalSala(pax, opts.numCamareros))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, opts.numCamareros))],
+    ["Bandeja camareros", String(personalSala(pax, opts.numCamareros, divisorCam))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, opts.numCamareros, divisorCam))],
     ["Hojas de fichaje", "1"],
   ]});
 
@@ -862,9 +866,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   if (diasPax.length) { pax = Math.max(...diasPax); ninos = 0; }
   const totalPax = pax + ninos;
   const paxConsumo = diasPax.length ? diasPax.reduce((a, b) => a + b, 0) : totalPax;
+  // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio.
+  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
   // En producciones no hay barra libre (ni cóctel ni copas): solo refrescos, agua
   // con gas y aguas (cajas de 33cl y botellas de 1,5L) — nada de alcohol ni cristalería
-  const personal = calcPersonal(pax, numCamareros, numStaff);
+  const personal = calcPersonal(pax, numCamareros, numStaff, divisorCam);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
   const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
@@ -882,7 +888,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
-    ["Camareros / office", String(personalSala(pax, numCamareros))],
+    ["Camareros / office", String(personalSala(pax, numCamareros, divisorCam))],
     ["Cocina", String(Math.max(2, Math.ceil(pax * 2 / 50)))],
   ]});
 
@@ -944,9 +950,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // sucias van sin vestir) + 1 de repuesto
     ["Manteles negros", String(mesasServicio + MESAS_BUFFET + 1)],
     ["Plancha de vapor (manteles)", "1"],
-    ["Delantales", String(personalSala(pax, numCamareros) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
-    ["Bandeja camareros", String(personalSala(pax, numCamareros))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros))],
+    ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
+    ["Bandeja camareros", String(personalSala(pax, numCamareros, divisorCam))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, divisorCam))],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -1040,7 +1046,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -1056,6 +1062,7 @@ const ETIQUETAS_CAMPO = {
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
   itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
   vueltos: "Items marcados como vueltos", roturas: "Roturas contadas",
+  notasCheck: "Recordatorios de notas hechos",
   valoresCalculados: "Foto de cantidades automáticas",
 };
 
@@ -1443,7 +1450,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onVuelve, onRoturas, onClose, meta = {} }) {
+function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, onClose, meta = {} }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   const checklist = quitarItemsSinCantidad(checklistCompleta);
@@ -1460,14 +1467,20 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       }).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
-  // Recordatorio de las notas del evento: se muestra fijo arriba mientras se carga
-  // el camión (para no olvidar avisos: alquileres, "llevar cuidado con…", etc.) y
-  // desaparece solo cuando TODO está cargado en Salida. Se puede silenciar a mano.
-  const cargadosSalida = checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => checkeados[`${c.nombre}::${lo}`]).length, 0);
-  const todoCargado = totalItems > 0 && cargadosSalida === totalItems;
+  // Recordatorios del evento: cada línea de las notas se convierte en una tarea con
+  // su propio check (coger comida del congelador, hielo, taxis, un material extra…).
+  // Se marcan a mano según se van haciendo y todo queda guardado/sincronizado con el
+  // evento. Cuando están todas hechas el bloque se colapsa a "completado". Se puede
+  // silenciar del todo con el botón de campana.
   const notasTexto = (meta.notasEvento || "").trim();
+  const notasItems = notasTexto
+    .split(/[\n;]+/)
+    .map(s => s.replace(/^[\s•·*✓\-–]+/, "").trim())
+    .filter(Boolean);
+  const notasHechas = notasItems.filter(t => notasCheck[t]).length;
+  const notasCompletas = notasItems.length > 0 && notasHechas === notasItems.length;
   const [notaSilenciada, setNotaSilenciada] = useState(false);
-  const mostrarRecordatorio = notasTexto && !todoCargado && !notaSilenciada;
+  const mostrarRecordatorio = notasItems.length > 0 && !notaSilenciada;
   // Resumen tipo hoja de cálculo: Carga Inicial / Vuelta / Consumo Real, agrupado por
   // categoría, igual que la plantilla en la que ya llevaban el control. "Vuelta" solo
   // se conoce si se ha registrado un valor en la pestaña Vuelta (número o, por datos
@@ -1521,17 +1534,26 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           </div>
         </div>
         {mostrarRecordatorio && (
-          <div className="carga-nota-recordatorio" role="note">
-            <Bell size={17} className="carga-nota-icono" />
-            <div className="carga-nota-texto">
-              <span className="carga-nota-titulo">Notas del evento — no olvidar</span>
-              <p className="carga-nota-cuerpo">{notasTexto}</p>
+          <div className={`carga-nota-recordatorio ${notasCompletas ? "is-completo" : ""}`} role="note">
+            <div className="carga-nota-cabecera">
+              {notasCompletas ? <Check size={16} className="carga-nota-icono" /> : <Bell size={16} className="carga-nota-icono" />}
+              <span className="carga-nota-titulo">Recordatorios del evento</span>
+              <span className="carga-nota-progreso">{notasHechas}/{notasItems.length}</span>
+              <button className="carga-nota-silenciar" onClick={() => setNotaSilenciada(true)} title="Silenciar los recordatorios" aria-label="Silenciar los recordatorios"><BellOff size={15} /></button>
             </div>
-            <button className="carga-nota-silenciar" onClick={() => setNotaSilenciada(true)} title="Silenciar el recordatorio" aria-label="Silenciar el recordatorio"><BellOff size={15} /></button>
+            <div className="carga-nota-lista">
+              {notasItems.map((t, i) => {
+                const hecho = !!notasCheck[t];
+                return (
+                  <label className={`carga-nota-item ${hecho ? "is-hecho" : ""}`} key={i}>
+                    <input type="checkbox" checked={hecho} onChange={() => onToggleNota && onToggleNota(t)} />
+                    <span className="carga-nota-item-texto">{t}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {notasCompletas && <div className="carga-nota-completo-msg"><Check size={14} /> Todos los recordatorios hechos</div>}
           </div>
-        )}
-        {todoCargado && notasTexto && !verResumen && (
-          <div className="carga-nota-hecha" role="status"><Check size={15} /> Todo cargado — recordatorio completado</div>
         )}
         {verResumen ? (
           <div className="preview-body">
@@ -1932,6 +1954,9 @@ export default function App({ onCerrarSesion } = {}) {
   const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState(estadoInicial.estiloPlatoPostre ?? "Blanco");
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
   const [numCamareros, setNumCamareros]                 = useState(estadoInicial.numCamareros ?? 0);
+  // Ratio de camareros configurable: "1 camarero cada X pax". 0 = automático (usa el
+  // recomendado por tipo de evento: boda/comunión 12, corporativo 18, cumple/produ 20).
+  const [paxPorCamarero, setPaxPorCamarero]             = useState(estadoInicial.paxPorCamarero ?? 0);
   // Staff extra (cocina, producción, refuerzo...) que no sirve mesas pero también
   // consume agua/vasos: se suma a los camareros para calcular esos consumibles
   const [numStaff, setNumStaff]                         = useState(estadoInicial.numStaff ?? 0);
@@ -1998,6 +2023,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [recalcularMsg, setRecalcularMsg] = useState("");
   const [vueltos, setVueltos] = useState(estadoInicial.vueltos ?? {}); // { "categoria::label": true } — marcados como "Vuelve" (devuelto tras el evento)
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
+  const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
   const [modoCarga, setModoCarga] = useState(false);
   // Items marcados a mano como "alquiler proveedor", para los que no llevan Dealde/Carvillo/
   // Novelda/alquiler en el nombre y por tanto no se detectan solos (ej. algo puntual que no
@@ -2098,7 +2124,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, numCamareros, numStaff, tipoBandejas,
+    llevaArmarioCaliente, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -2106,7 +2132,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas,
+    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas, notasCheck,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -2145,7 +2171,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2157,7 +2183,7 @@ export default function App({ onCerrarSesion } = {}) {
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
-    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas,
+    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, notasCheck: setNotasCheck,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
   };
@@ -2452,6 +2478,7 @@ export default function App({ onCerrarSesion } = {}) {
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas,
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
+    paxPorCamarero,
   };
 
   // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
@@ -2558,6 +2585,7 @@ export default function App({ onCerrarSesion } = {}) {
     });
   };
   const handleToggleCheckCarga = (key) => setCheckeados(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleToggleNotaCarga = (texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] }));
   // A diferencia de roturas, "0" en vuelve es un dato real (confirmado: no ha vuelto
   // nada), distinto de "todavía no se ha revisado" (sin entrada) — solo se borra la
   // clave si se deja el campo vacío del todo.
@@ -2806,6 +2834,8 @@ export default function App({ onCerrarSesion } = {}) {
           onToggleSale={handleToggleCheckCarga}
           onVuelve={handleVuelveCarga}
           onRoturas={handleRoturasCarga}
+          notasCheck={notasCheck}
+          onToggleNota={handleToggleNotaCarga}
           meta={{ nombreEvento, totalPax: pax + ninos, notasEvento }}
           onClose={() => setModoCarga(false)}
         />
@@ -3016,6 +3046,17 @@ export default function App({ onCerrarSesion } = {}) {
             <div className="form-group">
               <span className="form-label">Nº CAMAREROS</span>
               <input type="number" className="form-input" placeholder="Auto" value={numCamareros || ""} onChange={e => setNumCamareros(Math.max(0, parseInt(e.target.value) || 0))} min="0" />
+            </div>
+            <div className="form-group">
+              <span className="form-label" title="Si dejas Nº camareros en Auto, se calcula 1 camarero por cada tantos pax. Vacío = valor recomendado por tipo de evento.">1 CAMARERO CADA · PAX</span>
+              <input
+                type="number"
+                className="form-input"
+                placeholder={evento === "corporativo" ? "18 (recom.)" : (evento === "cumpleanos" || evento === "produccion") ? "20 (recom.)" : "12 (recom.)"}
+                value={paxPorCamarero || ""}
+                onChange={e => setPaxPorCamarero(Math.max(0, parseInt(e.target.value) || 0))}
+                min="0"
+              />
             </div>
             <div className="form-group">
               <span className="form-label">Nº STAFF (cocina, otros)</span>
