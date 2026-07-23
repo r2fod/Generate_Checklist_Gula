@@ -1,5 +1,10 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
+  Heart, Church, Cake, Briefcase, Clapperboard,
+  Plug, Armchair, CookingPot, Utensils, Wine, Shirt, UtensilsCrossed,
+  SprayCan, Coffee, CupSoda, Martini, Truck, Package, Users, Boxes,
+} from "lucide-react";
+import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
   guardarIndiceEventosNube, cargarIndiceEventosNube, suscribirIndiceEventosNube,
 } from "./nube.js";
@@ -94,28 +99,32 @@ const EVENTOS = {
 // Icono decorativo + color pastel por categoría, buscado por fragmento del nombre
 // (varía según el tipo de evento: "Cocina y fuego", "Cocina y Electro"...)
 const ICONOS_CATEGORIA = [
-  { fragmento: "electric", icono: "🔌", color: "#fef3c7", texto: "#92400e" },
-  { fragmento: "mobiliario", icono: "🪑", color: "#fce7f3", texto: "#9d174d" },
-  { fragmento: "cocina", icono: "🍳", color: "#ffedd5", texto: "#9a3412" },
-  { fragmento: "menaje", icono: "🔪", color: "#e0e7ff", texto: "#3730a3" },
-  { fragmento: "cristal", icono: "🥂", color: "#cffafe", texto: "#155e75" },
-  { fragmento: "mantel", icono: "🧺", color: "#fae8ff", texto: "#86198f" },
-  { fragmento: "vajilla", icono: "🍽️", color: "#dbeafe", texto: "#1e40af" },
-  { fragmento: "limpieza", icono: "🧹", color: "#d1fae5", texto: "#065f46" },
-  { fragmento: "café", icono: "☕", color: "#f3e8d2", texto: "#78350f" },
-  { fragmento: "bebida", icono: "🥤", color: "#e0f2fe", texto: "#075985" },
-  { fragmento: "alcohol", icono: "🥃", color: "#fee2e2", texto: "#991b1b" },
-  { fragmento: "logística", icono: "📦", color: "#ede9fe", texto: "#5b21b6" },
-  { fragmento: "desechable", icono: "🥡", color: "#fef9c3", texto: "#854d0e" },
-  { fragmento: "otros", icono: "✨", color: "#f1f5f9", texto: "#334155" },
+  { fragmento: "electric", Comp: Plug, color: "#fef3c7", texto: "#92400e" },
+  { fragmento: "personal", Comp: Users, color: "#e0e7ff", texto: "#3730a3" },
+  { fragmento: "mobiliario", Comp: Armchair, color: "#fce7f3", texto: "#9d174d" },
+  { fragmento: "cocina", Comp: CookingPot, color: "#ffedd5", texto: "#9a3412" },
+  { fragmento: "menaje", Comp: Utensils, color: "#e0e7ff", texto: "#3730a3" },
+  { fragmento: "cristal", Comp: Wine, color: "#cffafe", texto: "#155e75" },
+  { fragmento: "mantel", Comp: Shirt, color: "#fae8ff", texto: "#86198f" },
+  { fragmento: "vajilla", Comp: UtensilsCrossed, color: "#dbeafe", texto: "#1e40af" },
+  { fragmento: "limpieza", Comp: SprayCan, color: "#d1fae5", texto: "#065f46" },
+  { fragmento: "café", Comp: Coffee, color: "#f3e8d2", texto: "#78350f" },
+  { fragmento: "bebida", Comp: CupSoda, color: "#e0f2fe", texto: "#075985" },
+  { fragmento: "alcohol", Comp: Martini, color: "#fee2e2", texto: "#991b1b" },
+  { fragmento: "logística", Comp: Truck, color: "#ede9fe", texto: "#5b21b6" },
+  { fragmento: "desechable", Comp: Package, color: "#fef9c3", texto: "#854d0e" },
+  { fragmento: "otros", Comp: Boxes, color: "#f1f5f9", texto: "#334155" },
 ];
-const CATEGORIA_DEFAULT = { icono: "📋", color: "#f1f5f9", texto: "#334155" };
+const CATEGORIA_DEFAULT = { Comp: Boxes, color: "#f1f5f9", texto: "#334155" };
 function infoCategoria(nombre) {
   const n = nombre.toLowerCase();
   return ICONOS_CATEGORIA.find(i => n.includes(i.fragmento)) || CATEGORIA_DEFAULT;
 }
-function iconoCategoria(nombre) {
-  return infoCategoria(nombre).icono;
+const EVENTO_ICON = { boda: Heart, comunion: Church, cumpleanos: Cake, corporativo: Briefcase, produccion: Clapperboard };
+// Icono SVG (lucide) de una categoría, buscado por su nombre.
+function IconoCategoria({ nombre, size = 16 }) {
+  const Comp = infoCategoria(nombre).Comp || Boxes;
+  return <Comp size={size} strokeWidth={2.2} />;
 }
 
 
@@ -1338,7 +1347,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
               <div className="preview-category-header">
-                <span>{iconoCategoria(cat.nombre)}</span>
+                <span><IconoCategoria nombre={cat.nombre} /></span>
                 <span>{cat.nombre}</span>
               </div>
               <div className="preview-table-wrap">
@@ -1506,7 +1515,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                   {filasPorCategoria.map(cat => (
                     <tbody key={cat.nombre}>
                       <tr className="resumen-cat-header">
-                        <td colSpan={7}>{iconoCategoria(cat.nombre)} {cat.nombre}</td>
+                        <td colSpan={7}><IconoCategoria nombre={cat.nombre} size={14} /> {cat.nombre}</td>
                       </tr>
                       {cat.filas.map(f => (
                         <tr key={f.key}>
@@ -1540,7 +1549,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
               <div className="preview-category-header">
-                <span>{iconoCategoria(cat.nombre)}</span>
+                <span><IconoCategoria nombre={cat.nombre} /></span>
                 <span>{cat.nombre}</span>
               </div>
               <div className="carga-lista">
@@ -2745,7 +2754,7 @@ export default function App({ onCerrarSesion } = {}) {
         {/* HEADER */}
         <header className="app-header animate-entrance">
           <div className="header-title-group">
-            <div className="header-icon">{EVENTOS[evento]?.icon || "📋"}</div>
+            <div className="header-icon">{React.createElement(EVENTO_ICON[evento] || Heart, { size: 24, strokeWidth: 2.2 })}</div>
             <div className="header-info">
               <h1>{nombreEvento || EVENTOS[evento]?.label || "Generador Checklist"}</h1>
               <p>
@@ -3379,7 +3388,7 @@ export default function App({ onCerrarSesion } = {}) {
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
               <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
-                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.icono}</span>{cat.nombre}</span>
+                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span>{cat.nombre}</span>
                 <span className="cat-count">
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleRenombrarCategoria(cat.nombre); }} title="Renombrar categoría" aria-label={`Renombrar categoría ${cat.nombre}`}>✎</button>
                   {cat.items.length}<span className="arrow">▼</span>
