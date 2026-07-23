@@ -1791,10 +1791,8 @@ function leerEstadoGuardado() {
 // para que "Eventos guardados" y "Plantillas" no crezcan sin fin cuando hay muchos.
 function ListaColapsable({ nombres, limite = 5, children }) {
   const [verTodos, setVerTodos] = useState(false);
-  // Los más recientes primero: el último guardado aparece arriba, y el "ver 5"
-  // enseña justamente los 5 últimos, no los más antiguos.
-  const ordenados = [...nombres].reverse();
-  const visibles = verTodos ? ordenados : ordenados.slice(0, limite);
+  // El orden lo decide quien usa la lista (nombres ya viene ordenado).
+  const visibles = verTodos ? nombres : nombres.slice(0, limite);
   return (
     <div className="plantillas-lista">
       {visibles.map(children)}
@@ -1945,6 +1943,21 @@ export default function App({ onCerrarSesion } = {}) {
   // eventos guardados, no solo el que está abierto — para no olvidar recoger/devolver
   // alquileres (camión plataforma, armario caliente, flores...) de ningún evento.
   const [avisosOcultos, setAvisosOcultos] = useState(false);
+  // Eventos guardados ordenados por fecha: primero los PRÓXIMOS (fecha futura, el
+  // más cercano arriba); después los pasados y los sin fecha (más reciente primero).
+  const eventosOrdenados = useMemo(() => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    return Object.keys(eventosGuardados).sort((a, b) => {
+      const fa = eventosGuardados[a]?.fechaEvento || "";
+      const fb = eventosGuardados[b]?.fechaEvento || "";
+      const futA = fa && fa >= hoy, futB = fb && fb >= hoy;
+      if (futA && futB) return fa.localeCompare(fb);
+      if (futA) return -1;
+      if (futB) return 1;
+      return fb.localeCompare(fa);
+    });
+  }, [eventosGuardados]);
+
   const avisosRecogidas = useMemo(() => {
     const hoyISO = new Date().toISOString().slice(0, 10);
     const avisos = [];
@@ -2828,7 +2841,7 @@ export default function App({ onCerrarSesion } = {}) {
           {Object.keys(plantillas).length === 0 ? (
             <p className="plantillas-vacio">Guarda configuraciones que repites (ej: "Boda estándar 100 pax") y cárgalas con un click en el próximo evento.</p>
           ) : (
-            <ListaColapsable nombres={Object.keys(plantillas)}>
+            <ListaColapsable nombres={[...Object.keys(plantillas)].reverse()}>
               {n => (
                 <div className="plantilla-row" key={n}>
                   <button className="plantilla-nombre" onClick={() => handleAplicarPlantilla(n)} title={`Cargar la plantilla "${n}"`}>📁 {n}</button>
@@ -2853,7 +2866,7 @@ export default function App({ onCerrarSesion } = {}) {
           {Object.keys(eventosGuardados).length === 0 ? (
             <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
           ) : (
-            <ListaColapsable nombres={Object.keys(eventosGuardados)}>
+            <ListaColapsable nombres={eventosOrdenados}>
               {n => (
                 <div className="plantilla-row" key={n}>
                   <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
