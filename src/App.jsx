@@ -431,7 +431,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
-    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff = 0,
+    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, numCamareros, numStaff = 0,
     llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -528,7 +528,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
-  const bombonas   = numPaella + numFritura; // 1 bombona por paella + 1 extra si hay frituras
+  // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
+  const bombonas   = numPaella + numFritura + (llevaPlanchaGas ? 1 : 0);
   // Paella y fuego: todo el equipo de fuego/paella junto (paella, difusores, trípode,
   // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
   const paellaItems = [];
@@ -541,6 +542,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
     if (!llevaPaella) paellaItems.push(["Difusor pequeño (frituras)", String(numFritura)], ["Trípode de quemador", String(numFritura)]);
   }
+  if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
   paellaItems.push(["Bombonas llenas", String(bombonas)]);
   if (tipoBBQ !== "no lleva") {
     paellaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
@@ -691,7 +693,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    llevaArmarioCaliente, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaArmarioCaliente, llevaPlanchaGas, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella, tipoNevera, tipoCongelador, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1,
   } = opts;
@@ -753,8 +755,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)], ["Paravientos", "1"]);
     if (!llevaPaella) paellaItems.push(["Trípode de quemador", String(numFritura)]);
   }
-  // 1 bombona por paella + 1 extra por cada sartén de fritura
-  paellaItems.push(["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura)]);
+  if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
+  // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
+  paellaItems.push(["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura + (llevaPlanchaGas ? 1 : 0))]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   const cocinaItems = [];
@@ -942,12 +945,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   paellaItems.push(["Trípode de quemador", String(1 + numFritura)]);
   if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
   if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor pequeño (frituras)", String(numFritura)]);
-  // 1 bombona por paella + 1 extra por cada sartén de fritura
-  paellaItems.push(["Bombonas llenas", String(numPaellaProd + numFritura)]);
+  // En producción la plancha de gas va fija: se muestra aquí y suma 1 bombona
+  paellaItems.push(["Plancha de gas", "1"]);
+  // 1 bombona por paella + 1 por cada sartén de fritura + 1 de la plancha de gas
+  paellaItems.push(["Bombonas llenas", String(numPaellaProd + numFritura + 1)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   cats.push({ nombre: "Cocina y sala", items: [
-    ["Plancha de gas", "1"],
+    // (La plancha de gas va en "Paella y fuego" junto al resto de fuego)
     // Mesa caliente para mantener el pase: 1 por cada ~40 pax del día grande
     ["Horno pequeño", "1"], ["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
@@ -1071,7 +1076,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -2132,6 +2137,8 @@ export default function App({ onCerrarSesion } = {}) {
   const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState(estadoInicial.estiloPlatoPrincipal ?? "Blanco liso");
   const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState(estadoInicial.estiloPlatoPostre ?? "Blanco");
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
+  // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
+  const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
   const [numCamareros, setNumCamareros]                 = useState(estadoInicial.numCamareros ?? 0);
   // Ratio de camareros configurable: "1 camarero cada X pax". 0 = automático (usa el
   // recomendado por tipo de evento: boda/comunión 12, corporativo 18, cumple/produ 20).
@@ -2321,7 +2328,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
+    llevaArmarioCaliente, llevaPlanchaGas, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -2380,7 +2387,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2680,7 +2687,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, numCamareros, numStaff,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -3667,6 +3674,9 @@ export default function App({ onCerrarSesion } = {}) {
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
+              ...(evento !== "produccion"
+                ? [[llevaPlanchaGas, setLlevaPlanchaGas, "Plancha de gas", "suma 1 bombona"]]
+                : []),
               ...(evento !== "produccion"
                 ? [[tieneBrindisCava, setTieneBrindisCava, "Brindis con cava", "dobla copas de cava"]]
                 : []),
