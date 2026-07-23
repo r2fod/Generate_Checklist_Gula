@@ -1493,6 +1493,12 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const [precios, setPrecios] = useState(() => leerPrecios());
   const [editandoPrecios, setEditandoPrecios] = useState(false);
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
+  // Items con cantidad numérica (los que se pueden "marcar todo vuelto"). Sirve para
+  // alternar el botón entre marcar y desmarcar todo en la pestaña Vuelta.
+  const itemsConCantidad = checklist.flatMap(c => c.items
+    .map(([, q, , lo]) => ({ key: `${c.nombre}::${lo}`, n: parseFloat(String(q && q.u ? q.u : q).replace(",", ".")) }))
+    .filter(it => !isNaN(it.n)));
+  const todoVuelto = itemsConCantidad.length > 0 && itemsConCantidad.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
   const totalMarcados = modo === "salida"
     ? checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => checkeados[`${c.nombre}::${lo}`]).length, 0)
     : checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => {
@@ -1747,13 +1753,10 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
             : renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
           {modo === "vuelta" && (
             <button
-              className="btn btn-outline carga-todo-vuelto"
-              onClick={() => checklist.forEach(cat => cat.items.forEach(([, q, , lo]) => {
-                const n = parseFloat(String(q && q.u ? q.u : q).replace(",", "."));
-                if (!isNaN(n)) onVuelve(`${cat.nombre}::${lo}`, String(n));
-              }))}
-              title="Marca todos los items como que volvieron completos (luego ajustas los que falten y las roturas)"
-            ><Check size={15} /> Marcar todo como vuelto</button>
+              className={`btn btn-outline carga-todo-vuelto ${todoVuelto ? "is-desmarcar" : ""}`}
+              onClick={() => itemsConCantidad.forEach(it => onVuelve(it.key, todoVuelto ? "" : String(it.n)))}
+              title={todoVuelto ? "Quita la marca de vuelto de todos los items" : "Marca todos los items como que volvieron completos (luego ajustas los que falten y las roturas)"}
+            >{todoVuelto ? <><X size={15} /> Desmarcar todo</> : <><Check size={15} /> Marcar todo como vuelto</>}</button>
           )}
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
