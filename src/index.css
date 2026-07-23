@@ -2596,6 +2596,8 @@ hr {
   background: #ecfdf3;
 }
 .carga-todo-vuelto:hover { background: #d9f7e3; }
+.carga-todo-vuelto.is-desmarcar { border-color: var(--border-color-strong); color: var(--text-muted); background: var(--bg-color); }
+.carga-todo-vuelto.is-desmarcar:hover { background: #eef0f4; }
 
 @media (max-width: 480px) {
   .carga-row-principal.carga-row-vuelta {
@@ -3033,3 +3035,41 @@ hr {
   .header-icon:hover, .btn:active, .plantilla-row:hover,
   .category-header:hover .cat-icon svg { transform: none; }
 }
+
+/* ── Compactación móvil ──────────────────────────────────────────────────────
+   Menos aire muerto para que quepa más sin tanto scroll, pero conservando una
+   separación cómoda para el dedo. Va al final para ganar a los breakpoints de
+   arriba sin tener que tocarlos uno a uno. */
+@media (max-width: 560px) {
+  .app-wrapper { padding: 12px 10px 32px; gap: 14px; }
+  .config-sidebar { gap: 14px; }
+  .config-card { padding: 15px; gap: 13px; }
+  .main-layout { gap: 14px; }
+
+  /* Filas de la checklist: un pelín más juntas verticalmente */
+  .item-row { padding: 10px 14px; gap: 10px; }
+  .category-header { padding: 11px 14px; }
+  .category-header .cat-icon { width: 28px; height: 28px; min-width: 28px; }
+  .item-list-wrapper .item-row:first-child { padding-top: 11px; }
+
+  /* Modales (Vista previa / Modo carga): cuerpo y cabecera más ajustados */
+  .preview-overlay { padding: 14px 8px; }
+  .preview-header { padding: 14px 16px; }
+  .preview-body { padding: 14px 14px 22px; gap: 12px; }
+  .preview-category-header { padding: 9px 13px; }
+  .carga-row { padding: 10px 13px; }
+
+  /* Bloques de logística / recogidas / compras: menos separación entre campos */
+  .logistica-block { gap: 8px; }
+  .recogida-card { padding: 12px; }
+  .recogida-card-fechas { gap: 10px; }
+
+  /* Cronómetro y tiempos: que no ocupen tanto alto */
+  .crono-box { padding: 10px 12px; gap: 8px; }
+  .crono-tiempo { font-size: 1.3rem; }
+  .carga-nota-recordatorio { padding: 10px 12px; }
+
+  /* Títulos y textos ligeramente más ajustados */
+  .config-card > .section-title { margin-bottom: -2px; }
+}
+
