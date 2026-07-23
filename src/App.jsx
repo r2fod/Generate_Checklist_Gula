@@ -436,8 +436,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas = "Dealde",
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    paxPorCamarero = 0,
+    paxPorCamarero = 0, numLogisticaEquipo = 0,
   } = opts;
+  // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
+  // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
+  const numLogistica = numLogisticaEquipo > 0 ? numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60));
   // El origen de las sillas (alquiler Dealde/Carvillo o propias) se refleja en el
   // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre.
   // Los cojines vienen incluidos con la silla de alquiler en bodas (no es un item
@@ -480,7 +483,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // 1 cada 60 pax (carga/transporte/montaje), cocina ~3 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, numCamareros, divisorCam))],
-    ["Logística", String(Math.max(1, Math.ceil(pax / 60)))],
+    ["Logística", String(numLogistica)],
     ["Cocina", String(Math.max(2, Math.ceil(pax * 3 / 50)))],
   ]});
 
@@ -714,7 +717,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // 60 pax (carga/transporte), cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, opts.numCamareros, divisorCam))],
-    ["Logística", String(Math.max(1, Math.ceil(pax / 60)))],
+    ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
     ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
   ]});
 
@@ -889,6 +892,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros / office", String(personalSala(pax, numCamareros, divisorCam))],
+    ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
     ["Cocina", String(Math.max(2, Math.ceil(pax * 2 / 50)))],
   ]});
 
@@ -2625,6 +2629,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoNevera, tipoCongelador, tipoPaella, origenSillas,
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
     paxPorCamarero,
+    numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   };
 
   // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
