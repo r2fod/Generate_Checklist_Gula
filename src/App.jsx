@@ -1057,7 +1057,7 @@ const ETIQUETAS_CAMPO = {
   llevaAguasPequenas: "Aguas pequeñas", hayDesayuno: "Desayuno",
   tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
-  recogidas: "Recogidas",
+  recogidas: "Recogidas", compras: "Compras",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
   itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
@@ -2088,6 +2088,8 @@ export default function App({ onCerrarSesion } = {}) {
   // Recogidas: alquileres/equipo de otros proveedores que hay que devolver o recoger en
   // una fecha/hora concreta (camión plataforma, furgonetas, flores, armario caliente...)
   const [recogidas, setRecogidas] = useState(estadoInicial.recogidas ?? []); // [{ concepto, fecha, hora, notas }]
+  // Compras: cosas que hay que comprar para el evento, con fecha límite y aviso previo.
+  const [compras, setCompras] = useState(estadoInicial.compras ?? []); // [{ concepto, fecha, cantidad, comprado }]
   // Cronómetros de Modo carga: mide lo que se tarda de verdad cargando y descargando.
   // Por fase: { ms: acumulado en pausa, running: bool, since: timestamp del arranque }.
   const [cronos, setCronos] = useState(estadoInicial.cronos ?? {}); // { carga:{...}, descarga:{...} }
@@ -2174,27 +2176,39 @@ export default function App({ onCerrarSesion } = {}) {
     return { eventosPendientes: pend, eventosPasados: pas };
   }, [eventosGuardados]);
 
+  // Avisos de recogidas, devoluciones y compras. Ahora avisan CON ANTELACIÓN: entran en
+  // la lista cuando faltan DIAS_AVISO días o menos (o si ya están atrasados), no solo el
+  // mismo día. Cada aviso lleva su lista y campo para poder marcarlo como hecho.
+  const DIAS_AVISO = 3;
   const avisosRecogidas = useMemo(() => {
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const hoyISO = hoy.toISOString().slice(0, 10);
+    const limite = new Date(hoy); limite.setDate(limite.getDate() + DIAS_AVISO);
+    const limiteISO = limite.toISOString().slice(0, 10);
+    const diasHasta = (f) => Math.round((new Date(f + "T00:00:00") - hoy) / 86400000);
+    const dentroVentana = (f) => f && f <= limiteISO;
     const avisos = [];
     Object.entries(eventosGuardados).forEach(([nombreEvt, datos]) => {
       (datos.recogidas || []).forEach((r, idx) => {
         if (!r.concepto) return;
-        // Lo ya marcado como hecho desaparece del aviso: solo queda lo pendiente
-        if (r.fecha && r.fecha <= hoyISO && !r.recogido) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fecha, tipo: "Recogida" });
-        if (r.fechaDevolucion && r.fechaDevolucion <= hoyISO && !r.devuelto) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fechaDevolucion, tipo: "Devolución" });
+        if (dentroVentana(r.fecha) && !r.recogido) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fecha, tipo: "Recogida", lista: "recogidas", campo: "recogido", dias: diasHasta(r.fecha) });
+        if (dentroVentana(r.fechaDevolucion) && !r.devuelto) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fechaDevolucion, tipo: "Devolución", lista: "recogidas", campo: "devuelto", dias: diasHasta(r.fechaDevolucion) });
+      });
+      (datos.compras || []).forEach((c, idx) => {
+        if (!c.concepto) return;
+        if (dentroVentana(c.fecha) && !c.comprado) avisos.push({ evento: nombreEvt, idx, concepto: c.concepto + (c.cantidad ? ` (${c.cantidad})` : ""), fecha: c.fecha, tipo: "Compra", lista: "compras", campo: "comprado", dias: diasHasta(c.fecha) });
       });
     });
     avisos.sort((a, b) => a.fecha.localeCompare(b.fecha));
-    return avisos;
+    return avisos.map(a => ({ ...a, hoyISO }));
   }, [eventosGuardados]);
-  // Marca una recogida/devolución como hecha desde el propio aviso: se guarda en el
+  // Marca una recogida/devolución/compra como hecha desde el propio aviso: se guarda en el
   // evento afectado (nube incluida) y, si es el evento abierto, también en su estado vivo
   const marcarAvisoHecho = (aviso) => {
-    const campo = aviso.tipo === "Recogida" ? "recogido" : "devuelto";
+    const { lista, campo } = aviso;
     const datos = eventosGuardados[aviso.evento];
     if (datos) {
-      const nuevoEstado = { ...datos, recogidas: (datos.recogidas || []).map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r) };
+      const nuevoEstado = { ...datos, [lista]: (datos[lista] || []).map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r) };
       guardarEventos({ ...eventosGuardados, [aviso.evento]: nuevoEstado });
       // El doc individual del link compartido también se actualiza si el evento tiene uno
       if (nubeActiva() && nuevoEstado.eventoNubeId) guardarEventoNube(nuevoEstado.eventoNubeId, nuevoEstado).catch(() => {});
@@ -2204,7 +2218,8 @@ export default function App({ onCerrarSesion } = {}) {
     // posterior no pisa el hecho con el pendiente antiguo
     const esElAbierto = aviso.evento === nombreEvento || (datos && datos.eventoNubeId && datos.eventoNubeId === eventoNubeId);
     if (esElAbierto) {
-      setRecogidas(prev => prev.map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r));
+      const setter = lista === "compras" ? setCompras : setRecogidas;
+      setter(prev => prev.map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r));
     }
   };
   // Historial para deshacer cambios manuales (cantidad editada o item quitado).
@@ -2228,7 +2243,7 @@ export default function App({ onCerrarSesion } = {}) {
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas, notasCheck, cronos,
-    valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, eventoNubeId,
+    valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -2275,7 +2290,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
-    logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas,
+    logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
     itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, notasCheck: setNotasCheck, cronos: setCronos,
@@ -3032,6 +3047,7 @@ export default function App({ onCerrarSesion } = {}) {
             || (!!eventoNubeId && eventosGuardados[evt]?.eventoNubeId === eventoNubeId);
           const delAbierto = avisosRecogidas.filter(a => esAbierto(a.evento));
           const otrosEventos = [...new Set(avisosRecogidas.filter(a => !esAbierto(a.evento)).map(a => a.evento))];
+          const textoDias = (d) => d < 0 ? "atrasado" : d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
           return (
             <div className="avisos-recogidas-banner">
               <div className="cambios-remotos-detalle avisos-recogidas-detalle">
@@ -3040,9 +3056,10 @@ export default function App({ onCerrarSesion } = {}) {
                     <strong>⏰ Pendiente en este evento ({delAbierto[0].evento}):</strong>
                     <span className="avisos-recogidas-lista">
                       {delAbierto.map(a => (
-                        <span className="aviso-recogida-chip" key={`${a.idx}::${a.tipo}`}>
+                        <span className={`aviso-recogida-chip ${a.dias < 0 ? "is-atrasado" : a.dias === 0 ? "is-hoy" : ""}`} key={`${a.lista}::${a.idx}::${a.tipo}`}>
                           {a.tipo}: "{a.concepto}"
-                          {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })})` : ""}
+                          {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}
+                          {a.fecha ? <span className="aviso-recogida-dias"> · {textoDias(a.dias)})</span> : ""}
                           <button
                             className="aviso-recogida-hecho"
                             onClick={() => marcarAvisoHecho(a)}
@@ -3056,7 +3073,7 @@ export default function App({ onCerrarSesion } = {}) {
                 )}
                 {otrosEventos.length > 0 && (
                   <div className="aviso-evento-grupo">
-                    <strong>⏰ Recogidas pendientes en otros eventos:</strong>
+                    <strong>⏰ Pendientes en otros eventos:</strong>
                     <span className="avisos-recogidas-lista">
                       {otrosEventos.map(evt => (
                         <button
@@ -3258,7 +3275,22 @@ export default function App({ onCerrarSesion } = {}) {
             />
           </div>
           <div className="logistica-block">
-            <span className="form-label">EQUIPO DE LOGÍSTICA (cada uno con su horario)</span>
+            <span className="form-label logistica-label-rec">
+              EQUIPO DE LOGÍSTICA (cada uno con su horario)
+              <span className="logistica-recomendado" title="Recomendado: 1 persona de logística cada 60 pax. Se usa para repartir el tiempo de carga/descarga.">
+                <Truck size={12} /> Recomendado: {Math.max(1, Math.ceil(pax / 60))}
+                {logisticaEquipo.length < Math.max(1, Math.ceil(pax / 60)) && (
+                  <button
+                    className="logistica-add-rec"
+                    onClick={() => setLogisticaEquipo(prev => {
+                      const rec = Math.max(1, Math.ceil(pax / 60));
+                      if (prev.length >= rec) return prev;
+                      return [...prev, ...Array.from({ length: rec - prev.length }, () => ({ nombre: "", inicio: "", fin: "", furgoneta: false }))];
+                    })}
+                  >+ Añadir {Math.max(1, Math.ceil(pax / 60)) - logisticaEquipo.length}</button>
+                )}
+              </span>
+            </span>
             {logisticaEquipo.length > 0 && (
               <div className="logistica-tarifas">
                 <div className="form-group">
@@ -3402,6 +3434,62 @@ export default function App({ onCerrarSesion } = {}) {
               className="btn-add-logistica"
               onClick={() => setRecogidas(prev => [...prev, { concepto: "", fecha: "", hora: "", fechaDevolucion: "" }])}
             >+ Añadir recogida</button>
+          </div>
+          <div className="logistica-block">
+            <span className="form-label">COMPRAS (qué falta comprar, con fecha límite y aviso)</span>
+            {compras.map((c, i) => (
+              <div className="recogida-card" key={i}>
+                <div className="recogida-card-top">
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ej: Hielo, servilletas, pilas walkie..."
+                    value={c.concepto}
+                    onChange={e => setCompras(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
+                  />
+                  <button
+                    className="item-action-btn item-action-borrar"
+                    onClick={() => setCompras(prev => prev.filter((_, idx) => idx !== i))}
+                    title="Quitar compra"
+                    aria-label={`Quitar compra ${c.concepto || ""}`}
+                  ><X size={14} /></button>
+                </div>
+                <div className="recogida-card-fechas">
+                  <div className="form-group">
+                    <span className="form-label">Cantidad / detalle</span>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Ej: 4 bolsas"
+                      value={c.cantidad || ""}
+                      onChange={e => setCompras(prev => prev.map((x, idx) => idx === i ? { ...x, cantidad: e.target.value } : x))}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <span className="form-label">Comprar antes de</span>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={c.fecha || ""}
+                      title="Fecha límite de compra"
+                      onChange={e => setCompras(prev => prev.map((x, idx) => idx === i ? { ...x, fecha: e.target.value } : x))}
+                    />
+                    <label className={`recogida-estado ${c.comprado ? "is-hecho" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={!!c.comprado}
+                        onChange={e => setCompras(prev => prev.map((x, idx) => idx === i ? { ...x, comprado: e.target.checked } : x))}
+                      />
+                      {c.comprado ? "✓ Comprado" : "Pendiente de comprar"}
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button
+              className="btn-add-logistica"
+              onClick={() => setCompras(prev => [...prev, { concepto: "", cantidad: "", fecha: "", comprado: false }])}
+            >+ Añadir compra</button>
           </div>
           {evento !== "produccion" && (<>
           <hr />
