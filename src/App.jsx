@@ -6,7 +6,7 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
-  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff,
+  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff, Play, Pause,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
@@ -1450,7 +1450,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, onClose, meta = {} }) {
+function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, meta = {} }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   const checklist = quitarItemsSinCantidad(checklistCompleta);
@@ -1467,20 +1467,55 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       }).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
-  // Tiempo estimado de carga/descarga del camión. Criterio: el volumen de la lista
-  // (nº de ítems) marca el trabajo total, repartido entre el personal de logística.
-  // La carga (en almacén, comprobando la lista) es más lenta que la descarga in situ.
-  const CARGA_BASE_MIN = 20;      // preparar rampa, colocar y amarrar en el camión
-  const CARGA_MIN_POR_ITEM = 1.5; // localizar, empaquetar y tachar cada ítem
-  const CARGA_FACTOR_DESCARGA = 0.6; // la descarga va "a bulto", ~60% del tiempo de carga
+  // Tiempos estimados. Criterio: el volumen de la lista (nº de ítems) marca el trabajo,
+  // repartido entre la gente de logística. Fases:
+  //  · Preparación (previa, en almacén/cocina): estimada según pax + ítems.
+  //  · Carga (comprobando la lista): más lenta y cuidadosa.
+  //  · Descarga (in situ, al final de la jornada): más rápida "a bulto", pero con
+  //    recargo por fatiga según las horas que lleve trabajando el equipo.
+  const PREP_BASE_MIN = 30;          // montar cajas, mise en place mínima
+  const PREP_MIN_POR_PAX = 1;        // preparación que escala con los invitados
+  const PREP_MIN_POR_ITEM = 0.5;     // reunir y empaquetar cada ítem
+  const CARGA_BASE_MIN = 20;         // preparar rampa, colocar y amarrar en el camión
+  const CARGA_MIN_POR_ITEM = 1.5;    // localizar, empaquetar y tachar cada ítem
+  const DESCARGA_FACTOR = 0.6;       // la descarga va "a bulto", ~60% del tiempo de carga
+  const FATIGA_DESDE_H = 4;          // a partir de 4h de jornada empieza a notarse el cansancio
+  const FATIGA_POR_HORA = 0.08;      // +8% por cada hora extra
+  const FATIGA_MAX = 0.6;            // tope del recargo (+60%)
   const numLogistica = Math.max(1, meta.numLogistica || 1);
+  const horasJornada = meta.horasJornada || 0;
+  const paxTotal = meta.totalPax || 0;
+  const prepMin = totalItems > 0 ? Math.round((PREP_BASE_MIN + paxTotal * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM) / numLogistica) : 0;
   const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / numLogistica) : 0;
-  const descargaMin = Math.round(cargaMin * CARGA_FACTOR_DESCARGA);
+  const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
+  const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
+  const totalMin = prepMin + cargaMin + descargaMin;
   const fmtMin = (m) => {
     if (m <= 0) return "—";
     const h = Math.floor(m / 60);
     const min = m % 60;
     return h > 0 ? (min > 0 ? `${h} h ${min} min` : `${h} h`) : `${min} min`;
+  };
+  // Cronómetro en vivo: refresco cada segundo mientras algún cronómetro esté corriendo.
+  const [ahoraTick, setAhoraTick] = useState(Date.now());
+  const algunoCorriendo = ["carga", "descarga"].some(f => cronos[f] && cronos[f].running);
+  useEffect(() => {
+    if (!algunoCorriendo) return;
+    const id = setInterval(() => setAhoraTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [algunoCorriendo]);
+  const cronoMs = (fase) => {
+    const c = cronos[fase];
+    if (!c) return 0;
+    return (c.ms || 0) + (c.running && c.since ? ahoraTick - c.since : 0);
+  };
+  const fmtCrono = (ms) => {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
   };
   // Recordatorios del evento: cada línea de las notas se convierte en una tarea con
   // su propio check (coger comida del congelador, hielo, taxis, un material extra…).
@@ -1496,6 +1531,32 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const notasCompletas = notasItems.length > 0 && notasHechas === notasItems.length;
   const [notaSilenciada, setNotaSilenciada] = useState(false);
   const mostrarRecordatorio = notasItems.length > 0 && !notaSilenciada;
+  // Cronómetro de una fase (carga/descarga): empezar/seguir, pausar y reiniciar, con
+  // el tiempo real corriendo y el estimado al lado para poder controlarlo en vivo.
+  const renderCrono = (fase, estimadoMin, label) => {
+    const c = cronos[fase] || {};
+    const ms = cronoMs(fase);
+    const corriendo = !!c.running;
+    const estMs = estimadoMin * 60000;
+    const sobre = estMs > 0 && ms > estMs;
+    return (
+      <div className={`crono-box ${corriendo ? "is-corriendo" : ""}`}>
+        <div className="crono-info">
+          <span className="crono-label"><Clock size={14} /> {label}</span>
+          <span className={`crono-tiempo ${sobre ? "is-sobre" : ""}`}>{fmtCrono(ms)}</span>
+          {estimadoMin > 0 && <span className="crono-estimado">estimado ~{fmtMin(estimadoMin)}{sobre ? " · pasado" : ""}</span>}
+        </div>
+        <div className="crono-acciones">
+          {corriendo ? (
+            <button className="btn crono-btn crono-btn-pause" onClick={() => onCronoPause && onCronoPause(fase)}><Pause size={14} /> Pausar</button>
+          ) : (
+            <button className="btn crono-btn crono-btn-start" onClick={() => onCronoStart && onCronoStart(fase)}><Play size={14} /> {ms > 0 ? "Seguir" : "Empezar"}</button>
+          )}
+          <button className="btn btn-outline crono-btn crono-btn-reset" onClick={() => onCronoReset && onCronoReset(fase)} disabled={ms === 0 && !corriendo} title="Reiniciar a cero" aria-label="Reiniciar cronómetro"><RotateCcw size={14} /></button>
+        </div>
+      </div>
+    );
+  };
   // Resumen tipo hoja de cálculo: Carga Inicial / Vuelta / Consumo Real, agrupado por
   // categoría, igual que la plantilla en la que ya llevaban el control. "Vuelta" solo
   // se conoce si se ha registrado un valor en la pestaña Vuelta (número o, por datos
@@ -1539,12 +1600,16 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
             </div>
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
             {totalItems > 0 && (
-              <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística. Carga = (20 min + ítems × 1,5 min) ÷ logística; descarga ≈ 60% de la carga.`}>
+              <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.`}>
                 <Clock size={13} />
+                <span><strong>Prep</strong> ~{fmtMin(prepMin)}</span>
+                <span className="carga-tiempos-sep">·</span>
                 <span><strong>Carga</strong> ~{fmtMin(cargaMin)}</span>
                 <span className="carga-tiempos-sep">·</span>
-                <span><strong>Descarga</strong> ~{fmtMin(descargaMin)}</span>
-                <span className="carga-tiempos-nota">({numLogistica} logística)</span>
+                <span><strong>Descarga</strong> ~{fmtMin(descargaMin)}{fatiga > 0 ? " ⚠️" : ""}</span>
+                <span className="carga-tiempos-sep">·</span>
+                <span className="carga-tiempos-total"><strong>Total</strong> ~{fmtMin(totalMin)}</span>
+                <span className="carga-tiempos-nota">({numLogistica} logística{meta.logisticaReal ? "" : ", estimado"})</span>
               </div>
             )}
           </div>
@@ -1656,6 +1721,9 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           </div>
         ) : (
         <div className="preview-body">
+          {modo === "salida"
+            ? renderCrono("carga", cargaMin, "Cronómetro de carga")
+            : renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
               <div className="preview-category-header">
@@ -2020,6 +2088,9 @@ export default function App({ onCerrarSesion } = {}) {
   // Recogidas: alquileres/equipo de otros proveedores que hay que devolver o recoger en
   // una fecha/hora concreta (camión plataforma, furgonetas, flores, armario caliente...)
   const [recogidas, setRecogidas] = useState(estadoInicial.recogidas ?? []); // [{ concepto, fecha, hora, notas }]
+  // Cronómetros de Modo carga: mide lo que se tarda de verdad cargando y descargando.
+  // Por fase: { ms: acumulado en pausa, running: bool, since: timestamp del arranque }.
+  const [cronos, setCronos] = useState(estadoInicial.cronos ?? {}); // { carga:{...}, descarga:{...} }
   // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
@@ -2156,7 +2227,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas, notasCheck,
+    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -2207,7 +2278,7 @@ export default function App({ onCerrarSesion } = {}) {
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
-    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, notasCheck: setNotasCheck,
+    itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
   };
@@ -2610,6 +2681,20 @@ export default function App({ onCerrarSesion } = {}) {
   };
   const handleToggleCheckCarga = (key) => setCheckeados(prev => ({ ...prev, [key]: !prev[key] }));
   const handleToggleNotaCarga = (texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] }));
+  // Cronómetro de carga/descarga: arrancar acumula desde ahora, pausar suma el tramo
+  // corrido al acumulado, reiniciar lo pone a cero. Se guarda/sincroniza con el evento.
+  const handleCronoStart = (fase) => setCronos(prev => {
+    const c = prev[fase] || { ms: 0, running: false, since: null };
+    if (c.running) return prev;
+    return { ...prev, [fase]: { ms: c.ms || 0, running: true, since: Date.now() } };
+  });
+  const handleCronoPause = (fase) => setCronos(prev => {
+    const c = prev[fase];
+    if (!c || !c.running) return prev;
+    const add = c.since ? Date.now() - c.since : 0;
+    return { ...prev, [fase]: { ms: (c.ms || 0) + add, running: false, since: null } };
+  });
+  const handleCronoReset = (fase) => setCronos(prev => ({ ...prev, [fase]: { ms: 0, running: false, since: null } }));
   // A diferencia de roturas, "0" en vuelve es un dato real (confirmado: no ha vuelto
   // nada), distinto de "todavía no se ha revisado" (sin entrada) — solo se borra la
   // clave si se deja el campo vacío del todo.
@@ -2860,7 +2945,21 @@ export default function App({ onCerrarSesion } = {}) {
           onRoturas={handleRoturasCarga}
           notasCheck={notasCheck}
           onToggleNota={handleToggleNotaCarga}
-          meta={{ nombreEvento, totalPax: pax + ninos, notasEvento, numLogistica: Math.max(1, Math.ceil(pax / 60)) }}
+          cronos={cronos}
+          onCronoStart={handleCronoStart}
+          onCronoPause={handleCronoPause}
+          onCronoReset={handleCronoReset}
+          meta={{
+            nombreEvento,
+            totalPax: pax + ninos,
+            notasEvento,
+            numLogistica: (() => {
+              const n = logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length;
+              return n > 0 ? n : Math.max(1, Math.ceil(pax / 60));
+            })(),
+            logisticaReal: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
+            horasJornada: logisticaEquipo.reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0),
+          }}
           onClose={() => setModoCarga(false)}
         />
       )}

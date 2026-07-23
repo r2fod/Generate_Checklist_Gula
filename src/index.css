@@ -2066,7 +2066,64 @@ hr {
 .carga-tiempos svg { color: var(--accent); flex-shrink: 0; }
 .carga-tiempos strong { font-weight: 700; }
 .carga-tiempos-sep { color: var(--text-muted); }
-.carga-tiempos-nota { color: var(--text-muted); font-size: 0.76rem; }
+.carga-tiempos-total { color: var(--accent); }
+.carga-tiempos-nota { color: var(--text-muted); font-size: 0.76rem; width: 100%; }
+
+/* Cronómetro de carga/descarga (medición real) */
+.crono-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06));
+}
+.crono-box.is-corriendo {
+  border-color: #2fa25b;
+  box-shadow: 0 0 0 1px #2fa25b inset, 0 4px 14px rgba(47, 162, 91, 0.14);
+}
+.crono-info {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+}
+.crono-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-main);
+}
+.crono-label svg { color: var(--accent); }
+.crono-tiempo {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 0.5px;
+  color: var(--text-main);
+}
+.is-corriendo .crono-tiempo { color: #2fa25b; }
+.crono-tiempo.is-sobre { color: #d9483b; }
+.crono-estimado { font-size: 0.8rem; color: var(--text-muted); }
+.crono-acciones { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.crono-btn { display: inline-flex; align-items: center; gap: 6px; }
+.crono-btn-start { background: #2fa25b; border-color: #2fa25b; color: #fff; }
+.crono-btn-start:hover { background: #278a4d; }
+.crono-btn-pause { background: #e8a13a; border-color: #e8a13a; color: #fff; }
+.crono-btn-pause:hover { background: #d18f2c; }
+.crono-btn-reset { padding: 8px 10px; }
+.crono-btn-reset:disabled { opacity: 0.4; cursor: default; }
+@media (max-width: 480px) {
+  .crono-box { padding: 11px 12px; }
+  .crono-tiempo { font-size: 1.35rem; }
+}
 
 .carga-modo-toggle {
   padding: 14px 24px 0;
