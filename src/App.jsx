@@ -3,6 +3,11 @@ import {
   Heart, Church, Cake, Briefcase, Clapperboard,
   Plug, Armchair, CookingPot, Utensils, Wine, Shirt, UtensilsCrossed,
   SprayCan, Coffee, CupSoda, Martini, Truck, Package, Users, Boxes,
+  Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
+  ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
+  ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
+  BarChart3, AlertTriangle, Info, Archive, ArrowRight,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -125,6 +130,44 @@ const EVENTO_ICON = { boda: Heart, comunion: Church, cumpleanos: Cake, corporati
 function IconoCategoria({ nombre, size = 16 }) {
   const Comp = infoCategoria(nombre).Comp || Boxes;
   return <Comp size={size} strokeWidth={2.2} />;
+}
+
+// Icono por MATERIAL: se elige según palabras clave del nombre del item (el primero
+// que coincide gana, por eso el orden importa). Es decorativo — una pista visual.
+const ICONOS_ITEM = [
+  { f: ["vino", "tinto de verano", "vermut", "mistela", "cava", "champ", "sangr"], I: Wine },
+  { f: ["cerveza", "barril", "tercio", "alhambra"], I: Beer },
+  { f: ["ginebra", "ron ", "vodka", "tequila", "whisk", "licor", "baileys", "orujo", "cazalla", "jagger", "jägg", "martini", "ballantines", "barceló", "barcelo", "seagram", "smirnoff", "destilado", "tanqueray", "puerto de indias", "negrita", "tía maría", "tia maria", "limoncello", "peche"], I: Martini },
+  { f: ["café", "cafe", "cafetera", "capsul", "cápsula", "infusion", "infusión", "taza"], I: Coffee },
+  { f: ["coca", "fanta", "sprite", "nestea", "aquarius", "refresco", "redbull", "red bull", "zumo", "tónica", "tonica"], I: CupSoda },
+  { f: ["hielo"], I: Snowflake },
+  { f: ["agua", "solán", "solan", "vidaqua", "leche", "jarra"], I: GlassWater },
+  { f: ["copa", "vaso", "cristaler", "chupito"], I: Wine },
+  { f: ["bombona", " gas", "butano", "carbón", "carbon", "leña", "brasa", "barbacoa", "bbq", "pastillas de encender", "reja"], I: Flame },
+  { f: ["horno", "microondas", "vitro", "plancha", "sandwich", "sándwich", "túrmix", "turmix", "batidora", "exprimidor", "cafetera", "termo", "calentador", "chafer", "mesa caliente", "armario caliente"], I: ChefHat },
+  { f: ["paella", "olla", "sartén", "sarten", "cazuela", "gastro", "cuenco", "colador", "difusor", "paravientos", "trípode", "tripode", "descansador"], I: CookingPot },
+  { f: ["cuchillo", "tenedor", "cuchara", "cubiert", "paleta", "cucharón", "cucharon", "pinza", "abridor", "sacacorchos", "espumadera", "maletín", "maletin", "tabla"], I: Utensils },
+  { f: ["plato", "vajilla", "bandeja", "fuente", "champanera", "cubitera", "bol ", "boles", "conchas", "palangana", "blonda"], I: UtensilsCrossed },
+  { f: ["mantel", "servilleta", "delantal", "trapo", "bayeta", "lito", "textil", "camino"], I: Shirt },
+  { f: ["fairy", "estropajo", "limpieza", "escoba", "mocho", "recogedor", "papel", "film", "chemine", "bolsa", "cenicero", "basura", "cubo"], I: SprayCan },
+  { f: ["nevera", "congelador"], I: Snowflake },
+  { f: ["silla", "taburete", "sofá", "chill", "trona", "cesta"], I: Armchair },
+  { f: ["tarta", "candy", "mesa dulce"], I: Cake },
+  { f: ["mesa", "caballete", "servilletero", "marcos", "deco", "cajas de madera"], I: Table },
+  { f: ["regleta", "alargador", "cable", "generador", "garrafa", "foco", "luz", "guirnalda", "eléctric", "electric", "imperdible", "brida", "rulo", "cinta"], I: Zap },
+  { f: ["walkie", "micrófono", "microfono", "atril", "señalética", "senaletica", "cartel", "pegatina", "photocall", "porta-nombres", "acreditaci", "producciones"], I: Radio },
+  { f: ["carpa", "pared", "moqueta"], I: Tent },
+  { f: ["furgoneta", "camión", "camion", "taxi", "carro", "transporte", "flota"], I: Truck },
+  { f: ["camarero", "barman", "cocina", "personal", "staff", "office", "fichaje"], I: Users },
+];
+function iconoItem(label) {
+  const n = label.toLowerCase();
+  for (const it of ICONOS_ITEM) if (it.f.some(fr => n.includes(fr))) return it.I;
+  return Package;
+}
+function IconoItem({ label, size = 15 }) {
+  const I = iconoItem(label);
+  return <I size={size} strokeWidth={2} className="item-icon" />;
 }
 
 
@@ -1255,7 +1298,7 @@ function SelectConOtro({ label, value, onChange, options }) {
             className="item-action-btn"
             title="Volver a elegir de la lista"
             onClick={() => { setModoOtro(false); setTexto(""); onChange(options[0]); }}
-          >↺</button>
+          ><RotateCcw size={14} /></button>
         </div>
       </div>
     );
@@ -1333,15 +1376,15 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
             </div>
             {fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) && (
               <div className="preview-header-subtitle">
-                🚚 Logística: {fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}
+                <Truck size={14} /> Logística: {fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}
                 {totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 && ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€`}
               </div>
             )}
             {fmtRecogidas(meta.recogidas) && (
-              <div className="preview-header-subtitle">📦 Recogidas: {fmtRecogidas(meta.recogidas)}</div>
+              <div className="preview-header-subtitle"><Package size={14} /> Recogidas: {fmtRecogidas(meta.recogidas)}</div>
             )}
           </div>
-          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar">✕</button>
+          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar"><X size={14} /></button>
         </div>
         <div className="preview-body">
           {checklist.map(cat => (
@@ -1453,26 +1496,26 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header">
           <div>
-            <div className="preview-header-title">📦 Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
+            <div className="preview-header-title"><Package size={16} /> Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
             <div className="preview-header-subtitle">
               {totalMarcados} de {totalItems} {modo === "salida" ? "cargados" : "vueltos"}
               {totalRoturas > 0 ? ` · ${totalRoturas} roturas` : ""}
             </div>
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
           </div>
-          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar">✕</button>
+          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
         </div>
         <div className="carga-modo-toggle">
           <div className="segmented-control">
-            <button className={`segment-btn ${modo === "salida" && !verResumen ? "active" : ""}`} onClick={() => { setModo("salida"); setVerResumen(false); }}>🚚 Salida</button>
-            <button className={`segment-btn ${modo === "vuelta" && !verResumen ? "active" : ""}`} onClick={() => { setModo("vuelta"); setVerResumen(false); }}>↩️ Vuelta</button>
-            <button className={`segment-btn ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}>📊 Resumen</button>
+            <button className={`segment-btn ${modo === "salida" && !verResumen ? "active" : ""}`} onClick={() => { setModo("salida"); setVerResumen(false); }}><Truck size={14} /> Salida</button>
+            <button className={`segment-btn ${modo === "vuelta" && !verResumen ? "active" : ""}`} onClick={() => { setModo("vuelta"); setVerResumen(false); }}><Undo2 size={14} /> Vuelta</button>
+            <button className={`segment-btn ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}><BarChart3 size={14} /> Resumen</button>
           </div>
         </div>
         {verResumen ? (
           <div className="preview-body">
             <div className="resumen-precios-bar">
-              <button className="btn btn-outline" onClick={() => setEditandoPrecios(v => !v)}>💶 {editandoPrecios ? "Cerrar precios" : "Precios"}</button>
+              <button className="btn btn-outline" onClick={() => setEditandoPrecios(v => !v)}><Euro size={14} /> {editandoPrecios ? "Cerrar precios" : "Precios"}</button>
               {granTotal > 0 && (
                 <span className="resumen-coste-total">
                   Coste estimado: <strong>{fmtEur(granTotal)}</strong>
@@ -1583,7 +1626,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
                       </div>
                       <div className="carga-roturas carga-vuelve-cantidad">
-                        <span>↩️ vuelve</span>
+                        <span><Undo2 size={12} /> vuelve</span>
                         <input
                           type="number"
                           min="0"
@@ -1595,7 +1638,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                         />
                       </div>
                       <div className="carga-roturas">
-                        <span>💥 roturas</span>
+                        <span><AlertTriangle size={12} /> roturas</span>
                         <input
                           type="number"
                           min="0"
@@ -1647,7 +1690,7 @@ function ModalRecalcular({ cambios, onClose, onAplicar }) {
   return (
     <div className="dialogo-overlay" onClick={onClose}>
       <div className="dialogo-modal recalcular-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="dialogo-titulo">🔄 Recalcular cantidades</div>
+        <div className="dialogo-titulo"><RefreshCw size={16} /> Recalcular cantidades</div>
         <p className="dialogo-mensaje">
           Estas {cambios.length} cantidades automáticas han cambiado desde el último "Guardar evento"
           (seguramente por un ajuste en la app). Elige para cada una si prefieres mantener el valor de
@@ -1731,10 +1774,10 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
         {/* Header */}
         <div style={{ background: "#1f314d", color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>📋 Añadir varios items</div>
+            <div style={{ fontWeight: 700, fontSize: "1.05rem", display: "inline-flex", alignItems: "center", gap: 8 }}><ListPlus size={18} /> Añadir varios items</div>
             <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>{tituloPaso}</div>
           </div>
-          <button onClick={onClose} aria-label="Cerrar" style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} aria-label="Cerrar" style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}><X size={14} /></button>
         </div>
 
         <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1743,7 +1786,7 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
           {paso === "pegar" && (
             <>
               <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
-                ℹ️ Pega una lista de items, uno por línea. Puedes incluir la cantidad separada por tabulador, dos puntos o guion (ej. <em>"Vasos de tubo: 50"</em>); si no pones cantidad se añade con "1".
+                <Info size={14} /> Pega una lista de items, uno por línea. Puedes incluir la cantidad separada por tabulador, dos puntos o guion (ej. <em>"Vasos de tubo: 50"</em>); si no pones cantidad se añade con "1".
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Items a añadir</label>
@@ -1755,7 +1798,7 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
                   style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.85rem", fontFamily: "monospace", cursor: "text", resize: "vertical" }}
                 />
               </div>
-              {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}>⚠️ {error}</div>}
+              {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}><AlertTriangle size={14} /> {error}</div>}
               <button onClick={analizar} disabled={!texto.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: !texto.trim() ? 0.6 : 1 }}>
                 Analizar →
               </button>
@@ -2356,13 +2399,13 @@ export default function App({ onCerrarSesion } = {}) {
   const filaEvento = (n) => (
     <div className="plantilla-row" key={n}>
       <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
-        📋 {n}
+        <CalendarDays size={15} /> {n}
         {avisosRecogidas.some(a => a.evento === n) && (
-          <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes">⏰ {avisosRecogidas.filter(a => a.evento === n).length}</span>
+          <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes"><Clock size={12} /> {avisosRecogidas.filter(a => a.evento === n).length}</span>
         )}
       </button>
-      <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}>🔗</button>
-      <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado">✕</button>
+      <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}><Link2 size={15} /></button>
+      <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado"><X size={15} /></button>
     </div>
   );
 
@@ -2771,18 +2814,18 @@ export default function App({ onCerrarSesion } = {}) {
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>
             )}
             <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
-            <button className="btn btn-outline" onClick={() => setModoCarga(true)}>📦 Modo carga</button>
+            <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
               {menuCompartir && (
                 <>
                   <div className="compartir-menu-backdrop" onClick={() => setMenuCompartir(false)} />
                   <div className="compartir-menu">
-                    <button onClick={handleGenerarLink}>🔗 Link para el móvil</button>
-                    <button onClick={handleCompartirWord}>📄 Word</button>
-                    <button onClick={handleCompartirPDF}>🖨️ PDF</button>
-                    <button onClick={handleCompartirWhatsapp}>💬 WhatsApp (texto)</button>
-                    <button onClick={handleCompartirTexto}>📋 Copiar texto</button>
+                    <button onClick={handleGenerarLink}><Link2 size={15} /> Link para el móvil</button>
+                    <button onClick={handleCompartirWord}><FileText size={15} /> Word</button>
+                    <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>
+                    <button onClick={handleCompartirWhatsapp}><MessageCircle size={15} /> WhatsApp (texto)</button>
+                    <button onClick={handleCompartirTexto}><ClipboardCopy size={15} /> Copiar texto</button>
                   </div>
                 </>
               )}
@@ -2803,7 +2846,7 @@ export default function App({ onCerrarSesion } = {}) {
                 {hayCambiosRemotos.length > 4 ? ` · y ${hayCambiosRemotos.length - 4} cambios más` : ""}
               </span>
             </div>
-            <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso">✕</button>
+            <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso"><X size={14} /></button>
           </div>
         )}
 
@@ -2853,7 +2896,7 @@ export default function App({ onCerrarSesion } = {}) {
                   </div>
                 )}
               </div>
-              <button className="cambios-remotos-cerrar" onClick={() => setAvisosOcultos(true)} aria-label="Cerrar aviso">✕</button>
+              <button className="cambios-remotos-cerrar" onClick={() => setAvisosOcultos(true)} aria-label="Cerrar aviso"><X size={14} /></button>
             </div>
           );
         })()}
@@ -2872,15 +2915,15 @@ export default function App({ onCerrarSesion } = {}) {
           }}
           onClick={() => setModalAgregar(true)}
         >
-          <span>📋 {agregadosTag || "Añadir varios items pegando texto"}</span>
-          <span style={{ fontSize: 12 }}>→</span>
+          <span><ListPlus size={16} /> {agregadosTag || "Añadir varios items pegando texto"}</span>
+          <ArrowRight size={16} />
         </button>
 
         {/* PLANTILLAS GUARDADAS */}
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.08s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Plantillas</span>
-            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarPlantilla} title="Guarda solo la configuración (pax, extras, equipamiento...) como plantilla reutilizable, SIN nombre/fecha/ubicación">💾 Guardar actual</button>
+            <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarPlantilla} title="Guarda solo la configuración (pax, extras, equipamiento...) como plantilla reutilizable, SIN nombre/fecha/ubicación"><Save size={14} /> Guardar actual</button>
           </div>
           {guardadoPlantillaMsg && <p className="guardado-confirm">{guardadoPlantillaMsg}</p>}
           {Object.keys(plantillas).length === 0 ? (
@@ -2889,8 +2932,8 @@ export default function App({ onCerrarSesion } = {}) {
             <ListaColapsable nombres={[...Object.keys(plantillas)].reverse()}>
               {n => (
                 <div className="plantilla-row" key={n}>
-                  <button className="plantilla-nombre" onClick={() => handleAplicarPlantilla(n)} title={`Cargar la plantilla "${n}"`}>📁 {n}</button>
-                  <button className="plantilla-borrar" onClick={() => handleBorrarPlantilla(n)} aria-label={`Borrar plantilla ${n}`} title="Borrar plantilla">✕</button>
+                  <button className="plantilla-nombre" onClick={() => handleAplicarPlantilla(n)} title={`Cargar la plantilla "${n}"`}><FolderOpen size={15} /> {n}</button>
+                  <button className="plantilla-borrar" onClick={() => handleBorrarPlantilla(n)} aria-label={`Borrar plantilla ${n}`} title="Borrar plantilla"><X size={15} /></button>
                 </div>
               )}
             </ListaColapsable>
@@ -2902,8 +2945,8 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar">🔄 Recalcular</button>
-              <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link">💾 Guardar evento</button>
+              <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular</button>
+              <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link"><Save size={14} /> Guardar evento</button>
             </div>
           </div>
           {recalcularMsg && <p className="guardado-confirm">{recalcularMsg}</p>}
@@ -2920,7 +2963,7 @@ export default function App({ onCerrarSesion } = {}) {
               {eventosPasados.length > 0 && (
                 <>
                   <button className="ver-todos-btn" onClick={() => setVerPasados(v => !v)}>
-                    {verPasados ? "▲ Ocultar pasados" : `🗓️ Ver eventos pasados (${eventosPasados.length})`}
+                    {verPasados ? <><ChevronUp size={14} /> Ocultar pasados</> : <><CalendarClock size={14} /> Ver eventos pasados ({eventosPasados.length})</>}
                   </button>
                   {verPasados && <ListaColapsable nombres={eventosPasados}>{filaEvento}</ListaColapsable>}
                 </>
@@ -3076,7 +3119,7 @@ export default function App({ onCerrarSesion } = {}) {
                       checked={p.furgoneta || false}
                       onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, furgoneta: e.target.checked } : x))}
                     />
-                    🚐
+                    <Truck size={14} />
                   </label>
                   {horas !== null && (
                     <span className="logistica-info">{String(horas).replace(".", ",")}h · <strong>{String(importe).replace(".", ",")}€</strong></span>
@@ -3086,7 +3129,7 @@ export default function App({ onCerrarSesion } = {}) {
                     onClick={() => setLogisticaEquipo(prev => prev.filter((_, idx) => idx !== i))}
                     title="Quitar persona"
                     aria-label={`Quitar ${p.nombre || "persona"} de logística`}
-                  >✕</button>
+                  ><X size={14} /></button>
                 </div>
               );
             })}
@@ -3117,7 +3160,7 @@ export default function App({ onCerrarSesion } = {}) {
                     onClick={() => setRecogidas(prev => prev.filter((_, idx) => idx !== i))}
                     title="Quitar recogida"
                     aria-label={`Quitar recogida ${r.concepto || ""}`}
-                  >✕</button>
+                  ><X size={14} /></button>
                 </div>
                 <div className="recogida-card-fechas">
                   <div className="form-group">
@@ -3317,7 +3360,7 @@ export default function App({ onCerrarSesion } = {}) {
         <div className="animate-entrance search-row" style={{ animationDelay: "0.2s" }}>
           <input type="text" className="search-input-main" placeholder="Buscar un material..." value={filtro} onChange={e => setFiltro(e.target.value)} />
           {historial.length > 0 && (
-            <button className="btn btn-outline btn-deshacer" onClick={handleDeshacer} title="Deshace el último cambio manual (cantidad editada o item quitado)">↩ Deshacer</button>
+            <button className="btn btn-outline btn-deshacer" onClick={handleDeshacer} title="Deshace el último cambio manual (cantidad editada o item quitado)"><Undo2 size={14} /> Deshacer</button>
           )}
         </div>
 
@@ -3370,12 +3413,12 @@ export default function App({ onCerrarSesion } = {}) {
                   <option value={nuevoItemCategoria}>{nuevoItemCategoria}</option>
                 )}
                 <option value={CATEGORIA_MANUAL}>{CATEGORIA_MANUAL}</option>
-                <option value="__nueva__">➕ Nueva categoría…</option>
+                <option value="__nueva__">+ Nueva categoría…</option>
               </select>
             </div>
             <label className="add-item-alquiler-check" title="Marcar como alquiler proveedor (si no está incluido)">
               <input type="checkbox" checked={nuevoItemAlquiler} onChange={e => setNuevoItemAlquiler(e.target.checked)} />
-              🏷 Alquiler proveedor
+              <Tag size={12} /> Alquiler proveedor
             </label>
             <button className="btn btn-navy-outline add-item-btn" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
           </div>
@@ -3390,7 +3433,7 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
                 <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span>{cat.nombre}</span>
                 <span className="cat-count">
-                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleRenombrarCategoria(cat.nombre); }} title="Renombrar categoría" aria-label={`Renombrar categoría ${cat.nombre}`}>✎</button>
+                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleRenombrarCategoria(cat.nombre); }} title="Renombrar categoría" aria-label={`Renombrar categoría ${cat.nombre}`}><Pencil size={13} /></button>
                   {cat.items.length}<span className="arrow">▼</span>
                 </span>
               </div>
@@ -3434,14 +3477,14 @@ export default function App({ onCerrarSesion } = {}) {
                                 onMouseDown={e => e.preventDefault()}
                                 onChange={e => setAlquilerTemporal(e.target.checked)}
                               />
-                              🏷 Alquiler
+                              <Tag size={12} /> Alquiler
                             </label>
                           </div>
                         ) : (
                           <div className="item-name">
-                            {label}
-                            {alq && <span className="tag-alquiler">ALQUILER</span>}
-                            {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} style={{ color: "#9ca3af", fontSize: "0.7rem" }}>✎</span>}
+                            <span className="item-name-lead"><IconoItem label={label} /> {label}</span>
+                            {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+                            {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Pencil size={12} /></span>}
                           </div>
                         )}
                         <input
@@ -3473,13 +3516,13 @@ export default function App({ onCerrarSesion } = {}) {
                             onClick={() => { setEditandoNombre(keyId); setNombreTemporal(label); setAlquilerTemporal(esAlquilerManual); }}
                             title="Editar el nombre / marcar alquiler proveedor"
                             aria-label={`Editar ${label}`}
-                          >✎</button>
+                          ><Pencil size={13} /></button>
                           <button
                             className="item-action-btn item-action-borrar"
                             onClick={() => esItemManual ? handleRemoveItemManual(manualIdx) : handleOcultarItem(cat.nombre, labelOriginal ?? label)}
                             title="Quitar de la lista"
                             aria-label={`Quitar ${label}`}
-                          >✕</button>
+                          ><X size={14} /></button>
                         </div>
                       </div>
                     );
