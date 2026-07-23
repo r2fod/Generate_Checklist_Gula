@@ -3013,13 +3013,45 @@ hr {
 @media (prefers-reduced-motion: reduce) { .category-section.is-open .cat-icon { animation: none; } }
 
 /* Icono por material en cada fila: gris suave que cobra color y salta al pasar el ratón */
-.item-name-lead { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+/* El icono queda fijo a la izquierda y el texto (con su asterisco/etiqueta) fluye y
+   se parte junto, sin que el asterisco caiga solo a una línea aparte. */
+.item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1; }
+.item-name-lead > .item-icon { margin-top: 2px; }
+.item-label-text { min-width: 0; }
 /* Títulos de modales con icono alineado */
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: inline-flex; align-items: center; gap: 7px; }
-.item-icon { color: var(--accent); opacity: 0.5; flex-shrink: 0; transition: transform 0.2s ease, color 0.2s ease, opacity 0.2s ease; }
-.item-row:hover .item-icon { color: var(--accent); opacity: 1; transform: scale(1.2) rotate(-5deg); }
-.item-edit-flag { color: var(--accent, #c9a24b); display: inline-flex; align-items: center; opacity: 0.9; }
-.tag-alquiler { display: inline-flex; align-items: center; gap: 3px; }
+.item-icon { opacity: 0.92; flex-shrink: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
+.item-row:hover .item-icon { opacity: 1; transform: scale(1.2) rotate(-5deg); }
+.item-edit-flag { color: var(--accent, #c9a24b); display: inline; opacity: 0.9; margin-left: 3px; }
+.item-edit-flag svg { display: inline; vertical-align: -1px; }
+.tag-alquiler { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }
+
+/* Indicador "Guardado ✓": chip flotante abajo-derecha que aparece un instante */
+.guardado-indicador {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #ecfdf3;
+  color: #15803d;
+  border: 1px solid #a7e3bf;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  box-shadow: 0 8px 24px -8px rgba(21, 128, 61, 0.35);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.guardado-indicador.is-visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .guardado-indicador { transition: opacity 0.25s ease; transform: none; }
+}
 .item-edit-alquiler-check, .add-item-alquiler-check { display: inline-flex; align-items: center; gap: 5px; }
 
 /* Botones: micro-rebote al pulsar */
