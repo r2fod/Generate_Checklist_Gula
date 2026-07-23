@@ -1632,6 +1632,26 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
     guardarPrecios(nuevos);
     setEditandoPrecios(false);
   };
+  // Exporta el resumen a CSV (se abre en Excel/Sheets/Numbers). Separador ";" y BOM
+  // UTF-8 para que Excel en español lo lea bien con tildes.
+  const exportarResumenCSV = () => {
+    const sep = ";";
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [["Categoría", "Producto", "Carga inicial", "Vuelta", "Consumo real", "Roturas", "Coste ud.", "Coste total"]];
+    filasPorCategoria.forEach(cat => {
+      cat.filas.forEach(f => rows.push([cat.nombre, f.label, f.cargaInicial ?? "", f.vuelta ?? "", f.consumoReal ?? "", f.roturas || "", f.precio !== undefined ? f.precio : "", f.costeTotal !== null ? f.costeTotal : ""]));
+      rows.push([`Subtotal ${cat.nombre}`, "", "", "", "", "", "", cat.subtotal]);
+    });
+    rows.push(["TOTAL", "", "", "", "", "", "", granTotal]);
+    const csv = "﻿" + rows.map(r => r.map(esc).join(sep)).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Resumen_${(meta.nombreEvento || "evento").replace(/[^\w\-]+/g, "_")}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   return (
     <div className="preview-overlay" onClick={onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
@@ -1692,6 +1712,9 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           <div className="preview-body">
             <div className="resumen-precios-bar">
               <button className="btn btn-outline" onClick={() => setEditandoPrecios(v => !v)}><Euro size={14} /> {editandoPrecios ? "Cerrar precios" : "Precios"}</button>
+              {filasPorCategoria.length > 0 && (
+                <button className="btn btn-outline" onClick={exportarResumenCSV} title="Descarga el resumen en CSV (se abre en Excel, Sheets o Numbers)"><FileText size={14} /> Exportar (Excel)</button>
+              )}
               {granTotal > 0 && (
                 <span className="resumen-coste-total">
                   Coste estimado: <strong>{fmtEur(granTotal)}</strong>
@@ -1733,12 +1756,12 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                   </thead>
                   {filasPorCategoria.map(cat => (
                     <tbody key={cat.nombre}>
-                      <tr className="resumen-cat-header">
-                        <td colSpan={7}><IconoCategoria nombre={cat.nombre} size={14} /> {cat.nombre}</td>
+                      <tr className="resumen-cat-header" style={{ background: infoCategoria(cat.nombre).color }}>
+                        <td colSpan={7} style={{ color: infoCategoria(cat.nombre).texto }}><IconoCategoria nombre={cat.nombre} size={14} /> {cat.nombre}</td>
                       </tr>
                       {cat.filas.map(f => (
                         <tr key={f.key}>
-                          <td className="resumen-tabla-producto" title={f.label}>{f.label}</td>
+                          <td className="resumen-tabla-producto" title={f.label}><IconoItem label={f.label} size={13} /> {f.label}</td>
                           <td>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</td>
                           <td>{f.vuelta ?? "—"}</td>
                           <td>{f.consumoReal ?? "—"}</td>
@@ -1794,7 +1817,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                             checked={marcado}
                             onChange={() => onToggleSale(key)}
                           />
-                          <span className="carga-nombre">{label}</span>
+                          <span className="carga-nombre"><IconoItem label={label} /> {label}</span>
                           <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
                         </label>
                       </div>
@@ -1811,7 +1834,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                   return (
                     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`} key={i}>
                       <div className="carga-row-principal carga-row-vuelta">
-                        <span className="carga-nombre">{label}</span>
+                        <span className="carga-nombre"><IconoItem label={label} /> {label}</span>
                         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
                       </div>
                       {cantidadCompleta !== null && (
