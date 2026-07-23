@@ -1787,6 +1787,23 @@ function leerEstadoGuardado() {
   return { estado: {}, desdeLink: false };
 }
 
+// Lista que muestra solo unos pocos elementos y despliega el resto bajo demanda,
+// para que "Eventos guardados" y "Plantillas" no crezcan sin fin cuando hay muchos.
+function ListaColapsable({ nombres, limite = 5, children }) {
+  const [verTodos, setVerTodos] = useState(false);
+  const visibles = verTodos ? nombres : nombres.slice(0, limite);
+  return (
+    <div className="plantillas-lista">
+      {visibles.map(children)}
+      {nombres.length > limite && (
+        <button className="ver-todos-btn" onClick={() => setVerTodos(v => !v)}>
+          {verTodos ? "▲ Ver menos" : `▼ Ver todos (${nombres.length})`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App({ onCerrarSesion } = {}) {
   const [{ estado: estadoInicial, desdeLink: linkAbiertoInicial }] = useState(leerEstadoGuardado);
@@ -2808,14 +2825,14 @@ export default function App({ onCerrarSesion } = {}) {
           {Object.keys(plantillas).length === 0 ? (
             <p className="plantillas-vacio">Guarda configuraciones que repites (ej: "Boda estándar 100 pax") y cárgalas con un click en el próximo evento.</p>
           ) : (
-            <div className="plantillas-lista">
-              {Object.keys(plantillas).map(n => (
+            <ListaColapsable nombres={Object.keys(plantillas)}>
+              {n => (
                 <div className="plantilla-row" key={n}>
                   <button className="plantilla-nombre" onClick={() => handleAplicarPlantilla(n)} title={`Cargar la plantilla "${n}"`}>📁 {n}</button>
                   <button className="plantilla-borrar" onClick={() => handleBorrarPlantilla(n)} aria-label={`Borrar plantilla ${n}`} title="Borrar plantilla">✕</button>
                 </div>
-              ))}
-            </div>
+              )}
+            </ListaColapsable>
           )}
         </div>
 
@@ -2833,8 +2850,8 @@ export default function App({ onCerrarSesion } = {}) {
           {Object.keys(eventosGuardados).length === 0 ? (
             <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
           ) : (
-            <div className="plantillas-lista">
-              {Object.keys(eventosGuardados).map(n => (
+            <ListaColapsable nombres={Object.keys(eventosGuardados)}>
+              {n => (
                 <div className="plantilla-row" key={n}>
                   <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
                     📋 {n}
@@ -2845,8 +2862,8 @@ export default function App({ onCerrarSesion } = {}) {
                   <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}>🔗</button>
                   <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado">✕</button>
                 </div>
-              ))}
-            </div>
+              )}
+            </ListaColapsable>
           )}
         </div>
 
