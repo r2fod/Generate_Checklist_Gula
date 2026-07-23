@@ -371,6 +371,23 @@ body {
 }
 .logistica-add-rec:hover { background: #6d28d9; }
 
+/* Toggle Nómina / Extra por persona de logística */
+.logistica-tipo-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--border-color-strong);
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.logistica-tipo-btn.is-extra { color: #2563eb; border-color: #bfdbfe; background: #eff6ff; }
+.logistica-tipo-btn.is-nomina { color: #7c3aed; border-color: #ddd6fe; background: #f5f3ff; }
+.logistica-tipo-btn:hover { filter: brightness(0.97); }
+
 .aviso-recogida-hecho {
   border: none;
   background: #16a34a;

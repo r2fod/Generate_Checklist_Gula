@@ -1103,7 +1103,10 @@ function horasLogistica(inicio, fin) {
 function importeLogistica(p, tarifa, plusFurgo) {
   const h = horasLogistica(p.inicio, p.fin);
   if (h === null) return null;
-  return Math.round((h * (tarifa || 0) + (p.furgoneta ? (plusFurgo || 0) : 0)) * 100) / 100;
+  // "Nómina": ya cobra su sueldo, no suma coste por horas al evento (solo la furgoneta
+  // si la pone). "Extra" (por defecto): se paga por horas × tarifa + plus de furgoneta.
+  const costeHoras = p.tipo === "nomina" ? 0 : h * (tarifa || 0);
+  return Math.round((costeHoras + (p.furgoneta ? (plusFurgo || 0) : 0)) * 100) / 100;
 }
 
 // "Juan 08:00–13:30 (5,5h · 55€) · Pedro 09:00–14:00 (5h · 70€ con furgo)"
@@ -1114,7 +1117,8 @@ function fmtLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
       const h = horasLogistica(p.inicio, p.fin);
       const imp = importeLogistica(p, tarifa, plusFurgo);
       const horario = p.inicio || p.fin ? ` ${p.inicio || "?"}–${p.fin || "?"}` : "";
-      const detalle = h !== null ? ` (${String(h).replace(".", ",")}h · ${String(imp).replace(".", ",")}€${p.furgoneta ? " con furgo" : ""})` : "";
+      const tipoTxt = p.tipo === "nomina" ? " nómina" : "";
+      const detalle = h !== null ? ` (${String(h).replace(".", ",")}h · ${String(imp).replace(".", ",")}€${p.furgoneta ? " con furgo" : ""}${tipoTxt})` : (tipoTxt ? ` (${tipoTxt.trim()})` : "");
       return `${p.nombre || "¿?"}${horario}${detalle}`;
     })
     .join(" · ");
@@ -1123,6 +1127,28 @@ function fmtLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
 // Total en € de todo el equipo de logística (solo personas con horario completo)
 function totalLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
   return Math.round(equipo.reduce((acc, p) => acc + (importeLogistica(p, tarifa, plusFurgo) || 0), 0) * 100) / 100;
+}
+
+// Estimación (en minutos) del tiempo de Preparación / Carga / Descarga, repartido entre
+// la gente de logística. La descarga lleva recargo por fatiga según las horas de jornada.
+// Compartida entre Modo carga y el formulario (para sugerir la hora de fin de logística).
+const CARGA_BASE_MIN = 20, CARGA_MIN_POR_ITEM = 1.5, DESCARGA_FACTOR = 0.6;
+const PREP_BASE_MIN = 30, PREP_MIN_POR_PAX = 1, PREP_MIN_POR_ITEM = 0.5;
+const FATIGA_DESDE_H = 4, FATIGA_POR_HORA = 0.08, FATIGA_MAX = 0.6;
+function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJornada = 0 }) {
+  const nLog = Math.max(1, numLogistica || 1);
+  const prepMin = totalItems > 0 ? Math.round((PREP_BASE_MIN + pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM) / nLog) : 0;
+  const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / nLog) : 0;
+  const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
+  const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
+  return { prepMin, cargaMin, descargaMin, fatiga, totalMin: prepMin + cargaMin + descargaMin };
+}
+// "08:30" + 150 min → "11:00" (sumar minutos a una hora HH:MM, con vuelta de día)
+function sumarMinutosHora(hhmm, minutos) {
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  const total = ((h * 60 + m + Math.round(minutos)) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 // Recogidas: alquileres/equipo de otros proveedores a devolver o recoger en fecha/hora concreta
@@ -1467,29 +1493,13 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       }).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
-  // Tiempos estimados. Criterio: el volumen de la lista (nº de ítems) marca el trabajo,
-  // repartido entre la gente de logística. Fases:
-  //  · Preparación (previa, en almacén/cocina): estimada según pax + ítems.
-  //  · Carga (comprobando la lista): más lenta y cuidadosa.
-  //  · Descarga (in situ, al final de la jornada): más rápida "a bulto", pero con
-  //    recargo por fatiga según las horas que lleve trabajando el equipo.
-  const PREP_BASE_MIN = 30;          // montar cajas, mise en place mínima
-  const PREP_MIN_POR_PAX = 1;        // preparación que escala con los invitados
-  const PREP_MIN_POR_ITEM = 0.5;     // reunir y empaquetar cada ítem
-  const CARGA_BASE_MIN = 20;         // preparar rampa, colocar y amarrar en el camión
-  const CARGA_MIN_POR_ITEM = 1.5;    // localizar, empaquetar y tachar cada ítem
-  const DESCARGA_FACTOR = 0.6;       // la descarga va "a bulto", ~60% del tiempo de carga
-  const FATIGA_DESDE_H = 4;          // a partir de 4h de jornada empieza a notarse el cansancio
-  const FATIGA_POR_HORA = 0.08;      // +8% por cada hora extra
-  const FATIGA_MAX = 0.6;            // tope del recargo (+60%)
+  // Tiempos estimados (Preparación / Carga / Descarga). El criterio vive en
+  // estimarTiemposCarga() para compartirlo con el formulario. El nº de logística marca
+  // el reparto; la descarga lleva recargo por fatiga según las horas de jornada.
   const numLogistica = Math.max(1, meta.numLogistica || 1);
   const horasJornada = meta.horasJornada || 0;
   const paxTotal = meta.totalPax || 0;
-  const prepMin = totalItems > 0 ? Math.round((PREP_BASE_MIN + paxTotal * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM) / numLogistica) : 0;
-  const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / numLogistica) : 0;
-  const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
-  const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
-  const totalMin = prepMin + cargaMin + descargaMin;
+  const { prepMin, cargaMin, descargaMin, fatiga, totalMin } = estimarTiemposCarga({ totalItems, pax: paxTotal, numLogistica, horasJornada });
   const fmtMin = (m) => {
     if (m <= 0) return "—";
     const h = Math.floor(m / 60);
@@ -1501,13 +1511,16 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const algunoCorriendo = ["carga", "descarga"].some(f => cronos[f] && cronos[f].running);
   useEffect(() => {
     if (!algunoCorriendo) return;
+    setAhoraTick(Date.now()); // sincroniza YA al arrancar, si no el primer frame daría un valor raro
     const id = setInterval(() => setAhoraTick(Date.now()), 1000);
     return () => clearInterval(id);
   }, [algunoCorriendo]);
   const cronoMs = (fase) => {
     const c = cronos[fase];
     if (!c) return 0;
-    return (c.ms || 0) + (c.running && c.since ? ahoraTick - c.since : 0);
+    // Math.max evita el negativo del primer render antes de que ahoraTick se sincronice
+    const enMarcha = c.running && c.since ? Math.max(0, ahoraTick - c.since) : 0;
+    return (c.ms || 0) + enMarcha;
   };
   const fmtCrono = (ms) => {
     const s = Math.floor(ms / 1000);
@@ -2660,6 +2673,13 @@ export default function App({ onCerrarSesion } = {}) {
     return cats.filter(c => c.items.length > 0);
   }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual]);
 
+  // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
+  // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
+  const tiemposCargaForm = useMemo(() => {
+    const totalItemsCarga = quitarItemsSinCantidad(checklist).reduce((a, c) => a + c.items.length, 0);
+    return estimarTiemposCarga({ totalItems: totalItemsCarga, pax, numLogistica: Math.max(1, Math.ceil(pax / 60)) });
+  }, [checklist, pax]);
+
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
   const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
@@ -3320,16 +3340,36 @@ export default function App({ onCerrarSesion } = {}) {
                     className="form-input logistica-hora"
                     value={p.inicio}
                     title="Hora de inicio"
-                    onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, inicio: e.target.value } : x))}
+                    onChange={e => {
+                      const nuevaInicio = e.target.value;
+                      setLogisticaEquipo(prev => prev.map((x, idx) => {
+                        if (idx !== i) return x;
+                        const next = { ...x, inicio: nuevaInicio };
+                        // Sugerir la hora de fin desde la de inicio (inicio + tiempo estimado
+                        // total: preparación + carga + descarga). Solo si el fin está vacío o
+                        // se había puesto de forma automática; siempre editable a mano.
+                        if (nuevaInicio && tiemposCargaForm.totalMin > 0 && (!x.fin || x.finAuto)) {
+                          next.fin = sumarMinutosHora(nuevaInicio, tiemposCargaForm.totalMin);
+                          next.finAuto = true;
+                        }
+                        return next;
+                      }));
+                    }}
                   />
                   <span className="logistica-sep">–</span>
                   <input
                     type="time"
                     className="form-input logistica-hora"
                     value={p.fin}
-                    title="Hora de fin"
-                    onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, fin: e.target.value } : x))}
+                    title={p.finAuto ? "Hora de fin sugerida automáticamente (editable)" : "Hora de fin"}
+                    onChange={e => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, fin: e.target.value, finAuto: false } : x))}
                   />
+                  <button
+                    type="button"
+                    className={`logistica-tipo-btn ${p.tipo === "nomina" ? "is-nomina" : "is-extra"}`}
+                    onClick={() => setLogisticaEquipo(prev => prev.map((x, idx) => idx === i ? { ...x, tipo: x.tipo === "nomina" ? "extra" : "nomina" } : x))}
+                    title="Extra = se paga por horas · Nómina = ya va en nómina (no suma €/hora al evento)"
+                  >{p.tipo === "nomina" ? "Nómina" : "Extra"}</button>
                   <label className="logistica-furgo" title="Plus por llevar furgoneta">
                     <input
                       type="checkbox"
@@ -3339,7 +3379,7 @@ export default function App({ onCerrarSesion } = {}) {
                     <Truck size={14} />
                   </label>
                   {horas !== null && (
-                    <span className="logistica-info">{String(horas).replace(".", ",")}h · <strong>{String(importe).replace(".", ",")}€</strong></span>
+                    <span className="logistica-info">{String(horas).replace(".", ",")}h · <strong>{String(importe).replace(".", ",")}€</strong>{p.tipo === "nomina" ? " nómina" : ""}</span>
                   )}
                   <button
                     className="item-action-btn item-action-borrar"
