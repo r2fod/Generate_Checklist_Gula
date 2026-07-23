@@ -1396,8 +1396,8 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
         <div className="preview-body">
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
-              <div className="preview-category-header">
-                <span><IconoCategoria nombre={cat.nombre} /></span>
+              <div className="preview-category-header" style={{ borderLeftColor: infoCategoria(cat.nombre).color }}>
+                <span className="cat-icon-mini" style={{ background: infoCategoria(cat.nombre).color, color: infoCategoria(cat.nombre).texto }}><IconoCategoria nombre={cat.nombre} /></span>
                 <span>{cat.nombre}</span>
               </div>
               <div className="preview-table-wrap">
@@ -1726,8 +1726,8 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
             : renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
-              <div className="preview-category-header">
-                <span><IconoCategoria nombre={cat.nombre} /></span>
+              <div className="preview-category-header" style={{ borderLeftColor: infoCategoria(cat.nombre).color }}>
+                <span className="cat-icon-mini" style={{ background: infoCategoria(cat.nombre).color, color: infoCategoria(cat.nombre).texto }}><IconoCategoria nombre={cat.nombre} /></span>
                 <span>{cat.nombre}</span>
               </div>
               <div className="carga-lista">
