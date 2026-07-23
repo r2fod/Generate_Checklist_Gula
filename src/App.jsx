@@ -184,7 +184,10 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
   // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
   const refrescoTotal = Math.round(pax * 7.4);
-  const tonica = Math.max(6, Math.round(pax * 0.15 * barFactor));
+  // El factor de horas se acota (máx. 1,75) para que una barra muy larga no dispare
+  // la tónica/refrescos de mezcla por encima de lo real, igual que en la cristalería.
+  const barFactorTope = Math.min(1.75, barFactor);
+  const tonica = Math.max(6, Math.round(pax * 0.15 * barFactorTope));
   // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
   // Agua Vidaqua de personal, que se calcula aparte en calcPersonal(). El ratio es
   // 0,8 BOTELLAS por pax (~1,2 L/pax, en el rango alto del sector: 0,5-1 L/pax);
@@ -192,7 +195,7 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   // (64 packs = 384 botellas para 80 pax, 7 L/pax — un disparate multiplicado ×6).
   const agua15 = Math.round(pax * 0.8);
   const agua15Packs = Math.max(2, Math.ceil(agua15 / 6));
-  const redbull = h > 0 ? Math.max(6, Math.round(pax * 0.06 * barFactor)) : 0;
+  const redbull = h > 0 ? Math.max(6, Math.round(pax * 0.06 * barFactorTope)) : 0;
   // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
   const aguasPequenasUds = Math.round(pax * 3);
   const aguasPequenasCajas = Math.max(1, Math.ceil(aguasPequenasUds / 35));
@@ -231,7 +234,9 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
 }
 
 function calcDestilados(pax, h) {
-  const f = h / 4;
+  // Factor de horas de copas acotado (máx. 1,75): en barras muy largas el consumo
+  // de destilados por pax no sigue creciendo linealmente, igual que la cerveza/cristalería.
+  const f = Math.min(1.75, h / 4);
   const r  = (base) => Math.max(1, Math.round(base * f));
   // Estos licores no se compran de uno en uno: mínimo 2 botellas
   const r2 = (base) => Math.max(2, Math.round(base * f));
@@ -410,6 +415,14 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Carros de servicio/transporte", "2"], ["Walkies", "2"],
   ]});
 
+  // Personal (banquete emplatado): camareros 1:12, barman 1:60 (solo con barra),
+  // cocina ~3 cada 50 pax. Estándar del sector para servicio en mesa.
+  cats.push({ nombre: "Personal", items: [
+    ["Camareros", String(personalSala(pax, numCamareros, 12))],
+    opt(hayBarra, ["Barman", String(Math.max(1, Math.ceil(pax / 60)))]),
+    ["Cocina", String(Math.max(2, Math.ceil(pax * 3 / 50)))],
+  ]});
+
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
   const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
@@ -483,7 +496,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales", String(personalSala(pax, numCamareros, 15) + 2)],
+    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales", String(personalSala(pax, numCamareros, 12) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
@@ -515,15 +528,15 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
   ]});
 
-  const personal = calcPersonal(pax, numCamareros, numStaff, 15);
+  const personal = calcPersonal(pax, numCamareros, numStaff, 12);
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", conSufijo(1, "bote")], ["Estropajo", conSufijo(1, "paquete")], ["Papel plata", conSufijo(1, "rollo")], ["Film", conSufijo(1, "rollo")],
     ["Escoba", "1"], ["Mocho", "1"], ["Cubo", "1"], ["Recogedor", "1"],
     ["Bayetas", "4"], ["Trapos de horno", "4"], ["Papel Chemine", conSufijo(2, "rollo")], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
-    ["Bandeja camareros", String(personalSala(pax, numCamareros, 15))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 15))],
+    ["Bandeja camareros", String(personalSala(pax, numCamareros, 12))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 12))],
     ["Hojas de fichaje", "1"],
   ]});
 
@@ -623,6 +636,14 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Electricidad y otros", items: [
     ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"],
     ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Rulos", "2"], ["Walkies", "2"],
+  ]});
+
+  // Personal: en cumpleaños suele ser formato más informal (1:20); barman solo si hay
+  // barra, cocina ~2 cada 50 pax.
+  cats.push({ nombre: "Personal", items: [
+    ["Camareros", String(personalSala(pax, opts.numCamareros))],
+    opt(hayBarra, ["Barman", String(Math.max(1, Math.ceil(pax / 60)))]),
+    ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
   ]});
 
   cats.push({ nombre: "Mobiliario", items: [
@@ -789,6 +810,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"],
     ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Rulos", "2"], ["Generador", "1"], ["Garrafa gasolina (llena)", "1"],
     ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
+  ]});
+
+  // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
+  cats.push({ nombre: "Personal", items: [
+    ["Camareros / office", String(personalSala(pax, numCamareros))],
+    ["Cocina", String(Math.max(2, Math.ceil(pax * 2 / 50)))],
   ]});
 
   // Carpas para la zona de comer/office del rodaje: una 3x3 cubre ~12 personas de
