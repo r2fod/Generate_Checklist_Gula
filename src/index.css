@@ -2659,9 +2659,33 @@ hr {
 
 /* Iconos SVG (lucide): centrado y micro-animación al pasar el ratón */
 .cat-icon { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Botones con icono + texto: alineados y con separación (importante en móvil) */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btn svg { flex-shrink: 0; }
+/* Botones-icono pequeños (link, borrar, editar, cerrar): SVG centrado */
+.plantilla-link, .plantilla-borrar, .cat-edit-btn, .preview-close-btn,
+.cambios-remotos-cerrar, .item-action-btn, .ver-todos-btn, .segment-btn,
+.compartir-menu > button, .add-item-card > span {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+/* Icono que gira/late en botones de acción al pasar el ratón */
+.btn:hover svg, .plantilla-row:hover .plantilla-link svg { transition: transform 0.25s ease; }
+.plantilla-borrar:hover svg { transform: rotate(90deg); transition: transform 0.2s ease; }
+.btn-plantilla:hover svg, .compartir-menu > button:hover svg { transform: scale(1.12); }
 .header-icon svg, .cat-icon svg { display: block; }
 .cat-icon svg { transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .category-header:hover .cat-icon svg { transform: scale(1.18) rotate(-6deg); }
+
+/* Icono por material en cada fila: gris suave que cobra color y salta al pasar el ratón */
+.item-name-lead { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+/* Títulos de modales con icono alineado */
+.preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: inline-flex; align-items: center; gap: 7px; }
+.item-icon { color: var(--text-label); flex-shrink: 0; transition: transform 0.2s ease, color 0.2s ease; }
+.item-row:hover .item-icon { color: var(--accent); transform: scale(1.2) rotate(-5deg); }
+.item-edit-flag { color: #9ca3af; display: inline-flex; align-items: center; }
+.tag-alquiler { display: inline-flex; align-items: center; gap: 3px; }
+.item-edit-alquiler-check, .add-item-alquiler-check { display: inline-flex; align-items: center; gap: 5px; }
 
 /* Botones: micro-rebote al pulsar */
 .btn:active { transform: scale(0.96); }
