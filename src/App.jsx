@@ -399,6 +399,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Si se lleva congelador (propio o de la finca) se puede hacer/almacenar hielo in situ:
   // solo hace falta pedir taxis de hielo cuando NO se lleva ninguno.
   const hayCongelador = tipoCongelador !== "No lleva";
+  // Boda, Comunión/Bautizo y Corporativo comparten la mayor parte de la lista; estas
+  // banderas activan/ocultan lo que es propio de cada uno (ver items con opt() abajo).
+  const esComunion = evtKey === "comunion";
+  const esCorporativo = evtKey === "corporativo";
+  // Corporativo suele ser cóctel de pie (menos camareros que un banquete sentado):
+  // 1 cada 18 pax; boda y comunión (servicio en mesa) 1 cada 12.
+  const divisorCam = esCorporativo ? 18 : 12;
 
   const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
@@ -418,7 +425,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Personal (banquete emplatado): camareros 1:12, barman 1:60 (solo con barra),
   // cocina ~3 cada 50 pax. Estándar del sector para servicio en mesa.
   cats.push({ nombre: "Personal", items: [
-    ["Camareros", String(personalSala(pax, numCamareros, 12))],
+    ["Camareros", String(personalSala(pax, numCamareros, divisorCam))],
     opt(hayBarra, ["Barman", String(Math.max(1, Math.ceil(pax / 60)))]),
     ["Cocina", String(Math.max(2, Math.ceil(pax * 3 / 50)))],
   ]});
@@ -437,7 +444,16 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(evtKey === "boda", ["Mesa redonda especial para Tarta", "1"]),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
-    ["Guirnaldas de luces", "—"],
+    opt(!esCorporativo, ["Guirnaldas de luces", "—"]),
+    // Propio de Comunión / Bautizo
+    opt(esComunion, ["Mesa redonda (tarta comunión)", "1"]),
+    opt(esComunion, ["Candy bar / mesa dulce", "—"]),
+    opt(esComunion, ["Photocall / atrezzo", "—"]),
+    // Propio de Evento corporativo
+    opt(esCorporativo, ["Señalética / cartelería con logo", "—"]),
+    opt(esCorporativo, ["Porta-nombres / acreditaciones", "—"]),
+    opt(esCorporativo, ["Atril + micrófono", "—"]),
+    opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
     ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]),
     ["Cubo basura cocina", "2"],
@@ -496,7 +512,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales", String(personalSala(pax, numCamareros, 12) + 2)],
+    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
@@ -528,15 +544,15 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
   ]});
 
-  const personal = calcPersonal(pax, numCamareros, numStaff, 12);
+  const personal = calcPersonal(pax, numCamareros, numStaff, divisorCam);
   cats.push({ nombre: "Servicio y limpieza", items: [
     ["Fairy", conSufijo(1, "bote")], ["Estropajo", conSufijo(1, "paquete")], ["Papel plata", conSufijo(1, "rollo")], ["Film", conSufijo(1, "rollo")],
     ["Escoba", "1"], ["Mocho", "1"], ["Cubo", "1"], ["Recogedor", "1"],
     ["Bayetas", "4"], ["Trapos de horno", "4"], ["Papel Chemine", conSufijo(2, "rollo")], ["Bolsas de basura", "10"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
-    ["Bandeja camareros", String(personalSala(pax, numCamareros, 12))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, 12))],
+    ["Bandeja camareros", String(personalSala(pax, numCamareros, divisorCam))],
+    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, divisorCam))],
     ["Hojas de fichaje", "1"],
   ]});
 
