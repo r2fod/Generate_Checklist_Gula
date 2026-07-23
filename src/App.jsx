@@ -137,39 +137,40 @@ function IconoCategoria({ nombre, size = 16 }) {
 // Icono por MATERIAL: se elige según palabras clave del nombre del item (el primero
 // que coincide gana, por eso el orden importa). Es decorativo — una pista visual.
 const ICONOS_ITEM = [
-  { f: ["vino", "tinto de verano", "vermut", "mistela", "cava", "champ", "sangr"], I: Wine },
-  { f: ["cerveza", "barril", "tercio", "alhambra"], I: Beer },
-  { f: ["ginebra", "ron ", "vodka", "tequila", "whisk", "licor", "baileys", "orujo", "cazalla", "jagger", "jägg", "martini", "ballantines", "barceló", "barcelo", "seagram", "smirnoff", "destilado", "tanqueray", "puerto de indias", "negrita", "tía maría", "tia maria", "limoncello", "peche"], I: Martini },
-  { f: ["café", "cafe", "cafetera", "capsul", "cápsula", "infusion", "infusión", "taza"], I: Coffee },
-  { f: ["coca", "fanta", "sprite", "nestea", "aquarius", "refresco", "redbull", "red bull", "zumo", "tónica", "tonica"], I: CupSoda },
-  { f: ["hielo"], I: Snowflake },
-  { f: ["agua", "solán", "solan", "vidaqua", "leche", "jarra"], I: GlassWater },
-  { f: ["copa", "vaso", "cristaler", "chupito"], I: Wine },
-  { f: ["bombona", " gas", "butano", "carbón", "carbon", "leña", "brasa", "barbacoa", "bbq", "pastillas de encender", "reja"], I: Flame },
-  { f: ["horno", "microondas", "vitro", "plancha", "sandwich", "sándwich", "túrmix", "turmix", "batidora", "exprimidor", "cafetera", "termo", "calentador", "chafer", "mesa caliente", "armario caliente"], I: ChefHat },
-  { f: ["paella", "olla", "sartén", "sarten", "cazuela", "gastro", "cuenco", "colador", "difusor", "paravientos", "trípode", "tripode", "descansador"], I: CookingPot },
-  { f: ["cuchillo", "tenedor", "cuchara", "cubiert", "paleta", "cucharón", "cucharon", "pinza", "abridor", "sacacorchos", "espumadera", "maletín", "maletin", "tabla"], I: Utensils },
-  { f: ["plato", "vajilla", "bandeja", "fuente", "champanera", "cubitera", "bol ", "boles", "conchas", "palangana", "blonda"], I: UtensilsCrossed },
-  { f: ["mantel", "servilleta", "delantal", "trapo", "bayeta", "lito", "textil", "camino"], I: Shirt },
-  { f: ["fairy", "estropajo", "limpieza", "escoba", "mocho", "recogedor", "papel", "film", "chemine", "bolsa", "cenicero", "basura", "cubo"], I: SprayCan },
-  { f: ["nevera", "congelador"], I: Snowflake },
-  { f: ["silla", "taburete", "sofá", "chill", "trona", "cesta"], I: Armchair },
-  { f: ["tarta", "candy", "mesa dulce"], I: Cake },
-  { f: ["mesa", "caballete", "servilletero", "marcos", "deco", "cajas de madera"], I: Table },
-  { f: ["regleta", "alargador", "cable", "generador", "garrafa", "foco", "luz", "guirnalda", "eléctric", "electric", "imperdible", "brida", "rulo", "cinta"], I: Zap },
-  { f: ["walkie", "micrófono", "microfono", "atril", "señalética", "senaletica", "cartel", "pegatina", "photocall", "porta-nombres", "acreditaci", "producciones"], I: Radio },
-  { f: ["carpa", "pared", "moqueta"], I: Tent },
-  { f: ["furgoneta", "camión", "camion", "taxi", "carro", "transporte", "flota", "logístic", "logistic"], I: Truck },
-  { f: ["camarero", "barman", "cocina", "personal", "staff", "office", "fichaje"], I: Users },
+  { f: ["vino", "tinto de verano", "vermut", "mistela", "cava", "champ", "sangr"], I: Wine, c: "#9d174d" },
+  { f: ["cerveza", "barril", "tercio", "alhambra"], I: Beer, c: "#b45309" },
+  { f: ["ginebra", "ron ", "vodka", "tequila", "whisk", "licor", "baileys", "orujo", "cazalla", "jagger", "jägg", "martini", "ballantines", "barceló", "barcelo", "seagram", "smirnoff", "destilado", "tanqueray", "puerto de indias", "negrita", "tía maría", "tia maria", "limoncello", "peche"], I: Martini, c: "#7c3aed" },
+  { f: ["café", "cafe", "cafetera", "capsul", "cápsula", "infusion", "infusión", "taza"], I: Coffee, c: "#78350f" },
+  { f: ["coca", "fanta", "sprite", "nestea", "aquarius", "refresco", "redbull", "red bull", "zumo", "tónica", "tonica"], I: CupSoda, c: "#0891b2" },
+  { f: ["hielo"], I: Snowflake, c: "#0ea5e9" },
+  { f: ["agua", "solán", "solan", "vidaqua", "leche", "jarra"], I: GlassWater, c: "#2563eb" },
+  { f: ["copa", "vaso", "cristaler", "chupito"], I: Wine, c: "#0e7490" },
+  { f: ["bombona", " gas", "butano", "carbón", "carbon", "leña", "brasa", "barbacoa", "bbq", "pastillas de encender", "reja"], I: Flame, c: "#ea580c" },
+  { f: ["horno", "microondas", "vitro", "plancha", "sandwich", "sándwich", "túrmix", "turmix", "batidora", "exprimidor", "cafetera", "termo", "calentador", "chafer", "mesa caliente", "armario caliente"], I: ChefHat, c: "#dc2626" },
+  { f: ["paella", "olla", "sartén", "sarten", "cazuela", "gastro", "cuenco", "colador", "difusor", "paravientos", "trípode", "tripode", "descansador"], I: CookingPot, c: "#c2410c" },
+  { f: ["cuchillo", "tenedor", "cuchara", "cubiert", "paleta", "cucharón", "cucharon", "pinza", "abridor", "sacacorchos", "espumadera", "maletín", "maletin", "tabla"], I: Utensils, c: "#4f46e5" },
+  { f: ["plato", "vajilla", "bandeja", "fuente", "champanera", "cubitera", "bol ", "boles", "conchas", "palangana", "blonda"], I: UtensilsCrossed, c: "#1e40af" },
+  { f: ["mantel", "servilleta", "delantal", "trapo", "bayeta", "lito", "textil", "camino"], I: Shirt, c: "#a21caf" },
+  { f: ["fairy", "estropajo", "limpieza", "escoba", "mocho", "recogedor", "papel", "film", "chemine", "bolsa", "cenicero", "basura", "cubo"], I: SprayCan, c: "#059669" },
+  { f: ["nevera", "congelador"], I: Snowflake, c: "#0284c7" },
+  { f: ["silla", "taburete", "sofá", "chill", "trona", "cesta"], I: Armchair, c: "#9333ea" },
+  { f: ["tarta", "candy", "mesa dulce"], I: Cake, c: "#db2777" },
+  { f: ["mesa", "caballete", "servilletero", "marcos", "deco", "cajas de madera"], I: Table, c: "#7c3aed" },
+  { f: ["regleta", "alargador", "cable", "generador", "garrafa", "foco", "luz", "guirnalda", "eléctric", "electric", "imperdible", "brida", "rulo", "cinta"], I: Zap, c: "#ca8a04" },
+  { f: ["walkie", "micrófono", "microfono", "atril", "señalética", "senaletica", "cartel", "pegatina", "photocall", "porta-nombres", "acreditaci", "producciones"], I: Radio, c: "#0d9488" },
+  { f: ["carpa", "pared", "moqueta"], I: Tent, c: "#0f766e" },
+  { f: ["furgoneta", "camión", "camion", "taxi", "carro", "transporte", "flota", "logístic", "logistic"], I: Truck, c: "#7c3aed" },
+  { f: ["camarero", "barman", "cocina", "personal", "staff", "office", "fichaje"], I: Users, c: "#4338ca" },
 ];
+const ITEM_ICON_DEFAULT = { I: Package, c: "#64748b" };
 function iconoItem(label) {
   const n = label.toLowerCase();
-  for (const it of ICONOS_ITEM) if (it.f.some(fr => n.includes(fr))) return it.I;
-  return Package;
+  for (const it of ICONOS_ITEM) if (it.f.some(fr => n.includes(fr))) return it;
+  return ITEM_ICON_DEFAULT;
 }
 function IconoItem({ label, size = 15 }) {
-  const I = iconoItem(label);
-  return <I size={size} strokeWidth={2} className="item-icon" />;
+  const { I, c } = iconoItem(label);
+  return <I size={size} strokeWidth={2} className="item-icon" style={{ color: c }} />;
 }
 
 
@@ -2319,6 +2320,18 @@ export default function App({ onCerrarSesion } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON]);
 
+  // Indicador "Guardado ✓": parpadea un instante tras cada cambio (el guardado en el
+  // navegador es inmediato). Se salta el primer render para no aparecer al abrir.
+  const [guardadoFlash, setGuardadoFlash] = useState(false);
+  const primerGuardadoRef = React.useRef(true);
+  useEffect(() => {
+    if (primerGuardadoRef.current) { primerGuardadoRef.current = false; return; }
+    setGuardadoFlash(true);
+    const t = setTimeout(() => setGuardadoFlash(false), 1600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoActualJSON]);
+
   // ─── SINCRONIZACIÓN EN LA NUBE (si hay configuración de Firebase) ──────────
   // Referencias para distinguir nuestros propios guardados de los de otra persona
   const estadoActualJSONRef = React.useRef(estadoActualJSON);
@@ -3054,6 +3067,7 @@ export default function App({ onCerrarSesion } = {}) {
       {modalRecalcular && <ModalRecalcular cambios={modalRecalcular} onClose={() => setModalRecalcular(null)} onAplicar={handleAplicarRecalculo} />}
 
       <div className="app-wrapper">
+        <div className={`guardado-indicador ${guardadoFlash ? "is-visible" : ""}`} aria-live="polite"><Check size={14} /> Guardado</div>
         {/* HEADER */}
         <header className="app-header animate-entrance">
           <div className="header-title-group">
@@ -3846,9 +3860,14 @@ export default function App({ onCerrarSesion } = {}) {
                           </div>
                         ) : (
                           <div className="item-name">
-                            <span className="item-name-lead"><IconoItem label={label} /> {label}</span>
-                            {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
-                            {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
+                            <span className="item-name-lead">
+                              <IconoItem label={label} />
+                              <span className="item-label-text">
+                                {label}
+                                {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
+                                {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+                              </span>
+                            </span>
                           </div>
                         )}
                         <input
