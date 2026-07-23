@@ -2618,7 +2618,54 @@ hr {
   .login-logo { width: 132px; }
 }
 
+/* ─── Toques animados de la app ─────────────────────────────────────────────── */
+.ver-todos-btn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px dashed var(--border-color-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.ver-todos-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Icono del evento: latido sutil en bucle; al pasar el ratón se detiene y gira */
+.header-icon {
+  animation: iconLatido 4s ease-in-out infinite;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.header-icon:hover {
+  animation-play-state: paused;
+  transform: rotate(-8deg) scale(1.1);
+}
+@keyframes iconLatido {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-3px) scale(1.04); }
+}
+
+/* Tarjetas y categorías: leve elevación al pasar el ratón */
+.config-card:hover { box-shadow: var(--shadow-md); }
+.category-section { transition: box-shadow 0.25s ease; }
+.category-section:hover { box-shadow: var(--shadow-md); }
+
+/* Botones: micro-rebote al pulsar */
+.btn:active { transform: scale(0.96); }
+
+/* Filas de plantilla/evento guardado: deslizan un poco al pasar el ratón */
+.plantilla-row { transition: transform 0.2s ease, background 0.2s ease; }
+.plantilla-row:hover { transform: translateX(3px); }
+
 /* Respeta a quien prefiere menos movimiento en pantalla */
 @media (prefers-reduced-motion: reduce) {
-  .login-blob-1, .login-blob-2, .login-logo { animation: none; }
+  .login-blob-1, .login-blob-2, .login-logo, .header-icon { animation: none; }
+  .header-icon:hover, .btn:active, .plantilla-row:hover { transform: none; }
 }
