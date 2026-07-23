@@ -2657,6 +2657,12 @@ hr {
 .category-section { transition: box-shadow 0.25s ease; }
 .category-section:hover { box-shadow: var(--shadow-md); }
 
+/* Iconos SVG (lucide): centrado y micro-animación al pasar el ratón */
+.cat-icon { display: inline-flex; align-items: center; justify-content: center; }
+.header-icon svg, .cat-icon svg { display: block; }
+.cat-icon svg { transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.category-header:hover .cat-icon svg { transform: scale(1.18) rotate(-6deg); }
+
 /* Botones: micro-rebote al pulsar */
 .btn:active { transform: scale(0.96); }
 
@@ -2667,5 +2673,6 @@ hr {
 /* Respeta a quien prefiere menos movimiento en pantalla */
 @media (prefers-reduced-motion: reduce) {
   .login-blob-1, .login-blob-2, .login-logo, .header-icon { animation: none; }
-  .header-icon:hover, .btn:active, .plantilla-row:hover { transform: none; }
+  .header-icon:hover, .btn:active, .plantilla-row:hover,
+  .category-header:hover .cat-icon svg { transform: none; }
 }
