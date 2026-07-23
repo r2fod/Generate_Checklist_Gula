@@ -6,7 +6,7 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
-  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk,
+  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
@@ -1460,6 +1460,14 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       }).length, 0);
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
+  // Recordatorio de las notas del evento: se muestra fijo arriba mientras se carga
+  // el camión (para no olvidar avisos: alquileres, "llevar cuidado con…", etc.) y
+  // desaparece solo cuando TODO está cargado en Salida. Se puede silenciar a mano.
+  const cargadosSalida = checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => checkeados[`${c.nombre}::${lo}`]).length, 0);
+  const todoCargado = totalItems > 0 && cargadosSalida === totalItems;
+  const notasTexto = (meta.notasEvento || "").trim();
+  const [notaSilenciada, setNotaSilenciada] = useState(false);
+  const mostrarRecordatorio = notasTexto && !todoCargado && !notaSilenciada;
   // Resumen tipo hoja de cálculo: Carga Inicial / Vuelta / Consumo Real, agrupado por
   // categoría, igual que la plantilla en la que ya llevaban el control. "Vuelta" solo
   // se conoce si se ha registrado un valor en la pestaña Vuelta (número o, por datos
@@ -1512,6 +1520,19 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
             <button className={`segment-btn ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}><BarChart3 size={14} /> Resumen</button>
           </div>
         </div>
+        {mostrarRecordatorio && (
+          <div className="carga-nota-recordatorio" role="note">
+            <Bell size={17} className="carga-nota-icono" />
+            <div className="carga-nota-texto">
+              <span className="carga-nota-titulo">Notas del evento — no olvidar</span>
+              <p className="carga-nota-cuerpo">{notasTexto}</p>
+            </div>
+            <button className="carga-nota-silenciar" onClick={() => setNotaSilenciada(true)} title="Silenciar el recordatorio" aria-label="Silenciar el recordatorio"><BellOff size={15} /></button>
+          </div>
+        )}
+        {todoCargado && notasTexto && !verResumen && (
+          <div className="carga-nota-hecha" role="status"><Check size={15} /> Todo cargado — recordatorio completado</div>
+        )}
         {verResumen ? (
           <div className="preview-body">
             <div className="resumen-precios-bar">
@@ -2785,7 +2806,7 @@ export default function App({ onCerrarSesion } = {}) {
           onToggleSale={handleToggleCheckCarga}
           onVuelve={handleVuelveCarga}
           onRoturas={handleRoturasCarga}
-          meta={{ nombreEvento, totalPax: pax + ninos }}
+          meta={{ nombreEvento, totalPax: pax + ninos, notasEvento }}
           onClose={() => setModoCarga(false)}
         />
       )}

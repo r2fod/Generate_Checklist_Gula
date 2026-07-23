@@ -2066,6 +2066,95 @@ hr {
   text-align: center;
 }
 
+/* Recordatorio de las notas del evento durante la carga: banner ámbar fijo
+   arriba del listado, que desaparece solo cuando todo está cargado. */
+.carga-nota-recordatorio {
+  margin: 12px 24px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff8e6;
+  border: 1px solid #f2d68a;
+  border-left: 4px solid #d99e2b;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(217, 158, 43, 0.16);
+  animation: nota-entra 0.35s ease;
+}
+@keyframes nota-entra {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.carga-nota-icono {
+  color: #d99e2b;
+  flex-shrink: 0;
+  margin-top: 1px;
+  animation: nota-campana 2.4s ease-in-out infinite;
+  transform-origin: 50% 0;
+}
+@keyframes nota-campana {
+  0%, 88%, 100% { transform: rotate(0); }
+  90% { transform: rotate(12deg); }
+  94% { transform: rotate(-9deg); }
+  97% { transform: rotate(5deg); }
+}
+.carga-nota-texto { min-width: 0; flex: 1; }
+.carga-nota-titulo {
+  display: block;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #a86e12;
+  margin-bottom: 3px;
+}
+.carga-nota-cuerpo {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: #5f4708;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.carga-nota-silenciar {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #b07d1c;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.carga-nota-silenciar:hover { background: #f4e4bd; color: #7a5610; }
+.carga-nota-hecha {
+  margin: 12px 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  background: #e9f8ee;
+  border: 1px solid #b9e6c8;
+  border-radius: 10px;
+  color: #1f7a44;
+  font-size: 0.9rem;
+  font-weight: 600;
+  animation: nota-entra 0.35s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .carga-nota-recordatorio, .carga-nota-hecha { animation: none; }
+  .carga-nota-icono { animation: none; }
+}
+@media (max-width: 480px) {
+  .carga-nota-recordatorio { margin: 10px 14px 0; padding: 11px 12px; }
+  .carga-nota-hecha { margin: 10px 14px 0; }
+}
+
 .carga-lista {
   display: flex;
   flex-direction: column;
