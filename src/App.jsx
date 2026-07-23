@@ -1011,7 +1011,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Hielo", `${Math.max(2, Math.ceil(paxConsumo / 30))} taxis`],
   ]});
 
-  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo));
+  // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el
+  // día para el equipo (café continuo), además de la de servicio que calcula calcCafe.
+  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo);
+  cafeProduccion.items.push(["Cafetera de mantenimiento (rodaje, siempre encendida)", "1"]);
+  cats.push(cafeProduccion);
 
   cats.push({ nombre: "Limpieza y Despensa", items: [
     ["Fairy", conSufijo(1, "bote")], ["Estropajo", conSufijo(1, "paquete")], ["Papel plata", conSufijo(1, "rollo")], ["Film", conSufijo(1, "rollo")], ["Papel Chemine", conSufijo(3, "rollo")],
