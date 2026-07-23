@@ -1959,19 +1959,25 @@ export default function App({ onCerrarSesion } = {}) {
   // eventos guardados, no solo el que está abierto — para no olvidar recoger/devolver
   // alquileres (camión plataforma, armario caliente, flores...) de ningún evento.
   const [avisosOcultos, setAvisosOcultos] = useState(false);
-  // Eventos guardados ordenados por fecha: primero los PRÓXIMOS (fecha futura, el
-  // más cercano arriba); después los pasados y los sin fecha (más reciente primero).
-  const eventosOrdenados = useMemo(() => {
+  // Los eventos ya pasados se ocultan por defecto: la lista principal muestra solo los
+  // PENDIENTES (fecha futura, el más cercano arriba; los sin fecha al final). Los pasados
+  // quedan detrás de un "Ver pasados" para no perder el acceso a ellos.
+  const [verPasados, setVerPasados] = useState(false);
+  const { eventosPendientes, eventosPasados } = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
-    return Object.keys(eventosGuardados).sort((a, b) => {
-      const fa = eventosGuardados[a]?.fechaEvento || "";
-      const fb = eventosGuardados[b]?.fechaEvento || "";
-      const futA = fa && fa >= hoy, futB = fb && fb >= hoy;
-      if (futA && futB) return fa.localeCompare(fb);
-      if (futA) return -1;
-      if (futB) return 1;
-      return fb.localeCompare(fa);
+    const pend = [], pas = [];
+    Object.keys(eventosGuardados).forEach(n => {
+      const f = eventosGuardados[n]?.fechaEvento || "";
+      if (f && f < hoy) pas.push(n); else pend.push(n);
     });
+    pend.sort((a, b) => {
+      const fa = eventosGuardados[a]?.fechaEvento || "", fb = eventosGuardados[b]?.fechaEvento || "";
+      if (!fa) return 1;
+      if (!fb) return -1;
+      return fa.localeCompare(fb);
+    });
+    pas.sort((a, b) => (eventosGuardados[b]?.fechaEvento || "").localeCompare(eventosGuardados[a]?.fechaEvento || ""));
+    return { eventosPendientes: pend, eventosPasados: pas };
   }, [eventosGuardados]);
 
   const avisosRecogidas = useMemo(() => {
@@ -2336,6 +2342,20 @@ export default function App({ onCerrarSesion } = {}) {
       guardarEventos(next);
     },
   });
+
+  // Fila de un evento guardado (se reutiliza en la lista de pendientes y en la de pasados)
+  const filaEvento = (n) => (
+    <div className="plantilla-row" key={n}>
+      <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
+        📋 {n}
+        {avisosRecogidas.some(a => a.evento === n) && (
+          <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes">⏰ {avisosRecogidas.filter(a => a.evento === n).length}</span>
+        )}
+      </button>
+      <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}>🔗</button>
+      <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado">✕</button>
+    </div>
+  );
 
   const handleBorrarPlantilla = (nombre) => setDialogo({
     tipo: "confirm",
@@ -2882,20 +2902,21 @@ export default function App({ onCerrarSesion } = {}) {
           {Object.keys(eventosGuardados).length === 0 ? (
             <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
           ) : (
-            <ListaColapsable nombres={eventosOrdenados}>
-              {n => (
-                <div className="plantilla-row" key={n}>
-                  <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
-                    📋 {n}
-                    {avisosRecogidas.some(a => a.evento === n) && (
-                      <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes">⏰ {avisosRecogidas.filter(a => a.evento === n).length}</span>
-                    )}
-                  </button>
-                  <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}>🔗</button>
-                  <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado">✕</button>
-                </div>
+            <>
+              {eventosPendientes.length > 0 ? (
+                <ListaColapsable nombres={eventosPendientes}>{filaEvento}</ListaColapsable>
+              ) : (
+                <p className="plantillas-vacio">No hay eventos próximos.</p>
               )}
-            </ListaColapsable>
+              {eventosPasados.length > 0 && (
+                <>
+                  <button className="ver-todos-btn" onClick={() => setVerPasados(v => !v)}>
+                    {verPasados ? "▲ Ocultar pasados" : `🗓️ Ver eventos pasados (${eventosPasados.length})`}
+                  </button>
+                  {verPasados && <ListaColapsable nombres={eventosPasados}>{filaEvento}</ListaColapsable>}
+                </>
+              )}
+            </>
           )}
         </div>
 
