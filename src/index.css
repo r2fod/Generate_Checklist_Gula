@@ -2616,7 +2616,15 @@ hr {
   min-width: 0;
   font-size: 0.9rem;
   color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
+.carga-nombre .item-icon { flex-shrink: 0; }
+.carga-row:hover .item-icon { transform: scale(1.18) rotate(-5deg); }
+/* Icono en la tabla de resumen: alineado con el texto del producto */
+.resumen-tabla-producto .item-icon { vertical-align: -2px; margin-right: 5px; }
+.resumen-cat-header .cat-icon-mini, .resumen-cat-header td > svg { vertical-align: -2px; margin-right: 5px; }
 
 .carga-cantidad {
   font-weight: 700;
