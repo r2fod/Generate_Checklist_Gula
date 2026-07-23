@@ -35,7 +35,13 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background-color: var(--bg-color);
-  background-image: radial-gradient(circle at 15% 0%, rgba(79, 70, 229, 0.06), transparent 40%);
+  /* Tintes suaves de color en las esquinas para que no se vea plano/opaco:
+     índigo (marca), oro Gula y un verde muy tenue. Fijos al hacer scroll. */
+  background-image:
+    radial-gradient(circle at 10% -5%, rgba(79, 70, 229, 0.07), transparent 42%),
+    radial-gradient(circle at 92% 6%, rgba(201, 162, 75, 0.09), transparent 40%),
+    radial-gradient(circle at 55% 108%, rgba(34, 197, 94, 0.05), transparent 45%);
+  background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -746,12 +752,22 @@ body {
 }
 
 .section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   margin-bottom: -6px;
+}
+.section-title::before {
+  content: "";
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), rgba(201, 162, 75, 0.9));
 }
 
 /* Form Grid */
@@ -1984,15 +2000,29 @@ hr {
 .preview-category-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 10px 16px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: linear-gradient(90deg, rgba(0,0,0,0.015), transparent 60%), var(--card-bg);
+  border-left: 4px solid var(--accent);
+  color: var(--text-main);
   font-weight: 700;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
+/* Badge de color por categoría (icono) reutilizado en previa y modo carga */
+.cat-icon-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cat-icon-mini svg { display: block; }
+.preview-category:hover .cat-icon-mini { transform: scale(1.1) rotate(-5deg); }
 
 .preview-table-wrap {
   overflow-x: auto;
@@ -2916,13 +2946,17 @@ hr {
 .header-icon svg, .cat-icon svg { display: block; }
 .cat-icon svg { transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .category-header:hover .cat-icon svg { transform: scale(1.18) rotate(-6deg); }
+/* Icono de la categoría abierta: latido suave para dar vida sin distraer */
+@keyframes cat-badge-breath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+.category-section.is-open .cat-icon { animation: cat-badge-breath 3s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .category-section.is-open .cat-icon { animation: none; } }
 
 /* Icono por material en cada fila: gris suave que cobra color y salta al pasar el ratón */
 .item-name-lead { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 /* Títulos de modales con icono alineado */
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: inline-flex; align-items: center; gap: 7px; }
-.item-icon { color: var(--text-label); flex-shrink: 0; transition: transform 0.2s ease, color 0.2s ease; }
-.item-row:hover .item-icon { color: var(--accent); transform: scale(1.2) rotate(-5deg); }
+.item-icon { color: var(--accent); opacity: 0.5; flex-shrink: 0; transition: transform 0.2s ease, color 0.2s ease, opacity 0.2s ease; }
+.item-row:hover .item-icon { color: var(--accent); opacity: 1; transform: scale(1.2) rotate(-5deg); }
 .item-edit-flag { color: var(--accent, #c9a24b); display: inline-flex; align-items: center; opacity: 0.9; }
 .tag-alquiler { display: inline-flex; align-items: center; gap: 3px; }
 .item-edit-alquiler-check, .add-item-alquiler-check { display: inline-flex; align-items: center; gap: 5px; }
