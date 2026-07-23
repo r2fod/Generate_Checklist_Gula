@@ -469,8 +469,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const cats       = [];
 
   cats.push({ nombre: "Electricidad y camión", items: [
-    ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"], ["Cinta aislante", conSufijo(1, "rollo")],
-    ["Bridas", "1 bolsa"], ["Rulos", "2"], ["Imperdibles", "1 paquete"],
+    ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"], ["Cinta aislante", conSufijo(1, "rollo")],
+    ["Bridas", "1 bolsa"], ["Imperdibles", "1 paquete"],
     ["Carros de servicio/transporte", "2"], ["Walkies", "2"],
   ]});
 
@@ -702,8 +702,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
-    ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"],
-    ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Rulos", "2"], ["Walkies", "2"],
+    ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
+    ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Walkies", "2"],
   ]});
 
   // Personal: en cumpleaños suele ser formato más informal (1:20); barman solo si hay
@@ -875,8 +875,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Electricidad y otros", items: [
     ["Focos de luz", "—"], ["Trípode de foco", "—"],
-    ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Caja cables", "1"], ["Herramientas", "1"],
-    ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Rulos", "2"], ["Generador", "1"], ["Garrafa gasolina (llena)", "1"],
+    ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
+    ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Generador", "1"], ["Garrafa gasolina (llena)", "1"],
     ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
 
