@@ -883,7 +883,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
-    ["Focos de luz", "—"], ["Trípode de foco", "—"],
+    ["Focos de luz", "1"],
     ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
     ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", "1 bolsa"], ["Generador", "1"], ["Garrafa gasolina (llena)", "1"],
     ["Producciones (rotulación/etiquetas)", "—"], ["Walkies", "2"], ["Máquina pegatinas", "1"],
