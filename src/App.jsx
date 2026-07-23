@@ -1791,7 +1791,10 @@ function leerEstadoGuardado() {
 // para que "Eventos guardados" y "Plantillas" no crezcan sin fin cuando hay muchos.
 function ListaColapsable({ nombres, limite = 5, children }) {
   const [verTodos, setVerTodos] = useState(false);
-  const visibles = verTodos ? nombres : nombres.slice(0, limite);
+  // Los más recientes primero: el último guardado aparece arriba, y el "ver 5"
+  // enseña justamente los 5 últimos, no los más antiguos.
+  const ordenados = [...nombres].reverse();
+  const visibles = verTodos ? ordenados : ordenados.slice(0, limite);
   return (
     <div className="plantillas-lista">
       {visibles.map(children)}
