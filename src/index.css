@@ -1347,6 +1347,54 @@ body {
   color: var(--green-qty);
 }
 
+/* Buscador de eventos guardados */
+.buscador-eventos {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 10px 0 4px;
+}
+.buscador-eventos-icono {
+  position: absolute;
+  left: 11px;
+  color: var(--accent);
+  pointer-events: none;
+  opacity: 0.85;
+}
+.buscador-eventos-input {
+  width: 100%;
+  padding: 9px 34px 9px 34px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-main, inherit);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.buscador-eventos-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+.buscador-eventos-limpiar {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.buscador-eventos-limpiar:hover {
+  background: var(--border-color);
+  color: var(--accent);
+}
+
 .plantillas-lista {
   display: flex;
   flex-direction: column;
