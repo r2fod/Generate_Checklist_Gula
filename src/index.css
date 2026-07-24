@@ -977,6 +977,24 @@ body {
   transform: scale(0.95);
 }
 
+/* Botones Salida / Vuelta / Resumen: cada uno con su color e icono animado (solo en
+   el toggle de Modo carga, no en los segmented control del formulario). */
+.carga-modo-toggle .segment-salida svg { color: #2563eb; }
+.carga-modo-toggle .segment-vuelta svg { color: #ea580c; }
+.carga-modo-toggle .segment-resumen svg { color: #7c3aed; }
+.carga-modo-toggle .segment-salida.active { background: #dbeafe; color: #1d4ed8; }
+.carga-modo-toggle .segment-vuelta.active { background: #ffedd5; color: #c2410c; }
+.carga-modo-toggle .segment-resumen.active { background: #f3e8ff; color: #6d28d9; }
+.carga-modo-toggle .segment-salida.active svg { color: #1d4ed8; animation: seg-truck 1.6s ease-in-out infinite; }
+.carga-modo-toggle .segment-vuelta.active svg { color: #c2410c; animation: seg-undo 2.2s ease-in-out infinite; transform-origin: 55% 50%; }
+.carga-modo-toggle .segment-resumen.active svg { color: #6d28d9; animation: seg-bars 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes seg-truck { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2.5px); } }
+@keyframes seg-undo { 0%, 72%, 100% { transform: rotate(0); } 86% { transform: rotate(-28deg); } }
+@keyframes seg-bars { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.18); } }
+@media (prefers-reduced-motion: reduce) {
+  .carga-modo-toggle .segment-btn.active svg { animation: none; }
+}
+
 /* Equipamiento — rejilla ordenada: cada control con su etiqueta encima y el
    selector a ancho completo, en columnas iguales según el espacio disponible */
 .equip-grid {
@@ -3108,6 +3126,17 @@ hr {
   .crono-box { padding: 10px 12px; gap: 8px; }
   .crono-tiempo { font-size: 1.3rem; }
   .carga-nota-recordatorio { padding: 10px 12px; }
+
+  /* Cabecera de Modo carga más compacta (menos scroll) */
+  .preview-header-title { font-size: 0.98rem; }
+  .preview-header-subtitle { margin-top: 2px; font-size: 0.78rem; }
+  .carga-progreso { margin-top: 6px; }
+  .carga-tiempos { margin-top: 7px; font-size: 0.74rem; gap: 3px 5px; }
+  .carga-tiempos-nota { font-size: 0.7rem; }
+  .carga-modo-toggle { padding: 10px 14px 0; }
+  .crono-label { font-size: 0.85rem; }
+  .crono-info { gap: 2px 10px; }
+  .crono-btn { min-height: 40px; }
 
   /* Títulos y textos ligeramente más ajustados */
   .config-card > .section-title { margin-bottom: -2px; }
