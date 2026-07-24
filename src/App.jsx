@@ -436,6 +436,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
     tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -605,8 +606,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ...((!llevaCanapes && llevaPlatos) ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)],
       ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros", "—"], ["Boles blancos", "—"], ["Platos metálicos", "—"],
-      [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)],
     ] : []),
+    // El plato de postre va aparte del principal: se puede llevar postre aunque el
+    // resto vaya en bandeja (y al revés), así que tiene su propio "No llevan".
+    opt(!llevaCanapes && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
     ...(llevaCubiertos ? [
       ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
@@ -1086,7 +1089,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -2332,6 +2335,9 @@ export default function App({ onCerrarSesion } = {}) {
   // Platos y cubiertos se pueden poner en "No llevan" para servicio de solo bandejas /
   // finger food (cóctel de pie). Van por separado por si solo se quita uno de los dos.
   const [llevaPlatos, setLlevaPlatos]       = useState(estadoInicial.llevaPlatos ?? true);
+  // Los eventos guardados antes de separar postre de principal no tienen este campo:
+  // se hereda de llevaPlatos para que sigan generando exactamente la misma lista.
+  const [llevaPlatosPostre, setLlevaPlatosPostre] = useState(estadoInicial.llevaPlatosPostre ?? estadoInicial.llevaPlatos ?? true);
   const [llevaCubiertos, setLlevaCubiertos] = useState(estadoInicial.llevaCubiertos ?? true);
   const [numCamareros, setNumCamareros]                 = useState(estadoInicial.numCamareros ?? 0);
   // Ratio de camareros configurable: "1 camarero cada X pax". 0 = automático (usa el
@@ -2525,7 +2531,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
+    llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -2584,7 +2590,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2933,7 +2939,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -4112,8 +4118,10 @@ export default function App({ onCerrarSesion } = {}) {
             <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
             {/* Vajilla. Donde se elige el estilo del plato está también la opción
                 "No llevan" (p. ej. si solo van bandejas), en vez de un interruptor
-                aparte. En cumpleaños y producción no se elige estilo, así que ahí
-                sí se usa el interruptor Llevan / No llevan. */}
+                aparte. Principal y postre son independientes: los dos selectores
+                están siempre visibles y cada uno tiene su propio "No llevan".
+                En cumpleaños y producción no se elige estilo, así que ahí sí se
+                usa el interruptor Llevan / No llevan. */}
             {evento !== "cumpleanos" && evento !== "produccion" ? (
               <>
                 <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
@@ -4125,10 +4133,17 @@ export default function App({ onCerrarSesion } = {}) {
                     options={["Blanco liso", "Relieve blanco", "Verde", "Metálico"]}
                     opcionNinguna="No llevan"
                   />
-                  {llevaPlatos && (
-                    <SelectConOtro label="Estilo plato postre" value={estiloPlatoPostre} onChange={setEstiloPlatoPostre} options={["Blanco", "Verde"]} />
-                  )}
+                  <SelectConOtro
+                    label="Estilo plato postre"
+                    value={llevaPlatosPostre ? estiloPlatoPostre : "No llevan"}
+                    onChange={v => { if (v === "No llevan") setLlevaPlatosPostre(false); else { setLlevaPlatosPostre(true); setEstiloPlatoPostre(v); } }}
+                    options={["Blanco", "Verde"]}
+                    opcionNinguna="No llevan"
+                  />
                 </div>
+                {llevaCanapes && (llevaPlatos || llevaPlatosPostre) && (
+                  <div className="equip-aviso">Con canapés la comida va en bandeja, así que los platos no se cargan. Quita "Lleva canapés" si sí quieres llevarlos.</div>
+                )}
                 <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
               </>
             ) : (
