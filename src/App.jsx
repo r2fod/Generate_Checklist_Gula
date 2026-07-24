@@ -1639,7 +1639,11 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       const consumoReal = (cargaInicial !== null && vuelta !== null) ? Math.max(0, cargaInicial - vuelta) : null;
       const rot = parseInt(roturas[key], 10) || 0;
       const precio = precios[label];
-      const costeTotal = (precio !== undefined && consumoReal !== null) ? (consumoReal + rot) * precio : null;
+      // Coste = (lo consumido + lo roto) × precio. Las roturas cuentan aunque no se
+      // haya registrado la vuelta (una rotura ya es un coste de reposición seguro).
+      const costeTotal = (precio !== undefined && (consumoReal !== null || rot > 0))
+        ? ((consumoReal || 0) + rot) * precio
+        : null;
       return { key, label, sufijo, cargaInicial, vuelta, consumoReal, roturas: rot, precio, costeTotal };
     });
     const subtotal = filas.reduce((acc, f) => acc + (f.costeTotal || 0), 0);
