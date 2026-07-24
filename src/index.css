@@ -611,6 +611,52 @@ body {
   animation: modal-pop 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Revisar datos guardados: más ancho que un diálogo normal porque lista marcas
+   sueltas con su selector de destino, y la lista scrollea dentro del modal. */
+.revision-modal { max-width: 620px; }
+.revision-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.revision-evento {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.revision-evento-nombre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--navy);
+  margin-bottom: 8px;
+}
+.revision-fila {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--border-light, #eef2f7);
+}
+.revision-fila:first-of-type { border-top: none; }
+.revision-origen { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.revision-item { font-size: 0.82rem; font-weight: 600; word-break: break-word; }
+.revision-meta { font-size: 0.7rem; color: var(--text-muted); word-break: break-word; }
+.revision-fila select { max-width: 100%; min-width: 0; }
+@media (max-width: 640px) {
+  .revision-fila { grid-template-columns: 1fr; }
+  /* En móvil el modal es más estrecho y sin tanto acolchado, para que los nombres
+     largos de item y el selector quepan sin desbordar la pantalla. */
+  .revision-modal { max-width: min(620px, calc(100vw - 24px)); padding: 18px 14px; }
+  .revision-evento { padding: 10px 8px; }
+}
+
 .dialogo-titulo {
   font-size: 1.02rem;
   font-weight: 700;
@@ -1339,6 +1385,13 @@ body {
   /* En pantallas muy estrechas (<360px) los botones no caben en una línea con el
      título: se permite partir la fila en vez de desbordar la página */
   flex-wrap: wrap;
+}
+/* Los botones de la cabecera (Revisar datos / Recalcular / Guardar evento) también
+   parten de línea: en móvil no caben los tres seguidos. */
+.plantillas-header-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .btn-plantilla {
