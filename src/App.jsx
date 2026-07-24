@@ -10,7 +10,7 @@ import {
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
-  nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
+  nubeActiva, nuevoIdEvento, guardarEventoNube, cargarEventoNube, suscribirEventoNube,
   guardarIndiceEventosNube, cargarIndiceEventosNube, suscribirIndiceEventosNube,
 } from "./nube.js";
 
@@ -2983,6 +2983,49 @@ export default function App({ onCerrarSesion } = {}) {
         return actualizado;
       });
     }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosGuardados]);
+
+  // RECUPERACIÓN desde las copias individuales de la nube: cada evento COMPARTIDO tiene su
+  // propio documento (eventos/{id}) además del índice. Si el índice perdió configuración o
+  // checks de un evento, su copia individual suele conservarlos. Una sola vez: por cada
+  // evento con eventoNubeId se trae su copia y se FUSIONA quedándose con la versión más
+  // completa (config) y la UNIÓN de las marcas. Es puramente restaurativo: nunca quita nada.
+  const recuperacionDocsRef = React.useRef(false);
+  useEffect(() => {
+    if (recuperacionDocsRef.current || !nubeActiva()) return;
+    try { if (localStorage.getItem("gula_recuperacion_docs_v1")) { recuperacionDocsRef.current = true; return; } } catch (e) { /* */ }
+    const conNube = Object.entries(eventosGuardados).filter(([, ev]) => ev && ev.eventoNubeId);
+    if (!conNube.length) return;
+    recuperacionDocsRef.current = true;
+    const t = setTimeout(async () => {
+      const riqueza = (ev) => ev ? (Object.keys(ev.checkeados || {}).length + Object.keys(ev.vueltos || {}).length + Object.keys(ev.roturas || {}).length + (ev.logisticaEquipo || []).length + (ev.recogidas || []).length + (ev.compras || []).length + (ev.itemsManuales || []).length + Object.keys(ev.overridesManuales || {}).length + Object.keys(ev.itemsOcultos || {}).length) : -1;
+      const parches = {};
+      for (const [nombre, ev] of conNube) {
+        try {
+          const doc = await cargarEventoNube(ev.eventoNubeId);
+          if (!doc) continue;
+          const base = riqueza(doc) > riqueza(ev) ? doc : ev;
+          parches[nombre] = {
+            ...base,
+            nombreEvento: ev.nombreEvento || doc.nombreEvento || nombre,
+            eventoNubeId: ev.eventoNubeId,
+            checkeados: { ...(doc.checkeados || {}), ...(ev.checkeados || {}) },
+            vueltos: { ...(doc.vueltos || {}), ...(ev.vueltos || {}) },
+            roturas: { ...(doc.roturas || {}), ...(ev.roturas || {}) },
+          };
+        } catch (e) { /* seguir con el resto */ }
+      }
+      try { localStorage.setItem("gula_recuperacion_docs_v1", "1"); } catch (e) { /* */ }
+      if (!Object.keys(parches).length) return;
+      setEventosGuardados(prev => {
+        const actualizado = { ...prev, ...parches };
+        try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* */ }
+        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
+        return actualizado;
+      });
+    }, 6500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventosGuardados]);
