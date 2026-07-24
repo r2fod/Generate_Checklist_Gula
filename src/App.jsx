@@ -2619,6 +2619,7 @@ export default function App({ onCerrarSesion } = {}) {
     peligro: true,
     onConfirm: () => {
       try { localStorage.removeItem("gula_checklist_estado"); } catch (e) { /* localStorage no disponible */ }
+      marcarEventoActivo(""); // evento nuevo: no auto-guarda hasta que se guarde por primera vez
       window.location.href = window.location.origin + window.location.pathname;
     },
   });
@@ -2666,6 +2667,13 @@ export default function App({ onCerrarSesion } = {}) {
   // así que un evento recién borrado localmente resucitaba en cuanto llegaba cualquier
   // snapshot -aunque fuera uno viejo, en caché, de antes del borrado- de la nube).
   const ultimaEscrituraLocalRef = React.useRef(0);
+  // Nombre del evento "activo" (el que has abierto o guardado en esta sesión). Solo ese
+  // se auto-guarda, para no sobrescribir un evento bueno con un borrador del mismo nombre.
+  const eventoActivoRef = React.useRef((() => { try { return localStorage.getItem("gula_evento_activo") || ""; } catch (e) { return ""; } })());
+  const marcarEventoActivo = (nombre) => {
+    eventoActivoRef.current = nombre || "";
+    try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
+  };
   const guardarEventos = (obj) => {
     setEventosGuardados(obj);
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
@@ -2708,20 +2716,22 @@ export default function App({ onCerrarSesion } = {}) {
       // El campo "Nombre del evento" se sincroniza con el nombre elegido al guardar:
       // así el siguiente "Guardar evento" ya viene precargado sin volver a escribirlo
       setNombreEvento(nombre);
+      marcarEventoActivo(nombre); // a partir de ahora este evento se auto-guarda solo
       guardarEventos({ ...eventosGuardados, [nombre]: { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales } });
       setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3500);
     },
   });
-  // Auto-guardado en la lista de eventos (y en la nube): una vez que el evento se ha
-  // guardado por primera vez (existe con este nombre), cada cambio posterior se re-guarda
-  // solo con un pequeño retardo, sin tener que darle otra vez a "Guardar".
+  // Auto-guardado SEGURO: solo se re-guarda solo el evento que has ABIERTO o GUARDADO de
+  // verdad en esta sesión (marcado en "gula_evento_activo"). Así un borrador nuevo que por
+  // casualidad tenga el mismo nombre que un evento guardado NUNCA lo sobrescribe: era el
+  // riesgo de perder la configuración de un evento bueno.
   useEffect(() => {
     const nombre = (nombreEvento || "").trim();
-    if (!nombre || !eventosGuardados[nombre]) return;
+    if (!nombre || nombre !== eventoActivoRef.current || !eventosGuardados[nombre]) return;
     const t = setTimeout(() => {
       setEventosGuardados(prev => {
-        if (!prev[nombre]) return prev;
+        if (!prev[nombre] || nombre !== eventoActivoRef.current) return prev;
         const actualizado = { ...prev, [nombre]: { ...getEstadoActual(), nombreEvento: nombre } };
         try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
         if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
@@ -2781,6 +2791,7 @@ export default function App({ onCerrarSesion } = {}) {
           guardarEventoNube(estado.eventoNubeId, estado).catch(() => { /* sin conexión */ });
         }
         try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); } catch (e) { /* localStorage no disponible */ }
+        marcarEventoActivo(estado.nombreEvento || nombre); // al abrirlo, este pasa a auto-guardarse
         window.location.href = window.location.origin + window.location.pathname;
       },
     });
@@ -2943,27 +2954,35 @@ export default function App({ onCerrarSesion } = {}) {
   const migracionMasivaRef = React.useRef(false);
   useEffect(() => {
     if (migracionMasivaRef.current) return;
-    try { if (localStorage.getItem("gula_migracion_marcas_v2")) { migracionMasivaRef.current = true; return; } } catch (e) { /* */ }
+    try { if (localStorage.getItem("gula_migracion_marcas_v3")) { migracionMasivaRef.current = true; return; } } catch (e) { /* */ }
     if (!Object.keys(eventosGuardados).length) return;
     const t = setTimeout(() => {
       if (migracionMasivaRef.current) return;
       migracionMasivaRef.current = true;
-      let algo = false;
-      const actualizado = {};
-      Object.entries(eventosGuardados).forEach(([nombre, ev]) => {
-        const cl = checklistDeEventoGuardado(ev);
-        if (!cl.length) { actualizado[nombre] = ev; return; }
-        const c = migrarMarcas(ev.checkeados || {}, cl);
-        const v = migrarMarcas(ev.vueltos || {}, cl);
-        const r = migrarMarcas(ev.roturas || {}, cl);
-        if (c.cambiado || v.cambiado || r.cambiado) {
-          algo = true;
-          actualizado[nombre] = { ...ev, checkeados: c.mapa, vueltos: v.mapa, roturas: r.mapa };
-        } else { actualizado[nombre] = ev; }
+      // Se usa el estado MÁS RECIENTE (functional update): así nunca escribimos una versión
+      // vieja encima de una nueva de la nube. Es puramente ADITIVO: solo añade claves a los
+      // mapas de marcas, jamás toca ni borra la configuración de un evento.
+      setEventosGuardados(prev => {
+        let algo = false;
+        const actualizado = {};
+        Object.entries(prev).forEach(([nombre, ev]) => {
+          const cl = checklistDeEventoGuardado(ev);
+          if (!cl.length) { actualizado[nombre] = ev; return; }
+          const c = migrarMarcas(ev.checkeados || {}, cl);
+          const v = migrarMarcas(ev.vueltos || {}, cl);
+          const r = migrarMarcas(ev.roturas || {}, cl);
+          if (c.cambiado || v.cambiado || r.cambiado) {
+            algo = true;
+            actualizado[nombre] = { ...ev, checkeados: c.mapa, vueltos: v.mapa, roturas: r.mapa };
+          } else { actualizado[nombre] = ev; }
+        });
+        try { localStorage.setItem("gula_migracion_marcas_v3", "1"); } catch (e) { /* */ }
+        if (!algo) return prev;
+        try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* */ }
+        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
+        return actualizado;
       });
-      try { localStorage.setItem("gula_migracion_marcas_v2", "1"); } catch (e) { /* */ }
-      if (algo) guardarEventos(actualizado);
-    }, 4000);
+    }, 5000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventosGuardados]);
