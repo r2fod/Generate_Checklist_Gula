@@ -1509,7 +1509,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, roturas, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, meta = {} }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
-  const checklist = quitarItemsSinCantidad(checklistCompleta);
+  // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
+  // carga ni se devuelve, así que también se deja fuera de Modo carga.
+  const checklist = quitarItemsSinCantidad(checklistCompleta).filter(c => !/personal/i.test(c.nombre));
   const [modo, setModo] = useState("salida"); // salida | vuelta
   const [verResumen, setVerResumen] = useState(false);
   const [precios, setPrecios] = useState(() => leerPrecios());
