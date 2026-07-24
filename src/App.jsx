@@ -435,7 +435,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
-    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, soloBandejas, numCamareros, numStaff = 0,
+    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -602,12 +602,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
   const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla", items: [
-    ...((!llevaCanapes && !soloBandejas) ? [
+    ...((!llevaCanapes && llevaPlatos) ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)],
       ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros", "—"], ["Boles blancos", "—"], ["Platos metálicos", "—"],
       [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)],
     ] : []),
-    ...(!soloBandejas ? [
+    ...(llevaCubiertos ? [
       ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
@@ -699,7 +699,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    llevaArmarioCaliente, llevaPlanchaGas, soloBandejas, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     tipoPaella, tipoNevera, tipoCongelador, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1,
   } = opts;
@@ -801,11 +801,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
   const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
-    ...((!llevaCanapes && !soloBandejas) ? [
+    ...((!llevaCanapes && llevaPlatos) ? [
       ["Platos trinchero blancos", String(platosDoble)], ["Platos metálicos", "—"], ["Platos postre", String(platosDoble + platosPostreExtra)],
     ] : []),
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))],
-    ...(!soloBandejas ? [
+    ...(llevaCubiertos ? [
       ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
@@ -872,7 +872,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
-    llevaArmarioCaliente, llevaPalomitera, llevaJamonero, soloBandejas,
+    llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos,
     llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
@@ -998,11 +998,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
   const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla y Cubertería", items: [
-    ...((!llevaCanapes && !soloBandejas) ? [
+    ...((!llevaCanapes && llevaPlatos) ? [
       ["Platos trinchero blancos", String(platosDoble)], ["Platos postre (negro/gris)", String(platosDoble + platosPostreExtra)],
       ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ] : []),
-    ...(!soloBandejas ? [
+    ...(llevaCubiertos ? [
       ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
@@ -1086,7 +1086,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", soloBandejas: "Solo bandejas", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -2287,8 +2287,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
   // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
   const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
-  // Solo bandejas: servicio de pie/finger food, sin platos ni cubiertos (todo en bandejas).
-  const [soloBandejas, setSoloBandejas] = useState(estadoInicial.soloBandejas ?? false);
+  // Platos y cubiertos se pueden poner en "No llevan" para servicio de solo bandejas /
+  // finger food (cóctel de pie). Van por separado por si solo se quita uno de los dos.
+  const [llevaPlatos, setLlevaPlatos]       = useState(estadoInicial.llevaPlatos ?? true);
+  const [llevaCubiertos, setLlevaCubiertos] = useState(estadoInicial.llevaCubiertos ?? true);
   const [numCamareros, setNumCamareros]                 = useState(estadoInicial.numCamareros ?? 0);
   // Ratio de camareros configurable: "1 camarero cada X pax". 0 = automático (usa el
   // recomendado por tipo de evento: boda/comunión 12, corporativo 18, cumple/produ 20).
@@ -2478,7 +2480,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaPlanchaGas, soloBandejas, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
+    llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
@@ -2537,7 +2539,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, soloBandejas: setSoloBandejas, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2866,7 +2868,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, soloBandejas, numCamareros, numStaff,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
@@ -3946,7 +3948,6 @@ export default function App({ onCerrarSesion } = {}) {
               [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
               [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
               [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "bandejas en vez de platos"],
-              [soloBandejas,         setSoloBandejas,         "Solo bandejas",            "sin platos ni cubiertos (finger food)"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
@@ -4028,6 +4029,10 @@ export default function App({ onCerrarSesion } = {}) {
             )}
             <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
             <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
+            <div className="equip-pareja">
+              <SegmentedControl label="Platos" value={llevaPlatos ? "Llevan" : "No llevan"} onChange={v => setLlevaPlatos(v === "Llevan")} options={["Llevan", "No llevan"]} />
+              <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
+            </div>
             {evento !== "cumpleanos" && evento !== "produccion" && (
               <>
                 <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
