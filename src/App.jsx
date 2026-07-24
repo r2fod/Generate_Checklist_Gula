@@ -1159,11 +1159,15 @@ function totalLogistica(equipo = [], tarifa = 0, plusFurgo = 0) {
   return Math.round(equipo.reduce((acc, p) => acc + (importeLogistica(p, tarifa, plusFurgo) || 0), 0) * 100) / 100;
 }
 
-// Estimación (en minutos) del tiempo de Preparación / Carga / Descarga, repartido entre
-// la gente de logística. La descarga lleva recargo por fatiga según las horas de jornada.
+// Estimación (en minutos) del tiempo de Preparación / Carga / Descarga / Montaje.
+// Carga y descarga se reparten entre la gente de logística; la descarga lleva recargo por
+// fatiga según las horas de jornada. El Montaje (colocar mesas, decoración, montar cocina
+// in situ) es tiempo de todo el equipo — se estima como tiempo transcurrido (no se divide
+// por logística), en línea con el estándar del sector (~2-4 h para un evento medio).
 // Compartida entre Modo carga y el formulario (para sugerir la hora de fin de logística).
 const CARGA_BASE_MIN = 20, CARGA_MIN_POR_ITEM = 1.5, DESCARGA_FACTOR = 0.6;
 const PREP_BASE_MIN = 30, PREP_MIN_POR_PAX = 1, PREP_MIN_POR_ITEM = 0.5;
+const MONTAJE_BASE_MIN = 45, MONTAJE_MIN_POR_PAX = 1.1, MONTAJE_MIN_POR_ITEM = 0.4;
 const FATIGA_DESDE_H = 4, FATIGA_POR_HORA = 0.08, FATIGA_MAX = 0.6;
 function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJornada = 0 }) {
   const nLog = Math.max(1, numLogistica || 1);
@@ -1171,7 +1175,8 @@ function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJ
   const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / nLog) : 0;
   const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
   const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
-  return { prepMin, cargaMin, descargaMin, fatiga, totalMin: prepMin + cargaMin + descargaMin };
+  const montajeMin = totalItems > 0 ? Math.round(MONTAJE_BASE_MIN + pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM) : 0;
+  return { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin: prepMin + cargaMin + descargaMin + montajeMin };
 }
 // "08:30" + 150 min → "11:00" (sumar minutos a una hora HH:MM, con vuelta de día)
 function sumarMinutosHora(hhmm, minutos) {
@@ -1338,17 +1343,61 @@ const RENOMBRES_ITEMS = {
   "Trípode de quemador": "Trípode",
   "Difusores": "Difusor",
   "Difusor pequeño (frituras)": "Difusor",
+  "Copas cristal": "Copas de vino",
+  "Vasos cristal": "Vasos de agua",
+  "Copa cava": "Copas de cava",
+  "Vaso cubata": "Vasos de cubata",
+  "Pinzas servicio (metal/madera)": "Pinzas largas",
 };
+// Similitud entre dos nombres de item (0..1). Combina Jaccard de palabras, contención
+// (una es "subconjunto" de la otra: "Trípode" ⊂ "Trípode de quemador") y distancia de
+// edición (para plurales/variantes: "Difusores" ~ "Difusor"). Ignora tildes y relleno.
+const _STOP = new Set(["de", "del", "la", "el", "los", "las", "con", "y", "o", "para", "en", "a", "un", "una", "al"]);
+function _norm(s) {
+  return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+function _tokens(s) { return _norm(s).split(" ").filter(w => w && !_STOP.has(w)); }
+function _leven(a, b) {
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function similitudItems(a, b) {
+  const na = _norm(a), nb = _norm(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  const sa = new Set(_tokens(a)), sb = new Set(_tokens(b));
+  let inter = 0; sa.forEach(t => { if (sb.has(t)) inter++; });
+  const union = sa.size + sb.size - inter || 1;
+  const jaccard = inter / union;
+  const menor = sa.size <= sb.size ? sa : sb, mayor = sa.size <= sb.size ? sb : sa;
+  let cont = 0; menor.forEach(t => { if (mayor.has(t)) cont++; });
+  const contencion = menor.size ? cont / menor.size : 0;
+  const lev = 1 - _leven(na, nb) / Math.max(na.length, nb.length);
+  return Math.max(jaccard, contencion * 0.92, lev);
+}
 // Reasocia las marcas guardadas (checkeados/vueltos/roturas, con clave "categoría::item")
 // a los nombres y categorías ACTUALES de la checklist. No borra nada: solo AÑADE la clave
-// nueva cuando falta, buscando el item por su etiqueta —aunque haya cambiado de categoría—
-// y aplicando los renombrados conocidos. Así los eventos antiguos recuperan sus datos.
+// nueva cuando falta. Empareja por: nombre exacto → renombrado conocido → por SIMILITUD
+// (para nombres que cambiaron y no están en la tabla). Así los eventos antiguos recuperan
+// sus datos aunque el item se renombrara o cambiara de categoría.
+const SIMILITUD_MINIMA = 0.62;
 function migrarMarcas(mapa, checklist) {
   if (!mapa || typeof mapa !== "object") return { mapa: mapa || {}, cambiado: false };
+  const items = [];
   const labelToKey = {};
   checklist.forEach(cat => cat.items.forEach(it => {
     const lo = it[3] ?? it[0];
-    if (lo != null && labelToKey[lo] === undefined) labelToKey[lo] = `${cat.nombre}::${lo}`;
+    if (lo == null) return;
+    const key = `${cat.nombre}::${lo}`;
+    items.push({ label: lo, key });
+    if (labelToKey[lo] === undefined) labelToKey[lo] = key;
   }));
   const nuevo = { ...mapa };
   let cambiado = false;
@@ -1356,12 +1405,18 @@ function migrarMarcas(mapa, checklist) {
     const i = k.indexOf("::");
     if (i < 0) return;
     const oldLabel = k.slice(i + 2);
-    const newLabel = RENOMBRES_ITEMS[oldLabel] || oldLabel;
-    const nuevaKey = labelToKey[newLabel];
-    if (nuevaKey && nuevaKey !== k && nuevo[nuevaKey] === undefined) {
-      nuevo[nuevaKey] = v;
-      cambiado = true;
+    // 1) nombre exacto (cubre los cambios de solo-categoría) o renombrado conocido
+    let target = labelToKey[RENOMBRES_ITEMS[oldLabel] || oldLabel];
+    // 2) por similitud, solo si el nombre viejo ya no existe tal cual en la lista
+    if (!target && labelToKey[oldLabel] === undefined) {
+      let best = null, bestScore = 0;
+      items.forEach(({ label, key }) => {
+        const s = similitudItems(oldLabel, label);
+        if (s > bestScore) { bestScore = s; best = key; }
+      });
+      if (best && bestScore >= SIMILITUD_MINIMA) target = best;
     }
+    if (target && target !== k && nuevo[target] === undefined) { nuevo[target] = v; cambiado = true; }
   });
   return { mapa: nuevo, cambiado };
 }
@@ -1586,7 +1641,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const numLogistica = Math.max(1, meta.numLogistica || 1);
   const horasJornada = meta.horasJornada || 0;
   const paxTotal = meta.totalPax || 0;
-  const { prepMin, cargaMin, descargaMin, fatiga, totalMin } = estimarTiemposCarga({ totalItems, pax: paxTotal, numLogistica, horasJornada });
+  const { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin } = estimarTiemposCarga({ totalItems, pax: paxTotal, numLogistica, horasJornada });
   const fmtMin = (m) => {
     if (m <= 0) return "—";
     const h = Math.floor(m / 60);
@@ -1724,13 +1779,15 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
             </div>
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
             {totalItems > 0 && (
-              <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.`}>
+              <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.\nMontaje in situ (todo el equipo) = 45 + pax × 1,1 + ítems × 0,4.`}>
                 <Clock size={13} />
                 <span><strong>Prep</strong> ~{fmtMin(prepMin)}</span>
                 <span className="carga-tiempos-sep">·</span>
                 <span><strong>Carga</strong> ~{fmtMin(cargaMin)}</span>
                 <span className="carga-tiempos-sep">·</span>
                 <span><strong>Descarga</strong> ~{fmtMin(descargaMin)}{fatiga > 0 ? " ⚠️" : ""}</span>
+                <span className="carga-tiempos-sep">·</span>
+                <span><strong>Montaje</strong> ~{fmtMin(montajeMin)}</span>
                 <span className="carga-tiempos-sep">·</span>
                 <span className="carga-tiempos-total"><strong>Total</strong> ~{fmtMin(totalMin)}</span>
                 <span className="carga-tiempos-nota">({numLogistica} logística{meta.logisticaReal ? "" : ", estimado"})</span>
