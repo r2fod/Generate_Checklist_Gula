@@ -1686,9 +1686,9 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
         </div>
         <div className="carga-modo-toggle">
           <div className="segmented-control">
-            <button className={`segment-btn ${modo === "salida" && !verResumen ? "active" : ""}`} onClick={() => { setModo("salida"); setVerResumen(false); }}><Truck size={14} /> Salida</button>
-            <button className={`segment-btn ${modo === "vuelta" && !verResumen ? "active" : ""}`} onClick={() => { setModo("vuelta"); setVerResumen(false); }}><Undo2 size={14} /> Vuelta</button>
-            <button className={`segment-btn ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}><BarChart3 size={14} /> Resumen</button>
+            <button className={`segment-btn segment-salida ${modo === "salida" && !verResumen ? "active" : ""}`} onClick={() => { setModo("salida"); setVerResumen(false); }}><Truck size={14} /> Salida</button>
+            <button className={`segment-btn segment-vuelta ${modo === "vuelta" && !verResumen ? "active" : ""}`} onClick={() => { setModo("vuelta"); setVerResumen(false); }}><Undo2 size={14} /> Vuelta</button>
+            <button className={`segment-btn segment-resumen ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}><BarChart3 size={14} /> Resumen</button>
           </div>
         </div>
         {mostrarRecordatorio && (
