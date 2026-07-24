@@ -386,7 +386,7 @@ function calcMesasTotal(evtKey, pax) {
 // - Nespresso: cápsulas, cantidad calculada para cubrir el pax.
 // - Bar: cafetera tipo bar (portátil), también funciona con cápsulas, no café molido.
 // - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
-function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax) {
+function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false) {
   const items = [];
   // paxConsumo ≠ totalPax solo en producciones de varios días: lo que se gasta
   // (cápsulas, café, infusiones, azúcar, leches) se calcula sobre la suma de pax
@@ -407,10 +407,14 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax) {
   // Con desayuno se sirve más café por persona (todos toman, no solo parte de los pax)
   const factorLeche = hayDesayuno ? 0.9 : 0.6;
   const factorSolo  = hayDesayuno ? 0.7 : 0.4;
-  items.push(
+  // En producciones/rodajes el café se sirve en vaso de cartón con palito de madera, así
+  // que no van tazas, platos ni cucharas de café (esos consumibles se cargan aparte).
+  if (!sinVajilla) items.push(
     [`Tazas café con leche e infusiones${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorLeche))],
     [`Tazas café solo y cortado${hayDesayuno ? " (desayuno)" : ""}`, String(conMargen(totalPax * factorSolo))],
     ["Platos de café", String(conMargen(totalPax))],
+  );
+  items.push(
     ["Infusiones (té variado + descafeinado)", conSufijo(Math.ceil(paxConsumo / 30), "caja")],
     ["Azucarillos y edulcorantes", conSufijo(Math.ceil(paxConsumo / 50), "caja")],
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(paxConsumo / (hayDesayuno ? 8 : 40))))],
@@ -1035,7 +1039,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el
   // día para el equipo (café continuo), además de la de servicio que calcula calcCafe.
-  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo);
+  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true);
   cafeProduccion.items.push(["Cafetera de mantenimiento (rodaje, siempre encendida)", "1"]);
   cats.push(cafeProduccion);
 
