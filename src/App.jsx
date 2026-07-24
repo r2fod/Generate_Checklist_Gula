@@ -1331,6 +1331,41 @@ function parsePreciosPegados(texto) {
   return precios;
 }
 
+// Items que se han renombrado en actualizaciones (nombre viejo → nombre nuevo). Sirve
+// para recuperar en eventos antiguos los checks/vueltas/roturas que se guardaron con el
+// nombre de antes.
+const RENOMBRES_ITEMS = {
+  "Trípode de quemador": "Trípode",
+  "Difusores": "Difusor",
+  "Difusor pequeño (frituras)": "Difusor",
+};
+// Reasocia las marcas guardadas (checkeados/vueltos/roturas, con clave "categoría::item")
+// a los nombres y categorías ACTUALES de la checklist. No borra nada: solo AÑADE la clave
+// nueva cuando falta, buscando el item por su etiqueta —aunque haya cambiado de categoría—
+// y aplicando los renombrados conocidos. Así los eventos antiguos recuperan sus datos.
+function migrarMarcas(mapa, checklist) {
+  if (!mapa || typeof mapa !== "object") return { mapa: mapa || {}, cambiado: false };
+  const labelToKey = {};
+  checklist.forEach(cat => cat.items.forEach(it => {
+    const lo = it[3] ?? it[0];
+    if (lo != null && labelToKey[lo] === undefined) labelToKey[lo] = `${cat.nombre}::${lo}`;
+  }));
+  const nuevo = { ...mapa };
+  let cambiado = false;
+  Object.entries(mapa).forEach(([k, v]) => {
+    const i = k.indexOf("::");
+    if (i < 0) return;
+    const oldLabel = k.slice(i + 2);
+    const newLabel = RENOMBRES_ITEMS[oldLabel] || oldLabel;
+    const nuevaKey = labelToKey[newLabel];
+    if (nuevaKey && nuevaKey !== k && nuevo[nuevaKey] === undefined) {
+      nuevo[nuevaKey] = v;
+      cambiado = true;
+    }
+  });
+  return { mapa: nuevo, cambiado };
+}
+
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
 // ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
 // Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
@@ -2595,6 +2630,24 @@ export default function App({ onCerrarSesion } = {}) {
       setTimeout(() => setGuardadoEventoMsg(""), 3500);
     },
   });
+  // Auto-guardado en la lista de eventos (y en la nube): una vez que el evento se ha
+  // guardado por primera vez (existe con este nombre), cada cambio posterior se re-guarda
+  // solo con un pequeño retardo, sin tener que darle otra vez a "Guardar".
+  useEffect(() => {
+    const nombre = (nombreEvento || "").trim();
+    if (!nombre || !eventosGuardados[nombre]) return;
+    const t = setTimeout(() => {
+      setEventosGuardados(prev => {
+        if (!prev[nombre]) return prev;
+        const actualizado = { ...prev, [nombre]: { ...getEstadoActual(), nombreEvento: nombre } };
+        try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
+        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
+        return actualizado;
+      });
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoActualJSON]);
   const handleRecalcular = () => {
     const cambios = [];
     Object.keys(valoresBaseActuales).forEach(key => {
@@ -2786,6 +2839,19 @@ export default function App({ onCerrarSesion } = {}) {
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
     return cats.filter(c => c.items.length > 0);
   }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual]);
+
+  // Recuperación de datos de eventos antiguos: al abrir un evento, reasocia sus marcas
+  // (cargados/vueltos/roturas) a los nombres/categorías actuales de la checklist, para
+  // que no se pierdan por renombrados o cambios de categoría. Se ejecuta una sola vez.
+  const marcasMigradasRef = React.useRef(false);
+  useEffect(() => {
+    if (marcasMigradasRef.current || !checklist.length) return;
+    marcasMigradasRef.current = true;
+    const c = migrarMarcas(checkeados, checklist); if (c.cambiado) setCheckeados(c.mapa);
+    const v = migrarMarcas(vueltos, checklist);   if (v.cambiado) setVueltos(v.mapa);
+    const r = migrarMarcas(roturas, checklist);   if (r.cambiado) setRoturas(r.mapa);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklist]);
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
