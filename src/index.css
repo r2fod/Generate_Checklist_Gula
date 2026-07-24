@@ -1710,6 +1710,29 @@ body {
   background: #fee2e2;
 }
 
+/* Botón "+" para añadir/guardar una opción personalizada (SelectConOtro) */
+.item-action-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: #16a34a;
+  background: #f0fdf4;
+}
+.item-action-add:hover {
+  color: #fff;
+  background: #16a34a;
+  border-color: #16a34a;
+}
+.item-action-add:disabled {
+  color: #c6cbd4;
+  background: var(--card-bg);
+  border-color: var(--border-color);
+  cursor: not-allowed;
+}
+
 .tag-alquiler {
   background: #f59e0b;
   color: white;
