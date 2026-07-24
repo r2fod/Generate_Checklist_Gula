@@ -1297,6 +1297,20 @@ const PRECIOS_BASE = {
   "Barceló": 12.48,
   "Martini": 8.05,
   "Otros licores marca blanca (Smirnoff)": 11.15,
+  // Bebidas que faltaban por precio — ESTIMADOS de mercado, ajustar con la tarifa real
+  // del proveedor (Bebidas Serrano). Son un punto de partida para que el Resumen no deje
+  // huecos; cualquier precio pegado en "Precios" pisa estos.
+  "Sprite": 0.54,
+  "Cerveza sin gluten": 0.95,
+  "Tinto de verano (1,5L)": 2.5,
+  "Aguas pequeñas (33cl)": 6.5,                    // caja de 35 uds
+  "Agua Vidaqua 1,5L (personal)": 2.4,             // pack de 6
+  "Agua 1,5L (extra: paella, lavar, personal)": 4, // pack de 6
+  "Mistela": 5.5,
+  "Tía María": 13,
+  "Jagger (Jägermeister)": 15,
+  "Crema de orujo": 7.8,
+  "Crema de arroz": 6,
 };
 function leerPrecios() {
   try { return { ...PRECIOS_BASE, ...JSON.parse(localStorage.getItem("gula_precios_items") || "{}") }; }
