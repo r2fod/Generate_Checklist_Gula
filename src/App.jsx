@@ -1421,6 +1421,32 @@ function migrarMarcas(mapa, checklist) {
   return { mapa: nuevo, cambiado };
 }
 
+// Reconstruye la checklist (categorías + items) de un evento GUARDADO a partir de su
+// configuración, para poder migrar sus marcas SIN abrirlo. Aplica las categorías
+// renombradas y añade los items puestos a mano (la clave usa la etiqueta base del item).
+function checklistDeEventoGuardado(ev) {
+  if (!ev || !ev.evento) return [];
+  const opts = {
+    ...ev,
+    tipoBBQ: (ev.tipoBBQ || "").toLowerCase(),
+    tipoHorno: (ev.tipoHorno || "").toLowerCase(),
+    numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
+  };
+  let cats;
+  try {
+    cats = buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
+  } catch (e) { return []; }
+  const renom = ev.categoriasRenombradas || {};
+  const salida = cats.map(c => ({ nombre: renom[c.nombre] ?? c.nombre, items: c.items.map(it => [it[0]]) }));
+  (ev.itemsManuales || []).forEach(it => {
+    const nombreCat = renom[it.categoria] ?? it.categoria ?? "Otros";
+    let destino = salida.find(c => c.nombre === nombreCat);
+    if (!destino) { destino = { nombre: nombreCat, items: [] }; salida.push(destino); }
+    destino.items.push([it.label]);
+  });
+  return salida;
+}
+
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
 // ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
 // Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
@@ -2909,6 +2935,38 @@ export default function App({ onCerrarSesion } = {}) {
     const r = migrarMarcas(roturas, checklist);   if (r.cambiado) setRoturas(r.mapa);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checklist]);
+
+  // Migración masiva (una sola vez): arregla en la base de datos TODOS los eventos
+  // guardados —reasocia sus marcas a los nombres/categorías actuales— sin tener que abrir
+  // cada uno, para no perder el trabajo ya hecho en Modo carga. Se espera unos segundos a
+  // que llegue la versión de la nube antes de tocar nada, y se marca hecho en localStorage.
+  const migracionMasivaRef = React.useRef(false);
+  useEffect(() => {
+    if (migracionMasivaRef.current) return;
+    try { if (localStorage.getItem("gula_migracion_marcas_v2")) { migracionMasivaRef.current = true; return; } } catch (e) { /* */ }
+    if (!Object.keys(eventosGuardados).length) return;
+    const t = setTimeout(() => {
+      if (migracionMasivaRef.current) return;
+      migracionMasivaRef.current = true;
+      let algo = false;
+      const actualizado = {};
+      Object.entries(eventosGuardados).forEach(([nombre, ev]) => {
+        const cl = checklistDeEventoGuardado(ev);
+        if (!cl.length) { actualizado[nombre] = ev; return; }
+        const c = migrarMarcas(ev.checkeados || {}, cl);
+        const v = migrarMarcas(ev.vueltos || {}, cl);
+        const r = migrarMarcas(ev.roturas || {}, cl);
+        if (c.cambiado || v.cambiado || r.cambiado) {
+          algo = true;
+          actualizado[nombre] = { ...ev, checkeados: c.mapa, vueltos: v.mapa, roturas: r.mapa };
+        } else { actualizado[nombre] = ev; }
+      });
+      try { localStorage.setItem("gula_migracion_marcas_v2", "1"); } catch (e) { /* */ }
+      if (algo) guardarEventos(actualizado);
+    }, 4000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventosGuardados]);
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
