@@ -1475,10 +1475,10 @@ function guardarExtra(clave, valor) {
     if (!actuales.includes(valor)) localStorage.setItem(`gula_opciones_extra::${clave}`, JSON.stringify([...actuales, valor]));
   } catch (e) { /* localStorage no disponible */ }
 }
-function SelectConOtro({ label, value, onChange, options }) {
+function SelectConOtro({ label, value, onChange, options, opcionNinguna }) {
   const [extras, setExtras] = useState(() => leerExtrasGuardados(label));
   const opcionesCompletas = [...options, ...extras.filter(e => !options.includes(e))];
-  const esPersonalizado = value && !opcionesCompletas.includes(value);
+  const esPersonalizado = value && value !== opcionNinguna && !opcionesCompletas.includes(value);
   const [modoOtro, setModoOtro] = useState(false);
   const [texto, setTexto] = useState("");
   // Guarda el texto escrito como una opción reutilizable (en este navegador) y lo
@@ -1544,6 +1544,7 @@ function SelectConOtro({ label, value, onChange, options }) {
         >
           {opcionesCompletas.map(o => <option key={o} value={o}>{o}</option>)}
           {esPersonalizado && <option value={value}>{value}</option>}
+          {opcionNinguna && <option value={opcionNinguna}>{opcionNinguna}</option>}
           <option value="__otro__">+ Otro...</option>
         </select>
         {esPersonalizado && (
@@ -1803,7 +1804,9 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       else if (raw !== undefined && raw !== "") vuelta = parseFloat(String(raw).replace(",", ".")) || 0;
       const consumoReal = (cargaInicial !== null && vuelta !== null) ? Math.max(0, cargaInicial - vuelta) : null;
       const rot = parseInt(roturas[key], 10) || 0;
-      const precio = precios[label];
+      // Si el item se renombró a mano, se busca el precio por su nombre original
+      // para que el coste no se pierda al cambiarle la etiqueta.
+      const precio = precios[label] ?? precios[labelOriginal];
       // Coste = (lo consumido + lo roto) × precio. Las roturas cuentan aunque no se
       // haya registrado la vuelta (una rotura ya es un coste de reposición seguro).
       const costeTotal = (precio !== undefined && (consumoReal !== null || rot > 0))
@@ -4107,18 +4110,32 @@ export default function App({ onCerrarSesion } = {}) {
             )}
             <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
             <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
-            <div className="equip-pareja">
-              <SegmentedControl label="Platos" value={llevaPlatos ? "Llevan" : "No llevan"} onChange={v => setLlevaPlatos(v === "Llevan")} options={["Llevan", "No llevan"]} />
-              <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
-            </div>
-            {evento !== "cumpleanos" && evento !== "produccion" && (
+            {/* Vajilla. Donde se elige el estilo del plato está también la opción
+                "No llevan" (p. ej. si solo van bandejas), en vez de un interruptor
+                aparte. En cumpleaños y producción no se elige estilo, así que ahí
+                sí se usa el interruptor Llevan / No llevan. */}
+            {evento !== "cumpleanos" && evento !== "produccion" ? (
               <>
                 <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
                 <div className="equip-pareja">
-                  <SelectConOtro label="Estilo plato principal" value={estiloPlatoPrincipal} onChange={setEstiloPlatoPrincipal} options={["Blanco liso", "Relieve blanco", "Verde", "Metálico"]} />
-                  <SelectConOtro label="Estilo plato postre" value={estiloPlatoPostre} onChange={setEstiloPlatoPostre} options={["Blanco", "Verde"]} />
+                  <SelectConOtro
+                    label="Estilo plato principal"
+                    value={llevaPlatos ? estiloPlatoPrincipal : "No llevan"}
+                    onChange={v => { if (v === "No llevan") setLlevaPlatos(false); else { setLlevaPlatos(true); setEstiloPlatoPrincipal(v); } }}
+                    options={["Blanco liso", "Relieve blanco", "Verde", "Metálico"]}
+                    opcionNinguna="No llevan"
+                  />
+                  {llevaPlatos && (
+                    <SelectConOtro label="Estilo plato postre" value={estiloPlatoPostre} onChange={setEstiloPlatoPostre} options={["Blanco", "Verde"]} />
+                  )}
                 </div>
+                <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
               </>
+            ) : (
+              <div className="equip-pareja">
+                <SegmentedControl label="Platos" value={llevaPlatos ? "Llevan" : "No llevan"} onChange={v => setLlevaPlatos(v === "Llevan")} options={["Llevan", "No llevan"]} />
+                <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
+              </div>
             )}
           </div>
         </div>

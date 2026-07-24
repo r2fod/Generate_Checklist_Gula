@@ -1034,6 +1034,9 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+/* Si la pareja se queda con un solo control (ej. "No llevan" oculta el plato de
+   postre), que ocupe el ancho completo en vez de dejar media fila vacía. */
+.equip-pareja > :only-child { grid-column: 1 / -1; }
 
 /* Equipo de logística: una fila por persona con nombre y su horario */
 .logistica-block {
@@ -3115,8 +3118,9 @@ hr {
 .item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1; }
 .item-name-lead > .item-icon { margin-top: 2px; }
 .item-label-text { min-width: 0; }
-/* Títulos de modales con icono alineado */
-.preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: inline-flex; align-items: center; gap: 7px; }
+/* Títulos de modales con icono alineado. Van en "flex" (no "inline-flex") para
+   que el subtítulo caiga debajo del título en vez de pegarse a su derecha. */
+.preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: flex; align-items: center; gap: 7px; }
 .item-icon { opacity: 0.92; flex-shrink: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
 .item-row:hover .item-icon { opacity: 1; transform: scale(1.2) rotate(-5deg); }
 .item-edit-flag { color: var(--accent, #c9a24b); display: inline; opacity: 0.9; margin-left: 3px; }
