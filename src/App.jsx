@@ -7,7 +7,7 @@ import {
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
   BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
-  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette, ShieldCheck,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -1357,6 +1357,149 @@ function _norm(s) {
   return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// ─── REVISIÓN DE DATOS GUARDADOS ──────────────────────────────────────────────
+// Reconstruye la checklist (categorías + items) de un evento GUARDADO a partir de
+// su configuración, para poder comparar sus marcas con los items que tendría hoy
+// sin necesidad de abrirlo. Aplica las categorías renombradas y añade los items
+// puestos a mano (la clave usa la etiqueta base del item).
+function checklistDeEventoGuardado(ev) {
+  if (!ev || !ev.evento) return [];
+  const opts = {
+    ...ev,
+    tipoBBQ: (ev.tipoBBQ || "").toLowerCase(),
+    tipoHorno: (ev.tipoHorno || "").toLowerCase(),
+    numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
+  };
+  let cats;
+  try {
+    cats = buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
+  } catch (e) { return []; }
+  const renom = ev.categoriasRenombradas || {};
+  const salida = cats.map(c => ({ nombre: renom[c.nombre] ?? c.nombre, items: c.items.map(it => it[0]) }));
+  (ev.itemsManuales || []).forEach(it => {
+    const nombreCat = renom[it.categoria] ?? it.categoria ?? "Otros";
+    let destino = salida.find(c => c.nombre === nombreCat);
+    if (!destino) { destino = { nombre: nombreCat, items: [] }; salida.push(destino); }
+    destino.items.push(it.label);
+  });
+  return salida;
+}
+
+// Busca marcas (cargado / vuelta / roturas) cuya clave "categoría::item" ya no
+// corresponde a ningún item de la checklist que ese evento generaría hoy. Son las
+// que no se verían en Modo carga aunque sigan ocupando sitio en la base de datos.
+const CAMPOS_MARCAS = [["checkeados", "cargado"], ["vueltos", "vuelta"], ["roturas", "roturas"]];
+function buscarMarcasHuerfanas(eventosGuardados) {
+  const porEvento = [];
+  Object.entries(eventosGuardados || {}).forEach(([nombre, ev]) => {
+    const cl = checklistDeEventoGuardado(ev);
+    if (!cl.length) return; // sin config utilizable: no se puede juzgar, se deja en paz
+    const validas = new Set();
+    const opciones = [];
+    cl.forEach(c => c.items.forEach(label => {
+      if (label == null) return;
+      validas.add(`${c.nombre}::${label}`);
+      opciones.push(`${c.nombre}::${label}`);
+    }));
+    const huerfanas = [];
+    CAMPOS_MARCAS.forEach(([campo, etiqueta]) => {
+      Object.entries(ev[campo] || {}).forEach(([clave, valor]) => {
+        if (validas.has(clave)) return;
+        const i = clave.indexOf("::");
+        huerfanas.push({
+          campo, etiqueta, clave, valor,
+          categoria: i < 0 ? "" : clave.slice(0, i),
+          item: i < 0 ? clave : clave.slice(i + 2),
+        });
+      });
+    });
+    if (huerfanas.length) porEvento.push({ nombre, huerfanas, opciones });
+  });
+  return porEvento;
+}
+
+function ModalRevisionDatos({ eventosGuardados, onAplicar, onClose }) {
+  const informe = useMemo(() => buscarMarcasHuerfanas(eventosGuardados), [eventosGuardados]);
+  const totalEventos = Object.keys(eventosGuardados || {}).length;
+  const totalHuerfanas = informe.reduce((a, e) => a + e.huerfanas.length, 0);
+  // decisiones["evento||clave||campo"] = "" (no tocar) | "__borrar__" | clave destino
+  const [decisiones, setDecisiones] = useState({});
+  const idDe = (evNombre, h) => `${evNombre}||${h.campo}||${h.clave}`;
+  const pendientes = Object.values(decisiones).filter(Boolean).length;
+
+  const aplicar = () => {
+    const parches = {};
+    informe.forEach(({ nombre, huerfanas }) => {
+      huerfanas.forEach(h => {
+        const d = decisiones[idDe(nombre, h)];
+        if (!d) return;
+        const ev = parches[nombre] || { ...eventosGuardados[nombre] };
+        const mapa = { ...(ev[h.campo] || {}) };
+        delete mapa[h.clave];
+        if (d !== "__borrar__") mapa[d] = h.valor;
+        ev[h.campo] = mapa;
+        parches[nombre] = ev;
+      });
+    });
+    onAplicar(parches);
+    onClose();
+  };
+
+  return (
+    <div className="dialogo-overlay" onClick={onClose}>
+      <div className="dialogo-modal revision-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Revisar datos guardados">
+        <div className="dialogo-titulo"><ShieldCheck size={18} /> Revisar datos guardados</div>
+        {totalHuerfanas === 0 ? (
+          <p className="dialogo-mensaje">
+            Revisados <strong>{totalEventos}</strong> eventos. Todas las marcas guardadas (cargado, vuelta y roturas)
+            corresponden a un item que existe hoy en su checklist. No hay nada que arreglar.
+          </p>
+        ) : (
+          <>
+            <p className="dialogo-mensaje">
+              Revisados <strong>{totalEventos}</strong> eventos. Hay <strong>{totalHuerfanas}</strong> marcas guardadas
+              cuyo item ya no existe en la checklist de su evento, así que no se ven en Modo carga.
+              Elige a qué item va cada una, o bórrala. Lo que dejes en "Dejar como está" no se toca.
+            </p>
+            <div className="revision-lista">
+              {informe.map(({ nombre, huerfanas, opciones }) => (
+                <div className="revision-evento" key={nombre}>
+                  <div className="revision-evento-nombre"><CalendarDays size={14} /> {nombre}</div>
+                  {huerfanas.map(h => (
+                    <div className="revision-fila" key={idDe(nombre, h)}>
+                      <div className="revision-origen">
+                        <span className="revision-item">{h.item}</span>
+                        <span className="revision-meta">{h.categoria} · {h.etiqueta}: {String(h.valor === true ? "sí" : h.valor)}</span>
+                      </div>
+                      <select
+                        className="form-select"
+                        value={decisiones[idDe(nombre, h)] || ""}
+                        onChange={e => setDecisiones(prev => ({ ...prev, [idDe(nombre, h)]: e.target.value }))}
+                      >
+                        <option value="">Dejar como está</option>
+                        <option value="__borrar__">Borrar esta marca</option>
+                        {opciones.map(o => <option key={o} value={o}>{o.replace("::", " · ")}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <div className="dialogo-acciones">
+          <button className="btn btn-ghost" onClick={onClose}>{totalHuerfanas === 0 ? "Cerrar" : "Cancelar"}</button>
+          {totalHuerfanas > 0 && (
+            <button className="btn btn-green" onClick={aplicar} disabled={!pendientes}>
+              Aplicar {pendientes > 0 ? `(${pendientes})` : ""}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
 // ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
 // Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
@@ -2636,6 +2779,15 @@ export default function App({ onCerrarSesion } = {}) {
     eventoActivoRef.current = nombre || "";
     try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
   };
+  const [revisionAbierta, setRevisionAbierta] = useState(false);
+  // Aplica las correcciones elegidas en "Revisar datos" (reasignar o borrar marcas
+  // sueltas). Solo toca los eventos con algún cambio; el resto queda intacto.
+  const handleAplicarRevision = (parches) => {
+    if (!Object.keys(parches).length) return;
+    guardarEventos({ ...eventosGuardados, ...parches });
+    setGuardadoEventoMsg(`✓ Corregidas las marcas de ${Object.keys(parches).length} evento(s)`);
+    setTimeout(() => setGuardadoEventoMsg(""), 4000);
+  };
   const guardarEventos = (obj) => {
     setEventosGuardados(obj);
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
@@ -3211,6 +3363,7 @@ export default function App({ onCerrarSesion } = {}) {
 
   return (
     <>
+      {revisionAbierta && <ModalRevisionDatos eventosGuardados={eventosGuardados} onAplicar={handleAplicarRevision} onClose={() => setRevisionAbierta(false)} />}
       {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
       {modoCarga && (
         <ModalModoCarga
@@ -3399,7 +3552,8 @@ export default function App({ onCerrarSesion } = {}) {
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div className="plantillas-header-acciones">
+              <button className="btn btn-outline btn-plantilla" onClick={() => setRevisionAbierta(true)} title="Comprueba que todas las marcas guardadas (cargado, vuelta, roturas) corresponden a un item que existe hoy en la checklist de su evento"><ShieldCheck size={14} /> Revisar datos</button>
               <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular</button>
               <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link"><Save size={14} /> Guardar evento</button>
             </div>
