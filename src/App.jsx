@@ -6,7 +6,7 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
-  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff, Play, Pause,
+  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
@@ -2405,10 +2405,13 @@ export default function App({ onCerrarSesion } = {}) {
   // PENDIENTES (fecha futura, el más cercano arriba; los sin fecha al final). Los pasados
   // quedan detrás de un "Ver pasados" para no perder el acceso a ellos.
   const [verPasados, setVerPasados] = useState(false);
+  const [filtroEventos, setFiltroEventos] = useState("");
   const { eventosPendientes, eventosPasados } = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
+    const q = _norm(filtroEventos);
     const pend = [], pas = [];
     Object.keys(eventosGuardados).forEach(n => {
+      if (q && !_norm(n).includes(q)) return;
       const f = eventosGuardados[n]?.fechaEvento || "";
       if (f && f < hoy) pas.push(n); else pend.push(n);
     });
@@ -2420,7 +2423,7 @@ export default function App({ onCerrarSesion } = {}) {
     });
     pas.sort((a, b) => (eventosGuardados[b]?.fechaEvento || "").localeCompare(eventosGuardados[a]?.fechaEvento || ""));
     return { eventosPendientes: pend, eventosPasados: pas };
-  }, [eventosGuardados]);
+  }, [eventosGuardados, filtroEventos]);
 
   // Avisos de recogidas, devoluciones y compras. Ahora avisan CON ANTELACIÓN: entran en
   // la lista cuando faltan DIAS_AVISO días o menos (o si ya están atrasados), no solo el
@@ -2839,6 +2842,25 @@ export default function App({ onCerrarSesion } = {}) {
     },
   });
 
+  // Duplica un evento guardado: copia toda su configuración con otro nombre, pero como
+  // evento independiente y "en limpio" (sin los checks de carga/vuelta/roturas ni el link).
+  const handleDuplicarEvento = (nombre) => setDialogo({
+    tipo: "prompt",
+    titulo: "Duplicar evento",
+    mensaje: `Crea una copia de "${nombre}" con la misma configuración pero limpia (sin los checks de Modo carga).`,
+    placeholder: `${nombre} (copia)`,
+    valorInicial: `${nombre} (copia)`,
+    textoConfirmar: "Duplicar",
+    onConfirm: (nuevo) => {
+      const base = eventosGuardados[nombre];
+      const nom = (nuevo || "").trim();
+      if (!base || !nom) return;
+      const copia = { ...base, nombreEvento: nom, eventoNubeId: null, checkeados: {}, vueltos: {}, roturas: {}, cronos: {} };
+      guardarEventos({ ...eventosGuardados, [nom]: copia });
+      setGuardadoEventoMsg(`✓ Duplicado como "${nom}"`);
+      setTimeout(() => setGuardadoEventoMsg(""), 3000);
+    },
+  });
   // Fila de un evento guardado (se reutiliza en la lista de pendientes y en la de pasados)
   const filaEvento = (n) => (
     <div className="plantilla-row" key={n}>
@@ -2848,6 +2870,7 @@ export default function App({ onCerrarSesion } = {}) {
           <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes"><Clock size={12} /> {avisosRecogidas.filter(a => a.evento === n).length}</span>
         )}
       </button>
+      <button className="plantilla-link" onClick={() => handleDuplicarEvento(n)} title="Duplicar evento" aria-label={`Duplicar evento ${n}`}><Copy size={15} /></button>
       <button className="plantilla-link" onClick={() => handleLinkEvento(n)} title="Copiar link para compartir" aria-label={`Copiar link del evento ${n}`}><Link2 size={15} /></button>
       <button className="plantilla-borrar" onClick={() => handleBorrarEvento(n)} aria-label={`Borrar evento guardado ${n}`} title="Borrar evento guardado"><X size={15} /></button>
     </div>
@@ -3538,10 +3561,26 @@ export default function App({ onCerrarSesion } = {}) {
             <p className="plantillas-vacio">Guarda la checklist de cada evento y comparte su link: quien lo abra la verá en la web, lista para hacer check desde el móvil.</p>
           ) : (
             <>
+              {Object.keys(eventosGuardados).length > 4 && (
+                <div className="buscador-eventos">
+                  <Search size={15} className="buscador-eventos-icono" />
+                  <input
+                    type="text"
+                    className="buscador-eventos-input"
+                    placeholder="Buscar evento por nombre…"
+                    value={filtroEventos}
+                    onChange={(e) => setFiltroEventos(e.target.value)}
+                    aria-label="Buscar evento por nombre"
+                  />
+                  {filtroEventos && (
+                    <button className="buscador-eventos-limpiar" onClick={() => setFiltroEventos("")} title="Limpiar búsqueda" aria-label="Limpiar búsqueda"><X size={14} /></button>
+                  )}
+                </div>
+              )}
               {eventosPendientes.length > 0 ? (
                 <ListaColapsable nombres={eventosPendientes}>{filaEvento}</ListaColapsable>
               ) : (
-                <p className="plantillas-vacio">No hay eventos próximos.</p>
+                <p className="plantillas-vacio">{filtroEventos ? "Ningún evento próximo coincide con la búsqueda." : "No hay eventos próximos."}</p>
               )}
               {eventosPasados.length > 0 && (
                 <>
