@@ -10,7 +10,7 @@ import {
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette,
 } from "lucide-react";
 import {
-  nubeActiva, nuevoIdEvento, guardarEventoNube, cargarEventoNube, suscribirEventoNube,
+  nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
   guardarIndiceEventosNube, cargarIndiceEventosNube, suscribirIndiceEventosNube,
 } from "./nube.js";
 
@@ -1188,7 +1188,10 @@ function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJ
   const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / nLog) : 0;
   const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
   const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
-  const montajeMin = totalItems > 0 ? Math.round(MONTAJE_BASE_MIN + pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM) : 0;
+  // El montaje también se reparte entre la gente que monta, igual que la preparación
+  // y la carga: con dos personas se tarda la mitad. Antes salía el mismo tiempo
+  // fueran uno o cinco, y por eso la hora de fin sugerida se iba muy larga.
+  const montajeMin = totalItems > 0 ? Math.round((MONTAJE_BASE_MIN + pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM) / nLog) : 0;
   return { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin: prepMin + cargaMin + descargaMin + montajeMin };
 }
 // "08:30" + 150 min → "11:00" (sumar minutos a una hora HH:MM, con vuelta de día)
@@ -1349,115 +1352,9 @@ function parsePreciosPegados(texto) {
   return precios;
 }
 
-// Items que se han renombrado en actualizaciones (nombre viejo → nombre nuevo). Sirve
-// para recuperar en eventos antiguos los checks/vueltas/roturas que se guardaron con el
-// nombre de antes.
-const RENOMBRES_ITEMS = {
-  "Trípode de quemador": "Trípode",
-  "Difusores": "Difusor",
-  "Difusor pequeño (frituras)": "Difusor",
-  "Copas cristal": "Copas de vino",
-  "Vasos cristal": "Vasos de agua",
-  "Copa cava": "Copas de cava",
-  "Vaso cubata": "Vasos de cubata",
-  "Pinzas servicio (metal/madera)": "Pinzas largas",
-};
-// Similitud entre dos nombres de item (0..1). Combina Jaccard de palabras, contención
-// (una es "subconjunto" de la otra: "Trípode" ⊂ "Trípode de quemador") y distancia de
-// edición (para plurales/variantes: "Difusores" ~ "Difusor"). Ignora tildes y relleno.
-const _STOP = new Set(["de", "del", "la", "el", "los", "las", "con", "y", "o", "para", "en", "a", "un", "una", "al"]);
+// Normaliza un texto para buscar sin importar tildes ni mayúsculas.
 function _norm(s) {
-  return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-function _tokens(s) { return _norm(s).split(" ").filter(w => w && !_STOP.has(w)); }
-function _leven(a, b) {
-  const m = a.length, n = b.length;
-  if (!m) return n; if (!n) return m;
-  let prev = Array.from({ length: n + 1 }, (_, j) => j);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-    prev = cur;
-  }
-  return prev[n];
-}
-function similitudItems(a, b) {
-  const na = _norm(a), nb = _norm(b);
-  if (!na || !nb) return 0;
-  if (na === nb) return 1;
-  const sa = new Set(_tokens(a)), sb = new Set(_tokens(b));
-  let inter = 0; sa.forEach(t => { if (sb.has(t)) inter++; });
-  const union = sa.size + sb.size - inter || 1;
-  const jaccard = inter / union;
-  const menor = sa.size <= sb.size ? sa : sb, mayor = sa.size <= sb.size ? sb : sa;
-  let cont = 0; menor.forEach(t => { if (mayor.has(t)) cont++; });
-  const contencion = menor.size ? cont / menor.size : 0;
-  const lev = 1 - _leven(na, nb) / Math.max(na.length, nb.length);
-  return Math.max(jaccard, contencion * 0.92, lev);
-}
-// Reasocia las marcas guardadas (checkeados/vueltos/roturas, con clave "categoría::item")
-// a los nombres y categorías ACTUALES de la checklist. No borra nada: solo AÑADE la clave
-// nueva cuando falta. Empareja por: nombre exacto → renombrado conocido → por SIMILITUD
-// (para nombres que cambiaron y no están en la tabla). Así los eventos antiguos recuperan
-// sus datos aunque el item se renombrara o cambiara de categoría.
-const SIMILITUD_MINIMA = 0.62;
-function migrarMarcas(mapa, checklist) {
-  if (!mapa || typeof mapa !== "object") return { mapa: mapa || {}, cambiado: false };
-  const items = [];
-  const labelToKey = {};
-  checklist.forEach(cat => cat.items.forEach(it => {
-    const lo = it[3] ?? it[0];
-    if (lo == null) return;
-    const key = `${cat.nombre}::${lo}`;
-    items.push({ label: lo, key });
-    if (labelToKey[lo] === undefined) labelToKey[lo] = key;
-  }));
-  const nuevo = { ...mapa };
-  let cambiado = false;
-  Object.entries(mapa).forEach(([k, v]) => {
-    const i = k.indexOf("::");
-    if (i < 0) return;
-    const oldLabel = k.slice(i + 2);
-    // 1) nombre exacto (cubre los cambios de solo-categoría) o renombrado conocido
-    let target = labelToKey[RENOMBRES_ITEMS[oldLabel] || oldLabel];
-    // 2) por similitud, solo si el nombre viejo ya no existe tal cual en la lista
-    if (!target && labelToKey[oldLabel] === undefined) {
-      let best = null, bestScore = 0;
-      items.forEach(({ label, key }) => {
-        const s = similitudItems(oldLabel, label);
-        if (s > bestScore) { bestScore = s; best = key; }
-      });
-      if (best && bestScore >= SIMILITUD_MINIMA) target = best;
-    }
-    if (target && target !== k && nuevo[target] === undefined) { nuevo[target] = v; cambiado = true; }
-  });
-  return { mapa: nuevo, cambiado };
-}
-
-// Reconstruye la checklist (categorías + items) de un evento GUARDADO a partir de su
-// configuración, para poder migrar sus marcas SIN abrirlo. Aplica las categorías
-// renombradas y añade los items puestos a mano (la clave usa la etiqueta base del item).
-function checklistDeEventoGuardado(ev) {
-  if (!ev || !ev.evento) return [];
-  const opts = {
-    ...ev,
-    tipoBBQ: (ev.tipoBBQ || "").toLowerCase(),
-    tipoHorno: (ev.tipoHorno || "").toLowerCase(),
-    numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
-  };
-  let cats;
-  try {
-    cats = buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
-  } catch (e) { return []; }
-  const renom = ev.categoriasRenombradas || {};
-  const salida = cats.map(c => ({ nombre: renom[c.nombre] ?? c.nombre, items: c.items.map(it => [it[0]]) }));
-  (ev.itemsManuales || []).forEach(it => {
-    const nombreCat = renom[it.categoria] ?? it.categoria ?? "Otros";
-    let destino = salida.find(c => c.nombre === nombreCat);
-    if (!destino) { destino = { nombre: nombreCat, items: [] }; salida.push(destino); }
-    destino.items.push([it.label]);
-  });
-  return salida;
+  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
@@ -3018,102 +2915,6 @@ export default function App({ onCerrarSesion } = {}) {
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
     return cats.filter(c => c.items.length > 0);
   }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual]);
-
-  // Recuperación de datos de eventos antiguos: al abrir un evento, reasocia sus marcas
-  // (cargados/vueltos/roturas) a los nombres/categorías actuales de la checklist, para
-  // que no se pierdan por renombrados o cambios de categoría. Se ejecuta una sola vez.
-  const marcasMigradasRef = React.useRef(false);
-  useEffect(() => {
-    if (marcasMigradasRef.current || !checklist.length) return;
-    marcasMigradasRef.current = true;
-    const c = migrarMarcas(checkeados, checklist); if (c.cambiado) setCheckeados(c.mapa);
-    const v = migrarMarcas(vueltos, checklist);   if (v.cambiado) setVueltos(v.mapa);
-    const r = migrarMarcas(roturas, checklist);   if (r.cambiado) setRoturas(r.mapa);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checklist]);
-
-  // Migración masiva (una sola vez): arregla en la base de datos TODOS los eventos
-  // guardados —reasocia sus marcas a los nombres/categorías actuales— sin tener que abrir
-  // cada uno, para no perder el trabajo ya hecho en Modo carga. Se espera unos segundos a
-  // que llegue la versión de la nube antes de tocar nada, y se marca hecho en localStorage.
-  const migracionMasivaRef = React.useRef(false);
-  useEffect(() => {
-    if (migracionMasivaRef.current) return;
-    try { if (localStorage.getItem("gula_migracion_marcas_v3")) { migracionMasivaRef.current = true; return; } } catch (e) { /* */ }
-    if (!Object.keys(eventosGuardados).length) return;
-    const t = setTimeout(() => {
-      if (migracionMasivaRef.current) return;
-      migracionMasivaRef.current = true;
-      // Se usa el estado MÁS RECIENTE (functional update): así nunca escribimos una versión
-      // vieja encima de una nueva de la nube. Es puramente ADITIVO: solo añade claves a los
-      // mapas de marcas, jamás toca ni borra la configuración de un evento.
-      setEventosGuardados(prev => {
-        let algo = false;
-        const actualizado = {};
-        Object.entries(prev).forEach(([nombre, ev]) => {
-          const cl = checklistDeEventoGuardado(ev);
-          if (!cl.length) { actualizado[nombre] = ev; return; }
-          const c = migrarMarcas(ev.checkeados || {}, cl);
-          const v = migrarMarcas(ev.vueltos || {}, cl);
-          const r = migrarMarcas(ev.roturas || {}, cl);
-          if (c.cambiado || v.cambiado || r.cambiado) {
-            algo = true;
-            actualizado[nombre] = { ...ev, checkeados: c.mapa, vueltos: v.mapa, roturas: r.mapa };
-          } else { actualizado[nombre] = ev; }
-        });
-        try { localStorage.setItem("gula_migracion_marcas_v3", "1"); } catch (e) { /* */ }
-        if (!algo) return prev;
-        try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* */ }
-        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
-        return actualizado;
-      });
-    }, 5000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventosGuardados]);
-
-  // RECUPERACIÓN desde las copias individuales de la nube: cada evento COMPARTIDO tiene su
-  // propio documento (eventos/{id}) además del índice. Si el índice perdió configuración o
-  // checks de un evento, su copia individual suele conservarlos. Una sola vez: por cada
-  // evento con eventoNubeId se trae su copia y se FUSIONA quedándose con la versión más
-  // completa (config) y la UNIÓN de las marcas. Es puramente restaurativo: nunca quita nada.
-  const recuperacionDocsRef = React.useRef(false);
-  useEffect(() => {
-    if (recuperacionDocsRef.current || !nubeActiva()) return;
-    try { if (localStorage.getItem("gula_recuperacion_docs_v1")) { recuperacionDocsRef.current = true; return; } } catch (e) { /* */ }
-    const conNube = Object.entries(eventosGuardados).filter(([, ev]) => ev && ev.eventoNubeId);
-    if (!conNube.length) return;
-    recuperacionDocsRef.current = true;
-    const t = setTimeout(async () => {
-      const riqueza = (ev) => ev ? (Object.keys(ev.checkeados || {}).length + Object.keys(ev.vueltos || {}).length + Object.keys(ev.roturas || {}).length + (ev.logisticaEquipo || []).length + (ev.recogidas || []).length + (ev.compras || []).length + (ev.itemsManuales || []).length + Object.keys(ev.overridesManuales || {}).length + Object.keys(ev.itemsOcultos || {}).length) : -1;
-      const parches = {};
-      for (const [nombre, ev] of conNube) {
-        try {
-          const doc = await cargarEventoNube(ev.eventoNubeId);
-          if (!doc) continue;
-          const base = riqueza(doc) > riqueza(ev) ? doc : ev;
-          parches[nombre] = {
-            ...base,
-            nombreEvento: ev.nombreEvento || doc.nombreEvento || nombre,
-            eventoNubeId: ev.eventoNubeId,
-            checkeados: { ...(doc.checkeados || {}), ...(ev.checkeados || {}) },
-            vueltos: { ...(doc.vueltos || {}), ...(ev.vueltos || {}) },
-            roturas: { ...(doc.roturas || {}), ...(ev.roturas || {}) },
-          };
-        } catch (e) { /* seguir con el resto */ }
-      }
-      try { localStorage.setItem("gula_recuperacion_docs_v1", "1"); } catch (e) { /* */ }
-      if (!Object.keys(parches).length) return;
-      setEventosGuardados(prev => {
-        const actualizado = { ...prev, ...parches };
-        try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* */ }
-        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
-        return actualizado;
-      });
-    }, 6500);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventosGuardados]);
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
