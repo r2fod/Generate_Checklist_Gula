@@ -2555,7 +2555,7 @@ export default function App({ onCerrarSesion } = {}) {
       const nuevoEstado = { ...datos, [lista]: (datos[lista] || []).map((r, idx) => idx === aviso.idx ? { ...r, [campo]: true } : r) };
       guardarEventos({ ...eventosGuardados, [aviso.evento]: nuevoEstado });
       // El doc individual del link compartido también se actualiza si el evento tiene uno
-      if (nubeActiva() && nuevoEstado.eventoNubeId) guardarEventoNube(nuevoEstado.eventoNubeId, nuevoEstado).catch(() => {});
+      if (nubeActiva() && nuevoEstado.eventoNubeId) guardarEventoNube(nuevoEstado.eventoNubeId, nuevoEstado).catch(avisarFalloNube);
     }
     // Si el evento del aviso es el que está abierto en el formulario (mismo nombre o
     // mismo id de nube), su estado vivo también se marca — así un "Guardar evento"
@@ -2603,6 +2603,17 @@ export default function App({ onCerrarSesion } = {}) {
   // Indicador "Guardado ✓": parpadea un instante tras cada cambio (el guardado en el
   // navegador es inmediato). Se salta el primer render para no aparecer al abrir.
   const [guardadoFlash, setGuardadoFlash] = useState(false);
+  // Hasta ahora TODOS los guardados en la nube se tragaban su error en silencio: si
+  // fallaban (sin conexión, permisos, o el archivo pasado del límite de 1 MB de
+  // Firestore) la app parecía haber guardado. Ahora el fallo se ve y no desaparece
+  // solo, para poder actuar antes de perder el trabajo hecho.
+  const [errorNube, setErrorNube] = useState(null);
+  const avisarFalloNube = (e) => {
+    const msg = String(e?.message || e || "");
+    setErrorNube(/longer than|exceeds|maximum|too large|invalid-argument/i.test(msg)
+      ? "El archivo de eventos ya no cabe en la nube. Borra o archiva eventos antiguos para poder seguir guardando."
+      : "No se ha podido guardar en la nube. Los cambios están en este dispositivo; revisa la conexión.");
+  };
   const primerGuardadoRef = React.useRef(true);
   useEffect(() => {
     if (primerGuardadoRef.current) { primerGuardadoRef.current = false; return; }
@@ -2623,7 +2634,7 @@ export default function App({ onCerrarSesion } = {}) {
     if (!nubeActiva() || !eventoNubeId) return;
     const t = setTimeout(() => {
       ultimoGuardadoNubeRef.current = estadoActualJSON;
-      guardarEventoNube(eventoNubeId, getEstadoActual()).catch(() => { /* sin conexión: quedará en local */ });
+      guardarEventoNube(eventoNubeId, getEstadoActual()).then(() => setErrorNube(null)).catch(avisarFalloNube);
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2714,7 +2725,7 @@ export default function App({ onCerrarSesion } = {}) {
       if (!eventoNubeId) setEventoNubeId(id);
       const estado = { ...getEstadoActual(), eventoNubeId: id };
       ultimoGuardadoNubeRef.current = JSON.stringify(estado);
-      guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
+      guardarEventoNube(id, estado).catch(avisarFalloNube);
       copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, etiquetaLink);
     } else {
       // Sin nube: el link lleva la checklist dentro (solo lectura/copia local)
@@ -2787,6 +2798,15 @@ export default function App({ onCerrarSesion } = {}) {
     try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
   };
   const [revisionAbierta, setRevisionAbierta] = useState(false);
+  // Todos los eventos guardados viajan a la nube en UN solo documento, y Firestore
+  // no admite documentos de más de 1 MiB. Un evento con Modo carga terminado pesa
+  // ~12 KB, así que el tope llega sobre los 85-90 eventos: se avisa antes de chocar.
+  const LIMITE_DOC_NUBE = 1048576;
+  const ocupacionArchivo = useMemo(() => {
+    if (!nubeActiva()) return -1;
+    try { return new TextEncoder().encode(JSON.stringify(eventosGuardados)).length / LIMITE_DOC_NUBE; }
+    catch (e) { return -1; }
+  }, [eventosGuardados]);
   // Aplica las correcciones elegidas en "Revisar datos" (reasignar o borrar marcas
   // sueltas). Solo toca los eventos con algún cambio; el resto queda intacto.
   const handleAplicarRevision = (parches) => {
@@ -2802,7 +2822,7 @@ export default function App({ onCerrarSesion } = {}) {
     // desde cualquier dispositivo, no solo en el navegador donde se guardaron
     if (nubeActiva()) {
       ultimaEscrituraLocalRef.current = Date.now();
-      guardarIndiceEventosNube(obj).catch(() => { /* sin conexión: queda en local */ });
+      guardarIndiceEventosNube(obj).then(() => setErrorNube(null)).catch(avisarFalloNube);
     }
   };
 
@@ -2855,7 +2875,7 @@ export default function App({ onCerrarSesion } = {}) {
         if (!prev[nombre] || nombre !== eventoActivoRef.current) return prev;
         const actualizado = { ...prev, [nombre]: { ...getEstadoActual(), nombreEvento: nombre } };
         try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
-        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(() => {}); }
+        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(avisarFalloNube); }
         return actualizado;
       });
     }, 1200);
@@ -2909,7 +2929,7 @@ export default function App({ onCerrarSesion } = {}) {
         // El doc compartido de la nube también se actualiza con el nombre: si no, su
         // snapshot (con nombre vacío) volvería a dejar el campo en blanco tras abrir
         if (nubeActiva() && estado.eventoNubeId && !eventosGuardados[nombre].nombreEvento) {
-          guardarEventoNube(estado.eventoNubeId, estado).catch(() => { /* sin conexión */ });
+          guardarEventoNube(estado.eventoNubeId, estado).catch(avisarFalloNube);
         }
         try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); } catch (e) { /* localStorage no disponible */ }
         marcarEventoActivo(estado.nombreEvento || nombre); // al abrirlo, este pasa a auto-guardarse
@@ -2926,7 +2946,7 @@ export default function App({ onCerrarSesion } = {}) {
     if (nubeActiva()) {
       const id = guardado.eventoNubeId || nuevoIdEvento();
       const estado = { ...guardado, eventoNubeId: id };
-      guardarEventoNube(id, estado).catch(() => { /* sin conexión */ });
+      guardarEventoNube(id, estado).catch(avisarFalloNube);
       if (!guardado.eventoNubeId) guardarEventos({ ...eventosGuardados, [nombre]: estado });
       copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, nombre);
     } else {
@@ -3407,6 +3427,19 @@ export default function App({ onCerrarSesion } = {}) {
 
       <div className="app-wrapper">
         <div className={`guardado-indicador ${guardadoFlash ? "is-visible" : ""}`} aria-live="polite"><Check size={14} /> Guardado</div>
+        {errorNube && (
+          <div className="error-nube" role="alert">
+            <AlertTriangle size={15} />
+            <span>{errorNube}</span>
+            <button onClick={() => setErrorNube(null)} aria-label="Ocultar aviso" title="Ocultar"><X size={14} /></button>
+          </div>
+        )}
+        {ocupacionArchivo >= 0.75 && (
+          <div className="error-nube is-aviso" role="alert">
+            <AlertTriangle size={15} />
+            <span>El archivo de eventos ocupa el {Math.round(ocupacionArchivo * 100)}% del máximo que admite la nube. Borra o archiva eventos antiguos antes de llegar al tope.</span>
+          </div>
+        )}
         {/* HEADER */}
         <header className="app-header animate-entrance">
           <div className="header-title-group">
