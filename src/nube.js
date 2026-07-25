@@ -109,3 +109,94 @@ export function suscribirIndiceEventosNube(cb) {
   })();
   return () => { cancelado = true; unsub(); };
 }
+
+// ─── ARCHIVO DE EVENTOS: UN DOCUMENTO POR EVENTO ──────────────────────────────
+// El índice de arriba mete TODOS los eventos en un solo documento, y Firestore no
+// admite documentos de más de 1 MiB: un evento con Modo carga terminado pesa ~12 KB,
+// así que el archivo se llenaba sobre los 88 eventos y a partir de ahí los guardados
+// fallaban. Aquí cada evento es su propio documento, así que ya no hay techo: lo
+// único que limita es el tamaño de un evento suelto, que es 90 veces menor.
+const COL_ARCHIVO = "archivo";
+
+// Id estable y válido para Firestore a partir del nombre del evento: el mismo
+// nombre da siempre el mismo id (para poder actualizarlo en vez de duplicarlo) y
+// el sufijo hash evita que dos nombres distintos caigan en el mismo id al limpiar
+// tildes y símbolos ("Boda Ana/Luis" y "Boda Ana Luis").
+export function idDeNombreEvento(nombre) {
+  const txt = String(nombre ?? "");
+  const base = txt.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "evento";
+  let h = 0;
+  for (let i = 0; i < txt.length; i++) h = (Math.imul(h, 31) + txt.charCodeAt(i)) | 0;
+  return `${base}-${(h >>> 0).toString(36)}`;
+}
+
+// Qué eventos hay que escribir y cuáles borrar entre dos versiones del archivo.
+// Función pura y sin Firestore, para poder razonarla y probarla por separado.
+export function calcularCambiosArchivo(anterior = {}, nuevo = {}) {
+  const escribir = [];
+  const borrar = [];
+  Object.entries(nuevo).forEach(([nombre, ev]) => {
+    const antes = anterior[nombre];
+    if (antes !== undefined && JSON.stringify(antes) === JSON.stringify(ev)) return;
+    escribir.push({ nombre, id: idDeNombreEvento(nombre), estado: JSON.stringify(ev) });
+  });
+  Object.keys(anterior).forEach(nombre => {
+    if (nuevo[nombre] === undefined) borrar.push({ nombre, id: idDeNombreEvento(nombre) });
+  });
+  return { escribir, borrar };
+}
+
+// Sube solo lo que ha cambiado y borra lo que ya no está. Escribir evento a evento
+// (en vez del mapa entero) es lo que quita el techo del documento único.
+export async function sincronizarArchivoNube(anterior = {}, nuevo = {}) {
+  const conexion = await getDb();
+  if (!conexion) return;
+  const { db, fs } = conexion;
+  const { escribir, borrar } = calcularCambiosArchivo(anterior, nuevo);
+  if (!escribir.length && !borrar.length) return;
+  const ahora = Date.now();
+  await Promise.all([
+    ...escribir.map(e => fs.setDoc(fs.doc(db, COL_ARCHIVO, e.id), { nombre: e.nombre, estado: e.estado, actualizado: ahora })),
+    ...borrar.map(e => fs.deleteDoc(fs.doc(db, COL_ARCHIVO, e.id))),
+  ]);
+}
+
+// Lee el archivo entero. Devuelve { mapa, actualizado } igual que el índice viejo,
+// para que quien lo use no note la diferencia.
+export async function cargarArchivoNube() {
+  const conexion = await getDb();
+  if (!conexion) return null;
+  const { db, fs } = conexion;
+  const snap = await fs.getDocs(fs.collection(db, COL_ARCHIVO));
+  return leerSnapshotArchivo(snap);
+}
+
+function leerSnapshotArchivo(snap) {
+  const mapa = {};
+  let actualizado = 0;
+  snap.forEach(doc => {
+    const d = doc.data();
+    if (!d || !d.nombre || !d.estado) return;
+    try { mapa[d.nombre] = JSON.parse(d.estado); } catch (e) { /* documento corrupto: se salta */ }
+    if ((d.actualizado ?? 0) > actualizado) actualizado = d.actualizado ?? 0;
+  });
+  return { mapa, actualizado, vacio: snap.empty };
+}
+
+// Avisa cada vez que alguien guarda o borra un evento en cualquier dispositivo.
+export function suscribirArchivoNube(cb) {
+  let unsub = () => {};
+  let cancelado = false;
+  (async () => {
+    const conexion = await getDb();
+    if (!conexion || cancelado) return;
+    const { db, fs } = conexion;
+    unsub = fs.onSnapshot(
+      fs.collection(db, COL_ARCHIVO),
+      (snap) => cb(leerSnapshotArchivo(snap)),
+      () => { /* sin conexión: se ignora, la app sigue en local */ },
+    );
+  })();
+  return () => { cancelado = true; unsub(); };
+}

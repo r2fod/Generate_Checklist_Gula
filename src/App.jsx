@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
-  guardarIndiceEventosNube, cargarIndiceEventosNube, suscribirIndiceEventosNube,
+  cargarIndiceEventosNube,
+  sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
 } from "./nube.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
@@ -2832,6 +2833,9 @@ export default function App({ onCerrarSesion } = {}) {
   // así que un evento recién borrado localmente resucitaba en cuanto llegaba cualquier
   // snapshot -aunque fuera uno viejo, en caché, de antes del borrado- de la nube).
   const ultimaEscrituraLocalRef = React.useRef(0);
+  // Última versión del archivo que hemos escrito. Se usa para calcular qué eventos
+  // han cambiado y subir SOLO esos, en vez del mapa entero.
+  const eventosGuardadosRef = React.useRef(eventosGuardados);
   // Nombre del evento "activo" (el que has abierto o guardado en esta sesión). Solo ese
   // se auto-guarda, para no sobrescribir un evento bueno con un borrador del mismo nombre.
   const eventoActivoRef = React.useRef((() => { try { return localStorage.getItem("gula_evento_activo") || ""; } catch (e) { return ""; } })());
@@ -2840,15 +2844,6 @@ export default function App({ onCerrarSesion } = {}) {
     try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
   };
   const [revisionAbierta, setRevisionAbierta] = useState(false);
-  // Todos los eventos guardados viajan a la nube en UN solo documento, y Firestore
-  // no admite documentos de más de 1 MiB. Un evento con Modo carga terminado pesa
-  // ~12 KB, así que el tope llega sobre los 85-90 eventos: se avisa antes de chocar.
-  const LIMITE_DOC_NUBE = 1048576;
-  const ocupacionArchivo = useMemo(() => {
-    if (!nubeActiva()) return -1;
-    try { return new TextEncoder().encode(JSON.stringify(eventosGuardados)).length / LIMITE_DOC_NUBE; }
-    catch (e) { return -1; }
-  }, [eventosGuardados]);
   // Aplica las correcciones elegidas en "Revisar datos" (reasignar o borrar marcas
   // sueltas). Solo toca los eventos con algún cambio; el resto queda intacto.
   const handleAplicarRevision = (parches) => {
@@ -2858,13 +2853,15 @@ export default function App({ onCerrarSesion } = {}) {
     setTimeout(() => setGuardadoEventoMsg(""), 4000);
   };
   const guardarEventos = (obj) => {
+    const anterior = eventosGuardadosRef.current;
+    eventosGuardadosRef.current = obj;
     setEventosGuardados(obj);
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
-    // Con la nube activa el archivo de eventos guardados se sincroniza: se ve igual
-    // desde cualquier dispositivo, no solo en el navegador donde se guardaron
+    // Con la nube activa el archivo se sincroniza evento a evento: se ve igual desde
+    // cualquier dispositivo y, al no ir todo en un solo documento, no hay techo.
     if (nubeActiva()) {
       ultimaEscrituraLocalRef.current = Date.now();
-      guardarIndiceEventosNube(obj).then(() => setErrorNube(null)).catch(avisarFalloNube);
+      sincronizarArchivoNube(anterior, obj).then(() => setErrorNube(null)).catch(avisarFalloNube);
     }
   };
 
@@ -2877,11 +2874,30 @@ export default function App({ onCerrarSesion } = {}) {
       // nuestro propio cambio (o un snapshot viejo en caché): se ignora sin más.
       if (actualizado <= ultimaEscrituraLocalRef.current) return;
       ultimaEscrituraLocalRef.current = actualizado;
+      eventosGuardadosRef.current = mapa;
       setEventosGuardados(mapa);
       try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(mapa)); } catch (e) { /* localStorage lleno o no disponible */ }
     };
-    cargarIndiceEventosNube().then(aplicarSiEsMasReciente).catch(() => {});
-    const unsub = suscribirIndiceEventosNube(aplicarSiEsMasReciente);
+    // Arranque: se lee el archivo nuevo (un documento por evento). Si está vacío pero
+    // el índice viejo (todo en un documento) tiene eventos, se suben uno a uno una
+    // sola vez. El índice viejo NO se borra: queda como copia de seguridad.
+    (async () => {
+      try {
+        const archivo = await cargarArchivoNube();
+        if (cancelado) return;
+        if (archivo && !archivo.vacio) { aplicarSiEsMasReciente(archivo); return; }
+        const viejo = await cargarIndiceEventosNube();
+        if (cancelado || !viejo || !viejo.mapa || !Object.keys(viejo.mapa).length) return;
+        aplicarSiEsMasReciente(viejo);
+        ultimaEscrituraLocalRef.current = Date.now();
+        await sincronizarArchivoNube({}, viejo.mapa);
+      } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
+    })();
+    const unsub = suscribirArchivoNube(({ mapa, actualizado, vacio }) => {
+      // Un archivo vacío al principio de la migración no debe borrar lo local.
+      if (vacio) return;
+      aplicarSiEsMasReciente({ mapa, actualizado });
+    });
     return () => { cancelado = true; unsub(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2917,7 +2933,7 @@ export default function App({ onCerrarSesion } = {}) {
         if (!prev[nombre] || nombre !== eventoActivoRef.current) return prev;
         const actualizado = { ...prev, [nombre]: { ...getEstadoActual(), nombreEvento: nombre } };
         try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
-        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); guardarIndiceEventosNube(actualizado).catch(avisarFalloNube); }
+        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); sincronizarArchivoNube(prev, actualizado).catch(avisarFalloNube); }
         return actualizado;
       });
     }, 1200);
@@ -3487,12 +3503,6 @@ export default function App({ onCerrarSesion } = {}) {
             <AlertTriangle size={15} />
             <span>{errorNube}</span>
             <button onClick={() => setErrorNube(null)} aria-label="Ocultar aviso" title="Ocultar"><X size={14} /></button>
-          </div>
-        )}
-        {ocupacionArchivo >= 0.75 && (
-          <div className="error-nube is-aviso" role="alert">
-            <AlertTriangle size={15} />
-            <span>El archivo de eventos ocupa el {Math.round(ocupacionArchivo * 100)}% del máximo que admite la nube. Borra o archiva eventos antiguos antes de llegar al tope.</span>
           </div>
         )}
         {/* HEADER */}
