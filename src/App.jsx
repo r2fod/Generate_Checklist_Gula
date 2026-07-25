@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useDeferredValue } from "react";
+
 import {
   Heart, Church, Cake, Briefcase, Clapperboard,
   Plug, Armchair, CookingPot, Utensils, Wine, Shirt, UtensilsCrossed,
@@ -6,8 +7,8 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
-  BarChart3, AlertTriangle, Info, Archive, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
-  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cigarette, ShieldCheck,
+  BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, ShieldCheck,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -124,9 +125,16 @@ const ICONOS_CATEGORIA = [
   { fragmento: "otros", Comp: Boxes, color: "#f1f5f9", texto: "#334155" },
 ];
 const CATEGORIA_DEFAULT = { Comp: Boxes, color: "#f1f5f9", texto: "#334155" };
+// El resultado se guarda en caché: el nombre de una categoría no cambia de icono,
+// y esto se llamaba varias veces por render para cada una de las ~14 categorías.
+const _cacheCategoria = new Map();
 function infoCategoria(nombre) {
-  const n = nombre.toLowerCase();
-  return ICONOS_CATEGORIA.find(i => n.includes(i.fragmento)) || CATEGORIA_DEFAULT;
+  let info = _cacheCategoria.get(nombre);
+  if (info) return info;
+  const n = String(nombre).toLowerCase();
+  info = ICONOS_CATEGORIA.find(i => n.includes(i.fragmento)) || CATEGORIA_DEFAULT;
+  _cacheCategoria.set(nombre, info);
+  return info;
 }
 const EVENTO_ICON = { boda: Heart, comunion: Church, cumpleanos: Cake, corporativo: Briefcase, produccion: Clapperboard };
 // Icono SVG (lucide) de una categoría, buscado por su nombre.
@@ -164,10 +172,17 @@ const ICONOS_ITEM = [
   { f: ["camarero", "barman", "cocina", "personal", "staff", "office", "fichaje"], I: Users, c: "#4338ca" },
 ];
 const ITEM_ICON_DEFAULT = { I: Package, c: "#64748b" };
+// Buscar el icono recorre 24 grupos con ~10 palabras cada uno: hasta ~240 búsquedas
+// de texto POR ITEM, y con ~140 items eso son decenas de miles en cada render. Como
+// el icono de un nombre no cambia nunca, se calcula una vez y se guarda.
+const _cacheIconoItem = new Map();
 function iconoItem(label) {
-  const n = label.toLowerCase();
-  for (const it of ICONOS_ITEM) if (it.f.some(fr => n.includes(fr))) return it;
-  return ITEM_ICON_DEFAULT;
+  let icono = _cacheIconoItem.get(label);
+  if (icono) return icono;
+  const n = String(label).toLowerCase();
+  icono = ICONOS_ITEM.find(it => it.f.some(fr => n.includes(fr))) || ITEM_ICON_DEFAULT;
+  _cacheIconoItem.set(label, icono);
+  return icono;
 }
 function IconoItem({ label, size = 15 }) {
   const { I, c } = iconoItem(label);
@@ -880,7 +895,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
-    llevaEntrante, llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1,
@@ -2527,7 +2542,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
   const [nuevoItemAlquiler, setNuevoItemAlquiler] = useState(false);
   const [categoriaTocada, setCategoriaTocada] = useState(false);
-  const [linkAbierto, setLinkAbierto] = useState(linkAbiertoInicial ?? false);
+  const [linkAbierto] = useState(linkAbiertoInicial ?? false);
   // Plantillas guardadas con nombre: configuración reutilizable entre eventos
   const [plantillas, setPlantillas] = useState(() => {
     try { return JSON.parse(localStorage.getItem("gula_plantillas")) || {}; } catch (e) { return {}; }
@@ -2883,7 +2898,7 @@ export default function App({ onCerrarSesion } = {}) {
     // Arranque: se lee el archivo nuevo (un documento por evento). Si está vacío pero
     // el índice viejo (todo en un documento) tiene eventos, se suben uno a uno una
     // sola vez. El índice viejo NO se borra: queda como copia de seguridad.
-    (async () => {
+    const sincronizar = async () => {
       try {
         const archivo = await cargarArchivoNube();
         if (cancelado) return;
@@ -2894,7 +2909,8 @@ export default function App({ onCerrarSesion } = {}) {
         ultimaEscrituraLocalRef.current = Date.now();
         await sincronizarArchivoNube({}, viejo.mapa);
       } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
-    })();
+    };
+    sincronizar();
     const unsub = suscribirArchivoNube(({ mapa, actualizado, vacio }) => {
       // Un archivo vacío al principio de la migración no debe borrar lo local.
       if (vacio) return;
@@ -3072,7 +3088,11 @@ export default function App({ onCerrarSesion } = {}) {
     },
   });
 
-  const opts = {
+  // opts se reconstruía en cada render, así que el useMemo de baseChecklist nunca
+  // acertaba y la checklist entera (14 categorías, ~140 items) se recalculaba con
+  // CADA tecla que se pulsara en cualquier campo. Memorizado por su contenido, solo
+  // se rehace cuando de verdad cambia algo que afecta a las cantidades.
+  const opts = useMemo(() => ({
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
@@ -3084,7 +3104,16 @@ export default function App({ onCerrarSesion } = {}) {
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
     paxPorCamarero,
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
-  };
+  }), [
+    dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
+    fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
+    tipoHorno, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
+    tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
+    llevaAguasPequenas, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
+    tipoCongelador, tipoPaella, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
+    diasProduccion, paxPorCamarero, logisticaEquipo,
+  ]);
 
   // Checklist calculada (sin los items manuales) — sirve también para listar las categorías reales
   // disponibles a la hora de elegir dónde encajar un item añadido a mano.
@@ -3385,11 +3414,14 @@ export default function App({ onCerrarSesion } = {}) {
     setItemsManuales(prev => prev.filter((_, i) => i !== idx));
   };
 
+  // El campo de búsqueda responde al instante, pero recorrer y volver a pintar las
+  // ~140 filas se hace con prioridad baja: así escribir no se atasca en el móvil.
+  const filtroDiferido = useDeferredValue(filtro);
   const filtered = useMemo(() => {
-    if (!filtro.trim()) return checklist;
-    const q = filtro.toLowerCase();
+    if (!filtroDiferido.trim()) return checklist;
+    const q = filtroDiferido.toLowerCase();
     return checklist.map(c => ({ ...c, items: c.items.filter(i => i[0].toLowerCase().includes(q)) })).filter(c => c.items.length > 0);
-  }, [checklist, filtro]);
+  }, [checklist, filtroDiferido]);
 
   const totalConceptos = checklist.reduce((acc, c) => acc + c.items.length, 0);
   // Datos del resumen de cabecera: lo cargado hasta ahora y lo que queda por recoger

@@ -293,12 +293,6 @@ body {
   align-items: flex-start;
 }
 
-.aviso-evento-nombre {
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #78350f;
-}
-
 .aviso-otro-evento-btn {
   border: 1px solid #fde68a;
   background: #fffbeb;
@@ -950,13 +944,6 @@ body {
   font-size: 0.88rem;
   min-width: 28px;
   text-align: right;
-}
-
-/* Equipment controls row (bandejas, nevera, horno, cafetera...) */
-.controls-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 .controls-row {
@@ -2700,14 +2687,6 @@ hr {
   gap: 10px;
 }
 
-.resumen-titulo-coste {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--green-qty);
-  text-transform: none;
-  letter-spacing: normal;
-}
-
 @media (max-width: 480px) {
   .resumen-tabla {
     font-size: 0.76rem;
@@ -3172,7 +3151,6 @@ hr {
 .form-label svg { color: var(--accent); }
 .range-value, .dias-produccion-resumen { color: var(--accent); }
 .add-item-card > span svg { color: var(--accent); }
-.empty-state svg, .filtro-vacio svg { color: var(--border-color-strong); }
 /* Iconos de botón que NO deben teñirse (mantienen el color del botón) */
 .btn svg, .item-action-btn svg, .segment-btn svg, .preview-close-btn svg,
 .aviso-recogida-hecho svg, .logistica-add-rec svg, .crono-btn svg { color: inherit; }
