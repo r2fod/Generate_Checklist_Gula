@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import {
   Heart, Church, Cake, Briefcase, Clapperboard,
   Plug, Armchair, CookingPot, Utensils, Wine, Shirt, UtensilsCrossed,
-  SprayCan, Coffee, CupSoda, Martini, Truck, Package, Users, Boxes,
+  SprayCan, Coffee, CupSoda, Martini, Truck, Package, Users, Boxes, ShoppingCart,
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
@@ -1223,6 +1223,18 @@ function fmtRecogidas(recogidas = []) {
     .join(" · ");
 }
 
+// Compras: lo que hay que comprar antes del evento, con su cantidad y cuándo
+function fmtCompras(compras = []) {
+  return compras
+    .filter(c => c.concepto)
+    .map(c => {
+      const fechaFmt = c.fecha ? new Date(c.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+      const partes = [c.cantidad, fechaFmt, c.comprado ? "✓" : ""].filter(Boolean).join(" ");
+      return partes ? `${c.concepto} (${partes})` : c.concepto;
+    })
+    .join(" · ");
+}
+
 function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta, meta = {}) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
@@ -1251,6 +1263,26 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
     </table>`;
   const secciones = checklist.map(cat => `
     <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${cat.nombre}</h3>${tablaHTML(cat.items, cat.nombre)}`).join("");
+  // Recogidas y compras iban solo en pantalla: en el documento que se lleva la furgoneta
+  // no aparecían. Ahora van como secciones propias, con su casilla para marcar en papel.
+  const tablaSimple = (titulo, cols, filas) => filas.length === 0 ? "" : `
+    <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${titulo}</h3>
+    <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
+      <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
+      <tbody>${filas.map((f, i) => `<tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">${f.map((celda, j) => `<td style="padding:5px 6px;${j === f.length - 1 ? "width:60px;text-align:center;font-weight:bold;color:#16a34a;" : ""}">${celda}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>`;
+  const fmtFecha = (f) => f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
+  const seccionRecogidas = tablaSimple("Recogidas y devoluciones", ["Concepto", "Recoger", "Devolver", "Hecho"],
+    (meta.recogidas || []).filter(r => r.concepto).map(r => [
+      r.concepto,
+      [fmtFecha(r.fecha), r.hora].filter(Boolean).join(" ") || "—",
+      fmtFecha(r.fechaDevolucion) || "—",
+      r.recogido || r.devuelto ? "✓" : "",
+    ]));
+  const seccionCompras = tablaSimple("Compras", ["Concepto", "Cantidad", "Cuándo", "Hecho"],
+    (meta.compras || []).filter(c => c.concepto).map(c => [
+      c.concepto, c.cantidad || "—", fmtFecha(c.fecha) || "—", c.comprado ? "✓" : "",
+    ]));
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
     <title>Checklist ${EVENTOS[evtKey]?.label} · ${pax} pax</title>
     <style>body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#222;}h1{color:#1f314d;font-size:18pt;}
@@ -1275,6 +1307,8 @@ function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCocte
       ${evtKey !== "produccion" ? `<div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>` : ""}
     </div>
     ${secciones}
+    ${seccionRecogidas}
+    ${seccionCompras}
     <div class="notas"><strong>NOTAS:</strong><br/>${meta.notasEvento ? `<p style="white-space:pre-wrap;margin:6px 0;">${meta.notasEvento}</p>` : "<br/>"}</div>
     </body></html>`;
 }
@@ -1673,6 +1707,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
             {fmtRecogidas(meta.recogidas) && (
               <div className="preview-header-subtitle"><Package size={14} /> Recogidas: {fmtRecogidas(meta.recogidas)}</div>
             )}
+            {fmtCompras(meta.compras) && (
+              <div className="preview-header-subtitle"><ShoppingCart size={14} /> Compras: {fmtCompras(meta.compras)}</div>
+            )}
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar"><X size={14} /></button>
         </div>
@@ -2030,9 +2067,14 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           </div>
         ) : (
         <div className="preview-body">
-          {modo === "salida"
-            ? renderCrono("carga", cargaMin, "Cronómetro de carga")
-            : renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
+          {modo === "salida" ? (
+            <>
+              {renderCrono("carga", cargaMin, "Cronómetro de carga")}
+              {/* El montaje es la fase peor estimada, así que también se cronometra:
+                  con varios eventos medidos se puede afinar la hora de fin sugerida. */}
+              {renderCrono("montaje", montajeMin, "Cronómetro de montaje")}
+            </>
+          ) : renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
           {modo === "vuelta" && (
             <button
               className={`btn btn-outline carga-todo-vuelto ${todoVuelto ? "is-desmarcar" : ""}`}
@@ -3306,6 +3348,18 @@ export default function App({ onCerrarSesion } = {}) {
   }, [checklist, filtro]);
 
   const totalConceptos = checklist.reduce((acc, c) => acc + c.items.length, 0);
+  // Datos del resumen de cabecera: lo cargado hasta ahora y lo que queda por recoger
+  // o comprar en ESTE evento (los avisos globales incluyen los de otros eventos).
+  const itemsCargados = useMemo(() => Object.values(checkeados).filter(Boolean).length, [checkeados]);
+  const pendientesEvento = useMemo(() =>
+    (recogidas || []).filter(r => r.concepto && (!r.recogido || (r.fechaDevolucion && !r.devuelto))).length
+    + (compras || []).filter(c => c.concepto && !c.comprado).length,
+  [recogidas, compras]);
+  const fmtMinutos = (m) => {
+    if (!m || m <= 0) return "—";
+    const h = Math.floor(m / 60), min = Math.round(m % 60);
+    return h > 0 ? (min > 0 ? `${h} h ${min} min` : `${h} h`) : `${min} min`;
+  };
   const toggleCategory = (catName) => setOpenCategories(prev => ({ ...prev, [catName]: prev[catName] !== false ? false : true }));
 
   // Añade en bloque los items confirmados en ModalAgregarItems (ya filtrados de duplicados)
@@ -3317,7 +3371,7 @@ export default function App({ onCerrarSesion } = {}) {
   };
 
   const handleDescargar = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, checkeados, vueltos, roturas });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -3337,6 +3391,7 @@ export default function App({ onCerrarSesion } = {}) {
         ? `Logística: ${fmtLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)}${totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€` : ""}`
         : null,
       fmtRecogidas(recogidas) ? `Recogidas: ${fmtRecogidas(recogidas)}` : null,
+      fmtCompras(compras) ? `Compras: ${fmtCompras(compras)}` : null,
     ].filter(Boolean).join(" · ");
     const notas = notasEvento ? `\n\n📝 NOTAS: ${notasEvento}` : "";
     return `${cabecera}\n${texto}${notas}`;
@@ -3348,7 +3403,7 @@ export default function App({ onCerrarSesion } = {}) {
   };
 
   const handleCompartirPDF = () => {
-    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas });
+    const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, checkeados, vueltos, roturas });
     const ventana = window.open("", "_blank");
     if (!ventana) {
       window.alert("El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para esta página y vuelve a intentarlo.");
@@ -3391,7 +3446,7 @@ export default function App({ onCerrarSesion } = {}) {
   return (
     <>
       {revisionAbierta && <ModalRevisionDatos eventosGuardados={eventosGuardados} onAplicar={handleAplicarRevision} onClose={() => setRevisionAbierta(false)} />}
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, diasProduccion, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
       {modoCarga && (
         <ModalModoCarga
           checklist={checklist}
@@ -3478,6 +3533,35 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
           </div>
         </header>
+        {/* RESUMEN DEL EVENTO: los datos que antes había que buscar en Vista previa
+            o abriendo Modo carga. Se reparte en fichas que envuelven solas, así que
+            en móvil caen en dos columnas y en escritorio van en una fila. */}
+        <div className="resumen-evento animate-entrance" style={{ animationDelay: "0.04s" }}>
+          <div className="resumen-ficha">
+            <span className="resumen-ficha-label"><Users size={13} /> Pax total</span>
+            <span className="resumen-ficha-valor">{pax + ninos}{ninos > 0 ? <em> · {pax} + {ninos} niños</em> : null}</span>
+          </div>
+          <div className="resumen-ficha">
+            <span className="resumen-ficha-label"><Boxes size={13} /> Conceptos</span>
+            <span className="resumen-ficha-valor">{totalConceptos}{itemsCargados > 0 ? <em> · {itemsCargados} cargados</em> : null}</span>
+          </div>
+          <div className="resumen-ficha">
+            <span className="resumen-ficha-label"><Clock size={13} /> Tiempo estimado</span>
+            <span className="resumen-ficha-valor">{fmtMinutos(tiemposCargaForm.totalMin)}<em> · {Math.max(1, Math.ceil(pax / 60))} logística</em></span>
+          </div>
+          {totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 && (
+            <div className="resumen-ficha">
+              <span className="resumen-ficha-label"><Truck size={13} /> Coste logística</span>
+              <span className="resumen-ficha-valor">{String(totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta)).replace(".", ",")}€</span>
+            </div>
+          )}
+          {pendientesEvento > 0 && (
+            <div className="resumen-ficha is-aviso">
+              <span className="resumen-ficha-label"><Bell size={13} /> Pendientes</span>
+              <span className="resumen-ficha-valor">{pendientesEvento}<em> · recogidas y compras</em></span>
+            </div>
+          )}
+        </div>
 
         {linkAbierto && fechaEvento && fechaEvento < new Date().toISOString().slice(0, 10) && (
           <div className="archivado-banner">📦 Este evento ya pasó — checklist archivada, solo para consulta.</div>
