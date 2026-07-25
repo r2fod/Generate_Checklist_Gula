@@ -3220,6 +3220,57 @@ hr {
 }
 .guardado-indicador.is-visible { opacity: 1; transform: translateY(0); }
 
+/* Resumen del evento bajo la cabecera: las cifras que antes había que ir a buscar a
+   Vista previa o a Modo carga. Auto-fit para que se reparta solo según el ancho. */
+.resumen-evento {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.resumen-ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 12px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.resumen-ficha.is-aviso { background: #fffbeb; border-color: #fde68a; }
+.resumen-ficha-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.resumen-ficha.is-aviso .resumen-ficha-label { color: #92400e; }
+.resumen-ficha-valor {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--navy);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.resumen-ficha.is-aviso .resumen-ficha-valor { color: #92400e; }
+.resumen-ficha-valor em {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.resumen-ficha.is-aviso .resumen-ficha-valor em { color: #b45309; }
+@media (max-width: 420px) {
+  .resumen-evento { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .resumen-ficha { padding: 8px 9px; }
+  .resumen-ficha-valor { font-size: 0.92rem; }
+}
+
 /* Aviso de que algo no se ha podido guardar en la nube. A diferencia del "Guardado"
    verde, este NO se va solo: si se pierde el guardado hay que enterarse. */
 .error-nube {
