@@ -3220,6 +3220,11 @@ hr {
 }
 .guardado-indicador.is-visible { opacity: 1; transform: translateY(0); }
 
+/* Botones de mover categoría: deshabilitados en los extremos, y en móvil no se
+   encogen ni se solapan con el contador de items. */
+.cat-edit-btn:disabled { opacity: 0.25; cursor: default; }
+.cat-count { flex-shrink: 0; }
+
 /* Resumen del evento bajo la cabecera: las cifras que antes había que ir a buscar a
    Vista previa o a Modo carga. Auto-fit para que se reparta solo según el ancho. */
 .resumen-evento {
