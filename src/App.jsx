@@ -1107,7 +1107,7 @@ const ETIQUETAS_CAMPO = {
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   recogidas: "Recogidas", compras: "Compras",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
-  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas",
+  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas", ordenCategorias: "Orden de las categorías",
   itemsAlquilerManual: "Items marcados como alquiler proveedor", checkeados: "Items marcados como cargados",
   vueltos: "Items marcados como vueltos", roturas: "Roturas contadas",
   notasCheck: "Recordatorios de notas hechos",
@@ -2493,7 +2493,9 @@ export default function App({ onCerrarSesion } = {}) {
   const [itemsManuales, setItemsManuales] = useState(estadoInicial.itemsManuales ?? []); // [{ label, cantidad, categoria }] — añadidos a mano por el usuario
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
-  const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {}); // { "categoria::labelOriginal": "nombre corregido" }
+  const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {});
+  // Orden de categorías elegido a mano (lista de nombres). Vacío = el de la app.
+  const [ordenCategorias, setOrdenCategorias] = useState(estadoInicial.ordenCategorias ?? []); // { "categoria::labelOriginal": "nombre corregido" }
   const [checkeados, setCheckeados] = useState(estadoInicial.checkeados ?? {}); // { "categoria::label": true } — marcados como "Sale" (cargado) en "Modo carga"
   // Foto de las cantidades AUTOMÁTICAS (sin edición manual) tal como estaban la última vez
   // que se guardó el evento. Sirve para que "Recalcular" pueda detectar si alguna cantidad
@@ -2629,7 +2631,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, checkeados, vueltos, roturas, notasCheck, cronos,
+    itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, checkeados, vueltos, roturas, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -2702,7 +2704,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
-    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas,
+    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
     itemsAlquilerManual: setItemsAlquilerManual, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
@@ -3150,8 +3152,21 @@ export default function App({ onCerrarSesion } = {}) {
         });
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
-    return cats.filter(c => c.items.length > 0);
-  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual]);
+    const visibles = cats.filter(c => c.items.length > 0);
+    // Orden propio: las categorías que se hayan movido a mano mandan (en su orden), y
+    // detrás van las demás como las genera la app. Así se puede dejar la lista en el
+    // mismo orden en que se carga la furgoneta sin tocar los generadores.
+    if (!ordenCategorias.length) return visibles;
+    const pos = new Map(ordenCategorias.map((n, i) => [n, i]));
+    return visibles
+      .map((c, i) => ({ c, i }))
+      .sort((a, b) => {
+        const pa = pos.has(a.c.nombre) ? pos.get(a.c.nombre) : Infinity;
+        const pb = pos.has(b.c.nombre) ? pos.get(b.c.nombre) : Infinity;
+        return pa !== pb ? pa - pb : a.i - b.i;
+      })
+      .map(x => x.c);
+  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, ordenCategorias]);
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
@@ -3161,7 +3176,7 @@ export default function App({ onCerrarSesion } = {}) {
   }, [checklist, pax]);
 
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
-  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual });
+  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
 
   const handleEditarCantidad = (categoria, labelOriginal, valor) => {
@@ -3282,6 +3297,7 @@ export default function App({ onCerrarSesion } = {}) {
     setItemsManuales(ultimo.itemsManuales);
     setItemsOcultos(ultimo.itemsOcultos);
     setNombresManuales(ultimo.nombresManuales);
+    setOrdenCategorias(ultimo.ordenCategorias ?? []);
     setCategoriasRenombradas(ultimo.categoriasRenombradas);
     setItemsAlquilerManual(ultimo.itemsAlquilerManual);
     setHistorial(prev => prev.slice(0, -1));
@@ -3291,6 +3307,18 @@ export default function App({ onCerrarSesion } = {}) {
   // Renombra una categoría (botón ✎ de la cabecera). El nuevo nombre pasa a ser la
   // identidad: se migran las claves de todos los ajustes manuales de esa categoría
   // y los items añadidos a mano se mueven con ella.
+  // Mueve una categoría una posición arriba o abajo. El orden se guarda con el
+  // evento, así que cada tipo de evento puede tener el suyo (el de la furgoneta).
+  const handleMoverCategoria = (nombre, direccion) => {
+    const actual = checklist.map(c => c.nombre);
+    const i = actual.indexOf(nombre);
+    const j = i + direccion;
+    if (i < 0 || j < 0 || j >= actual.length) return;
+    pushHistorial();
+    const siguiente = [...actual];
+    [siguiente[i], siguiente[j]] = [siguiente[j], siguiente[i]];
+    setOrdenCategorias(siguiente);
+  };
   const handleRenombrarCategoria = (nombreActual) => setDialogo({
     tipo: "prompt",
     titulo: "Renombrar categoría",
@@ -4317,6 +4345,8 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
                 <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span>{cat.nombre}</span>
                 <span className="cat-count">
+                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, -1); }} disabled={idx === 0} title="Subir esta categoría" aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={13} /></button>
+                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, 1); }} disabled={idx === checklist.length - 1} title="Bajar esta categoría" aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={13} /></button>
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleRenombrarCategoria(cat.nombre); }} title="Renombrar categoría" aria-label={`Renombrar categoría ${cat.nombre}`}><Pencil size={13} /></button>
                   {cat.items.length}<span className="arrow">▼</span>
                 </span>
