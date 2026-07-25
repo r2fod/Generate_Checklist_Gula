@@ -8,7 +8,7 @@ import {
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
   BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
-  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, ShieldCheck,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, ShieldCheck, Moon, Sun,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -2861,6 +2861,20 @@ export default function App({ onCerrarSesion } = {}) {
     try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
   };
   const [revisionAbierta, setRevisionAbierta] = useState(false);
+  // Tema claro/oscuro. Arranca con lo que haya elegido el usuario y, si no ha elegido
+  // nada, con lo que pida el sistema. Se marca en el <html> para que el CSS cambie
+  // solo la paleta (ninguna regla de maquetación depende del tema).
+  const [tema, setTema] = useState(() => {
+    try {
+      const guardado = localStorage.getItem("gula_tema");
+      if (guardado === "claro" || guardado === "oscuro") return guardado;
+    } catch (e) { /* localStorage no disponible */ }
+    return (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "oscuro" : "claro";
+  });
+  useEffect(() => {
+    document.documentElement.dataset.tema = tema;
+    try { localStorage.setItem("gula_tema", tema); } catch (e) { /* localStorage no disponible */ }
+  }, [tema]);
   // Aplica las correcciones elegidas en "Revisar datos" (reasignar o borrar marcas
   // sueltas). Solo toca los eventos con algún cambio; el resto queda intacto.
   const handleAplicarRevision = (parches) => {
@@ -3580,6 +3594,12 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
           </div>
           <div className="header-actions">
+            <button
+              className="btn btn-ghost btn-tema"
+              onClick={() => setTema(t => (t === "oscuro" ? "claro" : "oscuro"))}
+              title={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              aria-label={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            >{tema === "oscuro" ? <Sun size={16} /> : <Moon size={16} />}</button>
             <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
             {onCerrarSesion && (
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>
