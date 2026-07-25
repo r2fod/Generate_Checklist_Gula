@@ -8,6 +8,17 @@ import Acceso from './Acceso.jsx'
 // la app y se deja en localStorage: así el arranque síncrono de App la restaura
 // igual que cualquier estado guardado. Se mantiene el parámetro en la URL para
 // que recargar la página vuelva a traer la última versión.
+// El tema se pone en el <html> ANTES de montar React: así no hay un fogonazo de
+// blanco al arrancar y la pantalla de acceso también sale en oscuro.
+function aplicarTemaInicial() {
+  let tema = null;
+  try { const g = localStorage.getItem("gula_tema"); if (g === "claro" || g === "oscuro") tema = g; }
+  catch (e) { /* localStorage no disponible */ }
+  if (!tema) tema = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "oscuro" : "claro";
+  document.documentElement.dataset.tema = tema;
+}
+aplicarTemaInicial()
+
 async function arrancar() {
   const id = new URLSearchParams(window.location.search).get("evento")
   if (id) {
