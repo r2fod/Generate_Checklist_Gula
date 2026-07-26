@@ -116,7 +116,14 @@ export function suscribirIndiceEventosNube(cb) {
 // así que el archivo se llenaba sobre los 88 eventos y a partir de ahí los guardados
 // fallaban. Aquí cada evento es su propio documento, así que ya no hay techo: lo
 // único que limita es el tamaño de un evento suelto, que es 90 veces menor.
-const COL_ARCHIVO = "archivo";
+// Los documentos por evento viven DENTRO de "indice", que es la colección que las
+// reglas de seguridad ya permiten al equipo con sesión iniciada. Una colección nueva
+// ("archivo") caía en el "todo lo demás: denegado" de las reglas, así que ni se leía
+// ni se escribía: por eso dejaban de verse eventos y saltaba el aviso rojo. Con el
+// prefijo se distinguen del documento antiguo "indice/eventosGuardados", que sigue
+// donde estaba como copia de seguridad.
+const COL_ARCHIVO = "indice";
+const PREFIJO_EVENTO = "evt_";
 
 // Id estable y válido para Firestore a partir del nombre del evento: el mismo
 // nombre da siempre el mismo id (para poder actualizarlo en vez de duplicarlo) y
@@ -128,7 +135,7 @@ export function idDeNombreEvento(nombre) {
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "evento";
   let h = 0;
   for (let i = 0; i < txt.length; i++) h = (Math.imul(h, 31) + txt.charCodeAt(i)) | 0;
-  return `${base}-${(h >>> 0).toString(36)}`;
+  return `${PREFIJO_EVENTO}${base}-${(h >>> 0).toString(36)}`;
 }
 
 // Qué eventos hay que escribir y cuáles borrar entre dos versiones del archivo.
@@ -176,12 +183,16 @@ function leerSnapshotArchivo(snap) {
   const mapa = {};
   let actualizado = 0;
   snap.forEach(doc => {
+    // El documento antiguo con TODOS los eventos vive en la misma colección: se salta
+    // (no lleva "nombre"/"estado", lleva "mapa"), igual que cualquier otro que no sea
+    // un evento suelto.
+    if (!doc.id.startsWith(PREFIJO_EVENTO)) return;
     const d = doc.data();
     if (!d || !d.nombre || !d.estado) return;
     try { mapa[d.nombre] = JSON.parse(d.estado); } catch (e) { /* documento corrupto: se salta */ }
     if ((d.actualizado ?? 0) > actualizado) actualizado = d.actualizado ?? 0;
   });
-  return { mapa, actualizado, vacio: snap.empty };
+  return { mapa, actualizado, vacio: Object.keys(mapa).length === 0 };
 }
 
 // Avisa cada vez que alguien guarda o borra un evento en cualquier dispositivo.
