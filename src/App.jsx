@@ -1869,10 +1869,16 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
   // Items con cantidad numérica (los que se pueden "marcar todo vuelto"). Sirve para
   // alternar el botón entre marcar y desmarcar todo en la pestaña Vuelta.
-  const itemsConCantidad = checklist.flatMap(c => c.items
-    .map(([, q, , lo]) => ({ key: `${c.nombre}::${lo}`, n: parseFloat(String(q && q.u ? q.u : q).replace(",", ".")) }))
-    .filter(it => !isNaN(it.n)));
-  const todoVuelto = itemsConCantidad.length > 0 && itemsConCantidad.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
+  // Todas las filas de la Vuelta se pueden marcar, tengan número o no. Las que llevan
+  // una cantidad en texto (ej. "Copas metálicas · Todas") se marcan con true, que la
+  // app ya entiende como "volvió entero". Antes se quedaban fuera del "marcar todo"
+  // y encima no tenían casilla propia: no había forma de darlas por vueltas.
+  const itemsMarcables = checklist.flatMap(c => c.items
+    .map(([, q, , lo]) => {
+      const n = parseFloat(String(q && q.u ? q.u : q).replace(",", "."));
+      return { key: `${c.nombre}::${lo}`, valor: isNaN(n) ? true : String(n) };
+    }));
+  const todoVuelto = itemsMarcables.length > 0 && itemsMarcables.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
   const totalMarcados = modo === "salida"
     ? checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => checkeados[`${c.nombre}::${lo}`]).length, 0)
     : checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => {
@@ -2175,7 +2181,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           {modo === "vuelta" && (
             <button
               className={`btn btn-outline carga-todo-vuelto ${todoVuelto ? "is-desmarcar" : ""}`}
-              onClick={() => itemsConCantidad.forEach(it => onVuelve(it.key, todoVuelto ? "" : String(it.n)))}
+              onClick={() => itemsMarcables.forEach(it => onVuelve(it.key, todoVuelto ? "" : it.valor))}
               title={todoVuelto ? "Quita la marca de vuelto de todos los items" : "Marca todos los items como que volvieron completos (luego ajustas los que falten y las roturas)"}
             >{todoVuelto ? <><X size={15} /> Desmarcar todo</> : <><Check size={15} /> Marcar todo como vuelto</>}</button>
           )}
@@ -2211,35 +2217,39 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                   const vueltaTexto = valorVuelta === true
                     ? String(cantidadCompleta || "")
                     : (valorVuelta ?? "");
-                  const vinoTodo = cantidadCompleta !== null && parseFloat(String(vueltaTexto).replace(",", ".")) === cantidadCompleta;
+                  const vinoTodo = cantidadCompleta !== null
+                    ? parseFloat(String(vueltaTexto).replace(",", ".")) === cantidadCompleta
+                    : valorVuelta === true;
                   return (
                     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`} key={i}>
                       <div className="carga-row-principal carga-row-vuelta">
                         <span className="carga-nombre"><IconoItem label={label} /> {label}</span>
                         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
                       </div>
-                      {cantidadCompleta !== null && (
-                        <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title="Vino todo: rellena la cantidad completa" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={vinoTodo}
-                            onChange={e => onVuelve(key, e.target.checked ? String(cantidadCompleta) : "")}
-                          />
-                          <Check size={12} /> todo
-                        </label>
-                      )}
-                      <div className="carga-roturas carga-vuelve-cantidad">
-                        <span><Undo2 size={12} /> vuelve</span>
+                      <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
                         <input
-                          type="number"
-                          min="0"
-                          className="carga-roturas-input"
-                          value={vueltaTexto}
-                          placeholder="0"
-                          onChange={e => onVuelve(key, e.target.value)}
-                          onClick={e => e.stopPropagation()}
+                          type="checkbox"
+                          checked={vinoTodo}
+                          onChange={e => onVuelve(key, e.target.checked ? (cantidadCompleta !== null ? String(cantidadCompleta) : true) : "")}
                         />
-                      </div>
+                        <Check size={12} /> todo
+                      </label>
+                      {/* Si la cantidad es un texto ("Todas") no hay número que contar:
+                          esa fila se marca solo con la casilla, sin campo numérico. */}
+                      {cantidadCompleta !== null && (
+                        <div className="carga-roturas carga-vuelve-cantidad">
+                          <span><Undo2 size={12} /> vuelve</span>
+                          <input
+                            type="number"
+                            min="0"
+                            className="carga-roturas-input"
+                            value={vueltaTexto}
+                            placeholder="0"
+                            onChange={e => onVuelve(key, e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                          />
+                        </div>
+                      )}
                       <div className="carga-roturas">
                         <span><AlertTriangle size={12} /> roturas</span>
                         <input
