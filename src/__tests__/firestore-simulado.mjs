@@ -1,5 +1,6 @@
 // Firestore de mentira con las MISMAS reglas de seguridad del proyecto
 export const almacen = new Map();          // "coleccion/id" -> data
+export const limpiarPrevios = () => previos.clear();
 const oyentes = [];
 export function reglasPermiten(ruta, op, auth = true) {
   const [col] = ruta.split('/');
@@ -10,11 +11,28 @@ export function reglasPermiten(ruta, op, auth = true) {
 export let sesionIniciada = true;
 export const setSesion = (v) => { sesionIniciada = v; };
 export const fakeDb = {};
-const notificar = (col) => oyentes.filter(o => o.col === col).forEach(o => o.cb(snapDe(col)));
+// La foto se calcula UNA vez por notificación y se pasa a todos los oyentes: si se
+// calculara por oyente, el primero se llevaría los cambios y los demás verían cero.
+const notificar = (col) => {
+  const suscritos = oyentes.filter(o => o.col === col);
+  if (!suscritos.length) return;
+  const snap = snapDe(col);
+  suscritos.forEach(o => o.cb(snap));
+};
+const previos = new Map();   // col -> Map(id -> data), para calcular los cambios
 const snapDe = (col) => {
   const docs = [...almacen.entries()].filter(([k]) => k.startsWith(col + '/'))
     .map(([k, v]) => ({ id: k.slice(col.length + 1), data: () => v }));
-  return { empty: docs.length === 0, forEach: (f) => docs.forEach(f) };
+  const antes = previos.get(col) || new Map();
+  const ahora = new Map(docs.map(d => [d.id, d.data()]));
+  const cambios = [];
+  ahora.forEach((v, id) => {
+    if (!antes.has(id)) cambios.push({ type: 'added', doc: { id, data: () => v } });
+    else if (JSON.stringify(antes.get(id)) !== JSON.stringify(v)) cambios.push({ type: 'modified', doc: { id, data: () => v } });
+  });
+  antes.forEach((v, id) => { if (!ahora.has(id)) cambios.push({ type: 'removed', doc: { id, data: () => v } }); });
+  previos.set(col, ahora);
+  return { empty: docs.length === 0, forEach: (f) => docs.forEach(f), docChanges: () => cambios };
 };
 export const fakeFs = {
   // doc(db, "col/id") y doc(db, "col", "id") son las dos formas válidas en Firestore

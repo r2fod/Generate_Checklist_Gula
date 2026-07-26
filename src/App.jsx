@@ -8,7 +8,7 @@ import {
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
   BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
-  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, ShieldCheck, Moon, Sun,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -1509,121 +1509,6 @@ function checklistDeEventoGuardado(ev) {
   return salida;
 }
 
-// Busca marcas (cargado / vuelta / roturas) cuya clave "categoría::item" ya no
-// corresponde a ningún item de la checklist que ese evento generaría hoy. Son las
-// que no se verían en Modo carga aunque sigan ocupando sitio en la base de datos.
-const CAMPOS_MARCAS = [["checkeados", "cargado"], ["vueltos", "vuelta"], ["roturas", "roturas"]];
-function buscarMarcasHuerfanas(eventosGuardados) {
-  const porEvento = [];
-  Object.entries(eventosGuardados || {}).forEach(([nombre, ev]) => {
-    const cl = checklistDeEventoGuardado(ev);
-    if (!cl.length) return; // sin config utilizable: no se puede juzgar, se deja en paz
-    const validas = new Set();
-    const opciones = [];
-    cl.forEach(c => c.items.forEach(label => {
-      if (label == null) return;
-      validas.add(`${c.nombre}::${label}`);
-      opciones.push(`${c.nombre}::${label}`);
-    }));
-    const huerfanas = [];
-    CAMPOS_MARCAS.forEach(([campo, etiqueta]) => {
-      Object.entries(ev[campo] || {}).forEach(([clave, valor]) => {
-        if (validas.has(clave)) return;
-        const i = clave.indexOf("::");
-        huerfanas.push({
-          campo, etiqueta, clave, valor,
-          categoria: i < 0 ? "" : clave.slice(0, i),
-          item: i < 0 ? clave : clave.slice(i + 2),
-        });
-      });
-    });
-    if (huerfanas.length) porEvento.push({ nombre, huerfanas, opciones });
-  });
-  return porEvento;
-}
-
-function ModalRevisionDatos({ eventosGuardados, onAplicar, onClose }) {
-  const informe = useMemo(() => buscarMarcasHuerfanas(eventosGuardados), [eventosGuardados]);
-  const totalEventos = Object.keys(eventosGuardados || {}).length;
-  const totalHuerfanas = informe.reduce((a, e) => a + e.huerfanas.length, 0);
-  // decisiones["evento||clave||campo"] = "" (no tocar) | "__borrar__" | clave destino
-  const [decisiones, setDecisiones] = useState({});
-  const idDe = (evNombre, h) => `${evNombre}||${h.campo}||${h.clave}`;
-  const pendientes = Object.values(decisiones).filter(Boolean).length;
-
-  const aplicar = () => {
-    const parches = {};
-    informe.forEach(({ nombre, huerfanas }) => {
-      huerfanas.forEach(h => {
-        const d = decisiones[idDe(nombre, h)];
-        if (!d) return;
-        const ev = parches[nombre] || { ...eventosGuardados[nombre] };
-        const mapa = { ...(ev[h.campo] || {}) };
-        delete mapa[h.clave];
-        if (d !== "__borrar__") mapa[d] = h.valor;
-        ev[h.campo] = mapa;
-        parches[nombre] = ev;
-      });
-    });
-    onAplicar(parches);
-    onClose();
-  };
-
-  return (
-    <div className="dialogo-overlay" onClick={onClose}>
-      <div className="dialogo-modal revision-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Revisar datos guardados">
-        <div className="dialogo-titulo"><ShieldCheck size={18} /> Revisar datos guardados</div>
-        {totalHuerfanas === 0 ? (
-          <p className="dialogo-mensaje">
-            Revisados <strong>{totalEventos}</strong> eventos. Todas las marcas guardadas (cargado, vuelta y roturas)
-            corresponden a un item que existe hoy en su checklist. No hay nada que arreglar.
-          </p>
-        ) : (
-          <>
-            <p className="dialogo-mensaje">
-              Revisados <strong>{totalEventos}</strong> eventos. Hay <strong>{totalHuerfanas}</strong> marcas guardadas
-              cuyo item ya no existe en la checklist de su evento, así que no se ven en Modo carga.
-              Elige a qué item va cada una, o bórrala. Lo que dejes en "Dejar como está" no se toca.
-            </p>
-            <div className="revision-lista">
-              {informe.map(({ nombre, huerfanas, opciones }) => (
-                <div className="revision-evento" key={nombre}>
-                  <div className="revision-evento-nombre"><CalendarDays size={14} /> {nombre}</div>
-                  {huerfanas.map(h => (
-                    <div className="revision-fila" key={idDe(nombre, h)}>
-                      <div className="revision-origen">
-                        <span className="revision-item">{h.item}</span>
-                        <span className="revision-meta">{h.categoria} · {h.etiqueta}: {String(h.valor === true ? "sí" : h.valor)}</span>
-                      </div>
-                      <select
-                        className="form-select"
-                        value={decisiones[idDe(nombre, h)] || ""}
-                        onChange={e => setDecisiones(prev => ({ ...prev, [idDe(nombre, h)]: e.target.value }))}
-                      >
-                        <option value="">Dejar como está</option>
-                        <option value="__borrar__">Borrar esta marca</option>
-                        {opciones.map(o => <option key={o} value={o}>{o.replace("::", " · ")}</option>)}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-        <div className="dialogo-acciones">
-          <button className="btn btn-ghost" onClick={onClose}>{totalHuerfanas === 0 ? "Cerrar" : "Cancelar"}</button>
-          {totalHuerfanas > 0 && (
-            <button className="btn btn-green" onClick={aplicar} disabled={!pendientes}>
-              Aplicar {pendientes > 0 ? `(${pendientes})` : ""}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── DIÁLOGO PROPIO (sustituye a window.prompt/confirm, que rompen la estética) ─
 // ─── SELECT CON OPCIÓN "OTRO..." ───────────────────────────────────────────────
 // Como un <select> normal, pero con una opción "+ Otro..." al final que revela un
@@ -2965,7 +2850,6 @@ export default function App({ onCerrarSesion } = {}) {
     eventoActivoRef.current = nombre || "";
     try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
   };
-  const [revisionAbierta, setRevisionAbierta] = useState(false);
   // Tema claro/oscuro. Arranca con lo que haya elegido el usuario y, si no ha elegido
   // nada, con lo que pida el sistema. Se marca en el <html> para que el CSS cambie
   // solo la paleta (ninguna regla de maquetación depende del tema).
@@ -2980,14 +2864,6 @@ export default function App({ onCerrarSesion } = {}) {
     document.documentElement.dataset.tema = tema;
     try { localStorage.setItem("gula_tema", tema); } catch (e) { /* localStorage no disponible */ }
   }, [tema]);
-  // Aplica las correcciones elegidas en "Revisar datos" (reasignar o borrar marcas
-  // sueltas). Solo toca los eventos con algún cambio; el resto queda intacto.
-  const handleAplicarRevision = (parches) => {
-    if (!Object.keys(parches).length) return;
-    guardarEventos({ ...eventosGuardados, ...parches });
-    setGuardadoEventoMsg(`✓ Corregidas las marcas de ${Object.keys(parches).length} evento(s)`);
-    setTimeout(() => setGuardadoEventoMsg(""), 4000);
-  };
   const guardarEventos = (obj) => {
     const anterior = eventosGuardadosRef.current;
     eventosGuardadosRef.current = obj;
@@ -3009,19 +2885,26 @@ export default function App({ onCerrarSesion } = {}) {
       setEventosGuardados(mapa);
       try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(mapa)); } catch (e) { /* localStorage lleno o no disponible */ }
     };
-    const aplicarSiEsMasReciente = ({ mapa, actualizado }) => {
-      if (!mapa || cancelado) return;
-      // Hasta que la primera sincronización termina no se sustituye nada: mientras se
-      // están subiendo los eventos uno a uno llegan fotos INCOMPLETAS del archivo, y
-      // sustituir con una de ellas hacía desaparecer de la lista los que aún no habían
-      // subido. Después ya se sustituye, que es lo que propaga los borrados.
+    // Aplica SOLO lo que ha cambiado. Sustituir la lista entera por la foto de la
+    // colección borraba de la pantalla los eventos que Firestore aún no conocía.
+    const aplicarCambios = ({ cambios, actualizado }) => {
+      if (!cambios || !cambios.length || cancelado) return;
       if (!primeraSincroHechaRef.current) return;
-      // Si ya hicimos una escritura local igual o más reciente, esto es un eco de
-      // nuestro propio cambio (o un snapshot viejo en caché): se ignora sin más.
-      if (actualizado <= ultimaEscrituraLocalRef.current) return;
-      ultimaEscrituraLocalRef.current = actualizado;
-      guardarLocal(mapa);
-      guardarSincronizados(Object.keys(mapa));
+      const base = { ...(eventosGuardadosRef.current || {}) };
+      let algo = false;
+      cambios.forEach(c => {
+        if (c.tipo === "borrado") {
+          if (base[c.nombre] !== undefined) { delete base[c.nombre]; algo = true; }
+          return;
+        }
+        if (JSON.stringify(base[c.nombre]) === JSON.stringify(c.estado)) return; // eco nuestro
+        base[c.nombre] = c.estado;
+        algo = true;
+      });
+      if (!algo) return;
+      if (actualizado > ultimaEscrituraLocalRef.current) ultimaEscrituraLocalRef.current = actualizado;
+      guardarLocal(base);
+      guardarSincronizados(Object.keys(base));
     };
     // Arranque: se FUSIONA lo que hay en la nube con lo que hay en este dispositivo, y
     // lo que solo esté aquí se sube. Antes se sustituía, así que un evento que todavía
@@ -3050,7 +2933,11 @@ export default function App({ onCerrarSesion } = {}) {
         //   · borrado desde otro dispositivo               → hay que dejarlo ir
         // Se distinguen con la lista de los que este dispositivo ya dio por subidos: si
         // estaba en esa lista y ya no está en la nube, es que lo borraron fuera.
-        const yaSincronizados = leerSincronizados();
+        // Solo se puede dar un evento por borrado fuera si la lectura de la nube ha ido
+        // BIEN y ha traído algo. Si falla o viene vacía (sin conexión, sesión caducada,
+        // caché fría) no se sabe nada, y ante la duda no se tira nada: se conserva todo.
+        const lecturaFiable = !!archivo && !archivo.vacio;
+        const yaSincronizados = lecturaFiable ? leerSincronizados() : [];
         const fusionado = { ...remoto };
         Object.keys(local).forEach(n => {
           if (remoto[n] !== undefined) return;
@@ -3059,17 +2946,15 @@ export default function App({ onCerrarSesion } = {}) {
         });
         guardarLocal(fusionado);
         ultimaEscrituraLocalRef.current = Date.now();
+        // La lista de "ya subidos" solo se actualiza si la subida ha ido bien: marcar
+        // como subido algo que falló haría que se diera por borrado la próxima vez.
         await sincronizarArchivoNube(enArchivo, fusionado);
         guardarSincronizados(Object.keys(fusionado));
       } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
       finally { primeraSincroHechaRef.current = true; }
     };
     sincronizar();
-    const unsub = suscribirArchivoNube(({ mapa, actualizado, vacio }) => {
-      // Un archivo vacío al principio de la migración no debe borrar lo local.
-      if (vacio) return;
-      aplicarSiEsMasReciente({ mapa, actualizado });
-    });
+    const unsub = suscribirArchivoNube(aplicarCambios);
     return () => { cancelado = true; unsub(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -3104,6 +2989,9 @@ export default function App({ onCerrarSesion } = {}) {
       setEventosGuardados(prev => {
         if (!prev[nombre] || nombre !== eventoActivoRef.current) return prev;
         const actualizado = { ...prev, [nombre]: { ...getEstadoActual(), nombreEvento: nombre } };
+        // Sin esto la referencia se queda vieja y el siguiente cálculo de "qué ha
+        // cambiado" compara contra un mapa desfasado.
+        eventosGuardadosRef.current = actualizado;
         try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
         if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); sincronizarArchivoNube(prev, actualizado).catch(avisarFalloNube); }
         return actualizado;
@@ -3695,7 +3583,6 @@ export default function App({ onCerrarSesion } = {}) {
 
   return (
     <>
-      {revisionAbierta && <ModalRevisionDatos eventosGuardados={eventosGuardados} onAplicar={handleAplicarRevision} onClose={() => setRevisionAbierta(false)} />}
       {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
       {modoCarga && (
         <ModalModoCarga
@@ -3931,7 +3818,6 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
             <div className="plantillas-header-acciones">
-              <button className="btn btn-outline btn-plantilla" onClick={() => setRevisionAbierta(true)} title="Comprueba que todas las marcas guardadas (cargado, vuelta, roturas) corresponden a un item que existe hoy en la checklist de su evento"><ShieldCheck size={14} /> Revisar datos</button>
               <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular</button>
               <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link"><Save size={14} /> Guardar evento</button>
             </div>
