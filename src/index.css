@@ -3362,6 +3362,13 @@ hr {
 .cat-edit-btn:disabled { opacity: 0.25; cursor: default; }
 .cat-count { flex-shrink: 0; }
 
+/* Aviso de que los tiempos ya se calculan con los cronómetros de eventos anteriores. */
+.carga-calibrado {
+  display: inline;
+  color: var(--green-qty);
+  font-weight: 700;
+}
+
 /* Interruptor de tema: va en la fila del título, alineado arriba a la derecha, con
    texto para que se encuentre a la primera. Compacto para no competir con el nombre. */
 .btn-tema {
