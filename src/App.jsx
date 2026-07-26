@@ -1210,16 +1210,78 @@ const FATIGA_DESDE_H = 4, FATIGA_POR_HORA = 0.08, FATIGA_MAX = 0.6;
 //   1 persona → 1,00   ·   2 → 1,87   ·   3 → 2,69   ·   4 → 3,48   ·   5 → 4,26
 const EXPONENTE_EQUIPO = 0.9;
 const equipoEfectivo = (n) => Math.pow(Math.max(1, n || 1), EXPONENTE_EQUIPO);
-function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJornada = 0 }) {
+// ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
+// Las constantes de arriba son estimaciones del sector. En cuanto hay eventos con
+// el cronómetro usado, se comparan con lo estimado y se saca un factor por fase:
+// si de verdad se tarda un 20% más cargando, las próximas estimaciones lo reflejan.
+// Se usa la MEDIANA (no la media) para que un evento raro no descoloque el ajuste, y
+// hacen falta al menos 3 eventos medidos por fase para fiarse.
+const MIN_EVENTOS_CALIBRAR = 3;
+const FASES_TIEMPO = ["prep", "carga", "descarga", "montaje"];
+function medianaFactor(valores) {
+  if (valores.length < MIN_EVENTOS_CALIBRAR) return null;
+  const orden = [...valores].sort((a, b) => a - b);
+  const m = orden.length % 2
+    ? orden[(orden.length - 1) / 2]
+    : (orden[orden.length / 2 - 1] + orden[orden.length / 2]) / 2;
+  // Se acota entre la mitad y el triple: un factor fuera de ahí es un cronómetro
+  // que se dejó corriendo, no un dato real.
+  return Math.min(3, Math.max(0.5, m));
+}
+function calcularCalibracion(eventosGuardados = {}) {
+  const ratios = { prep: [], carga: [], descarga: [], montaje: [] };
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.cronos) return;
+    const items = (ev.totalItemsCarga ?? 0) || contarItemsCarga(ev);
+    if (!items) return;
+    const est = estimarTiemposCarga({
+      totalItems: items,
+      pax: (ev.pax || 0) + (ev.ninos || 0),
+      numLogistica: numLogisticaDe(ev),
+      horasJornada: horasJornadaDe(ev),
+    }, null);
+    FASES_TIEMPO.forEach(f => {
+      const real = (ev.cronos[f] && ev.cronos[f].ms) || 0;
+      const estimado = est[`${f}Min`] * 60000;
+      if (real > 60000 && estimado > 0) ratios[f].push(real / estimado);
+    });
+  });
+  const factores = {};
+  let nMedidos = 0;
+  FASES_TIEMPO.forEach(f => {
+    const factor = medianaFactor(ratios[f]);
+    if (factor !== null) { factores[f] = factor; nMedidos = Math.max(nMedidos, ratios[f].length); }
+  });
+  return Object.keys(factores).length ? { factores, nMedidos } : null;
+}
+function numLogisticaDe(ev) {
+  const n = (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length;
+  return n > 0 ? n : Math.max(1, Math.ceil((ev.pax || 0) / 60));
+}
+function horasJornadaDe(ev) {
+  return (ev.logisticaEquipo || []).reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0);
+}
+// Nº de items que se cargan de verdad en un evento guardado (sin los que no llevan
+// cantidad y sin "Personal"), para poder comparar su tiempo real con el estimado.
+function contarItemsCarga(ev) {
+  try {
+    return quitarItemsSinCantidad(checklistDeEventoGuardado(ev))
+      .filter(c => !/personal/i.test(c.nombre))
+      .reduce((a, c) => a + c.items.length, 0);
+  } catch (e) { return 0; }
+}
+
+function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJornada = 0 }, calibracion) {
   const nEf = equipoEfectivo(numLogistica);
-  const reparte = (base, trabajo) => Math.round(base + trabajo / nEf);
-  const prepMin = totalItems > 0 ? reparte(PREP_BASE_MIN, pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM) : 0;
-  const cargaMin = totalItems > 0 ? reparte(CARGA_BASE_MIN, totalItems * CARGA_MIN_POR_ITEM) : 0;
+  const f = (fase) => (calibracion && calibracion.factores[fase]) || 1;
+  const reparte = (base, trabajo, fase) => Math.round((base + trabajo / nEf) * f(fase));
+  const prepMin = totalItems > 0 ? reparte(PREP_BASE_MIN, pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM, "prep") : 0;
+  const cargaMin = totalItems > 0 ? reparte(CARGA_BASE_MIN, totalItems * CARGA_MIN_POR_ITEM, "carga") : 0;
   const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
   // La recogida va más rápida que la carga (todo va a granel a las cajas), pero lleva
   // recargo por fatiga: es lo último de una jornada larga.
-  const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
-  const montajeMin = totalItems > 0 ? reparte(MONTAJE_BASE_MIN, pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM) : 0;
+  const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga) * (f("descarga") / f("carga")));
+  const montajeMin = totalItems > 0 ? reparte(MONTAJE_BASE_MIN, pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM, "montaje") : 0;
   return { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin: prepMin + cargaMin + descargaMin + montajeMin };
 }
 // "08:30" + 150 min → "11:00" (sumar minutos a una hora HH:MM, con vuelta de día)
@@ -1825,7 +1887,7 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
   const numLogistica = Math.max(1, meta.numLogistica || 1);
   const horasJornada = meta.horasJornada || 0;
   const paxTotal = meta.totalPax || 0;
-  const { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin } = estimarTiemposCarga({ totalItems, pax: paxTotal, numLogistica, horasJornada });
+  const { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin } = estimarTiemposCarga({ totalItems, pax: paxTotal, numLogistica, horasJornada }, meta.calibracion);
   const fmtMin = (m) => {
     if (m <= 0) return "—";
     const h = Math.floor(m / 60);
@@ -1976,7 +2038,18 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
                 <span><strong>Montaje</strong> ~{fmtMin(montajeMin)}</span>
                 <span className="carga-tiempos-sep">·</span>
                 <span className="carga-tiempos-total"><strong>Total</strong> ~{fmtMin(totalMin)}</span>
-                <span className="carga-tiempos-nota">({numLogistica} logística{meta.logisticaReal ? "" : ", estimado"})</span>
+                <span className="carga-tiempos-nota">
+                  ({numLogistica} logística{meta.logisticaReal ? "" : ", estimado"})
+                  {/* Si ya hay eventos cronometrados, el ajuste que se está aplicando se
+                      dice en voz alta: nada de corregir los tiempos por detrás. */}
+                  {meta.calibracion && (
+                    <span className="carga-calibrado" title="Los tiempos estimados están ajustados con los cronómetros de tus eventos anteriores">
+                      · ajustado con {meta.calibracion.nMedidos} eventos medidos
+                      {FASES_TIEMPO.filter(f => meta.calibracion.factores[f]).map(f =>
+                        ` · ${f} ×${meta.calibracion.factores[f].toFixed(2).replace(".", ",")}`).join("")}
+                    </span>
+                  )}
+                </span>
               </div>
             )}
           </div>
@@ -2861,6 +2934,9 @@ export default function App({ onCerrarSesion } = {}) {
   // Última versión del archivo que hemos escrito. Se usa para calcular qué eventos
   // han cambiado y subir SOLO esos, en vez del mapa entero.
   const eventosGuardadosRef = React.useRef(eventosGuardados);
+  // Mientras la primera sincronización está en marcha llegan fotos incompletas del
+  // archivo: hasta que termina, no se deja que sustituyan la lista local.
+  const primeraSincroHechaRef = React.useRef(false);
   // Nombre del evento "activo" (el que has abierto o guardado en esta sesión). Solo ese
   // se auto-guarda, para no sobrescribir un evento bueno con un borrador del mismo nombre.
   const eventoActivoRef = React.useRef((() => { try { return localStorage.getItem("gula_evento_activo") || ""; } catch (e) { return ""; } })());
@@ -2907,30 +2983,52 @@ export default function App({ onCerrarSesion } = {}) {
   useEffect(() => {
     if (!nubeActiva()) return;
     let cancelado = false;
-    const aplicarSiEsMasReciente = ({ mapa, actualizado }) => {
-      if (!mapa || cancelado) return;
-      // Si ya hicimos una escritura local igual o más reciente, esto es un eco de
-      // nuestro propio cambio (o un snapshot viejo en caché): se ignora sin más.
-      if (actualizado <= ultimaEscrituraLocalRef.current) return;
-      ultimaEscrituraLocalRef.current = actualizado;
+    const guardarLocal = (mapa) => {
       eventosGuardadosRef.current = mapa;
       setEventosGuardados(mapa);
       try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(mapa)); } catch (e) { /* localStorage lleno o no disponible */ }
     };
-    // Arranque: se lee el archivo nuevo (un documento por evento). Si está vacío pero
-    // el índice viejo (todo en un documento) tiene eventos, se suben uno a uno una
-    // sola vez. El índice viejo NO se borra: queda como copia de seguridad.
+    const aplicarSiEsMasReciente = ({ mapa, actualizado }) => {
+      if (!mapa || cancelado) return;
+      // Hasta que la primera sincronización termina no se sustituye nada: mientras se
+      // están subiendo los eventos uno a uno llegan fotos INCOMPLETAS del archivo, y
+      // sustituir con una de ellas hacía desaparecer de la lista los que aún no habían
+      // subido. Después ya se sustituye, que es lo que propaga los borrados.
+      if (!primeraSincroHechaRef.current) return;
+      // Si ya hicimos una escritura local igual o más reciente, esto es un eco de
+      // nuestro propio cambio (o un snapshot viejo en caché): se ignora sin más.
+      if (actualizado <= ultimaEscrituraLocalRef.current) return;
+      ultimaEscrituraLocalRef.current = actualizado;
+      guardarLocal(mapa);
+    };
+    // Arranque: se FUSIONA lo que hay en la nube con lo que hay en este dispositivo, y
+    // lo que solo esté aquí se sube. Antes se sustituía, así que un evento que todavía
+    // no estuviera en la nube desaparecía de la lista. Fusionar lo arregla solo: en
+    // cuanto se abre la app, lo que falte vuelve a aparecer y se sube.
     const sincronizar = async () => {
       try {
         const archivo = await cargarArchivoNube();
         if (cancelado) return;
-        if (archivo && !archivo.vacio) { aplicarSiEsMasReciente(archivo); return; }
-        const viejo = await cargarIndiceEventosNube();
-        if (cancelado || !viejo || !viejo.mapa || !Object.keys(viejo.mapa).length) return;
-        aplicarSiEsMasReciente(viejo);
-        ultimaEscrituraLocalRef.current = Date.now();
-        await sincronizarArchivoNube({}, viejo.mapa);
+        const local = eventosGuardadosRef.current || {};
+        // Si el archivo nuevo está vacío se mira el índice viejo (un solo documento),
+        // que es de donde venimos. No se borra: queda como copia de seguridad.
+        let remoto = archivo && !archivo.vacio ? archivo.mapa : null;
+        if (!remoto) {
+          const viejo = await cargarIndiceEventosNube();
+          if (cancelado) return;
+          remoto = (viejo && viejo.mapa) || {};
+        }
+        // El local manda para los eventos que solo están aquí; para el resto, la nube.
+        const fusionado = { ...local, ...remoto };
+        Object.keys(local).forEach(n => { if (remoto[n] === undefined) fusionado[n] = local[n]; });
+        guardarLocal(fusionado);
+        const soloLocales = Object.keys(fusionado).filter(n => remoto[n] === undefined);
+        if (soloLocales.length || !archivo || archivo.vacio) {
+          ultimaEscrituraLocalRef.current = Date.now();
+          await sincronizarArchivoNube(remoto, fusionado);
+        }
       } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
+      finally { primeraSincroHechaRef.current = true; }
     };
     sincronizar();
     const unsub = suscribirArchivoNube(({ mapa, actualizado, vacio }) => {
@@ -3228,6 +3326,9 @@ export default function App({ onCerrarSesion } = {}) {
     const n = logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length;
     return n > 0 ? n : Math.max(1, Math.ceil(pax / 60));
   }, [logisticaEquipo, pax]);
+  // Ajuste aprendido de los eventos ya cronometrados. Se recalcula solo cuando cambia
+  // el archivo de eventos, no en cada render.
+  const calibracion = useMemo(() => calcularCalibracion(eventosGuardados), [eventosGuardados]);
   // Horas de la jornada más larga del equipo: la recogida lleva recargo por fatiga.
   const horasJornadaEquipo = useMemo(
     () => logisticaEquipo.reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0),
@@ -3240,8 +3341,8 @@ export default function App({ onCerrarSesion } = {}) {
     const totalItemsCarga = quitarItemsSinCantidad(checklist)
       .filter(c => !/personal/i.test(c.nombre))
       .reduce((a, c) => a + c.items.length, 0);
-    return estimarTiemposCarga({ totalItems: totalItemsCarga, pax: pax + ninos, numLogistica: logisticaParaTiempos, horasJornada: horasJornadaEquipo });
-  }, [checklist, pax, ninos, logisticaParaTiempos, horasJornadaEquipo]);
+    return estimarTiemposCarga({ totalItems: totalItemsCarga, pax: pax + ninos, numLogistica: logisticaParaTiempos, horasJornada: horasJornadaEquipo }, calibracion);
+  }, [checklist, pax, ninos, logisticaParaTiempos, horasJornadaEquipo, calibracion]);
 
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
   const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
@@ -3582,6 +3683,7 @@ export default function App({ onCerrarSesion } = {}) {
             totalPax: pax + ninos,
             notasEvento,
             numLogistica: logisticaParaTiempos,
+            calibracion,
             logisticaReal: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
             horasJornada: horasJornadaEquipo,
           }}
