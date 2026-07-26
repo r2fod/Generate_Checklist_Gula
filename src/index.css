@@ -10,10 +10,10 @@
   --border-color-strong: #d6d9e4;
   --text-main: #1f2532;
   --text-muted: #6b7280;
-  --text-label: #64748b;
+  --text-label: #5b6676;
   --green-qty: #15803d;
-  --green-btn: #22c55e;
-  --green-btn-hover: #16a34a;
+  --green-btn: #16794a;
+  --green-btn-hover: #11603a;
   --alquiler-bg: #fdf6e3;
   --alquiler-text: #b45309;
   --accent-blue: #4f46e5;
@@ -46,6 +46,20 @@
   --superficie-velo-suave: rgba(255, 255, 255, 0.55);
   --superficie-velo-borde: rgba(255, 255, 255, 0.9);
   --fondo-acceso: linear-gradient(160deg, #f6f7fb 0%, #f1f3fb 55%, #eef0ff 100%);
+  --aviso-bg-fuerte: #fef3c7;
+  --hoy-bg: #fff7ed;
+  --hoy-borde: #fdba74;
+  --error-texto-fuerte: #dc2626;
+  --lila-suave: #f5f3ff;
+  --lila-icono: #7c3aed;
+  /* Botón/segmento sólido de marca: fondo y su texto van SIEMPRE en pareja, para
+     que invertir el tema no deje texto blanco sobre fondo claro. */
+  --solido-bg: #1f314d;
+  --solido-bg-hover: #16233a;
+  --solido-texto: #ffffff;
+  --hecho-bg: #f0fdf4;
+  --hecho-borde: #bbf7d0;
+  --hecho-texto: #15803d;
   color-scheme: light;
 }
 
@@ -67,8 +81,8 @@
   --text-muted: #a0a7b8;
   --text-label: #7f899e;
   --green-qty: #4ade80;
-  --green-btn: #22c55e;
-  --green-btn-hover: #16a34a;
+  --green-btn: #17804d;
+  --green-btn-hover: #1c9a5d;
   --alquiler-bg: #3a3117;
   --alquiler-text: #fbbf24;
   --accent-blue: #8b83f5;
@@ -93,6 +107,18 @@
   --superficie-velo-suave: rgba(27, 30, 40, 0.55);
   --superficie-velo-borde: rgba(255, 255, 255, 0.09);
   --fondo-acceso: linear-gradient(160deg, #0e1017 0%, #141722 55%, #1a1d2c 100%);
+  --aviso-bg-fuerte: #3d2f11;
+  --hoy-bg: #3a2a15;
+  --hoy-borde: #8a5a22;
+  --error-texto-fuerte: #f87171;
+  --lila-suave: #262a44;
+  --lila-icono: #a78bfa;
+  --solido-bg: #4f46e5;
+  --solido-bg-hover: #635bf0;
+  --solido-texto: #ffffff;
+  --hecho-bg: #16301f;
+  --hecho-borde: #2b6b45;
+  --hecho-texto: #6ee7a0;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 2px 6px -2px rgba(0, 0, 0, 0.4), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
@@ -235,6 +261,9 @@ body {
 }
 
 .header-title-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: space-between;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -334,7 +363,7 @@ body {
 /* Aviso de recogidas/devoluciones pendientes (hoy o pasadas), mismo layout que el
    de cambios remotos pero en ámbar de atención — comparte estilo con .archivado-banner */
 .avisos-recogidas-banner {
-  background: #fef3c7;
+  background: var(--aviso-bg-fuerte);
   border: 1px solid var(--aviso-borde);
   color: var(--aviso-texto);
   border-radius: var(--radius-md);
@@ -352,8 +381,15 @@ body {
   color: var(--aviso-texto);
 }
 
+.avisos-recogidas-banner {
+  position: relative;
+  padding-right: 40px;
+}
 .avisos-recogidas-banner .cambios-remotos-cerrar {
   color: var(--aviso-texto);
+  position: absolute;
+  top: 8px;
+  right: 10px;
 }
 
 .avisos-recogidas-lista {
@@ -393,7 +429,7 @@ body {
 }
 
 .aviso-otro-evento-btn:hover {
-  background: #fef3c7;
+  background: var(--aviso-bg-fuerte);
 }
 
 .plantilla-aviso-badge {
@@ -401,7 +437,7 @@ body {
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--aviso-texto);
-  background: #fef3c7;
+  background: var(--aviso-bg-fuerte);
   border: 1px solid var(--aviso-borde);
   border-radius: 999px;
   padding: 1px 7px;
@@ -411,16 +447,22 @@ body {
 .aviso-recogida-chip {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   gap: 8px;
   background: var(--aviso-bg);
   border: 1px solid var(--aviso-borde);
   border-radius: 999px;
   padding: 3px 6px 3px 12px;
 }
-.aviso-recogida-chip.is-hoy { background: #fff7ed; border-color: #fdba74; }
-.aviso-recogida-chip.is-atrasado { background: var(--error-bg); border-color: #fca5a5; }
+.aviso-recogida-chip.is-hoy { background: var(--hoy-bg); border-color: var(--hoy-borde); }
+.aviso-recogida-chip.is-atrasado { background: var(--error-bg); border-color: var(--error-borde); }
+.aviso-recogida-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+}
 .aviso-recogida-dias { font-weight: 700; color: var(--aviso-texto-suave); }
-.aviso-recogida-chip.is-atrasado .aviso-recogida-dias { color: #dc2626; }
+.aviso-recogida-chip.is-atrasado .aviso-recogida-dias { color: var(--error-texto-fuerte); }
 
 /* Recomendación de logística en el bloque de Equipo */
 .logistica-label-rec { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
@@ -431,13 +473,13 @@ body {
   text-transform: none;
   letter-spacing: 0;
   font-weight: 600;
-  color: var(--text-muted);
-  background: #f5f3ff;
+  color: var(--text-main);
+  background: var(--lila-suave);
   border: 1px solid #ddd6fe;
   border-radius: 999px;
   padding: 3px 6px 3px 10px;
 }
-.logistica-recomendado svg { color: #7c3aed; }
+.logistica-recomendado svg { color: var(--lila-icono); }
 .logistica-add-rec {
   border: none;
   background: #7c3aed;
@@ -1087,8 +1129,8 @@ body {
 }
 
 .segment-btn.active {
-  background: var(--primary-navy);
-  color: white;
+  background: var(--solido-bg);
+  color: var(--solido-texto);
   box-shadow: var(--shadow-sm);
 }
 
@@ -1880,7 +1922,7 @@ body {
 
 .tag-alquiler {
   background: #f59e0b;
-  color: white;
+  color: #442200;
   font-size: 0.63rem;
   font-weight: 800;
   padding: 2px 9px;
@@ -2024,15 +2066,31 @@ hr {
      flex:1 los reparte de forma desigual entre filas (ej. 3+1, el último
      estirado a todo el ancho). El grid los deja siempre en parejas iguales. */
   .header-actions {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     width: 100%;
   }
 
-  .header-actions > .btn,
+  /* Cada botón secundario ocupa media fila, pero si queda solo en la última se
+     estira a todo el ancho en vez de dejar un hueco a su lado. El nº de botones
+     cambia según haya sesión iniciada o no, así que tiene que valer para 3 y 4. */
+  .header-actions > .btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: calc(50% - 4px);
+    width: auto;
+  }
   .header-actions > .compartir-menu-wrap {
+    flex: 1 1 100%;
     width: 100%;
+  }
+
+  /* Todos los secundarios con el mismo aspecto: un "ghost" sin borde junto a uno
+     con borde parecía texto suelto en vez de un botón. */
+  .header-actions > .btn-ghost {
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+    color: var(--text-main);
   }
 
   /* La acción principal (Compartir) ocupa toda la fila inferior: así los botones
@@ -2129,6 +2187,9 @@ hr {
   }
 
   .header-title-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: space-between;
     gap: 10px;
   }
 
@@ -2327,7 +2388,7 @@ hr {
 
 .preview-rental-badge {
   background: #f59e0b;
-  color: white;
+  color: #442200;
   font-size: 0.62rem;
   font-weight: 800;
   padding: 2px 6px;
@@ -2430,9 +2491,9 @@ hr {
 .crono-estimado { font-size: 0.8rem; color: var(--text-muted); }
 .crono-acciones { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .crono-btn { display: inline-flex; align-items: center; gap: 6px; }
-.crono-btn-start { background: #2fa25b; border-color: #2fa25b; color: #fff; }
-.crono-btn-start:hover { background: #278a4d; }
-.crono-btn-pause { background: #e8a13a; border-color: #e8a13a; color: #fff; }
+.crono-btn-start { background: #1f7a44; border-color: #1f7a44; color: #fff; }
+.crono-btn-start:hover { background: #196536; }
+.crono-btn-pause { background: #e8a13a; border-color: #e8a13a; color: #442200; }
 .crono-btn-pause:hover { background: #d18f2c; }
 .crono-btn-reset { padding: 8px 10px; }
 .crono-btn-reset:disabled { opacity: 0.4; cursor: default; }
@@ -3289,12 +3350,29 @@ hr {
 .cat-edit-btn:disabled { opacity: 0.25; cursor: default; }
 .cat-count { flex-shrink: 0; }
 
-/* Interruptor de tema: cuadrado y solo icono, para que no robe sitio en la fila. */
+/* Interruptor de tema: va en la fila del título, alineado arriba a la derecha, con
+   texto para que se encuentre a la primera. Compacto para no competir con el nombre. */
 .btn-tema {
-  padding: 8px 10px;
-  min-width: 0;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  border-radius: 999px;
+  white-space: nowrap;
 }
-.btn-tema svg { display: block; }
+.btn-tema:hover {
+  background: var(--card-bg);
+  color: var(--text-main);
+  border-color: var(--border-color-strong);
+}
+.btn-tema svg { flex: 0 0 auto; }
 
 /* Resumen del evento bajo la cabecera: las cifras que antes había que ir a buscar a
    Vista previa o a Modo carga. Auto-fit para que se reparta solo según el ancho. */
@@ -3454,3 +3532,15 @@ hr {
 /* El logo de Gula es un PNG en negro: sobre la tarjeta oscura no se vería, así que
    se invierte. Es la única imagen de la app, no hay más que ajustar. */
 :root[data-tema="oscuro"] .login-logo { filter: invert(1) brightness(1.6); }
+
+/* "Añadir varios items" cuando ya se han pegado: antes se pintaba con colores en
+   línea desde JS, que ganaban a las variables y lo dejaban blanco en modo oscuro. */
+.add-material-btn.is-hecho {
+  background: var(--hecho-bg);
+  border-color: var(--hecho-borde);
+  color: var(--hecho-texto);
+}
+
+/* Resumen: el nombre de la categoría lleva su color de marca en un estilo en línea,
+   que en oscuro queda casi negro sobre fondo oscuro. Aquí manda el color del tema. */
+:root[data-tema="oscuro"] .resumen-cat-header td { color: var(--text-main) !important; }
