@@ -8,8 +8,11 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "predeploy": "npm run test",
+    "deploy": "gh-pages -d dist",
+    "test": "npm run build && node src/__tests__/sincronizacion.test.mjs && node src/__tests__/app.test.mjs",
+    "test:sync": "node src/__tests__/sincronizacion.test.mjs",
+    "test:app": "node src/__tests__/app.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.15.0",

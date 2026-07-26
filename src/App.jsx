@@ -8,7 +8,7 @@ import {
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
   BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
-  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun, Download, Upload,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -3508,6 +3508,62 @@ export default function App({ onCerrarSesion } = {}) {
     setTimeout(() => setAgregadosTag(""), 3000);
   };
 
+  // ─── COPIA DE SEGURIDAD DEL ARCHIVO COMPLETO ────────────────────────────────
+  // Un fichero con TODOS los eventos guardados, que no depende de la nube ni de nada.
+  // Si algún día falla la sincronización o se pierde el acceso, con esto se recupera
+  // todo. Se puede volver a cargar en cualquier dispositivo desde el mismo sitio.
+  const handleExportarCopia = () => {
+    const copia = {
+      formato: "gula-checklist-copia",
+      version: 1,
+      exportado: new Date().toISOString(),
+      eventos: eventosGuardados,
+      plantillas,
+      precios: leerPrecios(),
+    };
+    const blob = new Blob([JSON.stringify(copia, null, 2)], { type: "application/json;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `Gula_copia_${new Date().toISOString().slice(0, 10)}_${Object.keys(eventosGuardados).length}eventos.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    setGuardadoEventoMsg(`✓ Copia descargada con ${Object.keys(eventosGuardados).length} eventos`);
+    setTimeout(() => setGuardadoEventoMsg(""), 4000);
+  };
+  // Al restaurar NO se borra nada: se suman los que falten y se preguntan los que ya
+  // existen, para que cargar una copia vieja no pise trabajo más nuevo.
+  const handleImportarCopia = (fichero) => {
+    if (!fichero) return;
+    const lector = new FileReader();
+    lector.onload = () => {
+      let datos;
+      try { datos = JSON.parse(String(lector.result)); }
+      catch (e) { setGuardadoEventoMsg("✕ Ese fichero no es una copia válida"); setTimeout(() => setGuardadoEventoMsg(""), 4000); return; }
+      if (!datos || datos.formato !== "gula-checklist-copia" || !datos.eventos) {
+        setGuardadoEventoMsg("✕ Ese fichero no es una copia de Gula");
+        setTimeout(() => setGuardadoEventoMsg(""), 4000);
+        return;
+      }
+      const nuevos = Object.keys(datos.eventos).filter(n => eventosGuardados[n] === undefined);
+      const repetidos = Object.keys(datos.eventos).filter(n => eventosGuardados[n] !== undefined);
+      setDialogo({
+        tipo: "confirm",
+        titulo: "Restaurar copia de seguridad",
+        mensaje: `La copia tiene ${Object.keys(datos.eventos).length} eventos: ${nuevos.length} que no están aquí y ${repetidos.length} que ya existen. Se añaden los que faltan y NO se toca ninguno de los que ya tienes.`,
+        textoConfirmar: `Añadir ${nuevos.length} eventos`,
+        onConfirm: () => {
+          const combinado = { ...eventosGuardados };
+          nuevos.forEach(n => { combinado[n] = datos.eventos[n]; });
+          guardarEventos(combinado);
+          if (datos.plantillas) guardarPlantillas({ ...datos.plantillas, ...plantillas });
+          setGuardadoEventoMsg(`✓ Restaurados ${nuevos.length} eventos de la copia`);
+          setTimeout(() => setGuardadoEventoMsg(""), 5000);
+        },
+      });
+    };
+    lector.readAsText(fichero);
+  };
+
   const handleDescargar = () => {
     const html = generarHTMLWord(evento, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklist, { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, checkeados, vueltos, roturas });
     const blob = new Blob([html], { type: "application/msword;charset=utf-8" });
@@ -3818,6 +3874,12 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
             <div className="plantillas-header-acciones">
+              <button className="btn btn-outline btn-plantilla" onClick={handleExportarCopia} title="Descarga un fichero con TODOS tus eventos guardados. Es tu copia de seguridad: no depende de la nube ni de la conexión"><Download size={14} /> Copia de seguridad</button>
+              <label className="btn btn-outline btn-plantilla" title="Carga una copia de seguridad. Solo AÑADE los eventos que no tengas: nunca pisa los que ya están">
+                <Upload size={14} /> Restaurar
+                <input type="file" accept="application/json,.json" style={{ display: "none" }}
+                  onChange={e => { handleImportarCopia(e.target.files && e.target.files[0]); e.target.value = ""; }} />
+              </label>
               <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular</button>
               <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link"><Save size={14} /> Guardar evento</button>
             </div>
