@@ -9,7 +9,11 @@ service cloud.firestore {
       allow list: if false;
     }
 
-    // El archivo con TODOS los eventos guardados: solo el equipo con sesión iniciada.
+    // El archivo de eventos guardados: solo el equipo con sesión iniciada.
+    // Aquí viven tanto el documento antiguo con todos los eventos juntos
+    // ("eventosGuardados", que se conserva como copia de seguridad) como un documento
+    // por evento con prefijo "evt_", que es lo que se usa desde que el archivo dejó
+    // de caber en un único documento (Firestore no admite más de 1 MiB por documento).
     match /indice/{doc} {
       allow read, write: if request.auth != null;
     }
