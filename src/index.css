@@ -260,13 +260,32 @@ body {
   z-index: 40;
 }
 
+/* El grupo del título ocupa el hueco libre para que el nombre del evento quede
+   pegado a su icono, no centrado con dos huecos a los lados. El interruptor de tema
+   va al final del grupo, justo antes de los botones de acción. */
 .header-title-group {
   flex: 1 1 auto;
   min-width: 0;
-  justify-content: space-between;
   display: flex;
   align-items: center;
   gap: 14px;
+}
+.header-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.header-title-group > .btn-tema { margin-left: auto; }
+
+/* Todos los botones de la cabecera con el mismo aspecto: un "ghost" sin borde
+   entre botones con borde se leía como texto suelto, no como un botón. */
+.header-actions > .btn-ghost {
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-main);
+}
+.header-actions > .btn-ghost:hover {
+  border-color: var(--border-color-strong);
+  background: var(--bg-subtle);
 }
 
 .header-icon {
@@ -351,7 +370,7 @@ body {
 }
 
 .archivado-banner {
-  background: #fef3c7;
+  background: var(--aviso-bg-fuerte);
   border: 1px solid var(--aviso-borde);
   color: var(--aviso-texto);
   border-radius: var(--radius-md);
@@ -2085,13 +2104,6 @@ hr {
     width: 100%;
   }
 
-  /* Todos los secundarios con el mismo aspecto: un "ghost" sin borde junto a uno
-     con borde parecía texto suelto en vez de un botón. */
-  .header-actions > .btn-ghost {
-    border: 1px solid var(--border-color);
-    background: var(--card-bg);
-    color: var(--text-main);
-  }
 
   /* La acción principal (Compartir) ocupa toda la fila inferior: así los botones
      secundarios quedan siempre en parejas y el CTA va a ancho completo, tanto con
