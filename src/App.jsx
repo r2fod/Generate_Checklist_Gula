@@ -2457,6 +2457,17 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
 // (después del montaje) provoca una carrera con el guardado automático: en StrictMode,
 // donde React ejecuta los efectos del montaje dos veces, el efecto de guardado puede
 // escribir los valores por defecto en localStorage antes de que el de carga los restaure.
+// Nombres de los eventos que este dispositivo ya dio por subidos a la nube. Sirve
+// para distinguir "creado aquí y aún sin subir" de "borrado desde otro dispositivo".
+const CLAVE_SINCRONIZADOS = "gula_eventos_sincronizados";
+function leerSincronizados() {
+  try { const v = JSON.parse(localStorage.getItem(CLAVE_SINCRONIZADOS) || "[]"); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function guardarSincronizados(nombres) {
+  try { localStorage.setItem(CLAVE_SINCRONIZADOS, JSON.stringify(nombres)); } catch (e) { /* localStorage no disponible */ }
+}
+
 function leerEstadoGuardado() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3010,6 +3021,7 @@ export default function App({ onCerrarSesion } = {}) {
       if (actualizado <= ultimaEscrituraLocalRef.current) return;
       ultimaEscrituraLocalRef.current = actualizado;
       guardarLocal(mapa);
+      guardarSincronizados(Object.keys(mapa));
     };
     // Arranque: se FUSIONA lo que hay en la nube con lo que hay en este dispositivo, y
     // lo que solo esté aquí se sube. Antes se sustituía, así que un evento que todavía
@@ -3020,23 +3032,35 @@ export default function App({ onCerrarSesion } = {}) {
         const archivo = await cargarArchivoNube();
         if (cancelado) return;
         const local = eventosGuardadosRef.current || {};
-        // Si el archivo nuevo está vacío se mira el índice viejo (un solo documento),
-        // que es de donde venimos. No se borra: queda como copia de seguridad.
-        let remoto = archivo && !archivo.vacio ? archivo.mapa : null;
-        if (!remoto) {
+        // Lo que hay AHORA MISMO como documento por evento. Es la referencia contra la
+        // que se calcula qué falta por subir: si se compara contra el índice viejo, los
+        // eventos que solo estaban allí se dan por subidos y nunca llegan a tener su
+        // documento, así que desaparecen para los demás dispositivos.
+        const enArchivo = archivo && !archivo.vacio ? archivo.mapa : {};
+        // Para fusionar sí vale el índice viejo (un solo documento), que es de donde
+        // venimos. No se borra: queda como copia de seguridad.
+        let remoto = enArchivo;
+        if (!archivo || archivo.vacio) {
           const viejo = await cargarIndiceEventosNube();
           if (cancelado) return;
           remoto = (viejo && viejo.mapa) || {};
         }
-        // El local manda para los eventos que solo están aquí; para el resto, la nube.
-        const fusionado = { ...local, ...remoto };
-        Object.keys(local).forEach(n => { if (remoto[n] === undefined) fusionado[n] = local[n]; });
+        // Un evento que está aquí pero no en la nube puede ser dos cosas muy distintas:
+        //   · creado en este dispositivo y aún sin subir → hay que conservarlo y subirlo
+        //   · borrado desde otro dispositivo               → hay que dejarlo ir
+        // Se distinguen con la lista de los que este dispositivo ya dio por subidos: si
+        // estaba en esa lista y ya no está en la nube, es que lo borraron fuera.
+        const yaSincronizados = leerSincronizados();
+        const fusionado = { ...remoto };
+        Object.keys(local).forEach(n => {
+          if (remoto[n] !== undefined) return;
+          if (yaSincronizados.includes(n)) return; // borrado en otro dispositivo
+          fusionado[n] = local[n];
+        });
         guardarLocal(fusionado);
-        const soloLocales = Object.keys(fusionado).filter(n => remoto[n] === undefined);
-        if (soloLocales.length || !archivo || archivo.vacio) {
-          ultimaEscrituraLocalRef.current = Date.now();
-          await sincronizarArchivoNube(remoto, fusionado);
-        }
+        ultimaEscrituraLocalRef.current = Date.now();
+        await sincronizarArchivoNube(enArchivo, fusionado);
+        guardarSincronizados(Object.keys(fusionado));
       } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
       finally { primeraSincroHechaRef.current = true; }
     };
