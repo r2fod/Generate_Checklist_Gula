@@ -3348,13 +3348,15 @@ hr {
 .btn-tema svg { flex: 0 0 auto; }
 
 /* Resumen del evento bajo la cabecera: las cifras que antes había que ir a buscar a
-   Vista previa o a Modo carga. Auto-fit para que se reparta solo según el ancho. */
+   Vista previa o a Modo carga. En flex (no grid) para que la última fila se estire y
+   nunca quede una ficha suelta con medio hueco al lado. */
 .resumen-evento {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
 }
+.resumen-ficha { flex: 1 1 150px; }
 .resumen-ficha {
   display: flex;
   flex-direction: column;
@@ -3392,10 +3394,26 @@ hr {
   color: var(--text-muted);
 }
 .resumen-ficha.is-aviso .resumen-ficha-valor em { color: var(--aviso-texto-suave); }
-@media (max-width: 420px) {
-  .resumen-evento { grid-template-columns: 1fr 1fr; gap: 6px; }
-  .resumen-ficha { padding: 8px 9px; }
-  .resumen-ficha-valor { font-size: 0.92rem; }
+/* En móvil las tres cifras habituales (pax, conceptos y tiempo) caben en UNA fila:
+   se compactan el acolchado y las letras lo justo para que entren sin apretarse. Si
+   el evento tiene además coste de logística o pendientes, las de más pasan a una
+   segunda fila y se reparten el ancho entero, sin dejar huecos. */
+@media (max-width: 640px) {
+  .resumen-evento { gap: 6px; }
+  .resumen-ficha {
+    flex: 1 1 calc(33.333% - 4px);
+    min-width: calc(33.333% - 4px);
+    padding: 8px 9px;
+  }
+  .resumen-ficha-label { font-size: 0.6rem; gap: 4px; letter-spacing: 0.02em; }
+  .resumen-ficha-label svg { width: 11px; height: 11px; }
+  .resumen-ficha-valor { font-size: 0.88rem; }
+  .resumen-ficha-valor em { font-size: 0.64rem; display: block; }
+}
+@media (max-width: 360px) {
+  .resumen-ficha-label { font-size: 0.55rem; }
+  .resumen-ficha-valor { font-size: 0.8rem; }
+  .resumen-ficha { padding: 7px 6px; }
 }
 
 /* Aviso de que algo no se ha podido guardar en la nube. A diferencia del "Guardado"
