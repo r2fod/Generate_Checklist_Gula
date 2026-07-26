@@ -2283,8 +2283,8 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
   const nInclu = propuestos.filter(p => p.incluir).length;
 
   const selectStyle = {
-    padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: "0.85rem",
-    background: "white", color: "#374151", width: "100%", cursor: "pointer",
+    padding: "8px 10px", border: "1px solid var(--border-color)", borderRadius: 6, fontSize: "0.85rem",
+    background: "var(--card-bg)", color: "var(--text-main)", width: "100%", cursor: "pointer",
   };
 
   const tituloPaso = { pegar: "Pega los items que quieras añadir", confirmar: "Revisa antes de añadir" }[paso];
@@ -3592,14 +3592,17 @@ export default function App({ onCerrarSesion } = {}) {
                 {ubicacion ? ` · ${ubicacion}` : ""}
               </p>
             </div>
-          </div>
-          <div className="header-actions">
+            {/* El interruptor de tema va con el título, no en la rejilla de acciones:
+                siendo un icono suelto dejaba una celda huérfana y descuadraba la fila
+                de botones en el móvil. Lleva texto para que se encuentre. */}
             <button
-              className="btn btn-ghost btn-tema"
+              className="btn btn-tema"
               onClick={() => setTema(t => (t === "oscuro" ? "claro" : "oscuro"))}
               title={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
               aria-label={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            >{tema === "oscuro" ? <Sun size={16} /> : <Moon size={16} />}</button>
+            >{tema === "oscuro" ? <><Sun size={15} /> Claro</> : <><Moon size={15} /> Oscuro</>}</button>
+          </div>
+          <div className="header-actions">
             <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
             {onCerrarSesion && (
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>
@@ -3688,9 +3691,14 @@ export default function App({ onCerrarSesion } = {}) {
                     <span className="avisos-recogidas-lista">
                       {delAbierto.map(a => (
                         <span className={`aviso-recogida-chip ${a.dias < 0 ? "is-atrasado" : a.dias === 0 ? "is-hoy" : ""}`} key={`${a.lista}::${a.idx}::${a.tipo}`}>
-                          {a.tipo}: "{a.concepto}"
-                          {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}
-                          {a.fecha ? <span className="aviso-recogida-dias"> · {textoDias(a.dias)})</span> : ""}
+                          {/* Todo el texto en UN solo elemento: siendo trozos sueltos,
+                              el flex los trataba como piezas independientes y los
+                              separaba a lo ancho al partirse en dos líneas. */}
+                          <span className="aviso-recogida-texto">
+                            {a.tipo}: "{a.concepto}"
+                            {a.fecha ? ` (${new Date(a.fecha + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}` : ""}
+                            {a.fecha ? <span className="aviso-recogida-dias"> · {textoDias(a.dias)})</span> : ""}
+                          </span>
                           <button
                             className="aviso-recogida-hecho"
                             onClick={() => marcarAvisoHecho(a)}
@@ -3727,14 +3735,12 @@ export default function App({ onCerrarSesion } = {}) {
         <div className="config-sidebar">
 
         {/* AÑADIR VARIOS ITEMS (pegando texto) */}
+        {/* El estado "ya hay items pegados" se marca con una clase, no con colores en
+            línea: un estilo en línea gana a las variables del tema y dejaba el botón
+            blanco en modo oscuro. */}
         <button
-          className="add-material-btn animate-entrance"
-          style={{
-            animationDelay: "0.05s",
-            background: agregadosTag ? "#f0fdf4" : "white",
-            borderColor: agregadosTag ? "#bbf7d0" : undefined,
-            color: agregadosTag ? "#16a34a" : undefined,
-          }}
+          className={`add-material-btn animate-entrance ${agregadosTag ? "is-hecho" : ""}`}
+          style={{ animationDelay: "0.05s" }}
           onClick={() => setModalAgregar(true)}
         >
           <span><ListPlus size={16} /> {agregadosTag || "Añadir varios items pegando texto"}</span>
