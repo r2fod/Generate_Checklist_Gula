@@ -4,7 +4,7 @@
 // dispositivos, que es donde estaban los fallos que no se veían de otra forma.
 //
 //   node src/__tests__/sincronizacion.test.mjs
-import { almacen, setSesion } from './firestore-simulado.mjs';
+import { almacen, setSesion, limpiarPrevios } from './firestore-simulado.mjs';
 import * as N from './nube-simulada.mjs';
 const ok=(c,m)=>{console.log(`  ${c?'✅':'❌'} ${m}`); if(!c) process.exitCode=1;};
 
@@ -35,14 +35,26 @@ function crearDispositivo(nombre, local, sincronizados = []) {
       d.sinc = Object.keys(fus);
     } catch (e) { d.errores.push(e.message); }
     finally { d.primeraHecha = true; }
-    d.unsub = N.suscribirArchivoNube(({ mapa, actualizado, vacio }) => { if (vacio) return; aplicar({ mapa, actualizado }); });
+    d.unsub = N.suscribirArchivoNube(({ cambios, actualizado }) => {
+      if (!d.primeraHecha || !cambios || !cambios.length) return;
+      const base = { ...d.local };
+      let algo = false;
+      cambios.forEach(c => {
+        if (c.tipo === 'borrado') { if (base[c.nombre] !== undefined) { delete base[c.nombre]; algo = true; } return; }
+        if (JSON.stringify(base[c.nombre]) === JSON.stringify(c.estado)) return;
+        base[c.nombre] = c.estado; algo = true;
+      });
+      if (!algo) return;
+      if (actualizado > d.ultimaEscritura) d.ultimaEscritura = actualizado;
+      d.local = base; d.sinc = Object.keys(base);
+    });
   };
   return d;
 }
 const ev = (n) => ({ evento:'boda', pax:n });
 
 console.log('══ ESCENARIO REAL: móvil con todo, PC con lo viejo ══');
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 // El índice antiguo tiene lo que había ANTES de que las escrituras se bloquearan
 almacen.set('indice/eventosGuardados', { mapa: JSON.stringify({'Produccion Carlos':ev(20),'Boda Anna y Mario':ev(100),'Cena Pluto':ev(50)}), actualizado: 1000 });
 const movil = crearDispositivo('móvil', {'Produccion Carlos':ev(20),'Boda Anna y Mario':ev(100),'Cena Pluto':ev(50),'Produ kitten':ev(20),'Produccion Movistar':ev(30),'Boda nueva':ev(120)});
@@ -67,7 +79,7 @@ console.log(`  PC al volver a abrir: ${Object.keys(pc2.local).length} eventos �
 ok(Object.keys(pc2.local).length===6, 'AHORA el PC ve los 6');
 
 console.log('\n══ El PC abre PRIMERO y el móvil después (orden inverso) ══');
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 almacen.set('indice/eventosGuardados', { mapa: JSON.stringify({'Cena Pluto':ev(50)}), actualizado: 1000 });
 const pcA = crearDispositivo('PC', {'Solo del PC':ev(10)});
 await pcA.arrancar();
@@ -77,7 +89,7 @@ const pcC = crearDispositivo('PC', pcA.local, pcA.sinc); await pcC.arrancar();
 ok(Object.keys(pcC.local).length===3, `nadie pierde nada en ningún orden: ${JSON.stringify(Object.keys(pcC.local))}`);
 
 console.log('\n══ Sin sesión iniciada (las reglas deniegan) ══');
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 setSesion(false);
 const sinSesion = crearDispositivo('sin sesión', {'Mío':ev(10)});
 await sinSesion.arrancar();
@@ -87,7 +99,7 @@ setSesion(true);
 
 console.log('\n══ Escenarios duros ══');
 // 1. Borrar un evento en un dispositivo llega al otro
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 const a1 = crearDispositivo('A', {'Uno':ev(10),'Dos':ev(20),'Tres':ev(30)});
 await a1.arrancar();
 const b1 = crearDispositivo('B', {}); await b1.arrancar();
@@ -99,7 +111,7 @@ const b2 = crearDispositivo('B', b1.local, b1.sinc); await b2.arrancar();
 ok(!Object.keys(b2.local).includes('Dos'), `el borrado llega a B: ${JSON.stringify(Object.keys(b2.local))}`);
 
 // 2. Abrir dos veces seguidas no duplica ni borra
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 const c1 = crearDispositivo('C', {'Uno':ev(10),'Dos':ev(20)}); await c1.arrancar();
 const docs1 = [...almacen.keys()].filter(k=>k.startsWith('indice/evt_')).length;
 const c2 = crearDispositivo('C', c1.local, c1.sinc); await c2.arrancar();
@@ -108,23 +120,37 @@ ok(docs1===2 && docs2===2, `abrir dos veces deja 2 documentos, no ${docs2}`);
 ok(Object.keys(c2.local).length===2, 'y siguen los 2 eventos');
 
 // 3. Un evento editado en el móvil llega al PC
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 const m1 = crearDispositivo('móvil', {'Boda':{evento:'boda',pax:100}}); await m1.arrancar();
 await N.sincronizarArchivoNube(m1.local, {'Boda':{evento:'boda',pax:150}});
 const p1 = crearDispositivo('PC', {'Boda':{evento:'boda',pax:100}}, ['Boda']); await p1.arrancar();
 ok(p1.local['Boda'].pax===150, `el PC recibe la edición del móvil (pax=${p1.local['Boda'].pax})`);
 
 // 4. Nombres con tildes, barras y muy largos
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 const raros = {'Comunión Álvaro/Rocío':ev(40), ['x'.repeat(200)]:ev(10), 'Boda 50% + extra':ev(60)};
 const r1 = crearDispositivo('raros', raros); await r1.arrancar();
 const r2 = crearDispositivo('otro', {}); await r2.arrancar();
 ok(Object.keys(r2.local).length===3, `nombres raros viajan bien: ${JSON.stringify(Object.keys(r2.local).map(s=>s.slice(0,22)))}`);
 
 // 5. El documento antiguo NO se toca nunca
-almacen.clear();
+almacen.clear(); limpiarPrevios();
 almacen.set('indice/eventosGuardados', { mapa: JSON.stringify({'Viejo':ev(10)}), actualizado: 1 });
 const v1 = crearDispositivo('V', {'Nuevo':ev(20)}); await v1.arrancar();
 const antiguo = almacen.get('indice/eventosGuardados');
 ok(JSON.parse(antiguo.mapa).Viejo !== undefined && antiguo.actualizado===1, 'el documento antiguo queda intacto como copia de seguridad');
 ok(Object.keys(v1.local).length===2, 'y sus eventos se recuperan y se suben');
+
+console.log('\n══ El fallo que hacía desaparecer eventos de la pantalla ══');
+// Una escritura en vuelo hace que Firestore entregue una foto con SOLO ese documento.
+// Tomarla por la lista buena borraba los demás. Con cambios, no puede pasar.
+almacen.clear(); limpiarPrevios();
+const d1 = crearDispositivo('D', {'Boda que viene':ev(100), 'Pasado':ev(80)});
+await d1.arrancar();
+await new Promise(r => setTimeout(r, 0));   // la suscripción se registra en un microtask
+ok(Object.keys(d1.local).length===2, `arranca con los 2: ${JSON.stringify(Object.keys(d1.local))}`);
+// Se edita SOLO uno: la foto que llega trae un único documento
+await N.sincronizarArchivoNube(d1.local, { ...d1.local, 'Boda que viene': ev(175) });
+ok(Object.keys(d1.local).length===2, `tras editar uno siguen los 2: ${JSON.stringify(Object.keys(d1.local))}`);
+ok(d1.local['Boda que viene'].pax===175, 'y el editado se actualiza');
+ok(d1.local['Pasado'] !== undefined, 'el que no se tocó NO desaparece');

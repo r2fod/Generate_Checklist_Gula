@@ -195,7 +195,13 @@ function leerSnapshotArchivo(snap) {
   return { mapa, actualizado, vacio: Object.keys(mapa).length === 0 };
 }
 
-// Avisa cada vez que alguien guarda o borra un evento en cualquier dispositivo.
+// Avisa de CADA CAMBIO (alta, edición o borrado) en el archivo, no de la foto entera.
+// Es importante: una foto de la colección no es la lista completa. Estando sin
+// conexión, o mientras hay una escritura en vuelo, Firestore entrega una foto con
+// solo los documentos que conoce en ese momento, y tomarla por la lista buena borraba
+// de la pantalla todos los demás eventos. Con los cambios se puede aplicar lo que de
+// verdad ha pasado: los que llegan se añaden o actualizan, y solo desaparecen los que
+// Firestore marca explícitamente como borrados.
 export function suscribirArchivoNube(cb) {
   let unsub = () => {};
   let cancelado = false;
@@ -205,7 +211,23 @@ export function suscribirArchivoNube(cb) {
     const { db, fs } = conexion;
     unsub = fs.onSnapshot(
       fs.collection(db, COL_ARCHIVO),
-      (snap) => cb(leerSnapshotArchivo(snap)),
+      (snap) => {
+        const cambios = [];
+        let actualizado = 0;
+        (snap.docChanges ? snap.docChanges() : []).forEach(c => {
+          if (!c.doc || !c.doc.id.startsWith(PREFIJO_EVENTO)) return;
+          const d = c.doc.data();
+          if (c.type === "removed") {
+            if (d && d.nombre) cambios.push({ tipo: "borrado", nombre: d.nombre });
+            return;
+          }
+          if (!d || !d.nombre || !d.estado) return;
+          try { cambios.push({ tipo: "alta", nombre: d.nombre, estado: JSON.parse(d.estado) }); }
+          catch (e) { /* documento corrupto: se salta */ }
+          if ((d.actualizado ?? 0) > actualizado) actualizado = d.actualizado ?? 0;
+        });
+        if (cambios.length) cb({ cambios, actualizado });
+      },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
     );
   })();
