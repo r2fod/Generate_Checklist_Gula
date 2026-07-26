@@ -1202,16 +1202,24 @@ const CARGA_BASE_MIN = 20, CARGA_MIN_POR_ITEM = 1.5, DESCARGA_FACTOR = 0.6;
 const PREP_BASE_MIN = 30, PREP_MIN_POR_PAX = 1, PREP_MIN_POR_ITEM = 0.5;
 const MONTAJE_BASE_MIN = 45, MONTAJE_MIN_POR_PAX = 1.1, MONTAJE_MIN_POR_ITEM = 0.4;
 const FATIGA_DESDE_H = 4, FATIGA_POR_HORA = 0.08, FATIGA_MAX = 0.6;
+// Repartir el trabajo entre N personas NO divide el tiempo entre N: hay una parte
+// que no se puede paralelizar (colocar la furgoneta, repasar la hoja, coordinarse) y
+// cuellos de botella físicos (una puerta, un montacargas, una cocina). Se modela como
+// en cualquier planificación de obra: una parte fija en serie + el resto repartido
+// entre un equipo "efectivo" que crece por debajo de lo lineal.
+//   1 persona → 1,00   ·   2 → 1,87   ·   3 → 2,69   ·   4 → 3,48   ·   5 → 4,26
+const EXPONENTE_EQUIPO = 0.9;
+const equipoEfectivo = (n) => Math.pow(Math.max(1, n || 1), EXPONENTE_EQUIPO);
 function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJornada = 0 }) {
-  const nLog = Math.max(1, numLogistica || 1);
-  const prepMin = totalItems > 0 ? Math.round((PREP_BASE_MIN + pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM) / nLog) : 0;
-  const cargaMin = totalItems > 0 ? Math.round((CARGA_BASE_MIN + totalItems * CARGA_MIN_POR_ITEM) / nLog) : 0;
+  const nEf = equipoEfectivo(numLogistica);
+  const reparte = (base, trabajo) => Math.round(base + trabajo / nEf);
+  const prepMin = totalItems > 0 ? reparte(PREP_BASE_MIN, pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM) : 0;
+  const cargaMin = totalItems > 0 ? reparte(CARGA_BASE_MIN, totalItems * CARGA_MIN_POR_ITEM) : 0;
   const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
+  // La recogida va más rápida que la carga (todo va a granel a las cajas), pero lleva
+  // recargo por fatiga: es lo último de una jornada larga.
   const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga));
-  // El montaje también se reparte entre la gente que monta, igual que la preparación
-  // y la carga: con dos personas se tarda la mitad. Antes salía el mismo tiempo
-  // fueran uno o cinco, y por eso la hora de fin sugerida se iba muy larga.
-  const montajeMin = totalItems > 0 ? Math.round((MONTAJE_BASE_MIN + pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM) / nLog) : 0;
+  const montajeMin = totalItems > 0 ? reparte(MONTAJE_BASE_MIN, pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM) : 0;
   return { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin: prepMin + cargaMin + descargaMin + montajeMin };
 }
 // "08:30" + 150 min → "11:00" (sumar minutos a una hora HH:MM, con vuelta de día)
@@ -3213,10 +3221,27 @@ export default function App({ onCerrarSesion } = {}) {
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
+  // Gente que va a montar: la del equipo de logística si se ha metido, y si no, la
+  // recomendada (1 cada 60 pax). Antes esto usaba SIEMPRE la recomendada, así que
+  // añadir gente al equipo no cambiaba el tiempo estimado ni la hora de fin sugerida.
+  const logisticaParaTiempos = useMemo(() => {
+    const n = logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length;
+    return n > 0 ? n : Math.max(1, Math.ceil(pax / 60));
+  }, [logisticaEquipo, pax]);
+  // Horas de la jornada más larga del equipo: la recogida lleva recargo por fatiga.
+  const horasJornadaEquipo = useMemo(
+    () => logisticaEquipo.reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0),
+    [logisticaEquipo]);
+  // Mismos datos que Modo carga (pax TOTAL con niños y fatiga de jornada): antes la
+  // cabecera ignoraba las dos cosas y daba un total distinto al del modal.
   const tiemposCargaForm = useMemo(() => {
-    const totalItemsCarga = quitarItemsSinCantidad(checklist).reduce((a, c) => a + c.items.length, 0);
-    return estimarTiemposCarga({ totalItems: totalItemsCarga, pax, numLogistica: Math.max(1, Math.ceil(pax / 60)) });
-  }, [checklist, pax]);
+    // Se cuenta exactamente lo que se carga: sin items sin cantidad y sin "Personal",
+    // igual que hace Modo carga. Antes la cabecera contaba de más y daba otro total.
+    const totalItemsCarga = quitarItemsSinCantidad(checklist)
+      .filter(c => !/personal/i.test(c.nombre))
+      .reduce((a, c) => a + c.items.length, 0);
+    return estimarTiemposCarga({ totalItems: totalItemsCarga, pax: pax + ninos, numLogistica: logisticaParaTiempos, horasJornada: horasJornadaEquipo });
+  }, [checklist, pax, ninos, logisticaParaTiempos, horasJornadaEquipo]);
 
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
   const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
@@ -3556,12 +3581,9 @@ export default function App({ onCerrarSesion } = {}) {
             nombreEvento,
             totalPax: pax + ninos,
             notasEvento,
-            numLogistica: (() => {
-              const n = logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length;
-              return n > 0 ? n : Math.max(1, Math.ceil(pax / 60));
-            })(),
+            numLogistica: logisticaParaTiempos,
             logisticaReal: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
-            horasJornada: logisticaEquipo.reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0),
+            horasJornada: horasJornadaEquipo,
           }}
           onClose={() => setModoCarga(false)}
         />
@@ -3640,7 +3662,7 @@ export default function App({ onCerrarSesion } = {}) {
           </div>
           <div className="resumen-ficha">
             <span className="resumen-ficha-label"><Clock size={13} /> Tiempo estimado</span>
-            <span className="resumen-ficha-valor">{fmtMinutos(tiemposCargaForm.totalMin)}<em> · {Math.max(1, Math.ceil(pax / 60))} logística</em></span>
+            <span className="resumen-ficha-valor">{fmtMinutos(tiemposCargaForm.totalMin)}<em> · {logisticaParaTiempos} logística</em></span>
           </div>
           {totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 && (
             <div className="resumen-ficha">
