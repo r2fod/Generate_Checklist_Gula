@@ -3873,17 +3873,13 @@ export default function App({ onCerrarSesion } = {}) {
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
+            {/* Arriba, con el título, solo la acción de cada día — igual que "Guardar
+                actual" en Plantillas. Lo demás baja según se use menos. */}
             <div className="plantillas-header-acciones">
-              <button className="btn btn-outline btn-plantilla" onClick={handleExportarCopia} title="Descarga un fichero con TODOS tus eventos guardados. Es tu copia de seguridad: no depende de la nube ni de la conexión"><Download size={14} /> Copia de seguridad</button>
-              <label className="btn btn-outline btn-plantilla" title="Carga una copia de seguridad. Solo AÑADE los eventos que no tengas: nunca pisa los que ya están">
-                <Upload size={14} /> Restaurar
-                <input type="file" accept="application/json,.json" style={{ display: "none" }}
-                  onChange={e => { handleImportarCopia(e.target.files && e.target.files[0]); e.target.value = ""; }} />
-              </label>
-              <button className="btn btn-outline btn-plantilla" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular</button>
               <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link"><Save size={14} /> Guardar evento</button>
             </div>
           </div>
+          <button className="btn btn-outline btn-secundario-ancho" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular cantidades</button>
           {recalcularMsg && <p className="guardado-confirm">{recalcularMsg}</p>}
           {guardadoEventoMsg && <p className="guardado-confirm">{guardadoEventoMsg}</p>}
           {Object.keys(eventosGuardados).length === 0 ? (
@@ -3921,6 +3917,18 @@ export default function App({ onCerrarSesion } = {}) {
               )}
             </>
           )}
+          {/* Copia y restauración: mantenimiento, se usa una vez de Pascuas a Ramos.
+              Va al pie y en discreto para no competir con lo de cada día. */}
+          <div className="mantenimiento-fila">
+            <button className="btn-mantenimiento" onClick={handleExportarCopia} title="Descarga un fichero con TODOS tus eventos guardados. Es tu copia de seguridad: no depende de la nube ni de la conexión">
+              <Download size={13} /> Descargar copia de seguridad
+            </button>
+            <label className="btn-mantenimiento" title="Carga una copia de seguridad. Solo AÑADE los eventos que no tengas: nunca pisa los que ya están">
+              <Upload size={13} /> Restaurar
+              <input type="file" accept="application/json,.json" style={{ display: "none" }}
+                onChange={e => { handleImportarCopia(e.target.files && e.target.files[0]); e.target.value = ""; }} />
+            </label>
+          </div>
         </div>
 
         {/* CONFIG */}
