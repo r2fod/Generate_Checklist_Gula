@@ -950,11 +950,15 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const mesasServicio = calcMesasServicio(pax).total;
   const MESAS_BUFFET = 4;
   const MESA_CAMION = 1;
+  // En rodajes siempre aparece gente que no estaba en la lista (técnicos, productora,
+  // visitas), así que las sillas se piden con 5 de más sobre el pax del día.
+  // (con 0 pax no se suman: un evento aún sin rellenar no debe pedir 5 sillas)
+  const SILLAS_EXTRA = totalPax > 0 ? 5 : 0;
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas de 1,8m", String(mesasServicio + MESAS_BUFFET + MESA_CAMION)],
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
     ["Mesa redonda", "—"], ["Mesa larga", "—"],
-    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA)]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", String(numCarpas)], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
