@@ -3311,13 +3311,40 @@ hr {
 }
 .guardado-indicador.is-visible { opacity: 1; transform: translateY(0); }
 
-/* La "etiqueta" que abre el selector de fichero tiene que verse igual que un botón. */
-label.btn-plantilla {
+/* Acción secundaria a ancho completo: se distingue de la principal sin competir. */
+.btn-secundario-ancho {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+/* Mantenimiento (copia de seguridad y restaurar): se usa muy de vez en cuando, así
+   que va al pie de la tarjeta, separado por una línea y en discreto. No debe pesar
+   visualmente lo mismo que "Guardar evento", que se usa en cada evento. */
+.mantenimiento-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+.btn-mantenimiento {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: color 0.15s ease;
 }
+.btn-mantenimiento:hover { color: var(--accent); }
+.btn-mantenimiento svg { flex: 0 0 auto; }
 
 /* Botones de mover categoría: deshabilitados en los extremos, y en móvil no se
    encogen ni se solapan con el contador de items. */
