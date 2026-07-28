@@ -370,16 +370,18 @@ function calcMesasServicio(pax) {
 // lo calcula automáticamente por pax. El ratio del sector es 1 camarero cada 10-15
 // pax en banquete sentado (boda/comunión/corporativo) y 1 cada 20 en formato buffet
 // más informal (cumpleaños/producción) — de ahí el divisor configurable.
-function personalSala(pax, numCamareros, divisor = 20) {
-  return numCamareros > 0 ? numCamareros : Math.max(2, Math.ceil(pax / divisor));
+// El mínimo es 2 (en un banquete nunca se va con una sola persona de sala), pero en
+// producciones pequeñas se pasa a 1: para 25 pax de rodaje no van 2 y 2.
+function personalSala(pax, numCamareros, divisor = 20, minimo = 2) {
+  return numCamareros > 0 ? numCamareros : Math.max(minimo, Math.ceil(pax / divisor));
 }
 
 // Consumibles para el propio personal de sala/cocina (no para los invitados). El
 // "staff" extra (cocina, producción, refuerzo...) se suma a los camareros de sala,
 // porque también bebe agua y usa vasos aunque no sirva mesas.
 // Los packs de vasos de cartón y plástico vienen de 50 unidades
-function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20) {
-  const n = personalSala(pax, numCamareros, divisor) + numStaff;
+function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20, minimoSala = 2) {
+  const n = personalSala(pax, numCamareros, divisor, minimoSala) + numStaff;
   return {
     n,
     // Los vasos de café son "mini" (tamaño espresso/cortado): siempre se llevan 3 packs
@@ -898,7 +900,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
-    llevaChillOut, numChillOut = 1,
+    llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -914,9 +916,15 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const paxConsumo = diasPax.length ? diasPax.reduce((a, b) => a + b, 0) : totalPax;
   // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
+  // Producciones pequeñas (hasta 30 pax): 1 de sala/office y 1 de cocina. El ratio de
+  // banquete (1 cada 20 pax) y el mínimo de 2 daban 2 y 2 para un rodaje de 25 pax, que
+  // es más gente de la que hace falta. A partir de ahí escala como siempre.
+  const produPequena = pax <= 30;
+  const nSala = numCamareros > 0 ? numCamareros : (produPequena ? 1 : personalSala(pax, numCamareros, divisorCam));
+  const nCocina = produPequena ? 1 : Math.max(2, Math.ceil(pax * 2 / 50));
   // En producciones no hay barra libre (ni cóctel ni copas): solo refrescos, agua
   // con gas y aguas (cajas de 33cl y botellas de 1,5L) — nada de alcohol ni cristalería
-  const personal = calcPersonal(pax, numCamareros, numStaff, divisorCam);
+  const personal = calcPersonal(pax, nSala, numStaff, divisorCam);
   // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
   // sea cual sea el tipo de bandeja elegido para el resto del servicio
   const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
@@ -934,9 +942,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
-    ["Camareros / office", String(personalSala(pax, numCamareros, divisorCam))],
+    ["Camareros / office", String(nSala)],
     ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
-    ["Cocina", String(Math.max(2, Math.ceil(pax * 2 / 50)))],
+    ["Cocina", String(nCocina)],
   ]});
 
   // Carpas para la zona de comer/office del rodaje: una 3x3 cubre ~12 personas de
@@ -963,6 +971,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     ["Carpas con paredes y pesas", String(numCarpas)], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
+    // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que
+    // el resto de la decoración de esta categoría
+    ["Jarrones de cristal", "—"], ["Flores", "—"],
     opt(llevaPalomitera, ["Carrito palomitera", "1"]),
     opt(llevaChillOut, ["Chill out", String(numChillOut)]),
   ]});
@@ -988,7 +999,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Cocina y sala", items: [
     // (La plancha de gas va en "Paella y fuego" junto al resto de fuego)
     // Mesa caliente para mantener el pase: 1 por cada ~40 pax del día grande
-    ["Horno pequeño", "1"], ["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
+    // El horno lo elige el selector de Equipamiento, igual que en el resto de
+    // eventos: aquí estaba fijo en "Horno pequeño" y cambiar a Grande o Ambos no
+    // hacía nada.
+    opt(tipoHorno === "pequeño" || tipoHorno === "ambos", ["Horno pequeño", "1"]),
+    opt(tipoHorno === "grande" || tipoHorno === "ambos", ["Horno grande", "1"]),
+    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
     ["Vitro", "1"], ["Butano", "1"], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
@@ -1010,9 +1026,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // sucias van sin vestir) + 1 de repuesto
     ["Manteles negros", String(mesasServicio + MESAS_BUFFET + 1)],
     ["Plancha de vapor (manteles)", "1"],
-    ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
-    ["Bandeja camareros", String(personalSala(pax, numCamareros, divisorCam))],
-    ["Litos (paño bandeja camarero)", String(personalSala(pax, numCamareros, divisorCam))],
+    ["Delantales", String(nSala + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
+    ["Bandeja camareros", String(nSala)],
+    ["Litos (paño bandeja camarero)", String(nSala)],
   ]});
 
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
@@ -1054,7 +1070,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Palitos brocheta", conSufijo(Math.ceil(paxConsumo / 20), "paq.")], ["Palitos café", conSufijo(Math.ceil(paxConsumo / 30), "paq.")],
     ["Calentador de agua", "1"], ["Kit té matcha", "1"],
     ["Cacao", conSufijo(1, "bote")], ["Canela", conSufijo(1, "bote")], ["Leche condensada", conSufijo(1, "lata")],
-    ["Vasos de cartón (L/M/S)", conSufijo(Math.ceil((paxConsumo + (hayDesayuno ? paxConsumo * 1.2 : 0)) / 50), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
+    // En un rodaje se bebe todo el día (café, agua, refrescos), así que no basta con
+    // un vaso por persona: se calculan 4 por pax y día, más 1,2 extra si hay desayuno.
+    // Antes salía 1 solo paquete para 25 pax, que son 2 vasos por persona en toda la
+    // jornada.
+    ["Vasos de cartón (L/M/S)", conSufijo(Math.max(2, Math.ceil(paxConsumo * (4 + (hayDesayuno ? 1.2 : 0)) / 50)), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
+    // Los vasos del personal van aquí, con el resto de vasos, y no en Limpieza
+    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
+    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
     // en cada bebida por separado en vez de en dos líneas combinadas
     ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56))],
@@ -1080,8 +1103,6 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Fairy", conSufijo(1, "bote")], ["Estropajo", conSufijo(1, "paquete")], ["Papel plata", conSufijo(1, "rollo")], ["Film", conSufijo(1, "rollo")], ["Papel Chemine", conSufijo(3, "rollo")],
     ["Escoba", "1"], ["Mocho", "1"], ["Cubo", "1"], ["Recogedor", "1"],
     ["Cajas vacías", "2"], ["Ceniceros", String(Math.max(4, Math.ceil(totalPax / 15)))],
-    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
-    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
     ["Hojas de fichaje", "1"],
   ]});
 
@@ -1206,6 +1227,16 @@ const CARGA_BASE_MIN = 20, CARGA_MIN_POR_ITEM = 1.5, DESCARGA_FACTOR = 0.6;
 const PREP_BASE_MIN = 30, PREP_MIN_POR_PAX = 1, PREP_MIN_POR_ITEM = 0.5;
 const MONTAJE_BASE_MIN = 45, MONTAJE_MIN_POR_PAX = 1.1, MONTAJE_MIN_POR_ITEM = 0.4;
 const FATIGA_DESDE_H = 4, FATIGA_POR_HORA = 0.08, FATIGA_MAX = 0.6;
+// El tiempo por item se cobraba igual en un evento de 25 pax que en uno de 200, y no
+// es así: una produción de 25 pax tiene casi las mismas LÍNEAS de checklist que una
+// boda de 150 (128 frente a 136) — lo que cambia es el volumen de cada línea, no
+// cuántas hay. Se escala con la raíz del pax (el volumen crece, pero manejar 10 cajas
+// no cuesta 10 veces manejar 1) tomando 100 pax como referencia, que es donde se
+// calibró el modelo contra los tiempos de otros caterings: ahí el factor es 1 y los
+// tiempos no se mueven. Los topes evitan disparates en los extremos.
+const VOLUMEN_REF_PAX = 100, VOLUMEN_MIN = 0.45, VOLUMEN_MAX = 1.6;
+const factorVolumen = (pax) =>
+  Math.min(VOLUMEN_MAX, Math.max(VOLUMEN_MIN, Math.sqrt(Math.max(0, pax || 0) / VOLUMEN_REF_PAX)));
 // Repartir el trabajo entre N personas NO divide el tiempo entre N: hay una parte
 // que no se puede paralelizar (colocar la furgoneta, repasar la hoja, coordinarse) y
 // cuellos de botella físicos (una puerta, un montacargas, una cocina). Se modela como
@@ -1279,13 +1310,14 @@ function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1, horasJ
   const nEf = equipoEfectivo(numLogistica);
   const f = (fase) => (calibracion && calibracion.factores[fase]) || 1;
   const reparte = (base, trabajo, fase) => Math.round((base + trabajo / nEf) * f(fase));
-  const prepMin = totalItems > 0 ? reparte(PREP_BASE_MIN, pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM, "prep") : 0;
-  const cargaMin = totalItems > 0 ? reparte(CARGA_BASE_MIN, totalItems * CARGA_MIN_POR_ITEM, "carga") : 0;
+  const vol = factorVolumen(pax);
+  const prepMin = totalItems > 0 ? reparte(PREP_BASE_MIN, pax * PREP_MIN_POR_PAX + totalItems * PREP_MIN_POR_ITEM * vol, "prep") : 0;
+  const cargaMin = totalItems > 0 ? reparte(CARGA_BASE_MIN, totalItems * CARGA_MIN_POR_ITEM * vol, "carga") : 0;
   const fatiga = Math.min(FATIGA_MAX, Math.max(0, (horasJornada - FATIGA_DESDE_H) * FATIGA_POR_HORA));
   // La recogida va más rápida que la carga (todo va a granel a las cajas), pero lleva
   // recargo por fatiga: es lo último de una jornada larga.
   const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga) * (f("descarga") / f("carga")));
-  const montajeMin = totalItems > 0 ? reparte(MONTAJE_BASE_MIN, pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM, "montaje") : 0;
+  const montajeMin = totalItems > 0 ? reparte(MONTAJE_BASE_MIN, pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM * vol, "montaje") : 0;
   return { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin: prepMin + cargaMin + descargaMin + montajeMin };
 }
 // "08:30" + 150 min → "11:00" (sumar minutos a una hora HH:MM, con vuelta de día)
@@ -2205,14 +2237,19 @@ function ModalRecalcular({ cambios, onClose, onAplicar }) {
       <div className="dialogo-modal recalcular-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="dialogo-titulo"><RefreshCw size={16} /> Recalcular cantidades</div>
         <p className="dialogo-mensaje">
-          Estas {cambios.length} cantidades automáticas han cambiado desde el último "Guardar evento"
-          (seguramente por un ajuste en la app). Elige para cada una si prefieres mantener el valor de
-          siempre (se fija como edición manual, no volverá a moverse solo) o usar el nuevo cálculo.
+          En estas {cambios.length} cantidades el cálculo automático de ahora no coincide con lo que
+          tienes puesto: o las editaste a mano (marcadas <strong>a mano</strong>) o han cambiado desde
+          el último "Guardar evento". Elige para cada una si mantienes tu valor (queda fijo, no se
+          volverá a mover solo) o usas el nuevo cálculo.
         </p>
         <div className="recalcular-lista">
           {cambios.map(c => (
             <div className="recalcular-row" key={c.key}>
-              <div className="recalcular-nombre">{c.label}<span className="recalcular-categoria">{c.categoria}</span></div>
+              <div className="recalcular-nombre">
+                {c.label}
+                {c.aMano && <span className="recalcular-tag">a mano</span>}
+                <span className="recalcular-categoria">{c.categoria}</span>
+              </div>
               <div className="recalcular-opciones">
                 <button
                   className={`btn btn-outline recalcular-opcion ${decisiones[c.key] === "mantener" ? "active" : ""}`}
@@ -3027,12 +3064,25 @@ export default function App({ onCerrarSesion } = {}) {
   const handleRecalcular = () => {
     const cambios = [];
     Object.keys(valoresBaseActuales).forEach(key => {
-      if (overridesManuales[key] !== undefined) return; // ya fijado a mano, no se toca ni se pregunta
-      const anterior = valoresCalculados[key];
       const nuevo = valoresBaseActuales[key];
-      if (anterior === undefined || anterior === nuevo) return; // nunca guardado, o sin cambios
       const [categoria, ...resto] = key.split("::");
-      cambios.push({ key, categoria, label: resto.join("::"), anterior, nuevo });
+      const label = resto.join("::");
+      const aMano = overridesManuales[key];
+      // Cantidad puesta a mano: es justo la que NO se actualiza sola, así que si el
+      // cálculo automático ya no coincide (por ejemplo porque ha cambiado el pax) es
+      // la primera que hay que ofrecer. Antes se saltaba sin decir nada y el botón
+      // contestaba "nada ha cambiado" teniendo una cantidad desfasada delante.
+      if (aMano !== undefined) {
+        if (String(aMano) === String(nuevo)) return;
+        // Si ya se revisó contra este mismo cálculo (y se decidió mantener el valor a
+        // mano), no se vuelve a preguntar: solo si el automático se mueve otra vez.
+        if (valoresCalculados[key] === nuevo) return;
+        cambios.push({ key, categoria, label, anterior: String(aMano), nuevo, aMano: true });
+        return;
+      }
+      const anterior = valoresCalculados[key];
+      if (anterior === undefined || anterior === nuevo) return; // nunca guardado, o sin cambios
+      cambios.push({ key, categoria, label, anterior, nuevo, aMano: false });
     });
     if (cambios.length === 0) {
       setRecalcularMsg("✓ Nada ha cambiado desde el último guardado");
@@ -3047,8 +3097,14 @@ export default function App({ onCerrarSesion } = {}) {
     modalRecalcular.forEach(c => {
       if (decisiones[c.key] === "mantener") {
         nuevosOverrides[c.key] = c.anterior;
-        nuevoSnapshot[c.key] = c.anterior;
+        // En la foto se apunta el cálculo automático que se ha revisado, no el valor
+        // que se mantiene: así no se vuelve a preguntar por lo ya decidido, pero sí
+        // si el automático cambia otra vez más adelante.
+        nuevoSnapshot[c.key] = c.nuevo;
       } else {
+        // Con "usar el nuevo" hay que QUITAR la edición manual: si se deja puesta, la
+        // cantidad se queda clavada en la de antes y el recalculo no se nota.
+        if (c.aMano) delete nuevosOverrides[c.key];
         nuevoSnapshot[c.key] = c.nuevo;
       }
     });

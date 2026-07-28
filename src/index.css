@@ -819,6 +819,20 @@ body {
   letter-spacing: 0.3px;
 }
 
+/* Marca las cantidades que están puestas a mano: son las que no se actualizan
+   solas, así que conviene distinguirlas de las que ha movido la app */
+.recalcular-tag {
+  align-self: flex-start;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
 .recalcular-opciones {
   display: flex;
   gap: 8px;
