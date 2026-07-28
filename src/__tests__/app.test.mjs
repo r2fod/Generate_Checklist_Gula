@@ -44,6 +44,13 @@ async function arrancarServidor() {
     console.error('No hay dist/. Construye antes con "npm run build".');
     process.exit(1);
   }
+  // Si el puerto ya responde, hay otra prueba corriendo: se para aquí en vez de usar
+  // su servidor, que se lleva por delante esta ejecución en cuanto la otra termina.
+  try {
+    await fetch(BASE);
+    console.error(`El puerto ${PUERTO} ya está ocupado por otra ejecución. Espera a que termine.`);
+    process.exit(1);
+  } catch (e) { /* libre, seguimos */ }
   const srv = spawn("python3", ["-m", "http.server", String(PUERTO), "--directory", "dist"], { stdio: "ignore" });
   for (let i = 0; i < 40; i++) {
     try { const r = await fetch(BASE); if (r.ok) return srv; } catch (e) { /* aún levantando */ }
@@ -257,6 +264,125 @@ async function main() {
   const aviso = await page4.locator(".guardado-confirm").innerText().catch(() => "");
   const sigue = await page4.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")).length);
   ok(/no es una copia/.test(aviso) && sigue === 4, "un fichero que no es una copia se rechaza y no toca nada");
+
+  // ── Todos los selectores de Equipamiento tienen que hacer algo ──────────────
+  // El selector de horno en producción estaba puesto pero el item iba fijo a "Horno
+  // pequeño": elegir Grande no cambiaba nada. Se prueba cada opción de cada control
+  // en los cinco tipos de evento y se exige que la checklist cambie.
+  console.log("\n── Los selectores cambian la checklist ──");
+  const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
+    const n = r.querySelector(".item-name, .item-label");
+    const q = r.querySelector(".item-qty-input");
+    return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}`;
+  }));
+  const escapa = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const tipo of TIPOS) {
+    await page.goto(url({ evento: tipo, pax: 100, ninos: 10 }), { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1900);
+    const grupos = await page.locator(".segment-group").evaluateAll(gs => gs.map(g => ({
+      label: (g.querySelector(".segment-label") || {}).textContent || "",
+      opciones: [...g.querySelectorAll(".segment-btn")].map(b => b.textContent.trim()),
+      activo: ((g.querySelector(".segment-btn.active") || {}).textContent || "").trim(),
+    })));
+    const mudos = [];
+    for (const g of grupos) {
+      const boton = (txt) => page.locator(".segment-group", { hasText: g.label }).first()
+        .locator(".segment-btn", { hasText: new RegExp(`^${escapa(txt)}$`) }).first();
+      for (const op of g.opciones) {
+        if (op === g.activo) continue;
+        const antes = await listaItems(page);
+        await boton(op).click();
+        await page.waitForTimeout(420);
+        if (JSON.stringify(antes) === JSON.stringify(await listaItems(page))) mudos.push(`${g.label} → ${op}`);
+        await boton(g.activo).click();
+        await page.waitForTimeout(380);
+      }
+    }
+    ok(mudos.length === 0, `${tipo}: los ${grupos.length} controles cambian la checklist${mudos.length ? ` → sin efecto: ${mudos.join(", ")}` : ""}`);
+  }
+
+  // ── Recalcular cantidades ───────────────────────────────────────────────────
+  console.log("\n── Recalcular cantidades ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1600, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, nombreEvento: "Boda R" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2300);
+    const filaDe = (n) => p.locator(".item-row", { hasText: n }).first().locator(".item-qty-input");
+    const recalcular = async () => {
+      await p.locator("button", { hasText: "Recalcular cantidades" }).click();
+      await p.waitForTimeout(750);
+      if (!await p.locator(".recalcular-modal").count()) return { modal: false };
+      return { modal: true, filas: await p.locator(".recalcular-row").evaluateAll(rs => rs.map(r => r.innerText.replace(/\n+/g, " ¦ "))) };
+    };
+    // Se guarda para que exista la foto de cantidades contra la que comparar
+    await p.locator("button", { hasText: "Guardar evento" }).first().click();
+    await p.waitForTimeout(600);
+    await p.locator(".dialogo-modal input").fill("Boda R");
+    await p.locator(".dialogo-acciones button").last().click();
+    await p.waitForTimeout(1400);
+    ok((await recalcular()).modal === false, "recién guardado: no pregunta nada");
+
+    // Una cantidad a mano que se queda desfasada al cambiar el pax SÍ se ofrece:
+    // es justo la única que no se actualiza sola.
+    const auto100 = await filaDe("Servilletas cocktail").inputValue();
+    await filaDe("Servilletas cocktail").fill("999");
+    await p.waitForTimeout(600);
+    await p.locator("input[type=number]").first().fill("400");
+    await p.waitForTimeout(1500);
+    const auto400 = await p.locator(".item-row", { hasText: "Manteles" }).first().locator(".item-qty-input").inputValue();
+    const r1 = await recalcular();
+    const suya = (r1.filas || []).filter(f => /Servilletas cocktail/.test(f));
+    ok(r1.modal && suya.length === 1 && /a mano/i.test(suya[0]),
+      `la cantidad puesta a mano aparece marcada "a mano" → ${JSON.stringify(suya)}`);
+    ok(auto100 !== auto400 && r1.filas.length > 1, `y también las automáticas que han cambiado (${(r1.filas || []).length} en total)`);
+
+    // "Usar" el nuevo tiene que QUITAR la edición manual, si no la cantidad se queda clavada
+    await p.locator(".recalcular-row", { hasText: "Servilletas cocktail" }).locator("button", { hasText: "Usar" }).click();
+    await p.locator(".dialogo-acciones button").last().click();
+    await p.waitForTimeout(1200);
+    const tras = await filaDe("Servilletas cocktail").inputValue();
+    ok(tras !== "999" && tras !== auto100, `al elegir "Usar" la cantidad pasa al cálculo nuevo (${auto100} → ${tras})`);
+    ok((await recalcular()).modal === false, "y lo ya decidido no se vuelve a preguntar");
+    await c.close();
+  }
+
+  // ── Ningún campo puede quedar recortado ─────────────────────────────────────
+  // Que la página no desborde no basta: un input de fecha/hora al que no se le da
+  // su ancho natural no desborda, el navegador RECORTA el valor por dentro y se
+  // queda en "28/" o "10:0(". Se compara cada input con un clon suyo dejado crecer.
+  console.log("\n── Nada se corta ──");
+  const CON_FECHAS = {
+    evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: "2027-07-29",
+    horaInicio: "07:00", ubicacion: "Solo Houses",
+    logisticaEquipo: [{ nombre: "Irene", inicio: "10:00", fin: "17:10" }, { nombre: "Raúl", inicio: "10:00", fin: "17:10" }],
+    tarifaLogistica: 10, plusFurgoneta: 25,
+    recogidas: [{ concepto: "Recoger generador", fecha: "2027-07-28", hora: "12:00", fechaDevolucion: "2027-07-30" }],
+    compras: [{ concepto: "Comprar aguas Cartón Makro", cantidad: "5 cajas", fecha: "2027-07-28" }],
+  };
+  for (const w of [320, 412, 768, 1280, 1920]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 1100 }, isMobile: w < 768, hasTouch: w < 768 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(CON_FECHAS), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const cortados = await p.evaluate(() => {
+      const malos = [];
+      document.querySelectorAll("input[type=date], input[type=time]").forEach(i => {
+        const probe = i.cloneNode();
+        probe.style.cssText = "position:absolute;visibility:hidden;width:auto;min-width:0;max-width:none;flex:none";
+        i.parentNode.appendChild(probe);
+        const nat = Math.ceil(probe.getBoundingClientRect().width);
+        probe.remove();
+        const anc = Math.round(i.getBoundingClientRect().width);
+        if (anc < nat - 1) malos.push(`${i.title || i.className}: ${anc}px de ${nat}`);
+      });
+      return malos;
+    });
+    ok(cortados.length === 0, `${w}px: ningún campo de fecha/hora recortado${cortados.length ? ` → ${cortados.join(", ")}` : ""}`);
+    await c.close();
+  }
 
   // ── Avisos de recogidas, devoluciones y compras ─────────────────────────────
   // Un alquiler tiene DOS avisos (recogerlo y devolverlo) y salían los dos a la vez,
