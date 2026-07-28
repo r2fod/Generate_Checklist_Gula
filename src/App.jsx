@@ -576,7 +576,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
-  cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro", "1"]);
+  cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   cats.push({ nombre: "Cocina", items: cocinaItems });
@@ -791,7 +791,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const cocinaItems = [];
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
-  cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Vitro", "1"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"]);
+  cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   cats.push({ nombre: "Cocina y Electro", items: cocinaItems });
@@ -1004,7 +1004,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // hacía nada.
     opt(tipoHorno === "pequeño" || tipoHorno === "ambos", ["Horno pequeño", "1"]),
     opt(tipoHorno === "grande" || tipoHorno === "ambos", ["Horno grande", "1"]),
-    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Túrmix", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
+    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
     ["Vitro", "1"], ["Butano", "1"], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
