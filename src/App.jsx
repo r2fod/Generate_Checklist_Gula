@@ -1485,6 +1485,17 @@ function _norm(s) {
   return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// Los conceptos de las recogidas se escriben con el verbo delante ("Recoger
+// generador"), y al reutilizarlos para el aviso de devolución quedaba un
+// "Devolución: Recoger generador" que se lee al revés. Para la devolución se deja
+// solo el objeto: "Devolución: generador". Si al quitarlo no queda nada, se
+// respeta el texto original tal cual.
+function soloObjeto(concepto) {
+  const txt = String(concepto ?? "");
+  const limpio = txt.replace(/^\s*(recoger|recogida de|recogida|recojer)\s+/i, "").trim();
+  return limpio || txt;
+}
+
 // ─── REVISIÓN DE DATOS GUARDADOS ──────────────────────────────────────────────
 // Reconstruye la checklist (categorías + items) de un evento GUARDADO a partir de
 // su configuración, para poder comparar sus marcas con los items que tendría hoy
@@ -2587,7 +2598,16 @@ export default function App({ onCerrarSesion } = {}) {
       (datos.recogidas || []).forEach((r, idx) => {
         if (!r.concepto) return;
         if (dentroVentana(r.fecha) && !r.recogido) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fecha, tipo: "Recogida", lista: "recogidas", campo: "recogido", dias: diasHasta(r.fecha) });
-        if (dentroVentana(r.fechaDevolucion) && !r.devuelto) avisos.push({ evento: nombreEvt, idx, concepto: r.concepto, fecha: r.fechaDevolucion, tipo: "Devolución", lista: "recogidas", campo: "devuelto", dias: diasHasta(r.fechaDevolucion) });
+        // La devolución NO se avisa mientras la recogida siga pendiente: todavía no hay
+        // nada que devolver y el mismo concepto salía dos veces seguidas ("Recogida:
+        // generador" y justo debajo "Devolución: generador"), que es lo que hacía que
+        // el aviso pareciera duplicado. En cuanto se marca la recogida como hecha,
+        // aparece la devolución. Excepción: si la devolución vence hoy o está atrasada
+        // se avisa igual aunque nadie marcara la recogida, para no pagar días de más.
+        const devVencida = r.fechaDevolucion && diasHasta(r.fechaDevolucion) <= 0;
+        if (dentroVentana(r.fechaDevolucion) && !r.devuelto && (r.recogido || devVencida)) {
+          avisos.push({ evento: nombreEvt, idx, concepto: soloObjeto(r.concepto), fecha: r.fechaDevolucion, tipo: "Devolución", lista: "recogidas", campo: "devuelto", dias: diasHasta(r.fechaDevolucion) });
+        }
       });
       (datos.compras || []).forEach((c, idx) => {
         if (!c.concepto) return;

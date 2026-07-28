@@ -258,6 +258,53 @@ async function main() {
   const sigue = await page4.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")).length);
   ok(/no es una copia/.test(aviso) && sigue === 4, "un fichero que no es una copia se rechaza y no toca nada");
 
+  // ── Avisos de recogidas, devoluciones y compras ─────────────────────────────
+  // Un alquiler tiene DOS avisos (recogerlo y devolverlo) y salían los dos a la vez,
+  // así que el mismo concepto aparecía dos veces seguidas y parecía duplicado. La
+  // devolución solo debe avisar cuando ya se ha recogido... o cuando vence.
+  console.log("\n── Avisos de recogidas y compras ──");
+  const dia = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const chips = (p) => p.locator(".aviso-recogida-chip .aviso-recogida-texto").allInnerTexts();
+
+  const abrirConAvisos = async (recogidas) => {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const estado = {
+      evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: dia(1),
+      recogidas, compras: [{ concepto: "Aguas", cantidad: "5 cajas", fecha: dia(0) }],
+    };
+    await c.addInitScript(e => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({ "Produ kitten": e }));
+      localStorage.setItem("gula_evento_activo", "Produ kitten");
+    }, estado);
+    const p = await nuevaPagina(c);
+    await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2600);
+    return { c, p };
+  };
+
+  // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución
+  const a1 = await abrirConAvisos([{ concepto: "Recoger generador", fecha: dia(0), fechaDevolucion: dia(2) }]);
+  let t = await chips(a1.p);
+  ok(t.length === 2 && t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
+    `sin recoger: solo recogida y compra, sin devolución → ${JSON.stringify(t)}`);
+  const ficha = await a1.p.locator(".resumen-ficha.is-aviso .resumen-ficha-valor").innerText().catch(() => "");
+  ok(parseInt(ficha, 10) === t.length, `la ficha PENDIENTES (${parseInt(ficha, 10)}) coincide con los avisos (${t.length})`);
+
+  // 2) Al marcar la recogida como hecha aparece la devolución, ya sin el verbo delante
+  await a1.p.locator(".aviso-recogida-chip", { hasText: "Recogida" }).locator(".aviso-recogida-hecho").click();
+  await a1.p.waitForTimeout(1500);
+  t = await chips(a1.p);
+  ok(t.length === 2 && t.some(x => /Devolución: "generador"/.test(x)) && !t.some(x => /Recogida:/.test(x)),
+    `tras recogerlo: aparece la devolución sin repetir el verbo → ${JSON.stringify(t)}`);
+  await a1.c.close();
+
+  // 3) Devolución vencida sin recogida marcada: se avisa igual (no se pagan días de más)
+  const a2 = await abrirConAvisos([{ concepto: "Recoger generador", fecha: dia(-4), fechaDevolucion: dia(-1) }]);
+  t = await chips(a2.p);
+  ok(t.some(x => /Devolución/.test(x)), `devolución atrasada: se avisa aunque no se marcara la recogida → ${JSON.stringify(t)}`);
+  await a2.c.close();
+
   await navegador.close();
   srv.kill();
 
