@@ -258,6 +258,42 @@ async function main() {
   const sigue = await page4.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")).length);
   ok(/no es una copia/.test(aviso) && sigue === 4, "un fichero que no es una copia se rechaza y no toca nada");
 
+  // ── Ningún campo puede quedar recortado ─────────────────────────────────────
+  // Que la página no desborde no basta: un input de fecha/hora al que no se le da
+  // su ancho natural no desborda, el navegador RECORTA el valor por dentro y se
+  // queda en "28/" o "10:0(". Se compara cada input con un clon suyo dejado crecer.
+  console.log("\n── Nada se corta ──");
+  const CON_FECHAS = {
+    evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: "2027-07-29",
+    horaInicio: "07:00", ubicacion: "Solo Houses",
+    logisticaEquipo: [{ nombre: "Irene", inicio: "10:00", fin: "17:10" }, { nombre: "Raúl", inicio: "10:00", fin: "17:10" }],
+    tarifaLogistica: 10, plusFurgoneta: 25,
+    recogidas: [{ concepto: "Recoger generador", fecha: "2027-07-28", hora: "12:00", fechaDevolucion: "2027-07-30" }],
+    compras: [{ concepto: "Comprar aguas Cartón Makro", cantidad: "5 cajas", fecha: "2027-07-28" }],
+  };
+  for (const w of [320, 412, 768, 1280, 1920]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 1100 }, isMobile: w < 768, hasTouch: w < 768 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(CON_FECHAS), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const cortados = await p.evaluate(() => {
+      const malos = [];
+      document.querySelectorAll("input[type=date], input[type=time]").forEach(i => {
+        const probe = i.cloneNode();
+        probe.style.cssText = "position:absolute;visibility:hidden;width:auto;min-width:0;max-width:none;flex:none";
+        i.parentNode.appendChild(probe);
+        const nat = Math.ceil(probe.getBoundingClientRect().width);
+        probe.remove();
+        const anc = Math.round(i.getBoundingClientRect().width);
+        if (anc < nat - 1) malos.push(`${i.title || i.className}: ${anc}px de ${nat}`);
+      });
+      return malos;
+    });
+    ok(cortados.length === 0, `${w}px: ningún campo de fecha/hora recortado${cortados.length ? ` → ${cortados.join(", ")}` : ""}`);
+    await c.close();
+  }
+
   // ── Avisos de recogidas, devoluciones y compras ─────────────────────────────
   // Un alquiler tiene DOS avisos (recogerlo y devolverlo) y salían los dos a la vez,
   // así que el mismo concepto aparecía dos veces seguidas y parecía duplicado. La

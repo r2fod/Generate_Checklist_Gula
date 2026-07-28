@@ -1199,8 +1199,11 @@ body {
   flex-wrap: wrap;
 }
 
+/* El nombre ocupa su propia línea y las dos horas van debajo repartiéndose el
+   ancho. Antes iban los tres en una sola línea y las horas se quedaban en 102px,
+   con lo que el navegador cortaba el valor y se leía "10:0(" en vez de "10:00". */
 .logistica-nombre {
-  flex: 1 1 120px;
+  flex: 1 1 100%;
   min-width: 0;
 }
 
@@ -1227,9 +1230,15 @@ body {
   min-width: 0;
 }
 
+/* Dos columnas SOLO si caben de verdad. Un input de fecha nativo necesita ~162px
+   para enseñar "30/07/2026" con su icono, y la pareja fecha+hora ~305px: partiendo
+   la tarjeta en dos mitades fijas quedaban a 77px y el navegador recortaba el valor
+   ("28/" en vez de "28/07/2026"). Con auto-fit, si no hay sitio para dos columnas
+   de 300px se apilan y cada campo se ve entero. El min(100%,...) evita que en
+   móvil (menos de 300px de tarjeta) la columna sea más ancha que la pantalla. */
 .recogida-card-fechas {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 10px;
 }
 /* Por defecto una celda de grid no encoge por debajo de su contenido, así que en
@@ -1237,24 +1246,23 @@ body {
    hacia la derecha. Con min-width:0 la celda cede y los inputs se reparten. */
 .recogida-card-fechas > * { min-width: 0; }
 
+/* Fecha y hora de la recogida: se reparten la fila si caben las dos enteras y, si
+   no (móvil estrecho), la hora baja a la línea siguiente en vez de recortarse. */
 .recogida-fecha-hora {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .recogida-fecha-hora .form-input {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-@media (max-width: 480px) {
-  .recogida-card-fechas {
-    grid-template-columns: 1fr;
-  }
-}
-
 .logistica-hora {
-  flex: 0 0 auto;
-  width: 102px;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .logistica-sep {
