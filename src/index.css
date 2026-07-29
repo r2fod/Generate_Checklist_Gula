@@ -2508,8 +2508,8 @@ hr {
 .carga-nota-recordatorio {
   margin: 12px 24px 0;
   padding: 12px 14px;
-  background: #fff8e6;
-  border: 1px solid #f2d68a;
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-borde);
   border-left: 4px solid #d99e2b;
   border-radius: 10px;
   box-shadow: 0 4px 14px rgba(217, 158, 43, 0.16);
@@ -2517,8 +2517,8 @@ hr {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 .carga-nota-recordatorio.is-completo {
-  background: #eef9f1;
-  border-color: #bfe6cb;
+  background: var(--ok-bg);
+  border-color: var(--ok-borde);
   border-left-color: #2fa25b;
   box-shadow: none;
 }
@@ -2551,19 +2551,20 @@ hr {
   font-size: 0.78rem;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #a86e12;
+  color: var(--aviso-texto);
 }
-.is-completo .carga-nota-titulo { color: #1f7a44; }
+.is-completo .carga-nota-titulo { color: var(--ok-texto); }
 .carga-nota-progreso {
   flex-shrink: 0;
   font-size: 0.78rem;
   font-weight: 700;
-  color: #b07d1c;
-  background: #fbeecb;
+  color: var(--aviso-texto);
+  background: var(--card-bg);
+  border: 1px solid var(--aviso-borde);
   border-radius: 999px;
   padding: 2px 9px;
 }
-.is-completo .carga-nota-progreso { color: #1f7a44; background: #d6f0de; }
+.is-completo .carga-nota-progreso { color: var(--ok-texto); background: var(--card-bg); border-color: var(--ok-borde); }
 .carga-nota-silenciar {
   flex-shrink: 0;
   display: inline-flex;
@@ -2591,13 +2592,13 @@ hr {
   align-items: flex-start;
   gap: 10px;
   padding: 8px 10px;
-  background: var(--superficie-velo-suave);
-  border: 1px solid #f0dca6;
+  background: var(--card-bg);
+  border: 1px solid var(--aviso-borde);
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-.carga-nota-item:hover { background: var(--card-bg); }
+.carga-nota-item:hover { background: var(--bg-subtle); }
 .carga-nota-item input[type="checkbox"] {
   flex-shrink: 0;
   width: 20px;
@@ -2609,23 +2610,23 @@ hr {
 .carga-nota-item-texto {
   font-size: 0.95rem;
   line-height: 1.35;
-  color: #5f4708;
+  color: var(--text-main);
   word-break: break-word;
 }
 .carga-nota-item.is-hecho {
-  background: #eef9f1;
-  border-color: #cbe9d4;
+  background: var(--ok-bg);
+  border-color: var(--ok-borde);
 }
 .carga-nota-item.is-hecho .carga-nota-item-texto {
   text-decoration: line-through;
-  color: #7ba98c;
+  color: var(--text-muted);
 }
 .carga-nota-completo-msg {
   margin-top: 9px;
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #1f7a44;
+  color: var(--ok-texto);
   font-size: 0.86rem;
   font-weight: 600;
 }
@@ -3592,3 +3593,186 @@ hr {
 /* Resumen: el nombre de la categoría lleva su color de marca en un estilo en línea,
    que en oscuro queda casi negro sobre fondo oscuro. Aquí manda el color del tema. */
 :root[data-tema="oscuro"] .resumen-cat-header td { color: var(--text-main) !important; }
+
+/* ─── MODAL "AÑADIR VARIOS ITEMS" ──────────────────────────────────────────────
+   Era el único sitio de la app con los colores escritos a mano en el JSX (#fff,
+   #1f314d, #374151...). Un estilo en línea gana a las variables del tema, así que
+   en modo oscuro salía un modal blanco en una app oscura. Ahora usa las mismas
+   variables que el resto y sigue al tema solo. */
+.agregar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.agregar-modal {
+  background: var(--card-bg);
+  color: var(--text-main);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 680px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.agregar-cabecera {
+  background: var(--primary-navy);
+  color: var(--card-bg);
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.agregar-titulo {
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agregar-subtitulo {
+  font-size: 0.8rem;
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
+.agregar-cerrar {
+  background: rgba(127, 127, 127, 0.28);
+  border: none;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.agregar-cuerpo {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agregar-nota,
+.agregar-ok,
+.agregar-error {
+  border-radius: var(--radius-sm);
+  padding: 13px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.agregar-nota  { background: var(--accent-soft); border: 1px solid var(--border-color-strong); color: var(--text-main); }
+.agregar-ok    { background: var(--ok-bg);    border: 1px solid var(--ok-borde);    color: var(--ok-texto); }
+.agregar-error { background: var(--error-bg); border: 1px solid var(--error-borde); color: var(--error-texto); }
+
+.agregar-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agregar-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-label);
+}
+
+.agregar-btn-principal,
+.agregar-btn-confirmar,
+.agregar-btn-atras {
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 12px 16px;
+}
+.agregar-btn-principal { background: var(--primary-navy); color: var(--card-bg); border: none; }
+.agregar-btn-confirmar { background: var(--green-btn);    color: #ffffff;        border: none; flex: 1; }
+.agregar-btn-atras     { background: transparent; color: var(--text-main); border: 1px solid var(--border-color-strong); font-weight: 600; }
+.agregar-btn-principal:disabled,
+.agregar-btn-confirmar:disabled { opacity: 0.6; cursor: default; }
+
+.agregar-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.agregar-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  cursor: pointer;
+}
+.agregar-fila.is-duplicado {
+  border-color: var(--aviso-borde);
+  background: var(--aviso-bg);
+}
+
+.agregar-fila-nombre { font-weight: 600; color: var(--text-main); font-size: 0.9rem; }
+.agregar-fila-qty    { font-weight: 700; color: var(--green-qty); }
+.agregar-fila-nota   { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+.agregar-acciones {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .agregar-cuerpo { padding: 16px; }
+  .agregar-cabecera { padding: 14px 16px; }
+}
+
+/* En pantallas muy estrechas (320-360px, tipo iPhone SE) el nombre del item se
+   quedaba en unos 57px de ancho porque la cantidad, la unidad y los dos botones se
+   llevaban el resto: "Vasos de cartón café mini (personal)" salía partido palabra a
+   palabra en seis líneas y la fila medía 125px de alto. Aquí la fila pasa a dos
+   pisos: el nombre arriba a todo lo ancho, y debajo la cantidad, la unidad y los
+   botones en una sola línea. */
+@media (max-width: 360px) {
+  .item-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px 10px;
+  }
+
+  .item-row > .item-name,
+  .item-row > .item-edit-row {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .item-row > .item-qty-input {
+    max-width: none;
+    width: 92px;
+  }
+
+  .item-row > .item-actions {
+    justify-self: end;
+  }
+}

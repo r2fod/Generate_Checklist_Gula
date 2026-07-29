@@ -265,6 +265,53 @@ async function main() {
   const sigue = await page4.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")).length);
   ok(/no es una copia/.test(aviso) && sigue === 4, "un fichero que no es una copia se rechaza y no toca nada");
 
+  // ── Todo el texto se tiene que poder leer, en los dos temas ─────────────────
+  // Un color fijo en el CSS se lee bien en claro y desaparece en oscuro (o al revés).
+  // Se mide el contraste real de cada texto contra su fondo con la fórmula WCAG y se
+  // exige el mínimo AA: 4,5 normal y 3 para texto grande o en negrita.
+  console.log("\n── Contraste en los dos temas ──");
+  const SONDA_CONTRASTE = `window.__contraste = () => {
+    const lum = (c) => { const [r,g,b] = c.map(v => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*r+0.7152*g+0.0722*b; };
+    const parse = (s) => { const m=(s||"").match(/[\\d.]+/g); return m ? m.slice(0,3).map(Number) : null; };
+    const alpha = (s) => { const m=(s||"").match(/[\\d.]+/g); return m && m.length>3 ? Number(m[3]) : 1; };
+    const fondoDe = (el) => { let n=el; while(n && n!==document.documentElement){ const bg=getComputedStyle(n).backgroundColor; if(alpha(bg)>0.85) return parse(bg); n=n.parentElement; } return [255,255,255]; };
+    const malos = [];
+    document.querySelectorAll("span,label,button,strong,p,h1,h2,h3,td,th,a,div,em").forEach(e => {
+      if (e.children.length || !e.offsetParent) return;
+      const t = (e.textContent||"").trim(); if (!t) return;
+      const cs = getComputedStyle(e);
+      if (cs.visibility === "hidden" || Number(cs.opacity) < 0.5) return;
+      const fg = parse(cs.color), bg = fondoDe(e); if (!fg||!bg) return;
+      const l1=lum(fg), l2=lum(bg); const r=(Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05);
+      const px=parseFloat(cs.fontSize), grande = px>=24 || (px>=18.66 && Number(cs.fontWeight)>=700);
+      const min = grande?3:4.5;
+      if (r < min) malos.push("«"+t.slice(0,24)+"» "+r.toFixed(2)+"/"+min);
+    });
+    return [...new Set(malos)];
+  };`;
+  for (const tema of ["claro", "oscuro"]) {
+    const c = await navegador.newContext({ viewport: { width: 412, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(t => localStorage.setItem("gula_tema", t), tema);
+    await c.addInitScript(SONDA_CONTRASTE);
+    const p = await nuevaPagina(c);
+    await p.goto(url({
+      evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: "2027-07-29",
+      notasEvento: "Coger comida del congelador\nHielo",
+      logisticaEquipo: [{ nombre: "Irene", inicio: "10:00", fin: "17:10" }],
+      recogidas: [{ concepto: "Recoger generador", fecha: "2027-07-28", fechaDevolucion: "2027-07-30" }],
+      compras: [{ concepto: "Aguas", cantidad: "5 cajas", fecha: "2027-07-28" }],
+    }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const malos = await p.evaluate(() => window.__contraste());
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1100);
+    const malosCarga = await p.evaluate(() => window.__contraste());
+    const todos = [...new Set([...malos, ...malosCarga])];
+    ok(todos.length === 0, `${tema}: todo el texto llega al mínimo legible${todos.length ? ` → ${todos.slice(0, 4).join(", ")}${todos.length > 4 ? ` +${todos.length - 4}` : ""}` : ""}`);
+    await c.close();
+  }
+
   // ── Todos los selectores de Equipamiento tienen que hacer algo ──────────────
   // El selector de horno en producción estaba puesto pero el item iba fijo a "Horno
   // pequeño": elegir Grande no cambiaba nada. Se prueba cada opción de cada control

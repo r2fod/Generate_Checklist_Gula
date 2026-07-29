@@ -2318,28 +2318,28 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
   const tituloPaso = { pegar: "Pega los items que quieras añadir", confirmar: "Revisa antes de añadir" }[paso];
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 680, boxShadow: "0 25px 60px rgba(0,0,0,0.3)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
+    <div className="agregar-overlay" onClick={onClose}>
+      <div className="agregar-modal" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ background: "#1f314d", color: "white", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="agregar-cabecera">
           <div>
-            <div style={{ fontWeight: 700, fontSize: "1.05rem", display: "inline-flex", alignItems: "center", gap: 8 }}><ListPlus size={18} /> Añadir varios items</div>
-            <div style={{ opacity: 0.6, fontSize: "0.8rem", marginTop: 2 }}>{tituloPaso}</div>
+            <div className="agregar-titulo"><ListPlus size={18} /> Añadir varios items</div>
+            <div className="agregar-subtitulo">{tituloPaso}</div>
           </div>
-          <button onClick={onClose} aria-label="Cerrar" style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "white", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}><X size={14} /></button>
+          <button onClick={onClose} aria-label="Cerrar" className="agregar-cerrar"><X size={14} /></button>
         </div>
 
-        <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="agregar-cuerpo">
 
           {/* PASO PEGAR */}
           {paso === "pegar" && (
             <>
-              <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, padding: 14, fontSize: "0.85rem", color: "#0369a1" }}>
+              <div className="agregar-nota">
                 <Info size={14} /> Pega una lista de items, uno por línea. Puedes incluir la cantidad separada por tabulador, dos puntos o guion (ej. <em>"Vasos de tubo: 50"</em>); si no pones cantidad se añade con "1".
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}>Items a añadir</label>
+              <div className="agregar-campo">
+                <label className="agregar-label">Items a añadir</label>
                 <textarea
                   placeholder={"Vasos de tubo: 50\nManteles negros\nFocos led - 4"}
                   value={texto}
@@ -2348,8 +2348,8 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
                   style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.85rem", fontFamily: "monospace", cursor: "text", resize: "vertical" }}
                 />
               </div>
-              {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: 12, color: "#dc2626", fontSize: "0.85rem" }}><AlertTriangle size={14} /> {error}</div>}
-              <button onClick={analizar} disabled={!texto.trim()} style={{ background: "#1f314d", color: "white", border: "none", borderRadius: 8, padding: "12px", fontWeight: 700, cursor: "pointer", fontSize: "0.95rem", opacity: !texto.trim() ? 0.6 : 1 }}>
+              {error && <div className="agregar-error"><AlertTriangle size={14} /> {error}</div>}
+              <button onClick={analizar} disabled={!texto.trim()} className="agregar-btn-principal">
                 Analizar →
               </button>
             </>
@@ -2358,16 +2358,16 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
           {/* PASO CONFIRMAR: aviso previo — qué se añade, qué se omite por estar ya en la checklist */}
           {paso === "confirmar" && (
             <>
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, padding: 12, fontSize: "0.85rem", color: "#15803d" }}>
+              <div className="agregar-ok">
                 ✓ {propuestos.length} items interpretados. Desmarca los que no quieras añadir — los ya presentes en la checklist aparecen desmarcados por defecto para no duplicar.
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 360, overflowY: "auto" }}>
+              <div className="agregar-lista">
                 {propuestos.map((p, idx) => (
-                  <label key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: `1px solid ${p.duplicado ? "#fde68a" : "#e5e7eb"}`, borderRadius: 8, background: p.duplicado ? "#fffbeb" : "white", cursor: "pointer" }}>
+                  <label key={idx} className={`agregar-fila ${p.duplicado ? "is-duplicado" : ""}`}>
                     <input type="checkbox" checked={p.incluir} onChange={() => toggleIncluir(idx)} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, color: "#1f314d", fontSize: "0.9rem" }}>{p.label} <span style={{ fontWeight: 700, color: "#16a34a" }}>· {p.qty}</span></div>
-                      <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 2 }}>
+                      <div className="agregar-fila-nombre">{p.label} <span className="agregar-fila-qty">· {p.qty}</span></div>
+                      <div className="agregar-fila-nota">
                         {p.duplicado ? "⚠ Ya existe en la checklist (se omite)" : `Se añadirá a: ${p.categoria}`}
                       </div>
                     </div>
@@ -2375,9 +2375,9 @@ function ModalAgregarItems({ checklist, categoriasDisponibles, onClose, onConfir
                 ))}
               </div>
 
-              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                <button onClick={() => setPaso("pegar")} style={{ background: "transparent", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 16px", cursor: "pointer", fontWeight: 600, color: "#374151" }}>← Atrás</button>
-                <button onClick={confirmar} disabled={nInclu === 0} style={{ background: "#22c55e", color: "white", border: "none", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", flex: 1, opacity: nInclu === 0 ? 0.6 : 1 }}>
+              <div className="agregar-acciones">
+                <button onClick={() => setPaso("pegar")} className="agregar-btn-atras">← Atrás</button>
+                <button onClick={confirmar} disabled={nInclu === 0} className="agregar-btn-confirmar">
                   ✓ Añadir {nInclu} item{nInclu === 1 ? "" : "s"}
                 </button>
               </div>
@@ -2415,6 +2415,20 @@ function leerEstadoGuardado() {
   } catch (e) { /* link corrupto, localStorage no disponible, o JSON inválido: se ignora */ }
   return { estado: {}, desdeLink: false };
 }
+
+// Selector de opciones en botones (Sillas, Horno, Cafetera...). Va a nivel de módulo
+// a propósito: definido dentro de App, React lo trata como un componente NUEVO en cada
+// render y desmonta y vuelve a montar los nueve selectores con cada tecla que se pulse.
+const SegmentedControl = React.memo(({ value, onChange, options, label }) => (
+  <div className="segment-group">
+    <span className="segment-label">{label}</span>
+    <div className="segmented-control">
+      {options.map(opt => (
+        <button key={opt} className={`segment-btn ${value === opt ? "active" : ""}`} onClick={() => onChange(opt)}>{opt}</button>
+      ))}
+    </div>
+  </div>
+));
 
 // Lista que muestra solo unos pocos elementos y despliega el resto bajo demanda,
 // para que "Eventos guardados" y "Plantillas" no crezcan sin fin cuando hay muchos.
@@ -3705,17 +3719,6 @@ export default function App({ onCerrarSesion } = {}) {
     });
     setMenuCompartir(false);
   };
-
-  const SegmentedControl = ({ value, onChange, options, label }) => (
-    <div className="segment-group">
-      <span className="segment-label">{label}</span>
-      <div className="segmented-control">
-        {options.map(opt => (
-          <button key={opt} className={`segment-btn ${value === opt ? "active" : ""}`} onClick={() => onChange(opt)}>{opt}</button>
-        ))}
-      </div>
-    </div>
-  );
 
   return (
     <>
