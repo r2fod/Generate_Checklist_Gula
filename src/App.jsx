@@ -1530,6 +1530,26 @@ function parsePreciosPegados(texto) {
   return precios;
 }
 
+// ─── TEMA CLARO/OSCURO ────────────────────────────────────────────────────────
+// El automático va por horario: oscuro de noche, claro de día. Las horas son las de la
+// jornada de un catering — a las 20:00 ya se monta con luz artificial.
+export const HORA_OSCURO = 20, HORA_CLARO = 7;
+export function esHoraDeOscuro(ahora = new Date()) {
+  const h = ahora.getHours();
+  return h >= HORA_OSCURO || h < HORA_CLARO;
+}
+export function leerPreferenciaTema() {
+  try {
+    const g = localStorage.getItem("gula_tema");
+    if (g === "claro" || g === "oscuro" || g === "auto") return g;
+  } catch (e) { /* localStorage no disponible */ }
+  return "auto";
+}
+export function temaSegunPreferencia(pref, ahora = new Date()) {
+  if (pref === "claro" || pref === "oscuro") return pref;
+  return esHoraDeOscuro(ahora) ? "oscuro" : "claro";
+}
+
 // Normaliza un texto para buscar sin importar tildes ni mayúsculas.
 function _norm(s) {
   return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -2665,13 +2685,19 @@ export default function App({ onCerrarSesion } = {}) {
   // la lista cuando faltan DIAS_AVISO días o menos (o si ya están atrasados), no solo el
   // mismo día. Cada aviso lleva su lista y campo para poder marcarlo como hecho.
   const DIAS_AVISO = 3;
+  // Suelo por abajo: una recogida de hace dos meses que nunca se marcó no es un
+  // recordatorio, es ruido que tapa lo de esta semana. Se deja de avisar pasado ese
+  // tiempo (el dato sigue en el evento, solo desaparece del panel de avisos).
+  const DIAS_AVISO_CADUCA = 60;
   const avisosRecogidas = useMemo(() => {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     const hoyISO = hoy.toISOString().slice(0, 10);
     const limite = new Date(hoy); limite.setDate(limite.getDate() + DIAS_AVISO);
     const limiteISO = limite.toISOString().slice(0, 10);
     const diasHasta = (f) => Math.round((new Date(f + "T00:00:00") - hoy) / 86400000);
-    const dentroVentana = (f) => f && f <= limiteISO;
+    const suelo = new Date(hoy); suelo.setDate(suelo.getDate() - DIAS_AVISO_CADUCA);
+    const sueloISO = suelo.toISOString().slice(0, 10);
+    const dentroVentana = (f) => f && f <= limiteISO && f >= sueloISO;
     const avisos = [];
     Object.entries(eventosGuardados).forEach(([nombreEvt, datos]) => {
       (datos.recogidas || []).forEach((r, idx) => {
@@ -2954,20 +2980,28 @@ export default function App({ onCerrarSesion } = {}) {
     eventoActivoRef.current = nombre || "";
     try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
   };
-  // Tema claro/oscuro. Arranca con lo que haya elegido el usuario y, si no ha elegido
-  // nada, con lo que pida el sistema. Se marca en el <html> para que el CSS cambie
-  // solo la paleta (ninguna regla de maquetación depende del tema).
-  const [tema, setTema] = useState(() => {
-    try {
-      const guardado = localStorage.getItem("gula_tema");
-      if (guardado === "claro" || guardado === "oscuro") return guardado;
-    } catch (e) { /* localStorage no disponible */ }
-    return (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "oscuro" : "claro";
-  });
+  // Tema: automático por horario, o fijado a mano. Tres posiciones en el mismo botón:
+  //   auto   → oscuro de las 20:00 a las 7:00, claro el resto del día (y cambia solo
+  //            mientras la app está abierta: montando al atardecer se pone oscuro)
+  //   claro  → siempre claro
+  //   oscuro → siempre oscuro
+  // Lo elegido se recuerda. Quien ya tenía "claro" u "oscuro" guardado de antes lo
+  // conserva; el automático es lo que viene de fábrica.
+  const [preferenciaTema, setPreferenciaTema] = useState(() => leerPreferenciaTema());
+  const [tema, setTema] = useState(() => temaSegunPreferencia(leerPreferenciaTema()));
   useEffect(() => {
-    document.documentElement.dataset.tema = tema;
-    try { localStorage.setItem("gula_tema", tema); } catch (e) { /* localStorage no disponible */ }
-  }, [tema]);
+    try { localStorage.setItem("gula_tema", preferenciaTema); } catch (e) { /* localStorage no disponible */ }
+    const aplicar = () => setTema(temaSegunPreferencia(preferenciaTema));
+    aplicar();
+    if (preferenciaTema !== "auto") return;
+    // En automático se vuelve a mirar la hora cada 5 minutos y al volver a la pestaña,
+    // para que el cambio ocurra aunque la app lleve horas abierta
+    const cadaRato = setInterval(aplicar, 5 * 60 * 1000);
+    const alVolver = () => { if (document.visibilityState === "visible") aplicar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { clearInterval(cadaRato); document.removeEventListener("visibilitychange", alVolver); };
+  }, [preferenciaTema]);
+  useEffect(() => { document.documentElement.dataset.tema = tema; }, [tema]);
   const guardarEventos = (obj) => {
     const anterior = eventosGuardadosRef.current;
     eventosGuardadosRef.current = obj;
@@ -3474,6 +3508,27 @@ export default function App({ onCerrarSesion } = {}) {
   });
 
   // Quita de la lista un item calculado (los manuales se borran de itemsManuales)
+  // Items quitados con la ✕, agrupados por categoría. Antes solo se podían recuperar con
+  // "Deshacer", que vive en memoria: al recargar, ese item se había ido para siempre en
+  // ese evento. Con esto cada categoría enseña cuántos tiene quitados y deja recuperarlos.
+  const ocultosPorCategoria = useMemo(() => {
+    const m = {};
+    Object.keys(itemsOcultos).forEach(k => {
+      if (!itemsOcultos[k]) return;
+      const cat = k.split("::")[0];
+      (m[cat] ||= []).push(k.slice(cat.length + 2));
+    });
+    return m;
+  }, [itemsOcultos]);
+  const handleRecuperarOcultos = (categoria) => {
+    pushHistorial();
+    setItemsOcultos(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (k.startsWith(`${categoria}::`)) delete next[k]; });
+      return next;
+    });
+  };
+
   const handleOcultarItem = (categoria, labelOriginal) => {
     ultimaClaveEditadaRef.current = null;
     pushHistorial();
@@ -3826,12 +3881,24 @@ export default function App({ onCerrarSesion } = {}) {
             {/* El interruptor de tema va con el título, no en la rejilla de acciones:
                 siendo un icono suelto dejaba una celda huérfana y descuadraba la fila
                 de botones en el móvil. Lleva texto para que se encuentre. */}
-            <button
-              className="btn btn-tema"
-              onClick={() => setTema(t => (t === "oscuro" ? "claro" : "oscuro"))}
-              title={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-              aria-label={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            >{tema === "oscuro" ? <><Sun size={15} /> Claro</> : <><Moon size={15} /> Oscuro</>}</button>
+            {(() => {
+              const siguiente = { auto: "claro", claro: "oscuro", oscuro: "auto" }[preferenciaTema];
+              const etiqueta = {
+                auto: `Automático (ahora ${tema})`,
+                claro: "Siempre claro",
+                oscuro: "Siempre oscuro",
+              }[preferenciaTema];
+              const rotulo = { auto: "Auto", claro: "Claro", oscuro: "Oscuro" }[preferenciaTema];
+              const Icono = preferenciaTema === "auto" ? Clock : (preferenciaTema === "oscuro" ? Moon : Sun);
+              return (
+                <button
+                  className={`btn btn-tema ${preferenciaTema === "auto" ? "es-auto" : ""}`}
+                  onClick={() => setPreferenciaTema(siguiente)}
+                  title={`${etiqueta} · el automático pone oscuro de ${HORA_OSCURO}:00 a ${HORA_CLARO}:00. Pulsa para pasar a "${{ auto: "automático", claro: "siempre claro", oscuro: "siempre oscuro" }[siguiente]}"`}
+                  aria-label={etiqueta}
+                ><Icono size={15} /> {rotulo}</button>
+              );
+            })()}
           </div>
           <div className="header-actions">
             <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
@@ -4777,6 +4844,17 @@ export default function App({ onCerrarSesion } = {}) {
                       </div>
                     );
                   })}
+                  {(ocultosPorCategoria[cat.nombre] || []).length > 0 && (
+                    <div className="items-quitados">
+                      <span className="items-quitados-texto">
+                        {ocultosPorCategoria[cat.nombre].length} item{ocultosPorCategoria[cat.nombre].length === 1 ? "" : "s"} quitado{ocultosPorCategoria[cat.nombre].length === 1 ? "" : "s"}
+                        <em title={ocultosPorCategoria[cat.nombre].join(" · ")}>{ocultosPorCategoria[cat.nombre].join(" · ")}</em>
+                      </span>
+                      <button className="items-quitados-btn" onClick={() => handleRecuperarOcultos(cat.nombre)}>
+                        <RotateCcw size={13} /> Recuperar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -11,10 +11,14 @@ import Acceso from './Acceso.jsx'
 // El tema se pone en el <html> ANTES de montar React: así no hay un fogonazo de
 // blanco al arrancar y la pantalla de acceso también sale en oscuro.
 function aplicarTemaInicial() {
-  let tema = null;
-  try { const g = localStorage.getItem("gula_tema"); if (g === "claro" || g === "oscuro") tema = g; }
+  // Mismo criterio que dentro de la app (ver temaSegunPreferencia en App.jsx): lo que
+  // esté fijado a mano manda, y en automático va por hora. Se hace ANTES de montar React
+  // para que no haya un fogonazo de blanco al arrancar de noche.
+  let pref = "auto";
+  try { const g = localStorage.getItem("gula_tema"); if (g === "claro" || g === "oscuro" || g === "auto") pref = g; }
   catch (e) { /* localStorage no disponible */ }
-  if (!tema) tema = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "oscuro" : "claro";
+  const h = new Date().getHours();
+  const tema = pref === "claro" || pref === "oscuro" ? pref : (h >= 20 || h < 7 ? "oscuro" : "claro");
   document.documentElement.dataset.tema = tema;
 }
 aplicarTemaInicial()
@@ -38,3 +42,14 @@ async function arrancar() {
 }
 
 arrancar()
+
+// El service worker hace que la app abra sin cobertura (ver public/sw.js). Se registra
+// DESPUÉS de pintar para no retrasar el arranque, y si el navegador no lo soporta o
+// falla, la app funciona igual que siempre — solo pierde el modo sin conexión.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register(new URL("sw.js", window.location.href), { scope: "./" })
+      .catch(() => {})
+  })
+}

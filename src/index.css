@@ -3278,6 +3278,17 @@ hr {
 .compartir-menu > button, .add-item-card > span {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
+/* ...menos las opciones de Compartir: son una LISTA (Word, PDF, WhatsApp...), no
+   botones sueltos. Centradas quedaban cada una en un sitio y los iconos en zigzag.
+   Van pegadas a la izquierda y con los iconos en columna, como cualquier menú. */
+.compartir-menu > button {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.compartir-menu > button svg {
+  width: 16px;
+  height: 16px;
+}
 /* Icono que gira/late en botones de acción al pasar el ratón */
 .btn:hover svg, .plantilla-row:hover .plantilla-link svg { transition: transform 0.25s ease; }
 .plantilla-borrar:hover svg { transform: rotate(90deg); transition: transform 0.2s ease; }
@@ -3824,4 +3835,124 @@ hr {
   flex-shrink: 0;
   min-height: 40px;
   padding: 8px 18px;
+}
+
+/* ─── ZONAS TÁCTILES EN MÓVIL ──────────────────────────────────────────────────
+   Medido: 71 botones y casillas por debajo de 32px de alto o ancho — los ✎/✕ de cada
+   item median 27px y las casillas 16-20px, cuando lo cómodo son 44. Cargando un camión
+   con las manos frías o mojadas eso se falla. Aquí se agranda la ZONA DE TOQUE sin
+   cambiar el tamaño del icono: los botones crecen por relleno, y las casillas usan una
+   capa invisible que extiende el área sin mover nada de sitio.
+   Solo en móvil: en escritorio se apunta con el ratón y no hace falta. */
+@media (hover: none), (max-width: 767px) {
+  .item-action-btn,
+  .cat-edit-btn,
+  .carga-nota-silenciar,
+  .cambios-remotos-cerrar,
+  .aviso-recogida-hecho,
+  .logistica-add-rec,
+  .btn-mantenimiento {
+    min-width: 40px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Las casillas conservan su tamaño visible y ganan zona de toque por debajo, sin
+     empujar nada: la capa sobresale por igual a los cuatro lados. */
+  .checkbox-label-normal input[type="checkbox"],
+  .recogida-estado input[type="checkbox"],
+  .carga-nota-item input[type="checkbox"],
+  .item-edit-alquiler-check input[type="checkbox"],
+  .add-item-alquiler-check input[type="checkbox"] {
+    position: relative;
+  }
+  .checkbox-label-normal input[type="checkbox"]::after,
+  .recogida-estado input[type="checkbox"]::after,
+  .carga-nota-item input[type="checkbox"]::after,
+  .item-edit-alquiler-check input[type="checkbox"]::after,
+  .add-item-alquiler-check input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Las etiquetas que envuelven una casilla ya son "clicables" enteras: se les da alto
+     mínimo para que el dedo tenga dónde caer. */
+  .recogida-estado,
+  .carga-nota-item,
+  .aviso-recogida-chip {
+    min-height: 44px;
+  }
+
+  /* Los enlaces sueltos de mantenimiento (copia de seguridad, restaurar) */
+  .mantenimiento-fila .btn-mantenimiento {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}
+
+/* Línea al final de la categoría con los items que se han quitado con la ✕. Antes solo
+   los devolvía "Deshacer", que vive en memoria: al recargar se habían ido para siempre
+   en ese evento. */
+.items-quitados {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 22px;
+  border-top: 1px dashed var(--border-color-strong);
+  background: var(--bg-subtle);
+}
+
+.items-quitados-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-label);
+}
+
+.items-quitados-texto em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.items-quitados-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color-strong);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 40px;
+}
+
+.items-quitados-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (max-width: 480px) {
+  .items-quitados { padding: 10px 14px; }
 }
