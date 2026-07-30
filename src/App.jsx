@@ -959,8 +959,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // tiene sombra, nave o interior.
   const CARPA_BUFFET = 1, CARPA_CAMION = 1;
   const carpasComer = Math.max(1, Math.ceil(pax / 12));
-  const numCarpas = carpasComer + CARPA_BUFFET + CARPA_CAMION;
-  const PAREDES_POR_CARPA = 3, PESAS_POR_CARPA = 4;
+  const carpasIdeal = carpasComer + CARPA_BUFFET + CARPA_CAMION;
+  // Lo que hay en almacén: no se puede cargar más de lo que se tiene. La cantidad que
+  // sale es la que se coge del almacén, y si el cálculo pide más se avisa al lado para
+  // poder alquilar la diferencia a tiempo.
+  const CARPAS_EN_ALMACEN = 8, PESAS_EN_ALMACEN = 6;
+  const numCarpas = Math.min(carpasIdeal, CARPAS_EN_ALMACEN);
+  const faltanCarpas = Math.max(0, carpasIdeal - CARPAS_EN_ALMACEN);
+  const PAREDES_POR_CARPA = 3;
   const numChafers = Math.max(2, Math.ceil(pax / 40));
   // Las mesas de 1,8m van todas en un único total: cocina/servicio (por pax) + 4 de
   // buffet + 1 para el camión. La cuadrada 1x1 de la zona de cajas sucias va aparte
@@ -982,10 +988,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // Carpas, paredes y pesas en tres líneas: antes ponía "Carpas con paredes y pesas"
     // y más abajo otra línea de paredes, así que no se sabía si las de la primera
     // estaban incluidas o no. Tres paredes por carpa (tres caras cerradas y una
-    // abierta para entrar) y cuatro pesas, una por pata.
-    opt(llevaCarpas, ["Carpas", String(numCarpas)]),
+    // abierta para entrar) y dos pesas por carpa.
+    opt(llevaCarpas, ["Carpas", faltanCarpas > 0
+      ? conSufijo(numCarpas, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpas}, hay que alquilarlas`)
+      : String(numCarpas)]),
     opt(llevaCarpas, ["Paredes de carpas", String(numCarpas * PAREDES_POR_CARPA)]),
-    opt(llevaCarpas, ["Pesas", String(numCarpas * PESAS_POR_CARPA)]),
+    // Las pesas son las que hay: se cargan todas y se reparten entre las carpas más
+    // expuestas al viento, no van por carpa
+    opt(llevaCarpas, ["Pesas (15kg)", String(PESAS_EN_ALMACEN)]),
     ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que
