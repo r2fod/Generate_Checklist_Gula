@@ -348,6 +348,52 @@ async function main() {
     ok(mudos.length === 0, `${tipo}: los ${grupos.length} controles cambian la checklist${mudos.length ? ` → sin efecto: ${mudos.join(", ")}` : ""}`);
   }
 
+  // ── Los nombres de los items tienen que ser estables y limpios ──────────────
+  // La identidad de cada item ES su nombre: los checks de Modo carga, las cantidades
+  // editadas a mano y los nombres corregidos se guardan como "categoría::nombre". Si el
+  // nombre lleva dentro algo que cambia (el pax, un ratio), al mover el pax la app lo
+  // toma por otro item y se pierde todo eso sin avisar. Pasaba con "Cápsulas café ...
+  // para 110 pax" y con "Platos extra entrante (1 × cada 4 pax)".
+  // Y la unidad ("bolsa", "taxis") va SIEMPRE en el sufijo, nunca dentro de la cantidad,
+  // que es un campo editable.
+  console.log("\n── Nombres de los items ──");
+  {
+    const EXTRAS = { llevaPaella: true, tieneFrituras: true, hayDesayuno: true, entranteCompartido: true, barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 };
+    const leer = async (p, tipo, pax) => {
+      await p.goto(url({ evento: tipo, pax, ninos: 0, ...EXTRAS }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      return p.evaluate(() => {
+        const filas = [];
+        document.querySelectorAll(".category-section").forEach(sec => {
+          const cat = ((sec.querySelector(".category-header") || {}).textContent || "").split("\n")[0].trim();
+          sec.querySelectorAll(".item-row").forEach(r => {
+            const n = ((r.querySelector(".item-name") || {}).textContent || "").replace(/\s*ALQUILER\s*/, "").trim();
+            const q = r.querySelector(".item-qty-input");
+            filas.push({ cat, n, q: q ? q.value : "" });
+          });
+        });
+        return filas;
+      });
+    };
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const inestables = [], conUnidad = [], repetidos = [];
+    for (const tipo of TIPOS) {
+      const a = await leer(p, tipo, 100), b = await leer(p, tipo, 160);
+      const na = a.map(x => x.n), nb = b.map(x => x.n);
+      na.filter(x => !nb.includes(x)).forEach(x => inestables.push(`${tipo}: «${x}»`));
+      nb.filter(x => !na.includes(x)).forEach(x => inestables.push(`${tipo}: «${x}»`));
+      a.forEach(x => { if (/\d\s*[a-záéíóúñ]/i.test(x.q)) conUnidad.push(`${tipo}: «${x.n}» = "${x.q}"`); });
+      const vistos = new Set();
+      a.forEach(x => { const k = `${x.cat}::${x.n}`; if (vistos.has(k)) repetidos.push(`${tipo}: «${x.n}»`); vistos.add(k); });
+    }
+    ok(inestables.length === 0, `ningún nombre de item cambia al cambiar el pax${inestables.length ? ` → ${[...new Set(inestables)].slice(0, 4).join(", ")}` : ""}`);
+    ok(conUnidad.length === 0, `ninguna cantidad lleva la unidad dentro${conUnidad.length ? ` → ${conUnidad.slice(0, 4).join(", ")}` : ""}`);
+    ok(repetidos.length === 0, `ningún nombre repetido dentro de la misma categoría${repetidos.length ? ` → ${repetidos.slice(0, 4).join(", ")}` : ""}`);
+    await c.close();
+  }
+
   // ── Recalcular cantidades ───────────────────────────────────────────────────
   console.log("\n── Recalcular cantidades ──");
   {
