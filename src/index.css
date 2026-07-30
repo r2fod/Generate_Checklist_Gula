@@ -3278,6 +3278,17 @@ hr {
 .compartir-menu > button, .add-item-card > span {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
+/* ...menos las opciones de Compartir: son una LISTA (Word, PDF, WhatsApp...), no
+   botones sueltos. Centradas quedaban cada una en un sitio y los iconos en zigzag.
+   Van pegadas a la izquierda y con los iconos en columna, como cualquier menú. */
+.compartir-menu > button {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.compartir-menu > button svg {
+  width: 16px;
+  height: 16px;
+}
 /* Icono que gira/late en botones de acción al pasar el ratón */
 .btn:hover svg, .plantilla-row:hover .plantilla-link svg { transition: transform 0.25s ease; }
 .plantilla-borrar:hover svg { transform: rotate(90deg); transition: transform 0.2s ease; }
