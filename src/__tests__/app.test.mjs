@@ -513,6 +513,36 @@ async function main() {
     await c.close();
   }
 
+  // ── Aviso de versión nueva ──────────────────────────────────────────────────
+  // Los .js llevan hash en el nombre, así que un index.html cacheado en el móvil sigue
+  // cargando la compilación vieja indefinidamente y no te enteras: pasó de verdad, con
+  // una pantalla del móvil mostrando la checklist de dos versiones antes. La app compara
+  // el id de la compilación cargada con el version.json del servidor.
+  console.log("\n── Aviso de versión nueva ──");
+  {
+    const fs2 = await import("fs");
+    const original = fs2.readFileSync("dist/version.json", "utf8");
+    const c = await navegador.newContext({ viewport: { width: 412, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "produccion", pax: 25 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2300);
+    ok(await p.locator(".version-nueva-banner").count() === 0, "con la misma versión no avisa de nada");
+    // Se publica una versión nueva con la app abierta
+    fs2.writeFileSync("dist/version.json", JSON.stringify({ id: "2099-01-01T00:00:00.000Z" }));
+    await p.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await p.waitForTimeout(1300);
+    const avisa = await p.locator(".version-nueva-banner").count() === 1;
+    ok(avisa, "al publicar una versión nueva, avisa");
+    if (avisa) {
+      await p.locator(".version-nueva-btn").click();
+      await p.waitForTimeout(2600);
+      ok(await p.locator(".item-row").count() > 20, `y el botón recarga sin perder el evento (${await p.locator(".item-row").count()} items)`);
+    } else ok(false, "y el botón recarga sin perder el evento");
+    fs2.writeFileSync("dist/version.json", original);
+    await c.close();
+  }
+
   // ── Avisos de recogidas, devoluciones y compras ─────────────────────────────
   // Un alquiler tiene DOS avisos (recogerlo y devolverlo) y salían los dos a la vez,
   // así que el mismo concepto aparecía dos veces seguidas y parecía duplicado. La

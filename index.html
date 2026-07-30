@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>generate-checklist-gula-1</title>
+    <!-- Pedimos al navegador que revalide el index.html: los .js llevan hash, así que
+         un index.html cacheado sigue apuntando a la compilación vieja. No todos los
+         navegadores lo respetan, por eso la app comprueba además version.json. -->
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <meta name="theme-color" content="#1f314d" />
+    <title>Checklist Gula</title>
   </head>
   <body>
     <div id="root"></div>

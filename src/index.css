@@ -3799,3 +3799,29 @@ hr {
 .add-item-row .add-item-categoria {
   min-width: 256px;
 }
+
+/* Aviso de versión nueva: los .js llevan hash en el nombre, así que un index.html
+   cacheado en el móvil sigue sirviendo la compilación vieja para siempre. Esto avisa
+   y recarga. Usa los colores de aviso para que no se confunda con el banner azul de
+   "actualizado desde otro dispositivo", que es otra cosa. */
+.version-nueva-banner {
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-borde);
+  color: var(--aviso-texto);
+  border-radius: var(--radius-md);
+  padding: 10px 14px 10px 18px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.version-nueva-btn {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 18px;
+}

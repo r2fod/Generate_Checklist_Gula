@@ -2631,6 +2631,12 @@ export default function App({ onCerrarSesion } = {}) {
   // eventos guardados, no solo el que está abierto — para no olvidar recoger/devolver
   // alquileres (camión plataforma, armario caliente, flores...) de ningún evento.
   const [avisosOcultos, setAvisosOcultos] = useState(false);
+  // ¿Hay una versión nueva publicada? Los .js llevan hash en el nombre, así que si el
+  // navegador se queda con el index.html en caché sigue cargando la compilación vieja
+  // para siempre y no te enteras. Se compara el id de la compilación cargada con el
+  // version.json del servidor (pidiéndolo sin caché) al abrir, al volver a la pestaña
+  // y cada 10 minutos. Si no hay conexión, no se dice nada.
+  const [versionNueva, setVersionNueva] = useState(false);
   // Los eventos ya pasados se ocultan por defecto: la lista principal muestra solo los
   // PENDIENTES (fecha futura, el más cercano arriba; los sin fecha al final). Los pasados
   // quedan detrás de un "Ver pasados" para no perder el acceso a ellos.
@@ -3098,6 +3104,23 @@ export default function App({ onCerrarSesion } = {}) {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON]);
+  useEffect(() => {
+    let cancelado = false;
+    const comprobar = async () => {
+      try {
+        const r = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!r.ok) return;
+        const { id } = await r.json();
+        if (!cancelado && id && id !== __BUILD_ID__) setVersionNueva(true);
+      } catch (e) { /* sin conexión o servida desde fichero: se ignora */ }
+    };
+    comprobar();
+    const cadaRato = setInterval(comprobar, 10 * 60 * 1000);
+    const alVolver = () => { if (document.visibilityState === "visible") comprobar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { cancelado = true; clearInterval(cadaRato); document.removeEventListener("visibilitychange", alVolver); };
+  }, []);
+
   const handleRecalcular = () => {
     const cambios = [];
     Object.keys(valoresBaseActuales).forEach(key => {
@@ -3866,6 +3889,16 @@ export default function App({ onCerrarSesion } = {}) {
 
         {linkAbierto && fechaEvento && fechaEvento < new Date().toISOString().slice(0, 10) && (
           <div className="archivado-banner">📦 Este evento ya pasó — checklist archivada, solo para consulta.</div>
+        )}
+
+        {versionNueva && (
+          <div className="version-nueva-banner">
+            <div className="cambios-remotos-detalle">
+              <strong>⬆️ Hay una versión nueva de la app</strong>
+              <span>Tus datos no se tocan: se recarga la página y ya está.</span>
+            </div>
+            <button className="btn btn-green version-nueva-btn" onClick={() => window.location.reload()}>Actualizar</button>
+          </div>
         )}
 
         {hayCambiosRemotos && (
