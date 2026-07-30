@@ -237,7 +237,7 @@ function sugerirCategoria(label, categoriasDisponibles) {
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
 function bateas(units, size) { return Math.ceil(units / size); }
 
-function calcBebidas(pax, h, mesVerano, tieneCongelador) {
+function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false) {
   const barFactor = h / 4;
   const cervezaFactor = mesVerano ? 2.0 : 1.5;
   // El consumo de cerveza por pax no crece sin límite cuanto más dura la barra: a partir
@@ -250,7 +250,11 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador) {
   const ratioBlanco = mesVerano ? 0.65 : 0.45;
   const vinoBlanco = Math.round(vinoTotal * ratioBlanco);
   const vinoTinto = vinoTotal - vinoBlanco;
-  const cava = Math.round(pax * 0.2);
+  // Cava: 0,2 botellas por pax (1 cada 5) para el cava de siempre. Con brindis sube a
+  // 0,28 (1 cada 3,5): en un brindis todo el mundo coge copa y se sirven ~2 por persona,
+  // y una botella da 7-8 copas. Antes marcar "Brindis con cava" doblaba las COPAS de la
+  // cristalería (216 → 396) pero dejaba las botellas en 20, que no dan ni para la mitad.
+  const cava = Math.round(pax * (tieneBrindisCava ? 0.28 : 0.2));
   // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
   // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
   // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
@@ -490,7 +494,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // su propio ratio (1 camarero cada X pax) en el formulario, manda ese.
   const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 18 : 12);
 
-  const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
+  const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador, tieneBrindisCava);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito sí escalan con el total
@@ -566,7 +570,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     if (!llevaPaella) paellaItems.push(["Difusor", String(numFritura)], ["Trípode", String(numFritura)]);
   }
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
-  paellaItems.push(["Bombonas llenas", String(bombonas)]);
+  // Sin fuego no hay bombonas: sin esto la categoría "Paella y fuego" se quedaba en
+  // pantalla con una sola línea a 0, que no dice nada a quien carga.
+  if (bombonas > 0) paellaItems.push(["Bombonas llenas", String(bombonas)]);
   if (tipoBBQ !== "no lleva") {
     paellaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
   }
@@ -589,7 +595,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Cristalería", items: [
     [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)],
-    ["Vasos de cubata",                                   String(cristal.cubata.u)],
+    opt(cristal.cubata.u > 0, ["Vasos de cubata", String(cristal.cubata.u)]),
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)],
     ["Copas de cava",                                     String(cristal.cava.u)],
@@ -718,6 +724,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
+    tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
@@ -734,7 +741,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
 
-  const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador);
+  const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador, tieneBrindisCava);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
@@ -785,7 +792,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   }
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  paellaItems.push(["Bombonas llenas", String((llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura + (llevaPlanchaGas ? 1 : 0))]);
+  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura + (llevaPlanchaGas ? 1 : 0);
+  if (bombonasCumple > 0) paellaItems.push(["Bombonas llenas", String(bombonasCumple)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   const cocinaItems = [];
@@ -837,7 +845,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     [`Copas de vino${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)],
     ["Vasos de agua", String(cristal.agua.u)],
     ["Copas de cava", String(cristal.cava.u)],
-    ["Vasos de cubata", String(cristal.cubata.u)],
+    opt(cristal.cubata.u > 0, ["Vasos de cubata", String(cristal.cubata.u)]),
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
@@ -849,7 +857,20 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
 
   const personal = calcPersonal(pax, opts.numCamareros, opts.numStaff, divisorCam);
+  // Faltaban el vino, la cerveza y el cava: se cargaban las copas de vino y de cava pero
+  // no había nada que servir en ellas. Se calculan igual que en la boda: si hay barril,
+  // los litros que da se descuentan de los tercios en vez de sumarse.
+  const barrilLitros = tamanoBarril === "30L" ? 30 : tamanoBarril === "50L" ? 50 : 0;
+  const litrosDeBarril = barrilLitros * Math.max(1, numBarriles) * 0.85;
+  const terciosCerveza = Math.ceil(Math.max(0, bebidas.cerveza * 0.33 - litrosDeBarril) / 0.33 / 24) * 24;
   cats.push({ nombre: "Bebidas", items: [
+    opt(barrilLitros > 0, [`Barril de cerveza (${tamanoBarril})`, String(Math.max(1, numBarriles))]),
+    opt(barrilLitros > 0, ["Tirador de cerveza", "1"]),
+    opt(terciosCerveza > 0, ["Cerveza Alhambra (tercios)", String(terciosCerveza)]),
+    ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")],
+    ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
+    ["Cava", conSufijo(bebidas.cava, "botellas")],
+    ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
     ["Aquarius", String(bebidas.aquarius)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
@@ -4528,7 +4549,10 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
           </div>
           </>)}
-          {evento !== "produccion" && evento !== "cumpleanos" && (
+          {/* En producción no sale porque un rodaje no lleva alcohol. En cumpleaños sí:
+              estaba oculto del lote en que este evento se trató como "ligero", el mismo
+              que le dejó sin vino, cerveza ni cava. */}
+          {evento !== "produccion" && (
             <div className="form-row" style={{ marginTop: 12, alignItems: "flex-end" }}>
               <SegmentedControl label="Barril de cerveza" value={tamanoBarril} onChange={setTamanoBarril} options={["No lleva", "30L", "50L"]} />
               {tamanoBarril !== "No lleva" && (

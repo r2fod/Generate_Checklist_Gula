@@ -3555,7 +3555,10 @@ hr {
    arriba sin tener que tocarlos uno a uno. */
 @media (max-width: 560px) {
   .app-wrapper { padding: 12px 10px 32px; gap: 14px; }
-  .config-sidebar { gap: 14px; }
+  /* La columna de la checklist se había quedado fuera de la compactación: las tarjetas
+     de configuración iban a 14px y las categorías a 18px, así que al bajar cambiaba el
+     ritmo. Todo a 14 en móvil, todo a 18 en escritorio. */
+  .config-sidebar, .checklist-main { gap: 14px; }
   .config-card { padding: 15px; gap: 13px; }
   .main-layout { gap: 14px; }
 
