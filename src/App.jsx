@@ -167,7 +167,7 @@ const ICONOS_ITEM = [
   { f: ["mesa", "caballete", "servilletero", "marcos", "deco", "cajas de madera"], I: Table, c: "#7c3aed" },
   { f: ["regleta", "alargador", "cable", "generador", "garrafa", "foco", "luz", "guirnalda", "eléctric", "electric", "imperdible", "brida", "rulo", "cinta"], I: Zap, c: "#ca8a04" },
   { f: ["walkie", "micrófono", "microfono", "atril", "señalética", "senaletica", "cartel", "pegatina", "photocall", "porta-nombres", "acreditaci", "producciones"], I: Radio, c: "#0d9488" },
-  { f: ["carpa", "pared", "moqueta"], I: Tent, c: "#0f766e" },
+  { f: ["carpa", "pared", "moqueta", "pesas"], I: Tent, c: "#0f766e" },
   { f: ["furgoneta", "camión", "camion", "taxi", "carro", "transporte", "flota", "logístic", "logistic"], I: Truck, c: "#7c3aed" },
   { f: ["camarero", "barman", "cocina", "personal", "staff", "office", "fichaje"], I: Users, c: "#4338ca" },
 ];
@@ -418,9 +418,9 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(paxConsumo / 100)), "carga(s)")]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], [`Cápsulas café (estándar/descafeinado) para ${paxConsumo} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera de bar", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   } else {
-    items.push(["Cafetera Nespresso", "1"], [`Cápsulas café (estándar/descafeinado) para ${paxConsumo} pax`, String(capsulas)], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera Nespresso", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   }
   // Con desayuno se sirve más café por persona (todos toman, no solo parte de los pax)
   const factorLeche = hayDesayuno ? 0.9 : 0.6;
@@ -573,7 +573,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   const cocinaItems = [];
-  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha", "—"]);
+  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha (cocina)", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"]);
@@ -635,7 +635,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Cucharas postre", String(conMargen(totalPax))],
       ["Cucharas café", String(conMargen(totalPax * 0.8))],
     ] : []),
-    opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
+    opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
   ]});
 
   const personal = calcPersonal(pax, numCamareros, numStaff, divisorCam);
@@ -840,7 +840,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos de cubata", String(cristal.cubata.u)],
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
-    opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
+    opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
     // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
     ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"], ["Abridores de cerveza", "2"],
     ["Pinzas largas", "2"], ["Copas metálicas", "—"], ["Conchas", "—"],
@@ -950,10 +950,17 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cocina", String(nCocina)],
   ]});
 
-  // Carpas para la zona de comer/office del rodaje: una 3x3 cubre ~12 personas de
-  // pie (0,75 m²/pax, estándar de las alquiladoras de carpas) — para 65 pax salen 6.
-  // Sigue siendo editable a mano si el sitio ya tiene sombra o interior.
-  const numCarpas = Math.max(1, Math.ceil(pax / 12));
+  // Carpas: las dos fijas de siempre (la del buffet y la del culo del camión) se suman
+  // aparte de la zona de comer, igual que ya se hace con las mesas (por pax + 4 de
+  // buffet + 1 del camión). Antes iba todo en una sola cuenta de pax/12, así que esas
+  // dos se comían el número: con 25 pax salían 3 en total y quedaba UNA sola para que
+  // comieran 25 personas. La zona de comer sigue el estándar de las alquiladoras: una
+  // 3x3 cubre ~12 personas de pie (0,75 m²/pax). Todo editable a mano si el sitio ya
+  // tiene sombra, nave o interior.
+  const CARPA_BUFFET = 1, CARPA_CAMION = 1;
+  const carpasComer = Math.max(1, Math.ceil(pax / 12));
+  const numCarpas = carpasComer + CARPA_BUFFET + CARPA_CAMION;
+  const PAREDES_POR_CARPA = 3, PESAS_POR_CARPA = 4;
   const numChafers = Math.max(2, Math.ceil(pax / 40));
   // Las mesas de 1,8m van todas en un único total: cocina/servicio (por pax) + 4 de
   // buffet + 1 para el camión. La cuadrada 1x1 de la zona de cajas sucias va aparte
@@ -972,8 +979,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA)]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
-    opt(llevaCarpas, ["Carpas con paredes y pesas", String(numCarpas)]),
-    opt(llevaCarpas, ["Paredes negras (plegadas)", "—"]), ["Moqueta", "—"],
+    // Carpas, paredes y pesas en tres líneas: antes ponía "Carpas con paredes y pesas"
+    // y más abajo otra línea de paredes, así que no se sabía si las de la primera
+    // estaban incluidas o no. Tres paredes por carpa (tres caras cerradas y una
+    // abierta para entrar) y cuatro pesas, una por pata.
+    opt(llevaCarpas, ["Carpas", String(numCarpas)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(numCarpas * PAREDES_POR_CARPA)]),
+    opt(llevaCarpas, ["Pesas", String(numCarpas * PESAS_POR_CARPA)]),
+    ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que
     // el resto de la decoración de esta categoría
@@ -1011,7 +1024,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
     ["Vitro", "1"], ["Butano", "1"], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
-    ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (con hielo)", "2"],
+    ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (llenar de hielo)", "2"],
     ["Neveras playa pequeñas", "2"], ["Chafers", String(numChafers)],
     opt(llevaArmarioCaliente, ["Armario caliente (alquiler Dealde)", "1", true]),
   ]});
@@ -1059,7 +1072,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
-    opt(entranteCompartido, [`Platos extra entrante (${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax)`, String(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante))]),
+    opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
   ]});
 
   // Todo lo de esta categoría se gasta: con varios días se calcula sobre la suma
@@ -1094,7 +1107,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
     ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
-    ["Hielo", `${Math.max(2, Math.ceil(paxConsumo / 30))} taxis`],
+    ["Hielo", conSufijo(Math.max(2, Math.ceil(paxConsumo / 30)), "taxis")],
   ]});
 
   // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el
@@ -4436,10 +4449,6 @@ export default function App({ onCerrarSesion } = {}) {
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaChillOut,        setLlevaChillOut,        "Lleva chill out",          llevaChillOut ? `${numChillOut} (ajusta abajo)` : "sofás/zona chill out"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
-              ...(evento === "produccion"
-                ? [[llevaCarpas,    setLlevaCarpas,    "Llevan carpas",    "carpas con paredes y pesas"],
-                   [llevaGenerador, setLlevaGenerador, "Llevan generador", "generador + garrafa de gasolina"]]
-                : []),
               ...(evento !== "produccion"
                 ? [[llevaAguasPequenas, setLlevaAguasPequenas, "Aguas pequeñas", "botellas individuales 33cl"]]
                 : []),
@@ -4541,6 +4550,16 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="equip-aviso">Con canapés la comida va en bandeja, así que los platos no se cargan. Quita "Lleva canapés" si sí quieres llevarlos.</div>
             )}
             <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
+            {/* Carpas y generador son equipo estándar de rodaje, no un extra que se
+                añade: van aquí con el resto del equipamiento y las cantidades se
+                calculan solas. El "No llevan" es para el sitio puntual que ya tiene
+                sombra o luz propia. */}
+            {evento === "produccion" && (
+              <>
+                <SegmentedControl label="Carpas" value={llevaCarpas ? "Llevan" : "No llevan"} onChange={v => setLlevaCarpas(v === "Llevan")} options={["Llevan", "No llevan"]} />
+                <SegmentedControl label="Generador" value={llevaGenerador ? "Lleva" : "No lleva"} onChange={v => setLlevaGenerador(v === "Lleva")} options={["Lleva", "No lleva"]} />
+              </>
+            )}
           </div>
         </div>
 
