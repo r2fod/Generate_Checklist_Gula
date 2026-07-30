@@ -83,6 +83,46 @@ function fmtCantidadCompleta(label, qtyTexto, sufijo) {
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
 
+// ─── TEMPORADA ────────────────────────────────────────────────────────────────
+// El consumo cambia mucho entre verano e invierno: la cerveza baja de 2 a 1,5 por pax,
+// el reparto de vino se da la vuelta (65% blanco en verano, 45% en invierno) y el tinto
+// de verano se reduce a la mitad. Ese dato existía en el código pero no había forma de
+// cambiarlo desde ninguna parte: estaba fijo en "verano" todo el año, así que una boda
+// de diciembre cargaba cerveza de agosto y el doble de blanco que de tinto.
+// Ahora sale de la fecha del evento, con la opción de forzarlo a mano.
+const MES_VERANO_DESDE = 5, MES_VERANO_HASTA = 9; // de mayo a septiembre
+
+function esFechaDeVerano(fechaISO) {
+  // Sin fecha puesta todavía se usa el mes de hoy, que es la mejor pista que hay
+  const d = fechaISO ? new Date(fechaISO + "T00:00:00") : new Date();
+  const mes = (isNaN(d.getTime()) ? new Date() : d).getMonth() + 1;
+  return mes >= MES_VERANO_DESDE && mes <= MES_VERANO_HASTA;
+}
+
+// "auto" (por la fecha), "verano" o "invierno" forzados a mano
+function esVerano(estacion, fechaISO) {
+  if (estacion === "verano") return true;
+  if (estacion === "invierno") return false;
+  return esFechaDeVerano(fechaISO);
+}
+
+export function hoyISO() {
+  const d = new Date();
+  const dosCifras = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dosCifras(d.getMonth() + 1)}-${dosCifras(d.getDate())}`;
+}
+
+// Qué temporada le toca a un evento guardado ANTES de que existiera este dato. Los que
+// ya han pasado se quedan clavados en lo que tuvieran: su lista es historia y no tiene
+// sentido que las cifras cambien al abrirla. Los que están por venir pasan a automático,
+// para que se corrijan solos según su fecha.
+export function temporadaInicial(estado = {}, hoy = hoyISO()) {
+  if (estado.estacion) return estado.estacion;
+  const yaPasado = estado.fechaEvento && estado.fechaEvento < hoy;
+  if (!yaPasado) return "auto";
+  return estado.mesVerano === false ? "invierno" : "verano";
+}
+
 // ─── ALQUILERES ───────────────────────────────────────────────────────────────
 // Material que no es nuestro: hay que ir a buscarlo antes del evento y devolverlo
 // después. Antes eran dos interruptores sueltos (sillas y armario caliente) que solo
@@ -1247,7 +1287,7 @@ const ETIQUETAS_CAMPO = {
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
-  tipoHorno: "Horno", tipoBBQ: "Barbacoa", mesVerano: "Mes de verano", tieneBrindisCava: "Brindis con cava",
+  tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
@@ -2648,7 +2688,12 @@ export default function App({ onCerrarSesion } = {}) {
   const [tipoBandejas, setTipoBandejas] = useState(estadoInicial.tipoBandejas ?? "Mixto");
   const [tipoHorno, setTipoHorno]       = useState(estadoInicial.tipoHorno ?? "Pequeño");
   const [tipoBBQ, setTipoBBQ]           = useState(estadoInicial.tipoBBQ ?? "No lleva");
-  const [mesVerano, setMesVerano]               = useState(estadoInicial.mesVerano ?? true);
+  // Los eventos guardados hasta ahora llevan mesVerano: true (era el único valor
+  // posible, no había control) y ningún dato de temporada. Los que YA HAN PASADO se
+  // quedan fijados en lo que tuvieran, para que su lista no cambie de cifras; los que
+  // están por venir pasan a automático y se corrigen solos por su fecha.
+  const [estacion, setEstacion] = useState(() => temporadaInicial(estadoInicial));
+  const mesVerano = esVerano(estacion, fechaEvento);
   const [tieneBrindisCava, setTieneBrindisCava] = useState(estadoInicial.tieneBrindisCava ?? false);
   const [tieneFrituras, setTieneFrituras]       = useState(estadoInicial.tieneFrituras ?? false);
   const [numFrituras, setNumFrituras]           = useState(estadoInicial.numFrituras ?? 1);
@@ -2864,10 +2909,10 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
-    tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
+    tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas,
+    llevaMobiliarioAlquiler, alquilaCarpas, tieneBrindisCava,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2935,7 +2980,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
-    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, mesVerano: setMesVerano, tieneBrindisCava: setTieneBrindisCava,
+    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
@@ -4892,6 +4937,16 @@ export default function App({ onCerrarSesion } = {}) {
                 valor no se carga ninguno. */}
             <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos", "No lleva"]} />
             <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
+            {/* La temporada solo mueve bebida (cerveza, reparto de vino y tinto de
+                verano), así que en producción no se ofrece: un rodaje no lleva alcohol. */}
+            {evento !== "produccion" && (
+              <SegmentedControl
+                label={`Temporada${estacion === "auto" ? ` · ahora ${mesVerano ? "verano" : "invierno"}` : ""}`}
+                value={estacion === "auto" ? "Auto" : (estacion === "verano" ? "Verano" : "Invierno")}
+                onChange={v => setEstacion(v === "Auto" ? "auto" : v.toLowerCase())}
+                options={["Auto", "Verano", "Invierno"]}
+              />
+            )}
             {/* Vajilla. El estilo del plato se elige en TODOS los tipos de evento
                 (antes cumpleaños y producción solo tenían un interruptor). Donde se
                 elige el estilo está también la opción "No llevan", en vez de un

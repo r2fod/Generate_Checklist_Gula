@@ -333,6 +333,11 @@ async function main() {
     })));
     const mudos = [];
     for (const g of grupos) {
+      // "Temporada" no entra aquí: en Auto la app ya resuelve a verano o invierno, así
+      // que una de las tres opciones siempre coincide con lo que hay puesto. Además su
+      // etiqueta cambia al elegir ("Temporada · ahora verano" → "Temporada"). Tiene su
+      // propia comprobación, más completa, en la sección de temporada.
+      if (/^Temporada/.test(g.label)) continue;
       const boton = (txt) => page.locator(".segment-group", { hasText: g.label }).first()
         .locator(".segment-btn", { hasText: new RegExp(`^${escapa(txt)}$`) }).first();
       for (const op of g.opciones) {
@@ -783,6 +788,46 @@ async function main() {
   t = await chips(a2.p);
   ok(t.some(x => /Devolución/.test(x)), `devolución atrasada: se avisa aunque no se marcara la recogida → ${JSON.stringify(t)}`);
   await a2.c.close();
+
+  // ── Verano o invierno, según la fecha ───────────────────────────────────────
+  // El dato existía en el código pero no se podía cambiar desde ningún sitio: estaba
+  // fijo en verano todo el año, así que una boda de diciembre cargaba cerveza de agosto
+  // y el doble de blanco que de tinto. Ahora sale de la fecha del evento.
+  console.log("\n── Temporada ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const bebidas = async (estado) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 4, ...estado }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      const uno = async (n) => Number(await p.locator(".item-row", { hasText: n }).first().locator(".item-qty-input").inputValue());
+      return { cerveza: await uno("Cerveza Alhambra"), blanco: await uno("Vino blanco"), tinto: await uno("Vino tinto") };
+    };
+    const agosto = await bebidas({ fechaEvento: "2027-08-14" });
+    const diciembre = await bebidas({ fechaEvento: "2027-12-11" });
+
+    ok(agosto.cerveza > diciembre.cerveza,
+      `en agosto se carga más cerveza que en diciembre: ${agosto.cerveza} vs ${diciembre.cerveza} tercios`);
+    ok(agosto.blanco > agosto.tinto && diciembre.tinto > diciembre.blanco,
+      `y el vino se da la vuelta: agosto ${agosto.blanco}/${agosto.tinto} blanco-tinto, diciembre ${diciembre.blanco}/${diciembre.tinto}`);
+
+    // Forzar la temporada a mano manda sobre la fecha
+    const dicForzadoVerano = await bebidas({ fechaEvento: "2027-12-11", estacion: "verano" });
+    ok(dicForzadoVerano.cerveza === agosto.cerveza && dicForzadoVerano.blanco === agosto.blanco,
+      "forzar Verano en diciembre manda sobre la fecha");
+
+    // Los eventos guardados ANTES de esto llevan mesVerano true y ningún dato de
+    // temporada. Los que YA HAN PASADO no pueden cambiar de cifras: su lista es
+    // historia. Los que están por venir sí se corrigen solos por su fecha.
+    const yaPasado = await bebidas({ fechaEvento: "2024-12-11", mesVerano: true });
+    ok(yaPasado.cerveza === agosto.cerveza && yaPasado.blanco === agosto.blanco && yaPasado.tinto === agosto.tinto,
+      `un evento ya pasado no cambia ni una cifra: ${JSON.stringify(yaPasado)}`);
+    const porVenir = await bebidas({ fechaEvento: "2027-12-11", mesVerano: true });
+    ok(porVenir.cerveza === diciembre.cerveza && porVenir.tinto === diciembre.tinto,
+      `y uno que está por venir sí se corrige por su fecha: ${JSON.stringify(porVenir)}`);
+    await c.close();
+  }
 
   // ── Bandejas y servicio de bandeja ──────────────────────────────────────────
   // "Lleva canapés" hacía dos cosas a la vez: sumar bandejas y dejar los platos fuera
