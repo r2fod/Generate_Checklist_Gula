@@ -396,9 +396,12 @@ async function main() {
   }
 
   // ── Ningún campo puede quedar recortado ─────────────────────────────────────
-  // Que la página no desborde no basta: un input de fecha/hora al que no se le da
-  // su ancho natural no desborda, el navegador RECORTA el valor por dentro y se
-  // queda en "28/" o "10:0(". Se compara cada input con un clon suyo dejado crecer.
+  // Que la página no desborde no basta: a un campo al que no se le da el ancho que
+  // necesita el navegador le RECORTA el valor por dentro, sin desbordar nada. Pasaba
+  // con las fechas ("28/" en vez de "28/07/2026"), con las horas ("10:0(") y también
+  // con el nombre del evento y la ubicación, que se quedaban en 145px en la barra
+  // lateral. Se miden TODOS los campos: los de fecha y hora contra un clon suyo
+  // dejado crecer, y el resto midiendo el ancho real del texto del valor.
   console.log("\n── Nada se corta ──");
   const CON_FECHAS = {
     evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: "2027-07-29",
@@ -406,7 +409,7 @@ async function main() {
     logisticaEquipo: [{ nombre: "Irene", inicio: "10:00", fin: "17:10" }, { nombre: "Raúl", inicio: "10:00", fin: "17:10" }],
     tarifaLogistica: 10, plusFurgoneta: 25,
     recogidas: [{ concepto: "Recoger generador", fecha: "2027-07-28", hora: "12:00", fechaDevolucion: "2027-07-30" }],
-    compras: [{ concepto: "Comprar aguas Cartón Makro", cantidad: "5 cajas", fecha: "2027-07-28" }],
+    compras: [{ concepto: "Aguas Makro", cantidad: "5 cajas", fecha: "2027-07-28" }],
   };
   for (const w of [320, 412, 768, 1280, 1920]) {
     const c = await navegador.newContext({ viewport: { width: w, height: 1100 }, isMobile: w < 768, hasTouch: w < 768 });
@@ -415,19 +418,52 @@ async function main() {
     await p.goto(url(CON_FECHAS), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     const cortados = await p.evaluate(() => {
+      const ctx2d = document.createElement("canvas").getContext("2d");
       const malos = [];
-      document.querySelectorAll("input[type=date], input[type=time]").forEach(i => {
-        const probe = i.cloneNode();
-        probe.style.cssText = "position:absolute;visibility:hidden;width:auto;min-width:0;max-width:none;flex:none";
-        i.parentNode.appendChild(probe);
-        const nat = Math.ceil(probe.getBoundingClientRect().width);
-        probe.remove();
-        const anc = Math.round(i.getBoundingClientRect().width);
-        if (anc < nat - 1) malos.push(`${i.title || i.className}: ${anc}px de ${nat}`);
+      const etiqueta = (e) => {
+        const g = e.closest(".form-group, .logistica-row, .item-row, .recogida-card, .controls-mini");
+        const l = g && g.querySelector(".form-label, .segment-label");
+        return String(e.title || (l && l.textContent.trim()) || e.className || e.type).slice(0, 30);
+      };
+      document.querySelectorAll("input, select").forEach(e => {
+        if (!e.offsetParent) return;
+        const cs = getComputedStyle(e);
+        const r = e.getBoundingClientRect();
+        if (r.width < 2) return;
+        if (e.type === "date" || e.type === "time") {
+          // El valor lo pinta el navegador con su icono: se compara con un clon libre
+          const probe = e.cloneNode();
+          probe.style.cssText = "position:absolute;visibility:hidden;width:auto;min-width:0;max-width:none;flex:none";
+          e.parentNode.appendChild(probe);
+          const nat = Math.ceil(probe.getBoundingClientRect().width);
+          probe.remove();
+          if (r.width < nat - 1) malos.push(`${etiqueta(e)}: ${Math.round(r.width)}px de ${nat}`);
+          return;
+        }
+        // Texto, número y select: se mide el ancho real del valor con la misma fuente
+        const texto = e.value || "";
+        if (!texto) return;
+        const hueco = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+          - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth)
+          - (e.tagName === "SELECT" ? 18 : 0); // el select reserva sitio para la flecha
+        ctx2d.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const ancho = ctx2d.measureText(texto).width;
+        if (ancho > hueco + 0.5) malos.push(`${etiqueta(e)} "${texto.slice(0, 20)}": ${Math.round(hueco)}px de ${Math.ceil(ancho)}`);
       });
       return malos;
     });
-    ok(cortados.length === 0, `${w}px: ningún campo de fecha/hora recortado${cortados.length ? ` → ${cortados.join(", ")}` : ""}`);
+    ok(cortados.length === 0, `${w}px: ningún campo recortado${cortados.length ? ` → ${cortados.join(", ")}` : ""}`);
+    const anchos = await p.evaluate(() => {
+      const fila = document.querySelector(".form-row");
+      const ancho = fila ? fila.getBoundingClientRect().width : 0;
+      return [...document.querySelectorAll(".form-group-ancho input")].map(i => ({
+        et: (i.closest(".form-group").querySelector(".form-label") || {}).textContent,
+        parte: ancho ? +(i.getBoundingClientRect().width / ancho).toFixed(2) : 0,
+      }));
+    });
+    const estrechos = anchos.filter(a => a.parte < 0.9);
+    ok(anchos.length === 2 && estrechos.length === 0,
+      `${w}px: el nombre y la ubicación ocupan la fila entera${estrechos.length ? ` → ${estrechos.map(e => `${e.et} ${e.parte}`).join(", ")}` : ""}`);
     await c.close();
   }
 

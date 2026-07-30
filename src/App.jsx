@@ -901,6 +901,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
+    llevaCarpas = true, llevaGenerador = true,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -936,7 +937,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Electricidad y otros", items: [
     ["Focos de luz", "1"],
     ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
-    ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", conSufijo(1, "bolsa")], ["Generador", "1"], ["Garrafa gasolina (llena)", "1"],
+    ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", conSufijo(1, "bolsa")],
+    // La garrafa de gasolina va con el generador: si no se lleva generador, tampoco
+    opt(llevaGenerador, ["Generador", "1"]), opt(llevaGenerador, ["Garrafa gasolina (llena)", "1"]),
     ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
 
@@ -969,7 +972,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA)]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
-    ["Carpas con paredes y pesas", String(numCarpas)], ["Paredes negras (plegadas)", "—"], ["Moqueta", "—"],
+    opt(llevaCarpas, ["Carpas con paredes y pesas", String(numCarpas)]),
+    opt(llevaCarpas, ["Paredes negras (plegadas)", "—"]), ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que
     // el resto de la decoración de esta categoría
@@ -1082,7 +1086,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // en cada bebida por separado en vez de en dos líneas combinadas
     ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56))],
     ["Fanta naranja", String(Math.round(paxConsumo * 0.24))], ["Fanta limón", String(Math.round(paxConsumo * 0.2))],
-    ["Aquarius", String(Math.round(paxConsumo * 0.24))], ["Sprite", String(Math.round(paxConsumo * 0.12))],
+    ["Aquarius", String(Math.round(paxConsumo * 0.24))],
     // En producción el agua de beber son las CAJAS de 33cl (35 uds), a ~3,5 botellas
     // por pax y día; la de 1,5L es solo un extra por si hace falta (paella, lavar,
     // beber el personal), no va por pax — un par de packs por día es de sobra
@@ -1139,6 +1143,7 @@ const ETIQUETAS_CAMPO = {
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
+  llevaCarpas: "Carpas", llevaGenerador: "Generador",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -2515,6 +2520,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [numChillOut, setNumChillOut]           = useState(estadoInicial.numChillOut ?? 1);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(estadoInicial.fuerzaTextilTela ?? false);
   const [llevaPalomitera, setLlevaPalomitera]       = useState(estadoInicial.llevaPalomitera ?? false);
+  // En producciones casi siempre van carpas y generador, así que empiezan activados:
+  // el interruptor está para los sitios que ya tienen sombra o luz propia.
+  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? true);
+  const [llevaGenerador, setLlevaGenerador]         = useState(estadoInicial.llevaGenerador ?? true);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
@@ -2703,7 +2712,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2775,6 +2784,7 @@ export default function App({ onCerrarSesion } = {}) {
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
+    llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
@@ -3232,7 +3242,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -3245,6 +3255,7 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
+    llevaCarpas, llevaGenerador,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
     llevaAguasPequenas, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
@@ -4098,9 +4109,12 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
           )}
           <div className="form-row">
-            <div className="form-group">
+            {/* El nombre y la ubicación son los dos campos de texto libre más largos:
+                ocupan la fila entera en vez de media, que dejaba 145px y no se veía
+                lo que habías escrito. La fecha y la hora sí caben a media fila. */}
+            <div className="form-group form-group-ancho">
               <span className="form-label">NOMBRE DEL EVENTO</span>
-              <input type="text" className="form-input" placeholder="Ej: Boda de Ana y Luis" value={nombreEvento} onChange={e => setNombreEvento(e.target.value)} />
+              <input type="text" className="form-input" title={nombreEvento || "Nombre del evento"} placeholder="Ej: Boda de Ana y Luis" value={nombreEvento} onChange={e => setNombreEvento(e.target.value)} />
             </div>
             <div className="form-group">
               <span className="form-label">FECHA</span>
@@ -4110,9 +4124,9 @@ export default function App({ onCerrarSesion } = {}) {
               <span className="form-label">HORA DE INICIO</span>
               <input type="time" className="form-input" value={horaInicio} onChange={e => setHoraInicio(e.target.value)} />
             </div>
-            <div className="form-group">
+            <div className="form-group form-group-ancho">
               <span className="form-label">UBICACIÓN</span>
-              <input type="text" className="form-input" placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
+              <input type="text" className="form-input" title={ubicacion || "Ubicación"} placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
             </div>
           </div>
           <div className="form-group notas-group">
@@ -4240,6 +4254,7 @@ export default function App({ onCerrarSesion } = {}) {
                     type="text"
                     className="form-input"
                     placeholder="Ej: Camión plataforma (Albácar)"
+                    title={r.concepto || "Qué hay que recoger o devolver"}
                     value={r.concepto}
                     onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
                   />
@@ -4315,6 +4330,7 @@ export default function App({ onCerrarSesion } = {}) {
                     type="text"
                     className="form-input"
                     placeholder="Ej: Hielo, servilletas, pilas walkie..."
+                    title={c.concepto || "Qué hay que comprar"}
                     value={c.concepto}
                     onChange={e => setCompras(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
                   />
@@ -4332,6 +4348,7 @@ export default function App({ onCerrarSesion } = {}) {
                       type="text"
                       className="form-input"
                       placeholder="Ej: 4 bolsas"
+                      title={c.cantidad || "Cantidad o detalle"}
                       value={c.cantidad || ""}
                       onChange={e => setCompras(prev => prev.map((x, idx) => idx === i ? { ...x, cantidad: e.target.value } : x))}
                     />
@@ -4419,6 +4436,10 @@ export default function App({ onCerrarSesion } = {}) {
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaChillOut,        setLlevaChillOut,        "Lleva chill out",          llevaChillOut ? `${numChillOut} (ajusta abajo)` : "sofás/zona chill out"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
+              ...(evento === "produccion"
+                ? [[llevaCarpas,    setLlevaCarpas,    "Llevan carpas",    "carpas con paredes y pesas"],
+                   [llevaGenerador, setLlevaGenerador, "Llevan generador", "generador + garrafa de gasolina"]]
+                : []),
               ...(evento !== "produccion"
                 ? [[llevaAguasPequenas, setLlevaAguasPequenas, "Aguas pequeñas", "botellas individuales 33cl"]]
                 : []),
@@ -4486,7 +4507,10 @@ export default function App({ onCerrarSesion } = {}) {
                 <SegmentedControl label="Congelador" value={tipoCongelador} onChange={setTipoCongelador} options={["No lleva", "Mediana", "Grande"]} />
               </>
             )}
-            <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos"]} />
+            {/* "No lleva" no necesita nada más: los tres generadores solo añaden horno
+                cuando el valor es pequeño/grande/ambos, así que con cualquier otro
+                valor no se carga ninguno. */}
+            <SegmentedControl label="Horno" value={tipoHorno} onChange={setTipoHorno} options={["Pequeño", "Grande", "Ambos", "No lleva"]} />
             <SegmentedControl label="Cafetera" value={tipoCafetera} onChange={setTipoCafetera} options={["Nespresso", "Bar", "Grande"]} />
             {/* Vajilla. El estilo del plato se elige en TODOS los tipos de evento
                 (antes cumpleaños y producción solo tenían un interruptor). Donde se
@@ -4556,7 +4580,7 @@ export default function App({ onCerrarSesion } = {}) {
                 onKeyDown={e => e.key === "Enter" && handleAddItemManual()}
               />
             </div>
-            <div className="form-group" style={{ flex: 2 }}>
+            <div className="form-group add-item-categoria" style={{ flex: 2 }}>
               <span className="form-label">Categoría</span>
               <select
                 className="form-select"

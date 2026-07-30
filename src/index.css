@@ -1413,10 +1413,18 @@ body {
   min-width: 0;
 }
 
+/* Al marcar el interruptor el fondo pasa al lila de --accent-soft, y sobre ese fondo
+   el gris de --text-muted se quedaba en 4,27 de contraste, por debajo del mínimo
+   legible (4,5). En claro hace falta un gris MÁS OSCURO (--text-label, 5,14) y en
+   oscuro justo lo contrario: ahí --text-label es más oscuro que el fondo y baja a
+   3,99, mientras --text-muted (que es más claro) da 6,9. De ahí el valor por tema. */
 .checkbox-label-normal .checkbox-sub {
-  color: var(--text-muted);
+  color: var(--text-label);
   transition: color 0.2s;
   font-weight: 400;
+}
+:root[data-tema="oscuro"] .checkbox-label-normal .checkbox-sub {
+  color: var(--text-muted);
 }
 
 .checkbox-label-normal input {
@@ -3775,4 +3783,19 @@ hr {
   .item-row > .item-actions {
     justify-self: end;
   }
+}
+
+/* Campos de texto libre que ocupan la fila entera del formulario de evento. En la
+   barra lateral la fila va a 2 columnas, así que el nombre del evento y la ubicación
+   se quedaban en 145px: escribías "Producción Kitten Shooting Solo Houses" y solo
+   veías el principio. La fecha y la hora sí caben a media fila y siguen igual. */
+.form-group-ancho {
+  grid-column: 1 / -1;
+}
+
+/* La categoría es un select, y su opción más larga ("Otros (añadidos manualmente)")
+   necesita ~210px: por debajo de eso el navegador recorta el texto sin avisar. Con
+   este mínimo la fila prefiere envolver antes que cortar el nombre de la categoría. */
+.add-item-row .add-item-categoria {
+  min-width: 256px;
 }
