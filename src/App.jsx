@@ -501,7 +501,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela,
-    tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    soloBandeja,
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaMobiliarioAlquiler,
@@ -563,11 +564,15 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cocina", String(Math.max(2, Math.ceil(pax * 3 / 50)))],
   ]});
 
-  // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
-  // sea cual sea el tipo de bandeja elegido para el resto del servicio
-  const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+  // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
+  // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
+  // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
+  // los eventos se pasa algo en bandeja, lo normal era ir corto por no acordarse de
+  // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
+  const bandejasPasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
+  const bandejasMadera = bandejasPasar
     + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+  const bandejasPl     = bandejasPasar
     + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
@@ -674,13 +679,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
   const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla", items: [
-    ...((!llevaCanapes && llevaPlatos) ? [
+    ...((!soloBandeja && llevaPlatos) ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)],
       ["Platos hondos", "—"], ["Plato pan", "—"], ["Boles negros", "—"], ["Boles blancos", "—"], ["Platos metálicos", "—"],
     ] : []),
     // El plato de postre va aparte del principal: se puede llevar postre aunque el
     // resto vaya en bandeja (y al revés), así que tiene su propio "No llevan".
-    opt(!llevaCanapes && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
+    opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
     ...(llevaCubiertos ? [
       ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
@@ -769,7 +774,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 // Cumpleaños — fiel a "Checklist de Carga – cumpleaños"
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
+    dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
@@ -793,11 +798,15 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
-  // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
-  // sea cual sea el tipo de bandeja elegido para el resto del servicio
-  const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+  // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
+  // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
+  // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
+  // los eventos se pasa algo en bandeja, lo normal era ir corto por no acordarse de
+  // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
+  const bandejasPasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
+  const bandejasMadera = bandejasPasar
     + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+  const bandejasPl     = bandejasPasar
     + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
 
@@ -880,10 +889,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
   const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
-    ...((!llevaCanapes && llevaPlatos) ? [
+    ...((!soloBandeja && llevaPlatos) ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)], ["Platos metálicos", "—"],
     ] : []),
-    opt(!llevaCanapes && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
+    opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))],
     ...(llevaCubiertos ? [
       ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
@@ -967,7 +976,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
-    llevaCanapes, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
@@ -997,11 +1006,15 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // En producciones no hay barra libre (ni cóctel ni copas): solo refrescos, agua
   // con gas y aguas (cajas de 33cl y botellas de 1,5L) — nada de alcohol ni cristalería
   const personal = calcPersonal(pax, nSala, numStaff, divisorCam);
-  // Con canapés siempre hacen falta bandejas de plata y madera para pasarlos,
-  // sea cual sea el tipo de bandeja elegido para el resto del servicio
-  const bandejasMadera = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+  // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
+  // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
+  // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
+  // los eventos se pasa algo en bandeja, lo normal era ir corto por no acordarse de
+  // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
+  const bandejasPasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
+  const bandejasMadera = bandejasPasar
     + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = (llevaCanapes ? Math.max(2, Math.ceil(pax / 20)) : 0)
+  const bandejasPl     = bandejasPasar
     + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
   const cats = [];
 
@@ -1139,9 +1152,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
   const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla y Cubertería", items: [
-    opt(!llevaCanapes && llevaPlatos, [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)]),
-    opt(!llevaCanapes && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
-    ...((!llevaCanapes && llevaPlatos) ? [
+    opt(!soloBandeja && llevaPlatos, [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)]),
+    opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
+    ...((!soloBandeja && llevaPlatos) ? [
       ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ] : []),
     ...(llevaCubiertos ? [
@@ -1230,7 +1243,7 @@ const ETIQUETAS_CAMPO = {
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   diasProduccion: "Días de producción",
-  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés",
+  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
@@ -2600,7 +2613,14 @@ export default function App({ onCerrarSesion } = {}) {
   // comparten cada plato y cuántos entrantes distintos se reparten
   const [entranteCompartido, setEntranteCompartido] = useState(estadoInicial.entranteCompartido ?? false);
   const [numEntrantesCompartir, setNumEntrantesCompartir] = useState(estadoInicial.numEntrantesCompartir ?? 1);
-  const [llevaCanapes, setLlevaCanapes]               = useState(estadoInicial.llevaCanapes ?? false);
+  // "Lleva canapés" hacía dos cosas a la vez: sumar bandejas Y dejar los platos fuera
+  // de la carga, y en una boda normal hay canapés en el cóctel Y platos en el banquete,
+  // así que marcarlo te dejaba sin platos. Ahora las bandejas van siempre (por pax) y
+  // lo único que se marca es si el servicio es entero de bandeja. La casilla vieja ya
+  // no existe: se conserva su valor guardado solo para heredarlo aquí, y así los
+  // eventos de antes siguen generando su misma lista.
+  const [llevaCanapes] = useState(estadoInicial.llevaCanapes ?? false);
+  const [soloBandeja, setSoloBandeja] = useState(estadoInicial.soloBandeja ?? estadoInicial.llevaCanapes ?? false);
   const [llevaPaella, setLlevaPaella]                 = useState(estadoInicial.llevaPaella ?? false);
   const [tipoPaella, setTipoPaella]                   = useState(estadoInicial.tipoPaella ?? "Auto");
   const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState(estadoInicial.estiloPlatoPrincipal ?? "Blanco liso");
@@ -2841,7 +2861,7 @@ export default function App({ onCerrarSesion } = {}) {
   const getEstadoActual = () => ({
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
-    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, llevaPaella, tipoPaella,
+    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
@@ -2911,7 +2931,7 @@ export default function App({ onCerrarSesion } = {}) {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas, diasProduccion: setDiasProduccion,
-    dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, llevaCanapes: setLlevaCanapes,
+    dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
@@ -3460,7 +3480,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = useMemo(() => ({
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
@@ -3473,7 +3493,7 @@ export default function App({ onCerrarSesion } = {}) {
   }), [
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
-    tipoHorno, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
+    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
@@ -4782,7 +4802,10 @@ export default function App({ onCerrarSesion } = {}) {
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
               [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
               [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
-              [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "bandejas en vez de platos"],
+              /* "Lleva canapés" ya no existe: las bandejas para pasar comida van siempre,
+                 calculadas por pax. Lo que de verdad cambia la carga es si el servicio
+                 es entero de bandeja, y eso es esta casilla. */
+              [soloBandeja,          setSoloBandeja,          "Solo bandeja",             "quita TODOS los platos y suma bandejas"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               /* El armario caliente es alquiler: vive en el bloque ALQUILERES, junto a
                  las sillas, porque además de cargarlo hay que ir a por él y devolverlo. */
@@ -4894,8 +4917,8 @@ export default function App({ onCerrarSesion } = {}) {
                 opcionNinguna="No llevan"
               />
             </div>
-            {llevaCanapes && (llevaPlatos || llevaPlatosPostre) && (
-              <div className="equip-aviso">Con canapés la comida va en bandeja, así que los platos no se cargan. Quita "Lleva canapés" si sí quieres llevarlos.</div>
+            {soloBandeja && (llevaPlatos || llevaPlatosPostre) && (
+              <div className="equip-aviso">Con "Solo bandeja" la comida va toda en bandeja, así que los platos no se cargan aunque aquí tengan estilo elegido.</div>
             )}
             <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
             {/* Carpas y generador son equipo estándar de rodaje, no un extra que se

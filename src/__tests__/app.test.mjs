@@ -784,6 +784,44 @@ async function main() {
   ok(t.some(x => /Devolución/.test(x)), `devolución atrasada: se avisa aunque no se marcara la recogida → ${JSON.stringify(t)}`);
   await a2.c.close();
 
+  // ── Bandejas y servicio de bandeja ──────────────────────────────────────────
+  // "Lleva canapés" hacía dos cosas a la vez: sumar bandejas y dejar los platos fuera
+  // de la carga. Una boda normal lleva canapés en el cóctel Y platos en el banquete,
+  // así que marcarlo te dejaba sin platos. Ahora las bandejas para pasar comida van
+  // siempre (por pax) y lo único que se marca es si el servicio es entero de bandeja.
+  console.log("\n── Bandejas y solo bandeja ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const lee = async (estado) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, ...estado }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      return p.locator(".item-row").evaluateAll(rs => rs.map(r => {
+        const n = r.querySelector(".item-name");
+        const q = r.querySelector(".item-qty-input");
+        return { n: (n ? n.textContent : "").replace(/\s*ALQUILER\s*/, "").trim(), q: q ? q.value : "" };
+      }));
+    };
+    const bandejas = (filas) => filas.filter(x => /^Bandejas de (madera|plata)/.test(x.n)).map(x => Number(x.q));
+    const hayPlatos = (filas) => filas.some(x => /^Platos trinchero/.test(x.n));
+
+    const base = await lee({});
+    const soloBandeja = await lee({ soloBandeja: true });
+
+    ok(hayPlatos(base) && bandejas(base).length > 0 && bandejas(base).every(v => v >= Math.ceil(100 / 10)),
+      `sin marcar nada ya van bandejas por pax, y los platos del banquete → ${JSON.stringify(bandejas(base))}`);
+    ok(!hayPlatos(soloBandeja), '"Solo bandeja" deja los platos fuera de la carga');
+    ok(bandejas(soloBandeja).every((v, i) => v > bandejas(base)[i]),
+      `y suma unas cuantas bandejas más: ${JSON.stringify(bandejas(base))} → ${JSON.stringify(bandejas(soloBandeja))}`);
+
+    // Un evento guardado de ANTES del cambio solo tiene llevaCanapes (sin soloBandeja),
+    // y entonces esa casilla hacía las dos cosas: tiene que seguir dando la misma lista
+    ok(!hayPlatos(await lee({ llevaCanapes: true })),
+      "un evento guardado antes del cambio sigue sin cargar platos");
+    await c.close();
+  }
+
   // ── Alquileres: recogida y devolución solas ─────────────────────────────────
   // Un alquiler no es solo una línea más en la carga: hay que ir a buscarlo y
   // devolverlo. Antes esas dos fechas se escribían a mano evento tras evento (y por
