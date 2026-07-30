@@ -15,11 +15,24 @@ export default defineConfig({
     react(),
     {
       name: 'gula-version',
-      generateBundle() {
+      generateBundle(_opciones, bundle) {
         this.emitFile({
           type: 'asset',
           fileName: 'version.json',
           source: JSON.stringify({ id: BUILD_ID }),
+        })
+        // Lista de ficheros de ESTA compilación, para que el service worker pueda
+        // guardárselos al instalarse. Sin esto no llega a verlos: se registra cuando la
+        // página ya ha terminado de cargar, así que las peticiones de los .js y .css ya
+        // han pasado sin él y la app no abría sin cobertura aunque el HTML sí estuviera
+        // guardado. Los nombres llevan hash, por eso hay que generar la lista aquí.
+        const ficheros = Object.keys(bundle)
+          .filter((f) => /\.(js|css)$/.test(f))
+          .map((f) => './' + f)
+        this.emitFile({
+          type: 'asset',
+          fileName: 'precache.json',
+          source: JSON.stringify({ id: BUILD_ID, ficheros }),
         })
       },
     },

@@ -513,6 +513,200 @@ async function main() {
     await c.close();
   }
 
+  // ── Tema automático por horario ──────────────────────────────────────────────
+  // El botón tiene tres posiciones: automático (oscuro de 20:00 a 7:00), siempre claro y
+  // siempre oscuro. Se falsea el reloj del navegador para comprobar cada tramo.
+  console.log("\n── Tema automático ──");
+  {
+    const abrirAlas = async (hora, pref) => {
+      const c = await navegador.newContext({ viewport: { width: 1400, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      await c.addInitScript(([h, pr]) => {
+        if (pr) localStorage.setItem("gula_tema", pr); else localStorage.removeItem("gula_tema");
+        const Real = Date;
+        const fijo = new Real(2027, 6, 15, h, 30, 0).getTime();
+        Date = class extends Real {
+          constructor(...a) { return a.length ? new Real(...a) : new Real(fijo); }
+          static now() { return fijo; }
+        };
+      }, [hora, pref]);
+      const p = await nuevaPagina(c);
+      await p.goto(url({ evento: "produccion", pax: 25 }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(2000);
+      const r = await p.evaluate(() => document.documentElement.dataset.tema);
+      await c.close();
+      return r;
+    };
+    const tramos = [[6, "oscuro"], [8, "claro"], [14, "claro"], [19, "claro"], [20, "oscuro"], [23, "oscuro"]];
+    const fallos = [];
+    for (const [h, esperado] of tramos) {
+      const t = await abrirAlas(h, null);
+      if (t !== esperado) fallos.push(`${h}:30 → ${t} (esperado ${esperado})`);
+    }
+    ok(fallos.length === 0, `en automático el tema va por hora${fallos.length ? ` → ${fallos.join(", ")}` : " (oscuro de 20:00 a 7:00)"}`);
+    const deNoche = await abrirAlas(23, "claro"), deDia = await abrirAlas(8, "oscuro");
+    ok(deNoche === "claro" && deDia === "oscuro", `fijado a mano manda sobre la hora (23h→${deNoche}, 8h→${deDia})`);
+
+    // El botón cicla y recuerda lo elegido
+    const c = await navegador.newContext({ viewport: { width: 1400, height: 900 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "produccion", pax: 25 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2100);
+    const ciclo = [];
+    for (let i = 0; i < 4; i++) {
+      ciclo.push(await p.evaluate(() => localStorage.getItem("gula_tema")));
+      await p.locator(".btn-tema").click();
+      await p.waitForTimeout(600);
+    }
+    ok(JSON.stringify(ciclo) === JSON.stringify(["auto", "claro", "oscuro", "auto"]),
+      `el botón cicla automático → claro → oscuro (${ciclo.join(" → ")})`);
+    await c.close();
+  }
+
+  // ── Sin cobertura la app tiene que abrir ────────────────────────────────────
+  // El caso real: el equipo llega a un mas sin cobertura y abre la app. Antes salía la
+  // pantalla de "sin conexión" del navegador: los eventos estaban guardados en el móvil
+  // pero no se podía llegar a ellos. El service worker (public/sw.js) guarda la app.
+  console.log("\n── Sin cobertura ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "produccion", pax: 25 }), { waitUntil: "load" });
+    await p.waitForTimeout(3000);
+    const activo = await p.evaluate(async () => {
+      const r = await navigator.serviceWorker.getRegistration();
+      return !!(r && r.active);
+    });
+    ok(activo, "el service worker queda instalado en la primera visita");
+    await c.setOffline(true);
+    await p.reload({ waitUntil: "domcontentloaded" }).catch(() => {});
+    await p.waitForTimeout(3000);
+    const items = await p.locator(".item-row").count().catch(() => 0);
+    ok(items > 20, `sin conexión la app abre con la checklist (${items} items)`);
+    if (items > 20) {
+      await p.locator("button", { hasText: "Modo carga" }).first().click();
+      await p.waitForTimeout(1300);
+      await p.locator(".carga-row").first().locator("input[type=checkbox]").first().check({ force: true });
+      await p.waitForTimeout(900);
+      const marcados = await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}").checkeados || {}).length);
+      ok(marcados > 0, "y sin conexión se puede seguir cargando y se guarda");
+    } else ok(false, "y sin conexión se puede seguir cargando y se guarda");
+    await c.setOffline(false);
+    await c.close();
+  }
+
+  // ── Zonas táctiles en móvil ─────────────────────────────────────────────────
+  // Cargando un camión con las manos frías se falla un botón de 27px. El mínimo cómodo
+  // son 44; se exige al menos 32 contando la capa invisible que extiende las casillas.
+  console.log("\n── Zonas táctiles ──");
+  for (const w of [320, 390]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "produccion", pax: 25, notasEvento: "Hielo" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const pequenos = await p.evaluate(() => {
+      const malos = [];
+      document.querySelectorAll("button, a, input[type=checkbox], select").forEach(e => {
+        if (!e.offsetParent) return;
+        const r = e.getBoundingClientRect();
+        if (r.width < 1 || r.height < 1) return;
+        let ancho = r.width, alto = r.height;
+        const cs = getComputedStyle(e, "::after");
+        if (cs && cs.content !== "none" && cs.position === "absolute") {
+          ancho = Math.max(ancho, parseFloat(cs.width) || 0);
+          alto = Math.max(alto, parseFloat(cs.height) || 0);
+        }
+        if (alto < 32 || ancho < 32) malos.push(`${(e.textContent || e.className || e.type).trim().slice(0, 20)} ${Math.round(ancho)}x${Math.round(alto)}`);
+      });
+      return malos;
+    });
+    ok(pequenos.length === 0, `${w}px: ninguna zona táctil por debajo de 32px${pequenos.length ? ` → ${pequenos.slice(0, 4).join(", ")}` : ""}`);
+    await c.close();
+  }
+
+  // ── Items quitados: se pueden recuperar ─────────────────────────────────────
+  // Antes solo los devolvía "Deshacer", que vive en memoria: al recargar, el item se
+  // había ido para siempre en ese evento.
+  console.log("\n── Items quitados ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1400, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "produccion", pax: 25 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const antes = await p.locator(".item-row").count();
+    for (let i = 0; i < 2; i++) { await p.locator(".item-row").first().locator(".item-action-borrar").click(); await p.waitForTimeout(600); }
+    const linea = await p.locator(".items-quitados").first().innerText().catch(() => "");
+    ok(await p.locator(".item-row").count() === antes - 2 && /2 items quitados/.test(linea),
+      `al quitar 2 items lo dice y da cómo recuperarlos ("${linea.replace(/\n/g, " · ")}")`);
+    // Y al volver a abrir el evento (con los quitados ya guardados) sigue estando
+    await p.goto(url({ evento: "produccion", pax: 25, itemsOcultos: { "Electricidad y otros::Focos de luz": true } }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2300);
+    const hayLinea = await p.locator(".items-quitados").count() === 1;
+    ok(hayLinea, "al abrir un evento que ya tenía items quitados, sigue pudiéndose recuperar");
+    if (hayLinea) {
+      const conQuitado = await p.locator(".item-row").count();
+      await p.locator(".items-quitados-btn").first().click();
+      await p.waitForTimeout(900);
+      ok(await p.locator(".item-row").count() === conQuitado + 1, "y al recuperarlos vuelven a la lista");
+    } else ok(false, "y al recuperarlos vuelven a la lista");
+    await c.close();
+  }
+
+  // ── La app instalada tiene que recibir los cambios ──────────────────────────
+  // El fallo clásico de una app instalada: el service worker se queda con la versión
+  // guardada y no vuelve a coger nada nunca. Aquí se simula un despliegue de verdad —
+  // bundle con OTRO nombre (llevan hash), index.html apuntando al nuevo y version.json
+  // actualizado— con el service worker ya instalado, y se exige que el cambio se vea.
+  console.log("\n── La app instalada recibe los cambios ──");
+  {
+    const fs3 = await import("fs");
+    const PUERTO2 = 4179, BASE2 = `http://localhost:${PUERTO2}/publicado/index.html`;
+    fs3.rmSync("/tmp/gula-publicado", { recursive: true, force: true });
+    fs3.mkdirSync("/tmp/gula-publicado", { recursive: true });
+    fs3.cpSync("dist", "/tmp/gula-publicado/publicado", { recursive: true });
+    const srv2 = spawn("python3", ["-m", "http.server", String(PUERTO2), "--directory", "/tmp/gula-publicado"], { stdio: "ignore" });
+    for (let i = 0; i < 40; i++) { try { const r = await fetch(BASE2); if (r.ok) break; } catch (e) { /* levantando */ } await new Promise(r => setTimeout(r, 250)); }
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const p = await nuevaPagina(c);
+    const estado = encodeURIComponent(JSON.stringify({ evento: "produccion", pax: 25 }));
+    await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
+    await p.waitForTimeout(3000);
+    const dir = "/tmp/gula-publicado/publicado";
+    const jsViejo = fs3.readdirSync(`${dir}/assets`).find(f => /^index-.*\.js$/.test(f));
+    ok(!!jsViejo && await p.locator(".item-row").count() > 20, `la app queda instalada (bundle ${jsViejo})`);
+    // Se "despliega" una versión nueva con un cambio visible
+    const nuevo = "index-VERSIONNUEVA.js";
+    fs3.writeFileSync(`${dir}/assets/${nuevo}`,
+      fs3.readFileSync(`${dir}/assets/${jsViejo}`, "utf8").replaceAll("Cubo basura reciclaje", "CAMBIO VERSION NUEVA"));
+    fs3.rmSync(`${dir}/assets/${jsViejo}`);
+    fs3.writeFileSync(`${dir}/index.html`, fs3.readFileSync(`${dir}/index.html`, "utf8").replace(jsViejo, nuevo));
+    const pre = JSON.parse(fs3.readFileSync(`${dir}/precache.json`, "utf8"));
+    fs3.writeFileSync(`${dir}/precache.json`, JSON.stringify({ id: "NUEVA", ficheros: pre.ficheros.map(f => f.replace(jsViejo, nuevo)) }));
+    fs3.writeFileSync(`${dir}/version.json`, JSON.stringify({ id: "NUEVA" }));
+    // Se vuelve a abrir la app instalada, con cobertura
+    await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
+    await p.waitForTimeout(3000);
+    const conRed = await p.evaluate(() => ({
+      bundles: performance.getEntriesByType("resource").map(e => e.name.split("/").pop()).filter(n => /^index-.*\.js$/.test(n)),
+      cambio: [...document.querySelectorAll(".item-name")].some(n => /CAMBIO VERSION NUEVA/.test(n.textContent)),
+    }));
+    ok(conRed.cambio && conRed.bundles.includes("index-VERSIONNUEVA.js"),
+      `al reabrirla con cobertura carga la versión nueva (${conRed.bundles.join(", ")})`);
+    // Y a partir de ahí, sin cobertura abre con la NUEVA
+    await c.setOffline(true);
+    await p.reload({ waitUntil: "domcontentloaded" }).catch(() => {});
+    await p.waitForTimeout(3000);
+    const sinRed = await p.evaluate(() => [...document.querySelectorAll(".item-name")].some(n => /CAMBIO VERSION NUEVA/.test(n.textContent)));
+    ok(sinRed, "y sin cobertura abre ya con la versión nueva guardada");
+    await c.setOffline(false);
+    await c.close();
+    srv2.kill();
+    fs3.rmSync("/tmp/gula-publicado", { recursive: true, force: true });
+  }
+
   // ── Aviso de versión nueva ──────────────────────────────────────────────────
   // Los .js llevan hash en el nombre, así que un index.html cacheado en el móvil sigue
   // cargando la compilación vieja indefinidamente y no te enteras: pasó de verdad, con
