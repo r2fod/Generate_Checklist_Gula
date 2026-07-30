@@ -75,8 +75,52 @@ function fmtCantidadCompleta(label, qtyTexto, sufijo) {
   if (conCaja !== qtyTexto) return conCaja;
   return sufijo ? `${qtyTexto} ${sufijo}` : qtyTexto;
 }
+// Un item se marca como ALQUILER de tres formas, en este orden: porque el generador
+// lo crea ya marcado (tercer dato de la tupla, ver opt/buildChecklist), porque se ha
+// marcado a mano con el ✎, o porque el nombre lleva el proveedor dentro. Lo tercero es
+// el respaldo de siempre: sin él, un item escrito a mano como "Camión (alquiler)"
+// perdería el tag.
 const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
+
+// ─── ALQUILERES ───────────────────────────────────────────────────────────────
+// Material que no es nuestro: hay que ir a buscarlo antes del evento y devolverlo
+// después. Antes eran dos interruptores sueltos (sillas y armario caliente) que solo
+// añadían su línea a la carga; la recogida y la devolución había que escribirlas a
+// mano en cada evento, y por eso se olvidaban. Ahora cada alquiler que se activa crea
+// solo su recogida (el día antes) y su devolución (el día después), con las fechas
+// sacadas de la del evento.
+//
+// Para añadir otro alquiler basta con una entrada más aquí y engancharla a su control.
+const ALQUILERES = {
+  sillas:          { etiqueta: "Sillas" }, // el proveedor lo elige el selector: Dealde o Carvillo
+  armarioCaliente: { etiqueta: "Armario caliente", proveedor: "Dealde" },
+  mobiliario:      { etiqueta: "Mobiliario", proveedor: "Event Style" },
+  // Solo en producciones
+  generador:       { etiqueta: "Generador", proveedor: "Support On Set" },
+  carpas:          { etiqueta: "Carpas", proveedor: "Support On Set" },
+};
+// Cuántos días antes se recoge y cuántos después se devuelve
+const DIAS_ANTES_RECOGIDA = 1, DIAS_DESPUES_DEVOLUCION = 1;
+
+// Suma (o resta) días a una fecha "AAAA-MM-DD" sin pasar por UTC: con toISOString()
+// una fecha de verano se iba un día atrás según la hora del navegador.
+function sumaDias(iso, dias) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  d.setDate(d.getDate() + dias);
+  const dosCifras = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${dosCifras(d.getMonth() + 1)}-${dosCifras(d.getDate())}`;
+}
+
+// Nombre con el que el alquiler aparece en la lista de recogidas. Sin el verbo delante
+// ("Recoger sillas"): el aviso ya pone "Recogida:" o "Devolución:" según toque.
+function conceptoAlquiler(clave, proveedor) {
+  const a = ALQUILERES[clave];
+  const quien = proveedor || (a && a.proveedor);
+  return `${a ? a.etiqueta : clave}${quien ? ` (${quien})` : ""}`;
+}
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas:
 // es el buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan
 // pedir un 10-20% extra de copas y platos). Las bebidas, licores y cápsulas NO llevan
@@ -460,7 +504,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     tieneFrituras, numFrituras, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -478,6 +522,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // en vez de generar una línea "Cojines para sillas" suelta.
   const incluyeCojines = (origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda";
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`;
+  // Las nuestras no son alquiler, así que no llevan el tag ni generan recogida
+  const esAlquilerSillas = origenSillas !== "Nuestras";
 
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -527,7 +573,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ["Mesas de 1,8m", String(calcMesasTotal(evtKey, pax))],
-    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), true]),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
+    opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda", ["Mesa redonda especial para Tarta", "1"]),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
@@ -725,7 +772,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, llevaCanapes,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
     tamanoBarril = "No lleva", numBarriles = 1,
-    llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
@@ -733,6 +780,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaChillOut, numChillOut = 1,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
+  const esAlquilerSillas = origenSillas !== "Nuestras";
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -768,7 +816,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas de 1,8m", String(calcMesasServicio(pax).total)],
-    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax)]),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
+    opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
     ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     opt(llevaPalomitera, ["Carrito palomitera", "1"]),
@@ -925,6 +974,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaCarpas = true, llevaGenerador = true,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
+  const esAlquilerSillas = origenSillas !== "Nuestras";
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
   // Producción de varios días con pax distinto por día (ej. 12+17+12): el equipo
@@ -959,8 +1009,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Focos de luz", "1"],
     ["Regletas", String(Math.max(3, Math.ceil(pax / 50)))], ["Alargadores", String(Math.max(3, Math.ceil(pax / 50)))], ["Herramientas", "1"],
     ["Cinta aislante", conSufijo(1, "rollo")], ["Bridas", conSufijo(1, "bolsa")],
-    // La garrafa de gasolina va con el generador: si no se lleva generador, tampoco
-    opt(llevaGenerador, ["Generador", "1"]), opt(llevaGenerador, ["Garrafa gasolina (llena)", "1"]),
+    // La garrafa de gasolina va con el generador: si no se lleva generador, tampoco.
+    // El generador es alquilado (SOS) y va marcado como tal; la gasolina la ponemos nosotros.
+    opt(llevaGenerador, ["Generador", "1", true]), opt(llevaGenerador, ["Garrafa gasolina (llena)", "1"]),
     ["Walkies", "2"], ["Máquina pegatinas", "1"],
   ]});
 
@@ -1003,7 +1054,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesas de 1,8m", String(mesasServicio + MESAS_BUFFET + MESA_CAMION)],
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
     ["Mesa redonda", "—"], ["Mesa larga", "—"],
-    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA)]),
+    opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA), esAlquilerSillas]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     // Carpas, paredes y pesas en tres líneas: antes ponía "Carpas con paredes y pesas"
@@ -1188,6 +1239,7 @@ const ETIQUETAS_CAMPO = {
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
+  llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -2588,6 +2640,12 @@ export default function App({ onCerrarSesion } = {}) {
   // el interruptor está para los sitios que ya tienen sombra o luz propia.
   const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? true);
   const [llevaGenerador, setLlevaGenerador]         = useState(estadoInicial.llevaGenerador ?? true);
+  // Mobiliario de alquiler (Event Style): mesas altas, sofás, muebles de barra... No es
+  // material nuestro, así que además de salir en la carga hay que ir a por él y devolverlo.
+  const [llevaMobiliarioAlquiler, setLlevaMobiliarioAlquiler] = useState(estadoInicial.llevaMobiliarioAlquiler ?? false);
+  // Carpas de alquiler (SOS): las 8 del almacén cubren casi todo, pero cuando el cálculo
+  // pide más hay que alquilar las que falten. Solo en producciones.
+  const [alquilaCarpas, setAlquilaCarpas] = useState(estadoInicial.alquilaCarpas ?? false);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
@@ -2789,6 +2847,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno, tipoBBQ, mesVerano, tieneBrindisCava,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler, alquilaCarpas,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2861,6 +2920,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
+    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
@@ -2919,6 +2979,64 @@ export default function App({ onCerrarSesion } = {}) {
       window.prompt("No se pudo copiar automáticamente. Copia el link:", texto);
     });
   };
+
+  // ─── ALQUILERES ↔ RECOGIDAS ─────────────────────────────────────────────────
+  // Activar un alquiler crea su recogida (el día antes) y su devolución (el día
+  // después); desactivarlo la quita. Solo se toca la entrada marcada con `auto`: las
+  // recogidas escritas a mano no se rozan nunca. Y si ya se marcó como recogida o
+  // devuelta, no se borra aunque se apague el interruptor — el material está de por
+  // medio y hay que devolverlo igual.
+  const sincronizaAlquiler = (clave, activo, concepto) => {
+    setRecogidas(prev => {
+      const i = prev.findIndex(r => r.auto === clave);
+      if (activo) {
+        // Ya existe: solo se refresca el nombre (p. ej. al cambiar de proveedor), nunca
+        // las fechas, que a estas alturas pueden estar puestas a mano
+        if (i !== -1) return prev.map((r, idx) => idx === i ? { ...r, concepto } : r);
+        return [...prev, {
+          concepto, hora: "",
+          fecha: sumaDias(fechaEvento, -DIAS_ANTES_RECOGIDA),
+          fechaDevolucion: sumaDias(fechaEvento, DIAS_DESPUES_DEVOLUCION),
+          auto: clave, fechasAuto: true,
+        }];
+      }
+      if (i === -1 || prev[i].recogido || prev[i].devuelto) return prev;
+      return prev.filter((_, idx) => idx !== i);
+    });
+  };
+  // El generador de las producciones viene marcado de serie (siempre se lleva uno), así
+  // que su recogida se crea al elegir el tipo de evento, que es cuando entra en juego —
+  // si no, el único alquiler que nadie llega a pulsar sería justo el que más se olvida.
+  // Al salir de producción se retiran el generador y las carpas de alquiler, que solo
+  // existen ahí.
+  const handleCambiarTipoEvento = (tipo) => {
+    setEvento(tipo);
+    if (tipo === "produccion") {
+      if (llevaGenerador) sincronizaAlquiler("generador", true, conceptoAlquiler("generador"));
+      // En un rodaje no se alquila mobiliario: si venía marcado, se apaga con su recogida
+      if (llevaMobiliarioAlquiler) {
+        setLlevaMobiliarioAlquiler(false);
+        sincronizaAlquiler("mobiliario", false);
+      }
+      return;
+    }
+    sincronizaAlquiler("generador", false);
+    if (alquilaCarpas) { setAlquilaCarpas(false); sincronizaAlquiler("carpas", false); }
+  };
+  // Al poner o cambiar la fecha del evento se recolocan las fechas de los alquileres
+  // que sigan con las propuestas por la app. Las que se hayan tocado a mano se quedan.
+  const handleCambiarFechaEvento = (nuevaFecha) => {
+    setFechaEvento(nuevaFecha);
+    setRecogidas(prev => prev.map(r => r.auto && r.fechasAuto
+      ? { ...r, fecha: sumaDias(nuevaFecha, -DIAS_ANTES_RECOGIDA), fechaDevolucion: sumaDias(nuevaFecha, DIAS_DESPUES_DEVOLUCION) }
+      : r));
+  };
+  // Cualquier cambio a mano en las fechas de una recogida automática la desengancha de
+  // la fecha del evento: a partir de ahí manda lo que haya puesto el usuario.
+  const editarRecogida = (i, cambios, tocaFechas = false) =>
+    setRecogidas(prev => prev.map((x, idx) => idx === i
+      ? { ...x, ...cambios, ...(tocaFechas && x.fechasAuto ? { fechasAuto: false } : {}) }
+      : x));
 
   const handleGenerarLink = () => {
     // Si no se ha puesto nombre de evento todavía, se usa el tipo + pax como
@@ -3344,6 +3462,7 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -3356,7 +3475,7 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, llevaCanapes, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
-    llevaCarpas, llevaGenerador,
+    llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
     llevaAguasPequenas, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
@@ -3417,7 +3536,15 @@ export default function App({ onCerrarSesion } = {}) {
         // edición manual fijada, en cuyo caso se mantienen EN SU MISMA POSICIÓN natural
         // en vez de "resucitar" al final de la categoría como pasaba antes.
         .filter(([label, qty]) => qty !== null || overridesManuales[`${cat.nombre}::${label}`] !== undefined)
-        .map(([label, qty, idx]) => {
+        .map(([label, qty, extra]) => {
+          // El tercer dato de la tupla significa dos cosas según de dónde venga el item:
+          // el índice dentro de itemsManuales si se añadió a mano (un número), o la marca
+          // de alquiler si lo genera la app (true/false). Se leía siempre como índice, así
+          // que "Sillas (alquiler Dealde)" y "Armario caliente" pasaban por items manuales:
+          // su ✕ no los quitaba (buscaba el índice `true` en la lista de manuales, que no
+          // existe) y al renombrarlos se perdía el nombre nuevo.
+          const idx = typeof extra === "number" ? extra : undefined;
+          const esAlquilerFijo = extra === true;
           const key = `${cat.nombre}::${label}`;
           // qty puede venir como { u, sufijo } (conSufijo): se separa el número editable
           // del texto fijo del envase, que se conserva aparte aunque se edite el número
@@ -3425,7 +3552,7 @@ export default function App({ onCerrarSesion } = {}) {
           const valorBase = esObjetoConSufijo ? qty.u : qty;
           const sufijo = esObjetoConSufijo ? qty.sufijo : undefined;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
-          return [nombresManuales[key] ?? label, cantidad, idx, label, !!itemsAlquilerManual[key], sufijo];
+          return [nombresManuales[key] ?? label, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo];
         });
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
@@ -4175,7 +4302,7 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="form-row">
             <div className="form-group">
               <span className="form-label">TIPO DE EVENTO</span>
-              <select className="form-select" value={evento} onChange={e => setEvento(e.target.value)}>
+              <select className="form-select" value={evento} onChange={e => handleCambiarTipoEvento(e.target.value)}>
                 {Object.entries(EVENTOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </div>
@@ -4262,7 +4389,7 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
             <div className="form-group">
               <span className="form-label">FECHA</span>
-              <input type="date" className="form-input" value={fechaEvento} onChange={e => setFechaEvento(e.target.value)} />
+              <input type="date" className="form-input" value={fechaEvento} onChange={e => handleCambiarFechaEvento(e.target.value)} />
             </div>
             <div className="form-group">
               <span className="form-label">HORA DE INICIO</span>
@@ -4389,18 +4516,103 @@ export default function App({ onCerrarSesion } = {}) {
               )}
             </div>
           </div>
+          {/* ALQUILERES: material que no es nuestro. Estaban sueltos por el formulario
+              (las sillas en Equipamiento, el armario caliente entre los extras) y no
+              tenían ninguna relación con las recogidas de aquí abajo: se marcaba el
+              alquiler, salía en la carga, y la recogida y la devolución había que
+              escribirlas a mano evento tras evento. Ahora van juntos y cada uno crea
+              las suyas con las fechas sacadas de la del evento. */}
+          <div className="logistica-block">
+            <span className="form-label">ALQUILERES (material de otros — crea su recogida y su devolución)</span>
+            <div className="equip-grid alquileres-grid">
+              <SegmentedControl
+                label="Sillas"
+                value={origenSillas}
+                onChange={v => {
+                  setOrigenSillas(v);
+                  sincronizaAlquiler("sillas", v === "Dealde" || v === "Carvillo", conceptoAlquiler("sillas", v));
+                }}
+                options={["Dealde", "Carvillo", "Nuestras", "No llevan"]}
+              />
+              {/* El generador de las producciones siempre es alquilado (SOS), así que su
+                  interruptor vive aquí y no en Equipamiento: al marcarlo hay que ir a
+                  buscarlo y devolverlo, no solo cargarlo. */}
+              {evento === "produccion" && (
+                <SegmentedControl
+                  label="Generador"
+                  value={llevaGenerador ? "Lleva" : "No lleva"}
+                  onChange={v => {
+                    setLlevaGenerador(v === "Lleva");
+                    sincronizaAlquiler("generador", v === "Lleva", conceptoAlquiler("generador"));
+                  }}
+                  options={["Lleva", "No lleva"]}
+                />
+              )}
+              <label className="checkbox-label-normal">
+                <input
+                  type="checkbox"
+                  checked={llevaArmarioCaliente}
+                  onChange={e => {
+                    setLlevaArmarioCaliente(e.target.checked);
+                    sincronizaAlquiler("armarioCaliente", e.target.checked, conceptoAlquiler("armarioCaliente"));
+                  }}
+                />
+                <span className="checkbox-texto">Armario caliente <span className="checkbox-sub">· Dealde</span></span>
+              </label>
+              {/* Mobiliario EXTRA, el que no tenemos: se alquila a Event Style cuando el
+                  cliente pide más de lo nuestro. En un rodaje no se lleva, así que ahí no
+                  se ofrece. Los chill out son nuestros y se configuran en Extras: esos no
+                  hay que devolverlos. */}
+              {evento !== "produccion" && (
+                <label className="checkbox-label-normal">
+                  <input
+                    type="checkbox"
+                    checked={llevaMobiliarioAlquiler}
+                    onChange={e => {
+                      setLlevaMobiliarioAlquiler(e.target.checked);
+                      sincronizaAlquiler("mobiliario", e.target.checked, conceptoAlquiler("mobiliario"));
+                    }}
+                  />
+                  <span className="checkbox-texto">Mobiliario extra <span className="checkbox-sub">· Event Style, lo que no es nuestro</span></span>
+                </label>
+              )}
+              {/* Las 8 carpas del almacén cubren casi todo; cuando el cálculo pide más hay
+                  que alquilar las que falten, y esas también se van a buscar y se devuelven. */}
+              {evento === "produccion" && llevaCarpas && (
+                <label className="checkbox-label-normal">
+                  <input
+                    type="checkbox"
+                    checked={alquilaCarpas}
+                    onChange={e => {
+                      setAlquilaCarpas(e.target.checked);
+                      sincronizaAlquiler("carpas", e.target.checked, conceptoAlquiler("carpas"));
+                    }}
+                  />
+                  <span className="checkbox-texto">Carpas de alquiler <span className="checkbox-sub">· Support On Set</span></span>
+                </label>
+              )}
+            </div>
+            {!fechaEvento && recogidas.some(r => r.auto) && (
+              <p className="alquileres-aviso">Pon la fecha del evento y las de recogida y devolución se rellenan solas.</p>
+            )}
+          </div>
           <div className="logistica-block">
             <span className="form-label">RECOGIDAS (alquileres/equipo de otros a devolver o recoger)</span>
             {recogidas.map((r, i) => (
               <div className="recogida-card" key={i}>
                 <div className="recogida-card-top">
+                  {r.auto && (
+                    <span className="recogida-auto-badge" title="Creada sola al marcar el alquiler. Las fechas salen de la del evento hasta que las cambies a mano">
+                      <Tag size={11} /> Alquiler
+                    </span>
+                  )}
                   <input
                     type="text"
                     className="form-input"
                     placeholder="Ej: Camión plataforma (Albácar)"
                     title={r.concepto || "Qué hay que recoger o devolver"}
                     value={r.concepto}
-                    onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, concepto: e.target.value } : x))}
+                    onChange={e => editarRecogida(i, { concepto: e.target.value })}
                   />
                   <button
                     className="item-action-btn item-action-borrar"
@@ -4418,21 +4630,21 @@ export default function App({ onCerrarSesion } = {}) {
                         className="form-input"
                         value={r.fecha}
                         title="Fecha de recogida"
-                        onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fecha: e.target.value } : x))}
+                        onChange={e => editarRecogida(i, { fecha: e.target.value }, true)}
                       />
                       <input
                         type="time"
                         className="form-input"
                         value={r.hora}
                         title="Hora de recogida"
-                        onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, hora: e.target.value } : x))}
+                        onChange={e => editarRecogida(i, { hora: e.target.value })}
                       />
                     </div>
                     <label className={`recogida-estado ${r.recogido ? "is-hecho" : ""}`}>
                       <input
                         type="checkbox"
                         checked={!!r.recogido}
-                        onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, recogido: e.target.checked } : x))}
+                        onChange={e => editarRecogida(i, { recogido: e.target.checked })}
                       />
                       {r.recogido ? "✓ Recogido" : "Pendiente de recoger"}
                     </label>
@@ -4444,14 +4656,14 @@ export default function App({ onCerrarSesion } = {}) {
                       className="form-input"
                       value={r.fechaDevolucion || ""}
                       title="Fecha de devolución"
-                      onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, fechaDevolucion: e.target.value } : x))}
+                      onChange={e => editarRecogida(i, { fechaDevolucion: e.target.value }, true)}
                     />
                     {r.fechaDevolucion && (
                       <label className={`recogida-estado ${r.devuelto ? "is-hecho" : ""}`}>
                         <input
                           type="checkbox"
                           checked={!!r.devuelto}
-                          onChange={e => setRecogidas(prev => prev.map((x, idx) => idx === i ? { ...x, devuelto: e.target.checked } : x))}
+                          onChange={e => editarRecogida(i, { devuelto: e.target.checked })}
                         />
                         {r.devuelto ? "✓ Devuelto" : "Pendiente de devolver"}
                       </label>
@@ -4572,7 +4784,8 @@ export default function App({ onCerrarSesion } = {}) {
               [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
               [llevaCanapes,         setLlevaCanapes,         "Lleva canapés",            "bandejas en vez de platos"],
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
-              [llevaArmarioCaliente, setLlevaArmarioCaliente, "Armario caliente",         "alquiler Dealde"],
+              /* El armario caliente es alquiler: vive en el bloque ALQUILERES, junto a
+                 las sillas, porque además de cargarlo hay que ir a por él y devolverlo. */
               [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
               ...(evento !== "produccion"
                 ? [[llevaPlanchaGas, setLlevaPlanchaGas, "Plancha de gas", "suma 1 bombona"]]
@@ -4632,7 +4845,8 @@ export default function App({ onCerrarSesion } = {}) {
           <hr />
           <div className="section-title">Equipamiento</div>
           <div className="equip-grid">
-            <SegmentedControl label="Sillas" value={origenSillas} onChange={setOrigenSillas} options={["Dealde", "Carvillo", "Nuestras", "No llevan"]} />
+            {/* Las sillas se eligen en el bloque ALQUILERES (arriba, con las recogidas):
+                según de quién sean hay que ir a buscarlas y devolverlas. */}
             <SegmentedControl label="Bandejas de servicio" value={tipoBandejas} onChange={setTipoBandejas} options={["Madera", "Plata", "Mixto"]} />
             <div className="equip-pareja">
               <div className="form-group">
@@ -4688,11 +4902,23 @@ export default function App({ onCerrarSesion } = {}) {
                 añade: van aquí con el resto del equipamiento y las cantidades se
                 calculan solas. El "No llevan" es para el sitio puntual que ya tiene
                 sombra o luz propia. */}
+            {/* El generador está en ALQUILERES: siempre viene de SOS. Las carpas son
+                nuestras (8 en almacén), así que su interruptor se queda aquí; si hacen
+                falta más, se marcan como alquiler en ese bloque. */}
             {evento === "produccion" && (
-              <>
-                <SegmentedControl label="Carpas" value={llevaCarpas ? "Llevan" : "No llevan"} onChange={v => setLlevaCarpas(v === "Llevan")} options={["Llevan", "No llevan"]} />
-                <SegmentedControl label="Generador" value={llevaGenerador ? "Lleva" : "No lleva"} onChange={v => setLlevaGenerador(v === "Lleva")} options={["Lleva", "No lleva"]} />
-              </>
+              <SegmentedControl
+                label="Carpas"
+                value={llevaCarpas ? "Llevan" : "No llevan"}
+                onChange={v => {
+                  setLlevaCarpas(v === "Llevan");
+                  // Sin carpas no hay carpas que alquilar: se apaga también su recogida
+                  if (v !== "Llevan" && alquilaCarpas) {
+                    setAlquilaCarpas(false);
+                    sincronizaAlquiler("carpas", false);
+                  }
+                }}
+                options={["Llevan", "No llevan"]}
+              />
             )}
           </div>
         </div>
