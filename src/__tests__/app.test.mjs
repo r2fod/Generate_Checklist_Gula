@@ -6,6 +6,7 @@
 //   npm run test
 //
 import { chromium } from "playwright-core";
+import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
@@ -639,6 +640,153 @@ async function main() {
     ok(t && t.y < 120, `en Modo carga el toggle sigue arriba tras bajar (y=${t ? Math.round(t.y) : "?"})`);
     const cuenta = await p.locator(".carga-toggle-cuenta").innerText();
     ok(/^\d+\/\d+$/.test(cuenta.trim()), `y con él el recuento a la vista (${cuenta.trim()})`);
+    await c.close();
+  }
+
+  // ── El formulario de oficina ────────────────────────────────────────────────
+  // Se abre con ?enviar=<código> y NO da acceso a nada más: ni checklist, ni
+  // configuración, ni eventos. Esa es la garantía que sostiene todo lo demás.
+  console.log("\n── El formulario de oficina ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+
+    ok(await p.locator(".app-header").count() === 0 && await p.locator(".item-row").count() === 0
+      && await p.locator(".config-card").count() === 0,
+      "con el link del formulario no se llega a la app ni a la checklist");
+    ok(/De qué evento son los datos/i.test(await p.locator(".form-titulo").innerText()),
+      "empieza preguntando a qué evento van los datos");
+
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(500);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(600);
+    ok(/Cómo lo llamamos/i.test(await p.locator(".form-titulo").innerText()),
+      "al elegir el tipo pasa sola a la siguiente");
+
+    await p.locator(".form-input").first().fill("Boda de Ana y Luis");
+    await p.locator(".form-input").nth(1).fill("Finca La Alquería");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(400);
+
+    // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
+    // puede dejar el formulario atascado en ninguna pregunta
+    let vueltas = 0;
+    while (vueltas++ < 15 && !/Está todo bien/i.test(await p.locator(".form-titulo").innerText())) {
+      const nose = p.locator(".form-btn-nose");
+      if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
+      await p.waitForTimeout(280);
+    }
+    ok(/Está todo bien/i.test(await p.locator(".form-titulo").innerText()),
+      `se puede llegar al final contestando "No lo sé" a todo (${vueltas} pantallas)`);
+
+    const repaso = await p.locator(".form-repaso-fila").allInnerTexts();
+    ok(repaso.some(t => /Boda de Ana y Luis/.test(t)) && repaso.some(t => /no lo sé/i.test(t)),
+      "y el repaso enseña lo contestado y lo que se dejó en blanco");
+    ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
+      "sin desbordamiento en el móvil");
+
+    // El borrador sobrevive a cerrar el navegador a media pregunta
+    await p.reload({ waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
+      "y si cierran y vuelven, siguen donde lo dejaron");
+    await c.close();
+  }
+
+  // ── Del formulario a la checklist ───────────────────────────────────────────
+  // El formulario de la oficina no calcula nada: recoge respuestas y las traduce a los
+  // mismos campos que rellenarías tú a mano. Esta prueba recorre el camino entero —
+  // respuestas → configuración → checklist generada — para los tipos de evento, y es
+  // la garantía de que el formulario no necesita tocar ni una línea de los generadores.
+  console.log("\n── Del formulario a la checklist ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const desdeElFormulario = async (respuestas) => {
+      const estado = aRespuestasDeLaApp(respuestas);
+      await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      const nombres = await p.locator(".item-row .item-name").allInnerTexts();
+      return { estado, nombres: nombres.map(n => n.replace(/\s*ALQUILER\s*/, "").trim()) };
+    };
+    const tiene = (l, txt) => l.some(n => n.toLowerCase().includes(txt.toLowerCase()));
+
+    // Una boda de cóctel de pie: sin platos, con paella, horno grande y barril
+    const boda = await desdeElFormulario({
+      tipo: "boda", nombre: "Boda Ana y Luis", sitio: "Finca La Alquería",
+      fecha: "2027-12-11", horaInicio: "12:30", horaFin: "23:00",
+      adultos: 120, ninos: 10, coctel: 3, copas: 5,
+      servicio: "bandeja", menu: ["paella", "frito"], entrante: "compartir3",
+      horno: "Grande", extras: ["brindis", "barril50", "chillout"], chilloutNumero: 2,
+      sillas: "finca", notas: "Alergia al marisco en la mesa 4",
+    });
+    ok(boda.estado.evento === "boda" && boda.estado.pax === 120 && boda.estado.soloBandeja === true
+      && boda.estado.tipoHorno === "Grande" && boda.estado.tamanoBarril === "50L"
+      && boda.estado.origenSillas === "No llevan" && boda.estado.personasPorPlatoEntrante === 3,
+      `las respuestas se traducen a los campos de la app → ${JSON.stringify(boda.estado.tipoHorno)}, ${JSON.stringify(boda.estado.tamanoBarril)}`);
+    ok(tiene(boda.nombres, "Horno grande") && !tiene(boda.nombres, "Horno pequeño"),
+      "y la checklist carga el horno que se pidió");
+    ok(tiene(boda.nombres, "Paella") && tiene(boda.nombres, "Parisiene"),
+      "la paella y las frituras salen con su equipo");
+    ok(!tiene(boda.nombres, "Platos trinchero"),
+      "de pie y en bandeja: no se cargan platos");
+    ok(!tiene(boda.nombres, "Sillas"),
+      "si las sillas las pone la finca, no se cargan ni se alquilan");
+    ok(tiene(boda.nombres, "Barril de cerveza (50L)") && tiene(boda.nombres, "Chill out"),
+      "y lo presupuestado aparece: barril y chill out");
+
+    // Un rodaje de tres días sin sombra y con generador de alquiler
+    const produ = await desdeElFormulario({
+      tipo: "produccion", nombre: "Produ Movistar", sitio: "Solo Houses",
+      fecha: "2027-07-29", horaInicio: "07:00",
+      dias: [12, 17, 12], sombra: "no", generador: "si",
+      menu: ["paella"], horno: "Pequeño", extras: [], notas: "",
+    });
+    ok(produ.estado.llevaCarpas === true && produ.estado.llevaGenerador === true
+      && produ.estado.origenSillas === "Nuestras"
+      && JSON.stringify(produ.estado.diasProduccion) === JSON.stringify(["12", "17", "12"]),
+      `el rodaje traduce días, carpas, generador y sillas propias → ${JSON.stringify(produ.estado.diasProduccion)}`);
+    ok(tiene(produ.nombres, "Carpas") && tiene(produ.nombres, "Generador"),
+      "sin sombra van carpas, y el generador se carga con su gasolina");
+    ok(tiene(produ.nombres, "Sillas (nuestras)"),
+      "y las sillas del rodaje son las nuestras, sin alquiler");
+    {
+      // En un rodaje se separa mucho más residuo que en un banquete
+      const cubos = await p.locator(".item-row", { hasText: "Cubo basura reciclaje" }).first().locator(".item-qty-input").inputValue();
+      ok(cubos === "3", `y van 3 cubos de basura de reciclaje, no 1 (${cubos})`);
+
+      // Este rodaje es de tres días (12+17+12): lo reutilizable se dimensiona para el
+      // DÍA GRANDE (17) y lo que se gasta para la SUMA (41). Los cubiertos y los platos
+      // se friegan, así que van por el día grande; las cápsulas se gastan.
+      const DIA_GRANDE = 17, RACIONES = 41;
+      const margen = (n) => Math.ceil(n * 1.1);
+      const uno = async (t) => Number(await p.locator(".item-row", { hasText: t }).first().locator(".item-qty-input").inputValue());
+      const [tenedores, cuchPostre, platosPostre] = [
+        await uno("Tenedores grandes"), await uno("Cucharas postre"), await uno("Platos postre"),
+      ];
+      // En un rodaje se come dos veces (desayuno y comida): cubiertos para las dos
+      ok(tenedores === margen(DIA_GRANDE * 2) && cuchPostre === margen(DIA_GRANDE * 2),
+        `los cubiertos del rodaje van para dos servicios (${tenedores} tenedores, ${cuchPostre} cucharas de postre)`);
+      // Y el desayuno usa su plato pequeño: uno por cabeza de más
+      ok(platosPostre === margen(DIA_GRANDE) + DIA_GRANDE,
+        `y el plato de postre lleva uno por cabeza de más para el desayuno (${platosPostre})`);
+
+      // En un rodaje se bebe café todo el día, no los 2-3 de una sobremesa
+      const capsulas = await uno("Cápsulas café");
+      ok(capsulas === Math.ceil(RACIONES * 5.5),
+        `y las cápsulas de café van a 5,5 por persona y día (${capsulas} para ${RACIONES} raciones)`);
+    }
+
+    // Lo que no se contesta no se toca: se queda con el valor por defecto de la app
+    const minimo = aRespuestasDeLaApp({ tipo: "cumpleanos", nombre: "Cumple Marta", adultos: 40 });
+    ok(minimo.evento === "cumpleanos" && minimo.pax === 40
+      && minimo.tipoHorno === undefined && minimo.llevaPaella === undefined,
+      `lo que no se contesta no viaja: ${JSON.stringify(Object.keys(minimo))}`);
     await c.close();
   }
 
