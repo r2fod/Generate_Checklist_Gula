@@ -1401,12 +1401,25 @@ body {
   }
 }
 
-/* En móviles pequeños los selectores con 4 opciones ("No llevan" en Sillas)
-   necesitan letra algo menor para no recortarse */
+/* En móviles pequeños los selectores con 4 opciones ("No llevan" en Sillas,
+   "Auto/Pequeña/Mediana/Grande" en Tamaño de paella) necesitan letra algo menor para
+   no recortarse. Va para TODOS los selectores, no solo los de Equipamiento: el de la
+   paella vive en .controls-row y a 320px sus cuatro botones pedían 303px en una caja
+   de 268, así que empujaban la página entera 19px a la derecha. */
 @media (max-width: 420px) {
-  .equip-grid .segment-btn {
+  .segment-btn {
     font-size: 0.72rem;
     padding: 7px 3px;
+  }
+  /* Y que puedan encogerse de verdad: sin esto el contenido de cada botón fija un
+     ancho mínimo y el conjunto se sale igual por mucho que baje la letra. */
+  .segmented-control {
+    max-width: 100%;
+  }
+  .segmented-control .segment-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
   }
 }
 
@@ -3890,6 +3903,11 @@ hr {
   .cambios-remotos-cerrar,
   .aviso-recogida-hecho,
   .logistica-add-rec,
+  /* Estos tres se quedaron fuera de la primera pasada porque la prueba solo medía un
+     evento de producción, que no tiene filas de logística ni recogidas: el "+ Añadir
+     persona/recogida/compra" median 33px y el "Extra" de cada persona, 26. */
+  .btn-add-logistica,
+  .logistica-tipo-btn,
   .btn-mantenimiento {
     min-width: 40px;
     min-height: 40px;
@@ -3904,14 +3922,19 @@ hr {
   .recogida-estado input[type="checkbox"],
   .carga-nota-item input[type="checkbox"],
   .item-edit-alquiler-check input[type="checkbox"],
-  .add-item-alquiler-check input[type="checkbox"] {
+  .add-item-alquiler-check input[type="checkbox"],
+  /* Las de la barra libre (cóctel/copas) y la de furgoneta propia tampoco entraban */
+  .checkbox-label input[type="checkbox"],
+  .logistica-furgo input[type="checkbox"] {
     position: relative;
   }
   .checkbox-label-normal input[type="checkbox"]::after,
   .recogida-estado input[type="checkbox"]::after,
   .carga-nota-item input[type="checkbox"]::after,
   .item-edit-alquiler-check input[type="checkbox"]::after,
-  .add-item-alquiler-check input[type="checkbox"]::after {
+  .add-item-alquiler-check input[type="checkbox"]::after,
+  .checkbox-label input[type="checkbox"]::after,
+  .logistica-furgo input[type="checkbox"]::after {
     content: "";
     position: absolute;
     top: 50%;

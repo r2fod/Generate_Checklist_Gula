@@ -604,12 +604,26 @@ async function main() {
   // ── Zonas táctiles en móvil ─────────────────────────────────────────────────
   // Cargando un camión con las manos frías se falla un botón de 27px. El mínimo cómodo
   // son 44; se exige al menos 32 contando la capa invisible que extiende las casillas.
+  // Se miden DOS eventos, no uno: medir solo una producción dejaba fuera las filas de
+  // logística (el botón "Extra" y la casilla de furgoneta), el "+ Añadir persona/
+  // recogida/compra" y las casillas de la barra libre, que estaban por debajo del
+  // mínimo sin que nadie lo viera.
   console.log("\n── Zonas táctiles ──");
-  for (const w of [320, 390]) {
+  const PANTALLAS_TACTILES = [
+    { evento: "produccion", pax: 25, notasEvento: "Hielo" },
+    {
+      evento: "boda", pax: 120, ninos: 15, fechaEvento: "2027-12-11",
+      barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, llevaPaella: true,
+      logisticaEquipo: [{ nombre: "Raúl", inicio: "08:00", fin: "20:00", furgoneta: true }],
+      recogidas: [{ concepto: "Camión plataforma", fecha: "2027-12-09", fechaDevolucion: "2027-12-13" }],
+      compras: [{ concepto: "Hielo", cantidad: "20 sacos", fecha: "2027-12-10" }],
+    },
+  ];
+  for (const [i, w] of [[0, 320], [1, 390], [1, 320]]) {
     const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    await p.goto(url({ evento: "produccion", pax: 25, notasEvento: "Hielo" }), { waitUntil: "domcontentloaded" });
+    await p.goto(url(PANTALLAS_TACTILES[i]), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     const pequenos = await p.evaluate(() => {
       const malos = [];
@@ -627,7 +641,7 @@ async function main() {
       });
       return malos;
     });
-    ok(pequenos.length === 0, `${w}px: ninguna zona táctil por debajo de 32px${pequenos.length ? ` → ${pequenos.slice(0, 4).join(", ")}` : ""}`);
+    ok(pequenos.length === 0, `${PANTALLAS_TACTILES[i].evento} a ${w}px: ninguna zona táctil por debajo de 32px${pequenos.length ? ` → ${pequenos.slice(0, 4).join(", ")}` : ""}`);
     await c.close();
   }
 
