@@ -10,6 +10,7 @@ import {
   BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun, Download, Upload, Eye,
 } from "lucide-react";
+import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
   cargarIndiceEventosNube,
@@ -334,11 +335,15 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = fals
   const ratioBlanco = mesVerano ? 0.65 : 0.45;
   const vinoBlanco = Math.round(vinoTotal * ratioBlanco);
   const vinoTinto = vinoTotal - vinoBlanco;
-  // Cava: 0,2 botellas por pax (1 cada 5) para el cava de siempre. Con brindis sube a
-  // 0,28 (1 cada 3,5): en un brindis todo el mundo coge copa y se sirven ~2 por persona,
-  // y una botella da 7-8 copas. Antes marcar "Brindis con cava" doblaba las COPAS de la
-  // cristalería (216 → 396) pero dejaba las botellas en 20, que no dan ni para la mitad.
-  const cava = Math.round(pax * (tieneBrindisCava ? 0.28 : 0.2));
+  // Cava: 0,2 botellas por pax (1 cada 5). El brindis suma 4 botellas fijas, no un
+  // ratio: la referencia del sector para un brindis es 1 copa por cabeza (1 botella
+  // cada 5-6 personas, 7-8 copas por botella), y con la base ya puesta eso son unas
+  // cuatro botellas de más. Se probó subiendo el ratio a 0,28 y salían 28 botellas para
+  // 100 pax — dos copas por cabeza, que es el techo de lo que alguien bebe en un
+  // brindis, no la media. Las COPAS sí se doblan (ver calcCristaleria): en el brindis
+  // todo el mundo coge copa a la vez, que es cosa distinta de cuánto se bebe.
+  const BOTELLAS_EXTRA_BRINDIS = 4;
+  const cava = Math.round(pax * 0.2) + (tieneBrindisCava ? BOTELLAS_EXTRA_BRINDIS : 0);
   // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
   // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
   // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
@@ -2647,6 +2652,108 @@ function ListaColapsable({ nombres, limite = 5, children }) {
   );
 }
 
+// ─── UNA FILA DE LA LISTA ──────────────────────────────────────────────────────
+// Está fuera del componente grande y envuelta en React.memo por una razón medida: con
+// 162 items, cada tecla que se pulsaba en CUALQUIER campo (el nombre del evento, la
+// ubicación, las notas) repintaba las 162 filas aunque ninguna cambiara. En un móvil
+// de gama media eran 92 ms por letra. Así solo se repinta la fila cuyo dato ha cambiado.
+//
+// Los manejadores llegan en una referencia que nunca cambia de identidad (accionesRef):
+// si se pasaran como funciones sueltas se crearían nuevas en cada render y la
+// memoización no serviría de nada.
+const FilaItem = React.memo(function FilaItem({
+  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo,
+  editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones,
+}) {
+  const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+  const keyId = `${categoria}::${labelOriginal ?? label}`;
+  const esItemManual = manualIdx !== undefined;
+  // Nº de bateas recalculado siempre en vivo a partir de lo que se esté mostrando
+  // (aunque la cantidad se edite a mano), no de un texto fijado
+  const bateaSize = bateaSizeDe(label);
+  const bateaCount = bateaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / bateaSize) : null;
+  // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza, vino, refrescos)
+  const cajaSize = bateaSize ? null : cajaSizeDe(label);
+  const cajaCount = cajaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / cajaSize) : null;
+  return (
+    <div className={`item-row ${alq ? "is-alquiler" : ""}`}>
+      {editando ? (
+        <div className="item-edit-row">
+          <input
+            type="text"
+            className="item-name-input"
+            value={nombreTemporal}
+            autoFocus
+            onChange={e => acciones.current.setNombreTemporal(e.target.value)}
+            onBlur={() => acciones.current.confirmarEdicion(categoria, labelOriginal ?? label, manualIdx, label, alquilerTemporal)}
+            onKeyDown={e => {
+              if (e.key === "Enter") e.target.blur();
+              if (e.key === "Escape") { acciones.current.setNombreTemporal(label); acciones.current.setAlquilerTemporal(esAlquilerManual); e.target.blur(); }
+            }}
+          />
+          <label className="item-edit-alquiler-check" title="Marcar como alquiler proveedor (si no está incluido)">
+            <input
+              type="checkbox"
+              checked={alquilerTemporal}
+              onMouseDown={e => e.preventDefault()}
+              onChange={e => acciones.current.setAlquilerTemporal(e.target.checked)}
+            />
+            <Tag size={12} /> Alquiler
+          </label>
+        </div>
+      ) : (
+        <div className="item-name">
+          <span className="item-name-lead">
+            <IconoItem label={label} />
+            <span className="item-label-text">
+              {label}
+              {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
+              {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+            </span>
+          </span>
+        </div>
+      )}
+      <input
+        type="text"
+        className="item-qty-input"
+        value={displayQty}
+        title="Click para editar la cantidad"
+        onChange={e => {
+          acciones.current.editarCantidad(categoria, labelOriginal ?? label, e.target.value);
+          // Parpadeo verde de confirmación: se reinicia la animación en cada tecla
+          e.target.classList.remove("qty-flash");
+          void e.target.offsetWidth;
+          e.target.classList.add("qty-flash");
+        }}
+        onAnimationEnd={e => e.target.classList.remove("qty-flash")}
+        onFocus={e => e.target.select()}
+        size={Math.max(2, displayQty.length)}
+      />
+      {bateaCount !== null ? (
+        <span className="item-batea-info" title="Bateas recalculadas automáticamente según la cantidad">{bateaCount} bateas de {bateaSize}</span>
+      ) : cajaCount !== null ? (
+        <span className="item-batea-info" title="Cajas recalculadas automáticamente según la cantidad">{cajaCount} cajas de {cajaSize}</span>
+      ) : sufijo ? (
+        <span className="item-batea-info" title="Envase fijo: no cambia aunque edites la cantidad">{sufijo}</span>
+      ) : null}
+      <div className="item-actions">
+        <button
+          className="item-action-btn"
+          onClick={() => acciones.current.empezarEdicion(keyId, label, esAlquilerManual)}
+          title="Editar el nombre / marcar alquiler proveedor"
+          aria-label={`Editar ${label}`}
+        ><Pencil size={13} /></button>
+        <button
+          className="item-action-btn item-action-borrar"
+          onClick={() => esItemManual ? acciones.current.quitarManual(manualIdx) : acciones.current.ocultar(categoria, labelOriginal ?? label)}
+          title="Quitar de la lista"
+          aria-label={`Quitar ${label}`}
+        ><X size={14} /></button>
+      </div>
+    </div>
+  );
+});
+
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App({ onCerrarSesion } = {}) {
   const [{ estado: estadoInicial, desdeLink: linkAbiertoInicial }] = useState(leerEstadoGuardado);
@@ -2935,6 +3042,9 @@ export default function App({ onCerrarSesion } = {}) {
   };
   // Historial para deshacer cambios manuales (cantidad editada o item quitado).
   // Se guarda un snapshot al EMPEZAR a editar cada item (no por cada tecla).
+  // El nombre que has escrito ya es de otro evento guardado: no se auto-guarda para no
+  // pisarlo, y se dice claramente en vez de dejarlo en silencio.
+  const [nombreOcupado, setNombreOcupado] = useState(false);
   const [historial, setHistorial] = useState([]);
   const ultimaClaveEditadaRef = React.useRef(null);
 
@@ -3061,8 +3171,10 @@ export default function App({ onCerrarSesion } = {}) {
       });
       if (cambios.length > 0) {
         setHayCambiosRemotos(cambios);
+        // 25 segundos en vez de 10: da tiempo a leerlo aunque estés cargando el camión
+        // con las manos ocupadas. Y siempre se puede cerrar con la ✕.
         clearTimeout(window.__avisoSyncTimer);
-        window.__avisoSyncTimer = setTimeout(() => setHayCambiosRemotos(null), 10000);
+        window.__avisoSyncTimer = setTimeout(() => setHayCambiosRemotos(null), 25000);
       }
     });
     return unsub;
@@ -3294,6 +3406,25 @@ export default function App({ onCerrarSesion } = {}) {
       if (actualizado > ultimaEscrituraLocalRef.current) ultimaEscrituraLocalRef.current = actualizado;
       guardarLocal(base);
       guardarSincronizados(Object.keys(base));
+
+      // Y si lo que ha cambiado es el evento que tienes ABIERTO, se aplica a la
+      // pantalla, no solo a la lista. Antes esto solo pasaba con los eventos que
+      // tenían link compartido, así que dos personas con el mismo evento abierto sin
+      // link no se enteraban de nada: cada una editaba su copia y ganaba la última en
+      // guardar, en silencio. La lista sí se actualizaba; lo que tenías delante, no.
+      let previo;
+      try { previo = JSON.parse(estadoActualJSONRef.current); } catch (e) { return; }
+      const remoto = cambioDelEventoAbierto(cambios, eventoActivoRef.current, previo);
+      if (!remoto) return;
+      const listaCambios = resumirCambios(previo, remoto).filter(t => !/^Foto de cantidades/.test(t));
+      if (!listaCambios.length) return; // es nuestro propio guardado de vuelta
+      Object.entries(remoto).forEach(([k, v]) => {
+        if (k === "nombreEvento" && !v && previo.nombreEvento) return;
+        if (settersSyncRef.current[k]) settersSyncRef.current[k](v);
+      });
+      setHayCambiosRemotos(listaCambios);
+      clearTimeout(window.__avisoSyncTimer);
+      window.__avisoSyncTimer = setTimeout(() => setHayCambiosRemotos(null), 25000);
     };
     // Arranque: se FUSIONA lo que hay en la nube con lo que hay en este dispositivo, y
     // lo que solo esté aquí se sube. Antes se sustituía, así que un evento que todavía
@@ -3367,17 +3498,38 @@ export default function App({ onCerrarSesion } = {}) {
       setTimeout(() => setGuardadoEventoMsg(""), 3500);
     },
   });
-  // Auto-guardado SEGURO: solo se re-guarda solo el evento que has ABIERTO o GUARDADO de
-  // verdad en esta sesión (marcado en "gula_evento_activo"). Así un borrador nuevo que por
-  // casualidad tenga el mismo nombre que un evento guardado NUNCA lo sobrescribe: era el
-  // riesgo de perder la configuración de un evento bueno.
+  // Auto-guardado. Antes solo se re-guardaba solo el evento que ya habías guardado o
+  // abierto: un evento nuevo vivía únicamente en ESTE navegador hasta que le dabas a
+  // "Guardar evento", así que si se rompía el móvil o cambiabas de aparato, se perdía.
+  // Ahora se guarda solo desde el primer momento, en cuanto tiene nombre, y con ello
+  // sube a la nube como cualquier otro.
+  //
+  // Lo que NO se puede perder por el camino, y por eso está el guardián:
+  //   · Un borrador que por casualidad se llame igual que un evento ya guardado no lo
+  //     pisa JAMÁS. Se avisa y no se guarda hasta que le cambies el nombre.
+  //   · Escribir el nombre a trozos ("Boda", "Boda Ana", "Boda Ana y Luis") no puede
+  //     dejar tres eventos: si el activo se renombra, se MUEVE en vez de duplicarse.
+  //   · El primer guardado espera 3 segundos, para no crear nada mientras se escribe.
   useEffect(() => {
     const nombre = (nombreEvento || "").trim();
-    if (!nombre || nombre !== eventoActivoRef.current || !eventosGuardados[nombre]) return;
+    if (!nombre) { setNombreOcupado(false); return; }
+    const activo = eventoActivoRef.current;
+    const esElActivo = nombre === activo;
+    const ocupadoPorOtro = !esElActivo && !!eventosGuardados[nombre];
+    setNombreOcupado(ocupadoPorOtro);
+    if (ocupadoPorOtro) return;
     const t = setTimeout(() => {
       setEventosGuardados(prev => {
-        if (!prev[nombre] || nombre !== eventoActivoRef.current) return prev;
-        const actualizado = { ...prev, [nombre]: { ...getEstadoActual(), nombreEvento: nombre } };
+        // Se vuelve a comprobar aquí dentro: entre el cambio y el guardado han pasado
+        // segundos y el nombre o el evento activo pueden ser ya otros
+        if (nombre !== (nombreEvento || "").trim()) return prev;
+        const activoAhora = eventoActivoRef.current;
+        if (nombre !== activoAhora && prev[nombre]) return prev; // se ocupó mientras tanto
+        const actualizado = { ...prev };
+        // Renombrar el evento activo lo mueve, no lo duplica
+        if (activoAhora && activoAhora !== nombre && actualizado[activoAhora]) delete actualizado[activoAhora];
+        actualizado[nombre] = { ...getEstadoActual(), nombreEvento: nombre };
+        marcarEventoActivo(nombre);
         // Sin esto la referencia se queda vieja y el siguiente cálculo de "qué ha
         // cambiado" compara contra un mapa desfasado.
         eventosGuardadosRef.current = actualizado;
@@ -3385,7 +3537,7 @@ export default function App({ onCerrarSesion } = {}) {
         if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); sincronizarArchivoNube(prev, actualizado).catch(avisarFalloNube); }
         return actualizado;
       });
-    }, 1200);
+    }, esElActivo ? 1200 : 3000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON]);
@@ -3702,6 +3854,23 @@ export default function App({ onCerrarSesion } = {}) {
   }, [checklist, pax, ninos, logisticaParaTiempos, horasJornadaEquipo, calibracion]);
 
   // Foto del estado editable a mano, para poder deshacer cualquier cambio manual
+  // Los manejadores de cada fila viajan por esta referencia. Su identidad NUNCA cambia,
+  // así que React.memo puede saltarse las filas que no han cambiado; y su contenido se
+  // refresca en cada render, así que las funciones siempre son las de ahora.
+  const accionesFilaRef = React.useRef({});
+  accionesFilaRef.current = {
+    editarCantidad: (categoria, labelOriginal, valor) => handleEditarCantidad(categoria, labelOriginal, valor),
+    ocultar: (categoria, labelOriginal) => handleOcultarItem(categoria, labelOriginal),
+    quitarManual: (idx) => handleRemoveItemManual(idx),
+    empezarEdicion: (keyId, label, esAlquiler) => {
+      setEditandoNombre(keyId); setNombreTemporal(label); setAlquilerTemporal(esAlquiler);
+    },
+    confirmarEdicion: (categoria, labelOriginal, manualIdx, label, esAlquilerNuevo) =>
+      handleConfirmarEdicionItem(categoria, labelOriginal, manualIdx, label, nombreTemporal, esAlquilerNuevo),
+    setNombreTemporal,
+    setAlquilerTemporal,
+  };
+
   const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
 
@@ -4511,6 +4680,12 @@ export default function App({ onCerrarSesion } = {}) {
             <div className="form-group form-group-ancho">
               <span className="form-label">NOMBRE DEL EVENTO</span>
               <input type="text" className="form-input" title={nombreEvento || "Nombre del evento"} placeholder="Ej: Boda de Ana y Luis" value={nombreEvento} onChange={e => setNombreEvento(e.target.value)} />
+              {nombreOcupado && (
+                <span className="aviso-nombre-ocupado">
+                  Ya tienes un evento guardado con ese nombre. No se guarda solo para no pisarlo:
+                  cámbiale el nombre, o ábrelo desde la lista si es ese.
+                </span>
+              )}
             </div>
             <div className="form-group">
               <span className="form-label">FECHA</span>
@@ -5157,96 +5332,27 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="item-list-wrapper">
                 <div className="item-list">
                   {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual, sufijo], i) => {
-                    const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
-                    const displayQty = String(qty && qty.u ? qty.u : qty);
                     const keyId = `${cat.nombre}::${labelOriginal ?? label}`;
-                    const editado = overridesManuales[keyId] !== undefined;
-                    const renombrado = manualIdx === undefined && nombresManuales[keyId] !== undefined;
-                    const esItemManual = manualIdx !== undefined;
-                    // Nº de bateas recalculado siempre en vivo a partir de lo que se esté
-                    // mostrando (aunque la cantidad se edite a mano), no de un texto fijado
-                    const bateaSize = bateaSizeDe(label);
-                    const bateaCount = bateaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / bateaSize) : null;
-                    // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza,
-                    // vino, refrescos): recalculado en vivo a partir de la cantidad mostrada
-                    const cajaSize = bateaSize ? null : cajaSizeDe(label);
-                    const cajaCount = cajaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / cajaSize) : null;
+                    const editando = editandoNombre === keyId;
                     return (
-                      <div key={i} className={`item-row ${alq ? "is-alquiler" : ""}`}>
-                        {editandoNombre === keyId ? (
-                          <div className="item-edit-row">
-                            <input
-                              type="text"
-                              className="item-name-input"
-                              value={nombreTemporal}
-                              autoFocus
-                              onChange={e => setNombreTemporal(e.target.value)}
-                              onBlur={() => handleConfirmarEdicionItem(cat.nombre, labelOriginal ?? label, manualIdx, label, nombreTemporal, alquilerTemporal)}
-                              onKeyDown={e => {
-                                if (e.key === "Enter") e.target.blur();
-                                if (e.key === "Escape") { setNombreTemporal(label); setAlquilerTemporal(esAlquilerManual); e.target.blur(); }
-                              }}
-                            />
-                            <label className="item-edit-alquiler-check" title="Marcar como alquiler proveedor (si no está incluido)">
-                              <input
-                                type="checkbox"
-                                checked={alquilerTemporal}
-                                onMouseDown={e => e.preventDefault()}
-                                onChange={e => setAlquilerTemporal(e.target.checked)}
-                              />
-                              <Tag size={12} /> Alquiler
-                            </label>
-                          </div>
-                        ) : (
-                          <div className="item-name">
-                            <span className="item-name-lead">
-                              <IconoItem label={label} />
-                              <span className="item-label-text">
-                                {label}
-                                {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
-                                {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
-                              </span>
-                            </span>
-                          </div>
-                        )}
-                        <input
-                          type="text"
-                          className="item-qty-input"
-                          value={displayQty}
-                          title="Click para editar la cantidad"
-                          onChange={e => {
-                            handleEditarCantidad(cat.nombre, labelOriginal ?? label, e.target.value);
-                            // Parpadeo verde de confirmación: se reinicia la animación en cada tecla
-                            e.target.classList.remove("qty-flash");
-                            void e.target.offsetWidth;
-                            e.target.classList.add("qty-flash");
-                          }}
-                          onAnimationEnd={e => e.target.classList.remove("qty-flash")}
-                          onFocus={e => e.target.select()}
-                          size={Math.max(2, displayQty.length)}
-                        />
-                        {bateaCount !== null ? (
-                          <span className="item-batea-info" title="Bateas recalculadas automáticamente según la cantidad">{bateaCount} bateas de {bateaSize}</span>
-                        ) : cajaCount !== null ? (
-                          <span className="item-batea-info" title="Cajas recalculadas automáticamente según la cantidad">{cajaCount} cajas de {cajaSize}</span>
-                        ) : sufijo ? (
-                          <span className="item-batea-info" title="Envase fijo: no cambia aunque edites la cantidad">{sufijo}</span>
-                        ) : null}
-                        <div className="item-actions">
-                          <button
-                            className="item-action-btn"
-                            onClick={() => { setEditandoNombre(keyId); setNombreTemporal(label); setAlquilerTemporal(esAlquilerManual); }}
-                            title="Editar el nombre / marcar alquiler proveedor"
-                            aria-label={`Editar ${label}`}
-                          ><Pencil size={13} /></button>
-                          <button
-                            className="item-action-btn item-action-borrar"
-                            onClick={() => esItemManual ? handleRemoveItemManual(manualIdx) : handleOcultarItem(cat.nombre, labelOriginal ?? label)}
-                            title="Quitar de la lista"
-                            aria-label={`Quitar ${label}`}
-                          ><X size={14} /></button>
-                        </div>
-                      </div>
+                      <FilaItem
+                        key={i}
+                        categoria={cat.nombre}
+                        label={label}
+                        labelOriginal={labelOriginal}
+                        displayQty={String(qty && qty.u ? qty.u : qty)}
+                        manualIdx={manualIdx}
+                        esAlquilerManual={esAlquilerManual}
+                        sufijo={sufijo}
+                        editado={overridesManuales[keyId] !== undefined}
+                        renombrado={manualIdx === undefined && nombresManuales[keyId] !== undefined}
+                        editando={editando}
+                        // Solo la fila que se está editando recibe estos dos: si los
+                        // recibieran todas, escribir un nombre repintaría la lista entera
+                        nombreTemporal={editando ? nombreTemporal : null}
+                        alquilerTemporal={editando ? alquilerTemporal : null}
+                        acciones={accionesFilaRef}
+                      />
                     );
                   })}
                   {(ocultosPorCategoria[cat.nombre] || []).length > 0 && (
