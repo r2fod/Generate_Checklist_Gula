@@ -102,7 +102,7 @@ async function main() {
       await page.locator(".preview-close-btn").first().click().catch(() => {});
       await page.waitForTimeout(500);
       await page.locator("button", { hasText: "Modo carga" }).first().click(); await page.waitForTimeout(950);
-      for (const t of ["Salida", "Vuelta", "Resumen"]) {
+      for (const t of ["Prep.", "Salida", "Vuelta", "Resumen"]) {
         await page.locator(".carga-modo-toggle button").filter({ hasText: t }).first().click();
         await page.waitForTimeout(550);
         await mide("carga·" + t);
@@ -883,8 +883,17 @@ async function main() {
       checkeados: { "Personal::Camareros": true },
       roturas: { "Personal::Camareros": "2" },
     });
-    ok(conMarcas.length === 5 && conMarcas.some(t => /Roturas/i.test(t)),
-      `y con algo marcado aparecen Sale, Vuelve y Roturas → ${JSON.stringify(conMarcas)}`);
+    ok(conMarcas.length === 6 && conMarcas.some(t => /Prep/i.test(t)) && conMarcas.some(t => /Roturas/i.test(t)),
+      `y con algo marcado aparecen Prep., Sale, Vuelve y Roturas → ${JSON.stringify(conMarcas)}`);
+
+    // La marca de preparación sola ya justifica las columnas: si alguien preparó pero
+    // aún no ha cargado nada, la hoja tiene que enseñarlo igual
+    const soloPrep = await abrirHoja({
+      evento: "boda", pax: 120,
+      preparados: { "Personal::Camareros": true },
+    });
+    ok(soloPrep.length === 6 && soloPrep.some(t => /Prep/i.test(t)),
+      `y con solo la preparación marcada la hoja ya las enseña → ${JSON.stringify(soloPrep)}`);
     await c.close();
   }
 
@@ -1375,6 +1384,75 @@ async function main() {
     const cargaVuelta = await enCarga();
     ok(debenEstar.every(n => cargaVuelta.some(x => x === n)),
       "y también en Vuelta, que es donde se comprueba que el alquiler se devuelve entero");
+    await c.close();
+  }
+
+  // ── El check de preparación ────────────────────────────────────────────────
+  // Preparar (sacarlo del almacén y dejarlo listo) y cargarlo en el camión son dos
+  // momentos distintos, a menudo de personas distintas. Con un solo check no había
+  // forma de controlar la preparación: o estaba cargado o no existía. Ahora cada fase
+  // lleva su marca, y cada una enseña en pequeño cómo va la otra.
+  console.log("\n── El check de preparación ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ ...EVENTO_COMPLETO, nombreEvento: "Boda preparación" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1400);
+
+    const pestana = (t) => p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: t }).first();
+    const guardado = (clave) => p.evaluate(k => Object.keys(JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}")[k] || {}).length, clave);
+    const cuenta = () => p.locator(".carga-toggle-cuenta").first().innerText();
+
+    const tabs = (await p.locator(".carga-modo-toggle .segment-btn").allInnerTexts()).map(t => t.trim());
+    ok(tabs.length === 4 && /Prep/.test(tabs[0]) && /Salida/.test(tabs[1]),
+      `Modo carga abre con Preparación antes de Salida → ${JSON.stringify(tabs)}`);
+
+    await pestana("Prep.").click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".crono-label", { hasText: "Cronómetro de preparación" }).count() === 1,
+      "la preparación tiene su propio cronómetro, que ya alimentaba el tiempo estimado de prep");
+
+    const nombrePrimero = (await p.locator(".carga-nombre").first().innerText()).trim();
+    await p.locator(".carga-row input[type=checkbox]").nth(0).check({ force: true });
+    await p.locator(".carga-row input[type=checkbox]").nth(1).check({ force: true });
+    await p.waitForTimeout(900);
+    ok(await guardado("preparados") === 2, `marcar en Preparación se guarda aparte (preparados: ${await guardado("preparados")})`);
+    ok(await guardado("checkeados") === 0, "y no toca lo que está cargado en el camión");
+    const cuentaPrep = await cuenta();
+    ok(/^2\//.test(cuentaPrep), `el recuento cuenta lo preparado, no lo cargado (${cuentaPrep})`);
+
+    // En Salida esas dos filas siguen SIN marcar (son dos cosas distintas), pero se ve
+    // que venían preparadas
+    await pestana("Salida").click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".carga-row input[type=checkbox]:checked").count() === 0,
+      "preparado no es cargado: en Salida siguen sin marcar");
+    ok(await p.locator(".carga-marca-otra.is-preparado").count() === 2,
+      "pero al cargar se ve cuáles venían preparadas");
+    ok(/^0\//.test(await cuenta()), "y el recuento de Salida empieza de cero");
+
+    await p.locator(".carga-row input[type=checkbox]").nth(0).check({ force: true });
+    await p.waitForTimeout(900);
+    ok(await guardado("checkeados") === 1 && await guardado("preparados") === 2,
+      "cargar en el camión no borra la marca de preparado");
+    ok((await p.locator(".preview-header-subtitle").first().innerText()).includes("2 preparados"),
+      "la cabecera de Salida recuerda cuántos hay preparados");
+
+    await pestana("Prep.").click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".carga-marca-otra.is-cargado").count() === 1,
+      "y preparando se ve lo que ya está subido al camión");
+
+    // Cambiar la cantidad invalida las marcas: lo que se preparó ya no cuadra
+    await p.locator(".preview-close-btn").first().click();
+    await p.waitForTimeout(700);
+    await p.locator(".item-row", { hasText: nombrePrimero }).first().locator(".item-qty-input").fill("999");
+    await p.waitForTimeout(1200);
+    ok(await guardado("preparados") === 1,
+      `cambiar la cantidad desmarca su preparación, que ya no cuadra (quedan ${await guardado("preparados")})`);
     await c.close();
   }
 
