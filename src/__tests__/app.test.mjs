@@ -643,6 +643,60 @@ async function main() {
     await c.close();
   }
 
+  // ── El formulario de oficina ────────────────────────────────────────────────
+  // Se abre con ?enviar=<código> y NO da acceso a nada más: ni checklist, ni
+  // configuración, ni eventos. Esa es la garantía que sostiene todo lo demás.
+  console.log("\n── El formulario de oficina ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+
+    ok(await p.locator(".app-header").count() === 0 && await p.locator(".item-row").count() === 0
+      && await p.locator(".config-card").count() === 0,
+      "con el link del formulario no se llega a la app ni a la checklist");
+    ok(/De qué evento son los datos/i.test(await p.locator(".form-titulo").innerText()),
+      "empieza preguntando a qué evento van los datos");
+
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(500);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(600);
+    ok(/Cómo lo llamamos/i.test(await p.locator(".form-titulo").innerText()),
+      "al elegir el tipo pasa sola a la siguiente");
+
+    await p.locator(".form-input").first().fill("Boda de Ana y Luis");
+    await p.locator(".form-input").nth(1).fill("Finca La Alquería");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(400);
+
+    // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
+    // puede dejar el formulario atascado en ninguna pregunta
+    let vueltas = 0;
+    while (vueltas++ < 15 && !/Está todo bien/i.test(await p.locator(".form-titulo").innerText())) {
+      const nose = p.locator(".form-btn-nose");
+      if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
+      await p.waitForTimeout(280);
+    }
+    ok(/Está todo bien/i.test(await p.locator(".form-titulo").innerText()),
+      `se puede llegar al final contestando "No lo sé" a todo (${vueltas} pantallas)`);
+
+    const repaso = await p.locator(".form-repaso-fila").allInnerTexts();
+    ok(repaso.some(t => /Boda de Ana y Luis/.test(t)) && repaso.some(t => /no lo sé/i.test(t)),
+      "y el repaso enseña lo contestado y lo que se dejó en blanco");
+    ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
+      "sin desbordamiento en el móvil");
+
+    // El borrador sobrevive a cerrar el navegador a media pregunta
+    await p.reload({ waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
+      "y si cierran y vuelven, siguen donde lo dejaron");
+    await c.close();
+  }
+
   // ── Del formulario a la checklist ───────────────────────────────────────────
   // El formulario de la oficina no calcula nada: recoge respuestas y las traduce a los
   // mismos campos que rellenarías tú a mano. Esta prueba recorre el camino entero —

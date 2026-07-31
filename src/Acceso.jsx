@@ -6,12 +6,19 @@
 //   · Resto de casos → hay que iniciar sesión con el correo/contraseña del equipo.
 import { useState, useEffect } from "react";
 import App from "./App.jsx";
+import Formulario from "./formulario/Formulario.jsx";
 import { accesoActivo, iniciarSesion, cerrarSesion, observarSesion } from "./auth.js";
 import logoGula from "./assets/gula-logo.png";
 
 function esLinkDeEvento() {
   const p = new URLSearchParams(window.location.search);
   return !!(p.get("evento") || p.get("c"));
+}
+
+// El link que se le pasa a la oficina: ?enviar=<código>. Abre SOLO el formulario —
+// desde ahí no se llega a la checklist, ni a la configuración, ni a los eventos.
+function codigoDelFormulario() {
+  return new URLSearchParams(window.location.search).get("enviar") || "";
 }
 
 // Traduce los códigos de error de Firebase a un mensaje claro en español
@@ -100,6 +107,8 @@ function PantallaLogin() {
 }
 
 export default function Acceso() {
+  // El formulario de oficina va por su cuenta: ni login ni app.
+  const [codigoFormulario] = useState(codigoDelFormulario);
   // omitirLogin se fija una sola vez al arrancar: si es un link de evento o no hay
   // acceso configurado, nunca se pide login.
   const [omitirLogin] = useState(() => !accesoActivo() || esLinkDeEvento());
@@ -110,6 +119,8 @@ export default function Acceso() {
     const unsub = observarSesion((usuario) => setSesion({ cargando: false, usuario }));
     return unsub;
   }, [omitirLogin]);
+
+  if (codigoFormulario) return <Formulario codigo={codigoFormulario} />;
 
   if (omitirLogin) return <App />;
 
