@@ -1244,17 +1244,21 @@ body {
   transform: scale(0.95);
 }
 
-/* Botones Salida / Vuelta / Resumen: cada uno con su color e icono animado (solo en
-   el toggle de Modo carga, no en los segmented control del formulario). */
+/* Botones Prep. / Salida / Vuelta / Resumen: cada uno con su color e icono animado
+   (solo en el toggle de Modo carga, no en los segmented control del formulario). */
+.carga-modo-toggle .segment-preparacion svg { color: #0d9488; }
 .carga-modo-toggle .segment-salida svg { color: #2563eb; }
 .carga-modo-toggle .segment-vuelta svg { color: #ea580c; }
 .carga-modo-toggle .segment-resumen svg { color: #7c3aed; }
+.carga-modo-toggle .segment-preparacion.active { background: #ccfbf1; color: #0f766e; }
+.carga-modo-toggle .segment-preparacion.active svg { color: #0f766e; animation: seg-clip 2.2s ease-in-out infinite; transform-origin: 50% 60%; }
 .carga-modo-toggle .segment-salida.active { background: #dbeafe; color: #1d4ed8; }
 .carga-modo-toggle .segment-vuelta.active { background: #ffedd5; color: #c2410c; }
 .carga-modo-toggle .segment-resumen.active { background: #f3e8ff; color: #6d28d9; }
 .carga-modo-toggle .segment-salida.active svg { color: #1d4ed8; animation: seg-truck 1.6s ease-in-out infinite; }
 .carga-modo-toggle .segment-vuelta.active svg { color: #c2410c; animation: seg-undo 2.2s ease-in-out infinite; transform-origin: 55% 50%; }
 .carga-modo-toggle .segment-resumen.active svg { color: #6d28d9; animation: seg-bars 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+@keyframes seg-clip { 0%, 70%, 100% { transform: scale(1); } 82% { transform: scale(1.14); } }
 @keyframes seg-truck { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(2.5px); } }
 @keyframes seg-undo { 0%, 72%, 100% { transform: rotate(0); } 86% { transform: rotate(-28deg); } }
 @keyframes seg-bars { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.18); } }
@@ -3183,6 +3187,31 @@ hr {
   font-size: 0.9rem;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* Aviso pequeño de cómo va la OTRA marca: en Preparación dice lo que ya está cargado
+   en el camión, y en Salida lo que venía preparado. No se tacha con la fila porque
+   sigue siendo información válida aunque el item ya esté marcado. */
+.carga-marca-otra {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.carga-marca-otra.is-preparado { background: #ccfbf1; color: #0f766e; }
+.carga-marca-otra.is-cargado { background: #dbeafe; color: #1d4ed8; }
+:root[data-tema="oscuro"] .carga-marca-otra.is-preparado { background: rgba(13, 148, 136, 0.24); color: #5eead4; }
+:root[data-tema="oscuro"] .carga-marca-otra.is-cargado { background: rgba(37, 99, 235, 0.24); color: #93c5fd; }
+@media (max-width: 420px) {
+  /* En pantallas estrechas el nombre y la cantidad mandan: el aviso se queda en el icono */
+  .carga-marca-otra { padding: 2px 5px; }
+  .carga-marca-otra .carga-marca-otra-texto { display: none; }
 }
 
 .carga-row.is-marcado {
