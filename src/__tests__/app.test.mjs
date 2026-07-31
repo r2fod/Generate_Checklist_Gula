@@ -601,6 +601,43 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo que se queda fijo al hacer scroll ────────────────────────────────────
+  // Con 150 items en la lista, subir hasta arriba del todo para buscar algo o para
+  // cambiar de Salida a Vuelta es media docena de gestos cada vez.
+  console.log("\n── Barras fijas ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 120, ninos: 10, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const visible = async () => (await p.locator(".barra-fija").evaluate(e => getComputedStyle(e).opacity)) === "1";
+    ok(!await visible(), "arriba del todo la barra fina no estorba");
+    await p.evaluate(() => window.scrollTo(0, 900));
+    await p.waitForTimeout(600);
+    ok(await visible(), "al bajar aparece la barra fina");
+    const caja = await p.locator(".barra-fija").boundingBox();
+    ok(caja && caja.y >= 0 && caja.y < 20, `y se queda pegada arriba (y=${caja ? Math.round(caja.y) : "?"})`);
+    // El buscador de la barra fina filtra igual que el de la lista
+    await p.locator(".barra-fija-buscar").fill("mantel");
+    await p.waitForTimeout(700);
+    const nombres = await p.locator(".item-row .item-name").allInnerTexts();
+    ok(nombres.length > 0 && nombres.every(n => /mantel/i.test(n)), `y su buscador filtra la lista (${nombres.length} items)`);
+    await p.locator(".barra-fija-buscar").fill("");
+    await p.waitForTimeout(500);
+
+    // Dentro de Modo carga, el cambio Salida/Vuelta y el recuento no pueden irse
+    await p.locator(".barra-fija-carga").click();
+    await p.waitForTimeout(1400);
+    await p.evaluate(() => { document.querySelector(".carga-modal").scrollTop = 1500; });
+    await p.waitForTimeout(600);
+    const t = await p.locator(".carga-modo-toggle").boundingBox();
+    ok(t && t.y < 120, `en Modo carga el toggle sigue arriba tras bajar (y=${t ? Math.round(t.y) : "?"})`);
+    const cuenta = await p.locator(".carga-toggle-cuenta").innerText();
+    ok(/^\d+\/\d+$/.test(cuenta.trim()), `y con él el recuento a la vista (${cuenta.trim()})`);
+    await c.close();
+  }
+
   // ── Zonas táctiles en móvil ─────────────────────────────────────────────────
   // Cargando un camión con las manos frías se falla un botón de 27px. El mínimo cómodo
   // son 44; se exige al menos 32 contando la capa invisible que extiende las casillas.

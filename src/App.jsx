@@ -2167,12 +2167,20 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
         </div>
+        {/* Esta tira se queda fija al hacer scroll: marcando 150 items, el recuento y el
+            cambio Salida/Vuelta son lo único que se usa todo el rato, y antes había que
+            subir hasta arriba del todo para llegar a ellos. */}
         <div className="carga-modo-toggle">
           <div className="segmented-control">
             <button className={`segment-btn segment-salida ${modo === "salida" && !verResumen ? "active" : ""}`} onClick={() => { setModo("salida"); setVerResumen(false); }}><Truck size={14} /> Salida</button>
             <button className={`segment-btn segment-vuelta ${modo === "vuelta" && !verResumen ? "active" : ""}`} onClick={() => { setModo("vuelta"); setVerResumen(false); }}><Undo2 size={14} /> Vuelta</button>
             <button className={`segment-btn segment-resumen ${verResumen ? "active" : ""}`} onClick={() => setVerResumen(true)}><BarChart3 size={14} /> Resumen</button>
           </div>
+          {!verResumen && (
+            <span className="carga-toggle-cuenta" title={`${totalMarcados} de ${totalItems} ${modo === "salida" ? "cargados" : "vueltos"}`}>
+              {totalMarcados}/{totalItems}
+            </span>
+          )}
         </div>
         {mostrarRecordatorio && (
           <div className={`carga-nota-recordatorio ${notasCompletas ? "is-completo" : ""}`} role="note">
@@ -2772,6 +2780,18 @@ export default function App({ onCerrarSesion } = {}) {
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
   const [modoCarga, setModoCarga] = useState(false);
+  // Barra fina pegada arriba en móvil: la cabecera con los botones ocupa casi un tercio
+  // de la pantalla, así que dejarla fija entera sería peor. En su lugar, al bajar de la
+  // cabecera aparece una tira de ~50px con lo único que se usa mientras se recorre la
+  // lista: dónde estás, el buscador y Modo carga. React no repinta si el valor no
+  // cambia, así que basta con fijar el booleano en cada scroll.
+  const [barraFija, setBarraFija] = useState(false);
+  useEffect(() => {
+    const alBajar = () => setBarraFija(window.scrollY > 260);
+    window.addEventListener("scroll", alBajar, { passive: true });
+    alBajar();
+    return () => window.removeEventListener("scroll", alBajar);
+  }, []);
   // Items marcados a mano como "alquiler proveedor", para los que no llevan Dealde/Carvillo/
   // Novelda/alquiler en el nombre y por tanto no se detectan solos (ej. algo puntual que no
   // está incluido y hay que alquilar aparte)
@@ -4088,6 +4108,24 @@ export default function App({ onCerrarSesion } = {}) {
             <button onClick={() => setErrorNube(null)} aria-label="Ocultar aviso" title="Ocultar"><X size={14} /></button>
           </div>
         )}
+        {/* BARRA FINA (solo móvil, al bajar de la cabecera) */}
+        <div className={`barra-fija ${barraFija ? "is-visible" : ""}`}>
+          <span className="barra-fija-nombre" title={nombreEvento || EVENTOS[evento]?.label}>
+            {nombreEvento || EVENTOS[evento]?.label}
+          </span>
+          <input
+            type="text"
+            className="barra-fija-buscar"
+            placeholder="Buscar..."
+            aria-label="Buscar un material"
+            value={filtro}
+            onChange={e => setFiltro(e.target.value)}
+          />
+          <button className="barra-fija-carga" onClick={() => setModoCarga(true)} title="Modo carga">
+            <Package size={15} /><span className="barra-fija-carga-texto">Carga</span>
+          </button>
+        </div>
+
         {/* HEADER */}
         <header className="app-header animate-entrance">
           <div className="header-title-group">
