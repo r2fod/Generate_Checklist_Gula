@@ -239,6 +239,100 @@ body {
   max-width: none;
 }
 
+/* ─── BARRA FINA EN MÓVIL ──────────────────────────────────────────────────────
+   La cabecera con los botones (Nuevo evento, Cerrar sesión, Vista previa, Modo carga,
+   Compartir) ocupa casi un tercio de la pantalla del móvil: dejarla fija entera haría
+   ver MENOS lista, no más. Esta tira de ~50px aparece al bajar de la cabecera y lleva
+   solo lo que se usa mientras se recorre la lista: dónde estás, el buscador y Modo
+   carga. En escritorio no hace falta: la cabecera ya se queda fija ella sola. */
+.barra-fija {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .barra-fija {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 45;
+    /* Dentro del ancho del wrapper, sin salirse a los bordes: con margen negativo
+       quedaba 2-3px más ancha que la pantalla y la página se podía mover en lateral. */
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    background: var(--superficie-velo);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    /* Escondida arriba del todo: solo se despliega al pasar de la cabecera */
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.18s ease, opacity 0.18s ease, padding 0.18s ease;
+  }
+
+  .barra-fija.is-visible {
+    max-height: 64px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    opacity: 1;
+  }
+
+  .barra-fija-nombre {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 26%;
+    flex-shrink: 0;
+  }
+
+  .barra-fija-buscar {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: var(--text-main);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+  }
+
+  .barra-fija-carga {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-main);
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+}
+
+/* En pantallas muy estrechas el texto del botón sobra: con el icono se entiende */
+@media (max-width: 380px) {
+  .barra-fija-carga-texto {
+    display: none;
+  }
+  .barra-fija-nombre {
+    max-width: 34%;
+  }
+}
+
 /* Header — floating, light, sticky */
 .app-header {
   background: var(--superficie-velo);
@@ -1198,6 +1292,42 @@ body {
   padding: 6px 9px;
 }
 
+/* Alquileres: reutiliza la rejilla de Equipamiento, pero aquí conviven un selector
+   (las sillas) y una casilla (el armario caliente), así que la casilla se estira para
+   quedar a la misma altura que el selector de al lado en vez de flotar arriba. */
+.alquileres-grid {
+  align-items: stretch;
+}
+
+.alquileres-grid .checkbox-label-normal {
+  align-self: end;
+}
+
+.alquileres-aviso {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Distintivo de la recogida que ha creado sola un alquiler: se ve de un vistazo cuál
+   viene del interruptor y cuál has escrito tú. */
+.recogida-auto-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--aviso-texto);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-borde);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+
 /* Equipo de logística: una fila por persona con nombre y su horario */
 .logistica-block {
   display: flex;
@@ -1365,12 +1495,25 @@ body {
   }
 }
 
-/* En móviles pequeños los selectores con 4 opciones ("No llevan" en Sillas)
-   necesitan letra algo menor para no recortarse */
+/* En móviles pequeños los selectores con 4 opciones ("No llevan" en Sillas,
+   "Auto/Pequeña/Mediana/Grande" en Tamaño de paella) necesitan letra algo menor para
+   no recortarse. Va para TODOS los selectores, no solo los de Equipamiento: el de la
+   paella vive en .controls-row y a 320px sus cuatro botones pedían 303px en una caja
+   de 268, así que empujaban la página entera 19px a la derecha. */
 @media (max-width: 420px) {
-  .equip-grid .segment-btn {
+  .segment-btn {
     font-size: 0.72rem;
     padding: 7px 3px;
+  }
+  /* Y que puedan encogerse de verdad: sin esto el contenido de cada botón fija un
+     ancho mínimo y el conjunto se sale igual por mucho que baje la letra. */
+  .segmented-control {
+    max-width: 100%;
+  }
+  .segmented-control .segment-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
   }
 }
 
@@ -2498,8 +2641,41 @@ hr {
   .crono-tiempo { font-size: 1.35rem; }
 }
 
+/* El modal de carga scrollea por dentro (antes lo hacía la capa de fondo), y así esta
+   tira puede quedarse pegada arriba mientras se marcan los items. La cabecera alta —
+   título, tiempos estimados— sí se va: ocupa demasiado para dejarla fija en un móvil. */
+.carga-modal {
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+}
+
+.carga-modal .preview-header {
+  position: static;
+}
+
 .carga-modo-toggle {
-  padding: 14px 24px 0;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.carga-modo-toggle .segmented-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.carga-toggle-cuenta {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .carga-modo-toggle .segmented-control {
@@ -3854,6 +4030,11 @@ hr {
   .cambios-remotos-cerrar,
   .aviso-recogida-hecho,
   .logistica-add-rec,
+  /* Estos tres se quedaron fuera de la primera pasada porque la prueba solo medía un
+     evento de producción, que no tiene filas de logística ni recogidas: el "+ Añadir
+     persona/recogida/compra" median 33px y el "Extra" de cada persona, 26. */
+  .btn-add-logistica,
+  .logistica-tipo-btn,
   .btn-mantenimiento {
     min-width: 40px;
     min-height: 40px;
@@ -3868,14 +4049,19 @@ hr {
   .recogida-estado input[type="checkbox"],
   .carga-nota-item input[type="checkbox"],
   .item-edit-alquiler-check input[type="checkbox"],
-  .add-item-alquiler-check input[type="checkbox"] {
+  .add-item-alquiler-check input[type="checkbox"],
+  /* Las de la barra libre (cóctel/copas) y la de furgoneta propia tampoco entraban */
+  .checkbox-label input[type="checkbox"],
+  .logistica-furgo input[type="checkbox"] {
     position: relative;
   }
   .checkbox-label-normal input[type="checkbox"]::after,
   .recogida-estado input[type="checkbox"]::after,
   .carga-nota-item input[type="checkbox"]::after,
   .item-edit-alquiler-check input[type="checkbox"]::after,
-  .add-item-alquiler-check input[type="checkbox"]::after {
+  .add-item-alquiler-check input[type="checkbox"]::after,
+  .checkbox-label input[type="checkbox"]::after,
+  .logistica-furgo input[type="checkbox"]::after {
     content: "";
     position: absolute;
     top: 50%;

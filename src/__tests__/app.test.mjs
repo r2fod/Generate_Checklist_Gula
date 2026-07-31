@@ -333,6 +333,11 @@ async function main() {
     })));
     const mudos = [];
     for (const g of grupos) {
+      // "Temporada" no entra aquí: en Auto la app ya resuelve a verano o invierno, así
+      // que una de las tres opciones siempre coincide con lo que hay puesto. Además su
+      // etiqueta cambia al elegir ("Temporada · ahora verano" → "Temporada"). Tiene su
+      // propia comprobación, más completa, en la sección de temporada.
+      if (/^Temporada/.test(g.label)) continue;
       const boton = (txt) => page.locator(".segment-group", { hasText: g.label }).first()
         .locator(".segment-btn", { hasText: new RegExp(`^${escapa(txt)}$`) }).first();
       for (const op of g.opciones) {
@@ -596,15 +601,66 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo que se queda fijo al hacer scroll ────────────────────────────────────
+  // Con 150 items en la lista, subir hasta arriba del todo para buscar algo o para
+  // cambiar de Salida a Vuelta es media docena de gestos cada vez.
+  console.log("\n── Barras fijas ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 120, ninos: 10, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const visible = async () => (await p.locator(".barra-fija").evaluate(e => getComputedStyle(e).opacity)) === "1";
+    ok(!await visible(), "arriba del todo la barra fina no estorba");
+    await p.evaluate(() => window.scrollTo(0, 900));
+    await p.waitForTimeout(600);
+    ok(await visible(), "al bajar aparece la barra fina");
+    const caja = await p.locator(".barra-fija").boundingBox();
+    ok(caja && caja.y >= 0 && caja.y < 20, `y se queda pegada arriba (y=${caja ? Math.round(caja.y) : "?"})`);
+    // El buscador de la barra fina filtra igual que el de la lista
+    await p.locator(".barra-fija-buscar").fill("mantel");
+    await p.waitForTimeout(700);
+    const nombres = await p.locator(".item-row .item-name").allInnerTexts();
+    ok(nombres.length > 0 && nombres.every(n => /mantel/i.test(n)), `y su buscador filtra la lista (${nombres.length} items)`);
+    await p.locator(".barra-fija-buscar").fill("");
+    await p.waitForTimeout(500);
+
+    // Dentro de Modo carga, el cambio Salida/Vuelta y el recuento no pueden irse
+    await p.locator(".barra-fija-carga").click();
+    await p.waitForTimeout(1400);
+    await p.evaluate(() => { document.querySelector(".carga-modal").scrollTop = 1500; });
+    await p.waitForTimeout(600);
+    const t = await p.locator(".carga-modo-toggle").boundingBox();
+    ok(t && t.y < 120, `en Modo carga el toggle sigue arriba tras bajar (y=${t ? Math.round(t.y) : "?"})`);
+    const cuenta = await p.locator(".carga-toggle-cuenta").innerText();
+    ok(/^\d+\/\d+$/.test(cuenta.trim()), `y con él el recuento a la vista (${cuenta.trim()})`);
+    await c.close();
+  }
+
   // ── Zonas táctiles en móvil ─────────────────────────────────────────────────
   // Cargando un camión con las manos frías se falla un botón de 27px. El mínimo cómodo
   // son 44; se exige al menos 32 contando la capa invisible que extiende las casillas.
+  // Se miden DOS eventos, no uno: medir solo una producción dejaba fuera las filas de
+  // logística (el botón "Extra" y la casilla de furgoneta), el "+ Añadir persona/
+  // recogida/compra" y las casillas de la barra libre, que estaban por debajo del
+  // mínimo sin que nadie lo viera.
   console.log("\n── Zonas táctiles ──");
-  for (const w of [320, 390]) {
+  const PANTALLAS_TACTILES = [
+    { evento: "produccion", pax: 25, notasEvento: "Hielo" },
+    {
+      evento: "boda", pax: 120, ninos: 15, fechaEvento: "2027-12-11",
+      barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, llevaPaella: true,
+      logisticaEquipo: [{ nombre: "Raúl", inicio: "08:00", fin: "20:00", furgoneta: true }],
+      recogidas: [{ concepto: "Camión plataforma", fecha: "2027-12-09", fechaDevolucion: "2027-12-13" }],
+      compras: [{ concepto: "Hielo", cantidad: "20 sacos", fecha: "2027-12-10" }],
+    },
+  ];
+  for (const [i, w] of [[0, 320], [1, 390], [1, 320]]) {
     const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    await p.goto(url({ evento: "produccion", pax: 25, notasEvento: "Hielo" }), { waitUntil: "domcontentloaded" });
+    await p.goto(url(PANTALLAS_TACTILES[i]), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     const pequenos = await p.evaluate(() => {
       const malos = [];
@@ -622,7 +678,7 @@ async function main() {
       });
       return malos;
     });
-    ok(pequenos.length === 0, `${w}px: ninguna zona táctil por debajo de 32px${pequenos.length ? ` → ${pequenos.slice(0, 4).join(", ")}` : ""}`);
+    ok(pequenos.length === 0, `${PANTALLAS_TACTILES[i].evento} a ${w}px: ninguna zona táctil por debajo de 32px${pequenos.length ? ` → ${pequenos.slice(0, 4).join(", ")}` : ""}`);
     await c.close();
   }
 
@@ -783,6 +839,232 @@ async function main() {
   t = await chips(a2.p);
   ok(t.some(x => /Devolución/.test(x)), `devolución atrasada: se avisa aunque no se marcara la recogida → ${JSON.stringify(t)}`);
   await a2.c.close();
+
+  // ── Verano o invierno, según la fecha ───────────────────────────────────────
+  // El dato existía en el código pero no se podía cambiar desde ningún sitio: estaba
+  // fijo en verano todo el año, así que una boda de diciembre cargaba cerveza de agosto
+  // y el doble de blanco que de tinto. Ahora sale de la fecha del evento.
+  console.log("\n── Temporada ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const bebidas = async (estado) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 4, ...estado }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      const uno = async (n) => Number(await p.locator(".item-row", { hasText: n }).first().locator(".item-qty-input").inputValue());
+      return { cerveza: await uno("Cerveza Alhambra"), blanco: await uno("Vino blanco"), tinto: await uno("Vino tinto") };
+    };
+    const agosto = await bebidas({ fechaEvento: "2027-08-14" });
+    const diciembre = await bebidas({ fechaEvento: "2027-12-11" });
+
+    ok(agosto.cerveza > diciembre.cerveza,
+      `en agosto se carga más cerveza que en diciembre: ${agosto.cerveza} vs ${diciembre.cerveza} tercios`);
+    ok(agosto.blanco > agosto.tinto && diciembre.tinto > diciembre.blanco,
+      `y el vino se da la vuelta: agosto ${agosto.blanco}/${agosto.tinto} blanco-tinto, diciembre ${diciembre.blanco}/${diciembre.tinto}`);
+
+    // Forzar la temporada a mano manda sobre la fecha
+    const dicForzadoVerano = await bebidas({ fechaEvento: "2027-12-11", estacion: "verano" });
+    ok(dicForzadoVerano.cerveza === agosto.cerveza && dicForzadoVerano.blanco === agosto.blanco,
+      "forzar Verano en diciembre manda sobre la fecha");
+
+    // Los eventos guardados ANTES de esto llevan mesVerano true y ningún dato de
+    // temporada. Los que YA HAN PASADO no pueden cambiar de cifras: su lista es
+    // historia. Los que están por venir sí se corrigen solos por su fecha.
+    const yaPasado = await bebidas({ fechaEvento: "2024-12-11", mesVerano: true });
+    ok(yaPasado.cerveza === agosto.cerveza && yaPasado.blanco === agosto.blanco && yaPasado.tinto === agosto.tinto,
+      `un evento ya pasado no cambia ni una cifra: ${JSON.stringify(yaPasado)}`);
+    const porVenir = await bebidas({ fechaEvento: "2027-12-11", mesVerano: true });
+    ok(porVenir.cerveza === diciembre.cerveza && porVenir.tinto === diciembre.tinto,
+      `y uno que está por venir sí se corrige por su fecha: ${JSON.stringify(porVenir)}`);
+    await c.close();
+  }
+
+  // ── Bandejas y servicio de bandeja ──────────────────────────────────────────
+  // "Lleva canapés" hacía dos cosas a la vez: sumar bandejas y dejar los platos fuera
+  // de la carga. Una boda normal lleva canapés en el cóctel Y platos en el banquete,
+  // así que marcarlo te dejaba sin platos. Ahora las bandejas para pasar comida van
+  // siempre (por pax) y lo único que se marca es si el servicio es entero de bandeja.
+  console.log("\n── Bandejas y solo bandeja ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const lee = async (estado) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, ...estado }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      return p.locator(".item-row").evaluateAll(rs => rs.map(r => {
+        const n = r.querySelector(".item-name");
+        const q = r.querySelector(".item-qty-input");
+        return { n: (n ? n.textContent : "").replace(/\s*ALQUILER\s*/, "").trim(), q: q ? q.value : "" };
+      }));
+    };
+    const bandejas = (filas) => filas.filter(x => /^Bandejas de (madera|plata)/.test(x.n)).map(x => Number(x.q));
+    const hayPlatos = (filas) => filas.some(x => /^Platos trinchero/.test(x.n));
+
+    const base = await lee({});
+    const soloBandeja = await lee({ soloBandeja: true });
+
+    ok(hayPlatos(base) && bandejas(base).length > 0 && bandejas(base).every(v => v >= Math.ceil(100 / 10)),
+      `sin marcar nada ya van bandejas por pax, y los platos del banquete → ${JSON.stringify(bandejas(base))}`);
+    ok(!hayPlatos(soloBandeja), '"Solo bandeja" deja los platos fuera de la carga');
+    ok(bandejas(soloBandeja).every((v, i) => v > bandejas(base)[i]),
+      `y suma unas cuantas bandejas más: ${JSON.stringify(bandejas(base))} → ${JSON.stringify(bandejas(soloBandeja))}`);
+
+    // Un evento guardado de ANTES del cambio solo tiene llevaCanapes (sin soloBandeja),
+    // y entonces esa casilla hacía las dos cosas: tiene que seguir dando la misma lista
+    ok(!hayPlatos(await lee({ llevaCanapes: true })),
+      "un evento guardado antes del cambio sigue sin cargar platos");
+    await c.close();
+  }
+
+  // ── Alquileres: recogida y devolución solas ─────────────────────────────────
+  // Un alquiler no es solo una línea más en la carga: hay que ir a buscarlo y
+  // devolverlo. Antes esas dos fechas se escribían a mano evento tras evento (y por
+  // eso se olvidaban). Ahora el interruptor crea y quita su recogida, con las fechas
+  // sacadas de la del evento — y sin tocar nunca las escritas a mano.
+  console.log("\n── Alquileres ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const bloque = () => p.locator(".logistica-block").filter({ hasText: /RECOGIDAS \(/ });
+    const tarjetas = () => bloque().locator(".recogida-card").evaluateAll(cs => cs.map(x => ({
+      concepto: (x.querySelector('input[type="text"]') || {}).value || "",
+      fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),
+      auto: !!x.querySelector(".recogida-auto-badge"),
+    })));
+    const sillas = (op) => p.locator(".segment-group", { hasText: "Sillas" }).first()
+      .locator(".segment-btn", { hasText: new RegExp(`^${op}$`) }).first();
+    const armario = () => p.locator(".checkbox-label-normal", { hasText: "Armario caliente" }).locator("input");
+    const fechaDelEvento = () => p.locator(".form-group", { hasText: "FECHA" }).first().locator('input[type="date"]');
+
+    await p.goto(url({
+      evento: "boda", pax: 80, nombreEvento: "Boda alquileres", fechaEvento: "2027-08-11",
+      origenSillas: "Nuestras",
+      recogidas: [{ concepto: "Camión plataforma", fecha: "2027-08-09", fechaDevolucion: "2027-08-13" }],
+    }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok((await tarjetas()).length === 1, "de partida solo está la recogida escrita a mano");
+
+    // Sillas de alquiler → su recogida el día antes y su devolución el día después
+    await sillas("Dealde").click();
+    await p.waitForTimeout(600);
+    await armario().check();
+    await p.waitForTimeout(600);
+    let t = await tarjetas();
+    const sillasCard = t.find(x => /^Sillas/.test(x.concepto));
+    const armarioCard = t.find(x => /^Armario/.test(x.concepto));
+    ok(t.length === 3 && sillasCard && armarioCard, `los dos alquileres crean su recogida → ${JSON.stringify(t.map(x => x.concepto))}`);
+    ok(sillasCard && sillasCard.concepto === "Sillas (Dealde)" && sillasCard.auto
+      && sillasCard.fechas[0] === "2027-08-10" && sillasCard.fechas[1] === "2027-08-12",
+      `sillas: recoger el día antes y devolver el día después → ${JSON.stringify(sillasCard)}`);
+    ok(armarioCard && armarioCard.concepto === "Armario caliente (Dealde)" && armarioCard.auto,
+      `armario caliente: lleva su proveedor → ${JSON.stringify(armarioCard)}`);
+
+    // Cambiar el proveedor renombra la recogida, no crea otra
+    await sillas("Carvillo").click();
+    await p.waitForTimeout(600);
+    t = await tarjetas();
+    ok(t.length === 3 && t.some(x => x.concepto === "Sillas (Carvillo)"),
+      `cambiar de proveedor renombra la recogida en vez de duplicarla → ${JSON.stringify(t.map(x => x.concepto))}`);
+
+    // Mover la fecha del evento arrastra las fechas automáticas… y solo esas
+    await fechaDelEvento().fill("2027-09-05");
+    await p.waitForTimeout(800);
+    t = await tarjetas();
+    const aMano = t.find(x => x.concepto === "Camión plataforma");
+    ok(t.filter(x => x.auto).every(x => x.fechas[0] === "2027-09-04" && x.fechas[1] === "2027-09-06"),
+      `al mover la fecha del evento se recolocan las automáticas → ${JSON.stringify(t.filter(x => x.auto).map(x => x.fechas))}`);
+    ok(aMano && aMano.fechas[0] === "2027-08-09" && !aMano.auto,
+      `y la recogida escrita a mano se queda como estaba → ${JSON.stringify(aMano)}`);
+
+    // Una fecha automática que se toca a mano deja de seguir a la del evento.
+    // (El concepto vive en el valor de un input, así que la tarjeta se localiza por su
+    // posición, no por texto: filter({ hasText }) no ve los valores de los campos.)
+    const posSillas = t.findIndex(x => /^Sillas/.test(x.concepto));
+    await bloque().locator(".recogida-card").nth(posSillas).locator('input[type="date"]').first().fill("2027-09-01");
+    await p.waitForTimeout(500);
+    await fechaDelEvento().fill("2027-09-20");
+    await p.waitForTimeout(800);
+    t = await tarjetas();
+    ok(t.find(x => /^Sillas/.test(x.concepto)).fechas[0] === "2027-09-01",
+      "una fecha puesta a mano ya no se mueve sola");
+    ok(t.find(x => /^Armario/.test(x.concepto)).fechas[0] === "2027-09-19",
+      "y la que no se ha tocado sigue a la del evento");
+
+    // Quitar el alquiler se lleva su recogida, sin tocar las demás
+    await armario().uncheck();
+    await p.waitForTimeout(700);
+    t = await tarjetas();
+    ok(t.length === 2 && !t.some(x => /^Armario/.test(x.concepto)) && t.some(x => x.concepto === "Camión plataforma"),
+      `quitar el alquiler se lleva solo su recogida → ${JSON.stringify(t.map(x => x.concepto))}`);
+
+    // La ✕ de un item de alquiler tiene que quitarlo de verdad: los generaba con un
+    // dato de más que la app leía como "añadido a mano", así que no hacía nada
+    const filaSillas = () => p.locator(".item-row").filter({ hasText: "Sillas (alquiler" });
+    ok(await filaSillas().count() === 1, "la silla de alquiler está en la lista");
+    await filaSillas().locator(".item-action-borrar").click();
+    await p.waitForTimeout(700);
+    ok(await filaSillas().count() === 0, "y la ✕ la quita de la lista");
+
+    // Y el nombre corregido de un item de alquiler tiene que quedarse puesto
+    await armario().check();
+    await p.waitForTimeout(700);
+    const filaArmario = () => p.locator(".item-row").filter({ hasText: "Armario caliente" });
+    await filaArmario().locator(".item-action-btn").first().click();
+    await p.waitForTimeout(400);
+    await p.locator(".item-name-input").fill("Armario caliente de Dealde");
+    await p.keyboard.press("Enter");
+    await p.waitForTimeout(800);
+    ok(await p.locator(".item-row").filter({ hasText: "Armario caliente de Dealde" }).count() === 1,
+      "el nombre corregido de un item de alquiler se queda puesto");
+
+    // Mobiliario extra: lo puede pedir el cliente en cualquier evento menos en un
+    // rodaje (los chill out son nuestros y van aparte, sin recogida)
+    const casilla = (txt) => p.locator(".checkbox-label-normal", { hasText: txt }).locator("input");
+    await casilla("Mobiliario extra").check();
+    await p.waitForTimeout(700);
+    t = await tarjetas();
+    ok(t.some(x => x.concepto === "Mobiliario (Event Style)"),
+      `el mobiliario extra crea su recogida en Event Style → ${JSON.stringify(t.map(x => x.concepto))}`);
+    ok(await p.locator(".item-row").filter({ hasText: "Mobiliario (alquiler Event Style)" }).count() === 1,
+      "y el mobiliario alquilado sale en la carga");
+
+    // En producción el generador (marcado de serie) y las carpas que falten van a SOS,
+    // y el mobiliario extra ni se ofrece
+    await p.locator("select.form-select").first().selectOption("produccion");
+    await p.waitForTimeout(1000);
+    ok(await p.locator(".checkbox-label-normal", { hasText: "Mobiliario extra" }).count() === 0,
+      "en un rodaje no se ofrece mobiliario de Event Style");
+    await casilla("Carpas de alquiler").check();
+    await p.waitForTimeout(700);
+    t = await tarjetas();
+    ok(!t.some(x => x.concepto === "Mobiliario (Event Style)"),
+      `y al pasar a rodaje se retira su recogida → ${JSON.stringify(t.map(x => x.concepto))}`);
+    ok(t.some(x => x.concepto === "Carpas (Support On Set)"),
+      `las carpas de alquiler van a SOS → ${JSON.stringify(t.map(x => x.concepto))}`);
+    ok(t.some(x => x.concepto === "Generador (Support On Set)" && x.fechas[0] === "2027-09-19"),
+      `el generador de producción crea su recogida en SOS → ${JSON.stringify(t.map(x => x.concepto))}`);
+
+    // Separar los alquileres en el formulario NO los saca de la lista: se cargan y se
+    // devuelven como todo lo demás, así que tienen que estar en Modo carga para marcarlos
+    await casilla("Armario caliente").check();
+    await p.waitForTimeout(600);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1400);
+    const enCarga = async () => (await p.locator(".carga-nombre").allInnerTexts()).map(x => x.trim());
+    let cargaSalida = await enCarga();
+    const debenEstar = ["Generador", "Armario caliente (alquiler Dealde)", "Carpas"];
+    const faltan = debenEstar.filter(n => !cargaSalida.some(x => x === n));
+    ok(faltan.length === 0, `los alquileres están en Modo carga para marcarlos${faltan.length ? ` → faltan: ${faltan.join(", ")}` : ""}`);
+    await p.locator(".carga-modo-toggle button", { hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(700);
+    const cargaVuelta = await enCarga();
+    ok(debenEstar.every(n => cargaVuelta.some(x => x === n)),
+      "y también en Vuelta, que es donde se comprueba que el alquiler se devuelve entero");
+    await c.close();
+  }
 
   await navegador.close();
   srv.kill();
