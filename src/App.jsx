@@ -492,7 +492,12 @@ function calcMesasTotal(evtKey, pax) {
 // - Nespresso: cápsulas, cantidad calculada para cubrir el pax.
 // - Bar: cafetera tipo bar (portátil), también funciona con cápsulas, no café molido.
 // - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
-function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false) {
+// En una producción se bebe café todo el día, desde que se monta a las 6 hasta que se
+// recoge: no tiene nada que ver con los 2-3 cafés de sobremesa de un banquete. Por eso
+// el ratio se pasa desde fuera en vez de salir del interruptor de desayuno.
+const CAPSULAS_POR_PAX_PRODUCCION = 5.5;
+
+function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false, ratioCapsulas = null) {
   const items = [];
   // paxConsumo ≠ totalPax solo en producciones de varios días: lo que se gasta
   // (cápsulas, café, infusiones, azúcar, leches) se calcula sobre la suma de pax
@@ -502,7 +507,7 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
   // una boda española (sobremesa, tarta, recogida) sin llegar a triplicar lo que de
   // verdad se sirve, como pasaba con el ratio anterior (3,1/4,5, sin relación con las
   // tazas realmente calculadas más abajo: 0,6+0,4 = 1 taza/pax)
-  const capsulas = Math.ceil(paxConsumo * (hayDesayuno ? 3.2 : 2.2));
+  const capsulas = Math.ceil(paxConsumo * (ratioCapsulas ?? (hayDesayuno ? 3.2 : 2.2)));
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(paxConsumo / 100)), "carga(s)")]);
   } else if (tipoCafetera === "Bar") {
@@ -1108,7 +1113,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
     ["Mesa redonda", "—"], ["Mesa larga", "—"],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA), esAlquilerSillas]),
-    ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
+    // En un rodaje se separa mucho más residuo que en un banquete: van 3 de reciclaje
+    ["Cubo basura reciclaje", "3"], ["Cubo basura cocina", "1"],
     ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
     // Carpas, paredes y pesas en tres líneas: antes ponía "Carpas con paredes y pesas"
     // y más abajo otra línea de paredes, así que no se sabía si las de la primera
@@ -1186,11 +1192,15 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
      al recuento de "Platos postre" en vez de generar una línea aparte. El entrante sí se
      queda aparte porque suele llevar su propio plato/bol distinto. */}
-  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
+  // En un rodaje se come DOS veces: el desayuno de la mañana y la comida. Las dos con
+  // cubierto, y el desayuno además con su plato pequeño. Así que los cubiertos van
+  // siempre para dos servicios y el plato de postre lleva uno por cabeza de más — no
+  // depende de la casilla "Hay desayuno", que es para el evento suelto que lo pide.
+  const cubiertosProdu = conMargen(totalPax * 2);
+  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + totalPax;
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
-  const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla y Cubertería", items: [
     opt(!soloBandeja && llevaPlatos, [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)]),
     opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
@@ -1198,10 +1208,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
       ["Platos metálicos", "—"], ["Platos hondos", "—"],
     ] : []),
     ...(llevaCubiertos ? [
-      ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cucharas postre", String(conMargen(totalPax))],
+      ["Tenedores grandes", String(cubiertosProdu)],
+      ["Cuchillos grandes", String(cubiertosProdu)],
+      ["Cucharas grandes", String(cubiertosProdu)],
+      ["Cucharas postre", String(cubiertosProdu)],
     ] : []),
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))], ["Abridores de cerveza", "2"],
     ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
@@ -1247,7 +1257,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el
   // día para el equipo (café continuo), además de la de servicio que calcula calcCafe.
-  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true);
+  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true, CAPSULAS_POR_PAX_PRODUCCION);
   cafeProduccion.items.push(["Cafetera de mantenimiento (rodaje, siempre encendida)", "1"]);
   cats.push(cafeProduccion);
 
@@ -4936,10 +4946,17 @@ export default function App({ onCerrarSesion } = {}) {
               {entranteCompartido && (
                 <>
                   <SegmentedControl label="Se comparte cada" value={personasPorPlatoEntrante} onChange={setPersonasPorPlatoEntrante} options={[3, 4]} />
-                  <div className="form-group controls-mini">
-                    <span className="form-label">Nº de entrantes a compartir</span>
-                    <input type="number" className="form-input" value={numEntrantesCompartir} min="1" onChange={e => setNumEntrantesCompartir(Math.max(1, parseInt(e.target.value) || 1))} />
-                  </div>
+                  {/* Cuántos entrantes distintos se reparten. Era un campo numérico y no
+                      se veía: hay menús con dos entrantes para compartir (y algún día
+                      con tres) y cada uno multiplica sus platos. Como selector se ve de
+                      un vistazo lo que hay puesto. Si algún menú lleva más de tres, se
+                      edita la cantidad del item a mano en la lista. */}
+                  <SegmentedControl
+                    label="Entrantes a compartir"
+                    value={Math.min(3, Math.max(1, numEntrantesCompartir))}
+                    onChange={setNumEntrantesCompartir}
+                    options={[1, 2, 3]}
+                  />
                 </>
               )}
               {llevaPaella && (

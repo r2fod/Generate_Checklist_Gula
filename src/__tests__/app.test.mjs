@@ -755,6 +755,32 @@ async function main() {
       "sin sombra van carpas, y el generador se carga con su gasolina");
     ok(tiene(produ.nombres, "Sillas (nuestras)"),
       "y las sillas del rodaje son las nuestras, sin alquiler");
+    {
+      // En un rodaje se separa mucho más residuo que en un banquete
+      const cubos = await p.locator(".item-row", { hasText: "Cubo basura reciclaje" }).first().locator(".item-qty-input").inputValue();
+      ok(cubos === "3", `y van 3 cubos de basura de reciclaje, no 1 (${cubos})`);
+
+      // Este rodaje es de tres días (12+17+12): lo reutilizable se dimensiona para el
+      // DÍA GRANDE (17) y lo que se gasta para la SUMA (41). Los cubiertos y los platos
+      // se friegan, así que van por el día grande; las cápsulas se gastan.
+      const DIA_GRANDE = 17, RACIONES = 41;
+      const margen = (n) => Math.ceil(n * 1.1);
+      const uno = async (t) => Number(await p.locator(".item-row", { hasText: t }).first().locator(".item-qty-input").inputValue());
+      const [tenedores, cuchPostre, platosPostre] = [
+        await uno("Tenedores grandes"), await uno("Cucharas postre"), await uno("Platos postre"),
+      ];
+      // En un rodaje se come dos veces (desayuno y comida): cubiertos para las dos
+      ok(tenedores === margen(DIA_GRANDE * 2) && cuchPostre === margen(DIA_GRANDE * 2),
+        `los cubiertos del rodaje van para dos servicios (${tenedores} tenedores, ${cuchPostre} cucharas de postre)`);
+      // Y el desayuno usa su plato pequeño: uno por cabeza de más
+      ok(platosPostre === margen(DIA_GRANDE) + DIA_GRANDE,
+        `y el plato de postre lleva uno por cabeza de más para el desayuno (${platosPostre})`);
+
+      // En un rodaje se bebe café todo el día, no los 2-3 de una sobremesa
+      const capsulas = await uno("Cápsulas café");
+      ok(capsulas === Math.ceil(RACIONES * 5.5),
+        `y las cápsulas de café van a 5,5 por persona y día (${capsulas} para ${RACIONES} raciones)`);
+    }
 
     // Lo que no se contesta no se toca: se queda con el valor por defecto de la app
     const minimo = aRespuestasDeLaApp({ tipo: "cumpleanos", nombre: "Cumple Marta", adultos: 40 });

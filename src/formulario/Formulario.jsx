@@ -24,6 +24,7 @@ export default function Formulario({ codigo }) {
     try { return JSON.parse(localStorage.getItem(clave) || "{}"); } catch (e) { return {}; }
   });
   const [proximos, setProximos] = useState(null); // null = cargando
+  const [codigoMalo, setCodigoMalo] = useState(false);
   const [eventoDestino, setEventoDestino] = useState(guardado.eventoDestino ?? null); // null = sin elegir
   const [respuestas, setRespuestas] = useState(guardado.respuestas ?? {});
   const [paso, setPaso] = useState(guardado.paso ?? -1);
@@ -32,7 +33,15 @@ export default function Formulario({ codigo }) {
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => { leerProximos(codigo).then(l => setProximos(l || [])); }, [codigo]);
+  useEffect(() => {
+    leerProximos(codigo).then(r => {
+      // Un código que no existe cierra el formulario: si no, cualquiera que probara un
+      // ?enviar= inventado podría mandar cosas al buzón. Sin conexión no se cierra —
+      // eso no dice nada del código y sería dejar tirada a quien tiene mala cobertura.
+      if (!r.ok && r.motivo === "no-existe") { setCodigoMalo(true); setProximos([]); return; }
+      setProximos(r.ok ? r.eventos : []);
+    });
+  }, [codigo]);
 
   // Se guarda según escriben: si cierran el navegador a media pregunta, vuelven donde
   // lo dejaron. Es un formulario que se rellena de pie y con prisa.
@@ -49,6 +58,15 @@ export default function Formulario({ codigo }) {
   const pon = (campo, valor) => setRespuestas(r => ({ ...r, [campo]: valor }));
   const siguiente = () => setPaso(p => Math.min(p + 1, preguntas.length));
   const atras = () => setPaso(p => p - 1);
+
+  if (codigoMalo) {
+    return (
+      <div className="form-pantalla form-fin">
+        <h1>Este enlace ya no vale</h1>
+        <p>Pídele a logística el enlace nuevo.</p>
+      </div>
+    );
+  }
 
   // ── Pantalla final ─────────────────────────────────────────────────────────
   if (enviado) {
@@ -157,11 +175,24 @@ export default function Formulario({ codigo }) {
 
       <div className="form-campos">
         {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => (
-          <button
-            key={o.valor}
-            className={`form-opcion ${respuestas[p.id] === o.valor ? "es-elegida" : ""}`}
-            onClick={() => { pon(p.id, o.valor); setTimeout(siguiente, 120); }}
-          >{o.texto}</button>
+          <div key={o.valor}>
+            <button
+              className={`form-opcion ${respuestas[p.id] === o.valor ? "es-elegida" : ""}`}
+              // Las opciones que arrastran un número (¿cuántos entrantes?) no pasan
+              // solas de pantalla: hay que dejar contestarlo antes
+              onClick={() => { pon(p.id, o.valor); if (!o.conNumero) setTimeout(siguiente, 120); }}
+            >{o.texto}</button>
+            {respuestas[p.id] === o.valor && o.conNumero && (
+              <div className="form-subcampo">
+                <span>{o.conNumero}</span>
+                <input
+                  type="number" min="1" className="form-input form-input-corto"
+                  value={respuestas[`${o.valor}Numero`] ?? 1}
+                  onChange={e => pon(`${o.valor}Numero`, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                />
+              </div>
+            )}
+          </div>
         ))}
 
         {p.tipo === "marcar" && opcionesDe(p, tipo).map(o => {

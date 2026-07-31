@@ -113,8 +113,10 @@ export const PREGUNTAS = [
     opciones: [
       { valor: "no", texto: "No lleva" },
       { valor: "chupito", texto: "De chupito" },
-      { valor: "compartir3", texto: "Compartido, cada 3 personas" },
-      { valor: "compartir4", texto: "Compartido, cada 4 personas" },
+      // Muchas veces no es un entrante para compartir, son dos: por eso al elegir
+      // "compartido" se pregunta cuántos hay. Cada uno multiplica sus platos.
+      { valor: "compartir3", texto: "Compartido, cada 3 personas", conNumero: "¿Cuántos entrantes distintos?" },
+      { valor: "compartir4", texto: "Compartido, cada 4 personas", conNumero: "¿Cuántos entrantes distintos?" },
     ],
     soloEn: CON_BARRA,
   },
@@ -208,7 +210,12 @@ export function aRespuestasDeLaApp(r = {}) {
     if (puesto(r.entrante)) {
       estado.llevaEntrante = r.entrante === "chupito";
       estado.entranteCompartido = r.entrante === "compartir3" || r.entrante === "compartir4";
-      if (estado.entranteCompartido) estado.personasPorPlatoEntrante = r.entrante === "compartir3" ? 3 : 4;
+      if (estado.entranteCompartido) {
+        estado.personasPorPlatoEntrante = r.entrante === "compartir3" ? 3 : 4;
+        // Cuántos entrantes distintos se reparten (lo normal es 1, pero hay menús con 2)
+        const cuantos = r[`${r.entrante}Numero`];
+        if (cuantos > 0) estado.numEntrantesCompartir = cuantos;
+      }
     }
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : "Dealde";
     if (Array.isArray(r.extras)) {

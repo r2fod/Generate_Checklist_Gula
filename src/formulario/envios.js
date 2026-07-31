@@ -61,17 +61,19 @@ export async function publicarProximos(codigo, eventosGuardados) {
   });
 }
 
-// El formulario lee la lista con su código
+// El formulario lee la lista con su código. Distingue tres cosas, porque no son lo
+// mismo: que el código no valga (hay que cerrar el formulario), que no haya conexión
+// (se puede seguir rellenando) y que valga pero no haya eventos próximos.
 export async function leerProximos(codigo) {
   const conexion = await getDb();
-  if (!conexion || !codigo) return null;
+  if (!conexion || !codigo) return { ok: false, motivo: "no-existe" };
   const { db, fs } = conexion;
   try {
     const snap = await fs.getDoc(fs.doc(db, "publico", codigo));
-    if (!snap.exists()) return null;
-    return snap.data().eventos || [];
+    if (!snap.exists()) return { ok: false, motivo: "no-existe" };
+    return { ok: true, eventos: snap.data().eventos || [] };
   } catch (e) {
-    return null; // código que ya no vale, o sin conexión
+    return { ok: false, motivo: "sin-conexion" };
   }
 }
 
