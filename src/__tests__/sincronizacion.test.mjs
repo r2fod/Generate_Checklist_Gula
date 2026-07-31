@@ -154,3 +154,28 @@ await N.sincronizarArchivoNube(d1.local, { ...d1.local, 'Boda que viene': ev(175
 ok(Object.keys(d1.local).length===2, `tras editar uno siguen los 2: ${JSON.stringify(Object.keys(d1.local))}`);
 ok(d1.local['Boda que viene'].pax===175, 'y el editado se actualiza');
 ok(d1.local['Pasado'] !== undefined, 'el que no se tocó NO desaparece');
+
+// ─── QUÉ SE APLICA AL EVENTO QUE TIENES ABIERTO ───────────────────────────────
+// Dos personas con el mismo evento abierto y sin link compartido no se enteraban de
+// nada: la lista se actualizaba, pero lo que tenías delante no, y ganaba la última en
+// guardar en silencio. Estos son los guardianes de esa aplicación, que es la parte que
+// puede pisarte lo que estás viendo.
+console.log("\n══ Qué se aplica al evento que tienes abierto ══");
+{
+  const { cambioDelEventoAbierto } = await import("../sincronizacion-eventos.js");
+  const cambios = [
+    { nombre: "Boda Ana", tipo: "cambio", estado: { pax: 120 } },
+    { nombre: "Produ Movistar", tipo: "cambio", estado: { pax: 25 } },
+    { nombre: "Cumple Marta", tipo: "borrado" },
+  ];
+  ok(cambioDelEventoAbierto(cambios, "Boda Ana", {})?.pax === 120,
+    "se aplica el cambio del evento abierto");
+  ok(cambioDelEventoAbierto(cambios, "Otra boda", {}) === null,
+    "y solo ese: el de otro evento no toca tu pantalla");
+  ok(cambioDelEventoAbierto(cambios, "Cumple Marta", {}) === null,
+    "un borrado no se aplica a la pantalla");
+  ok(cambioDelEventoAbierto(cambios, "", {}) === null,
+    "sin evento abierto no se aplica nada");
+  ok(cambioDelEventoAbierto(cambios, "Boda Ana", { eventoNubeId: "abc123" }) === null,
+    "con link compartido manda su propia suscripción, no esta");
+}

@@ -710,7 +710,18 @@ body {
 }
 
 /* Aviso de que otra persona ha guardado cambios en este evento (nube) */
+/* El aviso de "esto lo ha cambiado otro" iba pegado arriba del todo de la página, así
+   que en el móvil —donde la lista empieza a miles de píxeles de scroll— no se veía
+   nunca, y dentro de Modo carga quedaba DEBAJO del panel: justo la pantalla donde dos
+   personas trabajan a la vez y donde más falta hace. Ahora flota abajo, por encima de
+   todo, y se ve estés donde estés. */
 .cambios-remotos-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 1100;               /* por encima del panel de Modo carga (1000) */
+  width: min(560px, calc(100vw - 24px));
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   color: var(--accent);
@@ -723,6 +734,20 @@ body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  box-shadow: var(--shadow-lg);
+  animation: slideUpFade 0.25s ease both;
+}
+
+.aviso-nombre-ocupado {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--aviso-texto);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-borde);
+  border-radius: 8px;
+  padding: 7px 10px;
 }
 
 .cambios-remotos-detalle {

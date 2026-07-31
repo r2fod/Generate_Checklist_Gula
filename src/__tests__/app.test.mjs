@@ -643,6 +643,64 @@ async function main() {
     await c.close();
   }
 
+  // ── Auto-guardado desde el primer momento ───────────────────────────────────
+  // Antes, un evento nuevo vivía SOLO en ese navegador hasta que le dabas a "Guardar
+  // evento": si se rompía el móvil o cambiabas de aparato, se perdía el trabajo. Ahora
+  // se guarda solo en cuanto tiene nombre — sin pisar nunca un evento que ya existe y
+  // sin dejar un evento por cada trozo del nombre mientras se escribe.
+  console.log("\n── Auto-guardado ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const guardados = () => p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")));
+    const campoNombre = () => p.locator(".form-group", { hasText: "NOMBRE DEL EVENTO" }).locator("input");
+
+    await p.goto(url({ evento: "boda", pax: 90 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2100);
+    ok((await guardados()).length === 0, "un evento sin nombre no se guarda solo");
+
+    // Se escribe el nombre a trozos, como se escribe de verdad
+    await campoNombre().fill("Boda Ana");
+    await p.waitForTimeout(3600);
+    await campoNombre().fill("Boda Ana y Luis");
+    await p.waitForTimeout(3600);
+    const tras = await guardados();
+    ok(tras.length === 1 && tras[0] === "Boda Ana y Luis",
+      `escribir el nombre a trozos deja UN evento con el nombre final → ${JSON.stringify(tras)}`);
+
+    // Y sigue guardándose solo con cada cambio
+    await p.locator("input[type=number]").first().fill("150");
+    await p.waitForTimeout(2000);
+    const pax = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_eventos_guardados"))["Boda Ana y Luis"].pax);
+    ok(pax === 150, `y los cambios posteriores se guardan solos (pax=${pax})`);
+    await c.close();
+  }
+
+  // ── Un borrador no puede pisar un evento guardado ───────────────────────────
+  console.log("\n── Nombres repetidos ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    // Ya hay un evento guardado "Boda Ana y Luis" de 200 pax, y NO es el activo
+    await c.addInitScript(() => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        "Boda Ana y Luis": { evento: "boda", pax: 200, nombreEvento: "Boda Ana y Luis" },
+      }));
+      localStorage.removeItem("gula_evento_activo");
+    });
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 30 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2100);
+    await p.locator(".form-group", { hasText: "NOMBRE DEL EVENTO" }).locator("input").fill("Boda Ana y Luis");
+    await p.waitForTimeout(4000);
+    const pax = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_eventos_guardados"))["Boda Ana y Luis"].pax);
+    ok(pax === 200, `un borrador con el mismo nombre NO pisa el evento guardado (sigue con ${pax} pax)`);
+    ok(await p.locator(".aviso-nombre-ocupado").count() === 1,
+      "y se avisa de que ese nombre ya está cogido");
+    await c.close();
+  }
+
   // ── El formulario de oficina ────────────────────────────────────────────────
   // Se abre con ?enviar=<código> y NO da acceso a nada más: ni checklist, ni
   // configuración, ni eventos. Esa es la garantía que sostiene todo lo demás.
@@ -1099,6 +1157,38 @@ async function main() {
     const porVenir = await bebidas({ fechaEvento: "2027-12-11", mesVerano: true });
     ok(porVenir.cerveza === diciembre.cerveza && porVenir.tinto === diciembre.tinto,
       `y uno que está por venir sí se corrige por su fecha: ${JSON.stringify(porVenir)}`);
+    await c.close();
+  }
+
+  // ── El brindis con cava ─────────────────────────────────────────────────────
+  // Marcarlo hace dos cosas distintas y conviene no confundirlas: suma 4 botellas (la
+  // referencia del sector para un brindis es 1 copa por cabeza) y DOBLA las copas,
+  // porque en el brindis todo el mundo coge copa a la vez. Antes subía el ratio de
+  // botellas a 0,28 y salían 28 para 100 pax: dos copas por cabeza, el techo de lo que
+  // alguien bebe en un brindis, no la media.
+  console.log("\n── Brindis con cava ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const cava = async (brindis) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 4, tieneBrindisCava: brindis }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      // Por nombre EXACTO: buscando "Cava" a secas se cazaba antes "Copas de cava",
+      // que aparece más arriba en la lista
+      const porNombre = await p.locator(".item-row").evaluateAll(rs => Object.fromEntries(rs.map(r => [
+        ((r.querySelector(".item-name") || {}).textContent || "").replace(/\s*ALQUILER\s*/, "").trim(),
+        Number((r.querySelector(".item-qty-input") || {}).value),
+      ])));
+      return { botellas: porNombre["Cava"], copas: porNombre["Copas de cava"] };
+    };
+    const sin = await cava(false), con = await cava(true);
+    ok(sin.botellas === 20 && con.botellas === 24,
+      `el brindis suma 4 botellas de cava, no un ratio entero (${sin.botellas} → ${con.botellas})`);
+    // El cálculo dobla (110 → 220 copas), pero lo que se carga va redondeado a bateas
+    // completas de 36, así que en pantalla se ve 144 → 252
+    ok(con.copas >= sin.copas * 1.7,
+      `y dobla las copas, que en el brindis todo el mundo coge una a la vez — en bateas de 36 (${sin.copas} → ${con.copas})`);
     await c.close();
   }
 
