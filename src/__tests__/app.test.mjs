@@ -92,9 +92,13 @@ async function main() {
       await page.waitForTimeout(2000);
       const mide = async (pantalla) => { const n = await desbordamiento(page); if (n > 0) desbordan.push(`${w}px ${pantalla} +${n}`); };
       await mide("config");
-      await page.locator("button", { hasText: "Vista previa" }).first().click(); await page.waitForTimeout(800);
+      // La vista de la hoja está ahora dentro de Compartir, no en la cabecera
+      await page.locator(".compartir-menu-wrap > .btn").first().click(); await page.waitForTimeout(400);
+      await page.locator(".compartir-menu button", { hasText: "Ver la hoja" }).first().click(); await page.waitForTimeout(800);
       await mide("vista previa");
-      await page.locator(".preview-overlay").first().click({ position: { x: 3, y: 3 } }).catch(() => {});
+      // Se cierra con su ✕: en móvil el panel ocupa la pantalla entera, así que ya no
+      // hay "fuera" donde tocar para cerrarlo (ese hueco era justo el que sobraba).
+      await page.locator(".preview-close-btn").first().click().catch(() => {});
       await page.waitForTimeout(500);
       await page.locator("button", { hasText: "Modo carga" }).first().click(); await page.waitForTimeout(950);
       for (const t of ["Salida", "Vuelta", "Resumen"]) {
@@ -635,6 +639,76 @@ async function main() {
     ok(t && t.y < 120, `en Modo carga el toggle sigue arriba tras bajar (y=${t ? Math.round(t.y) : "?"})`);
     const cuenta = await p.locator(".carga-toggle-cuenta").innerText();
     ok(/^\d+\/\d+$/.test(cuenta.trim()), `y con él el recuento a la vista (${cuenta.trim()})`);
+    await c.close();
+  }
+
+  // ── La hoja (antes "Vista previa") ──────────────────────────────────────────
+  // Es la hoja tal como sale en el Word y en el PDF, así que su sitio es dentro de
+  // Compartir, un segundo antes de exportar, y no un botón más en una cabecera que en
+  // el móvil ocupaba casi un tercio de la pantalla. Y sus columnas Sale/Vuelve/Roturas
+  // solo tienen sentido cuando hay algo marcado: vacías se comían 78px de ancho.
+  console.log("\n── La hoja ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const abrirHoja = async (estado) => {
+      await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(2100);
+      await p.locator(".compartir-menu-wrap > .btn").first().click();
+      await p.waitForTimeout(400);
+      await p.locator(".compartir-menu button", { hasText: "Ver la hoja" }).first().click();
+      await p.waitForTimeout(1000);
+      // Solo la primera tabla: hay una por categoría y allInnerTexts las juntaría todas
+      return p.locator(".preview-table").first().locator("thead th").allInnerTexts();
+    };
+
+    await p.goto(url({ evento: "boda", pax: 120 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2100);
+    ok(await p.locator(".header-actions button", { hasText: "Vista previa" }).count() === 0,
+      "la cabecera ya no lleva el botón de Vista previa");
+
+    const sinMarcas = await abrirHoja({ evento: "boda", pax: 120 });
+    ok(sinMarcas.length === 2 && /Concepto/i.test(sinMarcas[0]) && /Cant/i.test(sinMarcas[1]),
+      `sin nada marcado la hoja va a dos columnas → ${JSON.stringify(sinMarcas)}`);
+
+    const conMarcas = await abrirHoja({
+      evento: "boda", pax: 120,
+      checkeados: { "Personal::Camareros": true },
+      roturas: { "Personal::Camareros": "2" },
+    });
+    ok(conMarcas.length === 5 && conMarcas.some(t => /Roturas/i.test(t)),
+      `y con algo marcado aparecen Sale, Vuelve y Roturas → ${JSON.stringify(conMarcas)}`);
+    await c.close();
+  }
+
+  // ── Cuánto sitio se come antes de poder marcar ──────────────────────────────
+  // Medido en un móvil de 844px: el primer item de Modo carga estaba a 615px (73% de
+  // la pantalla gastada en margen, cabecera, selector y dos cronómetros) y solo se
+  // veían tres. Cargando un camión eso es scroll constante. Se exige que el panel
+  // empiece pegado arriba y que quepan al menos cinco items sin tocar nada.
+  console.log("\n── Sitio útil en Modo carga ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "produccion", pax: 30, nombreEvento: "Produccion Elche" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1400);
+    const m = await p.evaluate(() => {
+      const y = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      return {
+        modal: y(".carga-modal"),
+        primero: y(".carga-row"),
+        visibles: [...document.querySelectorAll(".carga-row")].filter(e => e.getBoundingClientRect().top < window.innerHeight).length,
+        crono: Math.round((document.querySelector(".crono-box") || { getBoundingClientRect: () => ({ height: 0 }) }).getBoundingClientRect().height),
+      };
+    });
+    ok(m.modal === 0, `en móvil el panel de carga empieza pegado arriba (y=${m.modal})`);
+    ok(m.crono <= 80, `los cronómetros caben en una línea (${m.crono}px de alto)`);
+    ok(m.primero !== null && m.primero < 500, `el primer item entra en la primera pantalla (y=${m.primero})`);
+    ok(m.visibles >= 5, `y se ven al menos cinco items de una vez (${m.visibles})`);
     await c.close();
   }
 
