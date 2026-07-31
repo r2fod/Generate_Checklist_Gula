@@ -6,6 +6,7 @@
 //   npm run test
 //
 import { chromium } from "playwright-core";
+import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
@@ -639,6 +640,73 @@ async function main() {
     ok(t && t.y < 120, `en Modo carga el toggle sigue arriba tras bajar (y=${t ? Math.round(t.y) : "?"})`);
     const cuenta = await p.locator(".carga-toggle-cuenta").innerText();
     ok(/^\d+\/\d+$/.test(cuenta.trim()), `y con él el recuento a la vista (${cuenta.trim()})`);
+    await c.close();
+  }
+
+  // ── Del formulario a la checklist ───────────────────────────────────────────
+  // El formulario de la oficina no calcula nada: recoge respuestas y las traduce a los
+  // mismos campos que rellenarías tú a mano. Esta prueba recorre el camino entero —
+  // respuestas → configuración → checklist generada — para los tipos de evento, y es
+  // la garantía de que el formulario no necesita tocar ni una línea de los generadores.
+  console.log("\n── Del formulario a la checklist ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const desdeElFormulario = async (respuestas) => {
+      const estado = aRespuestasDeLaApp(respuestas);
+      await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      const nombres = await p.locator(".item-row .item-name").allInnerTexts();
+      return { estado, nombres: nombres.map(n => n.replace(/\s*ALQUILER\s*/, "").trim()) };
+    };
+    const tiene = (l, txt) => l.some(n => n.toLowerCase().includes(txt.toLowerCase()));
+
+    // Una boda de cóctel de pie: sin platos, con paella, horno grande y barril
+    const boda = await desdeElFormulario({
+      tipo: "boda", nombre: "Boda Ana y Luis", sitio: "Finca La Alquería",
+      fecha: "2027-12-11", horaInicio: "12:30", horaFin: "23:00",
+      adultos: 120, ninos: 10, coctel: 3, copas: 5,
+      servicio: "bandeja", menu: ["paella", "frito"], entrante: "compartir3",
+      horno: "Grande", extras: ["brindis", "barril50", "chillout"], chilloutNumero: 2,
+      sillas: "finca", notas: "Alergia al marisco en la mesa 4",
+    });
+    ok(boda.estado.evento === "boda" && boda.estado.pax === 120 && boda.estado.soloBandeja === true
+      && boda.estado.tipoHorno === "Grande" && boda.estado.tamanoBarril === "50L"
+      && boda.estado.origenSillas === "No llevan" && boda.estado.personasPorPlatoEntrante === 3,
+      `las respuestas se traducen a los campos de la app → ${JSON.stringify(boda.estado.tipoHorno)}, ${JSON.stringify(boda.estado.tamanoBarril)}`);
+    ok(tiene(boda.nombres, "Horno grande") && !tiene(boda.nombres, "Horno pequeño"),
+      "y la checklist carga el horno que se pidió");
+    ok(tiene(boda.nombres, "Paella") && tiene(boda.nombres, "Parisiene"),
+      "la paella y las frituras salen con su equipo");
+    ok(!tiene(boda.nombres, "Platos trinchero"),
+      "de pie y en bandeja: no se cargan platos");
+    ok(!tiene(boda.nombres, "Sillas"),
+      "si las sillas las pone la finca, no se cargan ni se alquilan");
+    ok(tiene(boda.nombres, "Barril de cerveza (50L)") && tiene(boda.nombres, "Chill out"),
+      "y lo presupuestado aparece: barril y chill out");
+
+    // Un rodaje de tres días sin sombra y con generador de alquiler
+    const produ = await desdeElFormulario({
+      tipo: "produccion", nombre: "Produ Movistar", sitio: "Solo Houses",
+      fecha: "2027-07-29", horaInicio: "07:00",
+      dias: [12, 17, 12], sombra: "no", generador: "si",
+      menu: ["paella"], horno: "Pequeño", extras: [], notas: "",
+    });
+    ok(produ.estado.llevaCarpas === true && produ.estado.llevaGenerador === true
+      && produ.estado.origenSillas === "Nuestras"
+      && JSON.stringify(produ.estado.diasProduccion) === JSON.stringify(["12", "17", "12"]),
+      `el rodaje traduce días, carpas, generador y sillas propias → ${JSON.stringify(produ.estado.diasProduccion)}`);
+    ok(tiene(produ.nombres, "Carpas") && tiene(produ.nombres, "Generador"),
+      "sin sombra van carpas, y el generador se carga con su gasolina");
+    ok(tiene(produ.nombres, "Sillas (nuestras)"),
+      "y las sillas del rodaje son las nuestras, sin alquiler");
+
+    // Lo que no se contesta no se toca: se queda con el valor por defecto de la app
+    const minimo = aRespuestasDeLaApp({ tipo: "cumpleanos", nombre: "Cumple Marta", adultos: 40 });
+    ok(minimo.evento === "cumpleanos" && minimo.pax === 40
+      && minimo.tipoHorno === undefined && minimo.llevaPaella === undefined,
+      `lo que no se contesta no viaja: ${JSON.stringify(Object.keys(minimo))}`);
     await c.close();
   }
 
