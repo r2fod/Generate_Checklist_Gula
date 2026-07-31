@@ -2649,6 +2649,72 @@ hr {
   overflow-y: auto;
 }
 
+/* ─── MODO CARGA A PANTALLA COMPLETA EN MÓVIL ─────────────────────────────────
+   Medido en un móvil de 844px de alto: 50px de margen por encima del panel, 175 de
+   cabecera, 59 del selector y 248 de los dos cronómetros. El primer item quedaba a
+   615px, o sea el 73% de la pantalla gastado antes de poder marcar nada, y solo se
+   veían tres. Cargando un camión eso es scroll constante. En móvil el panel ocupa la
+   pantalla entera y los cronómetros se compactan a una línea. */
+@media (max-width: 767px) {
+  .preview-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .preview-modal {
+    border-radius: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .carga-modal {
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+
+  /* Los tiempos estimados y su nota, en una línea corrida en vez de tres */
+  .carga-tiempos-nota {
+    width: auto;
+  }
+
+  /* Cronómetro en una sola línea: título y estimado a la izquierda, tiempo y botones
+     a la derecha. Pasan de 124px de alto a poco más de 50. */
+  .crono-box {
+    flex-wrap: nowrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .crono-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    flex: 1;
+  }
+
+  .crono-label {
+    font-size: 0.82rem;
+  }
+
+  .crono-estimado {
+    font-size: 0.72rem;
+  }
+
+  .crono-tiempo {
+    font-size: 1.15rem;
+    flex-shrink: 0;
+  }
+
+  .crono-btn {
+    padding: 8px 10px;
+  }
+
+  /* Con el botón a una línea, el texto "Empezar/Seguir/Pausar" sobra: el icono basta */
+  .crono-btn-texto {
+    display: none;
+  }
+}
+
 .carga-modal .preview-header {
   position: static;
 }
@@ -3457,6 +3523,13 @@ hr {
 /* ...menos las opciones de Compartir: son una LISTA (Word, PDF, WhatsApp...), no
    botones sueltos. Centradas quedaban cada una en un sitio y los iconos en zigzag.
    Van pegadas a la izquierda y con los iconos en columna, como cualquier menú. */
+/* Separa "Ver la hoja" (mirar) de lo que de verdad envía o descarga algo */
+.compartir-menu-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-color);
+}
+
 .compartir-menu > button {
   justify-content: flex-start;
   gap: 10px;
@@ -3745,7 +3818,10 @@ hr {
   .item-list-wrapper .item-row:first-child { padding-top: 11px; }
 
   /* Modales (Vista previa / Modo carga): cuerpo y cabecera más ajustados */
-  .preview-overlay { padding: 14px 8px; }
+  /* En móvil el panel va a pantalla completa (ver el bloque de Modo carga más
+     arriba): aquí solo se deja el respiro lateral de la vista previa, sin margen
+     arriba, que era lo que dejaba una franja gris inútil sobre la cabecera. */
+  .preview-overlay { padding: 0; }
   .preview-header { padding: 14px 16px; }
   .preview-body { padding: 14px 14px 22px; gap: 12px; }
   .preview-category-header { padding: 9px 13px; }

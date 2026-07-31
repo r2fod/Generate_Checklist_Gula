@@ -8,7 +8,7 @@ import {
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
   BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
-  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun, Download, Upload,
+  Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun, Download, Upload, Eye,
 } from "lucide-react";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
@@ -1877,6 +1877,13 @@ function Dialogo({ config, onCerrar }) {
 // ─── MODAL VISTA PREVIA ───────────────────────────────────────────────────────
 function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, meta = {}, onClose }) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
+  // Las columnas Sale/Vuelve/Roturas solo aparecen si hay algo marcado. Antes salían
+  // siempre y en el móvil se comían 78px de ancho y 68 de alto (con las cabeceras
+  // giradas en vertical para caber), para quedarse vacías: lo normal es mirar la hoja
+  // ANTES del evento, cuando aún no se ha marcado nada. El Word y el PDF sí las llevan
+  // siempre, que ahí sirven para ir marcando a mano sobre el papel.
+  const algo = (o) => Object.values(o || {}).some(v => v !== "" && v !== false && v !== undefined);
+  const hayMarcas = algo(meta.checkeados) || algo(meta.vueltos) || algo(meta.roturas);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   const fechaEventoFmt = meta.fechaEvento ? new Date(meta.fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null;
   return (
@@ -1918,9 +1925,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                     <tr>
                       <th>Concepto</th>
                       <th>Cant.</th>
-                      <th className="preview-check-cell">Sale</th>
-                      <th className="preview-check-cell">Vuelve</th>
-                      <th className="preview-check-cell">Roturas</th>
+                      {hayMarcas && <th className="preview-check-cell">Sale</th>}
+                      {hayMarcas && <th className="preview-check-cell">Vuelve</th>}
+                      {hayMarcas && <th className="preview-check-cell">Roturas</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -1934,9 +1941,9 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
                             {alq && <span className="preview-rental-badge">ALQUILER</span>}
                           </td>
                           <td className="preview-qty-cell">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
-                          <td className="preview-check-cell">{(meta.checkeados || {})[key] ? "✓" : ""}</td>
-                          <td className="preview-check-cell">{(meta.vueltos || {})[key] ? "✓" : ""}</td>
-                          <td className="preview-check-cell">{(meta.roturas || {})[key] || ""}</td>
+                          {hayMarcas && <td className="preview-check-cell">{(meta.checkeados || {})[key] ? "✓" : ""}</td>}
+                          {hayMarcas && <td className="preview-check-cell">{(meta.vueltos || {})[key] ? "✓" : ""}</td>}
+                          {hayMarcas && <td className="preview-check-cell">{(meta.roturas || {})[key] || ""}</td>}
                         </tr>
                       );
                     })}
@@ -2056,14 +2063,14 @@ function ModalModoCarga({ checklist: checklistCompleta, checkeados, vueltos, rot
       <div className={`crono-box ${corriendo ? "is-corriendo" : ""}`}>
         <div className="crono-info">
           <span className="crono-label"><Clock size={14} /> {label}</span>
-          <span className={`crono-tiempo ${sobre ? "is-sobre" : ""}`}>{fmtCrono(ms)}</span>
           {estimadoMin > 0 && <span className="crono-estimado">estimado ~{fmtMin(estimadoMin)}{sobre ? " · pasado" : ""}</span>}
         </div>
         <div className="crono-acciones">
+          <span className={`crono-tiempo ${sobre ? "is-sobre" : ""}`}>{fmtCrono(ms)}</span>
           {corriendo ? (
-            <button className="btn crono-btn crono-btn-pause" onClick={() => onCronoPause && onCronoPause(fase)}><Pause size={14} /> Pausar</button>
+            <button className="btn crono-btn crono-btn-pause" onClick={() => onCronoPause && onCronoPause(fase)} title="Pausar" aria-label="Pausar cronómetro"><Pause size={14} /> <span className="crono-btn-texto">Pausar</span></button>
           ) : (
-            <button className="btn crono-btn crono-btn-start" onClick={() => onCronoStart && onCronoStart(fase)}><Play size={14} /> {ms > 0 ? "Seguir" : "Empezar"}</button>
+            <button className="btn crono-btn crono-btn-start" onClick={() => onCronoStart && onCronoStart(fase)} title={ms > 0 ? "Seguir" : "Empezar"} aria-label={ms > 0 ? "Seguir cronómetro" : "Empezar cronómetro"}><Play size={14} /> <span className="crono-btn-texto">{ms > 0 ? "Seguir" : "Empezar"}</span></button>
           )}
           <button className="btn btn-outline crono-btn crono-btn-reset" onClick={() => onCronoReset && onCronoReset(fase)} disabled={ms === 0 && !corriendo} title="Reiniciar a cero" aria-label="Reiniciar cronómetro"><RotateCcw size={14} /></button>
         </div>
@@ -4166,7 +4173,10 @@ export default function App({ onCerrarSesion } = {}) {
             {onCerrarSesion && (
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>
             )}
-            <button className="btn btn-outline" onClick={() => setModalPrevia(true)}>Vista previa</button>
+            {/* "Vista previa" ya no vive aquí: es la hoja tal como sale en el Word y en
+                el PDF, así que su sitio es dentro de Compartir, un segundo antes de
+                exportar. Además libera un botón de una cabecera que ocupaba casi un
+                tercio de la pantalla del móvil. */}
             <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
@@ -4174,6 +4184,8 @@ export default function App({ onCerrarSesion } = {}) {
                 <>
                   <div className="compartir-menu-backdrop" onClick={() => setMenuCompartir(false)} />
                   <div className="compartir-menu">
+                    <button onClick={() => { setMenuCompartir(false); setModalPrevia(true); }}><Eye size={15} /> Ver la hoja</button>
+                    <div className="compartir-menu-sep" />
                     <button onClick={handleGenerarLink}><Link2 size={15} /> Link para el móvil</button>
                     <button onClick={handleCompartirWord}><FileText size={15} /> Word</button>
                     <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>
