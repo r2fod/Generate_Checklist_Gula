@@ -179,3 +179,89 @@ console.log("\n══ Qué se aplica al evento que tienes abierto ══");
   ok(cambioDelEventoAbierto(cambios, "Boda Ana", { eventoNubeId: "abc123" }) === null,
     "con link compartido manda su propia suscripción, no esta");
 }
+
+// ── Las recogidas que trae un envío del formulario ────────────────────────────
+// Los interruptores de la pantalla crean la recogida de cada alquiler al pulsarlos.
+// Cuando la configuración llega de fuera (un envío de la oficina) no hay clic que
+// valga: si esto falla, la app carga material de alquiler y NADIE va a buscarlo.
+console.log("\n══ Alquileres → recogidas, sin pantalla ══");
+{
+  const { recogidasConAlquileres } = await import("../alquileres.js");
+  const conceptos = (rs) => rs.map(r => r.concepto).sort();
+
+  const boda = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-08-11",
+    origenSillas: "Carvillo", llevaArmarioCaliente: true, llevaMobiliarioAlquiler: true,
+  });
+  ok(JSON.stringify(conceptos(boda)) === JSON.stringify(["Armario caliente (Dealde)", "Mobiliario (Event Style)", "Sillas (Carvillo)"]),
+    `cada alquiler trae su recogida con su proveedor → ${JSON.stringify(conceptos(boda))}`);
+  const sillas = boda.find(r => r.auto === "sillas");
+  ok(sillas.fecha === "2027-08-10" && sillas.fechaDevolucion === "2027-08-12",
+    `se recoge el día antes y se devuelve el día después → ${sillas.fecha} / ${sillas.fechaDevolucion}`);
+
+  ok(recogidasConAlquileres({ evento: "boda", origenSillas: "Nuestras" }).length === 0,
+    "las sillas nuestras no crean recogida");
+  ok(recogidasConAlquileres({ evento: "boda", origenSillas: "No llevan" }).length === 0,
+    "y si no se llevan sillas, tampoco");
+
+  // En un rodaje no hay mobiliario de Event Style, y las carpas solo si se alquilan
+  const rodaje = recogidasConAlquileres({
+    evento: "produccion", fechaEvento: "2027-09-05",
+    llevaMobiliarioAlquiler: true, llevaGenerador: true, llevaCarpas: true, alquilaCarpas: true,
+  });
+  ok(JSON.stringify(conceptos(rodaje)) === JSON.stringify(["Carpas (Support On Set)", "Generador (Support On Set)"]),
+    `en un rodaje: generador y carpas a SOS, y nada de Event Style → ${JSON.stringify(conceptos(rodaje))}`);
+  ok(recogidasConAlquileres({ evento: "produccion", llevaCarpas: true }).length === 0,
+    "las carpas del almacén no crean recogida: solo las alquiladas");
+
+  // Lo escrito a mano no se toca NUNCA, y lo ya recogido tampoco se borra
+  const conManual = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-08-11", origenSillas: "Dealde",
+    recogidas: [{ concepto: "Camión plataforma", fecha: "2027-08-09" }],
+  });
+  ok(conManual.some(r => r.concepto === "Camión plataforma" && !r.auto) && conManual.length === 2,
+    `la recogida escrita a mano se queda como estaba → ${JSON.stringify(conceptos(conManual))}`);
+  const yaRecogido = recogidasConAlquileres({
+    evento: "boda", origenSillas: "Nuestras",
+    recogidas: [{ concepto: "Sillas (Dealde)", auto: "sillas", recogido: true }],
+  });
+  ok(yaRecogido.length === 1,
+    "un alquiler ya recogido no se borra aunque se apague: el material está de por medio");
+
+  // Cambiar de proveedor renombra, no duplica
+  const cambiado = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-08-11", origenSillas: "Carvillo",
+    recogidas: [{ concepto: "Sillas (Dealde)", auto: "sillas", fecha: "2027-08-01", fechasAuto: false }],
+  });
+  ok(cambiado.length === 1 && cambiado[0].concepto === "Sillas (Carvillo)" && cambiado[0].fecha === "2027-08-01",
+    `cambiar de proveedor renombra y respeta la fecha puesta a mano → ${JSON.stringify(cambiado[0])}`);
+}
+
+// ── Un envío, leído en la bandeja ─────────────────────────────────────────────
+// Quien revisa el envío tiene que leer lo mismo que vio quien lo mandó, y sobre todo
+// tiene que distinguir "han dicho que no" de "no lo saben": lo segundo es lo que hay
+// que mirar antes del evento.
+console.log("\n══ Cómo se lee un envío en la bandeja ══");
+{
+  const { resumirEnvio } = await import("../formulario/preguntas.js");
+  const filas = resumirEnvio({
+    tipo: "boda", nombre: "Boda Ana y Luis", sitio: "Finca La Alquería",
+    fecha: "2027-08-11", horaInicio: "12:30", horaFin: "02:00",
+    adultos: 120, ninos: 10, coctel: 3, copas: 0,
+    servicio: "bandeja", horno: "Grande", sillas: "Carvillo",
+    menu: ["paella"], extras: [], entrante: null, notas: "",
+  });
+  const de = (id) => filas.find(f => f.id === id);
+  ok(de("sillas").respuesta === "Las alquilamos a Carvillo",
+    `las sillas se leen con su proveedor → "${de("sillas").respuesta}"`);
+  ok(de("copas").respuesta === "no hay",
+    `"cero horas de barra" se lee como no hay, no como sin contestar → "${de("copas").respuesta}"`);
+  ok(de("entrante").respuesta === "no lo sé" && de("entrante").sinContestar === true,
+    "lo que no saben sale marcado aparte, que es lo que hay que revisar");
+  ok(de("coctel").sinContestar === false && de("gente").respuesta === "120 adultos · 10 niños",
+    `lo contestado se lee entero → "${de("gente").respuesta}"`);
+  ok(de("cuando").respuesta.includes("12:30") && de("cuando").respuesta.includes("a 02:00"),
+    `la hora de fin se enseña aunque no configure nada → "${de("cuando").respuesta}"`);
+  ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "sombra"),
+    "y de una boda no se enseñan las preguntas de rodaje");
+}

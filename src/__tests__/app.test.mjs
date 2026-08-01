@@ -7,6 +7,7 @@
 //
 import { chromium } from "playwright-core";
 import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
+import { recogidasConAlquileres } from "../alquileres.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
@@ -747,7 +748,63 @@ async function main() {
     ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
       "sin desbordamiento en el móvil");
 
+    // Lo de las carpas de alquiler solo se pregunta si NO hay sombra: preguntarlo
+    // cuando ni siquiera van carpas sería una pantalla de más, y esto se rellena de pie
+    const preguntaDe = async (texto) => {
+      let vueltas = 0;
+      while (vueltas++ < 20) {
+        const t = await p.locator(".form-titulo").innerText();
+        if (new RegExp(texto, "i").test(t)) return true;
+        if (/Está todo bien/i.test(t)) return false;
+        const nose = p.locator(".form-btn-nose");
+        if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
+        await p.waitForTimeout(260);
+      }
+      return false;
+    };
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Producción o rodaje" }).first().click();
+    await p.waitForTimeout(600);
+    ok(await preguntaDe("Hay sombra"), "en un rodaje se pregunta por la sombra");
+    await p.locator(".form-opcion", { hasText: "Sí, hay" }).first().click();
+    await p.waitForTimeout(500);
+    ok(!/carpas/i.test(await p.locator(".form-titulo").innerText()),
+      "si hay sombra, de las carpas no se pregunta nada");
+
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Producción o rodaje" }).first().click();
+    await p.waitForTimeout(600);
+    await preguntaDe("Hay sombra");
+    await p.locator(".form-opcion", { hasText: "No hay" }).first().click();
+    await p.waitForTimeout(600);
+    ok(/carpas/i.test(await p.locator(".form-titulo").innerText()),
+      `sin sombra sí se pregunta si hay que alquilarlas → "${await p.locator(".form-titulo").innerText()}"`);
+
     // El borrador sobrevive a cerrar el navegador a media pregunta
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(600);
+    await p.locator(".form-input").first().fill("Boda de Ana y Luis");
+    await p.locator(".form-input").nth(1).fill("Finca La Alquería");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(400);
+    while (!/Está todo bien/i.test(await p.locator(".form-titulo").innerText())) {
+      const nose = p.locator(".form-btn-nose");
+      if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
+      await p.waitForTimeout(260);
+    }
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
@@ -813,6 +870,23 @@ async function main() {
       "sin sombra van carpas, y el generador se carga con su gasolina");
     ok(tiene(produ.nombres, "Sillas (nuestras)"),
       "y las sillas del rodaje son las nuestras, sin alquiler");
+    ok(produ.estado.alquilaCarpas === undefined,
+      "sin contestar lo de las carpas, no se da por hecho que se alquilan");
+
+    // A quién se alquilan las sillas lo sabe la oficina y la app no lo puede deducir:
+    // cada proveedor es una recogida distinta
+    const conCarvillo = aRespuestasDeLaApp({ tipo: "boda", nombre: "Boda C", adultos: 90, sillas: "Carvillo" });
+    ok(conCarvillo.origenSillas === "Carvillo",
+      `el proveedor de las sillas viaja tal cual → ${conCarvillo.origenSillas}`);
+    ok(recogidasConAlquileres(conCarvillo).some(r => r.concepto === "Sillas (Carvillo)"),
+      "y trae su recogida en Carvillo, no en Dealde");
+    const carpasSOS = aRespuestasDeLaApp({
+      tipo: "produccion", nombre: "Rodaje X", fecha: "2027-07-29",
+      dias: [20], sombra: "no", carpasAlquiler: "sos",
+    });
+    ok(carpasSOS.llevaCarpas === true && carpasSOS.alquilaCarpas === true
+      && recogidasConAlquileres(carpasSOS).some(r => r.concepto === "Carpas (Support On Set)"),
+      "las carpas que hay que alquilar crean su recogida en SOS");
     {
       // En un rodaje se separa mucho más residuo que en un banquete
       const cubos = await p.locator(".item-row", { hasText: "Cubo basura reciclaje" }).first().locator(".item-qty-input").inputValue();
@@ -1385,6 +1459,47 @@ async function main() {
     ok(debenEstar.every(n => cargaVuelta.some(x => x === n)),
       "y también en Vuelta, que es donde se comprueba que el alquiler se devuelve entero");
     await c.close();
+  }
+
+  // ── La bandeja del formulario ──────────────────────────────────────────────
+  // El lado de la app: de dónde sale el enlace que se le pasa a la oficina y dónde se
+  // revisa lo que mandan. Aquí la nube está cortada a propósito, así que se comprueba
+  // justo lo que se ve sin conexión: que se llega, que se explica y que cabe.
+  console.log("\n── La bandeja del formulario ──");
+  {
+    for (const ancho of [320, 390]) {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 780 }, isMobile: true, hasTouch: true });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda bandeja" }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(2200);
+      await p.locator(".compartir-menu-wrap > .btn").first().click();
+      await p.waitForTimeout(400);
+      const entrada = p.locator(".compartir-menu button", { hasText: "Formulario de oficina" });
+      if (ancho === 320) ok(await entrada.count() === 1, "el formulario de oficina se abre desde Compartir");
+      await entrada.first().click();
+      await p.waitForTimeout(900);
+      const titulo = await p.locator(".preview-header-title").first().innerText();
+      if (ancho === 320) {
+        ok(/Formulario de oficina/i.test(titulo), `abre su pantalla → "${titulo.trim()}"`);
+        ok(await p.locator(".btn", { hasText: "Crear el enlace" }).count() === 1,
+          "sin enlace creado, lo primero que ofrece es crearlo");
+        ok(/No hay envíos sin revisar/i.test(await p.locator(".preview-body").innerText()),
+          "y dice claramente que el buzón está vacío");
+      }
+      const desborda = await p.evaluate(() => {
+        const m = document.querySelector(".preview-modal");
+        return {
+          pagina: document.documentElement.scrollWidth > window.innerWidth,
+          modal: m ? m.scrollWidth > m.clientWidth + 1 : true,
+        };
+      });
+      ok(!desborda.pagina && !desborda.modal, `cabe en ${ancho}px sin desbordarse`);
+      await p.locator(".preview-close-btn").first().click();
+      await p.waitForTimeout(400);
+      ok(await p.locator(".preview-modal").count() === 0, `y se cierra con su ✕ (${ancho}px)`);
+      await c.close();
+    }
   }
 
   // ── El check de preparación ────────────────────────────────────────────────

@@ -22,6 +22,31 @@ function getDb() {
 // ¿Está activada la edición compartida? (síncrono, para decidir qué link generar)
 export const nubeActiva = () => !!firebaseConfig;
 
+// ─── CÓDIGO DEL FORMULARIO DE OFICINA ─────────────────────────────────────────
+// El código del link que se le pasa a la oficina vive en el archivo (colección
+// "indice"), no en el navegador: si viviera en cada móvil, cada uno generaría el suyo
+// y el link que la oficina ya tiene guardado dejaría de recibir la lista de eventos.
+// El lector del archivo se salta todo lo que no empiece por "evt_", así que este
+// documento no se cuela como si fuera un evento.
+const DOC_FORMULARIO = "formulario";
+
+export async function leerCodigoFormulario() {
+  const conexion = await getDb();
+  if (!conexion) return "";
+  const { db, fs } = conexion;
+  try {
+    const snap = await fs.getDoc(fs.doc(db, COL_ARCHIVO, DOC_FORMULARIO));
+    return (snap.exists() && snap.data().codigo) || "";
+  } catch (e) { return ""; }
+}
+
+export async function guardarCodigoFormulario(codigo) {
+  const conexion = await getDb();
+  if (!conexion) return;
+  const { db, fs } = conexion;
+  await fs.setDoc(fs.doc(db, COL_ARCHIVO, DOC_FORMULARIO), { codigo, actualizado: Date.now() });
+}
+
 // Id corto y legible para el link (~8 caracteres sin ambiguos: 31^8 combinaciones)
 export function nuevoIdEvento() {
   const abc = "abcdefghjkmnpqrstuvwxyz23456789";

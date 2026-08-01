@@ -12,10 +12,17 @@ import {
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import {
+  ALQUILERES, DIAS_ANTES_RECOGIDA, DIAS_DESPUES_DEVOLUCION,
+  sumaDias, conceptoAlquiler, recogidasConAlquileres,
+} from "./alquileres.js";
+import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
   cargarIndiceEventosNube,
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
+  leerCodigoFormulario, guardarCodigoFormulario,
 } from "./nube.js";
+import { aRespuestasDeLaApp, resumirEnvio } from "./formulario/preguntas.js";
+import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio } from "./formulario/envios.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -133,35 +140,6 @@ export function temporadaInicial(estado = {}, hoy = hoyISO()) {
 // sacadas de la del evento.
 //
 // Para añadir otro alquiler basta con una entrada más aquí y engancharla a su control.
-const ALQUILERES = {
-  sillas:          { etiqueta: "Sillas" }, // el proveedor lo elige el selector: Dealde o Carvillo
-  armarioCaliente: { etiqueta: "Armario caliente", proveedor: "Dealde" },
-  mobiliario:      { etiqueta: "Mobiliario", proveedor: "Event Style" },
-  // Solo en producciones
-  generador:       { etiqueta: "Generador", proveedor: "Support On Set" },
-  carpas:          { etiqueta: "Carpas", proveedor: "Support On Set" },
-};
-// Cuántos días antes se recoge y cuántos después se devuelve
-const DIAS_ANTES_RECOGIDA = 1, DIAS_DESPUES_DEVOLUCION = 1;
-
-// Suma (o resta) días a una fecha "AAAA-MM-DD" sin pasar por UTC: con toISOString()
-// una fecha de verano se iba un día atrás según la hora del navegador.
-function sumaDias(iso, dias) {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  if (isNaN(d.getTime())) return "";
-  d.setDate(d.getDate() + dias);
-  const dosCifras = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${dosCifras(d.getMonth() + 1)}-${dosCifras(d.getDate())}`;
-}
-
-// Nombre con el que el alquiler aparece en la lista de recogidas. Sin el verbo delante
-// ("Recoger sillas"): el aviso ya pone "Recogida:" o "Devolución:" según toque.
-function conceptoAlquiler(clave, proveedor) {
-  const a = ALQUILERES[clave];
-  const quien = proveedor || (a && a.proveedor);
-  return `${a ? a.etiqueta : clave}${quien ? ` (${quien})` : ""}`;
-}
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas:
 // es el buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan
 // pedir un 10-20% extra de copas y platos). Las bebidas, licores y cápsulas NO llevan
@@ -2433,6 +2411,103 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
   );
 }
 
+// ─── EL FORMULARIO DE OFICINA: EL ENLACE Y LA BANDEJA ─────────────────────────
+// Las dos puntas del canal con la oficina, en una sola pantalla: de dónde sale el
+// enlace que se les pasa, y qué han mandado por él.
+//
+// Aplicar un envío NO escribe nada a escondidas: abre el evento con los datos ya
+// puestos para que se revisen. Lo que la oficina no contestó se queda con el valor
+// por defecto de la app y sale marcado aquí, para saber qué mirar.
+function ModalFormularioOficina({
+  codigo, enlace, envios, cargando, copiado,
+  onCrear, onCambiar, onCopiar, onAplicar, onDescartar, onClose,
+}) {
+  const fmtEnviado = (e) => {
+    const s = e && e.enviado && e.enviado.seconds;
+    if (!s) return "recién";
+    return new Date(s * 1000).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  };
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={e => e.stopPropagation()}>
+        <div className="preview-header">
+          <div>
+            <div className="preview-header-title"><ClipboardCheck size={16} /> Formulario de oficina</div>
+            <div className="preview-header-subtitle">
+              {envios.length > 0 ? `${envios.length} sin revisar` : "Nada sin revisar"}
+            </div>
+          </div>
+          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar" title="Cerrar"><X size={14} /></button>
+        </div>
+        <div className="preview-body">
+          <div className="form-oficina-bloque">
+            <div className="form-oficina-titulo">El enlace para la oficina</div>
+            {!codigo ? (
+              <>
+                <p className="resumen-vacio">
+                  Se les pasa una vez y lo pueden guardar. Abre solo el formulario: desde ahí
+                  no se llega a la checklist, ni a la configuración, ni a los eventos. Verán
+                  los 8 próximos eventos (nombre, día y sitio) para elegir a cuál van los datos.
+                </p>
+                <button className="btn btn-green" onClick={onCrear}><Link2 size={15} /> Crear el enlace</button>
+              </>
+            ) : (
+              <>
+                <div className="form-oficina-enlace">
+                  <input className="form-input" type="text" readOnly value={enlace} onFocus={e => e.target.select()} />
+                  <button className="btn btn-green" onClick={onCopiar}>
+                    {copiado ? <><Check size={15} /> Copiado</> : <><ClipboardCopy size={15} /> Copiar</>}
+                  </button>
+                </div>
+                <p className="resumen-vacio">
+                  Código <strong>{codigo}</strong>. Si lo cambias, el que ya tengan deja de
+                  funcionar al momento.
+                </p>
+                <button className="btn btn-outline" onClick={onCambiar}><RefreshCw size={14} /> Cambiar el enlace</button>
+              </>
+            )}
+          </div>
+
+          <div className="form-oficina-bloque">
+            <div className="form-oficina-titulo">Lo que ha llegado</div>
+            {cargando && <p className="resumen-vacio">Mirando el buzón...</p>}
+            {!cargando && envios.length === 0 && (
+              <p className="resumen-vacio">No hay envíos sin revisar.</p>
+            )}
+            {envios.map(e => {
+              const filas = resumirEnvio(e.respuestas || {});
+              return (
+                <div className="envio-card" key={e.id}>
+                  <div className="envio-cabecera">
+                    <span className="envio-destino">
+                      {e.eventoDestino
+                        ? <><ArrowRight size={13} /> Para <strong>{e.eventoDestino}</strong></>
+                        : <><Plus size={13} /> Evento nuevo</>}
+                    </span>
+                    <span className="envio-fecha">{fmtEnviado(e)}</span>
+                  </div>
+                  <div className="envio-respuestas">
+                    {filas.map(f => (
+                      <div className={`envio-fila ${f.sinContestar ? "es-sin-contestar" : ""}`} key={f.id}>
+                        <span className="envio-preg">{f.pregunta}</span>
+                        <span className="envio-resp">{f.respuesta}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="envio-acciones">
+                    <button className="btn btn-outline" onClick={() => onDescartar(e)}>Descartar</button>
+                    <button className="btn btn-green" onClick={() => onAplicar(e)}>Aplicar y abrir</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MODAL AÑADIR VARIOS ITEMS (pegando texto) ────────────────────────────────
 // Cada línea pegada se interpreta como "nombre" o "nombre <tab/2 espacios/":"/"-"> cantidad".
 // Antes de tocar la checklist se normaliza cada nombre y se compara con lo que ya existe
@@ -2975,6 +3050,14 @@ export default function App({ onCerrarSesion } = {}) {
   // eventos guardados, no solo el que está abierto — para no olvidar recoger/devolver
   // alquileres (camión plataforma, armario caliente, flores...) de ningún evento.
   const [avisosOcultos, setAvisosOcultos] = useState(false);
+  // El formulario de oficina: el código del enlace (vive en la nube, compartido por
+  // todos los dispositivos) y lo que han mandado por él. Sin nube esto no existe y la
+  // app va exactamente igual que antes.
+  const [codigoFormulario, setCodigoFormulario] = useState("");
+  const [envios, setEnvios] = useState([]);
+  const [cargandoEnvios, setCargandoEnvios] = useState(false);
+  const [modalFormulario, setModalFormulario] = useState(false);
+  const [enlaceCopiado, setEnlaceCopiado] = useState(false);
   // ¿Hay una versión nueva publicada? Los .js llevan hash en el nombre, así que si el
   // navegador se queda con el index.html en caché sigue cargando la compilación vieja
   // para siempre y no te enteras. Se compara el id de la compilación cargada con el
@@ -3634,6 +3717,110 @@ export default function App({ onCerrarSesion } = {}) {
     setOverridesManuales(nuevosOverrides);
     setValoresCalculados(nuevoSnapshot);
     setModalRecalcular(null);
+  };
+  // ── El formulario de oficina ──────────────────────────────────────────────
+  // El código se lee una vez al abrir; con él ya se puede mirar el buzón.
+  useEffect(() => {
+    if (!nubeActiva()) return;
+    let vivo = true;
+    leerCodigoFormulario().then(c => {
+      if (!vivo || !c) return;
+      setCodigoFormulario(c);
+      refrescarEnviosRef.current(c);
+    }).catch(() => { /* sin conexión: ya se verá al abrir la bandeja */ });
+    return () => { vivo = false; };
+  }, []);
+  // La lista corta que ve la oficina se republica cuando cambian los eventos. Va con
+  // retardo para no escribir en la nube en cada tecleo mientras se edita un nombre.
+  useEffect(() => {
+    if (!codigoFormulario || !nubeActiva()) return;
+    const t = setTimeout(() => {
+      publicarProximos(codigoFormulario, eventosGuardadosRef.current).catch(() => { /* se reintenta al siguiente cambio */ });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [codigoFormulario, eventosGuardados]);
+  const enlaceFormulario = codigoFormulario
+    ? `${window.location.origin}${window.location.pathname}?enviar=${codigoFormulario}`
+    : "";
+  const refrescarEnvios = async (codigo = codigoFormulario) => {
+    if (!codigo || !nubeActiva()) return;
+    setCargandoEnvios(true);
+    try { setEnvios(await leerEnvios()); }
+    catch (e) { /* sin conexión: se queda con lo que ya tenía */ }
+    finally { setCargandoEnvios(false); }
+  };
+  // El efecto de arranque necesita esta función, pero no puede depender de ella sin
+  // volver a ejecutarse en cada render: se le pasa por un ref siempre fresco.
+  const refrescarEnviosRef = React.useRef(refrescarEnvios);
+  refrescarEnviosRef.current = refrescarEnvios;
+  const handleCrearCodigoFormulario = async () => {
+    const codigo = nuevoCodigo();
+    try {
+      await guardarCodigoFormulario(codigo);
+      await publicarProximos(codigo, eventosGuardadosRef.current);
+      setCodigoFormulario(codigo);
+      refrescarEnvios(codigo);
+    } catch (e) { avisarFalloNube(e); }
+  };
+  const handleCambiarCodigoFormulario = () => setDialogo({
+    tipo: "confirm",
+    titulo: "¿Cambiar el enlace del formulario?",
+    mensaje: "El que ya tenga la oficina dejará de funcionar al momento y habrá que pasarles el nuevo. Lo que ya han mandado no se pierde.",
+    textoConfirmar: "Cambiar el enlace",
+    onConfirm: async () => {
+      const viejo = codigoFormulario;
+      await handleCrearCodigoFormulario();
+      if (viejo) borrarProximos(viejo).catch(() => { /* si no se puede borrar, el nuevo manda igual */ });
+    },
+  });
+  const handleCopiarEnlaceFormulario = () => {
+    navigator.clipboard.writeText(enlaceFormulario).then(() => {
+      setEnlaceCopiado(true);
+      setTimeout(() => setEnlaceCopiado(false), 2500);
+    }).catch(() => {
+      window.prompt("No se pudo copiar automáticamente. Copia el enlace:", enlaceFormulario);
+    });
+  };
+  const handleDescartarEnvio = (envio) => setDialogo({
+    tipo: "confirm",
+    titulo: "¿Descartar este envío?",
+    mensaje: "Se borra del buzón y no se aplica nada. Si hace falta, tendrán que volver a mandarlo.",
+    textoConfirmar: "Descartar",
+    onConfirm: async () => {
+      try { await borrarEnvio(envio.id); } catch (e) { avisarFalloNube(e); }
+      setEnvios(prev => prev.filter(x => x.id !== envio.id));
+    },
+  });
+  // Aplicar = abrir el evento con lo contestado ya puesto. No se escribe nada por
+  // detrás en un evento que no estás mirando: lo que llega de fuera se revisa.
+  const handleAplicarEnvio = (envio) => {
+    const cambios = aRespuestasDeLaApp(envio.respuestas || {});
+    const destino = envio.eventoDestino || cambios.nombreEvento || "";
+    const guardados = eventosGuardadosRef.current || {};
+    const existe = !!(destino && guardados[destino]);
+    const nombre = destino || "Evento del formulario";
+    setDialogo({
+      tipo: "confirm",
+      titulo: existe ? `¿Aplicar al evento "${nombre}"?` : `¿Crear el evento "${nombre}"?`,
+      mensaje: existe
+        ? "Se abre el evento con los datos del formulario puestos encima de lo que ya tenía. Lo que la oficina no contestó se queda como está."
+        : "Se crea el evento con lo que ha contestado la oficina; el resto se queda con los valores de siempre para que lo revises.",
+      textoConfirmar: existe ? "Aplicar y abrir" : "Crear y abrir",
+      onConfirm: async () => {
+        const base = existe ? guardados[destino] : {};
+        const estado = { ...base, ...cambios, nombreEvento: nombre };
+        // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
+        // si no, la app cargaría el material y nadie iría a buscarlo.
+        estado.recogidas = recogidasConAlquileres(estado);
+        const siguiente = { ...guardados, [nombre]: estado };
+        guardarEventos(siguiente);
+        try { await borrarEnvio(envio.id); } catch (e) { /* ya se verá en el buzón */ }
+        try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); }
+        catch (e) { /* localStorage no disponible */ }
+        marcarEventoActivo(nombre);
+        window.location.href = window.location.origin + window.location.pathname;
+      },
+    });
   };
   const handleCargarEvento = (nombre) => {
     if (!eventosGuardados[nombre]) return;
@@ -4318,6 +4505,21 @@ export default function App({ onCerrarSesion } = {}) {
           onClose={() => setModoCarga(false)}
         />
       )}
+      {modalFormulario && (
+        <ModalFormularioOficina
+          codigo={codigoFormulario}
+          enlace={enlaceFormulario}
+          envios={envios}
+          cargando={cargandoEnvios}
+          copiado={enlaceCopiado}
+          onCrear={handleCrearCodigoFormulario}
+          onCambiar={handleCambiarCodigoFormulario}
+          onCopiar={handleCopiarEnlaceFormulario}
+          onAplicar={handleAplicarEnvio}
+          onDescartar={handleDescartarEnvio}
+          onClose={() => setModalFormulario(false)}
+        />
+      )}
       {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
       {modalRecalcular && <ModalRecalcular cambios={modalRecalcular} onClose={() => setModalRecalcular(null)} onAplicar={handleAplicarRecalculo} />}
@@ -4407,6 +4609,18 @@ export default function App({ onCerrarSesion } = {}) {
                     <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>
                     <button onClick={handleCompartirWhatsapp}><MessageCircle size={15} /> WhatsApp (texto)</button>
                     <button onClick={handleCompartirTexto}><ClipboardCopy size={15} /> Copiar texto</button>
+                    {/* El canal con la oficina: el enlace que se les pasa y lo que
+                        mandan por él. Vive aquí y no en la cabecera, que en el móvil
+                        ya iba justa de sitio. */}
+                    {nubeActiva() && (
+                      <>
+                        <div className="compartir-menu-sep" />
+                        <button onClick={() => { setMenuCompartir(false); setModalFormulario(true); refrescarEnvios(); }}>
+                          <ClipboardCheck size={15} /> Formulario de oficina
+                          {envios.length > 0 && <span className="menu-badge">{envios.length}</span>}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -4472,6 +4686,19 @@ export default function App({ onCerrarSesion } = {}) {
               </span>
             </div>
             <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Si la oficina ha mandado algo, se dice aquí: en el menú de Compartir hay un
+            contador, pero eso hay que abrirlo para verlo y estos datos caducan. */}
+        {envios.length > 0 && !modalFormulario && (
+          <div className="envios-aviso" role="status">
+            <ClipboardCheck size={16} />
+            <span>
+              <strong>{envios.length === 1 ? "1 envío" : `${envios.length} envíos`} de la oficina</strong>
+              {" "}sin revisar
+            </span>
+            <button className="btn btn-green" onClick={() => { setModalFormulario(true); refrescarEnvios(); }}>Ver</button>
           </div>
         )}
 
