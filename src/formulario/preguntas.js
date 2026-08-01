@@ -47,7 +47,7 @@ export const PREGUNTAS = [
   },
   {
     id: "cuando", tipo: "cuando", texto: "¿Qué día y a qué hora?",
-    nota: "La hora de fin es para calcular los horarios del equipo de logística.",
+    nota: "La hora de fin la usa logística para cuadrar los horarios del equipo.",
   },
   {
     id: "gente", tipo: "numeros", texto: "¿Cuánta gente?",
@@ -69,6 +69,19 @@ export const PREGUNTAS = [
     nota: "Si no, se cargan carpas con sus paredes y sus pesas.",
     opciones: [{ valor: "si", texto: "Sí, hay" }, { valor: "no", texto: "No hay" }],
     soloEn: ["produccion"],
+  },
+  {
+    // Solo tiene sentido si van carpas, y solo van si no hay sombra. Sin esto la app
+    // cargaba las carpas pero no creaba su recogida en SOS, que es la parte que se
+    // olvida y deja al equipo sin carpas el día del rodaje.
+    id: "carpasAlquiler", tipo: "opciones", texto: "Las carpas, ¿son nuestras o hay que alquilarlas?",
+    nota: "Tenemos 8 en el almacén. Las de alquiler van a Support On Set, con su recogida y su devolución.",
+    opciones: [
+      { valor: "nuestras", texto: "Las nuestras" },
+      { valor: "sos", texto: "Hay que alquilarlas (SOS)" },
+    ],
+    soloEn: ["produccion"],
+    si: (r) => r.sombra === "no",
   },
   {
     id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
@@ -145,11 +158,15 @@ export const PREGUNTAS = [
     ],
   },
   {
-    id: "sillas", tipo: "opciones", texto: "¿Las sillas las pone la finca?",
-    nota: "Si las llevamos nosotros, se alquilan y se crea su recogida.",
+    id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
+    // Cuántas no se pregunta: salen del pax. A quién se alquilan sí, porque cada
+    // proveedor es una recogida distinta y es lo único que la app no puede deducir.
+    nota: "Si las alquilamos, se crea sola su recogida y su devolución.",
     opciones: [
-      { valor: "finca", texto: "Sí, las pone la finca" },
-      { valor: "nosotros", texto: "No, las llevamos nosotros" },
+      { valor: "finca", texto: "Las pone la finca" },
+      { valor: "Dealde", texto: "Las alquilamos a Dealde" },
+      { valor: "Carvillo", texto: "Las alquilamos a Carvillo" },
+      { valor: "Nuestras", texto: "Llevamos las nuestras" },
     ],
     soloEn: CON_BARRA,
   },
@@ -162,14 +179,59 @@ export const PREGUNTAS = [
   },
 ];
 
-// Preguntas que le tocan a un tipo de evento
-export function preguntasDe(tipo) {
-  return PREGUNTAS.filter(p => !p.soloEn || p.soloEn.includes(tipo));
+// Preguntas que le tocan a un tipo de evento. Algunas dependen de otra respuesta
+// (`si`): preguntar por las carpas de alquiler cuando ni siquiera van carpas sería
+// una pantalla de más, y este formulario se rellena de pie y con prisa.
+export function preguntasDe(tipo, respuestas = null) {
+  return PREGUNTAS.filter(p => (!p.soloEn || p.soloEn.includes(tipo))
+    && (!p.si || (respuestas !== null && p.si(respuestas))));
 }
 
 // Opciones de una pregunta de marcar, filtradas por tipo de evento
 export function opcionesDe(pregunta, tipo) {
   return (pregunta.opciones || []).filter(o => !o.soloEn || o.soloEn.includes(tipo));
+}
+
+export const fmtFechaCorta = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+};
+
+// Una respuesta en palabras. Lo usan las dos puntas: el repaso antes de enviar y la
+// bandeja de la app, para que quien revisa el envío lea exactamente lo mismo que vio
+// quien lo mandó. Vive aquí, con el guion, y no en una de las dos pantallas.
+export function resumirRespuesta(p, r, tipo) {
+  const v = r[p.id];
+  if (p.tipo === "textos") return p.campos.map(c => r[c.id]).filter(Boolean).join(" · ") || "sin contestar";
+  if (p.tipo === "numeros") return p.campos.map(c => r[c.id] ? `${r[c.id]} ${c.etiqueta.toLowerCase()}` : "").filter(Boolean).join(" · ") || "sin contestar";
+  if (p.tipo === "cuando") return [fmtFechaCorta(r.fecha), r.horaInicio, r.horaFin && `a ${r.horaFin}`].filter(Boolean).join(" · ") || "sin contestar";
+  if (p.tipo === "texto-largo") return r.notas ? r.notas.slice(0, 60) : "nada";
+  if (p.tipo === "dias") {
+    const d = (r.dias || []).filter(Boolean);
+    return d.length ? `${d.join(" + ")} en ${d.length} días` : "sin contestar";
+  }
+  if (v === null || v === undefined) return "no lo sé";
+  if (p.tipo === "horas") return v === 0 ? "no hay" : `${v}h`;
+  if (p.tipo === "marcar") {
+    if (!v.length) return "nada";
+    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => o.texto).join(", ");
+  }
+  const op = (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).find(o => o.valor === v);
+  return op ? op.texto : String(v);
+}
+
+// El envío entero en palabras, para la bandeja: pregunta y respuesta, en el orden en
+// que se contestaron, marcando lo que se dejó sin contestar.
+export function resumirEnvio(respuestas = {}) {
+  const tipo = respuestas.tipo || "boda";
+  return preguntasDe(tipo, respuestas).map(p => ({
+    id: p.id,
+    pregunta: p.texto,
+    respuesta: resumirRespuesta(p, respuestas, tipo),
+    sinContestar: respuestas[p.id] === undefined || respuestas[p.id] === null,
+  }));
 }
 
 // ─── RESPUESTAS → CONFIGURACIÓN DE LA APP ──────────────────────────────────────
@@ -188,12 +250,15 @@ export function aRespuestasDeLaApp(r = {}) {
   pon("ubicacion", r.sitio);
   pon("fechaEvento", r.fecha);
   pon("horaInicio", r.horaInicio);
-  pon("horaFin", r.horaFin);
+  // La hora de FIN no es un campo del evento: en la app el horario vive en el equipo de
+  // logística, persona a persona, y eso no lo decide la oficina. Viaja en el envío y la
+  // bandeja la enseña para cuadrar el equipo al aceptarlo, pero no se escribe sola.
   pon("notasEvento", r.notas);
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
     if (puesto(r.sombra)) estado.llevaCarpas = r.sombra === "no";
+    if (puesto(r.carpasAlquiler)) estado.alquilaCarpas = r.carpasAlquiler === "sos";
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
     // En un rodaje las sillas son nuestras: no se pregunta y no genera recogida
     estado.origenSillas = "Nuestras";
@@ -217,7 +282,9 @@ export function aRespuestasDeLaApp(r = {}) {
         if (cuantos > 0) estado.numEntrantesCompartir = cuantos;
       }
     }
-    if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : "Dealde";
+    // "finca" = no las llevamos nosotros; el resto es literalmente el valor que usa la
+    // app (Dealde / Carvillo / Nuestras), y solo los dos primeros crean recogida
+    if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (Array.isArray(r.extras)) {
       estado.tieneBrindisCava = marcado("extras", "brindis");
       estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";
@@ -247,7 +314,7 @@ export function aRespuestasDeLaApp(r = {}) {
 // Qué campos ha decidido la app por su cuenta (no los ha contestado nadie). Sirve
 // para enseñarlos en otro color en la bandeja: de un vistazo se ve qué revisar.
 export function camposSinContestar(r = {}, tipo = "boda") {
-  return preguntasDe(tipo)
+  return preguntasDe(tipo, r)
     .filter(p => r[p.id] === undefined || r[p.id] === null)
     .map(p => p.id);
 }

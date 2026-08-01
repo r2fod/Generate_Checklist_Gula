@@ -3004,6 +3004,122 @@ hr {
   margin: 0;
 }
 
+/* ─── FORMULARIO DE OFICINA: ENLACE Y BANDEJA ─────────────────────────────────
+   El enlace y lo que llega por él. Todo se apila en una columna y los botones
+   crecen a lo ancho en móvil: se usa con una mano y con prisa. */
+.form-oficina-bloque {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.form-oficina-bloque:last-child { border-bottom: none; }
+
+.form-oficina-titulo {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
+.form-oficina-enlace {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.form-oficina-enlace .form-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Un envío: de quién es, qué contestaron y qué hacer con él */
+.envio-card {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-color);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.envio-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.envio-destino {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.88rem;
+  color: var(--text-main);
+}
+.envio-destino svg { color: var(--accent); flex-shrink: 0; }
+.envio-fecha { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+
+.envio-respuestas { display: flex; flex-direction: column; gap: 4px; }
+.envio-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.envio-preg { color: var(--text-muted); min-width: 0; }
+.envio-resp { font-weight: 700; color: var(--text-main); text-align: right; min-width: 0; }
+/* Lo que no contestaron se ve de un vistazo: es justo lo que hay que revisar */
+.envio-fila.es-sin-contestar .envio-resp { font-weight: 500; font-style: italic; color: var(--text-muted); }
+
+.envio-acciones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* Contador en el menú de Compartir */
+.menu-badge {
+  margin-left: auto;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-align: center;
+}
+
+/* Aviso de portada cuando hay envíos sin revisar */
+.envios-aviso {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--aviso-bg);
+  border: 1px solid var(--border-color);
+  font-size: 0.88rem;
+}
+.envios-aviso > svg { color: var(--accent); flex-shrink: 0; }
+.envios-aviso > span { flex: 1 1 160px; min-width: 0; }
+.envios-aviso .btn { flex-shrink: 0; }
+
+@media (max-width: 560px) {
+  .form-oficina-bloque { padding: 14px 16px; }
+  /* Con poco ancho, pregunta y respuesta en dos líneas se leen mejor que apretadas */
+  .envio-fila { flex-direction: column; gap: 1px; }
+  .envio-resp { text-align: left; }
+  .envio-acciones .btn { flex: 1 1 0; justify-content: center; }
+}
+
 .resumen-tabla-wrap {
   overflow-x: auto;
   border: 1px solid var(--border-color);

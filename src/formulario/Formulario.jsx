@@ -6,17 +6,10 @@
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo } from "react";
-import { preguntasDe, opcionesDe, TIPOS_EVENTO } from "./preguntas.js";
+import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, enviarFormulario } from "./envios.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
-
-const fmtFecha = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
-};
 
 export default function Formulario({ codigo }) {
   const clave = `gula_formulario_${codigo}`;
@@ -51,9 +44,12 @@ export default function Formulario({ codigo }) {
   }, [clave, respuestas, paso, eventoDestino]);
 
   const tipo = respuestas.tipo || "boda";
-  const preguntas = useMemo(() => preguntasDe(tipo)
+  // Hay preguntas que dependen de otra respuesta (las carpas de alquiler solo si no hay
+  // sombra), así que la lista se recalcula con lo contestado hasta ahora. La condicional
+  // va justo detrás de la que la dispara, así que el paso siguiente cae en ella sola.
+  const preguntas = useMemo(() => preguntasDe(tipo, respuestas)
     // Si han elegido un evento que ya existe, el tipo ya lo sabemos: no se pregunta
-    .filter(p => !(p.id === "tipo" && eventoDestino)), [tipo, eventoDestino]);
+    .filter(p => !(p.id === "tipo" && eventoDestino)), [tipo, eventoDestino, respuestas]);
 
   const pon = (campo, valor) => setRespuestas(r => ({ ...r, [campo]: valor }));
   const siguiente = () => setPaso(p => Math.min(p + 1, preguntas.length));
@@ -317,22 +313,3 @@ export default function Formulario({ codigo }) {
 }
 
 // Cómo se resume cada respuesta en la pantalla de repaso
-function resumirRespuesta(p, r, tipo) {
-  const v = r[p.id];
-  if (p.tipo === "textos") return p.campos.map(c => r[c.id]).filter(Boolean).join(" · ") || "sin contestar";
-  if (p.tipo === "numeros") return p.campos.map(c => r[c.id] ? `${r[c.id]} ${c.etiqueta.toLowerCase()}` : "").filter(Boolean).join(" · ") || "sin contestar";
-  if (p.tipo === "cuando") return [fmtFecha(r.fecha), r.horaInicio, r.horaFin && `a ${r.horaFin}`].filter(Boolean).join(" · ") || "sin contestar";
-  if (p.tipo === "texto-largo") return r.notas ? r.notas.slice(0, 60) : "nada";
-  if (p.tipo === "dias") {
-    const d = (r.dias || []).filter(Boolean);
-    return d.length ? `${d.join(" + ")} en ${d.length} días` : "sin contestar";
-  }
-  if (v === null || v === undefined) return "no lo sé";
-  if (p.tipo === "horas") return v === 0 ? "no hay" : `${v}h`;
-  if (p.tipo === "marcar") {
-    if (!v.length) return "nada";
-    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => o.texto).join(", ");
-  }
-  const op = (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).find(o => o.valor === v);
-  return op ? op.texto : String(v);
-}

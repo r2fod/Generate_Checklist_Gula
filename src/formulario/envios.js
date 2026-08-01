@@ -61,6 +61,15 @@ export async function publicarProximos(codigo, eventosGuardados) {
   });
 }
 
+// Cambiar el enlace tiene que MATAR el anterior: si el documento viejo se quedara ahí,
+// quien tuviera el link de antes seguiría viendo la lista de eventos y mandando cosas.
+export async function borrarProximos(codigo) {
+  const conexion = await getDb();
+  if (!conexion || !codigo) return;
+  const { db, fs } = conexion;
+  await fs.deleteDoc(fs.doc(db, "publico", codigo));
+}
+
 // El formulario lee la lista con su código. Distingue tres cosas, porque no son lo
 // mismo: que el código no valga (hay que cerrar el formulario), que no haya conexión
 // (se puede seguir rellenando) y que valga pero no haya eventos próximos.
