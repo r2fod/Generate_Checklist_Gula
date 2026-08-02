@@ -51,6 +51,11 @@ export default function Formulario({ codigo }) {
     // Si han elegido un evento que ya existe, el tipo ya lo sabemos: no se pregunta
     .filter(p => !(p.id === "tipo" && eventoDestino)), [tipo, eventoDestino, respuestas]);
 
+  // Los sitios de los próximos eventos, para ofrecerlos al escribir el sitio
+  const sitiosConocidos = useMemo(
+    () => [...new Set((proximos || []).map(e => (e.sitio || "").trim()).filter(Boolean))],
+    [proximos]);
+
   const pon = (campo, valor) => setRespuestas(r => ({ ...r, [campo]: valor }));
   const siguiente = () => setPaso(p => Math.min(p + 1, preguntas.length));
   const atras = () => setPaso(p => p - 1);
@@ -219,11 +224,20 @@ export default function Formulario({ codigo }) {
             <span>{c.etiqueta}</span>
             <input
               type="text" className="form-input" placeholder={c.ejemplo}
+              // Los sitios donde ya se ha trabajado se ofrecen escritos como están en la
+              // app: "Mas de León" y "mas de leon" son el mismo sitio para una persona,
+              // pero dos distintos en una lista, y luego no cuadra nada.
+              list={c.sugerencias === "sitiosRecientes" ? "form-sitios" : undefined}
               value={respuestas[c.id] ?? ""}
               onChange={e => pon(c.id, e.target.value)}
             />
           </label>
         ))}
+        {p.tipo === "textos" && sitiosConocidos.length > 0 && (
+          <datalist id="form-sitios">
+            {sitiosConocidos.map(s => <option value={s} key={s} />)}
+          </datalist>
+        )}
 
         {p.tipo === "numeros" && p.campos.map(c => (
           <label className="form-campo" key={c.id}>
