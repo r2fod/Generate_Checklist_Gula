@@ -15,6 +15,35 @@ import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+// La hora, con dos desplegables en vez del <input type="time">. El selector de reloj
+// de Android es un diálogo del sistema: con la letra grande se recorta el botón de
+// "Establecer" y no hay CSS que lo arregle, porque no es nuestro. Dos <select> los
+// dibuja el sistema como una lista y nunca se salen.
+const DOS = (n) => String(n).padStart(2, "0");
+const HORAS_DIA = Array.from({ length: 24 }, (_, i) => DOS(i));
+const MINUTOS = Array.from({ length: 12 }, (_, i) => DOS(i * 5));
+
+function CampoHora({ etiqueta, valor, onCambio }) {
+  const [h, m] = (valor || "").split(":");
+  const poner = (hh, mm) => onCambio(hh && mm ? `${hh}:${mm}` : "");
+  return (
+    <label className="form-campo">
+      <span>{etiqueta}</span>
+      <div className="form-hora-campos">
+        <select className="form-input" value={h || ""} onChange={e => poner(e.target.value, m || "00")}>
+          <option value="">--</option>
+          {HORAS_DIA.map(x => <option key={x} value={x}>{x}</option>)}
+        </select>
+        <span className="form-hora-sep">:</span>
+        <select className="form-input" value={m || ""} onChange={e => poner(h || "00", e.target.value)}>
+          <option value="">--</option>
+          {MINUTOS.map(x => <option key={x} value={x}>{x}</option>)}
+        </select>
+      </div>
+    </label>
+  );
+}
+
 // El logo, para que quien rellena esto sepa de quién es el formulario. Entra con un
 // gesto corto la primera vez y luego se queda quieto: es una marca, no un anuncio.
 function LogoGula({ grande = false, pequeno = false }) {
@@ -638,12 +667,8 @@ export default function Formulario({ codigo }) {
             <label className="form-campo"><span>Día</span>
               <input type="date" className="form-input" value={respuestas.fecha ?? ""} onChange={e => pon("fecha", e.target.value)} />
             </label>
-            <label className="form-campo"><span>Empieza</span>
-              <input type="time" className="form-input" value={respuestas.horaInicio ?? ""} onChange={e => pon("horaInicio", e.target.value)} />
-            </label>
-            <label className="form-campo"><span>Termina</span>
-              <input type="time" className="form-input" value={respuestas.horaFin ?? ""} onChange={e => pon("horaFin", e.target.value)} />
-            </label>
+            <CampoHora etiqueta="Empieza" valor={respuestas.horaInicio} onCambio={v => pon("horaInicio", v)} />
+            <CampoHora etiqueta="Termina" valor={respuestas.horaFin} onCambio={v => pon("horaFin", v)} />
           </>
         )}
 

@@ -603,3 +603,76 @@ console.log("\n══ Compras que trae el envío ══");
   ok(filas.find(f => f.id === "notas").respuesta === "Alergia al marisco",
     "y no se mezclan con las notas del evento");
 }
+
+// ── El armario caliente también es alquiler ───────────────────────────────────
+// Se pide a Dealde: no basta con cargarlo en la checklist, hay que ir a buscarlo y
+// devolverlo. Si no viaja en el envío, la app lo carga y nadie va a por él.
+console.log("\n══ Armario caliente ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const { recogidasConAlquileres } = await import("../alquileres.js");
+
+  const con = aRespuestasDeLaApp({ tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100, armarioCaliente: "si" });
+  ok(con.llevaArmarioCaliente === true, "marcarlo llega a la app");
+  const r = recogidasConAlquileres(con);
+  ok(r.some(x => x.concepto === "Armario caliente (Dealde)" && x.fecha === "2027-08-10" && x.fechaDevolucion === "2027-08-12"),
+    `y trae su recogida en Dealde con sus fechas → ${JSON.stringify(r.map(x => x.concepto))}`);
+
+  const sin = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, armarioCaliente: "no" });
+  ok(sin.llevaArmarioCaliente === false && recogidasConAlquileres(sin).length === 0,
+    "decir que no lleva no crea ninguna recogida");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 100 }).llevaArmarioCaliente === undefined,
+    "y si no lo contestan, se queda lo que tuviera la app");
+
+  const ids = (t) => resumirEnvio({ tipo: t }).map(f => f.id);
+  ok(ids("boda").includes("armarioCaliente") && ids("cumpleanos").includes("armarioCaliente"),
+    "se pregunta en los eventos de salón");
+  ok(!ids("produccion").includes("armarioCaliente"),
+    "y no en un rodaje, que ahí no se lleva");
+}
+
+// ── Lo que se presupuesta aparte ──────────────────────────────────────────────
+// Jarras, aguas pequeñas y cuántos barriles. Van dentro de "¿está presupuestado
+// algo de esto?" y no en preguntas propias: son tres cosas que se marcan de un
+// vistazo y el formulario ya tiene quince pantallas.
+console.log("\n══ Jarras, aguas y barriles ══");
+{
+  const { aRespuestasDeLaApp, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const extras = PREGUNTAS.find(p => p.id === "extras");
+  const ops = (t) => opcionesDe(extras, t).map(o => o.valor);
+
+  ok(ops("boda").includes("jarras") && !ops("cumpleanos").includes("jarras"),
+    "las jarras se ofrecen donde la app las tiene: no en cumpleaños ni en rodaje");
+  ok(!ops("boda").includes("aguasPequenas"),
+    "las aguas pequeñas no se preguntan aquí: son cosa de rodaje y allí van siempre");
+
+  const e = aRespuestasDeLaApp({
+    tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100,
+    extras: ["barril50", "jarras"], numBarriles: 3,
+  });
+  ok(e.tamanoBarril === "50L" && e.numBarriles === 3,
+    `el barril lleva su tamaño y cuántos → ${e.tamanoBarril} ×${e.numBarriles}`);
+  ok(e.llevaJarrasCristal === true, "y las jarras llegan marcadas");
+
+  const sinBarril = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: ["jarras"], numBarriles: 3 });
+  ok(sinBarril.numBarriles === undefined,
+    "sin barril marcado no se cuela un número de barriles");
+  const nada = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: [] });
+  ok(nada.llevaJarrasCristal === false,
+    "y decir que no hay nada presupuestado es una respuesta, no un hueco");
+}
+
+// ── Aguas pequeñas: en rodaje van siempre, lo que cambia es el envase ─────────
+// La app tenía el interruptor al revés: lo ofrecía en los eventos de salón, cuando
+// las cajas de 33cl son el agua de beber de todo el día en un rodaje.
+console.log("\n══ Envase de las aguas pequeñas ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const e = aRespuestasDeLaApp({ tipo: "produccion", nombre: "R", fecha: "2027-08-11", dias: [30], aguaPequena: "Cartón" });
+  ok(e.tipoAguaPequena === "Cartón", `el envase viaja a la app → ${e.tipoAguaPequena}`);
+  ok(aRespuestasDeLaApp({ tipo: "produccion", dias: [30] }).tipoAguaPequena === undefined,
+    "y sin contestar no se inventa: se queda como estaba");
+  const ids = (t) => resumirEnvio({ tipo: t }).map(f => f.id);
+  ok(ids("produccion").includes("aguaPequena") && !ids("boda").includes("aguaPequena"),
+    "solo se pregunta en rodaje");
+}

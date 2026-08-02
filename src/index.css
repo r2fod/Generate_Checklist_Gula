@@ -4958,3 +4958,15 @@ hr {
   font-style: italic;
   opacity: 0.75;
 }
+
+/* La hora, en dos desplegables: el selector de reloj del sistema se recorta con la
+   letra grande de algunos móviles y no es maquetable desde aquí */
+.form-hora-campos { display: flex; align-items: center; gap: 8px; }
+.form-hora-campos .form-input {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+  text-align: center;
+  font-size: 1rem;
+}
+.form-hora-sep { font-weight: 800; color: var(--text-muted); }
