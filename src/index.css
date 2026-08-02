@@ -4721,3 +4721,156 @@ hr {
   color: var(--text-muted);
 }
 .envio-ver-revisados { align-self: flex-start; }
+
+/* Lo que han adjuntado en el envío: el menú a imprimir o la imagen de etiquetas */
+.envio-archivos { display: flex; flex-wrap: wrap; gap: 8px; }
+.envio-archivo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-bg);
+  text-decoration: none;
+  color: var(--text-main);
+  max-width: 100%;
+}
+.envio-archivo:hover { border-color: var(--accent); }
+.envio-archivo-mini {
+  width: 38px; height: 38px; object-fit: cover; border-radius: 7px; flex-shrink: 0;
+}
+.envio-archivo-icono {
+  width: 38px; height: 38px; border-radius: 7px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-color); color: var(--accent);
+}
+.envio-archivo-texto {
+  display: flex; flex-direction: column; min-width: 0;
+  font-size: 0.82rem; font-weight: 700;
+}
+.envio-archivo-texto em {
+  font-style: normal; font-weight: 500; font-size: 0.74rem; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Formulario: campos que cuelgan de una opción (a quién, qué día) y adjuntar */
+.form-subcampo-largo { margin-top: 8px; }
+.form-archivo {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.form-archivo-etiqueta { font-size: 0.86rem; font-weight: 700; color: var(--text-main); }
+.form-archivo-botones { display: flex; gap: 8px; }
+.form-archivo-botones .form-btn-atras { flex: 1; }
+.form-archivo-puesto { display: flex; align-items: center; gap: 10px; }
+.form-archivo-miniatura { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.form-archivo-icono {
+  width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-color); color: var(--accent); font-weight: 800; font-size: 0.75rem;
+}
+.form-archivo-nombre {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.form-archivo-nombre em { font-style: normal; font-size: 0.76rem; color: var(--text-muted); }
+.form-archivo-quitar {
+  background: none; border: none; color: var(--text-muted);
+  text-decoration: underline; cursor: pointer; font-size: 0.82rem;
+  padding: 10px 6px; min-height: 40px; flex-shrink: 0;
+}
+
+/* Lo que ya se ha mandado desde este móvil, para volver a ello y cambiarlo */
+.form-mios { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.form-mios-titulo {
+  font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--text-muted);
+}
+.form-mio { border-style: dashed; }
+
+/* Un envío que la oficina ha corregido después de mandarlo */
+.envio-corregido {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* A quién se avisa por WhatsApp: nombre + móvil, uno por línea */
+.aviso-contacto { display: flex; gap: 8px; width: 100%; align-items: center; }
+.aviso-contacto .form-input { flex: 1 1 120px; min-width: 0; }
+.aviso-contacto-quitar {
+  flex-shrink: 0; width: 40px; min-height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--border-color); border-radius: 10px;
+  color: var(--text-muted); cursor: pointer;
+}
+.aviso-contacto-quitar:hover { color: var(--peligro, #dc2626); border-color: currentColor; }
+@media (max-width: 480px) {
+  /* Con poco ancho, el nombre arriba y el móvil debajo: apretados no se leen */
+  .aviso-contacto { flex-wrap: wrap; }
+  .aviso-contacto .form-input { flex: 1 1 100%; }
+  .aviso-contacto-quitar { margin-left: auto; }
+}
+
+/* Avisar por WhatsApp al terminar de mandar */
+.form-avisar { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.form-btn-whatsapp {
+  display: flex; align-items: center; justify-content: center;
+  text-decoration: none; background: #25d366; color: #05320f;
+}
+.form-btn-whatsapp:hover { filter: brightness(1.05); }
+
+/* Avisar por WhatsApp desde la bandeja: es logística quien avisa, no la oficina */
+.envio-avisar { display: flex; flex-wrap: wrap; gap: 6px; }
+.envio-avisar-btn { text-decoration: none; }
+
+/* El aviso del formulario lleva varias acciones: que envuelvan en móvil */
+.cambios-remotos-banner { flex-wrap: wrap; }
+.cambios-remotos-banner .btn { flex-shrink: 0; text-decoration: none; }
+
+/* ─── EL LOGO EN EL FORMULARIO ─────────────────────────────────────────────────
+   Marca sin estorbar: entra una vez con un gesto corto y se queda quieto. En las
+   preguntas va pequeño y arriba, para no comerle sitio a lo que hay que contestar. */
+.form-logo {
+  display: flex;
+  justify-content: center;
+  animation: form-logo-entra 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.form-logo img {
+  height: 44px;
+  width: auto;
+  max-width: 70%;
+  object-fit: contain;
+}
+.form-logo.es-grande img { height: 62px; }
+.form-logo.es-pequeno {
+  justify-content: flex-start;
+  margin-bottom: -2px;
+}
+.form-logo.es-pequeno img { height: 26px; opacity: 0.85; }
+:root[data-tema="oscuro"] .form-logo img { filter: brightness(0) invert(1); opacity: 0.92; }
+
+@keyframes form-logo-entra {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Un latido muy suave al abrir, solo en la primera pantalla */
+.form-logo.es-grande img { animation: form-logo-late 4s ease-in-out 1s infinite; }
+@keyframes form-logo-late {
+  0%, 92%, 100% { transform: scale(1); }
+  96% { transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form-logo, .form-logo.es-grande img { animation: none; }
+}

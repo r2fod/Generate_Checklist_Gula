@@ -22,6 +22,8 @@
 //   opciones  · para las de elegir
 //   noSe      · si admite "No lo sé" (por defecto sí; el id se guarda como null)
 
+import { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } from "../carpas.js";
+
 export const TIPOS_EVENTO = [
   { valor: "boda", texto: "Boda" },
   { valor: "comunion", texto: "Comunión o bautizo" },
@@ -69,23 +71,31 @@ export const PREGUNTAS = [
     soloEn: ["produccion"],
   },
   {
-    id: "sombra", tipo: "opciones", texto: "¿Hay sombra o sitio techado?",
-    nota: "Si no, se cargan carpas con sus paredes y sus pesas.",
-    opciones: [{ valor: "si", texto: "Sí, hay" }, { valor: "no", texto: "No hay" }],
-    soloEn: ["produccion"],
-  },
-  {
-    // Solo tiene sentido si van carpas, y solo van si no hay sombra. Sin esto la app
-    // cargaba las carpas pero no creaba su recogida en SOS, que es la parte que se
-    // olvida y deja al equipo sin carpas el día del rodaje.
-    id: "carpasAlquiler", tipo: "opciones", texto: "Las carpas, ¿son nuestras o hay que alquilarlas?",
-    nota: "Tenemos 8 en el almacén. Las de alquiler van a Support On Set, con su recogida y su devolución.",
+    // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
+    // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
+    // número que sale de la gente, que se puede cambiar: quien rellena esto no tiene
+    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos.
+    id: "carpas", tipo: "opciones", texto: "¿Hacen falta carpas?",
+    nota: (r) => {
+      const pax = paxDelDiaGrande(r.dias);
+      if (!pax) return `Tenemos ${CARPAS_EN_ALMACEN} en el almacén; de las que falten se avisa para alquilarlas.`;
+      return `Con ${pax} personas el día de más gente salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
+    },
     opciones: [
-      { valor: "nuestras", texto: "Las nuestras" },
-      { valor: "sos", texto: "Hay que alquilarlas (SOS)" },
+      { valor: "no", texto: "No hacen falta" },
+      {
+        valor: "si", texto: "Sí",
+        conNumero: "¿Cuántas?",
+        campoNumero: "numCarpas",
+        sugerido: (r) => carpasRecomendadas(paxDelDiaGrande(r.dias)),
+        // Lo que pase de las del almacén hay que alquilarlo, y eso se dice aquí en vez
+        // de descubrirlo el día del rodaje
+        avisoNumero: (n) => (carpasPorAlquilar(n) > 0
+          ? `Tenemos ${CARPAS_EN_ALMACEN}: hay que alquilar ${carpasPorAlquilar(n)} a Support On Set, con su recogida.`
+          : `Caben en el almacén (tenemos ${CARPAS_EN_ALMACEN}), no hay que alquilar ninguna.`),
+      },
     ],
     soloEn: ["produccion"],
-    si: (r) => r.sombra === "no",
   },
   {
     id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
@@ -121,7 +131,7 @@ export const PREGUNTAS = [
     opciones: [
       { valor: "paella", texto: "Paella" },
       { valor: "frito", texto: "Algo frito" },
-      { valor: "jamonero", texto: "Jamonero" },
+      { valor: "jamonero", texto: "Jamonero", soloEn: CON_BARRA },
       { valor: "dosPlatos", texto: "Dos platos principales", soloEn: CON_BARRA },
     ],
   },
@@ -183,12 +193,12 @@ export const PREGUNTAS = [
     id: "extras", tipo: "marcar", texto: "¿Está presupuestado algo de esto?",
     opciones: [
       { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
-      { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?" },
+      { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
       { valor: "barril30", texto: "Barril de cerveza de 30L", soloEn: CON_BARRA },
       { valor: "barril50", texto: "Barril de cerveza de 50L", soloEn: CON_BARRA },
       { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
       { valor: "mobiliario", texto: "Mobiliario extra de alquiler", soloEn: CON_BARRA },
-      { valor: "palomitera", texto: "Palomitera" },
+      { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
     ],
   },
@@ -206,6 +216,69 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
 
+  // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
+  // En un rodaje el menú se imprime y se ponen etiquetas: si el archivo no viaja con
+  // los datos, acaba en un WhatsApp perdido y el día del rodaje no lo encuentra nadie.
+  // Va dentro del propio envío, así que la foto se encoge antes de subirse.
+  {
+    id: "imprimirMenu", tipo: "opciones", texto: "¿Hay que imprimir el menú?",
+    opciones: [
+      { valor: "no", texto: "No hace falta" },
+      {
+        valor: "si", texto: "Sí",
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube el menú o hazle una foto" },
+      },
+    ],
+    soloEn: ["produccion"],
+  },
+  {
+    id: "etiquetas", tipo: "opciones", texto: "¿Hay que imprimir etiquetas?",
+    nota: "La imagen que va en la máquina de etiquetas.",
+    opciones: [
+      { valor: "no", texto: "No hace falta" },
+      {
+        valor: "si", texto: "Sí",
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la imagen o hazle una foto" },
+      },
+    ],
+    soloEn: ["produccion"],
+  },
+
+  // ── Lo que hay que ir a buscar ─────────────────────────────────────────────
+  // Flores y minutas no se cargan del almacén: alguien tiene que ir a recogerlas a
+  // un sitio y un día concretos. Por eso no son un interruptor más, sino que crean
+  // su recogida con su fecha, que es lo que luego avisa.
+  {
+    id: "flores", tipo: "opciones", texto: "¿Lleva flores?",
+    nota: "Se añade a las recogidas con su día, para que no se quede nadie sin ir a por ellas.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Quien", etiqueta: "¿A quién se le piden?", ejemplo: "Floristería..." },
+          { sufijo: "Fecha", etiqueta: "¿Qué día se recogen?", tipo: "date" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "minutas", tipo: "opciones", texto: "¿Lleva minutas?",
+    nota: "Igual que las flores: se añade a las recogidas con su día.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Quien", etiqueta: "¿Dónde se imprimen?", ejemplo: "Imprenta..." },
+          { sufijo: "Fecha", etiqueta: "¿Qué día se recogen?", tipo: "date" },
+        ],
+      },
+    ],
+    // En un rodaje no se ponen minutas
+    soloEn: CON_BARRA,
+  },
+
   // ── Cierre ─────────────────────────────────────────────────────────────────
   {
     id: "notas", tipo: "texto-largo", texto: "¿Algo que haya que tener en cuenta?",
@@ -218,8 +291,16 @@ export const PREGUNTAS = [
 // (`si`): preguntar por las carpas de alquiler cuando ni siquiera van carpas sería
 // una pantalla de más, y este formulario se rellena de pie y con prisa.
 export function preguntasDe(tipo, respuestas = null) {
-  return PREGUNTAS.filter(p => (!p.soloEn || p.soloEn.includes(tipo))
-    && (!p.si || (respuestas !== null && p.si(respuestas))));
+  return PREGUNTAS.filter(p => {
+    if (p.soloEn && !p.soloEn.includes(tipo)) return false;
+    if (p.si && !(respuestas !== null && p.si(respuestas))) return false;
+    // Una pregunta de elegir cuyas opciones no aplican a este tipo de evento sería
+    // una pantalla en blanco: si a un rodaje no le toca ninguna de las opciones de
+    // "¿está presupuestado algo de esto?", esa pregunta no existe para el rodaje.
+    if ((p.tipo === "marcar" || p.tipo === "opciones") && p.id !== "tipo"
+        && opcionesDe(p, tipo).length === 0) return false;
+    return true;
+  });
 }
 
 // Opciones de una pregunta de marcar, filtradas por tipo de evento
@@ -254,7 +335,19 @@ export function resumirRespuesta(p, r, tipo) {
     return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => o.texto).join(", ");
   }
   const op = (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).find(o => o.valor === v);
-  return op ? op.texto : String(v);
+  if (!op) return String(v);
+  // Las opciones que arrastran algo detrás se leen con ello: "Sí · Floristería X ·
+  // 10 ago" dice bastante más que un "Sí" a secas.
+  const extra = [];
+  (op.conCampos || []).forEach(c => {
+    const val = r[`${p.id}${c.sufijo}`];
+    if (val) extra.push(c.tipo === "date" ? fmtFechaCorta(val) : val);
+  });
+  if (op.conArchivo) {
+    const a = r[`${p.id}${op.conArchivo.sufijo}`];
+    extra.push(a && a.datos ? (a.nombre || "archivo adjunto") : "sin archivo");
+  }
+  return extra.length ? `${op.texto} · ${extra.join(" · ")}` : op.texto;
 }
 
 // El envío entero en palabras, para la bandeja: pregunta y respuesta, en el orden en
@@ -292,8 +385,15 @@ export function aRespuestasDeLaApp(r = {}) {
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
-    if (puesto(r.sombra)) estado.llevaCarpas = r.sombra === "no";
-    if (puesto(r.carpasAlquiler)) estado.alquilaCarpas = r.carpasAlquiler === "sos";
+    if (puesto(r.carpas)) {
+      estado.llevaCarpas = r.carpas === "si";
+      if (r.numCarpas > 0) {
+        estado.numCarpas = r.numCarpas;
+        // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
+        // hace falta preguntarlo aparte, se sabe con el número.
+        estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
+      }
+    }
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
     // En un rodaje las sillas son nuestras: no se pregunta y no genera recogida
     estado.origenSillas = "Nuestras";
@@ -357,4 +457,54 @@ export function camposSinContestar(r = {}, tipo = "boda") {
   return preguntasDe(tipo, r)
     .filter(p => r[p.id] === undefined || r[p.id] === null)
     .map(p => p.id);
+}
+
+// ─── LO QUE HAY QUE IR A BUSCAR ────────────────────────────────────────────────
+// Flores y minutas no son un interruptor de la app: son un sitio y un día al que
+// alguien tiene que ir. Se convierten en recogidas normales (de las escritas a
+// mano), así que entran en los avisos y nada las quita sola.
+//
+// Va aparte de aRespuestasDeLaApp a propósito: eso devuelve campos del evento, y
+// esto son líneas que se SUMAN a las recogidas que el evento ya tenga. Si se
+// devolvieran juntas, aplicar un envío borraría las recogidas de antes.
+export function recogidasDelEnvio(r = {}) {
+  const salida = [];
+  const mete = (id, etiqueta) => {
+    if (r[id] !== "si") return;
+    const quien = (r[`${id}Quien`] || "").trim();
+    salida.push({
+      concepto: quien ? `${etiqueta} (${quien})` : etiqueta,
+      fecha: r[`${id}Fecha`] || "",
+      hora: "",
+    });
+  };
+  mete("flores", "Flores");
+  mete("minutas", "Minutas");
+  return salida;
+}
+
+// Los archivos que trae un envío (el menú a imprimir, la imagen de las etiquetas),
+// listos para enseñarlos o descargarlos desde la bandeja.
+export function archivosDelEnvio(r = {}) {
+  return [
+    { id: "imprimirMenuArchivo", etiqueta: "Menú para imprimir" },
+    { id: "etiquetasArchivo", etiqueta: "Imagen de etiquetas" },
+  ]
+    .map(x => ({ ...x, archivo: r[x.id] }))
+    .filter(x => x.archivo && x.archivo.datos);
+}
+
+// ─── QUÉ HA CAMBIADO ENTRE DOS VERSIONES DE UN ENVÍO ───────────────────────────
+// Cuando la oficina corrige algo, lo que importa no es el envío entero: es qué han
+// cambiado. Se compara pregunta a pregunta y se dice en palabras ("Cuánta gente:
+// 120 adultos → 140 adultos"), que es lo que se lee de un vistazo en el aviso.
+export function cambiosEntreRespuestas(antes = {}, ahora = {}) {
+  const tipo = ahora.tipo || antes.tipo || "boda";
+  const cambios = [];
+  preguntasDe(tipo, ahora).forEach(p => {
+    const a = resumirRespuesta(p, antes, tipo);
+    const b = resumirRespuesta(p, ahora, tipo);
+    if (a !== b) cambios.push({ id: p.id, pregunta: p.texto, antes: a, ahora: b });
+  });
+  return cambios;
 }

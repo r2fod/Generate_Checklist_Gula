@@ -8,11 +8,36 @@
 import { useState, useEffect, useMemo } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, enviarFormulario, corregirEnvio } from "./envios.js";
+import logoGula from "../assets/gula-logo.png";
 import FondoIconos from "./FondoIconos.jsx";
+import CampoArchivo from "./CampoArchivo.jsx";
+import { leerMios, apuntarEnvio } from "./mios.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-export default function Formulario({ codigo, onSalir }) {
+// El logo, para que quien rellena esto sepa de quién es el formulario. Entra con un
+// gesto corto la primera vez y luego se queda quieto: es una marca, no un anuncio.
+function LogoGula({ grande = false, pequeno = false }) {
+  return (
+    <div className={`form-logo ${grande ? "es-grande" : ""} ${pequeno ? "es-pequeno" : ""}`}>
+      <img src={logoGula} alt="Gula" />
+    </div>
+  );
+}
+
+// "hace 10 min", "ayer": para saber de un vistazo si eso que mandaste es de hoy
+function fmtCuando(ms) {
+  if (!ms) return "hace un rato";
+  const min = Math.floor((Date.now() - ms) / 60000);
+  if (min < 1) return "ahora mismo";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? "ayer" : `hace ${d} días`;
+}
+
+export default function Formulario({ codigo }) {
   const clave = `gula_formulario_${codigo}`;
   const [guardado] = useState(() => {
     try { return JSON.parse(localStorage.getItem(clave) || "{}"); } catch (e) { return {}; }
@@ -26,10 +51,15 @@ export default function Formulario({ codigo, onSalir }) {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
+  // Si al corregir resulta que logística ya lo había revisado, se dice: se ha
+  // mandado como envío nuevo y hay dos, y eso hay que saberlo.
+  const [yaRevisado, setYaRevisado] = useState(false);
   // Id del envío que se acaba de mandar. Mientras logística no lo revise se puede
   // corregir (cambian los pax, se cae la barra...) en vez de mandar otro y que les
   // lleguen dos versiones del mismo evento sin saber cuál vale.
   const [envioId, setEnvioId] = useState(guardado.envioId ?? "");
+  // Lo que ya se ha mandado desde este móvil, para poder volver y cambiarlo
+  const [mios, setMios] = useState(() => leerMios());
   // Instalar el formulario en la pantalla de inicio: así no hay que buscar el enlace
   // en el WhatsApp cada vez. En Android y en el ordenador el navegador nos deja
   // pedirlo; en iPhone no hay forma de pedirlo desde la web y hay que explicarlo.
@@ -106,11 +136,14 @@ export default function Formulario({ codigo, onSalir }) {
 
   const pon = (campo, valor) => setRespuestas(r => ({ ...r, [campo]: valor }));
   const siguiente = () => setPaso(p => Math.min(p + 1, preguntas.length));
-  const atras = () => setPaso(p => p - 1);
+  // Desde el repaso, "Atrás" vuelve a la última pregunta. Se acota porque al abrir
+  // un envío para cambiarlo se salta directo al repaso con un paso muy alto.
+  const atras = () => setPaso(p => Math.min(p, preguntas.length) - 1);
 
   if (codigoMalo) {
     return (
       <div className="form-pantalla form-fin">
+        <LogoGula />
         <h1>Este enlace ya no vale</h1>
         <p>Pídele a logística el enlace nuevo.</p>
       </div>
@@ -122,12 +155,20 @@ export default function Formulario({ codigo, onSalir }) {
     return (
       <div className="form-pantalla form-fin">
         <FondoIconos pregunta="fin" />
+        <LogoGula />
         <div className="form-fin-tic">✓</div>
         <h1>Enviado</h1>
-        <p>Ya le ha llegado a logística. Si algo no cuadra, te llamarán.</p>
+        {yaRevisado
+          ? <p>Logística ya había revisado el anterior, así que esto ha ido como un envío aparte. Avísales del cambio.</p>
+          : <p>Ya le ha llegado a logística. Si algo no cuadra, te llamarán.</p>}
         {/* Cambian los pax, se cae la barra libre... se corrige lo mandado y a
             logística le llega la versión buena, no dos envíos del mismo evento. */}
-        <button className="form-btn-principal" onClick={() => { setEnviado(false); setPaso(0); }}>
+        <button className="form-btn-principal" onClick={() => {
+          const ultimo = leerMios()[0];
+          if (ultimo) { setRespuestas(ultimo.respuestas || {}); setEventoDestino(ultimo.eventoDestino || ""); setEnvioId(ultimo.id); }
+          setEnviado(false);
+          setPaso(999); // al repaso: se cambia lo que sea y se manda
+        }}>
           Cambiar algo de lo que he mandado
         </button>
         <button className="form-btn-atras" onClick={() => {
@@ -145,6 +186,7 @@ export default function Formulario({ codigo, onSalir }) {
     return (
       <div className="form-pantalla">
         <FondoIconos pregunta="elegir" />
+        <LogoGula grande />
         <h1 className="form-titulo">¿De qué evento son los datos?</h1>
         {proximos === null && <p className="form-nota">Cargando los próximos eventos...</p>}
         {proximos !== null && proximos.length === 0 && (
@@ -178,10 +220,35 @@ export default function Formulario({ codigo, onSalir }) {
         <button className="form-btn-principal" onClick={() => { setEventoDestino(""); setPaso(0); }}>
           + Es un evento nuevo
         </button>
+        {/* Lo ya mandado desde este móvil: se puede volver a cualquiera y cambiarlo
+            (cambian los pax, se cae la barra libre) en vez de mandar otro y que a
+            logística le lleguen dos versiones del mismo evento. */}
+        {mios.length > 0 && (
+          <div className="form-mios">
+            <span className="form-mios-titulo">Lo que has mandado</span>
+            {mios.map(m => (
+              <button
+                className="form-evento form-mio"
+                key={m.id}
+                onClick={() => {
+                  setRespuestas(m.respuestas || {});
+                  setEventoDestino(m.eventoDestino || "");
+                  setEnvioId(m.id);
+                  // Directo al repaso, no a la primera pregunta: se viene a cambiar
+                  // una cosa, no a contestarlo todo otra vez. Desde el repaso se toca
+                  // la pregunta que sea y se manda.
+                  setPaso(999);
+                }}
+              >
+                <span className="form-evento-nombre">{m.nombre}</span>
+                <span className="form-evento-datos">
+                  {m.fecha ? `${fmtFecha(m.fecha)} · ` : ""}mandado {fmtCuando(m.enviado)} · toca para cambiarlo
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         {bloqueInstalar}
-        {/* Si esto es el móvil de alguien del equipo que abrió el enlace por probar,
-            aquí sale cómo volver a la app en vez de quedarse atrapado. */}
-        {onSalir && <button className="form-salir" onClick={onSalir}>Soy del equipo · entrar a la app</button>}
       </div>
     );
   }
@@ -191,20 +258,30 @@ export default function Formulario({ codigo, onSalir }) {
     const enviar = async () => {
       setEnviando(true); setError("");
       try {
+        let id = envioId;
+        let eraCambio = !!envioId;
         if (envioId) {
           // Corregir el que ya mandaron. Si logística ya lo ha revisado, la nube lo
           // rechaza: entonces se manda uno nuevo, que es lo honesto.
           try {
             await corregirEnvio(envioId, respuestas, eventoDestino || "");
           } catch (e) {
-            const id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
-            setEnvioId(id);
+            id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
+            eraCambio = false;
           }
         } else {
-          const id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
-          setEnvioId(id);
+          id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
         }
+        apuntarEnvio({ id, respuestas, eventoDestino: eventoDestino || "" });
+        setMios(leerMios());
+        setYaRevisado(envioId && !eraCambio);
         setEnviado(true);
+        // El borrador de trabajo se limpia: si no, la próxima vez que abran el
+        // formulario se encuentran el evento anterior a medio poner, que es incómodo
+        // y acaba mandándose otra vez sin querer. Lo mandado no se pierde: queda en
+        // "Lo que has mandado", y desde ahí se abre para cambiarlo.
+        setEnvioId("");
+        try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
       } catch (e) {
         setError("No se ha podido enviar. Mira la conexión y vuelve a darle.");
       } finally { setEnviando(false); }
@@ -212,6 +289,7 @@ export default function Formulario({ codigo, onSalir }) {
     return (
       <div className="form-pantalla">
         <FondoIconos pregunta="repaso" />
+        <LogoGula />
         <h1 className="form-titulo">¿Está todo bien?</h1>
         {eventoDestino
           ? <p className="form-nota">Son datos para <strong>{eventoDestino}</strong>.</p>
@@ -243,35 +321,80 @@ export default function Formulario({ codigo, onSalir }) {
   return (
     <div className="form-pantalla">
       <FondoIconos pregunta={p.id} />
+      <LogoGula pequeno />
       <div className="form-progreso"><div style={{ width: `${(paso / preguntas.length) * 100}%` }} /></div>
       {/* La clave por pregunta hace que cada pantalla entre con su animación en vez
           de cambiar el texto de golpe: se nota que has pasado de pregunta. */}
       <div className="form-entra" key={p.id}>
         <h1 className="form-titulo">{p.texto}</h1>
-        {p.nota && <p className="form-nota">{p.nota}</p>}
+        {p.nota && <p className="form-nota">{typeof p.nota === "function" ? p.nota(respuestas) : p.nota}</p>}
       </div>
 
       <div className="form-campos form-entra form-entra-tarde" key={`campos-${p.id}`}>
-        {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => (
-          <div key={o.valor}>
-            <button
-              className={`form-opcion ${respuestas[p.id] === o.valor ? "es-elegida" : ""}`}
-              // Las opciones que arrastran un número (¿cuántos entrantes?) no pasan
-              // solas de pantalla: hay que dejar contestarlo antes
-              onClick={() => { pon(p.id, o.valor); if (!o.conNumero) setTimeout(siguiente, 120); }}
-            >{o.texto}</button>
-            {respuestas[p.id] === o.valor && o.conNumero && (
-              <div className="form-subcampo">
-                <span>{o.conNumero}</span>
-                <input
-                  type="number" min="1" className="form-input form-input-corto"
-                  value={respuestas[`${o.valor}Numero`] ?? 1}
-                  onChange={e => pon(`${o.valor}Numero`, Math.max(1, parseInt(e.target.value, 10) || 1))}
+        {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => {
+          const elegida = respuestas[p.id] === o.valor;
+          // Las opciones que arrastran algo detrás (cuántos entrantes, a quién se le
+          // piden las flores, el archivo del menú) no pasan solas de pantalla: hay que
+          // dejar contestarlo antes.
+          const arrastraAlgo = !!(o.conNumero || o.conCampos || o.conArchivo);
+          return (
+            <div key={o.valor}>
+              <button
+                className={`form-opcion ${elegida ? "es-elegida" : ""}`}
+                onClick={() => {
+                  pon(p.id, o.valor);
+                  // Al elegir la opción se guarda ya el número propuesto: si no, lo que
+                  // se ve en pantalla y lo que viaja en el envío serían cosas distintas
+                  // en cuanto no lo tocaran.
+                  if (o.conNumero && typeof o.sugerido === "function") {
+                    const campo = o.campoNumero || `${o.valor}Numero`;
+                    if (respuestas[campo] === undefined) pon(campo, o.sugerido(respuestas));
+                  }
+                  if (!arrastraAlgo) setTimeout(siguiente, 120);
+                }}
+              >{o.texto}</button>
+              {elegida && o.conNumero && (() => {
+                // El campo se puede llamar como quiera la pregunta (numCarpas); si no,
+                // se apaña con el valor de la opción, como se ha hecho siempre.
+                const campo = o.campoNumero || `${o.valor}Numero`;
+                const sugerido = typeof o.sugerido === "function" ? o.sugerido(respuestas) : 1;
+                const valor = respuestas[campo] ?? sugerido;
+                return (
+                  <>
+                    <div className="form-subcampo">
+                      <span>{o.conNumero}</span>
+                      <input
+                        type="number" min="1" className="form-input form-input-corto"
+                        value={valor}
+                        onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      />
+                    </div>
+                    {o.avisoNumero && <p className="form-nota form-nota-aviso">{o.avisoNumero(valor)}</p>}
+                  </>
+                );
+              })()}
+              {elegida && o.conCampos && o.conCampos.map(c => (
+                <label className="form-campo form-subcampo-largo" key={c.sufijo}>
+                  <span>{c.etiqueta}</span>
+                  <input
+                    type={c.tipo || "text"}
+                    className="form-input"
+                    placeholder={c.ejemplo}
+                    value={respuestas[`${p.id}${c.sufijo}`] ?? ""}
+                    onChange={e => pon(`${p.id}${c.sufijo}`, e.target.value)}
+                  />
+                </label>
+              ))}
+              {elegida && o.conArchivo && (
+                <CampoArchivo
+                  etiqueta={o.conArchivo.etiqueta}
+                  archivo={respuestas[`${p.id}${o.conArchivo.sufijo}`]}
+                  onCambio={(a) => pon(`${p.id}${o.conArchivo.sufijo}`, a)}
                 />
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
 
         {p.tipo === "marcar" && opcionesDe(p, tipo).map(o => {
           const marcadas = respuestas[p.id] || [];

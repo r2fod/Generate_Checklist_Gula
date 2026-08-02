@@ -11,6 +11,7 @@ import {
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun, Download, Upload, Eye,
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
+import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import {
   ALQUILERES, DIAS_ANTES_RECOGIDA, DIAS_DESPUES_DEVOLUCION,
   sumaDias, conceptoAlquiler, recogidasConAlquileres,
@@ -19,10 +20,10 @@ import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
   cargarIndiceEventosNube,
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
-  leerCodigoFormulario, guardarCodigoFormulario,
+  leerConfigFormulario, guardarConfigFormulario,
 } from "./nube.js";
-import { aRespuestasDeLaApp, resumirEnvio } from "./formulario/preguntas.js";
-import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios } from "./formulario/envios.js";
+import { aRespuestasDeLaApp, resumirEnvio, recogidasDelEnvio, archivosDelEnvio, fmtFechaCorta, cambiosEntreRespuestas } from "./formulario/preguntas.js";
+import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -1070,15 +1071,16 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // comieran 25 personas. La zona de comer sigue el estándar de las alquiladoras: una
   // 3x3 cubre ~12 personas de pie (0,75 m²/pax). Todo editable a mano si el sitio ya
   // tiene sombra, nave o interior.
-  const CARPA_BUFFET = 1, CARPA_CAMION = 1;
-  const carpasComer = Math.max(1, Math.ceil(pax / 12));
-  const carpasIdeal = carpasComer + CARPA_BUFFET + CARPA_CAMION;
+  // Cuántas hacen falta: la cuenta de siempre a partir del pax, salvo que alguien haya
+  // dicho un número (desde el formulario o a mano), que manda sobre el cálculo — el
+  // sitio lo ha visto una persona y la cuenta no.
+  const carpasIdeal = opts.numCarpas > 0 ? opts.numCarpas : carpasRecomendadas(pax);
   // Lo que hay en almacén: no se puede cargar más de lo que se tiene. La cantidad que
-  // sale es la que se coge del almacén, y si el cálculo pide más se avisa al lado para
+  // sale es la que se coge del almacén, y si hacen falta más se avisa al lado para
   // poder alquilar la diferencia a tiempo.
-  const CARPAS_EN_ALMACEN = 8, PESAS_EN_ALMACEN = 6;
+  const PESAS_EN_ALMACEN = 6;
   const numCarpas = Math.min(carpasIdeal, CARPAS_EN_ALMACEN);
-  const faltanCarpas = Math.max(0, carpasIdeal - CARPAS_EN_ALMACEN);
+  const faltanCarpas = carpasPorAlquilar(carpasIdeal);
   const PAREDES_POR_CARPA = 3;
   const numChafers = Math.max(2, Math.ceil(pax / 40));
   // Las mesas de 1,8m van todas en un único total: cocina/servicio (por pax) + 4 de
@@ -1285,7 +1287,7 @@ const ETIQUETAS_CAMPO = {
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
-  llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler",
+  llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -2420,7 +2422,28 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
 // por defecto de la app y sale marcado aquí, para saber qué mirar.
 // Un envío en la bandeja: a qué evento va, qué contestaron y qué se puede hacer con
 // él. Los ya revisados se ven igual, pero apagados y diciendo dónde acabaron.
-function TarjetaEnvio({ e, fmtEnviado, revisado = false, children }) {
+// De qué evento habla un envío, para poder nombrarlo en un aviso
+function nombreDelEnvio(e) {
+  return e.eventoDestino || (e.respuestas && e.respuestas.nombre) || "evento nuevo";
+}
+
+// El mensaje que se manda por WhatsApp desde la bandeja: lo justo para saber de qué
+// va sin abrir nada, y las cifras que más cambian los planes.
+function textoAvisoEnvio(e) {
+  const r = e.respuestas || {};
+  const trozos = [];
+  if (r.fecha) trozos.push(fmtFechaCorta(r.fecha));
+  if (r.sitio) trozos.push(r.sitio);
+  const gente = [r.adultos && `${r.adultos} adultos`, r.ninos && `${r.ninos} niños`, r.staff && `${r.staff} staff`]
+    .filter(Boolean).join(" + ");
+  if (gente) trozos.push(gente);
+  const cabecera = e.corregido
+    ? `Han CAMBIADO los datos de "${nombreDelEnvio(e)}"`
+    : `Datos nuevos de "${nombreDelEnvio(e)}"`;
+  return `${cabecera}${trozos.length ? `\n${trozos.join(" · ")}` : ""}\nEstá en el formulario, sin aplicar todavía.`;
+}
+
+function TarjetaEnvio({ e, fmtEnviado, revisado = false, avisos = [], children }) {
   return (
     <div className={`envio-card ${revisado ? "es-revisado" : ""}`}>
       <div className="envio-cabecera">
@@ -2429,13 +2452,31 @@ function TarjetaEnvio({ e, fmtEnviado, revisado = false, children }) {
             ? <><ArrowRight size={13} /> Para <strong>{e.eventoDestino}</strong></>
             : <><Plus size={13} /> Evento nuevo</>}
         </span>
-        <span className="envio-fecha">{fmtEnviado(e)}</span>
+        <span className="envio-fecha">
+          {e.corregido && <span className="envio-corregido">cambiado</span>}
+          {fmtEnviado(e)}
+        </span>
       </div>
       {revisado && (
         <div className="envio-estado">
           {e.aplicado
             ? <><Check size={12} /> Aplicado{e.aplicadoA ? ` a "${e.aplicadoA}"` : ""}</>
             : <><X size={12} /> Descartado</>}
+        </div>
+      )}
+      {/* Lo que han adjuntado: el menú a imprimir o la imagen de las etiquetas. Se
+          abre en otra pestaña y desde ahí se imprime o se guarda. */}
+      {archivosDelEnvio(e.respuestas || {}).length > 0 && (
+        <div className="envio-archivos">
+          {archivosDelEnvio(e.respuestas || {}).map(({ id, etiqueta, archivo }) => (
+            <a className="envio-archivo" href={archivo.datos} target="_blank" rel="noreferrer"
+               download={archivo.nombre} key={id}>
+              {/^image\//.test(archivo.tipo)
+                ? <img src={archivo.datos} alt="" className="envio-archivo-mini" />
+                : <span className="envio-archivo-icono"><FileText size={14} /></span>}
+              <span className="envio-archivo-texto">{etiqueta}<em>{archivo.nombre}</em></span>
+            </a>
+          ))}
         </div>
       )}
       <div className="envio-respuestas">
@@ -2446,6 +2487,21 @@ function TarjetaEnvio({ e, fmtEnviado, revisado = false, children }) {
           </div>
         ))}
       </div>
+      {avisos.length > 0 && !revisado && (
+        <div className="envio-avisar">
+          {avisos.map((a, i) => (
+            <a
+              className="btn btn-outline envio-avisar-btn"
+              key={i}
+              href={`https://wa.me/${a.tel}?text=${encodeURIComponent(textoAvisoEnvio(e))}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <MessageCircle size={14} /> Avisar{a.nombre ? ` a ${a.nombre.split(/[ ·]/)[0]}` : ""}
+            </a>
+          ))}
+        </div>
+      )}
       <div className="envio-acciones">{children}</div>
     </div>
   );
@@ -2454,6 +2510,7 @@ function TarjetaEnvio({ e, fmtEnviado, revisado = false, children }) {
 function ModalFormularioOficina({
   codigo, enlace, envios, cargando, copiado,
   onCrear, onCambiar, onCopiar, onCompartir, onAplicar, onDescartar, onBorrar, onClose,
+  avisos = [], onCambiarAvisos,
 }) {
   const { pendientes, revisados } = repartirEnvios(envios);
   const [verRevisados, setVerRevisados] = useState(false);
@@ -2515,13 +2572,40 @@ function ModalFormularioOficina({
           </div>
 
           <div className="form-oficina-bloque">
+            <div className="form-oficina-titulo">A quién se avisa por WhatsApp</div>
+            <p className="resumen-vacio">
+              Al mandar o cambiar un envío, al formulario le sale un botón para avisarte
+              por WhatsApp con el mensaje ya escrito. Llega aunque tengas la app cerrada.
+            </p>
+            {avisos.map((a, i) => (
+              <div className="aviso-contacto" key={i}>
+                <input
+                  className="form-input" type="text" placeholder="Nombre"
+                  value={a.nombre}
+                  onChange={e => onCambiarAvisos(avisos.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x))}
+                />
+                <input
+                  className="form-input" type="tel" placeholder="Móvil con prefijo (34...)"
+                  value={a.tel}
+                  onChange={e => onCambiarAvisos(avisos.map((x, j) => j === i ? { ...x, tel: e.target.value } : x))}
+                />
+                <button className="aviso-contacto-quitar" aria-label="Quitar" title="Quitar"
+                        onClick={() => onCambiarAvisos(avisos.filter((x, j) => j !== i))}><X size={14} /></button>
+              </div>
+            ))}
+            <button className="btn btn-outline" onClick={() => onCambiarAvisos([...avisos, { nombre: "", tel: "" }])}>
+              <Plus size={14} /> Añadir a alguien
+            </button>
+          </div>
+
+          <div className="form-oficina-bloque">
             <div className="form-oficina-titulo">Lo que ha llegado</div>
             {cargando && <p className="resumen-vacio">Mirando el buzón...</p>}
             {!cargando && pendientes.length === 0 && (
               <p className="resumen-vacio">No hay envíos sin revisar.</p>
             )}
             {pendientes.map(e => (
-              <TarjetaEnvio e={e} fmtEnviado={fmtEnviado} key={e.id}>
+              <TarjetaEnvio e={e} fmtEnviado={fmtEnviado} avisos={limpiarAvisos(avisos)} key={e.id}>
                 <button className="btn btn-outline" onClick={() => onDescartar(e)}>Descartar</button>
                 <button className="btn btn-green" onClick={() => onAplicar(e)}>Aplicar y abrir</button>
               </TarjetaEnvio>
@@ -2908,6 +2992,9 @@ export default function App({ onCerrarSesion } = {}) {
   // reutilizable se calcula para el día de MÁS pax y lo consumible para la SUMA.
   const [diasProduccion, setDiasProduccion] = useState(estadoInicial.diasProduccion ?? []);
   const diasPaxValidos = evento === "produccion" ? diasProduccion.map(d => parseInt(d, 10)).filter(n => n > 0) : [];
+  // El pax que manda para las carpas: se montan una vez y se quedan, así que van por
+  // el día de más gente, no por la suma de todos.
+  const paxCarpas = diasPaxValidos.length ? Math.max(...diasPaxValidos) : pax;
   const [barraCoctel, setBarraCoctel] = useState(estadoInicial.barraCoctel ?? true);
   const [horasCoctel, setHorasCoctel] = useState(estadoInicial.horasCoctel ?? 2);
   const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
@@ -2982,6 +3069,9 @@ export default function App({ onCerrarSesion } = {}) {
   // Carpas de alquiler (SOS): las 8 del almacén cubren casi todo, pero cuando el cálculo
   // pide más hay que alquilar las que falten. Solo en producciones.
   const [alquilaCarpas, setAlquilaCarpas] = useState(estadoInicial.alquilaCarpas ?? false);
+  // Cuántas carpas hacen falta. 0 = las que salgan de la cuenta por pax; cualquier
+  // otro número manda sobre ella (lo pone quien ha visto el sitio, o el formulario).
+  const [numCarpas, setNumCarpas] = useState(estadoInicial.numCarpas ?? 0);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
@@ -3100,6 +3190,18 @@ export default function App({ onCerrarSesion } = {}) {
   const [cargandoEnvios, setCargandoEnvios] = useState(false);
   const [modalFormulario, setModalFormulario] = useState(false);
   const [enlaceCopiado, setEnlaceCopiado] = useState(false);
+  // Aviso flotante cuando la oficina manda o cambia algo con la app abierta
+  const [avisoEnvios, setAvisoEnvios] = useState(null);
+  // A quién avisa la oficina por WhatsApp al mandar o cambiar algo. Se guarda en la
+  // nube con el código, así que se pone una vez y vale para todos los dispositivos.
+  // El número NO va escrito en el código: este repositorio es público.
+  const [avisosWhatsapp, setAvisosWhatsapp] = useState([{ nombre: "Raúl · Jefe de logística", tel: "" }]);
+  const primeraFotoEnviosRef = React.useRef(true);
+  useEffect(() => {
+    if (!avisoEnvios) return;
+    const t = setTimeout(() => setAvisoEnvios(null), 30000);
+    return () => clearTimeout(t);
+  }, [avisoEnvios]);
   // ¿Hay una versión nueva publicada? Los .js llevan hash en el nombre, así que si el
   // navegador se queda con el index.html en caché sigue cargando la compilación vieja
   // para siempre y no te enteras. Se compara el id de la compilación cargada con el
@@ -3210,7 +3312,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas, tieneBrindisCava,
+    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -3283,7 +3385,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
-    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas,
+    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
@@ -3765,10 +3867,11 @@ export default function App({ onCerrarSesion } = {}) {
   useEffect(() => {
     if (!nubeActiva()) return;
     let vivo = true;
-    leerCodigoFormulario().then(c => {
-      if (!vivo || !c) return;
-      setCodigoFormulario(c);
-      refrescarEnviosRef.current(c);
+    leerConfigFormulario().then(({ codigo, avisos }) => {
+      if (!vivo || !codigo) return;
+      setCodigoFormulario(codigo);
+      if (avisos && avisos.length) setAvisosWhatsapp(avisos);
+      refrescarEnviosRef.current(codigo);
     }).catch(() => { /* sin conexión: ya se verá al abrir la bandeja */ });
     return () => { vivo = false; };
   }, []);
@@ -3776,7 +3879,32 @@ export default function App({ onCerrarSesion } = {}) {
   // corrige porque han cambiado los pax, aparece solo sin recargar ni abrir nada.
   useEffect(() => {
     if (!codigoFormulario || !nubeActiva()) return;
-    return suscribirEnvios(setEnvios);
+    return suscribirEnvios((lista) => {
+      // Lo que llega DESPUÉS de la primera foto es novedad: un envío nuevo o uno que
+      // han cambiado. Eso se dice en voz alta, porque un cambio no sube el contador
+      // de pendientes y pasaría desapercibido justo cuando más importa.
+      setEnvios(prev => {
+        const antes = new Map(prev.map(e => [e.id, e]));
+        if (primeraFotoEnviosRef.current) { primeraFotoEnviosRef.current = false; return lista; }
+        const nuevos = lista.filter(e => !antes.has(e.id));
+        const cambiados = lista.filter(e => {
+          const a = antes.get(e.id);
+          return a && (a.enviado?.seconds || 0) !== (e.enviado?.seconds || 0);
+        });
+        const frases = [
+          ...nuevos.map(e => `Nuevo: ${nombreDelEnvio(e)}`),
+          // De un cambio interesa QUÉ han cambiado, no que haya cambiado algo: la
+          // versión de antes está aquí en memoria, así que se puede decir.
+          ...cambiados.map(e => {
+            const dif = cambiosEntreRespuestas((antes.get(e.id) || {}).respuestas || {}, e.respuestas || {});
+            const detalle = dif.slice(0, 2).map(c => `${c.pregunta.replace(/^¿|\?$/g, "")}: ${c.antes} → ${c.ahora}`).join("; ");
+            return `Cambiado ${nombreDelEnvio(e)}${detalle ? ` — ${detalle}` : ""}${dif.length > 2 ? ` (+${dif.length - 2})` : ""}`;
+          }),
+        ];
+        if (frases.length) setAvisoEnvios({ frases, envios: [...nuevos, ...cambiados] });
+        return lista;
+      });
+    });
   }, [codigoFormulario]);
   // La lista corta que ve la oficina se republica cuando cambian los eventos. Va con
   // retardo para no escribir en la nube en cada tecleo mientras se edita un nombre.
@@ -3807,7 +3935,7 @@ export default function App({ onCerrarSesion } = {}) {
   const handleCrearCodigoFormulario = async () => {
     const codigo = nuevoCodigo();
     try {
-      await guardarCodigoFormulario(codigo);
+      await guardarConfigFormulario({ codigo, avisos: avisosWhatsapp });
       await publicarProximos(codigo, eventosGuardadosRef.current);
       setCodigoFormulario(codigo);
       refrescarEnvios(codigo);
@@ -3832,6 +3960,13 @@ export default function App({ onCerrarSesion } = {}) {
       text: "Con este enlace nos pas\u00e1is los datos del evento. Se puede guardar en la pantalla de inicio.",
       url: enlaceFormulario,
     }).catch(() => { /* si lo cancelan, no pasa nada */ });
+  };
+  // Guarda a quién se avisa. Solo en la config del equipo: los teléfonos NO viajan a
+  // la lista que lee el formulario, porque quien avisa es logística desde su bandeja.
+  const handleGuardarAvisos = (lista) => {
+    setAvisosWhatsapp(lista);
+    if (!codigoFormulario || !nubeActiva()) return;
+    guardarConfigFormulario({ codigo: codigoFormulario, avisos: lista }).catch(avisarFalloNube);
   };
   const handleCopiarEnlaceFormulario = () => {
     navigator.clipboard.writeText(enlaceFormulario).then(() => {
@@ -3894,6 +4029,13 @@ export default function App({ onCerrarSesion } = {}) {
         // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
         // si no, la app cargaría el material y nadie iría a buscarlo.
         estado.recogidas = recogidasConAlquileres(estado);
+        // Y las flores y las minutas, que no son material nuestro sino un sitio y un
+        // día al que hay que ir. Se suman sin duplicar: si ya estaba escrita a mano,
+        // manda la que ya había (puede tener la fecha ajustada o estar marcada).
+        recogidasDelEnvio(envio.respuestas || {}).forEach(r => {
+          if (estado.recogidas.some(x => (x.concepto || "").trim().toLowerCase() === r.concepto.toLowerCase())) return;
+          estado.recogidas = [...estado.recogidas, r];
+        });
         const siguiente = { ...guardados, [nombre]: estado };
         guardarEventos(siguiente);
         // No se borra: queda guardado como revisado, con a qué evento fue a parar
@@ -4600,6 +4742,8 @@ export default function App({ onCerrarSesion } = {}) {
           onCambiar={handleCambiarCodigoFormulario}
           onCopiar={handleCopiarEnlaceFormulario}
           onCompartir={handleCompartirEnlaceFormulario}
+          avisos={avisosWhatsapp}
+          onCambiarAvisos={handleGuardarAvisos}
           onAplicar={handleAplicarEnvio}
           onDescartar={handleDescartarEnvio}
           onBorrar={handleBorrarEnvio}
@@ -4772,6 +4916,47 @@ export default function App({ onCerrarSesion } = {}) {
               </span>
             </div>
             <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Con la app abierta, lo que llega del formulario se dice al momento. Un
+            cambio no sube el contador de pendientes, así que sin esto pasaría
+            desapercibido justo cuando más importa (han cambiado los pax de mañana). */}
+        {avisoEnvios && (
+          <div className="cambios-remotos-banner">
+            <div className="cambios-remotos-detalle">
+              <strong>📋 Del formulario:</strong>
+              <span>
+                {avisoEnvios.frases.slice(0, 3).join(" · ")}
+                {avisoEnvios.frases.length > 3 ? ` · y ${avisoEnvios.frases.length - 3} más` : ""}
+              </span>
+            </div>
+            {/* Avisar aquí mismo, en cuanto llega: si hay que abrir la bandeja para
+                hacerlo, se hace más tarde o no se hace. Manda el último que ha
+                entrado, que es de lo que habla el aviso. */}
+            {limpiarAvisos(avisosWhatsapp).map((a, i) => (
+              <a
+                className="btn btn-outline"
+                key={i}
+                href={`https://wa.me/${a.tel}?text=${encodeURIComponent(textoAvisoEnvio(avisoEnvios.envios[avisoEnvios.envios.length - 1]))}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={14} /> Avisar{a.nombre ? ` a ${a.nombre.split(/[ ·]/)[0]}` : ""}
+              </a>
+            ))}
+            {/* Aceptar sin pasar por la bandeja: cuando llega uno solo, que es lo
+                normal, se acepta aquí y el evento se abre ya configurado. Sigue
+                preguntando antes, que aplicar toca un evento de verdad. */}
+            {avisoEnvios.envios.length === 1 && (
+              <button className="btn btn-green" onClick={() => {
+                const envio = avisoEnvios.envios[0];
+                setAvisoEnvios(null);
+                handleAplicarEnvio(envio);
+              }}>Aceptar y abrir</button>
+            )}
+            <button className="btn btn-outline" onClick={() => { setAvisoEnvios(null); setModalFormulario(true); }}>Verlo</button>
+            <button className="cambios-remotos-cerrar" onClick={() => setAvisoEnvios(null)} aria-label="Cerrar aviso"><X size={14} /></button>
           </div>
         )}
 
@@ -5594,6 +5779,36 @@ export default function App({ onCerrarSesion } = {}) {
                 }}
                 options={["Llevan", "No llevan"]}
               />
+            )}
+            {/* Cuántas. Vacío = las que salen de la cuenta por pax; un número manda
+                sobre ella, porque el sitio lo ha visto una persona y la cuenta no.
+                Si pasa de las 8 del almacén, se dice aquí mismo cuántas alquilar. */}
+            {evento === "produccion" && llevaCarpas && (
+              <div className="form-group">
+                <span className="form-label">Nº DE CARPAS</span>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="0"
+                  placeholder={String(carpasRecomendadas(paxCarpas))}
+                  value={numCarpas || ""}
+                  onChange={e => {
+                    const n = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setNumCarpas(n);
+                    // Lo que pase de lo que hay en almacén se alquila, con su recogida
+                    const hayQueAlquilar = carpasPorAlquilar(n > 0 ? n : carpasRecomendadas(paxCarpas)) > 0;
+                    if (hayQueAlquilar !== alquilaCarpas) {
+                      setAlquilaCarpas(hayQueAlquilar);
+                      sincronizaAlquiler("carpas", hayQueAlquilar, conceptoAlquiler("carpas"));
+                    }
+                  }}
+                />
+                {carpasPorAlquilar(numCarpas || carpasRecomendadas(paxCarpas)) > 0 && (
+                  <span className="checkbox-sub">
+                    Tenemos {CARPAS_EN_ALMACEN}: hay que alquilar {carpasPorAlquilar(numCarpas || carpasRecomendadas(paxCarpas))} a Support On Set
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
