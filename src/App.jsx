@@ -13,6 +13,7 @@ import {
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
+import { calcPaella } from "./paella.js";
 import {
   ALQUILERES, DIAS_ANTES_RECOGIDA, DIAS_DESPUES_DEVOLUCION,
   sumaDias, conceptoAlquiler, recogidasConAlquileres,
@@ -425,14 +426,6 @@ function calcCristaleria(pax, horasCoctel, horasCopas, dobleCopa, tieneBrindisCa
   };
 }
 
-function calcPaella(pax, tallaManual) {
-  const n = Math.max(1, Math.ceil(pax / 30));
-  const talla = tallaManual && tallaManual !== "Auto"
-    ? tallaManual.toLowerCase()
-    : (pax <= 40 ? "pequeña" : pax <= 80 ? "mediana" : "grande");
-  return { n, talla };
-}
-
 function calcMesasServicio(pax) {
   if (pax <= 50) return { total: 7 };
   if (pax <= 100) return { total: 11 };
@@ -539,7 +532,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoNevera, tipoCongelador, tipoPaella, origenSillas = "Dealde",
+    tipoNevera, tipoCongelador, tipoPaella, numPaellas = 0, origenSillas = "Dealde",
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
   } = opts;
@@ -624,7 +617,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esCorporativo, ["Atril + micrófono", "—"]),
     opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
     ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
-    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella).n)]),
+    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
     opt(tipoNevera !== "No lleva", [tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]),
@@ -635,7 +628,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
   ]});
 
-  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
+  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
   const bombonas   = numPaella + numFritura + (llevaPlanchaGas ? 1 : 0);
@@ -643,7 +636,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella);
+    const p = calcPaella(pax, tipoPaella, numPaellas);
     // Difusor y trípode se comparten con las frituras (misma herramienta), se suman en vez de listar aparte
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusor", String(p.n + numFritura)], ["Trípode", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
   }
@@ -812,7 +805,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    tipoPaella, tipoNevera, tipoCongelador, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, tipoNevera, tipoCongelador, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
@@ -871,7 +864,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo)
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella);
+    const p = calcPaella(pax, tipoPaella, numPaellas);
     // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode", String(p.n + numFritura)]);
   }
@@ -881,7 +874,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   }
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella).n : 0) + numFritura + (llevaPlanchaGas ? 1 : 0);
+  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0) + numFritura + (llevaPlanchaGas ? 1 : 0);
   if (bombonasCumple > 0) paellaItems.push(["Bombonas llenas", String(bombonasCumple)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
@@ -1009,7 +1002,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
     soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoPaella, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
     llevaCarpas = true, llevaGenerador = true,
   } = opts;
@@ -1125,11 +1118,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo).
   // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco.
-  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella).n : 0;
+  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
   const numParavientos = numPaellaProd + numFritura;
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella);
+    const p = calcPaella(pax, tipoPaella, numPaellas);
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
   }
   paellaItems.push(["Trípode", String(1 + numFritura)]);
@@ -1282,7 +1275,7 @@ const ETIQUETAS_CAMPO = {
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   diasProduccion: "Días de producción",
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
-  llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella",
+  llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
@@ -3050,6 +3043,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [soloBandeja, setSoloBandeja] = useState(estadoInicial.soloBandeja ?? estadoInicial.llevaCanapes ?? false);
   const [llevaPaella, setLlevaPaella]                 = useState(estadoInicial.llevaPaella ?? false);
   const [tipoPaella, setTipoPaella]                   = useState(estadoInicial.tipoPaella ?? "Auto");
+  // 0 = las que salgan de la gente (una cada 30). Se guarda el 0 en vez de la cuenta
+  // ya hecha para que al cambiar el pax se recalcule solo, como antes de poder ponerlo
+  // a mano; en cuanto se escribe un número, manda ese.
+  const [numPaellas, setNumPaellas]                   = useState(estadoInicial.numPaellas ?? 0);
   const [estiloPlatoPrincipal, setEstiloPlatoPrincipal] = useState(estadoInicial.estiloPlatoPrincipal ?? "Blanco liso");
   // En producción el plato de postre siempre fue el negro/gris, así que ese es su
   // valor de partida; en el resto de eventos, blanco. Solo aplica cuando el evento
@@ -3347,7 +3344,7 @@ export default function App({ onCerrarSesion } = {}) {
   const getEstadoActual = () => ({
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
-    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, // llevaCanapes: solo se conserva para no perderlo al guardar
+    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, estacion, mesVerano,
@@ -3418,7 +3415,7 @@ export default function App({ onCerrarSesion } = {}) {
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas, diasProduccion: setDiasProduccion,
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
-    llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella,
+    llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
@@ -4211,7 +4208,7 @@ export default function App({ onCerrarSesion } = {}) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
-    tipoNevera, tipoCongelador, tipoPaella, origenSillas,
+    tipoNevera, tipoCongelador, tipoPaella, numPaellas, origenSillas,
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
     paxPorCamarero,
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
@@ -4223,7 +4220,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
-    tipoCongelador, tipoPaella, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
+    tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
     diasProduccion, paxPorCamarero, logisticaEquipo,
   ]);
 
@@ -5737,7 +5734,26 @@ export default function App({ onCerrarSesion } = {}) {
                 </>
               )}
               {llevaPaella && (
-                <SegmentedControl label="Tamaño de paella" value={tipoPaella} onChange={setTipoPaella} options={["Auto", "Pequeña", "Mediana", "Grande"]} />
+                <>
+                  <SegmentedControl label="Tamaño de paella" value={tipoPaella} onChange={setTipoPaella} options={["Auto", "Pequeña", "Mediana", "Grande"]} />
+                  {/* Cuántas paelleras. En blanco = las que salen de la gente (una cada
+                      30), que es como funcionaba antes; escribir un número manda sobre
+                      la cuenta y arrastra paletas, difusores, trípodes y bombonas. */}
+                  <div className="form-group controls-mini">
+                    <span className="form-label">Nº de paellas</span>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={numPaellas || ""}
+                      min="1"
+                      placeholder={String(calcPaella(pax, tipoPaella, 0).n)}
+                      onChange={e => setNumPaellas(Math.max(0, parseInt(e.target.value) || 0))}
+                    />
+                    <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                      En blanco salen {calcPaella(pax, tipoPaella, 0).n} por la gente
+                    </span>
+                  </div>
+                </>
               )}
               {tieneFrituras && (
                 <div className="form-group controls-mini">

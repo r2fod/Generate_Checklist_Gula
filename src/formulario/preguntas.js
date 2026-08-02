@@ -26,6 +26,13 @@
 //   noSe      · si admite "No lo sé" (por defecto sí; el id se guarda como null)
 
 import { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } from "../carpas.js";
+import { paellasPorPax, tallaPorPax } from "../paella.js";
+
+// La gente que manda para el material. En un rodaje es el día de más gente (el equipo
+// se monta una vez); en el resto, los adultos. Sirve para proponer números, no para
+// calcular la checklist: eso lo sigue haciendo la app con sus propios campos.
+const paxDeLaGente = (r = {}) =>
+  (r.tipo === "produccion" ? paxDelDiaGrande(r.dias) : parseInt(r.adultos, 10) || 0);
 
 export const TIPOS_EVENTO = [
   { valor: "boda", texto: "Boda" },
@@ -151,10 +158,55 @@ export const PREGUNTAS = [
     id: "menu", tipo: "marcar", texto: "¿Qué lleva el menú?",
     opciones: [
       { valor: "paella", texto: "Paella" },
-      { valor: "frito", texto: "Algo frito" },
+      // Cuántas sartenes parisiene, que no es lo mismo un frito que tres a la vez: cada
+      // una lleva su difusor, su trípode y su bombona, y la app se quedaba siempre en una.
+      { valor: "frito", texto: "Algo frito", conNumero: "¿Cuántas sartenes parisiene?", campoNumero: "numFrituras" },
       { valor: "jamonero", texto: "Jamonero", soloEn: CON_BARRA },
       { valor: "dosPlatos", texto: "Dos platos principales", soloEn: CON_BARRA },
     ],
+  },
+  {
+    // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
+    // para arriba) y nunca se preguntaba. Pero el pax no lo sabe todo: con el mismo
+    // número de gente cocina puede querer una talla u otra según el arroz y el sitio,
+    // y eso lo sabe quien lo ha hablado con el cliente.
+    id: "tamanoPaella", tipo: "opciones", texto: "La paella, ¿de qué tamaño?",
+    nota: (r) => {
+      const pax = paxDeLaGente(r);
+      return pax
+        ? `Con ${pax} personas saldría ${tallaPorPax(pax)}. Solo hay que tocarlo si cocina quiere otra.`
+        : "Si no lo sabes, se pone la que salga por la gente.";
+    },
+    opciones: [
+      { valor: "Auto", texto: "La que salga por la gente" },
+      { valor: "Pequeña", texto: "Pequeña" },
+      { valor: "Mediana", texto: "Mediana" },
+      { valor: "Grande", texto: "Grande" },
+    ],
+    si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
+  },
+  {
+    // Y cuántas. La cuenta de la app es una cada 30 personas, pero hay menús en los que
+    // se prefieren dos medianas a una grande (o al revés, y se hacen dos pases con la
+    // misma). El número arrastra paletas, difusores, trípodes, paravientos y bombonas,
+    // así que decirlo aquí evita cargar de menos.
+    id: "cuantasPaellas", tipo: "opciones", texto: "¿Cuántas paellas se hacen?",
+    nota: (r) => {
+      const pax = paxDeLaGente(r);
+      return pax
+        ? `Con ${pax} personas salen ${paellasPorPax(pax)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
+        : "Cada paella lleva su paleta, su trípode y su bombona.";
+    },
+    opciones: [
+      { valor: "auto", texto: "Las que salgan por la gente" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cuántas?",
+        campoNumero: "numPaellas",
+        sugerido: (r) => paellasPorPax(paxDeLaGente(r)) || 1,
+      },
+    ],
+    si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
   },
   {
     // Los dos entrantes NO son excluyentes: en la app son dos interruptores distintos
@@ -448,7 +500,12 @@ export function resumirRespuesta(p, r, tipo) {
   if (p.tipo === "horas") return v === 0 ? "no hay" : `${v}h`;
   if (p.tipo === "marcar") {
     if (!v.length) return "nada";
-    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => o.texto).join(", ");
+    // Con su número si lo lleva: "Algo frito (3)" dice lo que hay que cargar, "Algo
+    // frito" a secas no, y esto es lo último que se lee antes de darle a enviar.
+    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => {
+      const n = o.conNumero ? r[o.campoNumero || `${o.valor}Numero`] : null;
+      return n ? `${o.texto} (${n})` : o.texto;
+    }).join(", ");
   }
   const op = (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).find(o => o.valor === v);
   if (!op) return String(v);
@@ -462,6 +519,12 @@ export function resumirRespuesta(p, r, tipo) {
   if (op.conArchivo) {
     const a = r[`${p.id}${op.conArchivo.sufijo}`];
     extra.push(a && a.datos ? (a.nombre || "archivo adjunto") : "sin archivo");
+  }
+  // Y las que llevan un número: en el repaso salía "Sí" a secas y no se veía si eran
+  // 3 carpas o 11, que es justo lo que hay que repasar antes de mandarlo.
+  if (op.conNumero) {
+    const n = r[op.campoNumero || `${op.valor}Numero`];
+    if (n) extra.push(String(n));
   }
   return extra.length ? `${op.texto} · ${extra.join(" · ")}` : op.texto;
 }
@@ -575,8 +638,17 @@ export function aRespuestasDeLaApp(r = {}) {
   if (Array.isArray(r.menu)) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");
+    if (estado.tieneFrituras && r.numFrituras > 0) estado.numFrituras = r.numFrituras;
     estado.llevaJamonero = marcado("menu", "jamonero");
     if (tipo !== "produccion") estado.dobleServicio = marcado("menu", "dosPlatos");
+  }
+  // Talla y número de paellas. "Auto" y "las que salgan por la gente" son respuestas de
+  // verdad: dicen "déjalo como lo calcula la app", y por eso se escriben (Auto y 0) en
+  // vez de no tocar nada — si el evento traía una talla puesta a mano y ahora dicen que
+  // vale la de siempre, hay que quitarla.
+  if (puesto(r.tamanoPaella)) estado.tipoPaella = r.tamanoPaella;
+  if (puesto(r.cuantasPaellas)) {
+    estado.numPaellas = r.cuantasPaellas === "otras" && r.numPaellas > 0 ? r.numPaellas : 0;
   }
   if (Array.isArray(r.extras)) {
     estado.llevaChillOut = marcado("extras", "chillout");
