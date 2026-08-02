@@ -363,6 +363,37 @@ async function main() {
     ok(mudos.length === 0, `${tipo}: los ${grupos.length} controles cambian la checklist${mudos.length ? ` → sin efecto: ${mudos.join(", ")}` : ""}`);
   }
 
+  // Los campos NUMÉRICOS de la configuración no entran en el barrido de arriba, que solo
+  // recorre los selectores. Y son justo los que dicen CUÁNTO se carga: si uno se queda
+  // desconectado del cálculo, la pantalla enseña el número que has puesto y el camión
+  // sale con otro, que es la peor forma de fallar. Ya pasó con el color de manteles.
+  console.log("\n── Los números de la configuración ──");
+  {
+    await page.goto(url({ evento: "boda", pax: 100, ninos: 10, llevaPaella: true, tieneFrituras: true }),
+      { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1900);
+    const campo = (etiqueta) => page.locator(".controls-mini", { hasText: etiqueta }).first().locator('input[type="number"]');
+    const cantidadDe = async (trozo) => (await listaItems(page)).find(i => i.includes(trozo)) || "";
+
+    // Con 100 personas salen 4 paelleras (una cada 30). Poner 2 tiene que dejarlas en 2.
+    ok(/=4/.test(await cantidadDe("Paella ")), `de partida salen 4 paellas por la gente → "${await cantidadDe("Paella ")}"`);
+    await campo("Nº de paellas").fill("2");
+    await page.waitForTimeout(500);
+    ok(/=2/.test(await cantidadDe("Paella ")), `y poner 2 a mano manda sobre la cuenta → "${await cantidadDe("Paella ")}"`);
+    ok(/=2/.test(await cantidadDe("Paletas de paella")), "y las paletas van con ellas, una por paella");
+
+    // Y volver a dejarlo en blanco tiene que devolver la cuenta de siempre
+    await campo("Nº de paellas").fill("");
+    await page.waitForTimeout(500);
+    ok(/=4/.test(await cantidadDe("Paella ")), "y dejarlo en blanco vuelve a las que salen por la gente");
+
+    const antesFrituras = await listaItems(page);
+    await campo("Nº sartenes parisiene").fill("3");
+    await page.waitForTimeout(500);
+    ok(JSON.stringify(antesFrituras) !== JSON.stringify(await listaItems(page)),
+      "y el nº de sartenes parisiene también mueve la carga");
+  }
+
   // ── Los nombres de los items tienen que ser estables y limpios ──────────────
   // La identidad de cada item ES su nombre: los checks de Modo carga, las cantidades
   // editadas a mano y los nombres corregidos se guardan como "categoría::nombre". Si el

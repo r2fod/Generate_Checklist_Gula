@@ -626,16 +626,24 @@ export default function Formulario({ codigo }) {
                 className={`form-opcion ${puesta ? "es-elegida" : ""}`}
                 onClick={() => pon(p.id, puesta ? marcadas.filter(v => v !== o.valor) : [...marcadas, o.valor])}
               >{o.texto}</button>
-              {puesta && o.conNumero && (
-                <div className="form-subcampo">
-                  <span>{o.conNumero}</span>
-                  <input
-                    type="number" min="1" className="form-input form-input-corto"
-                    value={respuestas[`${o.valor}Numero`] ?? ""}
-                    onChange={e => pon(`${o.valor}Numero`, Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  />
-                </div>
-              )}
+              {/* El número se guarda donde diga la pregunta (campoNumero), como en las de
+                  elegir. Antes esta rama lo escribía siempre en "<valor>Numero" y se
+                  saltaba el campoNumero: los barriles decían guardarse en numBarriles,
+                  se guardaban en barril30Numero, y el número que escribían se perdía —
+                  llegaba "barril de 30L" pero la app cargaba uno. */}
+              {puesta && o.conNumero && (() => {
+                const campo = o.campoNumero || `${o.valor}Numero`;
+                return (
+                  <div className="form-subcampo">
+                    <span>{o.conNumero}</span>
+                    <input
+                      type="number" min="1" className="form-input form-input-corto"
+                      value={respuestas[campo] ?? ""}
+                      onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    />
+                  </div>
+                );
+              })()}
             </div>
           );
         })}

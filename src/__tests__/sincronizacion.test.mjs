@@ -676,3 +676,104 @@ console.log("\n══ Envase de las aguas pequeñas ══");
   ok(ids("produccion").includes("aguaPequena") && !ids("boda").includes("aguaPequena"),
     "solo se pregunta en rodaje");
 }
+
+// ── Paella: cuántas y de qué tamaño ──────────────────────────────────────────
+// El formulario preguntaba SI había paella pero ni la talla ni el número: la talla se
+// quedaba en "Auto" y el número siempre salía de la gente (una cada 30). Con el mismo
+// pax cocina puede querer dos medianas en vez de una grande, y eso arrastra paletas,
+// trípodes, paravientos y bombonas.
+console.log("\n══ Paella: cuántas y de qué tamaño ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio, resumirRespuesta, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const { calcPaella, paellasPorPax, tallaPorPax } = await import("../paella.js");
+
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100, menu: ["paella"] };
+  const puesto = aRespuestasDeLaApp({ ...base, tamanoPaella: "Mediana", cuantasPaellas: "otras", numPaellas: 3 });
+  ok(puesto.tipoPaella === "Mediana" && puesto.numPaellas === 3,
+    `la talla y el número viajan a la app → ${puesto.tipoPaella} × ${puesto.numPaellas}`);
+
+  const auto = aRespuestasDeLaApp({ ...base, tamanoPaella: "Auto", cuantasPaellas: "auto" });
+  ok(auto.tipoPaella === "Auto" && auto.numPaellas === 0,
+    "y decir \"las que salgan por la gente\" es una respuesta: se escribe, no se deja a medias");
+
+  const sinTocar = aRespuestasDeLaApp(base);
+  ok(sinTocar.tipoPaella === undefined && sinTocar.numPaellas === undefined,
+    "sin contestar no se inventa nada: el evento se queda como estaba");
+
+  // Las dos preguntas solo aparecen si el menú lleva paella
+  const ids = (r) => resumirEnvio(r).map(f => f.id);
+  const conPaella = ids({ tipo: "boda", menu: ["paella"] });
+  const sinPaella = ids({ tipo: "boda", menu: ["frito"] });
+  ok(conPaella.includes("tamanoPaella") && conPaella.includes("cuantasPaellas"),
+    "con paella en el menú se pregunta talla y número");
+  ok(!sinPaella.includes("tamanoPaella") && !sinPaella.includes("cuantasPaellas"),
+    "y sin paella no se pregunta ninguna de las dos");
+  ok(ids({ tipo: "produccion", menu: ["paella"] }).includes("cuantasPaellas"),
+    "en un rodaje también, que también se hace paella");
+
+  // La cuenta es la misma en las dos puntas: un solo sitio, no dos que se separan
+  ok(calcPaella(100, "Auto", 0).n === paellasPorPax(100) && paellasPorPax(100) === 4,
+    `100 personas → ${paellasPorPax(100)} paellas (una cada 30)`);
+  ok(calcPaella(100, "Auto", 0).talla === tallaPorPax(100) && tallaPorPax(100) === "grande",
+    "y la talla que sale de la gente es la misma que propone el formulario");
+  ok(calcPaella(100, "Mediana", 2).n === 2 && calcPaella(100, "Mediana", 2).talla === "mediana",
+    "lo puesto a mano manda sobre la cuenta (2 medianas con 100 personas)");
+  ok(calcPaella(100, "Auto", 0).n === 4,
+    "y con el número en blanco se vuelve a la cuenta de siempre");
+
+  // El repaso tiene que enseñar el número, no un "Otro número" pelado
+  const pNum = PREGUNTAS.find(p => p.id === "cuantasPaellas");
+  const resumen = resumirRespuesta(pNum, { ...base, cuantasPaellas: "otras", numPaellas: 3 }, "boda");
+  ok(/3/.test(resumen), `el repaso enseña cuántas son → "${resumen}"`);
+  const pCarpas = PREGUNTAS.find(p => p.id === "carpas");
+  const resCarpas = resumirRespuesta(pCarpas, { tipo: "produccion", carpas: "si", numCarpas: 11 }, "produccion");
+  ok(/11/.test(resCarpas), `y las carpas también, que se quedaban en "Sí" → "${resCarpas}"`);
+}
+
+// ── Frituras: cuántas sartenes parisiene ─────────────────────────────────────
+// Se marcaba "Algo frito" y nada más: la app se quedaba en una sartén aunque hubiera
+// tres frituras a la vez, y cada una arrastra su difusor, su trípode y su bombona.
+//
+// Al añadirlo salió un fallo que llevaba tiempo ahí: en las preguntas de MARCAR el
+// número se guardaba siempre en "<valor>Numero" ignorando el campoNumero de la
+// pregunta. Los barriles decían guardarse en numBarriles y se guardaban en
+// barril30Numero, así que el número que escribían en oficina no llegaba nunca: la app
+// recibía "barril de 30L" y cargaba uno.
+console.log("\n══ Frituras y el número de las preguntas de marcar ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio, PREGUNTAS } = await import("../formulario/preguntas.js");
+
+  const f = aRespuestasDeLaApp({ tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100, menu: ["frito"], numFrituras: 3 });
+  ok(f.tieneFrituras === true && f.numFrituras === 3,
+    `las sartenes parisiene viajan a la app → ${f.numFrituras}`);
+
+  const sinFrito = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, menu: ["paella"], numFrituras: 3 });
+  ok(sinFrito.tieneFrituras === false && sinFrito.numFrituras === undefined,
+    "sin marcar frito no se cuela un número de sartenes");
+
+  const soloMarca = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, menu: ["frito"] });
+  ok(soloMarca.tieneFrituras === true && soloMarca.numFrituras === undefined,
+    "y marcarlo sin decir cuántas deja el valor de la app, no un cero");
+
+  // La pregunta declara dónde va el número, y ahí tiene que ir
+  const menu = PREGUNTAS.find(p => p.id === "menu");
+  const frito = menu.opciones.find(o => o.valor === "frito");
+  ok(frito.conNumero && frito.campoNumero === "numFrituras",
+    "la pregunta del menú pide el número y dice dónde guardarlo");
+
+  // El fallo de los barriles: lo que escribían se perdía por el camino
+  const b = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: ["barril30"], numBarriles: 3 });
+  ok(b.tamanoBarril === "30L" && b.numBarriles === 3,
+    `y los barriles ya no pierden su número → ${b.tamanoBarril} × ${b.numBarriles}`);
+
+  // Las que NO declaran campoNumero siguen guardando donde siempre: no se rompe nada
+  const extras = PREGUNTAS.find(p => p.id === "extras");
+  const chill = extras.opciones.find(o => o.valor === "chillout");
+  ok(!chill.campoNumero, "el chill out no declara campoNumero: sigue en chilloutNumero");
+  const c = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: ["chillout"], chilloutNumero: 2 });
+  ok(c.llevaChillOut === true && c.numChillOut === 2,
+    `y su número sigue llegando igual → ${c.numChillOut}`);
+
+  ok(resumirEnvio({ tipo: "boda", menu: ["frito"], numFrituras: 3 }).some(f2 => /3/.test(f2.respuesta)),
+    "el repaso enseña cuántas sartenes son antes de mandarlo");
+}
