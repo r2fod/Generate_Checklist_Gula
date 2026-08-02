@@ -7,11 +7,14 @@
 //      mismos campos que rellenarías tú a mano. La checklist la siguen generando
 //      buildChecklistBoda / Cumpleanos / Produccion, sin enterarse de que existe
 //      este fichero.
-//   2. Solo se pregunta lo que ellas pueden saber. Todo lo que sale del pax o de la
-//      fecha (paella, cafetera, camareros, carpas, bandejas, verano...) y todo lo
-//      que es decisión de logística (nevera, congelador, plancha, armario caliente,
-//      estilo de platos, personal, tarifas) NO se pregunta: se queda con su valor
-//      por defecto y lo ajustas al confirmar el envío.
+//   2. Solo se pregunta lo que ellas pueden saber. Lo que sale del pax o de la fecha
+//      (paella, cafetera, camareros, bandejas, verano...) y lo que es decisión de
+//      logística (plancha de gas, jarras, aguas pequeñas, personal, tarifas) NO se
+//      pregunta: se queda con su valor por defecto y lo ajustas al confirmar el
+//      envío. Lo que sí se pregunta aunque no sea "del cliente" es lo que ARRASTRA
+//      UNA RECOGIDA (sillas, armario caliente, mobiliario, carpas, generador,
+//      flores, minutas): si eso no viaja, la app carga el material y nadie va a
+//      buscarlo.
 //
 // Cada pregunta lleva:
 //   id        · clave con la que se guarda la respuesta
@@ -101,6 +104,17 @@ export const PREGUNTAS = [
           ? `Tenemos ${CARPAS_EN_ALMACEN}: hay que alquilar ${carpasPorAlquilar(n)} a Support On Set, con su recogida.`
           : `Caben en el almacén (tenemos ${CARPAS_EN_ALMACEN}), no hay que alquilar ninguna.`),
       },
+    ],
+    soloEn: ["produccion"],
+  },
+  {
+    // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
+    // día): lo que cambia es el envase, y eso lo sabe quien lo ha presupuestado.
+    id: "aguaPequena", tipo: "opciones", texto: "Las aguas pequeñas, ¿de qué son?",
+    nota: "En un rodaje van siempre; esto es solo el envase.",
+    opciones: [
+      { valor: "Plástico", texto: "De plástico" },
+      { valor: "Cartón", texto: "De cartón" },
     ],
     soloEn: ["produccion"],
   },
@@ -201,13 +215,28 @@ export const PREGUNTAS = [
     opciones: [
       { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
       { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
-      { valor: "barril30", texto: "Barril de cerveza de 30L", soloEn: CON_BARRA },
-      { valor: "barril50", texto: "Barril de cerveza de 50L", soloEn: CON_BARRA },
+      // Cuántos barriles: hasta ahora se daba por hecho que era uno
+      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
+      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
+      // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
+      // se añade otra pantalla a un formulario que ya tiene quince
+      { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
       { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
       { valor: "mobiliario", texto: "Mobiliario extra de alquiler", soloEn: CON_BARRA },
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
     ],
+  },
+  {
+    // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
+    // devolverlo. Al marcarlo se crea su recogida sola. En un rodaje no se lleva.
+    id: "armarioCaliente", tipo: "opciones", texto: "¿Lleva armario caliente?",
+    nota: "Se alquila a Dealde: se crea sola su recogida y su devolución.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: CON_BARRA,
   },
   {
     id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
@@ -346,7 +375,10 @@ export const PREGUNTAS = [
   {
     id: "notas", tipo: "texto-largo", texto: "¿Algo que haya que tener en cuenta?",
     campo: "notas",
-    nota: "Alergias, peticiones del cliente, con quién hay que hablar en el sitio...",
+    // Aquí acaba todo lo que no tiene pregunta propia. Se dicen ejemplos de verdad
+    // porque un campo libre sin ejemplos se queda en blanco: alguna bebida suelta que
+    // haya que añadir, alergias, o con quién hablar al llegar.
+    nota: "Alergias, peticiones del cliente, alguna bebida que haya que añadir, con quién hablar en el sitio...",
     noSe: false,
   },
 ];
@@ -462,6 +494,7 @@ export function aRespuestasDeLaApp(r = {}) {
       }
     }
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
+    if (puesto(r.aguaPequena)) estado.tipoAguaPequena = r.aguaPequena;
     // En un rodaje las sillas son nuestras: no se pregunta y no genera recogida
     estado.origenSillas = "Nuestras";
   } else {
@@ -489,6 +522,7 @@ export function aRespuestasDeLaApp(r = {}) {
     }
     // "finca" = no las llevamos nosotros; el resto es literalmente el valor que usa la
     // app (Dealde / Carvillo / Nuestras), y solo los dos primeros crean recogida
+    if (puesto(r.armarioCaliente)) estado.llevaArmarioCaliente = r.armarioCaliente === "si";
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (Array.isArray(r.extras)) {
       estado.tieneBrindisCava = marcado("extras", "brindis");
@@ -497,6 +531,8 @@ export function aRespuestasDeLaApp(r = {}) {
       estado.hayDesayuno = marcado("extras", "desayuno");
       estado.tamanoBarril = marcado("extras", "barril50") ? "50L"
         : marcado("extras", "barril30") ? "30L" : "No lleva";
+      if (estado.tamanoBarril !== "No lleva" && r.numBarriles > 0) estado.numBarriles = r.numBarriles;
+      estado.llevaJarrasCristal = marcado("extras", "jarras");
     }
   }
 

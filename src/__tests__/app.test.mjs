@@ -326,7 +326,11 @@ async function main() {
   const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
     const n = r.querySelector(".item-name, .item-label");
     const q = r.querySelector(".item-qty-input");
-    return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}`;
+    // El sufijo cuenta: hay cambios que SOLO se ven ahí (el envase de las aguas de
+    // un rodaje, el "de 8 en almacén" de las carpas). Sin él, la prueba daba por
+    // mudo un control que sí cambiaba lo que se carga.
+    const suf = r.querySelector(".item-batea-info");
+    return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${suf ? "|" + suf.textContent.trim() : ""}`;
   }));
   const escapa = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   for (const tipo of TIPOS) {
@@ -763,7 +767,7 @@ async function main() {
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
     // puede dejar el formulario atascado en ninguna pregunta
     let vueltas = 0;
-    while (vueltas++ < 18) {
+    while (vueltas++ < 32) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -786,7 +790,7 @@ async function main() {
     // de las 8 del almacén, tiene que decirlo AHÍ, no descubrirse el día del rodaje.
     const preguntaDe = async (texto) => {
       let vueltas = 0;
-      while (vueltas++ < 22) {
+      while (vueltas++ < 32) {
         const t = await p.locator(".form-titulo").innerText();
         if (new RegExp(texto, "i").test(t)) return true;
         if (/Está todo bien/i.test(t)) return false;
@@ -846,7 +850,7 @@ async function main() {
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
     // en vez de fallar y decir por qué.
     let vueltasBorrador = 0;
-    while (vueltasBorrador++ < 20) {
+    while (vueltasBorrador++ < 32) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -854,7 +858,7 @@ async function main() {
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
-    ok(vueltasBorrador < 20, "el recorrido llega al repaso sin quedarse atascado");
+    ok(vueltasBorrador < 32, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),

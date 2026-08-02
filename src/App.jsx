@@ -1235,7 +1235,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // En producción el agua de beber son las CAJAS de 33cl (35 uds), a ~3,5 botellas
     // por pax y día; la de 1,5L es solo un extra por si hace falta (paella, lavar,
     // beber el personal), no va por pax — un par de packs por día es de sobra
-    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(paxConsumo * 3.5 / 35)), "cajas (35 uds)")],
+    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(paxConsumo * 3.5 / 35)),
+      `cajas (35 uds)${opts.tipoAguaPequena ? ` · ${opts.tipoAguaPequena.toLowerCase()}` : ""}`)],
     ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
     ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
@@ -1293,7 +1294,7 @@ const ETIQUETAS_CAMPO = {
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
-  llevaAguasPequenas: "Aguas pequeñas", hayDesayuno: "Desayuno",
+  llevaAguasPequenas: "Aguas pequeñas", tipoAguaPequena: "Envase de las aguas pequeñas", hayDesayuno: "Desayuno",
   tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   recogidas: "Recogidas", compras: "Compras",
@@ -3085,6 +3086,9 @@ export default function App({ onCerrarSesion } = {}) {
   const [llevaJamonero, setLlevaJamonero]             = useState(estadoInicial.llevaJamonero ?? false);
   const [personasPorPlatoEntrante, setPersonasPorPlatoEntrante] = useState(estadoInicial.personasPorPlatoEntrante ?? 4);
   const [llevaAguasPequenas, setLlevaAguasPequenas]   = useState(estadoInicial.llevaAguasPequenas ?? false);
+  // En rodaje las aguas pequeñas van siempre: lo que se elige es el envase. Vacío =
+  // como estaba, sin decir nada, para no cambiar los rodajes ya guardados.
+  const [tipoAguaPequena, setTipoAguaPequena] = useState(estadoInicial.tipoAguaPequena ?? "");
   const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
@@ -3320,7 +3324,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
-    personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, notasCheck, cronos,
@@ -3394,7 +3398,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
-    personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
+    personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
@@ -4174,7 +4178,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
-    personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, tipoPaella, origenSillas,
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
@@ -4187,7 +4191,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
-    llevaAguasPequenas, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
+    llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
     diasProduccion, paxPorCamarero, logisticaEquipo,
   ]);
@@ -5802,6 +5806,14 @@ export default function App({ onCerrarSesion } = {}) {
             {/* El generador está en ALQUILERES: siempre viene de SOS. Las carpas son
                 nuestras (8 en almacén), así que su interruptor se queda aquí; si hacen
                 falta más, se marcan como alquiler en ese bloque. */}
+            {evento === "produccion" && (
+              <SegmentedControl
+                label="Aguas pequeñas"
+                value={tipoAguaPequena || "Sin decir"}
+                onChange={v => setTipoAguaPequena(v === "Sin decir" ? "" : v)}
+                options={["Plástico", "Cartón", "Sin decir"]}
+              />
+            )}
             {evento === "produccion" && (
               <SegmentedControl
                 label="Carpas"
