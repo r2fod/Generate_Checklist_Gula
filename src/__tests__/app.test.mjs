@@ -623,8 +623,14 @@ async function main() {
     await p.waitForTimeout(2200);
     const visible = async () => (await p.locator(".barra-fija").evaluate(e => getComputedStyle(e).opacity)) === "1";
     ok(!await visible(), "arriba del todo la barra fina no estorba");
+    // Bajar de verdad: si la lista todavía no ha terminado de pintarse, el documento
+    // aún no llega a 900px, el scroll no mueve nada y la barra no tiene por qué salir.
+    // Esperar a que haya sitio para bajar, y luego a que termine el fundido, en vez de
+    // dar por hecho un tiempo fijo: eso hacía fallar la prueba de vez en cuando.
+    await p.waitForFunction(() => document.documentElement.scrollHeight > window.innerHeight + 900,
+      null, { timeout: 15000 });
     await p.evaluate(() => window.scrollTo(0, 900));
-    await p.waitForTimeout(600);
+    for (let i = 0; i < 20 && !await visible(); i++) await p.waitForTimeout(150);
     ok(await visible(), "al bajar aparece la barra fina");
     const caja = await p.locator(".barra-fija").boundingBox();
     ok(caja && caja.y >= 0 && caja.y < 20, `y se queda pegada arriba (y=${caja ? Math.round(caja.y) : "?"})`);
