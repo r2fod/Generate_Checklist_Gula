@@ -719,6 +719,15 @@ async function main() {
     ok(/De qué evento son los datos/i.test(await p.locator(".form-titulo").innerText()),
       "empieza preguntando a qué evento van los datos");
 
+    // Ningún botón puede estirarse a lo alto para llenar la pantalla: el principal
+    // lleva flex para repartir el ANCHO en la fila de acciones, y como hijo directo de
+    // la pantalla (que es una columna) eso lo convertía en un botonazo de 1200px
+    const altos = await p.locator(".form-btn-principal, .form-opcion, .form-evento")
+      .evaluateAll(bs => bs.map(b => ({ t: b.innerText.trim().slice(0, 22), h: Math.round(b.getBoundingClientRect().height) })));
+    const estirados = altos.filter(b => b.h > 110);
+    ok(estirados.length === 0,
+      `ningún botón se estira a lo alto${estirados.length ? ` → ${JSON.stringify(estirados)}` : ""}`);
+
     await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
     await p.waitForTimeout(500);
     await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
@@ -836,7 +845,7 @@ async function main() {
       tipo: "boda", nombre: "Boda Ana y Luis", sitio: "Finca La Alquería",
       fecha: "2027-12-11", horaInicio: "12:30", horaFin: "23:00",
       adultos: 120, ninos: 10, coctel: 3, copas: 5,
-      servicio: "bandeja", menu: ["paella", "frito"], entrante: "compartir3",
+      servicio: "bandeja", menu: ["paella", "frito"], entrante: ["compartir"], entrantePersonas: 3,
       horno: "Grande", extras: ["brindis", "barril50", "chillout"], chilloutNumero: 2,
       sillas: "finca", notas: "Alergia al marisco en la mesa 4",
     });
@@ -1475,13 +1484,13 @@ async function main() {
       await p.waitForTimeout(2200);
       await p.locator(".compartir-menu-wrap > .btn").first().click();
       await p.waitForTimeout(400);
-      const entrada = p.locator(".compartir-menu button", { hasText: "Formulario de oficina" });
-      if (ancho === 320) ok(await entrada.count() === 1, "el formulario de oficina se abre desde Compartir");
+      const entrada = p.locator(".compartir-menu button", { hasText: "Formulario del evento" });
+      if (ancho === 320) ok(await entrada.count() === 1, "el formulario del evento se abre desde Compartir");
       await entrada.first().click();
       await p.waitForTimeout(900);
       const titulo = await p.locator(".preview-header-title").first().innerText();
       if (ancho === 320) {
-        ok(/Formulario de oficina/i.test(titulo), `abre su pantalla → "${titulo.trim()}"`);
+        ok(/Formulario del evento/i.test(titulo), `abre su pantalla → "${titulo.trim()}"`);
         ok(await p.locator(".btn", { hasText: "Crear el enlace" }).count() === 1,
           "sin enlace creado, lo primero que ofrece es crearlo");
         ok(/No hay envíos sin revisar/i.test(await p.locator(".preview-body").innerText()),

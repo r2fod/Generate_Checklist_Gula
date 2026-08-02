@@ -22,7 +22,7 @@ import {
   leerCodigoFormulario, guardarCodigoFormulario,
 } from "./nube.js";
 import { aRespuestasDeLaApp, resumirEnvio } from "./formulario/preguntas.js";
-import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio } from "./formulario/envios.js";
+import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios } from "./formulario/envios.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
@@ -2418,10 +2418,45 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
 // Aplicar un envío NO escribe nada a escondidas: abre el evento con los datos ya
 // puestos para que se revisen. Lo que la oficina no contestó se queda con el valor
 // por defecto de la app y sale marcado aquí, para saber qué mirar.
+// Un envío en la bandeja: a qué evento va, qué contestaron y qué se puede hacer con
+// él. Los ya revisados se ven igual, pero apagados y diciendo dónde acabaron.
+function TarjetaEnvio({ e, fmtEnviado, revisado = false, children }) {
+  return (
+    <div className={`envio-card ${revisado ? "es-revisado" : ""}`}>
+      <div className="envio-cabecera">
+        <span className="envio-destino">
+          {e.eventoDestino
+            ? <><ArrowRight size={13} /> Para <strong>{e.eventoDestino}</strong></>
+            : <><Plus size={13} /> Evento nuevo</>}
+        </span>
+        <span className="envio-fecha">{fmtEnviado(e)}</span>
+      </div>
+      {revisado && (
+        <div className="envio-estado">
+          {e.aplicado
+            ? <><Check size={12} /> Aplicado{e.aplicadoA ? ` a "${e.aplicadoA}"` : ""}</>
+            : <><X size={12} /> Descartado</>}
+        </div>
+      )}
+      <div className="envio-respuestas">
+        {resumirEnvio(e.respuestas || {}).map(f => (
+          <div className={`envio-fila ${f.sinContestar ? "es-sin-contestar" : ""}`} key={f.id}>
+            <span className="envio-preg">{f.pregunta}</span>
+            <span className="envio-resp">{f.respuesta}</span>
+          </div>
+        ))}
+      </div>
+      <div className="envio-acciones">{children}</div>
+    </div>
+  );
+}
+
 function ModalFormularioOficina({
   codigo, enlace, envios, cargando, copiado,
-  onCrear, onCambiar, onCopiar, onAplicar, onDescartar, onClose,
+  onCrear, onCambiar, onCopiar, onCompartir, onAplicar, onDescartar, onBorrar, onClose,
 }) {
+  const { pendientes, revisados } = repartirEnvios(envios);
+  const [verRevisados, setVerRevisados] = useState(false);
   const fmtEnviado = (e) => {
     const s = e && e.enviado && e.enviado.seconds;
     if (!s) return "recién";
@@ -2432,16 +2467,17 @@ function ModalFormularioOficina({
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header">
           <div>
-            <div className="preview-header-title"><ClipboardCheck size={16} /> Formulario de oficina</div>
+            <div className="preview-header-title"><ClipboardCheck size={16} /> Formulario del evento</div>
             <div className="preview-header-subtitle">
-              {envios.length > 0 ? `${envios.length} sin revisar` : "Nada sin revisar"}
+              {pendientes.length > 0 ? `${pendientes.length} sin revisar` : "Nada sin revisar"}
+              {revisados.length > 0 ? ` · ${revisados.length} ya revisados` : ""}
             </div>
           </div>
           <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar" title="Cerrar"><X size={14} /></button>
         </div>
         <div className="preview-body">
           <div className="form-oficina-bloque">
-            <div className="form-oficina-titulo">El enlace para la oficina</div>
+            <div className="form-oficina-titulo">El enlace para compartir</div>
             {!codigo ? (
               <>
                 <p className="resumen-vacio">
@@ -2458,6 +2494,16 @@ function ModalFormularioOficina({
                   <button className="btn btn-green" onClick={onCopiar}>
                     {copiado ? <><Check size={15} /> Copiado</> : <><ClipboardCopy size={15} /> Copiar</>}
                   </button>
+                  {/* En el móvil esto abre el compartir de siempre (WhatsApp y demás):
+                      es como se les va a pasar de verdad, sin pegarlo a mano. */}
+                  {typeof navigator !== "undefined" && navigator.share && (
+                    <button className="btn btn-outline" onClick={onCompartir}>
+                      <MessageCircle size={15} /> Enviar
+                    </button>
+                  )}
+                  <button className="btn btn-outline" onClick={() => window.open(enlace, "_blank", "noopener")}>
+                    <Eye size={15} /> Verlo
+                  </button>
                 </div>
                 <p className="resumen-vacio">
                   Código <strong>{codigo}</strong>. Si lo cambias, el que ya tengan deja de
@@ -2471,36 +2517,32 @@ function ModalFormularioOficina({
           <div className="form-oficina-bloque">
             <div className="form-oficina-titulo">Lo que ha llegado</div>
             {cargando && <p className="resumen-vacio">Mirando el buzón...</p>}
-            {!cargando && envios.length === 0 && (
+            {!cargando && pendientes.length === 0 && (
               <p className="resumen-vacio">No hay envíos sin revisar.</p>
             )}
-            {envios.map(e => {
-              const filas = resumirEnvio(e.respuestas || {});
-              return (
-                <div className="envio-card" key={e.id}>
-                  <div className="envio-cabecera">
-                    <span className="envio-destino">
-                      {e.eventoDestino
-                        ? <><ArrowRight size={13} /> Para <strong>{e.eventoDestino}</strong></>
-                        : <><Plus size={13} /> Evento nuevo</>}
-                    </span>
-                    <span className="envio-fecha">{fmtEnviado(e)}</span>
-                  </div>
-                  <div className="envio-respuestas">
-                    {filas.map(f => (
-                      <div className={`envio-fila ${f.sinContestar ? "es-sin-contestar" : ""}`} key={f.id}>
-                        <span className="envio-preg">{f.pregunta}</span>
-                        <span className="envio-resp">{f.respuesta}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="envio-acciones">
-                    <button className="btn btn-outline" onClick={() => onDescartar(e)}>Descartar</button>
-                    <button className="btn btn-green" onClick={() => onAplicar(e)}>Aplicar y abrir</button>
-                  </div>
-                </div>
-              );
-            })}
+            {pendientes.map(e => (
+              <TarjetaEnvio e={e} fmtEnviado={fmtEnviado} key={e.id}>
+                <button className="btn btn-outline" onClick={() => onDescartar(e)}>Descartar</button>
+                <button className="btn btn-green" onClick={() => onAplicar(e)}>Aplicar y abrir</button>
+              </TarjetaEnvio>
+            ))}
+
+            {/* Lo ya revisado NO se borra: es la única prueba de lo que dijo la
+                oficina, y es lo que se mira cuando el día del evento algo no cuadra.
+                Va plegado para que no estorbe a lo que sí hay que hacer. */}
+            {revisados.length > 0 && (
+              <>
+                <button className="btn btn-outline envio-ver-revisados" onClick={() => setVerRevisados(v => !v)}>
+                  {verRevisados ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {" "}Ya revisados ({revisados.length})
+                </button>
+                {verRevisados && revisados.map(e => (
+                  <TarjetaEnvio e={e} fmtEnviado={fmtEnviado} revisado key={e.id}>
+                    <button className="btn btn-outline" onClick={() => onBorrar(e)}>Borrar del todo</button>
+                  </TarjetaEnvio>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -3730,6 +3772,12 @@ export default function App({ onCerrarSesion } = {}) {
     }).catch(() => { /* sin conexión: ya se verá al abrir la bandeja */ });
     return () => { vivo = false; };
   }, []);
+  // Y a partir de ahí se escucha en vivo: un envío nuevo, o uno que la oficina
+  // corrige porque han cambiado los pax, aparece solo sin recargar ni abrir nada.
+  useEffect(() => {
+    if (!codigoFormulario || !nubeActiva()) return;
+    return suscribirEnvios(setEnvios);
+  }, [codigoFormulario]);
   // La lista corta que ve la oficina se republica cuando cambian los eventos. Va con
   // retardo para no escribir en la nube en cada tecleo mientras se edita un nombre.
   useEffect(() => {
@@ -3739,6 +3787,9 @@ export default function App({ onCerrarSesion } = {}) {
     }, 2000);
     return () => clearTimeout(t);
   }, [codigoFormulario, eventosGuardados]);
+  // Pendiente = lo que aún no se ha revisado. El aviso y el contador cuentan eso, no
+  // el buzón entero: lo ya revisado se guarda para consultarlo, no para dar la lata.
+  const enviosPendientes = repartirEnvios(envios).pendientes;
   const enlaceFormulario = codigoFormulario
     ? `${window.location.origin}${window.location.pathname}?enviar=${codigoFormulario}`
     : "";
@@ -3773,6 +3824,15 @@ export default function App({ onCerrarSesion } = {}) {
       if (viejo) borrarProximos(viejo).catch(() => { /* si no se puede borrar, el nuevo manda igual */ });
     },
   });
+  // En el móvil, el compartir del sistema: se manda por WhatsApp sin pegar nada a mano
+  const handleCompartirEnlaceFormulario = () => {
+    if (!navigator.share) return handleCopiarEnlaceFormulario();
+    navigator.share({
+      title: "Formulario de Gula",
+      text: "Con este enlace nos pas\u00e1is los datos del evento. Se puede guardar en la pantalla de inicio.",
+      url: enlaceFormulario,
+    }).catch(() => { /* si lo cancelan, no pasa nada */ });
+  };
   const handleCopiarEnlaceFormulario = () => {
     navigator.clipboard.writeText(enlaceFormulario).then(() => {
       setEnlaceCopiado(true);
@@ -3784,8 +3844,20 @@ export default function App({ onCerrarSesion } = {}) {
   const handleDescartarEnvio = (envio) => setDialogo({
     tipo: "confirm",
     titulo: "¿Descartar este envío?",
-    mensaje: "Se borra del buzón y no se aplica nada. Si hace falta, tendrán que volver a mandarlo.",
+    mensaje: "Sale de la bandeja sin aplicar nada, pero se queda guardado en \"ya revisados\" por si hay que consultarlo luego.",
     textoConfirmar: "Descartar",
+    onConfirm: async () => {
+      try { await marcarRevisado(envio.id, { aplicado: false }); } catch (e) { avisarFalloNube(e); }
+      refrescarEnvios();
+    },
+  });
+  // Este sí borra de verdad, y solo se ofrece sobre los que ya se han revisado
+  const handleBorrarEnvio = (envio) => setDialogo({
+    tipo: "confirm",
+    titulo: "\u00bfBorrar este env\u00edo del todo?",
+    mensaje: "Se borra lo que mand\u00f3 la oficina y deja de poder consultarse. El evento no se toca.",
+    textoConfirmar: "Borrar",
+    peligro: true,
     onConfirm: async () => {
       try { await borrarEnvio(envio.id); } catch (e) { avisarFalloNube(e); }
       setEnvios(prev => prev.filter(x => x.id !== envio.id));
@@ -3824,7 +3896,9 @@ export default function App({ onCerrarSesion } = {}) {
         estado.recogidas = recogidasConAlquileres(estado);
         const siguiente = { ...guardados, [nombre]: estado };
         guardarEventos(siguiente);
-        try { await borrarEnvio(envio.id); } catch (e) { /* ya se verá en el buzón */ }
+        // No se borra: queda guardado como revisado, con a qué evento fue a parar
+        try { await marcarRevisado(envio.id, { aplicado: true, eventoDestino: nombre }); }
+        catch (e) { /* si falla, seguirá en la bandeja y se vuelve a intentar */ }
         try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); }
         catch (e) { /* localStorage no disponible */ }
         marcarEventoActivo(nombre);
@@ -4525,8 +4599,10 @@ export default function App({ onCerrarSesion } = {}) {
           onCrear={handleCrearCodigoFormulario}
           onCambiar={handleCambiarCodigoFormulario}
           onCopiar={handleCopiarEnlaceFormulario}
+          onCompartir={handleCompartirEnlaceFormulario}
           onAplicar={handleAplicarEnvio}
           onDescartar={handleDescartarEnvio}
+          onBorrar={handleBorrarEnvio}
           onClose={() => setModalFormulario(false)}
         />
       )}
@@ -4626,8 +4702,8 @@ export default function App({ onCerrarSesion } = {}) {
                       <>
                         <div className="compartir-menu-sep" />
                         <button onClick={() => { setMenuCompartir(false); setModalFormulario(true); refrescarEnvios(); }}>
-                          <ClipboardCheck size={15} /> Formulario de oficina
-                          {envios.length > 0 && <span className="menu-badge">{envios.length}</span>}
+                          <ClipboardCheck size={15} /> Formulario del evento
+                          {enviosPendientes.length > 0 && <span className="menu-badge">{enviosPendientes.length}</span>}
                         </button>
                       </>
                     )}
@@ -4701,11 +4777,11 @@ export default function App({ onCerrarSesion } = {}) {
 
         {/* Si la oficina ha mandado algo, se dice aquí: en el menú de Compartir hay un
             contador, pero eso hay que abrirlo para verlo y estos datos caducan. */}
-        {envios.length > 0 && !modalFormulario && (
+        {enviosPendientes.length > 0 && !modalFormulario && (
           <div className="envios-aviso" role="status">
             <ClipboardCheck size={16} />
             <span>
-              <strong>{envios.length === 1 ? "1 envío" : `${envios.length} envíos`} de la oficina</strong>
+              <strong>{enviosPendientes.length === 1 ? "1 envío" : `${enviosPendientes.length} envíos`} del formulario</strong>
               {" "}sin revisar
             </span>
             <button className="btn btn-green" onClick={() => { setModalFormulario(true); refrescarEnvios(); }}>Ver</button>

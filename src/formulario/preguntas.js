@@ -51,9 +51,13 @@ export const PREGUNTAS = [
   },
   {
     id: "gente", tipo: "numeros", texto: "¿Cuánta gente?",
+    // El staff (cocina, refuerzo, proveedores que comen) no son invitados, pero están
+    // ahí y beben agua y usan vasos: la app los cuenta aparte, con los camareros.
+    nota: "El staff son los que están trabajando y no van en el número de invitados.",
     campos: [
       { id: "adultos", etiqueta: "Adultos", min: 0 },
       { id: "ninos", etiqueta: "Niños", min: 0 },
+      { id: "staff", etiqueta: "Staff", min: 0 },
     ],
     soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
   },
@@ -122,16 +126,47 @@ export const PREGUNTAS = [
     ],
   },
   {
-    id: "entrante", tipo: "opciones", texto: "¿Lleva entrante?",
+    // Los dos entrantes NO son excluyentes: en la app son dos interruptores distintos
+    // (el de chupito carga vasos de chupito, el compartido carga platos extra) y hay
+    // menús que llevan los dos. Antes esta pregunta obligaba a elegir uno y se perdía
+    // el otro. Muchas veces tampoco es un entrante para compartir, son dos: por eso
+    // lleva su número, y cada uno multiplica sus platos.
+    id: "entrante", tipo: "marcar", texto: "¿Lleva entrante?",
+    nota: "Puede llevar los dos: el de chupito y uno (o varios) para compartir.",
     opciones: [
-      { valor: "no", texto: "No lleva" },
       { valor: "chupito", texto: "De chupito" },
-      // Muchas veces no es un entrante para compartir, son dos: por eso al elegir
-      // "compartido" se pregunta cuántos hay. Cada uno multiplica sus platos.
-      { valor: "compartir3", texto: "Compartido, cada 3 personas", conNumero: "¿Cuántos entrantes distintos?" },
-      { valor: "compartir4", texto: "Compartido, cada 4 personas", conNumero: "¿Cuántos entrantes distintos?" },
+      { valor: "compartir", texto: "Para compartir", conNumero: "¿Cuántos entrantes distintos?" },
     ],
     soloEn: CON_BARRA,
+  },
+  {
+    // Solo si hay entrante para compartir: es lo que decide cuántos platos extra se
+    // cargan (un plato cada 3 personas no es lo mismo que cada 4).
+    id: "entrantePersonas", tipo: "opciones", texto: "El entrante para compartir, ¿cada cuántas personas?",
+    opciones: [
+      { valor: 3, texto: "Un plato cada 3 personas" },
+      { valor: 4, texto: "Un plato cada 4 personas" },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
+  },
+  {
+    // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
+    // poner tal cual sin traducir nada por el camino.
+    id: "nevera", tipo: "opciones", texto: "¿Qué nevera hace falta?",
+    opciones: [
+      { valor: "Mediana", texto: "Mediana" },
+      { valor: "Grande", texto: "Grande" },
+      { valor: "No lleva", texto: "No lleva" },
+    ],
+  },
+  {
+    id: "congelador", tipo: "opciones", texto: "¿Y congelador?",
+    opciones: [
+      { valor: "Mediana", texto: "Mediano" },
+      { valor: "Grande", texto: "Grande" },
+      { valor: "No lleva", texto: "No lleva" },
+    ],
   },
   {
     id: "horno", tipo: "opciones", texto: "¿Qué horno hace falta?",
@@ -265,6 +300,7 @@ export function aRespuestasDeLaApp(r = {}) {
   } else {
     pon("pax", r.adultos);
     pon("ninos", r.ninos);
+    pon("numStaff", r.staff);
     if (puesto(r.coctel)) { estado.barraCoctel = r.coctel > 0; estado.horasCoctel = r.coctel || 0; }
     if (puesto(r.copas)) { estado.barraCopas = r.copas > 0; estado.horasCopas = r.copas || 0; }
     if (puesto(r.servicio)) {
@@ -272,14 +308,16 @@ export function aRespuestasDeLaApp(r = {}) {
       // De pie se sirve con menos camareros que un banquete sentado (1÷18 frente a 1÷12)
       estado.paxPorCamarero = r.servicio === "bandeja" ? 18 : 12;
     }
-    if (puesto(r.entrante)) {
-      estado.llevaEntrante = r.entrante === "chupito";
-      estado.entranteCompartido = r.entrante === "compartir3" || r.entrante === "compartir4";
+    // Los dos entrantes son independientes: un menú puede llevar chupito Y compartido
+    if (Array.isArray(r.entrante)) {
+      estado.llevaEntrante = marcado("entrante", "chupito");
+      estado.entranteCompartido = marcado("entrante", "compartir");
       if (estado.entranteCompartido) {
-        estado.personasPorPlatoEntrante = r.entrante === "compartir3" ? 3 : 4;
-        // Cuántos entrantes distintos se reparten (lo normal es 1, pero hay menús con 2)
-        const cuantos = r[`${r.entrante}Numero`];
-        if (cuantos > 0) estado.numEntrantesCompartir = cuantos;
+        // Cada cuántas personas va un plato, y cuántos entrantes distintos hay (lo
+        // normal es 1, pero hay menús con 2). Si no lo contestan, manda el valor de
+        // siempre de la app.
+        if (puesto(r.entrantePersonas)) estado.personasPorPlatoEntrante = r.entrantePersonas;
+        if (r.compartirNumero > 0) estado.numEntrantesCompartir = r.compartirNumero;
       }
     }
     // "finca" = no las llevamos nosotros; el resto es literalmente el valor que usa la
@@ -296,6 +334,8 @@ export function aRespuestasDeLaApp(r = {}) {
   }
 
   if (puesto(r.horno)) estado.tipoHorno = r.horno;
+  if (puesto(r.nevera)) estado.tipoNevera = r.nevera;
+  if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
   if (Array.isArray(r.menu)) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");
