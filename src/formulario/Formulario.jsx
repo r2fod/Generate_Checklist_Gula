@@ -227,6 +227,15 @@ export default function Formulario({ codigo }) {
   // Desde el repaso, "Atrás" vuelve a la última pregunta. Se acota porque al abrir
   // un envío para cambiarlo se salta directo al repaso con un paso muy alto.
   const atras = () => setPaso(p => Math.min(p, preguntas.length) - 1);
+  // En la primera pregunta "Atrás" no salía, y eso dejaba encerrada a la que estaba
+  // contestando: una vez elegido el evento no había forma de volver a la lista de
+  // eventos ni de mirar lo que ya se había mandado sin cerrar la aplicación entera.
+  // Ahora vuelve por donde se vino: al buzón de "lo que has mandado" si se estaba
+  // cambiando un envío, y a la lista de eventos en cualquier otro caso.
+  const salirDeLasPreguntas = () => {
+    if (envioId) { setVerMios(true); return; }
+    setPaso(-1);
+  };
 
   if (codigoMalo) {
     return (
@@ -724,7 +733,7 @@ export default function Formulario({ codigo }) {
       </div>
 
       <div className="form-acciones">
-        {paso > 0 && <button className="form-btn-atras" onClick={atras}>Atrás</button>}
+        <button className="form-btn-atras" onClick={paso > 0 ? atras : salirDeLasPreguntas}>Atrás</button>
         {p.noSe !== false && <button className="form-btn-nose" onClick={noSe}>No lo sé</button>}
         {/* En las de marcar, pasar sin marcar nada significa "no lleva nada de esto",
             que es una respuesta de verdad. "No lo sé" está justo al lado para cuando
