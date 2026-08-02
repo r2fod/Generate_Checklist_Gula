@@ -3809,6 +3809,16 @@ export default function App({ onCerrarSesion } = {}) {
       onConfirm: async () => {
         const base = existe ? guardados[destino] : {};
         const estado = { ...base, ...cambios, nombreEvento: nombre };
+        // Las notas se SUMAN, no se sustituyen: las del evento suelen ser tuyas (a quién
+        // llamar, qué recoger) y las del formulario vienen del cliente. Perder unas por
+        // las otras es justo lo que no puede pasar.
+        const notasAntes = (base.notasEvento || "").trim();
+        const notasNuevas = (cambios.notasEvento || "").trim();
+        if (notasAntes && notasNuevas && !notasAntes.includes(notasNuevas)) {
+          estado.notasEvento = `${notasAntes}\n${notasNuevas}`;
+        } else if (notasAntes && !notasNuevas) {
+          estado.notasEvento = base.notasEvento;
+        }
         // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
         // si no, la app cargaría el material y nadie iría a buscarlo.
         estado.recogidas = recogidasConAlquileres(estado);

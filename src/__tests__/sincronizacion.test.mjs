@@ -265,3 +265,32 @@ console.log("\n══ Cómo se lee un envío en la bandeja ══");
   ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "sombra"),
     "y de una boda no se enseñan las preguntas de rodaje");
 }
+
+// ── Aplicar un envío no puede pisar lo que ya había ───────────────────────────
+// Un envío llega de fuera y se mezcla con un evento que ya tiene trabajo hecho:
+// fechas de recogida, notas de logística... Lo que trae el envío manda, pero lo que
+// nadie ha contestado no puede borrar nada.
+console.log("\n══ Un envío sobre un evento que ya existe ══");
+{
+  const { recogidasConAlquileres } = await import("../alquileres.js");
+  // El envío cambia la fecha del evento: las recogidas automáticas se mueven con ella
+  const movidas = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-09-04", origenSillas: "Dealde",
+    recogidas: [
+      { concepto: "Sillas (Dealde)", auto: "sillas", fecha: "2027-08-10", fechaDevolucion: "2027-08-12", fechasAuto: true },
+      { concepto: "Camión plataforma", fecha: "2027-08-09" },
+    ],
+  });
+  const sillas = movidas.find(r => r.auto === "sillas");
+  ok(sillas.fecha === "2027-09-03" && sillas.fechaDevolucion === "2027-09-05",
+    `si el envío mueve la fecha del evento, la recogida se va con ella → ${sillas.fecha} / ${sillas.fechaDevolucion}`);
+  ok(movidas.find(r => !r.auto).fecha === "2027-08-09",
+    "y la escrita a mano se queda donde estaba");
+
+  const aMano = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-09-04", origenSillas: "Dealde",
+    recogidas: [{ concepto: "Sillas (Dealde)", auto: "sillas", fecha: "2027-08-01", fechasAuto: false }],
+  });
+  ok(aMano[0].fecha === "2027-08-01",
+    "una fecha de recogida puesta a mano no se mueve ni cambiando la del evento");
+}

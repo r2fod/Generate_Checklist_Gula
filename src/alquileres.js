@@ -53,7 +53,18 @@ export function recogidasConAlquileres(estado = {}) {
   const quiere = alquileresDe(estado);
   const fecha = estado.fechaEvento || "";
   const resultado = previas.filter(r => !r.auto || quiere[r.auto] || r.recogido || r.devuelto)
-    .map(r => (r.auto && quiere[r.auto]) ? { ...r, concepto: quiere[r.auto] } : r);
+    .map(r => {
+      if (!r.auto || !quiere[r.auto]) return r;
+      const actualizada = { ...r, concepto: quiere[r.auto] };
+      // Si el envío trae otra fecha del evento, las recogidas automáticas se mueven con
+      // ella, igual que al cambiar la fecha a mano en la pantalla. Las que tengan la
+      // fecha puesta a mano (fechasAuto: false) no se tocan: alguien ya lo decidió.
+      if (fecha && r.fechasAuto) {
+        actualizada.fecha = sumaDias(fecha, -DIAS_ANTES_RECOGIDA);
+        actualizada.fechaDevolucion = sumaDias(fecha, DIAS_DESPUES_DEVOLUCION);
+      }
+      return actualizada;
+    });
   Object.entries(quiere).forEach(([clave, concepto]) => {
     if (!concepto || resultado.some(r => r.auto === clave)) return;
     resultado.push({
