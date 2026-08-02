@@ -3911,10 +3911,10 @@ export default function App({ onCerrarSesion } = {}) {
   useEffect(() => {
     if (!codigoFormulario || !nubeActiva()) return;
     const t = setTimeout(() => {
-      publicarProximos(codigoFormulario, eventosGuardadosRef.current).catch(() => { /* se reintenta al siguiente cambio */ });
+      publicarProximos(codigoFormulario, eventosGuardadosRef.current, avisosWhatsapp).catch(() => { /* se reintenta al siguiente cambio */ });
     }, 2000);
     return () => clearTimeout(t);
-  }, [codigoFormulario, eventosGuardados]);
+  }, [codigoFormulario, eventosGuardados, avisosWhatsapp]);
   // Pendiente = lo que aún no se ha revisado. El aviso y el contador cuentan eso, no
   // el buzón entero: lo ya revisado se guarda para consultarlo, no para dar la lata.
   const enviosPendientes = repartirEnvios(envios).pendientes;
@@ -3936,7 +3936,7 @@ export default function App({ onCerrarSesion } = {}) {
     const codigo = nuevoCodigo();
     try {
       await guardarConfigFormulario({ codigo, avisos: avisosWhatsapp });
-      await publicarProximos(codigo, eventosGuardadosRef.current);
+      await publicarProximos(codigo, eventosGuardadosRef.current, avisosWhatsapp);
       setCodigoFormulario(codigo);
       refrescarEnvios(codigo);
     } catch (e) { avisarFalloNube(e); }
@@ -3961,12 +3961,14 @@ export default function App({ onCerrarSesion } = {}) {
       url: enlaceFormulario,
     }).catch(() => { /* si lo cancelan, no pasa nada */ });
   };
-  // Guarda a quién se avisa. Solo en la config del equipo: los teléfonos NO viajan a
-  // la lista que lee el formulario, porque quien avisa es logística desde su bandeja.
+  // Guarda a quién se avisa, en los dos sitios: la config del equipo (para verlo al
+  // abrir la app en otro móvil) y la lista que lee el formulario, que es quien pinta
+  // el botón de avisar al terminar de mandar.
   const handleGuardarAvisos = (lista) => {
     setAvisosWhatsapp(lista);
     if (!codigoFormulario || !nubeActiva()) return;
     guardarConfigFormulario({ codigo: codigoFormulario, avisos: lista }).catch(avisarFalloNube);
+    publicarProximos(codigoFormulario, eventosGuardadosRef.current, lista).catch(() => { /* se reintenta al siguiente cambio */ });
   };
   const handleCopiarEnlaceFormulario = () => {
     navigator.clipboard.writeText(enlaceFormulario).then(() => {

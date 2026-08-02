@@ -508,3 +508,29 @@ console.log("\n══ La diferencia entre dos versiones de un envío ══");
   ok(cambiosEntreRespuestas({}, {}).length === 0,
     "y con envíos vacíos no revienta");
 }
+
+// ── Lo que no se puede dejar en blanco ────────────────────────────────────────
+// El nombre y el día no son "un dato más": sin nombre logística recibe un "Evento
+// sin nombre" y no sabe de qué le hablan, y sin día no se pueden calcular las
+// recogidas (flores, minutas, alquileres), que es lo que hace que alguien vaya a
+// buscarlas a tiempo.
+console.log("\n══ Lo obligatorio del formulario ══");
+{
+  const { loQueFalta, preguntasDe } = await import("../formulario/preguntas.js");
+  const vacio = loQueFalta({ tipo: "boda" }).map(f => f.id);
+  ok(vacio.includes("nombreYsitio") && vacio.includes("cuando"),
+    `sin nombre ni día se avisa de las dos → ${JSON.stringify(vacio)}`);
+  ok(loQueFalta({ tipo: "boda", nombre: "Boda A", fecha: "2027-08-11" }).length === 0,
+    "con nombre y día no falta nada");
+  ok(loQueFalta({ tipo: "boda", nombre: "   ", fecha: "2027-08-11" }).length === 1,
+    "un nombre de solo espacios no cuenta como nombre");
+  ok(loQueFalta({ tipo: "produccion", nombre: "Rodaje", fecha: "2027-08-11" }).length === 0,
+    "y en un rodaje pide lo mismo, ni más ni menos");
+
+  // Y esas dos preguntas ya no ofrecen "No lo sé": sería una salida a un callejón
+  const dela = (id, tipo) => preguntasDe(tipo, {}).find(p => p.id === id);
+  ok(dela("nombreYsitio", "boda").noSe === false && dela("cuando", "boda").noSe === false,
+    "no se puede contestar \"no lo sé\" al nombre ni al día");
+  ok(dela("horno", "boda").noSe !== false,
+    "pero al resto sí: una respuesta en blanco sigue siendo información buena");
+}

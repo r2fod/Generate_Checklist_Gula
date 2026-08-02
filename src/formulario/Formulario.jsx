@@ -5,13 +5,13 @@
 //
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
-import { useState, useEffect, useMemo } from "react";
-import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
-import { leerProximos, enviarFormulario, corregirEnvio } from "./envios.js";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, loQueFalta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
+import { leerProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.png";
 import FondoIconos from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
-import { leerMios, apuntarEnvio } from "./mios.js";
+import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -43,6 +43,11 @@ export default function Formulario({ codigo }) {
     try { return JSON.parse(localStorage.getItem(clave) || "{}"); } catch (e) { return {}; }
   });
   const [proximos, setProximos] = useState(null); // null = cargando
+  // A quién avisar por WhatsApp al terminar de mandar (lo configura logística)
+  const [avisos, setAvisos] = useState([]);
+  // Los que se pintan en la confirmación. Se congelan al enviar porque justo después
+  // se limpia el borrador, y si el botón dependiera del estado vivo cambiaría solo.
+  const [avisosParaBoton, setAvisosParaBoton] = useState([]);
   const [codigoMalo, setCodigoMalo] = useState(false);
   const [eventoDestino, setEventoDestino] = useState(guardado.eventoDestino ?? null); // null = sin elegir
   const [respuestas, setRespuestas] = useState(guardado.respuestas ?? {});
@@ -60,6 +65,16 @@ export default function Formulario({ codigo }) {
   const [envioId, setEnvioId] = useState(guardado.envioId ?? "");
   // Lo que ya se ha mandado desde este móvil, para poder volver y cambiarlo
   const [mios, setMios] = useState(() => leerMios());
+  // Lo mandado vive en su propia pantalla: en la primera estorbaba y encima
+  // crecía con cada envío hasta empujar lo que de verdad hay que hacer.
+  const [verMios, setVerMios] = useState(false);
+  // Lo que falta por contestar en la pregunta actual, cuando intentan pasar de largo
+  const [aviso, setAviso] = useState("");
+  // Lo último que borró un "No lo sé", para poder deshacerlo sin volver a escribirlo
+  const [deshacer, setDeshacer] = useState(null);
+  // La barra de progreso no retrocede: al aparecer una pregunta condicional (las
+  // carpas de un rodaje) la lista crece y, sin esto, la barra daba un salto atrás
+  const [avance, setAvance] = useState(0);
   // Instalar el formulario en la pantalla de inicio: así no hay que buscar el enlace
   // en el WhatsApp cada vez. En Android y en el ordenador el navegador nos deja
   // pedirlo; en iPhone no hay forma de pedirlo desde la web y hay que explicarlo.
@@ -111,8 +126,22 @@ export default function Formulario({ codigo }) {
       // eso no dice nada del código y sería dejar tirada a quien tiene mala cobertura.
       if (!r.ok && r.motivo === "no-existe") { setCodigoMalo(true); setProximos([]); return; }
       setProximos(r.ok ? r.eventos : []);
+      setAvisos(r.ok && Array.isArray(r.avisos) ? r.avisos : []);
     });
   }, [codigo]);
+
+  // Mientras se está en el formulario, el manifiesto que se ofrece a instalar es el
+  // SUYO: la app instalada se llama "Formulario Gula" y arranca en el formulario,
+  // no en la checklist del equipo. Sin esto se instalaría la app de logística con
+  // su nombre, que es lo que menos espera quien está rellenando esto.
+  useEffect(() => {
+    const link = document.querySelector('link[rel="manifest"]');
+    if (!link) return;
+    const antes = link.getAttribute("href");
+    link.setAttribute("href", "./formulario.webmanifest");
+    document.title = "Formulario Gula";
+    return () => { if (antes) link.setAttribute("href", antes); };
+  }, []);
 
   // Se guarda según escriben: si cierran el navegador a media pregunta, vuelven donde
   // lo dejaron. Es un formulario que se rellena de pie y con prisa.
@@ -133,6 +162,36 @@ export default function Formulario({ codigo }) {
   const sitiosConocidos = useMemo(
     () => [...new Set((proximos || []).map(e => (e.sitio || "").trim()).filter(Boolean))],
     [proximos]);
+
+  // La barra solo avanza. Y al cambiar de pantalla el foco va al título, que si no
+  // con teclado o lector te quedas donde estabas.
+  const tituloRef = useRef(null);
+  useEffect(() => {
+    if (paso < 0) { setAvance(0); return; }
+    const total = Math.max(1, preguntas.length);
+    setAvance(a => Math.max(a, Math.round((Math.min(paso, total) / total) * 100)));
+    setAviso("");
+    setDeshacer(null);
+    if (tituloRef.current) { try { tituloRef.current.focus({ preventScroll: true }); } catch (e) { /* da igual */ } }
+  }, [paso, preguntas.length]);
+
+  // Lo que se manda por WhatsApp al terminar: qué evento y si es nuevo o un cambio
+  const mensajeAviso = () => {
+    const nombre = respuestas.nombre || eventoDestino || "un evento";
+    const cuando = respuestas.fecha ? ` (${fmtFecha(respuestas.fecha)})` : "";
+    return envioId
+      ? `He cambiado los datos de "${nombre}"${cuando} en el formulario.`
+      : `He mandado los datos de "${nombre}"${cuando} por el formulario.`;
+  };
+
+  const abrirParaCambiar = (m) => {
+    setRespuestas(m.respuestas || {});
+    setEventoDestino(m.eventoDestino || "");
+    setEnvioId(m.id);
+    setVerMios(false);
+    // Directo al repaso: se viene a cambiar una cosa, no a contestarlo todo otra vez
+    setPaso(999);
+  };
 
   const pon = (campo, valor) => setRespuestas(r => ({ ...r, [campo]: valor }));
   const siguiente = () => setPaso(p => Math.min(p + 1, preguntas.length));
@@ -161,6 +220,24 @@ export default function Formulario({ codigo }) {
         {yaRevisado
           ? <p>Logística ya había revisado el anterior, así que esto ha ido como un envío aparte. Avísales del cambio.</p>
           : <p>Ya le ha llegado a logística. Si algo no cuadra, te llamarán.</p>}
+        {/* Avisar es lo primero que se ofrece: es el paso que hace que logística se
+            entere aunque tenga la app cerrada, y aquí ya se ha enviado, así que
+            abrir WhatsApp no puede hacer que se pierda nada. */}
+        {avisosParaBoton.length > 0 && (
+          <div className="form-avisar">
+            {avisosParaBoton.map((a, i) => (
+              <a
+                className="form-btn-principal form-btn-whatsapp"
+                key={i}
+                href={`https://wa.me/${a.tel}?text=${encodeURIComponent(mensajeAviso())}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Avisar{a.nombre ? ` a ${a.nombre.split(/[ ·]/)[0]}` : ""} por WhatsApp
+              </a>
+            ))}
+          </div>
+        )}
         {/* Cambian los pax, se cae la barra libre... se corrige lo mandado y a
             logística le llega la versión buena, no dos envíos del mismo evento. */}
         <button className="form-btn-principal" onClick={() => {
@@ -175,6 +252,50 @@ export default function Formulario({ codigo }) {
           try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
           setRespuestas({}); setPaso(-1); setEventoDestino(null); setEnviado(false); setEnvioId("");
         }}>Mandar otro evento</button>
+      </div>
+    );
+  }
+
+  // ── Lo que ya se ha mandado desde este móvil ───────────────────────────────
+  if (verMios) {
+    return (
+      <div className="form-pantalla">
+        <FondoIconos pregunta="repaso" />
+        <LogoGula />
+        <h1 className="form-titulo">Lo que has mandado</h1>
+        {mios.length === 0
+          ? <p className="form-nota">Todavía no has mandado nada desde este móvil.</p>
+          : <p className="form-nota">Toca uno para cambiar lo que haga falta y volver a mandarlo.</p>}
+        <div className="form-lista-eventos">
+          {mios.map(m => (
+            <div className="form-mio-fila" key={m.id}>
+              <button className="form-evento form-mio" onClick={() => abrirParaCambiar(m)}>
+                <span className="form-evento-nombre">{m.nombre}</span>
+                <span className="form-evento-datos">
+                  {m.fecha ? `${fmtFecha(m.fecha)} · ` : ""}mandado {fmtCuando(m.enviado)}
+                </span>
+              </button>
+              <button
+                className="form-mio-quitar"
+                title="Quitar de esta lista"
+                aria-label="Quitar de esta lista"
+                onClick={() => { olvidarEnvio(m.id); setMios(leerMios()); }}
+              >✕</button>
+            </div>
+          ))}
+        </div>
+        {mios.length > 0 && (
+          <p className="form-nota">
+            Quitarlo de aquí solo lo saca de esta lista: logística sigue teniendo lo que
+            mandaste. Si te has equivocado, díselo.
+          </p>
+        )}
+        <div className="form-acciones">
+          <button className="form-btn-atras" onClick={() => setVerMios(false)}>Atrás</button>
+          <button className="form-btn-principal" onClick={() => {
+            setRespuestas({}); setEventoDestino(null); setEnvioId(""); setVerMios(false); setPaso(-1);
+          }}>Mandar uno nuevo</button>
+        </div>
       </div>
     );
   }
@@ -220,33 +341,10 @@ export default function Formulario({ codigo }) {
         <button className="form-btn-principal" onClick={() => { setEventoDestino(""); setPaso(0); }}>
           + Es un evento nuevo
         </button>
-        {/* Lo ya mandado desde este móvil: se puede volver a cualquiera y cambiarlo
-            (cambian los pax, se cae la barra libre) en vez de mandar otro y que a
-            logística le lleguen dos versiones del mismo evento. */}
         {mios.length > 0 && (
-          <div className="form-mios">
-            <span className="form-mios-titulo">Lo que has mandado</span>
-            {mios.map(m => (
-              <button
-                className="form-evento form-mio"
-                key={m.id}
-                onClick={() => {
-                  setRespuestas(m.respuestas || {});
-                  setEventoDestino(m.eventoDestino || "");
-                  setEnvioId(m.id);
-                  // Directo al repaso, no a la primera pregunta: se viene a cambiar
-                  // una cosa, no a contestarlo todo otra vez. Desde el repaso se toca
-                  // la pregunta que sea y se manda.
-                  setPaso(999);
-                }}
-              >
-                <span className="form-evento-nombre">{m.nombre}</span>
-                <span className="form-evento-datos">
-                  {m.fecha ? `${fmtFecha(m.fecha)} · ` : ""}mandado {fmtCuando(m.enviado)} · toca para cambiarlo
-                </span>
-              </button>
-            ))}
-          </div>
+          <button className="form-btn-secundario" onClick={() => setVerMios(true)}>
+            Ver lo que he mandado ({mios.length})
+          </button>
         )}
         {bloqueInstalar}
       </div>
@@ -255,6 +353,12 @@ export default function Formulario({ codigo }) {
 
   // ── Repaso antes de enviar ─────────────────────────────────────────────────
   if (paso >= preguntas.length) {
+    const falta = loQueFalta(respuestas);
+    const sinContestar = (pr) => respuestas[pr.id] === undefined || respuestas[pr.id] === null;
+    const suNombre = (respuestas.nombre || eventoDestino || "").trim().toLowerCase();
+    const yaMandado = suNombre
+      ? mios.find(m => (m.eventoDestino || m.nombre || "").trim().toLowerCase() === suNombre)
+      : null;
     const enviar = async () => {
       setEnviando(true); setError("");
       try {
@@ -280,6 +384,7 @@ export default function Formulario({ codigo }) {
         // formulario se encuentran el evento anterior a medio poner, que es incómodo
         // y acaba mandándose otra vez sin querer. Lo mandado no se pierde: queda en
         // "Lo que has mandado", y desde ahí se abre para cambiarlo.
+        setAvisosParaBoton(limpiarAvisos(avisos));
         setEnvioId("");
         try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
       } catch (e) {
@@ -295,9 +400,34 @@ export default function Formulario({ codigo }) {
           ? <p className="form-nota">Son datos para <strong>{eventoDestino}</strong>.</p>
           : <p className="form-nota">Se creará un evento nuevo.</p>}
         {envioId && <p className="form-nota">Esto cambia lo que ya mandaste, no manda otro aparte.</p>}
+
+        {/* Mandar dos veces el mismo evento deja a logística adivinando cuál vale.
+            Si ya hay uno de este evento y no se está cambiando ese, se avisa y se
+            ofrece ir a él. */}
+        {!envioId && yaMandado && (
+          <div className="form-repetido">
+            <span>
+              Ya mandaste datos de <strong>{yaMandado.nombre}</strong> {fmtCuando(yaMandado.enviado)}.
+              Si es lo mismo, mejor cambiar aquel que mandar otro.
+            </span>
+            <button className="form-btn-secundario" onClick={() => abrirParaCambiar(yaMandado)}>
+              Cambiar el de antes
+            </button>
+          </div>
+        )}
+
+        {falta.length > 0 && (
+          <p className="form-error" role="alert">
+            Falta algo por poner: {falta.map(f => f.aviso).join(" ")}
+          </p>
+        )}
         <div className="form-repaso">
           {preguntas.map((p, i) => (
-            <button className="form-repaso-fila" key={p.id} onClick={() => setPaso(i)}>
+            <button
+              className={`form-repaso-fila ${sinContestar(p) ? "es-sin-contestar" : ""}`}
+              key={p.id}
+              onClick={() => setPaso(i)}
+            >
               <span className="form-repaso-preg">{p.texto}</span>
               <span className="form-repaso-resp">{resumirRespuesta(p, respuestas, tipo)}</span>
             </button>
@@ -306,8 +436,20 @@ export default function Formulario({ codigo }) {
         {error && <p className="form-error">{error}</p>}
         <div className="form-acciones">
           <button className="form-btn-atras" onClick={atras} disabled={enviando}>Atrás</button>
-          <button className="form-btn-principal" onClick={enviar} disabled={enviando}>
-            {enviando ? "Enviando..." : envioId ? "Mandar el cambio" : "Enviar"}
+          <button
+            className="form-btn-principal"
+            onClick={() => {
+              // Si falta lo obligatorio, se lleva a esa pregunta en vez de dar un error
+              if (falta.length) {
+                const i = preguntas.findIndex(x => x.id === falta[0].id);
+                if (i !== -1) setPaso(i);
+                return;
+              }
+              enviar();
+            }}
+            disabled={enviando}
+          >
+            {enviando ? "Enviando..." : falta.length ? "Falta algo" : envioId ? "Mandar el cambio" : "Enviar"}
           </button>
         </div>
       </div>
@@ -316,19 +458,60 @@ export default function Formulario({ codigo }) {
 
   // ── Una pregunta ───────────────────────────────────────────────────────────
   const p = preguntas[paso];
-  const noSe = () => { pon(p.id, null); siguiente(); };
+  // "No lo sé" borra lo que hubiera puesto (es una respuesta, no un a medias), pero
+  // si había algo escrito se ofrece deshacerlo: se pulsa sin querer más de lo que
+  // parece, y volver a escribir 120 adultos molesta.
+  const noSe = () => {
+    const habia = respuestas[p.id];
+    const campos = (p.campos || []).map(c => [c.id, respuestas[c.id]]).filter(([, v]) => v !== undefined && v !== "");
+    if ((habia !== undefined && habia !== null && habia !== "") || campos.length) {
+      setDeshacer({ id: p.id, valor: habia, campos });
+    }
+    campos.forEach(([id]) => pon(id, ""));
+    pon(p.id, null);
+    setAviso("");
+    siguiente();
+  };
+  // Pasar de pantalla, comprobando antes lo que no se puede dejar en blanco
+  const intentarSiguiente = () => {
+    const falta = p.falta ? p.falta(respuestas) : "";
+    if (falta) { setAviso(falta); return; }
+    setAviso("");
+    if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, []);
+    siguiente();
+  };
 
   return (
     <div className="form-pantalla">
       <FondoIconos pregunta={p.id} />
       <LogoGula pequeno />
-      <div className="form-progreso"><div style={{ width: `${(paso / preguntas.length) * 100}%` }} /></div>
+      <div className="form-progreso"><div style={{ width: `${avance}%` }} /></div>
+      {/* De qué evento se está hablando. Son quince pantallas seguidas y sin esto es
+          fácil acabar mandando los datos de una boda al evento de otra. */}
+      {(respuestas.nombre || eventoDestino) && (
+        <div className="form-contexto">
+          <strong>{respuestas.nombre || eventoDestino}</strong>
+          {respuestas.fecha ? ` · ${fmtFecha(respuestas.fecha)}` : ""}
+          {envioId ? " · cambiando lo mandado" : ""}
+        </div>
+      )}
       {/* La clave por pregunta hace que cada pantalla entre con su animación en vez
           de cambiar el texto de golpe: se nota que has pasado de pregunta. */}
       <div className="form-entra" key={p.id}>
-        <h1 className="form-titulo">{p.texto}</h1>
+        <h1 className="form-titulo" tabIndex={-1} ref={tituloRef}>{p.texto}</h1>
         {p.nota && <p className="form-nota">{typeof p.nota === "function" ? p.nota(respuestas) : p.nota}</p>}
       </div>
+      {aviso && <p className="form-error" role="alert">{aviso}</p>}
+      {deshacer && deshacer.id === p.id && (
+        <p className="form-deshacer">
+          Se ha quitado lo que habías puesto.
+          <button onClick={() => {
+            pon(deshacer.id, deshacer.valor);
+            deshacer.campos.forEach(([id, v]) => pon(id, v));
+            setDeshacer(null);
+          }}>Deshacer</button>
+        </p>
+      )}
 
       <div className="form-campos form-entra form-entra-tarde" key={`campos-${p.id}`}>
         {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => {
@@ -518,14 +701,11 @@ export default function Formulario({ codigo }) {
       <div className="form-acciones">
         {paso > 0 && <button className="form-btn-atras" onClick={atras}>Atrás</button>}
         {p.noSe !== false && <button className="form-btn-nose" onClick={noSe}>No lo sé</button>}
-        <button className="form-btn-principal" onClick={() => {
-          // En las de marcar, pasar sin marcar nada significa "no lleva nada de esto",
-          // que es una respuesta de verdad. "No lo sé" está justo al lado para cuando
-          // no lo saben: si los dos botones hicieran lo mismo, no habría forma de
-          // distinguir un menú sin paella de un menú que nadie ha mirado.
-          if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, []);
-          siguiente();
-        }}>
+        {/* En las de marcar, pasar sin marcar nada significa "no lleva nada de esto",
+            que es una respuesta de verdad. "No lo sé" está justo al lado para cuando
+            no lo saben: si los dos botones hicieran lo mismo, no habría forma de
+            distinguir un menú sin paella de un menú que nadie ha mirado. */}
+        <button className="form-btn-principal" onClick={intentarSiguiente}>
           {paso === preguntas.length - 1 ? "Repasar" : "Siguiente"}
         </button>
       </div>
