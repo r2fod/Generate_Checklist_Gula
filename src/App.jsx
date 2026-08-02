@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
+import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import {
   ALQUILERES, DIAS_ANTES_RECOGIDA, DIAS_DESPUES_DEVOLUCION,
   sumaDias, conceptoAlquiler, recogidasConAlquileres,
@@ -22,7 +23,7 @@ import {
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
   leerConfigFormulario, guardarConfigFormulario,
 } from "./nube.js";
-import { aRespuestasDeLaApp, resumirEnvio, recogidasDelEnvio, archivosDelEnvio, fmtFechaCorta, cambiosEntreRespuestas } from "./formulario/preguntas.js";
+import { aRespuestasDeLaApp, resumirEnvio, recogidasDelEnvio, comprasDelEnvio, archivosDelEnvio, fmtFechaCorta, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
@@ -529,7 +530,7 @@ function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
-    mesVerano, tieneBrindisCava, fuerzaTextilTela,
+    mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
     tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
@@ -689,7 +690,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ["Manteles beige", String(calcMesasTotal(evtKey, pax) + 2 + mesasAltas)], ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
+    ...repartoManteles(calcMesasTotal(evtKey, pax) + 2 + mesasAltas, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
+    ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
       ? [["Servilletas de tela", String(conMargen(totalPax))], ["Servilletas grandes (extra)", conSufijo(conMargen(totalPax / 50), "paq. (50)")]]
@@ -804,7 +806,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
-    tieneBrindisCava, mesVerano, fuerzaTextilTela, tipoCafetera,
+    tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera,
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -900,7 +902,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ["Manteles beige", String(calcMesasServicio(pax).total + 1)],
+    ...repartoManteles(calcMesasServicio(pax).total + 1, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ...(usaTela
@@ -1167,7 +1169,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     // Un mantel por mesa de servicio y de buffet (la del camión y la de cajas
     // sucias van sin vestir) + 1 de repuesto
-    ["Manteles negros", String(mesasServicio + MESAS_BUFFET + 1)],
+    ...repartoManteles(mesasServicio + MESAS_BUFFET + 1, opts.colorManteles || colorPorDefecto("produccion"), opts.porcentajeBeige),
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(nSala + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ["Bandeja camareros", String(nSala)],
@@ -3072,6 +3074,10 @@ export default function App({ onCerrarSesion } = {}) {
   // Cuántas carpas hacen falta. 0 = las que salgan de la cuenta por pax; cualquier
   // otro número manda sobre ella (lo pone quien ha visto el sitio, o el formulario).
   const [numCarpas, setNumCarpas] = useState(estadoInicial.numCarpas ?? 0);
+  // Color de los manteles. Vacío = el de siempre según el tipo de evento, para que un
+  // evento guardado antes de existir esta opción cargue exactamente lo mismo.
+  const [colorManteles, setColorManteles] = useState(estadoInicial.colorManteles ?? "");
+  const [porcentajeBeige, setPorcentajeBeige] = useState(estadoInicial.porcentajeBeige ?? 50);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
@@ -3312,7 +3318,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava,
+    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -3386,6 +3392,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
+    colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
@@ -4038,6 +4045,14 @@ export default function App({ onCerrarSesion } = {}) {
           if (estado.recogidas.some(x => (x.concepto || "").trim().toLowerCase() === r.concepto.toLowerCase())) return;
           estado.recogidas = [...estado.recogidas, r];
         });
+        // Y lo que hay que comprar, a Compras: también se suma sin duplicar, que lo
+        // que ya estuviera apuntado puede estar marcado como comprado.
+        const comprasAntes = Array.isArray(estado.compras) ? estado.compras : [];
+        estado.compras = comprasAntes.slice();
+        comprasDelEnvio(envio.respuestas || {}).forEach(c => {
+          if (estado.compras.some(x => (x.concepto || "").trim().toLowerCase() === c.concepto.toLowerCase())) return;
+          estado.compras = [...estado.compras, c];
+        });
         const siguiente = { ...guardados, [nombre]: estado };
         guardarEventos(siguiente);
         // No se borra: queda guardado como revisado, con a qué evento fue a parar
@@ -4154,7 +4169,7 @@ export default function App({ onCerrarSesion } = {}) {
   // se rehace cuando de verdad cambia algo que afecta a las cantidades.
   const opts = useMemo(() => ({
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
-    fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
+    fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler,
@@ -4167,7 +4182,7 @@ export default function App({ onCerrarSesion } = {}) {
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   }), [
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
-    fuerzaTextilTela, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
+    fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
@@ -5740,6 +5755,26 @@ export default function App({ onCerrarSesion } = {}) {
             {evento !== "cumpleanos" && evento !== "produccion" && (
               <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
             )}
+            <div className="equip-pareja">
+              {/* Cuántos manteles lo sigue calculando la app por las mesas; aquí solo
+                  se elige de cuáles. Vacío = el de siempre según el tipo de evento. */}
+              <SegmentedControl
+                label="Manteles"
+                value={colorManteles || colorPorDefecto(evento)}
+                onChange={setColorManteles}
+                options={["Beige", "Negros", "Ambos"]}
+              />
+              {(colorManteles || colorPorDefecto(evento)) === "Ambos" && (
+                <div className="form-group">
+                  <span className="form-label">% BEIGE (el resto, negros)</span>
+                  <input
+                    type="number" className="form-input" min="0" max="100"
+                    value={porcentajeBeige}
+                    onChange={e => setPorcentajeBeige(Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+                  />
+                </div>
+              )}
+            </div>
             <div className="equip-pareja">
               <SelectConOtro
                 label="Estilo plato principal"

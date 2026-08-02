@@ -534,3 +534,72 @@ console.log("\n══ Lo obligatorio del formulario ══");
   ok(dela("horno", "boda").noSe !== false,
     "pero al resto sí: una respuesta en blanco sigue siendo información buena");
 }
+
+// ── Manteles: la app pone cuántos, la oficina de qué color ────────────────────
+// Lo importante es que el reparto SUME el total calculado: si cargara el número
+// completo de cada color, se iría el doble de manteles en el camión.
+console.log("\n══ Color de los manteles ══");
+{
+  const { repartoManteles, colorPorDefecto } = await import("../manteles.js");
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+
+  ok(colorPorDefecto("boda") === "Beige" && colorPorDefecto("produccion") === "Negros",
+    "sin elegir nada se carga lo de siempre: beige en salón, negros en rodaje");
+
+  const uno = repartoManteles(11, "Negros");
+  ok(uno.length === 1 && uno[0][0] === "Manteles negros" && uno[0][1] === "11",
+    `un solo color lleva el total → ${JSON.stringify(uno)}`);
+
+  const dos = repartoManteles(11, "Ambos", 50);
+  const suma = dos.reduce((a, [, n]) => a + Number(n), 0);
+  ok(suma === 11, `de los dos colores, la suma es el total calculado (${suma} de 11)`);
+  ok(dos[0][0] === "Manteles beige" && dos[0][1] === "6" && dos[1][1] === "5",
+    `y se reparte por el porcentaje → ${JSON.stringify(dos)}`);
+  const setenta = repartoManteles(11, "Ambos", 70);
+  ok(setenta[0][1] === "8" && setenta[1][1] === "3",
+    `70% beige de 11 son 8 y 3 → ${JSON.stringify(setenta)}`);
+  ok(repartoManteles(11, "Ambos", 100).length === 1,
+    "al 100% no se carga una línea de cero del otro color");
+
+  // Los nombres son los de siempre: el nombre ES la identidad del item, y cambiarlo
+  // perdería las marcas de carga de los eventos que ya existen
+  ok(repartoManteles(5, "Beige")[0][0] === "Manteles beige",
+    "el nombre del item no cambia respecto a lo que ya había");
+
+  const e = aRespuestasDeLaApp({
+    tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100,
+    manteles: "Ambos", porcentajeBeige: 70, estiloPlato: "Otro", estiloPlatoCual: "Pizarra",
+  });
+  ok(e.colorManteles === "Ambos" && e.porcentajeBeige === 70,
+    "el color y el reparto viajan del formulario a la app");
+  ok(e.estiloPlatoPrincipal === "Pizarra",
+    `y un plato escrito a mano llega tal cual → "${e.estiloPlatoPrincipal}"`);
+  const lista = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde" });
+  ok(lista.estiloPlatoPrincipal === "Verde", "y uno de la lista, con su nombre exacto");
+  const sinDecir = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Otro", estiloPlatoCual: "  " });
+  ok(sinDecir.estiloPlatoPrincipal === undefined,
+    "si eligen \"Otro\" y no escriben nada, no se pisa el plato que tuviera la app");
+}
+
+// ── Lo que hay que comprar ────────────────────────────────────────────────────
+// El hielo no está en el almacén: alguien pasa a comprarlo. Va a Compras, que ya
+// tiene su aviso, en vez de quedarse enterrado en las notas del evento.
+console.log("\n══ Compras que trae el envío ══");
+{
+  const { comprasDelEnvio, resumirEnvio } = await import("../formulario/preguntas.js");
+  const c = comprasDelEnvio({ comprar: "20 sacos de hielo\n· Hielo seco\n\n   \n- Limas" });
+  ok(c.length === 3, `una línea, una compra (${c.length})`);
+  ok(c[0].concepto === "20 sacos de hielo" && c[1].concepto === "Hielo seco" && c[2].concepto === "Limas",
+    `y se limpian las viñetas y los huecos → ${JSON.stringify(c.map(x => x.concepto))}`);
+  ok(c.every(x => x.comprado === false),
+    "ninguna llega marcada como comprada: eso lo marca quien va a la tienda");
+  ok(comprasDelEnvio({}).length === 0 && comprasDelEnvio({ comprar: "  " }).length === 0,
+    "y sin nada que comprar no se inventa una línea vacía");
+
+  // En la bandeja se lee sin abrir el envío, y las notas siguen siendo cosa aparte
+  const filas = resumirEnvio({ tipo: "boda", comprar: "20 sacos de hielo\nHielo seco", notas: "Alergia al marisco" });
+  ok(filas.find(f => f.id === "comprar").respuesta === "20 sacos de hielo · Hielo seco",
+    "las compras se leen en una línea en la bandeja");
+  ok(filas.find(f => f.id === "notas").respuesta === "Alergia al marisco",
+    "y no se mezclan con las notas del evento");
+}
