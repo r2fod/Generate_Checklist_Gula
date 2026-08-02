@@ -734,6 +734,17 @@ async function main() {
 
     await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
     await p.waitForTimeout(500);
+
+    // Desde la PRIMERA pregunta se tiene que poder volver. Sin esto, en cuanto elegías
+    // el evento te quedabas encerrada en las preguntas: no había forma de mirar los
+    // eventos que hay ni lo que ya habías mandado sin cerrar la aplicación entera.
+    await p.locator(".form-btn-atras").click();
+    await p.waitForTimeout(500);
+    ok(/De qué evento son los datos/i.test(await p.locator(".form-titulo").innerText()),
+      "desde la primera pregunta se vuelve a la lista de eventos");
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(500);
+
     await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
     await p.waitForTimeout(600);
     ok(/Cómo lo llamamos/i.test(await p.locator(".form-titulo").innerText()),
