@@ -251,6 +251,52 @@ export const PREGUNTAS = [
     soloEn: ["produccion"],
   },
 
+  // ── Mantelería y platos ────────────────────────────────────────────────────
+  // Cuántos manteles lo calcula la app por las mesas: aquí solo se elige de cuáles.
+  {
+    id: "manteles", tipo: "opciones", texto: "¿De qué color los manteles?",
+    nota: "Cuántos hacen falta lo calcula la app; esto es solo el color.",
+    opciones: [
+      { valor: "Beige", texto: "Beige" },
+      { valor: "Negros", texto: "Negros" },
+      {
+        valor: "Ambos", texto: "De los dos",
+        conNumero: "¿Qué parte en beige? (%)",
+        campoNumero: "porcentajeBeige",
+        sugerido: () => 50,
+        avisoNumero: (n) => `${n}% beige y ${100 - Math.min(100, Math.max(0, n))}% negros, repartiendo el total que salga.`,
+      },
+    ],
+  },
+  {
+    // En una boda van siempre de tela, así que ahí no se pregunta
+    id: "servilletasTela", tipo: "opciones", texto: "¿Servilletas de tela?",
+    nota: "Si no, van de papel.",
+    opciones: [
+      { valor: "si", texto: "Sí, de tela" },
+      { valor: "no", texto: "No, de papel" },
+    ],
+    soloEn: ["comunion", "corporativo", "cumpleanos", "produccion"],
+  },
+  {
+    // Se elige de una lista y no se escribe libre a propósito: el nombre del plato
+    // sale tal cual en la checklist y ES la identidad del item, así que "blanco",
+    // "blancos" y "el blanco liso" serían tres cosas distintas y cada corrección
+    // perdería las marcas de carga.
+    id: "estiloPlato", tipo: "opciones", texto: "¿Qué plato lleva?",
+    opciones: [
+      { valor: "Blanco liso", texto: "Blanco liso" },
+      { valor: "Relieve blanco", texto: "Relieve blanco" },
+      { valor: "Verde", texto: "Verde" },
+      { valor: "Metálico", texto: "Metálico" },
+      {
+        valor: "Otro", texto: "Otro (escribirlo)",
+        conCampos: [{ sufijo: "Cual", etiqueta: "¿Cuál?", ejemplo: "Pizarra, madera..." }],
+      },
+    ],
+    soloEn: CON_BARRA,
+  },
+
   // ── Lo que hay que ir a buscar ─────────────────────────────────────────────
   // Flores y minutas no se cargan del almacén: alguien tiene que ir a recogerlas a
   // un sitio y un día concretos. Por eso no son un interruptor más, sino que crean
@@ -286,9 +332,20 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
 
+  {
+    // Lo que hay que comprar (hielo, hielo seco, algo del súper) no es material de
+    // almacén: alguien tiene que pasar a comprarlo. Va a Compras, que ya tiene su
+    // aviso, en vez de perderse en las notas.
+    id: "comprar", tipo: "texto-largo", texto: "¿Hay que comprar algo?",
+    nota: "Hielo, refrescos concretos, algo del súper... Una cosa por línea.",
+    campo: "comprar",
+    ejemplo: "20 sacos de hielo\nHielo seco",
+  },
+
   // ── Cierre ─────────────────────────────────────────────────────────────────
   {
     id: "notas", tipo: "texto-largo", texto: "¿Algo que haya que tener en cuenta?",
+    campo: "notas",
     nota: "Alergias, peticiones del cliente, con quién hay que hablar en el sitio...",
     noSe: false,
   },
@@ -330,7 +387,10 @@ export function resumirRespuesta(p, r, tipo) {
   if (p.tipo === "textos") return p.campos.map(c => r[c.id]).filter(Boolean).join(" · ") || "sin contestar";
   if (p.tipo === "numeros") return p.campos.map(c => r[c.id] ? `${r[c.id]} ${c.etiqueta.toLowerCase()}` : "").filter(Boolean).join(" · ") || "sin contestar";
   if (p.tipo === "cuando") return [fmtFechaCorta(r.fecha), r.horaInicio, r.horaFin && `a ${r.horaFin}`].filter(Boolean).join(" · ") || "sin contestar";
-  if (p.tipo === "texto-largo") return r.notas ? r.notas.slice(0, 60) : "nada";
+  if (p.tipo === "texto-largo") {
+    const txt = r[p.campo || "notas"];
+    return txt ? txt.replace(/\n+/g, " · ").slice(0, 70) : "nada";
+  }
   if (p.tipo === "dias") {
     const d = (r.dias || []).filter(Boolean);
     return d.length ? `${d.join(" + ")} en ${d.length} días` : "sin contestar";
@@ -440,6 +500,17 @@ export function aRespuestasDeLaApp(r = {}) {
     }
   }
 
+  if (puesto(r.manteles)) {
+    estado.colorManteles = r.manteles;
+    if (r.manteles === "Ambos" && r.porcentajeBeige > 0) estado.porcentajeBeige = r.porcentajeBeige;
+  }
+  if (puesto(r.servilletasTela)) estado.fuerzaTextilTela = r.servilletasTela === "si";
+  if (puesto(r.estiloPlato)) {
+    // "Otro" viaja con lo que hayan escrito; si lo dejaron vacío no se pisa el de la app
+    const suyo = (r.estiloPlatoCual || "").trim();
+    if (r.estiloPlato !== "Otro") estado.estiloPlatoPrincipal = r.estiloPlato;
+    else if (suyo) estado.estiloPlatoPrincipal = suyo;
+  }
   if (puesto(r.horno)) estado.tipoHorno = r.horno;
   if (puesto(r.nevera)) estado.tipoNevera = r.nevera;
   if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
@@ -523,4 +594,15 @@ export function loQueFalta(respuestas = {}) {
   return preguntasDe(tipo, respuestas)
     .map(p => ({ id: p.id, aviso: p.falta ? p.falta(respuestas) : "" }))
     .filter(x => !!x.aviso);
+}
+
+// Lo que hay que comprar, en líneas, tal como las guarda la app en Compras. Va aparte
+// de aRespuestasDeLaApp por lo mismo que las recogidas: son líneas que se SUMAN a lo
+// que el evento ya tuviera, no un campo que lo sustituye.
+export function comprasDelEnvio(r = {}) {
+  return String(r.comprar || "")
+    .split("\n")
+    .map(l => l.replace(/^[\s•·*-]+/, "").trim())
+    .filter(Boolean)
+    .map(concepto => ({ concepto, cantidad: "", comprado: false }));
 }
