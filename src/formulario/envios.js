@@ -43,9 +43,9 @@ export const MAX_PROXIMOS = 8;
 // Deja los avisos en su forma mínima: nombre y teléfono solo con dígitos (WhatsApp
 // no traga espacios ni guiones). Los que se queden sin número no viajan.
 //
-// Los teléfonos NO salen de la app: no viajan a la lista que lee el formulario. Quien
-// avisa es logística desde su bandeja, así que la oficina no necesita verlos — y un
-// número menos ahí fuera es un número menos que se puede filtrar con el enlace.
+// Aviso: estos números viajan en la lista que lee el formulario, porque es su pantalla
+// de "Enviado" la que pinta el botón de avisar. Quien tenga el enlace del formulario
+// puede verlos. Es el precio de que el aviso salga de un solo toque al enviar.
 export function limpiarAvisos(avisos = []) {
   return (Array.isArray(avisos) ? avisos : [])
     .map(a => ({ nombre: (a.nombre || "").trim(), tel: String(a.tel || "").replace(/[^0-9]/g, "") }))
@@ -67,12 +67,15 @@ export function resumirParaOficina(eventosGuardados = {}, hoy = new Date().toISO
 }
 
 // La app publica la lista corta cada vez que cambian sus eventos
-export async function publicarProximos(codigo, eventosGuardados) {
+export async function publicarProximos(codigo, eventosGuardados, avisos = []) {
   const conexion = await getDb();
   if (!conexion || !codigo) return;
   const { db, fs } = conexion;
   await fs.setDoc(fs.doc(db, "publico", codigo), {
     eventos: resumirParaOficina(eventosGuardados),
+    // A quién avisar por WhatsApp al terminar de mandar. Va aquí porque el botón lo
+    // pinta el formulario: es su "Enviar" el que encadena el aviso.
+    avisos: limpiarAvisos(avisos),
     actualizado: Date.now(),
   });
 }
@@ -96,7 +99,8 @@ export async function leerProximos(codigo) {
   try {
     const snap = await fs.getDoc(fs.doc(db, "publico", codigo));
     if (!snap.exists()) return { ok: false, motivo: "no-existe" };
-    return { ok: true, eventos: snap.data().eventos || [] };
+    const d = snap.data();
+    return { ok: true, eventos: d.eventos || [], avisos: Array.isArray(d.avisos) ? d.avisos : [] };
   } catch (e) {
     return { ok: false, motivo: "sin-conexion" };
   }

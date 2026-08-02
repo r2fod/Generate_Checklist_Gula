@@ -43,6 +43,10 @@ function codigoGuardado() {
 // para probarlo no deja el navegador atrapado en el formulario.
 function abiertaComoApp() {
   try {
+    // La app instalada del formulario arranca en ?formulario=1, que es lo que dice su
+    // propio manifiesto: es la señal más fiable, no depende de cómo el navegador
+    // reporte el modo de pantalla.
+    if (new URLSearchParams(window.location.search).get("formulario")) return true;
     if (window.navigator.standalone) return true;
     return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
   } catch (e) { return false; }

@@ -740,19 +740,44 @@ async function main() {
     await p.locator(".form-btn-principal").click();
     await p.waitForTimeout(400);
 
+    // El nombre y el día no se pueden dejar en blanco (sin día no hay recogidas), así
+    // que al pasar por esas dos pantallas hay que rellenarlas: en el resto vale "No lo sé".
+    const rellenarObligatorio = async (titulo) => {
+      if (/Cómo lo llamamos/i.test(titulo)) {
+        await p.locator(".form-input").first().fill("Evento de prueba");
+        await p.locator(".form-input").nth(1).fill("Finca de prueba");
+        await p.locator(".form-btn-principal").click();
+        await p.waitForTimeout(300);
+        return true;
+      }
+      if (/Qué día/i.test(titulo)) {
+        await p.locator('input[type="date"]').first().fill("2027-08-11");
+        await p.waitForTimeout(200);
+        await p.locator(".form-btn-principal").click();
+        await p.waitForTimeout(300);
+        return true;
+      }
+      return false;
+    };
+
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
     // puede dejar el formulario atascado en ninguna pregunta
     let vueltas = 0;
-    while (vueltas++ < 15 && !/Está todo bien/i.test(await p.locator(".form-titulo").innerText())) {
+    while (vueltas++ < 18) {
+      const t = await p.locator(".form-titulo").innerText();
+      if (/Está todo bien/i.test(t)) break;
+      if (await rellenarObligatorio(t)) continue;
       const nose = p.locator(".form-btn-nose");
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(280);
     }
     ok(/Está todo bien/i.test(await p.locator(".form-titulo").innerText()),
-      `se puede llegar al final contestando "No lo sé" a todo (${vueltas} pantallas)`);
+      `se llega al final contestando "No lo sé" a todo lo que no es obligatorio (${vueltas} pantallas)`);
+    ok(await p.locator(".form-btn-principal", { hasText: "Falta algo" }).count() === 0,
+      "y con el nombre y el día puestos, el repaso deja enviar");
 
     const repaso = await p.locator(".form-repaso-fila").allInnerTexts();
-    ok(repaso.some(t => /Boda de Ana y Luis/.test(t)) && repaso.some(t => /no lo sé/i.test(t)),
+    ok(repaso.some(t => /Boda de Ana y Luis|Evento de prueba/.test(t)) && repaso.some(t => /no lo sé/i.test(t)),
       "y el repaso enseña lo contestado y lo que se dejó en blanco");
     ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
       "sin desbordamiento en el móvil");
@@ -761,10 +786,11 @@ async function main() {
     // de las 8 del almacén, tiene que decirlo AHÍ, no descubrirse el día del rodaje.
     const preguntaDe = async (texto) => {
       let vueltas = 0;
-      while (vueltas++ < 20) {
+      while (vueltas++ < 22) {
         const t = await p.locator(".form-titulo").innerText();
         if (new RegExp(texto, "i").test(t)) return true;
         if (/Está todo bien/i.test(t)) return false;
+        if (await rellenarObligatorio(t)) continue;
         const nose = p.locator(".form-btn-nose");
         if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
         await p.waitForTimeout(260);
@@ -816,11 +842,19 @@ async function main() {
     await p.locator(".form-input").nth(1).fill("Finca La Alquería");
     await p.locator(".form-btn-principal").click();
     await p.waitForTimeout(400);
-    while (!/Está todo bien/i.test(await p.locator(".form-titulo").innerText())) {
+    // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
+    // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
+    // en vez de fallar y decir por qué.
+    let vueltasBorrador = 0;
+    while (vueltasBorrador++ < 20) {
+      const t = await p.locator(".form-titulo").innerText();
+      if (/Está todo bien/i.test(t)) break;
+      if (await rellenarObligatorio(t)) continue;
       const nose = p.locator(".form-btn-nose");
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
+    ok(vueltasBorrador < 20, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),

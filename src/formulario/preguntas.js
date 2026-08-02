@@ -42,6 +42,9 @@ export const PREGUNTAS = [
   },
   {
     id: "nombreYsitio", tipo: "textos", texto: "¿Cómo lo llamamos y dónde es?",
+    // Sin nombre, a logística le llega un "Evento sin nombre" y no sabe de qué habla
+    noSe: false,
+    falta: (r) => (!r.nombre || !r.nombre.trim()) && "Ponle un nombre, aunque sea provisional.",
     campos: [
       { id: "nombre", etiqueta: "Nombre del evento", ejemplo: "Boda de Ana y Luis" },
       { id: "sitio", etiqueta: "Sitio", ejemplo: "Finca La Alquería", sugerencias: "sitiosRecientes" },
@@ -50,6 +53,10 @@ export const PREGUNTAS = [
   {
     id: "cuando", tipo: "cuando", texto: "¿Qué día y a qué hora?",
     nota: "La hora de fin la usa logística para cuadrar los horarios del equipo.",
+    // Sin día no se pueden calcular las recogidas (flores, minutas, alquileres), que
+    // es justo lo que hace que alguien vaya a buscarlas a tiempo
+    noSe: false,
+    falta: (r) => !r.fecha && "Pon el día del evento: sin él no se pueden preparar las recogidas.",
   },
   {
     id: "gente", tipo: "numeros", texto: "¿Cuánta gente?",
@@ -507,4 +514,13 @@ export function cambiosEntreRespuestas(antes = {}, ahora = {}) {
     if (a !== b) cambios.push({ id: p.id, pregunta: p.texto, antes: a, ahora: b });
   });
   return cambios;
+}
+
+// Lo que falta por contestar y no se puede dejar en blanco. Devuelve [{ id, aviso }]
+// para poder llevar a esa pregunta desde el repaso en vez de solo decir "falta algo".
+export function loQueFalta(respuestas = {}) {
+  const tipo = respuestas.tipo || "boda";
+  return preguntasDe(tipo, respuestas)
+    .map(p => ({ id: p.id, aviso: p.falta ? p.falta(respuestas) : "" }))
+    .filter(x => !!x.aviso);
 }
