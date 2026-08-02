@@ -757,8 +757,8 @@ async function main() {
     ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
       "sin desbordamiento en el móvil");
 
-    // Lo de las carpas de alquiler solo se pregunta si NO hay sombra: preguntarlo
-    // cuando ni siquiera van carpas sería una pantalla de más, y esto se rellena de pie
+    // Las carpas: se propone un número sacado de la gente y se puede cambiar. Si pasa
+    // de las 8 del almacén, tiene que decirlo AHÍ, no descubrirse el día del rodaje.
     const preguntaDe = async (texto) => {
       let vueltas = 0;
       while (vueltas++ < 20) {
@@ -778,24 +778,31 @@ async function main() {
     await p.waitForTimeout(400);
     await p.locator(".form-opcion", { hasText: "Producción o rodaje" }).first().click();
     await p.waitForTimeout(600);
-    ok(await preguntaDe("Hay sombra"), "en un rodaje se pregunta por la sombra");
-    await p.locator(".form-opcion", { hasText: "Sí, hay" }).first().click();
-    await p.waitForTimeout(500);
-    ok(!/carpas/i.test(await p.locator(".form-titulo").innerText()),
-      "si hay sombra, de las carpas no se pregunta nada");
-
-    await p.evaluate(() => localStorage.clear());
-    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
-    await p.waitForTimeout(2400);
-    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    // Los días, que son los que dan la recomendación
+    ok(await preguntaDe("Cuántos días"), "en un rodaje se pregunta por los días y la gente");
+    // Primero cuántos días, y eso abre un campo por día: la gente va en el segundo
+    await p.locator(".form-campos input[type=number]").first().fill("1");
     await p.waitForTimeout(400);
-    await p.locator(".form-opcion", { hasText: "Producción o rodaje" }).first().click();
-    await p.waitForTimeout(600);
-    await preguntaDe("Hay sombra");
-    await p.locator(".form-opcion", { hasText: "No hay" }).first().click();
-    await p.waitForTimeout(600);
-    ok(/carpas/i.test(await p.locator(".form-titulo").innerText()),
-      `sin sombra sí se pregunta si hay que alquilarlas → "${await p.locator(".form-titulo").innerText()}"`);
+    await p.locator(".form-campos input[type=number]").nth(1).fill("40");
+    await p.waitForTimeout(400);
+    // Con "Siguiente", no con "No lo sé": ese borra lo que se acaba de rellenar
+    await p.locator(".form-btn-principal").first().click();
+    await p.waitForTimeout(400);
+
+    ok(await preguntaDe("Hacen falta carpas"),
+      `se pregunta por las carpas, no por la sombra → "${await p.locator(".form-titulo").innerText()}"`);
+    await p.locator(".form-opcion", { hasText: "Sí" }).first().click();
+    await p.waitForTimeout(500);
+    const numero = p.locator(".form-subcampo input[type=number]").first();
+    const propuesto = Number(await numero.inputValue());
+    // 40 pax → 4 para comer (40/12) + buffet + camión = 6
+    ok(propuesto === 6, `propone las que salen de la gente puesta (${propuesto})`);
+    ok(/no hay que alquilar ninguna/i.test(await p.locator(".form-nota-aviso").innerText()),
+      "y con 6 dice que caben en el almacén");
+    await numero.fill("11");
+    await p.waitForTimeout(400);
+    ok(/alquilar 3/i.test(await p.locator(".form-nota-aviso").innerText()),
+      `si se piden 11 dice cuántas hay que alquilar → "${await p.locator(".form-nota-aviso").innerText()}"`);
 
     // El borrador sobrevive a cerrar el navegador a media pregunta
     await p.evaluate(() => localStorage.clear());
@@ -868,7 +875,7 @@ async function main() {
     const produ = await desdeElFormulario({
       tipo: "produccion", nombre: "Produ Movistar", sitio: "Solo Houses",
       fecha: "2027-07-29", horaInicio: "07:00",
-      dias: [12, 17, 12], sombra: "no", generador: "si",
+      dias: [12, 17, 12], carpas: "si", numCarpas: 4, generador: "si",
       menu: ["paella"], horno: "Pequeño", extras: [], notas: "",
     });
     ok(produ.estado.llevaCarpas === true && produ.estado.llevaGenerador === true
@@ -876,11 +883,11 @@ async function main() {
       && JSON.stringify(produ.estado.diasProduccion) === JSON.stringify(["12", "17", "12"]),
       `el rodaje traduce días, carpas, generador y sillas propias → ${JSON.stringify(produ.estado.diasProduccion)}`);
     ok(tiene(produ.nombres, "Carpas") && tiene(produ.nombres, "Generador"),
-      "sin sombra van carpas, y el generador se carga con su gasolina");
+      "las carpas van con el generador y su gasolina");
     ok(tiene(produ.nombres, "Sillas (nuestras)"),
       "y las sillas del rodaje son las nuestras, sin alquiler");
-    ok(produ.estado.alquilaCarpas === undefined,
-      "sin contestar lo de las carpas, no se da por hecho que se alquilan");
+    ok(produ.estado.alquilaCarpas === false && produ.estado.numCarpas === 4,
+      `4 carpas caben en el almacén: no se alquila ninguna (${JSON.stringify(produ.estado.alquilaCarpas)})`);
 
     // A quién se alquilan las sillas lo sabe la oficina y la app no lo puede deducir:
     // cada proveedor es una recogida distinta
@@ -891,11 +898,11 @@ async function main() {
       "y trae su recogida en Carvillo, no en Dealde");
     const carpasSOS = aRespuestasDeLaApp({
       tipo: "produccion", nombre: "Rodaje X", fecha: "2027-07-29",
-      dias: [20], sombra: "no", carpasAlquiler: "sos",
+      dias: [20], carpas: "si", numCarpas: 11,
     });
     ok(carpasSOS.llevaCarpas === true && carpasSOS.alquilaCarpas === true
       && recogidasConAlquileres(carpasSOS).some(r => r.concepto === "Carpas (Support On Set)"),
-      "las carpas que hay que alquilar crean su recogida en SOS");
+      "pedir más carpas de las que hay en almacén crea sola su recogida en SOS");
     {
       // En un rodaje se separa mucho más residuo que en un banquete
       const cubos = await p.locator(".item-row", { hasText: "Cubo basura reciclaje" }).first().locator(".item-qty-input").inputValue();

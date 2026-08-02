@@ -30,21 +30,23 @@ export const nubeActiva = () => !!firebaseConfig;
 // documento no se cuela como si fuera un evento.
 const DOC_FORMULARIO = "formulario";
 
-export async function leerCodigoFormulario() {
+export async function leerConfigFormulario() {
   const conexion = await getDb();
-  if (!conexion) return "";
+  if (!conexion) return { codigo: "", avisos: [] };
   const { db, fs } = conexion;
   try {
     const snap = await fs.getDoc(fs.doc(db, COL_ARCHIVO, DOC_FORMULARIO));
-    return (snap.exists() && snap.data().codigo) || "";
-  } catch (e) { return ""; }
+    if (!snap.exists()) return { codigo: "", avisos: [] };
+    const d = snap.data();
+    return { codigo: d.codigo || "", avisos: Array.isArray(d.avisos) ? d.avisos : [] };
+  } catch (e) { return { codigo: "", avisos: [] }; }
 }
 
-export async function guardarCodigoFormulario(codigo) {
+export async function guardarConfigFormulario({ codigo, avisos = [] }) {
   const conexion = await getDb();
   if (!conexion) return;
   const { db, fs } = conexion;
-  await fs.setDoc(fs.doc(db, COL_ARCHIVO, DOC_FORMULARIO), { codigo, actualizado: Date.now() });
+  await fs.setDoc(fs.doc(db, COL_ARCHIVO, DOC_FORMULARIO), { codigo, avisos, actualizado: Date.now() });
 }
 
 // Id corto y legible para el link (~8 caracteres sin ambiguos: 31^8 combinaciones)

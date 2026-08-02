@@ -40,6 +40,19 @@ export function nuevoCodigo() {
 // Cuántos eventos ve la oficina y de qué ventana de fechas salen
 export const MAX_PROXIMOS = 8;
 
+// Deja los avisos en su forma mínima: nombre y teléfono solo con dígitos (WhatsApp
+// no traga espacios ni guiones). Los que se queden sin número no viajan.
+//
+// Los teléfonos NO salen de la app: no viajan a la lista que lee el formulario. Quien
+// avisa es logística desde su bandeja, así que la oficina no necesita verlos — y un
+// número menos ahí fuera es un número menos que se puede filtrar con el enlace.
+export function limpiarAvisos(avisos = []) {
+  return (Array.isArray(avisos) ? avisos : [])
+    .map(a => ({ nombre: (a.nombre || "").trim(), tel: String(a.tel || "").replace(/[^0-9]/g, "") }))
+    .filter(a => a.tel.length >= 6)
+    .slice(0, 6);
+}
+
 // Deja SOLO lo que la oficina necesita para reconocer un evento. Esta función es la
 // frontera de lo que sale de la app: si algún día se añade un campo al evento, aquí
 // no aparece salvo que se ponga a mano, que es justo lo que se quiere.

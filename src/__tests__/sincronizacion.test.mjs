@@ -262,7 +262,7 @@ console.log("\n══ Cómo se lee un envío en la bandeja ══");
     `lo contestado se lee entero → "${de("gente").respuesta}"`);
   ok(de("cuando").respuesta.includes("12:30") && de("cuando").respuesta.includes("a 02:00"),
     `la hora de fin se enseña aunque no configure nada → "${de("cuando").respuesta}"`);
-  ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "sombra"),
+  ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "carpas"),
     "y de una boda no se enseñan las preguntas de rodaje");
 }
 
@@ -371,4 +371,140 @@ console.log("\n══ Borrar un evento ══");
   const paraOficina = resumirParaOficina(despues, "2027-01-01").map(e => e.nombre);
   ok(!paraOficina.includes("Cumple Marta") && paraOficina.includes("Boda Ana"),
     `y desaparece de los próximos que ve la oficina → ${JSON.stringify(paraOficina)}`);
+}
+
+// ── Flores y minutas: no son material, son un sitio y un día ──────────────────
+// No se cargan del almacén: alguien tiene que ir a por ellas. Si no acaban en las
+// recogidas con su fecha, no avisa nadie y el día del evento no están.
+console.log("\n══ Flores y minutas → recogidas ══");
+{
+  const { recogidasDelEnvio, resumirEnvio, archivosDelEnvio } = await import("../formulario/preguntas.js");
+
+  const r = recogidasDelEnvio({
+    tipo: "boda", flores: "si", floresQuien: "Floristería Mar", floresFecha: "2027-08-10",
+    minutas: "si", minutasQuien: "Imprenta Ruiz", minutasFecha: "2027-08-09",
+  });
+  ok(r.length === 2 && r[0].concepto === "Flores (Floristería Mar)" && r[0].fecha === "2027-08-10",
+    `las flores van con su sitio y su día → ${JSON.stringify(r[0])}`);
+  ok(r[1].concepto === "Minutas (Imprenta Ruiz)" && r[1].fecha === "2027-08-09",
+    `y las minutas igual → ${JSON.stringify(r[1])}`);
+  ok(!r.some(x => x.auto),
+    "no son automáticas: se portan como una recogida escrita a mano y nada las quita sola");
+
+  ok(recogidasDelEnvio({ flores: "no", minutas: "no" }).length === 0,
+    "si no llevan, no se crea ninguna recogida");
+  ok(recogidasDelEnvio({}).length === 0,
+    "y si no lo han contestado, tampoco se inventa nada");
+  const sinQuien = recogidasDelEnvio({ flores: "si", floresFecha: "2027-08-10" });
+  ok(sinQuien[0].concepto === "Flores",
+    `sin saber a quién, la recogida se crea igual → "${sinQuien[0].concepto}"`);
+
+  // En la bandeja se leen con su sitio y su día, no como un "Sí" pelado
+  const fila = resumirEnvio({
+    tipo: "boda", flores: "si", floresQuien: "Floristería Mar", floresFecha: "2027-08-10",
+  }).find(f => f.id === "flores");
+  ok(/Floristería Mar/.test(fila.respuesta) && /ago/.test(fila.respuesta),
+    `y se leen enteras en la bandeja → "${fila.respuesta}"`);
+
+  // Minutas en todos los eventos menos en rodaje; flores en todos
+  const ids = (tipo) => resumirEnvio({ tipo }).map(f => f.id);
+  ok(ids("produccion").includes("flores") && !ids("produccion").includes("minutas"),
+    "en un rodaje se preguntan las flores pero no las minutas");
+  ok(ids("cumpleanos").includes("minutas") && ids("boda").includes("minutas"),
+    "y las minutas se preguntan en el resto de eventos");
+
+  // Lo que hay que imprimir, solo en rodaje
+  ok(ids("produccion").includes("imprimirMenu") && ids("produccion").includes("etiquetas"),
+    "en un rodaje se pregunta por el menú a imprimir y por las etiquetas");
+  ok(!ids("boda").includes("imprimirMenu"),
+    "y en una boda no se pregunta nada de imprimir");
+
+  const conArchivo = archivosDelEnvio({
+    imprimirMenu: "si",
+    imprimirMenuArchivo: { nombre: "menu.jpg", tipo: "image/jpeg", datos: "data:image/jpeg;base64,AAAA", peso: 1234 },
+  });
+  ok(conArchivo.length === 1 && conArchivo[0].etiqueta === "Menú para imprimir",
+    `el archivo adjunto llega a la bandeja → ${conArchivo[0].archivo.nombre}`);
+  ok(archivosDelEnvio({ imprimirMenu: "si" }).length === 0,
+    "y decir que sí sin adjuntar nada no inventa un archivo vacío");
+}
+
+// ── Carpas: se pregunta el número, no si hay sombra ───────────────────────────
+// Preguntar "¿hay sombra?" es preguntar por el problema; lo que hay que cargar es un
+// número de carpas. Se propone el que sale de la gente y se puede cambiar, y lo que
+// pase de las 8 del almacén se alquila solo.
+console.log("\n══ Cuántas carpas y cuántas alquilar ══");
+{
+  const { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } = await import("../carpas.js");
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+
+  ok(carpasRecomendadas(40) === 6, `40 pax → 6 carpas (4 de comer + buffet + camión): ${carpasRecomendadas(40)}`);
+  ok(carpasRecomendadas(12) === 3, `12 pax → 3: ${carpasRecomendadas(12)}`);
+  ok(carpasRecomendadas(0) === 3, "sin gente puesta se propone el mínimo, no cero");
+  ok(carpasPorAlquilar(11) === 3 && carpasPorAlquilar(6) === 0,
+    `de 11 hay que alquilar 3, y de 6 ninguna (almacén: ${CARPAS_EN_ALMACEN})`);
+  ok(paxDelDiaGrande(["12", "17", "12"]) === 17,
+    "manda el día de más gente: las carpas se montan una vez y se quedan");
+
+  const pocas = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], carpas: "si", numCarpas: 5 });
+  ok(pocas.llevaCarpas === true && pocas.numCarpas === 5 && pocas.alquilaCarpas === false,
+    "5 carpas caben en el almacén: no se alquila ninguna");
+  const muchas = aRespuestasDeLaApp({ tipo: "produccion", dias: [120], carpas: "si", numCarpas: 12 });
+  ok(muchas.alquilaCarpas === true,
+    "12 no caben: se marca el alquiler solo, sin preguntarlo aparte");
+  const ninguna = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], carpas: "no" });
+  ok(ninguna.llevaCarpas === false && ninguna.numCarpas === undefined,
+    "y si no hacen falta, no se lleva ninguna");
+
+  // Lo que ya no se pregunta en un rodaje
+  const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
+  ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),
+    "ya no se pregunta por la sombra ni si se alquilan: lo dice el número");
+  const opcionesMenu = resumirEnvio({ tipo: "produccion", menu: ["paella", "frito", "jamonero"] });
+  ok(!/Jamonero/.test(opcionesMenu.find(f => f.id === "menu").respuesta),
+    "en un rodaje no se ofrece jamonero");
+  ok(!ids.includes("extras"),
+    "y sin chill out ni palomitera no queda nada que preguntar de lo presupuestado: esa pantalla no sale");
+  ok(resumirEnvio({ tipo: "boda" }).some(f => f.id === "extras"),
+    "pero en una boda esa pregunta sigue estando");
+}
+
+// ── A quién se avisa por WhatsApp ─────────────────────────────────────────────
+// El aviso dentro de la app solo salta si la app está abierta. Desde la bandeja se
+// puede avisar por WhatsApp con todo cerrado, y por eso los números tienen que
+// quedar limpios: WhatsApp no traga espacios, guiones ni el "+".
+console.log("\n══ Avisos por WhatsApp ══");
+{
+  const { limpiarAvisos } = await import("../formulario/envios.js");
+  const l = limpiarAvisos([{ nombre: "  Raúl · Jefe de logística ", tel: "+34 656 47 47 01" }]);
+  ok(l[0].tel === "34656474701", `el número se limpia para el enlace → ${l[0].tel}`);
+  ok(l[0].nombre === "Raúl · Jefe de logística", "y el nombre se queda sin espacios de más");
+  ok(limpiarAvisos([{ nombre: "Sin número", tel: "" }]).length === 0,
+    "un contacto sin número no viaja: sería un botón que no lleva a ningún sitio");
+  ok(limpiarAvisos([{ nombre: "Corto", tel: "123" }]).length === 0,
+    "y un número imposible tampoco");
+  ok(limpiarAvisos(Array.from({ length: 12 }, (_, i) => ({ nombre: `N${i}`, tel: "34600111222" }))).length === 6,
+    "como mucho 6, que si no cada envío de la bandeja es una fila de botones");
+  ok(limpiarAvisos(null).length === 0 && limpiarAvisos(undefined).length === 0,
+    "sin nadie configurado no falla: simplemente no sale el botón");
+}
+
+// ── Qué han cambiado, no que hayan cambiado algo ──────────────────────────────
+// Cuando la oficina corrige un envío, lo útil es la diferencia: "120 → 140 adultos"
+// se lee de un vistazo, "han cambiado algo" obliga a abrirlo y compararlo a mano.
+console.log("\n══ La diferencia entre dos versiones de un envío ══");
+{
+  const { cambiosEntreRespuestas } = await import("../formulario/preguntas.js");
+  const antes = { tipo: "boda", nombre: "Boda A", adultos: 120, ninos: 10, horno: "Grande", copas: 4 };
+  const dif = cambiosEntreRespuestas(antes, { ...antes, adultos: 140, horno: "Ambos" });
+  ok(dif.length === 2, `solo salen las que han cambiado (${dif.length})`);
+  const gente = dif.find(c => c.id === "gente");
+  ok(gente.antes.includes("120") && gente.ahora.includes("140"),
+    `y se leen en palabras → "${gente.antes} → ${gente.ahora}"`);
+  ok(dif.some(c => c.id === "horno" && c.ahora === "Los dos"),
+    "también las de elegir, con el texto de la opción y no su código");
+  ok(cambiosEntreRespuestas(antes, antes).length === 0,
+    "si no ha cambiado nada, no se dice nada");
+  ok(cambiosEntreRespuestas({}, {}).length === 0,
+    "y con envíos vacíos no revienta");
 }
