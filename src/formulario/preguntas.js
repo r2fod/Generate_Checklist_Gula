@@ -326,6 +326,23 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
 
+  {
+    // Solo si han dicho el plato principal: si no lo saben, tampoco van a saber el de
+    // postre, y sería una pantalla de más.
+    id: "estiloPlatoPostre", tipo: "opciones", texto: "¿Y el plato de postre?",
+    opciones: [
+      { valor: "Blanco", texto: "Blanco" },
+      { valor: "Verde", texto: "Verde" },
+      { valor: "Negro/gris", texto: "Negro o gris" },
+      {
+        valor: "Otro", texto: "Otro (escribirlo)",
+        conCampos: [{ sufijo: "Cual", etiqueta: "¿Cuál?", ejemplo: "Pizarra, madera..." }],
+      },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null,
+  },
+
   // ── Lo que hay que ir a buscar ─────────────────────────────────────────────
   // Flores y minutas no se cargan del almacén: alguien tiene que ir a recogerlas a
   // un sitio y un día concretos. Por eso no son un interruptor más, sino que crean
@@ -546,6 +563,11 @@ export function aRespuestasDeLaApp(r = {}) {
     const suyo = (r.estiloPlatoCual || "").trim();
     if (r.estiloPlato !== "Otro") estado.estiloPlatoPrincipal = r.estiloPlato;
     else if (suyo) estado.estiloPlatoPrincipal = suyo;
+  }
+  if (puesto(r.estiloPlatoPostre)) {
+    const suyo = (r.estiloPlatoPostreCual || "").trim();
+    if (r.estiloPlatoPostre !== "Otro") estado.estiloPlatoPostre = r.estiloPlatoPostre;
+    else if (suyo) estado.estiloPlatoPostre = suyo;
   }
   if (puesto(r.horno)) estado.tipoHorno = r.horno;
   if (puesto(r.nevera)) estado.tipoNevera = r.nevera;

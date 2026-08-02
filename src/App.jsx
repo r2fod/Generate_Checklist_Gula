@@ -2835,6 +2835,24 @@ function guardarSincronizados(nombres) {
   try { localStorage.setItem(CLAVE_SINCRONIZADOS, JSON.stringify(nombres)); } catch (e) { /* localStorage no disponible */ }
 }
 
+// ─── LINK DE SOLO MARCAR ───────────────────────────────────────────────────────
+// El link de un evento se le pasa a quien carga el camión. Hasta ahora daba lo mismo
+// que a ti: podía cambiar cantidades, quitar items o tocar la configuración sin
+// querer, y eso se sincroniza a todo el mundo. Con "?solo=1" la pantalla se queda en
+// modo marcar: se ve la checklist, se abre Modo carga y se marca todo lo que haga
+// falta, pero no se puede cambiar QUÉ se carga.
+//
+// Es una barrera contra el despiste, no contra alguien con mala idea: quien tenga el
+// link y sepa quitarle el "?solo=1" vuelve a poder editar. Para impedirlo de verdad
+// haría falta que la nube distinguiera quién escribe cada campo, y eso son otras
+// reglas y otro día.
+function esSoloMarcar() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return !!p.get("solo") && !!p.get("evento");
+  } catch (e) { return false; }
+}
+
 function leerEstadoGuardado() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -2889,7 +2907,7 @@ function ListaColapsable({ nombres, limite = 5, children }) {
 // memoización no serviría de nada.
 const FilaItem = React.memo(function FilaItem({
   categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo,
-  editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones,
+  editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones, soloMarcar = false,
 }) {
   const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
   const keyId = `${categoria}::${labelOriginal ?? label}`;
@@ -2903,7 +2921,7 @@ const FilaItem = React.memo(function FilaItem({
   const cajaCount = cajaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / cajaSize) : null;
   return (
     <div className={`item-row ${alq ? "is-alquiler" : ""}`}>
-      {editando ? (
+      {editando && !soloMarcar ? (
         <div className="item-edit-row">
           <input
             type="text"
@@ -2943,7 +2961,11 @@ const FilaItem = React.memo(function FilaItem({
         type="text"
         className="item-qty-input"
         value={displayQty}
-        title="Click para editar la cantidad"
+        // Con el link de solo marcar la cantidad se lee pero no se toca: quien carga
+        // el camión no tiene por qué cambiar QUÉ se carga, y un cambio suyo se
+        // sincronizaría a todo el mundo.
+        readOnly={soloMarcar}
+        title={soloMarcar ? "Con este link las cantidades no se cambian" : "Click para editar la cantidad"}
         onChange={e => {
           acciones.current.editarCantidad(categoria, labelOriginal ?? label, e.target.value);
           // Parpadeo verde de confirmación: se reinicia la animación en cada tecla
@@ -2962,20 +2984,24 @@ const FilaItem = React.memo(function FilaItem({
       ) : sufijo ? (
         <span className="item-batea-info" title="Envase fijo: no cambia aunque edites la cantidad">{sufijo}</span>
       ) : null}
-      <div className="item-actions">
-        <button
-          className="item-action-btn"
-          onClick={() => acciones.current.empezarEdicion(keyId, label, esAlquilerManual)}
-          title="Editar el nombre / marcar alquiler proveedor"
-          aria-label={`Editar ${label}`}
-        ><Pencil size={13} /></button>
-        <button
-          className="item-action-btn item-action-borrar"
-          onClick={() => esItemManual ? acciones.current.quitarManual(manualIdx) : acciones.current.ocultar(categoria, labelOriginal ?? label)}
-          title="Quitar de la lista"
-          aria-label={`Quitar ${label}`}
-        ><X size={14} /></button>
-      </div>
+      {/* Renombrar y quitar items cambian la checklist para todo el mundo: con el
+          link de solo marcar no se ofrecen. */}
+      {!soloMarcar && (
+        <div className="item-actions">
+          <button
+            className="item-action-btn"
+            onClick={() => acciones.current.empezarEdicion(keyId, label, esAlquilerManual)}
+            title="Editar el nombre / marcar alquiler proveedor"
+            aria-label={`Editar ${label}`}
+          ><Pencil size={13} /></button>
+          <button
+            className="item-action-btn item-action-borrar"
+            onClick={() => esItemManual ? acciones.current.quitarManual(manualIdx) : acciones.current.ocultar(categoria, labelOriginal ?? label)}
+            title="Quitar de la lista"
+            aria-label={`Quitar ${label}`}
+          ><X size={14} /></button>
+        </div>
+      )}
     </div>
   );
 });
@@ -3147,6 +3173,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
   const [modoCarga, setModoCarga] = useState(false);
+  const [soloMarcar] = useState(esSoloMarcar);
   // Barra fina pegada arriba en móvil: la cabecera con los botones ocupa casi un tercio
   // de la pantalla, así que dejarla fija entera sería peor. En su lugar, al bajar de la
   // cabecera aparece una tira de ~50px con lo único que se usa mientras se recorre la
@@ -3242,10 +3269,14 @@ export default function App({ onCerrarSesion } = {}) {
     return { eventosPendientes: pend, eventosPasados: pas };
   }, [eventosGuardados, filtroEventos]);
 
-  // Avisos de recogidas, devoluciones y compras. Ahora avisan CON ANTELACIÓN: entran en
-  // la lista cuando faltan DIAS_AVISO días o menos (o si ya están atrasados), no solo el
+  // Avisos de recogidas, devoluciones y compras. Avisan CON ANTELACIÓN: entran en la
+  // lista cuando faltan DIAS_AVISO días o menos (o si ya están atrasados), no solo el
   // mismo día. Cada aviso lleva su lista y campo para poder marcarlo como hecho.
-  const DIAS_AVISO = 3;
+  //
+  // Cinco días y no tres: una recogida de flores o de minutas no se resuelve el mismo
+  // día — hay que llamar, confirmar y pasar a por ello. Con tres días la llamada
+  // llegaba justa.
+  const DIAS_AVISO = 5;
   // Suelo por abajo: una recogida de hace dos meses que nunca se marcó no es un
   // recordatorio, es ruido que tapa lo de esta semana. Se deja de avisar pasado ese
   // tiempo (el dato sigue en el evento, solo desaparece del panel de avisos).
@@ -3516,7 +3547,7 @@ export default function App({ onCerrarSesion } = {}) {
       ? { ...x, ...cambios, ...(tocaFechas && x.fechasAuto ? { fechasAuto: false } : {}) }
       : x));
 
-  const handleGenerarLink = () => {
+  const handleGenerarLink = (paraMarcar = false) => {
     // Si no se ha puesto nombre de evento todavía, se usa el tipo + pax como
     // identificador de respaldo (ej. "Boda 80 pax") — así el link nunca sale pelado
     // y se puede distinguir de otros al pegarlo en WhatsApp, aunque no le hayas
@@ -3530,7 +3561,7 @@ export default function App({ onCerrarSesion } = {}) {
       const estado = { ...getEstadoActual(), eventoNubeId: id };
       ultimoGuardadoNubeRef.current = JSON.stringify(estado);
       guardarEventoNube(id, estado).catch(avisarFalloNube);
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, etiquetaLink);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${paraMarcar ? "&solo=1" : ""}`, etiquetaLink);
     } else {
       // Sin nube: el link lleva la checklist dentro (solo lectura/copia local)
       copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`, etiquetaLink);
@@ -4838,7 +4869,9 @@ export default function App({ onCerrarSesion } = {}) {
             })()}
           </div>
           <div className="header-actions">
-            <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
+            {!soloMarcar && (
+              <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
+            )}
             {onCerrarSesion && (
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>
             )}
@@ -4855,7 +4888,8 @@ export default function App({ onCerrarSesion } = {}) {
                   <div className="compartir-menu">
                     <button onClick={() => { setMenuCompartir(false); setModalPrevia(true); }}><Eye size={15} /> Ver la hoja</button>
                     <div className="compartir-menu-sep" />
-                    <button onClick={handleGenerarLink}><Link2 size={15} /> Link para el móvil</button>
+                    <button onClick={() => handleGenerarLink(true)}><Link2 size={15} /> Link para marcar</button>
+                    <button onClick={() => handleGenerarLink(false)}><Link2 size={15} /> Link con edición</button>
                     <button onClick={handleCompartirWord}><FileText size={15} /> Word</button>
                     <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>
                     <button onClick={handleCompartirWhatsapp}><MessageCircle size={15} /> WhatsApp (texto)</button>
@@ -5059,6 +5093,7 @@ export default function App({ onCerrarSesion } = {}) {
         {/* El estado "ya hay items pegados" se marca con una clase, no con colores en
             línea: un estilo en línea gana a las variables del tema y dejaba el botón
             blanco en modo oscuro. */}
+        {!soloMarcar && (
         <button
           className={`add-material-btn animate-entrance ${agregadosTag ? "is-hecho" : ""}`}
           style={{ animationDelay: "0.05s" }}
@@ -5067,8 +5102,10 @@ export default function App({ onCerrarSesion } = {}) {
           <span><ListPlus size={16} /> {agregadosTag || "Añadir varios items pegando texto"}</span>
           <ArrowRight size={16} />
         </button>
+        )}
 
         {/* PLANTILLAS GUARDADAS */}
+        {!soloMarcar && (
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.08s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Plantillas</span>
@@ -5088,8 +5125,10 @@ export default function App({ onCerrarSesion } = {}) {
             </ListaColapsable>
           )}
         </div>
+        )}
 
         {/* EVENTOS GUARDADOS */}
+        {!soloMarcar && (
         <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
@@ -5150,8 +5189,10 @@ export default function App({ onCerrarSesion } = {}) {
             </label>
           </div>
         </div>
+        )}
 
         {/* CONFIG */}
+        {!soloMarcar && (
         <div className="config-card animate-entrance" style={{ animationDelay: "0.1s" }}>
           <div className="section-title">Evento</div>
           <div className="form-row">
@@ -5861,6 +5902,7 @@ export default function App({ onCerrarSesion } = {}) {
             )}
           </div>
         </div>
+        )}
 
         </div>
         <div className="checklist-main">
@@ -5874,6 +5916,7 @@ export default function App({ onCerrarSesion } = {}) {
         </div>
 
         {/* AÑADIR ITEM PERSONALIZADO */}
+        {!soloMarcar && (
         <div className="config-card animate-entrance add-item-card" style={{ animationDelay: "0.22s" }}>
           <div className="add-item-row">
             <div className="form-group" style={{ flex: 2 }}>
@@ -5932,6 +5975,7 @@ export default function App({ onCerrarSesion } = {}) {
             <button className="btn btn-navy-outline add-item-btn" onClick={handleAddItemManual} disabled={!nuevoItemLabel.trim()}>+ Añadir</button>
           </div>
         </div>
+        )}
 
         {/* CATEGORÍAS */}
         {filtered.map((cat, idx) => {
@@ -5971,6 +6015,7 @@ export default function App({ onCerrarSesion } = {}) {
                         nombreTemporal={editando ? nombreTemporal : null}
                         alquilerTemporal={editando ? alquilerTemporal : null}
                         acciones={accionesFilaRef}
+                        soloMarcar={soloMarcar}
                       />
                     );
                   })}
