@@ -17,8 +17,30 @@ function esLinkDeEvento() {
 
 // El link que se le pasa a la oficina: ?enviar=<código>. Abre SOLO el formulario —
 // desde ahí no se llega a la checklist, ni a la configuración, ni a los eventos.
-function codigoDelFormulario() {
-  return new URLSearchParams(window.location.search).get("enviar") || "";
+//
+// El código se recuerda en ESTE navegador porque si no, instalar la app desde el
+// formulario no serviría de nada: el icono abre la dirección de siempre (sin
+// ?enviar=) y quien lo instaló se encontraría la pantalla de login del equipo en
+// vez de su formulario. Con el código guardado, el icono abre lo que instaló.
+const CLAVE_CODIGO = "gula_formulario_codigo";
+
+function codigoEnLaUrl() {
+  const dela = new URLSearchParams(window.location.search).get("enviar") || "";
+  if (dela) {
+    try { localStorage.setItem(CLAVE_CODIGO, dela); } catch (e) { /* en privado no se guarda, da igual */ }
+  }
+  return dela;
+}
+
+function codigoGuardado() {
+  try { return localStorage.getItem(CLAVE_CODIGO) || ""; } catch (e) { return ""; }
+}
+
+// Quien de verdad es del equipo puede salir del formulario y entrar a la app: el
+// código guardado se olvida y este navegador vuelve a ser un navegador normal.
+function olvidarCodigoFormulario() {
+  try { localStorage.removeItem(CLAVE_CODIGO); } catch (e) { /* da igual */ }
+  window.location.href = window.location.origin + window.location.pathname;
 }
 
 // Traduce los códigos de error de Firebase a un mensaje claro en español
@@ -108,7 +130,13 @@ function PantallaLogin() {
 
 export default function Acceso() {
   // El formulario de oficina va por su cuenta: ni login ni app.
-  const [codigoFormulario] = useState(codigoDelFormulario);
+  //   · Con ?enviar= en la dirección manda siempre, tengas sesión o no: es como se
+  //     abre el enlace, y también como lo compruebas tú desde la app.
+  //   · Sin él, vale el código guardado de la última vez, que es lo que hace que la
+  //     app instalada desde el formulario abra el formulario. Pero solo si no eres
+  //     del equipo (sin sesión) y no estás abriendo el link de un evento.
+  const [codigoUrl] = useState(codigoEnLaUrl);
+  const [codigoRecordado] = useState(() => (esLinkDeEvento() ? "" : codigoGuardado()));
   // omitirLogin se fija una sola vez al arrancar: si es un link de evento o no hay
   // acceso configurado, nunca se pide login.
   const [omitirLogin] = useState(() => !accesoActivo() || esLinkDeEvento());
@@ -120,7 +148,7 @@ export default function Acceso() {
     return unsub;
   }, [omitirLogin]);
 
-  if (codigoFormulario) return <Formulario codigo={codigoFormulario} />;
+  if (codigoUrl) return <Formulario codigo={codigoUrl} onSalir={olvidarCodigoFormulario} />;
 
   if (omitirLogin) return <App />;
 
@@ -130,6 +158,12 @@ export default function Acceso() {
         <div className="login-cargando">Cargando…</div>
       </div>
     );
+  }
+
+  // Sin sesión: si este navegador es el de la oficina (instaló el formulario), se
+  // abre su formulario en vez de un login que no le sirve de nada.
+  if (!sesion.usuario && codigoRecordado) {
+    return <Formulario codigo={codigoRecordado} onSalir={olvidarCodigoFormulario} />;
   }
 
   if (!sesion.usuario) return <PantallaLogin />;

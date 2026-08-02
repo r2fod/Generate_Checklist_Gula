@@ -7,11 +7,12 @@
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
-import { leerProximos, enviarFormulario } from "./envios.js";
+import { leerProximos, enviarFormulario, corregirEnvio } from "./envios.js";
+import FondoIconos from "./FondoIconos.jsx";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-export default function Formulario({ codigo }) {
+export default function Formulario({ codigo, onSalir }) {
   const clave = `gula_formulario_${codigo}`;
   const [guardado] = useState(() => {
     try { return JSON.parse(localStorage.getItem(clave) || "{}"); } catch (e) { return {}; }
@@ -25,6 +26,53 @@ export default function Formulario({ codigo }) {
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState("");
+  // Id del envío que se acaba de mandar. Mientras logística no lo revise se puede
+  // corregir (cambian los pax, se cae la barra...) en vez de mandar otro y que les
+  // lleguen dos versiones del mismo evento sin saber cuál vale.
+  const [envioId, setEnvioId] = useState(guardado.envioId ?? "");
+  // Instalar el formulario en la pantalla de inicio: así no hay que buscar el enlace
+  // en el WhatsApp cada vez. En Android y en el ordenador el navegador nos deja
+  // pedirlo; en iPhone no hay forma de pedirlo desde la web y hay que explicarlo.
+  const [avisoInstalar, setAvisoInstalar] = useState(null); // null | "puede" | "iphone"
+  const [pedirInstalar, setPedirInstalar] = useState(null); // el evento del navegador
+
+  useEffect(() => {
+    try { if (localStorage.getItem("gula_formulario_instalar") === "no") return; } catch (e) { /* da igual */ }
+    // Ya instalado: no se dice nada
+    if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) return;
+    if (window.navigator.standalone) return;
+    const alPoder = (e) => { e.preventDefault(); setPedirInstalar(e); setAvisoInstalar("puede"); };
+    window.addEventListener("beforeinstallprompt", alPoder);
+    const esIphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (esIphone) setAvisoInstalar("iphone");
+    return () => window.removeEventListener("beforeinstallprompt", alPoder);
+  }, []);
+
+  const noInstalar = () => {
+    try { localStorage.setItem("gula_formulario_instalar", "no"); } catch (e) { /* da igual */ }
+    setAvisoInstalar(null);
+  };
+  const instalar = async () => {
+    if (!pedirInstalar) return;
+    pedirInstalar.prompt();
+    try { await pedirInstalar.userChoice; } catch (e) { /* da igual lo que elijan */ }
+    setPedirInstalar(null);
+    setAvisoInstalar(null);
+  };
+  const bloqueInstalar = !avisoInstalar ? null : (
+    <div className="form-instalar">
+      <div className="form-instalar-texto">
+        <strong>Ténlo a mano</strong>
+        {avisoInstalar === "iphone"
+          ? <span>Dale a Compartir y luego a "Añadir a pantalla de inicio": se queda como una app y no hay que buscar el enlace.</span>
+          : <span>Instálalo y se queda como una app, sin buscar el enlace cada vez.</span>}
+      </div>
+      <div className="form-instalar-acciones">
+        {avisoInstalar === "puede" && <button className="form-btn-principal" onClick={instalar}>Instalar</button>}
+        <button className="form-btn-atras" onClick={noInstalar}>Ahora no</button>
+      </div>
+    </div>
+  );
 
   useEffect(() => {
     leerProximos(codigo).then(r => {
@@ -39,9 +87,9 @@ export default function Formulario({ codigo }) {
   // Se guarda según escriben: si cierran el navegador a media pregunta, vuelven donde
   // lo dejaron. Es un formulario que se rellena de pie y con prisa.
   useEffect(() => {
-    try { localStorage.setItem(clave, JSON.stringify({ respuestas, paso, eventoDestino })); }
+    try { localStorage.setItem(clave, JSON.stringify({ respuestas, paso, eventoDestino, envioId })); }
     catch (e) { /* sin sitio o en privado: se sigue igual, solo se pierde el borrador */ }
-  }, [clave, respuestas, paso, eventoDestino]);
+  }, [clave, respuestas, paso, eventoDestino, envioId]);
 
   const tipo = respuestas.tipo || "boda";
   // Hay preguntas que dependen de otra respuesta (las carpas de alquiler solo si no hay
@@ -73,12 +121,18 @@ export default function Formulario({ codigo }) {
   if (enviado) {
     return (
       <div className="form-pantalla form-fin">
+        <FondoIconos pregunta="fin" />
         <div className="form-fin-tic">✓</div>
         <h1>Enviado</h1>
         <p>Ya le ha llegado a logística. Si algo no cuadra, te llamarán.</p>
-        <button className="form-btn-principal" onClick={() => {
+        {/* Cambian los pax, se cae la barra libre... se corrige lo mandado y a
+            logística le llega la versión buena, no dos envíos del mismo evento. */}
+        <button className="form-btn-principal" onClick={() => { setEnviado(false); setPaso(0); }}>
+          Cambiar algo de lo que he mandado
+        </button>
+        <button className="form-btn-atras" onClick={() => {
           try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
-          setRespuestas({}); setPaso(-1); setEventoDestino(null); setEnviado(false);
+          setRespuestas({}); setPaso(-1); setEventoDestino(null); setEnviado(false); setEnvioId("");
         }}>Mandar otro evento</button>
       </div>
     );
@@ -90,6 +144,7 @@ export default function Formulario({ codigo }) {
       !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()));
     return (
       <div className="form-pantalla">
+        <FondoIconos pregunta="elegir" />
         <h1 className="form-titulo">¿De qué evento son los datos?</h1>
         {proximos === null && <p className="form-nota">Cargando los próximos eventos...</p>}
         {proximos !== null && proximos.length === 0 && (
@@ -123,6 +178,10 @@ export default function Formulario({ codigo }) {
         <button className="form-btn-principal" onClick={() => { setEventoDestino(""); setPaso(0); }}>
           + Es un evento nuevo
         </button>
+        {bloqueInstalar}
+        {/* Si esto es el móvil de alguien del equipo que abrió el enlace por probar,
+            aquí sale cómo volver a la app en vez de quedarse atrapado. */}
+        {onSalir && <button className="form-salir" onClick={onSalir}>Soy del equipo · entrar a la app</button>}
       </div>
     );
   }
@@ -132,8 +191,19 @@ export default function Formulario({ codigo }) {
     const enviar = async () => {
       setEnviando(true); setError("");
       try {
-        await enviarFormulario(codigo, respuestas, eventoDestino || "");
-        try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
+        if (envioId) {
+          // Corregir el que ya mandaron. Si logística ya lo ha revisado, la nube lo
+          // rechaza: entonces se manda uno nuevo, que es lo honesto.
+          try {
+            await corregirEnvio(envioId, respuestas, eventoDestino || "");
+          } catch (e) {
+            const id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
+            setEnvioId(id);
+          }
+        } else {
+          const id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
+          setEnvioId(id);
+        }
         setEnviado(true);
       } catch (e) {
         setError("No se ha podido enviar. Mira la conexión y vuelve a darle.");
@@ -141,10 +211,12 @@ export default function Formulario({ codigo }) {
     };
     return (
       <div className="form-pantalla">
+        <FondoIconos pregunta="repaso" />
         <h1 className="form-titulo">¿Está todo bien?</h1>
         {eventoDestino
           ? <p className="form-nota">Son datos para <strong>{eventoDestino}</strong>.</p>
           : <p className="form-nota">Se creará un evento nuevo.</p>}
+        {envioId && <p className="form-nota">Esto cambia lo que ya mandaste, no manda otro aparte.</p>}
         <div className="form-repaso">
           {preguntas.map((p, i) => (
             <button className="form-repaso-fila" key={p.id} onClick={() => setPaso(i)}>
@@ -157,7 +229,7 @@ export default function Formulario({ codigo }) {
         <div className="form-acciones">
           <button className="form-btn-atras" onClick={atras} disabled={enviando}>Atrás</button>
           <button className="form-btn-principal" onClick={enviar} disabled={enviando}>
-            {enviando ? "Enviando..." : "Enviar"}
+            {enviando ? "Enviando..." : envioId ? "Mandar el cambio" : "Enviar"}
           </button>
         </div>
       </div>
@@ -170,11 +242,16 @@ export default function Formulario({ codigo }) {
 
   return (
     <div className="form-pantalla">
+      <FondoIconos pregunta={p.id} />
       <div className="form-progreso"><div style={{ width: `${(paso / preguntas.length) * 100}%` }} /></div>
-      <h1 className="form-titulo">{p.texto}</h1>
-      {p.nota && <p className="form-nota">{p.nota}</p>}
+      {/* La clave por pregunta hace que cada pantalla entre con su animación en vez
+          de cambiar el texto de golpe: se nota que has pasado de pregunta. */}
+      <div className="form-entra" key={p.id}>
+        <h1 className="form-titulo">{p.texto}</h1>
+        {p.nota && <p className="form-nota">{p.nota}</p>}
+      </div>
 
-      <div className="form-campos">
+      <div className="form-campos form-entra form-entra-tarde" key={`campos-${p.id}`}>
         {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => (
           <div key={o.valor}>
             <button
@@ -318,7 +395,14 @@ export default function Formulario({ codigo }) {
       <div className="form-acciones">
         {paso > 0 && <button className="form-btn-atras" onClick={atras}>Atrás</button>}
         {p.noSe !== false && <button className="form-btn-nose" onClick={noSe}>No lo sé</button>}
-        <button className="form-btn-principal" onClick={siguiente}>
+        <button className="form-btn-principal" onClick={() => {
+          // En las de marcar, pasar sin marcar nada significa "no lleva nada de esto",
+          // que es una respuesta de verdad. "No lo sé" está justo al lado para cuando
+          // no lo saben: si los dos botones hicieran lo mismo, no habría forma de
+          // distinguir un menú sin paella de un menú que nadie ha mirado.
+          if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, []);
+          siguiente();
+        }}>
           {paso === preguntas.length - 1 ? "Repasar" : "Siguiente"}
         </button>
       </div>

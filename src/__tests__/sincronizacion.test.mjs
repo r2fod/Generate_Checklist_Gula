@@ -294,3 +294,81 @@ console.log("\n══ Un envío sobre un evento que ya existe ══");
   ok(aMano[0].fecha === "2027-08-01",
     "una fecha de recogida puesta a mano no se mueve ni cambiando la del evento");
 }
+
+// ── Un menú puede llevar los dos entrantes ────────────────────────────────────
+// En la app el de chupito y el de compartir son dos interruptores distintos (uno
+// carga vasos de chupito, el otro platos extra) y hay menús que llevan los dos. El
+// formulario obligaba a elegir uno, así que el otro se perdía.
+console.log("\n══ Entrante de chupito Y para compartir ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+
+  const losDos = aRespuestasDeLaApp({
+    tipo: "boda", nombre: "Boda dos entrantes", adultos: 100,
+    entrante: ["chupito", "compartir"], compartirNumero: 2, entrantePersonas: 3,
+  });
+  ok(losDos.llevaEntrante === true && losDos.entranteCompartido === true,
+    "se pueden llevar los dos entrantes a la vez");
+  ok(losDos.numEntrantesCompartir === 2 && losDos.personasPorPlatoEntrante === 3,
+    `y con sus cifras: ${losDos.numEntrantesCompartir} entrantes, uno cada ${losDos.personasPorPlatoEntrante} pax`);
+
+  const soloChupito = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, entrante: ["chupito"] });
+  ok(soloChupito.llevaEntrante === true && soloChupito.entranteCompartido === false,
+    "solo el de chupito no activa el compartido");
+
+  const ninguno = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, entrante: [] });
+  ok(ninguno.llevaEntrante === false && ninguno.entranteCompartido === false,
+    "y decir que no lleva ninguno es una respuesta, no un hueco");
+
+  // Sin contestar cada cuántas personas, manda el valor de siempre de la app
+  const sinDetalle = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, entrante: ["compartir"] });
+  ok(sinDetalle.entranteCompartido === true && sinDetalle.personasPorPlatoEntrante === undefined,
+    "si no dicen cada cuántas personas, no se inventa: se queda el valor de la app");
+
+  // La pregunta del detalle solo aparece si hay entrante para compartir
+  const filasCon = resumirEnvio({ tipo: "boda", entrante: ["compartir"], entrantePersonas: 4 });
+  const filasSin = resumirEnvio({ tipo: "boda", entrante: ["chupito"] });
+  ok(filasCon.some(f => f.id === "entrantePersonas") && !filasSin.some(f => f.id === "entrantePersonas"),
+    "y lo de cada cuántas personas solo se pregunta si hay entrante para compartir");
+}
+
+// ── El staff se pregunta con los adultos y los niños ──────────────────────────
+// No son invitados, pero están ahí: la app los suma al personal para agua y vasos.
+console.log("\n══ Staff en el recuento de gente ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const con = aRespuestasDeLaApp({ tipo: "boda", adultos: 120, ninos: 10, staff: 6 });
+  ok(con.pax === 120 && con.ninos === 10 && con.numStaff === 6,
+    `el staff viaja aparte de los invitados → ${con.pax} + ${con.ninos} niños + ${con.numStaff} staff`);
+  const sin = aRespuestasDeLaApp({ tipo: "boda", adultos: 120 });
+  ok(sin.numStaff === undefined,
+    "y si no lo ponen, no se inventa un cero: se queda el valor de la app");
+  const fila = resumirEnvio({ tipo: "boda", adultos: 120, ninos: 10, staff: 6 }).find(f => f.id === "gente");
+  ok(fila.respuesta.includes("6 staff"),
+    `la bandeja lo enseña con el resto de la gente → "${fila.respuesta}"`);
+}
+
+// ── Borrar un evento lo borra también de la nube ──────────────────────────────
+// Si el borrado solo pasara en este navegador, el evento volvería en cuanto otro
+// dispositivo sincronizara su copia, y además seguiría saliéndole a la oficina en la
+// lista de próximos del formulario.
+console.log("\n══ Borrar un evento ══");
+{
+  const { calcularCambiosArchivo, idDeNombreEvento } = await import("../nube.js");
+  const { resumirParaOficina } = await import("../formulario/envios.js");
+
+  const antes = { "Boda Ana": { pax: 100, fechaEvento: "2027-08-11" }, "Cumple Marta": { pax: 30, fechaEvento: "2027-09-02" } };
+  const despues = { "Boda Ana": antes["Boda Ana"] };
+  const { escribir, borrar } = calcularCambiosArchivo(antes, despues);
+  ok(borrar.length === 1 && borrar[0].nombre === "Cumple Marta",
+    `el evento borrado se manda a borrar de la nube → ${JSON.stringify(borrar.map(b => b.nombre))}`);
+  ok(borrar[0].id === idDeNombreEvento("Cumple Marta"),
+    "y se borra justo su documento, no otro");
+  ok(escribir.length === 0,
+    "y no se reescribe el que no se ha tocado");
+
+  // Y deja de estar en la lista corta que ve la oficina
+  const paraOficina = resumirParaOficina(despues, "2027-01-01").map(e => e.nombre);
+  ok(!paraOficina.includes("Cumple Marta") && paraOficina.includes("Boda Ana"),
+    `y desaparece de los próximos que ve la oficina → ${JSON.stringify(paraOficina)}`);
+}

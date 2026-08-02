@@ -4406,6 +4406,54 @@ hr {
   gap: 14px;
   min-height: 100vh;
   min-height: 100dvh;
+  position: relative;
+  z-index: 1;
+}
+
+/* Iconos flotando detrás, distintos en cada pregunta. Va fijo y sin sitio propio:
+   no empuja nada, no se puede tocar y no puede provocar scroll lateral. En un
+   ordenador es además lo que llena el hueco de los lados de la columna. */
+.form-fondo {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  animation: form-fondo-entra 0.9s ease both;
+}
+.form-fondo-icono {
+  position: absolute;
+  color: var(--accent);
+  opacity: 0.07;
+  animation-name: form-flota;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+:root[data-tema="oscuro"] .form-fondo-icono { opacity: 0.11; }
+
+@keyframes form-fondo-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes form-flota {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  33% { transform: translate3d(10px, -18px, 0) rotate(5deg); }
+  66% { transform: translate3d(-8px, -8px, 0) rotate(-4deg); }
+}
+
+/* Cada pregunta entra en vez de aparecer de golpe: se nota que has pasado de
+   pantalla, que en un formulario de una pregunta por vez es la única pista. */
+.form-entra { animation: form-entra 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.form-entra-tarde { animation-delay: 0.06s; }
+@keyframes form-entra {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Quien pide menos movimiento en su sistema se queda con el formulario quieto:
+   sigue funcionando exactamente igual. */
+@media (prefers-reduced-motion: reduce) {
+  .form-fondo-icono { animation: none; }
+  .form-fondo { animation: none; }
+  .form-entra { animation: none; }
 }
 
 .form-progreso {
@@ -4586,7 +4634,11 @@ hr {
   background: linear-gradient(to top, var(--bg-color) 70%, transparent);
 }
 .form-btn-principal {
-  flex: 1;
+  /* Sin flex-grow a secas: el "1" es para repartir el ANCHO dentro de la fila de
+     acciones, pero cuando el botón es hijo directo de la pantalla (que es una
+     columna) ese mismo "1" lo estiraba a lo ALTO y salía un botonazo de media
+     pantalla. Así que el reparto se pide solo donde toca, en .form-acciones. */
+  flex: 0 0 auto;
   min-height: 52px;
   padding: 14px 20px;
   font-size: 1rem;
@@ -4598,6 +4650,8 @@ hr {
   cursor: pointer;
 }
 .form-btn-principal:disabled { opacity: 0.55; cursor: default; }
+/* En la fila de acciones sí reparte el ancho con Atrás y No lo sé */
+.form-acciones .form-btn-principal { flex: 1; }
 .form-btn-atras, .form-btn-nose {
   min-height: 52px;
   padding: 14px 16px;
@@ -4622,3 +4676,48 @@ hr {
   background: #1f7a44;
   border-radius: 50%;
 }
+
+/* ─── FORMULARIO: INSTALAR Y SALIR ─────────────────────────────────────────────
+   El aviso de "ténlo a mano" y la salida para quien es del equipo. Los dos van al
+   final de la primera pantalla, donde no estorban a lo que hay que hacer. */
+.form-instalar {
+  margin-top: 6px;
+  padding: 14px;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card-bg);
+}
+.form-instalar-texto { display: flex; flex-direction: column; gap: 3px; }
+.form-instalar-texto strong { font-size: 0.95rem; color: var(--text-main); }
+.form-instalar-texto span { font-size: 0.84rem; line-height: 1.4; color: var(--text-muted); }
+.form-instalar-acciones { display: flex; gap: 8px; }
+.form-instalar-acciones .form-btn-principal { flex: 1; }
+
+.form-salir {
+  align-self: center;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 10px 8px;
+  min-height: 40px;
+}
+
+/* Los envíos ya revisados: se ven, pero apagados, para que no compitan con lo que
+   sí hay que mirar */
+.envio-card.es-revisado { opacity: 0.72; }
+.envio-estado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.envio-ver-revisados { align-self: flex-start; }

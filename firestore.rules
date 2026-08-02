@@ -46,6 +46,24 @@ service cloud.firestore {
                     && request.resource.data.respuestas is map
                     && request.resource.data.enviado == request.time
                     && request.resource.data.size() <= 5;
+
+      // Corregir lo ya mandado (cambian los pax, se cae la barra libre...) MIENTRAS
+      // logística no lo haya revisado. Hay que conocer el id del documento, que solo
+      // tiene quien lo mandó, guardado en su móvil. No se puede cambiar el código, ni
+      // tocar uno ya revisado, ni colar campos nuevos: una corrección es una
+      // corrección y no una puerta para otra cosa.
+      // Ojo: se pregunta si el campo EXISTE, no si vale null. Leer un campo que no
+      // está hace fallar la regla entera, y un envío recién mandado no tiene
+      // "revisado": con la comparación a null no se habría podido corregir ninguno.
+      allow update: if request.auth == null
+                    && !("revisado" in resource.data)
+                    && request.resource.data.codigo == resource.data.codigo
+                    && request.resource.data.keys().hasOnly(
+                         ["codigo", "respuestas", "enviado", "eventoDestino", "version", "corregido"])
+                    && request.resource.data.respuestas is map
+                    && request.resource.data.enviado == request.time
+                    && request.resource.data.size() <= 6;
+
       allow get, list, update, delete: if request.auth != null;
     }
 

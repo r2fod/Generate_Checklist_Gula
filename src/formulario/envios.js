@@ -28,10 +28,13 @@ function getDb() {
 
 export const nubeActiva = () => !!firebaseConfig;
 
-// Código de acceso del formulario: 6 caracteres sin ambiguos (nada de l/1, o/0)
+// Código de acceso del formulario: 10 caracteres sin ambiguos (nada de l/1, o/0).
+// Nadie lo teclea —el enlace se copia y se pega—, así que alargarlo no molesta a nadie
+// y quita de la mesa el probar códigos hasta acertar: 31^10 combinaciones.
+// Los códigos viejos de 6 siguen valiendo: son el nombre de su documento, sin más.
 export function nuevoCodigo() {
   const abc = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  return Array.from({ length: 6 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+  return Array.from({ length: 10 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
 }
 
 // Cuántos eventos ve la oficina y de qué ventana de fechas salen
@@ -104,8 +107,8 @@ export async function enviarFormulario(codigo, respuestas, eventoDestino = "") {
   return ref.id;
 }
 
-// La bandeja de la app: los envíos que aún no se han revisado, del más nuevo al más
-// viejo. Requiere sesión iniciada (lo dicen las reglas, no solo esta función).
+// La bandeja de la app: lo que ha mandado la oficina, del más nuevo al más viejo.
+// Requiere sesión iniciada (lo dicen las reglas, no solo esta función).
 export async function leerEnvios() {
   const conexion = await getDb();
   if (!conexion) return [];
@@ -114,6 +117,67 @@ export async function leerEnvios() {
   return snap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (b.enviado?.seconds || 0) - (a.enviado?.seconds || 0));
+}
+
+// Corregir un envío ya mandado: cambian los pax, se cae la barra libre, lo que sea.
+// Solo funciona MIENTRAS no se haya revisado — lo dicen las reglas, no esta función.
+// Si ya se revisó, la escritura falla y el formulario manda uno nuevo.
+export async function corregirEnvio(id, respuestas, eventoDestino = "") {
+  const conexion = await getDb();
+  if (!conexion) throw new Error("sin-nube");
+  const { db, fs } = conexion;
+  await fs.updateDoc(fs.doc(db, "envios", id), {
+    respuestas,
+    eventoDestino,
+    enviado: fs.serverTimestamp(),
+    corregido: true,
+  });
+}
+
+// La app escucha el buzón en vivo: así un envío nuevo (o uno corregido) se ve al
+// momento sin tener que abrir nada ni recargar. Devuelve la función para dejar de
+// escuchar.
+export function suscribirEnvios(cb) {
+  let unsub = () => {};
+  let cancelado = false;
+  (async () => {
+    const conexion = await getDb();
+    if (!conexion || cancelado) return;
+    const { db, fs } = conexion;
+    unsub = fs.onSnapshot(
+      fs.collection(db, "envios"),
+      (snap) => {
+        const lista = [];
+        snap.forEach(d => lista.push({ id: d.id, ...d.data() }));
+        cb(lista.sort((a, b) => (b.enviado?.seconds || 0) - (a.enviado?.seconds || 0)));
+      },
+      () => { /* sin conexión o sin permiso: la app sigue igual */ },
+    );
+  })();
+  return () => { cancelado = true; unsub(); };
+}
+
+// Un envío revisado (aplicado o descartado) NO se borra: sale de la bandeja pero se
+// queda guardado. Lo que mandó la oficina es la única prueba de lo que dijeron, y
+// cuando algo no cuadra el día del evento es justo lo que hay que poder mirar.
+export async function marcarRevisado(id, { aplicado, eventoDestino = "" } = {}) {
+  const conexion = await getDb();
+  if (!conexion) return;
+  const { db, fs } = conexion;
+  await fs.updateDoc(fs.doc(db, "envios", id), {
+    revisado: Date.now(),
+    aplicado: !!aplicado,
+    aplicadoA: eventoDestino,
+  });
+}
+
+// Separa lo que falta por mirar de lo que ya se miró. Función pura: la decisión de
+// qué sigue pendiente no depende de la nube.
+export function repartirEnvios(envios = []) {
+  const pendientes = envios.filter(e => !e.revisado);
+  const revisados = envios.filter(e => e.revisado)
+    .sort((a, b) => (b.revisado || 0) - (a.revisado || 0));
+  return { pendientes, revisados };
 }
 
 export async function borrarEnvio(id) {
