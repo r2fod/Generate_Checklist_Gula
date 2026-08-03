@@ -373,8 +373,9 @@ body {
 /* El logo de Gula en la cabecera. El hueco libre se lo come él, así que el logo y el
    interruptor de tema quedan juntos en la esquina derecha en vez de separados. El
    archivo es un PNG negro sobre transparente: se usa de máscara y el color lo pone el
-   degradado de debajo, que va quieto — en la cabecera un logo animado distrae. Con
-   aspect-ratio el alto manda y el ancho sale solo. */
+   degradado de debajo, que se va moviendo — el mismo que el del formulario, para que
+   la marca se vea igual en las dos apps. Con aspect-ratio el alto manda y el ancho
+   sale solo. */
 .header-title-group > .app-logo {
   display: block;
   flex: 0 0 auto;
@@ -387,8 +388,9 @@ body {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  background: linear-gradient(100deg, #6d28d9, #db2777, #f97316);
-  opacity: 0.92;
+  background: linear-gradient(100deg, #6d28d9, #db2777, #f97316, #16a34a, #0ea5e9, #6d28d9);
+  background-size: 320% 100%;
+  animation: form-logo-colores 11s linear infinite;
 }
 .header-title-group > .app-logo + .btn-tema { margin-left: 12px; }
 
@@ -5014,6 +5016,40 @@ hr {
   transition: var(--transition-smooth);
 }
 .form-btn-secundario:hover { border-color: var(--accent); }
+
+/* El logo y el botón de Inicio comparten la línea de arriba: el logo manda a la
+   izquierda y el Inicio se va al otro extremo, donde no compite con nada. */
+.form-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.form-cabecera .form-logo { margin-bottom: 0; }
+
+/* Discreto a propósito: se usa poco y no puede competir con "Siguiente". Pero con
+   altura de dedo, que se pulsa de pie y con prisa. */
+.form-btn-inicio {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+.form-btn-inicio:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Volver a lo que estabas rellenando: va el primero de la pantalla porque, si has
+   venido aquí a media pregunta, es lo que más falta te hace. */
+.form-btn-seguir {
+  margin-bottom: 4px;
+}
 
 /* Cada envío en la pantalla de "lo que has mandado": abrirlo o quitarlo de la lista */
 .form-mio-fila { display: flex; align-items: stretch; gap: 8px; }

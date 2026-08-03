@@ -34,6 +34,12 @@ import logoGula from "./assets/gula-logo.png";
 // muerto. Con cobertura normal la subida tarda menos de un segundo; si pasa de aquí,
 // más vale decirlo que dejar que manden un link que no abre nada.
 const ESPERA_SUBIDA_LINK = 4000;
+
+// Botellas de 33cl por persona y DÍA en un rodaje. Va por temporada porque la
+// diferencia es enorme: una jornada de doce horas al sol en agosto no se parece en
+// nada a una de enero. Son ~2,1 litros por cabeza en verano y ~1,5 en invierno,
+// además de los refrescos y del agua de 1,5L que va aparte.
+const BOTELLAS_AGUA_POR_PAX = { verano: 6.5, invierno: 4.5 };
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 // Qué tamaño de batea corresponde a cada tipo de vaso/copa, detectado por el nombre
 // del item. Así el nº de bateas se recalcula siempre en vivo a partir de la cantidad
@@ -1037,7 +1043,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
-    llevaCarpas = true, llevaGenerador = true,
+    llevaCarpas = true, llevaGenerador = true, mesVerano = true,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
   const esAlquilerSillas = origenSillas !== "Nuestras";
@@ -1270,11 +1276,15 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56))],
     ["Fanta naranja", String(Math.round(paxConsumo * 0.24))], ["Fanta limón", String(Math.round(paxConsumo * 0.2))],
     ["Aquarius", String(Math.round(paxConsumo * 0.24))],
-    // En producción el agua de beber son las CAJAS de 33cl (35 uds), a ~3,5 botellas
-    // por pax y día; la de 1,5L es solo un extra por si hace falta (paella, lavar,
-    // beber el personal), no va por pax — un par de packs por día es de sobra
-    ["Aguas pequeñas (33cl)", conSufijo(Math.max(1, Math.ceil(paxConsumo * 3.5 / 35)),
-      `cajas (35 uds)${opts.tipoAguaPequena ? ` · ${opts.tipoAguaPequena.toLowerCase()}` : ""}`)],
+    // En producción el agua de beber son las CAJAS de 33cl (35 uds). El ratio va por
+    // temporada: en un rodaje de doce horas al sol se bebe el doble que en enero, y
+    // con 3,5 fijas se salía con poco más de un litro por cabeza y día. La de 1,5L es
+    // solo un extra por si hace falta (paella, lavar, beber el personal), no va por
+    // pax — un par de packs por día es de sobra.
+    ["Aguas pequeñas (33cl)", conSufijo(
+      Math.max(1, Math.ceil(paxConsumo * BOTELLAS_AGUA_POR_PAX[mesVerano ? "verano" : "invierno"] / 35)),
+      `cajas (35 uds) · ${mesVerano ? "verano" : "invierno"}, ${String(BOTELLAS_AGUA_POR_PAX[mesVerano ? "verano" : "invierno"]).replace(".", ",")}/pax`
+      + `${opts.tipoAguaPequena ? ` · ${opts.tipoAguaPequena.toLowerCase()}` : ""}`)],
     ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
     ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
@@ -3574,13 +3584,17 @@ export default function App({ onCerrarSesion } = {}) {
     }, ms);
   };
 
-  const copiarLink = (url, nombre) => {
-    const texto = nombre ? `${nombre}: ${url}` : url;
-    navigator.clipboard.writeText(texto).then(() => {
+  // Se copia SOLO la dirección, sin el nombre del evento delante. Llevaba
+  // "Evento: https://…" para que en WhatsApp se supiera de cuál era, pero eso rompía
+  // pegarlo en la barra del navegador: al ver un texto con espacios, el navegador lo
+  // BUSCA en vez de abrirlo, y parecía que el link no funcionaba. En WhatsApp da
+  // igual, que ahí la dirección se detecta sola y de qué evento es se escribe al lado.
+  const copiarLink = (url) => {
+    navigator.clipboard.writeText(url).then(() => {
       avisarCompartir("¡Link copiado! ✓");
     }).catch(() => {
       // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a mano
-      window.prompt("No se pudo copiar automáticamente. Copia el link:", texto);
+      window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
     });
   };
 
@@ -3643,11 +3657,6 @@ export default function App({ onCerrarSesion } = {}) {
       : x));
 
   const handleGenerarLink = (paraMarcar = false) => {
-    // Si no se ha puesto nombre de evento todavía, se usa el tipo + pax como
-    // identificador de respaldo (ej. "Boda 80 pax") — así el link nunca sale pelado
-    // y se puede distinguir de otros al pegarlo en WhatsApp, aunque no le hayas
-    // puesto nombre aún.
-    const etiquetaLink = nombreEvento || `${EVENTOS[evento]?.label} ${pax} pax`;
     const marca = paraMarcar ? "&solo=1" : "";
     // Cada clic empieza limpio: si el anterior acabó en un aviso de fallo, ese aviso no
     // puede quedarse mandando y tapar el resultado de este
@@ -3664,7 +3673,7 @@ export default function App({ onCerrarSesion } = {}) {
       // subiera, la copia caía fuera del gesto y el navegador la rechazaba — se cerraba
       // el menú y no pasaba nada más. El respaldo (un prompt con el link) tampoco se ve
       // en una app instalada, así que el fallo era invisible.
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`, etiquetaLink);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`);
       // Y la subida se comprueba DESPUÉS: el link está copiado, pero hasta que el evento
       // no esté en la nube ese link no abre nada al otro lado. Eso hay que decirlo antes
       // de que lo manden, que es como nacía un link muerto sin que se enterara nadie.
@@ -3691,7 +3700,7 @@ export default function App({ onCerrarSesion } = {}) {
     } else {
       // Sin nube el link lleva la checklist dentro. Aquí el "solo marcar" también vale:
       // no se sincroniza con nadie, pero evita que quien carga cambie lo que ve.
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}${marca}`, etiquetaLink);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}${marca}`);
     }
     setMenuCompartir(false);
   };
@@ -4268,9 +4277,9 @@ export default function App({ onCerrarSesion } = {}) {
       const estado = { ...guardado, eventoNubeId: id };
       guardarEventoNube(id, estado).catch(avisarFalloNube);
       if (!guardado.eventoNubeId) guardarEventos({ ...eventosGuardados, [nombre]: estado });
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, nombre);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`);
     } else {
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`, nombre);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`);
     }
   };
   const handleBorrarEvento = (nombre) => setDialogo({

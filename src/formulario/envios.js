@@ -106,6 +106,34 @@ export async function leerProximos(codigo) {
   }
 }
 
+// El formulario escucha la lista EN VIVO. Antes se leía una sola vez al abrirlo: si la
+// oficina lo dejaba abierto y en la app se creaba un evento nuevo, allí no aparecía
+// hasta recargar — y nadie recarga una app que ya tiene abierta. Así el evento nuevo
+// sale solo, sin tocar nada.
+//
+// Solo avisa cuando el documento EXISTE. Un fallo de red o un borrado momentáneo no
+// pueden vaciarle la lista a quien está a media pregunta: en ese caso se sigue con lo
+// último que había, que es más útil que una pantalla en blanco.
+export function suscribirProximos(codigo, cb) {
+  let unsub = () => {};
+  let cancelado = false;
+  (async () => {
+    const conexion = await getDb();
+    if (!conexion || !codigo || cancelado) return;
+    const { db, fs } = conexion;
+    unsub = fs.onSnapshot(
+      fs.doc(db, "publico", codigo),
+      (snap) => {
+        if (!snap.exists()) return;
+        const d = snap.data();
+        cb({ eventos: d.eventos || [], avisos: Array.isArray(d.avisos) ? d.avisos : [] });
+      },
+      () => { /* sin conexión o sin permiso: se sigue con lo que ya había */ },
+    );
+  })();
+  return () => { cancelado = true; unsub(); };
+}
+
 // Manda las respuestas. `eventoDestino` es el nombre del evento que han elegido de la
 // lista, o "" si han dicho que es nuevo. La fecha la pone el servidor: así no depende
 // del reloj del móvil de quien lo envía.
