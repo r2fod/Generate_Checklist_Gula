@@ -13,9 +13,10 @@ import { existsSync } from "fs";
 
 const CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const PUERTO = 4178;
-const BASE = `http://localhost:${PUERTO}/index.html`;
-// El formulario es otra app, en su propia carpeta: por eso se instala aparte de la
-// checklist en vez de abrirse dentro de ella (ver formulario/index.html).
+// Cada app en SU carpeta y ninguna dentro de la otra: el ámbito de un manifiesto es la
+// carpeta donde vive, y una app dentro del ámbito de otra no se puede instalar aparte
+// (el navegador solo ofrece "abrir en la de fuera"). La raíz es solo el desvío.
+const BASE = `http://localhost:${PUERTO}/checklist/index.html`;
 const RAIZ = `http://localhost:${PUERTO}/`;
 const BASE_FORM = `http://localhost:${PUERTO}/formulario/index.html`;
 // Las llamadas a la nube se cortan: la prueba va sobre lo que la app hace en local,
@@ -46,7 +47,7 @@ const ok = (cond, msg) => {
 const url = (estado) => BASE + "?c=" + encodeURIComponent(JSON.stringify(estado));
 
 async function arrancarServidor() {
-  if (!existsSync("dist/index.html")) {
+  if (!existsSync("dist/checklist/index.html")) {
     console.error('No hay dist/. Construye antes con "npm run build".');
     process.exit(1);
   }
@@ -80,6 +81,19 @@ async function nuevaPagina(ctx) {
 
 const desbordamiento = (page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+// La checklist entera como texto, "nombre=cantidad|sufijo" por item. Vive aquí arriba
+// porque lo usan bloques repartidos por toda la prueba, y definido a media función se
+// quedaba fuera del alcance de los de más arriba.
+const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
+  const n = r.querySelector(".item-name, .item-label");
+  const q = r.querySelector(".item-qty-input");
+  // El sufijo cuenta: hay cambios que SOLO se ven ahí (el envase de las aguas de
+  // un rodaje, el "de 8 en almacén" de las carpas). Sin él, la prueba daba por
+  // mudo un control que sí cambiaba lo que se carga.
+  const suf = r.querySelector(".item-batea-info");
+  return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${suf ? "|" + suf.textContent.trim() : ""}`;
+}));
 
 async function main() {
   const srv = await arrancarServidor();
@@ -201,6 +215,230 @@ async function main() {
     ok(html.includes("Recogidas y devoluciones") && html.includes("Compras") && html.includes("Apollo paella"),
       "el Word incluye Recogidas y Compras");
   } else ok(false, "el Word se descarga");
+
+  // ── La pestaña Vuelta tiene que respirar ────────────────────────────────────
+  // Cada item apilaba cuatro líneas —nombre, la pastilla "todo", "vuelve" y "roturas"—
+  // y encima con sangrías distintas: la pastilla pegada al borde y los dos campos
+  // metidos hacia dentro. Se veía apretado y recorrer la vuelta era bajar el triple.
+  console.log("\n── La pestaña Vuelta ──");
+  {
+    // Dos líneas por item en los dos tamaños: la pastilla "todo" con el nombre (igual
+    // que la casilla de Prep. y de Salida, que es la misma acción) y los dos números
+    // juntos debajo.
+    for (const ancho of [390, 1440]) {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url({ evento: "produccion", pax: 30, nombreEvento: "Produccion vuelta" }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      await p.locator("button", { hasText: "Modo carga" }).first().click();
+      await p.waitForTimeout(1200);
+      await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+      await p.waitForTimeout(900);
+
+      const m = await p.evaluate(() => {
+        const fila = document.querySelector(".carga-row");
+        const linea = fila.querySelector(".carga-row-principal");
+        const grupo = fila.querySelector(".carga-vuelta-controles");
+        const campos = [...grupo.children].map(e => e.getBoundingClientRect());
+        const pastilla = fila.querySelector(".carga-vino-todo").getBoundingClientRect();
+        const nombre = fila.querySelector(".carga-nombre").getBoundingClientRect();
+        return {
+          alto: Math.round(fila.getBoundingClientRect().height),
+          // Cuántas líneas ocupa el item de verdad. Se cuentan los bloques del item,
+          // no los píxeles: en móvil la pastilla es más alta (zona táctil) y un tope
+          // en píxeles saltaría por eso aunque las líneas sigan siendo dos.
+          lineas: new Set([...fila.children].map(e => Math.round(e.getBoundingClientRect().top))).size,
+          // La pastilla "todo" comparte línea con el nombre, igual que la casilla de
+          // marcar en Prep. y en Salida: es la misma acción y va en el mismo sitio.
+          conElNombre: Math.abs(pastilla.top - nombre.top) < 24
+            && pastilla.top >= linea.getBoundingClientRect().top - 1,
+          // Y los dos números, en una sola fila entre ellos
+          camposEnUnaFila: campos.length === 2 && Math.abs(campos[0].top - campos[1].top) < 4,
+          campos: campos.length,
+          pastillaAlto: Math.round(pastilla.height),
+          // La pastilla, a la derecha del todo; los números, bajo el nombre
+          pastillaALaDerecha: pastilla.left > nombre.left,
+          sangriaCampos: Math.round(campos[0].left - fila.getBoundingClientRect().left),
+          desborda: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      ok(m.conElNombre && m.pastillaALaDerecha,
+        `a ${ancho}px la pastilla "todo" va en la línea del nombre, como en Prep. y Salida`);
+      ok(m.camposEnUnaFila,
+        `y "vuelve" y "roturas" comparten fila (${m.campos} campos)`);
+      ok(m.sangriaCampos >= 12,
+        `sin nada pegado al borde (${m.sangriaCampos}px de sangría)`);
+      ok(m.pastillaAlto >= 32, `la pastilla se puede pulsar con el dedo (${m.pastillaAlto}px de alto)`);
+      ok(m.lineas === 2 && m.alto <= 140,
+        `y el item ocupa ${m.lineas} líneas, no cuatro (${m.alto}px de alto)`);
+      ok(m.desborda === 0, `y no desborda a ${ancho}px`);
+      await c.close();
+    }
+  }
+
+  // ── El botón "Recalcular cantidades" ────────────────────────────────────────
+  // Compara el cálculo de AHORA con la foto que se guardó (valoresCalculados) y ofrece,
+  // una por una, mantener lo que hay o coger lo nuevo. Es el botón que salva a los
+  // eventos ya guardados cuando cambia una fórmula — justo lo que acaba de pasar con
+  // las champaneras. No tenía ninguna prueba.
+  console.log("\n── Recalcular cantidades ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const ITEM = "Champanera metálica grande";
+    const cantidadDe = async (nombre) => {
+      const f = (await listaItems(p)).find(i => i.startsWith(nombre + "=")) || "";
+      return f ? f.split("=")[1].split("|")[0] : null;
+    };
+    const base = { evento: "boda", pax: 100, ninos: 0, nombreEvento: "Boda recalcular" };
+
+    // Primero se averigua en qué categoría vive el item, que la clave es "categoría::nombre"
+    await p.goto(url(base), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    const ahora = await cantidadDe(ITEM);
+    ok(ahora === "3", `de partida una boda de 100 lleva 3 champaneras (${ahora})`);
+    // La clave de un item es "categoría::nombre". El nombre de la categoría se saca del
+    // textContent, NO del innerText: el innerText llega en mayúsculas (lo hace el CSS) y
+    // no coincidiría con el nombre real. Detrás lleva pegados el contador y la flecha.
+    const categoria = await p.locator(".category-section", { hasText: ITEM }).first()
+      .locator(".category-header").first()
+      .evaluate(e => e.textContent.replace(/\d+\s*[▼▲]?\s*$/, "").trim());
+    ok(categoria === "Cristalería", `la champanera vive en "${categoria}"`);
+    const clave = `${categoria}::${ITEM}`;
+
+    // Un evento guardado ANTES del cambio de fórmula: su foto dice 4
+    const viejo = { ...base, valoresCalculados: { [clave]: "4" } };
+    await p.goto(url(viejo), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Recalcular cantidades" }).first().click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".recalcular-modal").count() === 1, "el botón abre el repaso de cantidades");
+    const fila = p.locator(".recalcular-row", { hasText: ITEM }).first();
+    ok(await fila.count() === 1, `y encuentra la cantidad que ha cambiado (${ITEM})`);
+    ok(await fila.locator(".recalcular-opcion", { hasText: "Mantener 4" }).count() === 1
+      && await fila.locator(".recalcular-opcion", { hasText: "Usar 3" }).count() === 1,
+      "ofreciendo mantener la de antes (4) o coger la nueva (3)");
+
+    // Coger la nueva: la cantidad tiene que quedarse en 3 y no volver a preguntar
+    await fila.locator(".recalcular-opcion", { hasText: "Usar 3" }).click();
+    await p.locator(".recalcular-modal .btn-green", { hasText: "Aplicar" }).click();
+    await p.waitForTimeout(900);
+    ok(await cantidadDe(ITEM) === "3", `al coger la nueva, la carga se queda en 3 (${await cantidadDe(ITEM)})`);
+    await p.locator("button", { hasText: "Recalcular cantidades" }).first().click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".recalcular-modal").count() === 0
+      && await p.locator(".guardado-confirm", { hasText: /Nada ha cambiado/i }).count() === 1,
+      "y a la segunda ya dice que no ha cambiado nada");
+
+    // Y el otro camino: una cantidad puesta a mano que se quiere conservar
+    const aMano = { ...base, valoresCalculados: { [clave]: "4" }, overridesManuales: { [clave]: "9" } };
+    await p.goto(url(aMano), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    ok(await cantidadDe(ITEM) === "9", `la cantidad puesta a mano manda (${await cantidadDe(ITEM)})`);
+    await p.locator("button", { hasText: "Recalcular cantidades" }).first().click();
+    await p.waitForTimeout(700);
+    const fila2 = p.locator(".recalcular-row", { hasText: ITEM }).first();
+    ok(await fila2.locator(".recalcular-tag", { hasText: "a mano" }).count() === 1,
+      "el repaso avisa de que esa la pusiste tú a mano");
+    await fila2.locator(".recalcular-opcion", { hasText: "Mantener 9" }).click();
+    await p.locator(".recalcular-modal .btn-green", { hasText: "Aplicar" }).click();
+    await p.waitForTimeout(900);
+    ok(await cantidadDe(ITEM) === "9", `mantenerla la deja en 9 (${await cantidadDe(ITEM)})`);
+    await p.locator("button", { hasText: "Recalcular cantidades" }).first().click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".recalcular-modal").count() === 0,
+      "y no vuelve a preguntar por lo ya decidido");
+    await c.close();
+  }
+
+  // ── El logo de la cabecera no puede comerse nada ────────────────────────────
+  // Va en el hueco libre del grupo del título, pegado al interruptor de tema. Lo que
+  // hay que vigilar es justo eso: que no le quite ancho al nombre del evento ni empuje
+  // los botones, y que en móvil (donde la cabecera ya va justa) desaparezca.
+  console.log("\n── El logo de la cabecera ──");
+  {
+    const medir = async (ancho) => {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url({ ...EVENTO_COMPLETO, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      const m = await p.evaluate(() => {
+        const caja = (s) => { const e = document.querySelector(s); return e ? e.getBoundingClientRect() : null; };
+        const logo = document.querySelector(".app-logo");
+        const h1 = document.querySelector(".header-info h1");
+        return {
+          visible: !!logo && getComputedStyle(logo).display !== "none",
+          logo: caja(".app-logo"),
+          cabecera: caja(".app-header"),
+          tema: caja(".btn-tema"),
+          tituloEntero: h1 ? h1.scrollWidth <= h1.clientWidth + 1 : false,
+          desborda: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      await c.close();
+      return m;
+    };
+
+    // El corte de móvil de esta app es "max-width: 768px", así que 768 ya es móvil:
+    // el logo se esconde ahí también.
+    for (const ancho of [320, 390, 480, 768]) {
+      const m = await medir(ancho);
+      ok(!m.visible && m.desborda === 0, `a ${ancho}px el logo se esconde y no desborda`);
+    }
+    for (const ancho of [1024, 1440, 1920]) {
+      const m = await medir(ancho);
+      ok(m.visible && m.logo.width > 30 && m.desborda === 0,
+        `a ${ancho}px el logo se ve (${Math.round(m.logo.width)}×${Math.round(m.logo.height)}px) y no desborda`);
+      // Dentro de la cabecera y a la izquierda del interruptor de tema, que es su sitio
+      ok(m.logo.top >= m.cabecera.top && m.logo.bottom <= m.cabecera.bottom && m.logo.right <= m.tema.left + 1,
+        `y queda dentro de la cabecera, justo antes de "Auto"`);
+      ok(m.tituloEntero, `sin recortar el nombre del evento a ${ancho}px`);
+    }
+  }
+
+  // ── Los links de Compartir tienen que copiarse SIEMPRE ──────────────────────
+  // El portapapeles solo se puede escribir mientras dura el gesto de quien pulsa. Al
+  // poner la copia detrás de un "await" (esperando a que el evento subiera a la nube)
+  // caía fuera del gesto y el navegador la rechazaba: se cerraba el menú y no pasaba
+  // nada. Aquí la nube está cortada a propósito, que es justo el caso que fallaba: el
+  // link tiene que estar en el portapapeles igual, y encima hay que avisar de que el
+  // evento NO ha subido para que nadie lo mande creyendo que sirve.
+  console.log("\n── Los links de Compartir ──");
+  {
+    const c = await navegador.newContext({
+      viewport: { width: 1440, height: 1000 },
+      permissions: ["clipboard-read", "clipboard-write"],
+    });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const portapapeles = () => p.evaluate(() => navigator.clipboard.readText());
+    for (const [entrada, marca] of [["Link para marcar", true], ["Link con edición", false]]) {
+      await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      await p.evaluate(() => navigator.clipboard.writeText("(vacío)"));
+      await p.locator("button", { hasText: "Compartir" }).first().click();
+      await p.waitForTimeout(400);
+      await p.locator(".compartir-menu button", { hasText: entrada }).first().click();
+      await p.waitForTimeout(900);
+      const copiado = await portapapeles();
+      ok(/\?evento=[a-z0-9]{8}/.test(copiado), `"${entrada}" deja el link en el portapapeles → ${copiado.slice(0, 90)}`);
+      ok(copiado.includes("&solo=1") === marca,
+        marca ? "y el de marcar lleva su &solo=1" : "y el de edición no lo lleva");
+      ok(copiado.includes("Boda Anna y Mario"), "con el nombre del evento delante, para saber cuál es al pegarlo");
+    }
+    // Y como la nube está cortada, el evento no llega a subir: hay que decirlo, que si
+    // no se manda un link que no abre nada al otro lado. El aviso tarda lo que dura el
+    // plazo, porque Firestore no rechaza la escritura sin conexión —la deja pendiente
+    // para siempre— y esperando solo al fallo el aviso no llegaría nunca.
+    await p.locator(".btn-green", { hasText: /NO ha subido/i }).first()
+      .waitFor({ timeout: 12000 }).catch(() => {});
+    ok(/no ha subido/i.test(await p.locator(".btn-green").first().innerText()),
+      `y avisa de que el evento no ha subido → "${(await p.locator(".btn-green").first().innerText()).trim()}"`);
+    await c.close();
+  }
 
   // ── Editar un evento guardado no puede perder los demás ─────────────────────
   console.log("\n── Eventos guardados ──");
@@ -329,15 +567,6 @@ async function main() {
   // pequeño": elegir Grande no cambiaba nada. Se prueba cada opción de cada control
   // en los cinco tipos de evento y se exige que la checklist cambie.
   console.log("\n── Los selectores cambian la checklist ──");
-  const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
-    const n = r.querySelector(".item-name, .item-label");
-    const q = r.querySelector(".item-qty-input");
-    // El sufijo cuenta: hay cambios que SOLO se ven ahí (el envase de las aguas de
-    // un rodaje, el "de 8 en almacén" de las carpas). Sin él, la prueba daba por
-    // mudo un control que sí cambiaba lo que se carga.
-    const suf = r.querySelector(".item-batea-info");
-    return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${suf ? "|" + suf.textContent.trim() : ""}`;
-  }));
   const escapa = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   for (const tipo of TIPOS) {
     await page.goto(url({ evento: tipo, pax: 100, ninos: 10 }), { waitUntil: "domcontentloaded" });
@@ -1030,15 +1259,34 @@ async function main() {
       const href = await p.locator('link[rel="manifest"]').getAttribute("href");
       const abs = new URL(href, p.url()).href;
       const m = await (await fetch(abs)).json();
-      return { abs, ambito: new URL(m.scope, abs).pathname, arranque: new URL(m.start_url, abs).pathname, nombre: m.name };
+      return {
+        abs,
+        ambito: new URL(m.scope, abs).pathname,
+        arranque: new URL(m.start_url, abs).pathname,
+        id: m.id ? new URL(m.id, abs).pathname : new URL(m.start_url, abs).pathname,
+        nombre: m.name,
+      };
     };
 
     const mChecklist = await manifiestoDe(BASE);
     const mForm = await manifiestoDe(BASE_FORM);
     ok(mChecklist.ambito !== mForm.ambito,
       `cada app tiene su propio ámbito (checklist ${mChecklist.ambito} · formulario ${mForm.ambito})`);
+    // ESTA es la que importa, y es la que faltaba: que sean distintos NO basta. Con la
+    // checklist en la raíz sus ámbitos eran "/" y "/formulario/" —distintos— pero uno
+    // contenía al otro, y una app dentro del ámbito de otra no se puede instalar
+    // aparte: Chrome solo ofrecía "Abrir en aplicación" (la checklist). Tienen que ser
+    // carpetas hermanas, ninguna prefijo de la otra.
+    ok(!mForm.ambito.startsWith(mChecklist.ambito) && !mChecklist.ambito.startsWith(mForm.ambito),
+      `y ninguno está DENTRO del otro: son hermanos (${mChecklist.ambito} · ${mForm.ambito})`);
     ok(mForm.ambito === "/formulario/" && mForm.arranque === "/formulario/index.html",
       `el formulario arranca y vive en su carpeta (${mForm.arranque})`);
+    ok(mChecklist.ambito === "/checklist/" && mChecklist.arranque === "/checklist/index.html",
+      `y la checklist en la suya (${mChecklist.arranque})`);
+    // La checklist ya instalada no puede convertirse en otra app distinta: su identidad
+    // es el "id", y se deja clavado al que tenía cuando vivía en la raíz.
+    ok(mChecklist.id === "/index.html",
+      `la checklist conserva su identidad de siempre, así nadie tiene que reinstalarla (${mChecklist.id})`);
     ok(mChecklist.nombre === "Checklist Gula" && mForm.nombre === "Formulario Gula",
       `y cada una se instala con su nombre ("${mChecklist.nombre}" / "${mForm.nombre}")`);
     // Los iconos tienen que existir de verdad: una app instalada con el icono roto es
@@ -1050,21 +1298,38 @@ async function main() {
     }, mForm.abs);
     ok(iconosOk, "y sus iconos se descargan (no quedan rotos al instalarla)");
 
-    // La checklist ya no monta el formulario: quien llegue con el enlace se desvía
-    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    // La raíz ya no es ninguna app: es el desvío que salva los enlaces ya repartidos
+    // por WhatsApp, que apuntan todos ahí. El del formulario, a su carpeta…
+    await p.goto(RAIZ + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(1800);
     ok(p.url().includes("/formulario/") && p.url().includes("enviar=PRUEBA1"),
-      `un enlace viejo (?enviar=) acaba en el formulario → ${p.url().replace(RAIZ, "…/")}`);
+      `un enlace viejo del formulario acaba en el formulario → ${p.url().replace(RAIZ, "…/")}`);
     ok(await p.locator(".form-titulo").count() > 0,
       "y llega funcionando, no a una pantalla en blanco");
+
+    // …y el de un evento, a la checklist SIN perder por el camino de qué evento era,
+    // que es lo único que hace útil ese link
+    await p.goto(RAIZ + "?c=" + encodeURIComponent(JSON.stringify({ evento: "boda", pax: 100 })) + "&solo=1",
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2000);
+    ok(p.url().includes("/checklist/") && p.url().includes("solo=1"),
+      `un enlace viejo de un evento acaba en la checklist con su consulta entera → ${p.url().replace(RAIZ, "…/").slice(0, 70)}…`);
+    ok(await p.locator(".item-row").count() > 20,
+      `y abre la checklist del evento, no una vacía (${await p.locator(".item-row").count()} items)`);
 
     // Quien instaló el formulario ANTES de la mudanza tiene un icono que abre
     // "?formulario=1". Ese icono no puede acabar en el login del equipo.
     await p.evaluate(() => localStorage.setItem("gula_formulario_codigo", "PRUEBA1"));
-    await p.goto(BASE + "?formulario=1", { waitUntil: "domcontentloaded" });
+    await p.goto(RAIZ + "?formulario=1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(1800);
     ok(p.url().includes("/formulario/") && await p.locator(".login-tarjeta").count() === 0,
       "el icono viejo del formulario tampoco cae en el login del equipo");
+
+    // Y quien tenía instalada la checklist abre "index.html" de la raíz: también va
+    await p.goto(RAIZ + "index.html", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1800);
+    ok(p.url().includes("/checklist/"),
+      `el icono de la checklist de siempre acaba en su carpeta → ${p.url().replace(RAIZ, "…/")}`);
 
     // Y al revés: desde la carpeta del formulario no se llega a la checklist
     await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
@@ -1345,7 +1610,7 @@ async function main() {
   console.log("\n── La app instalada recibe los cambios ──");
   {
     const fs3 = await import("fs");
-    const PUERTO2 = 4179, BASE2 = `http://localhost:${PUERTO2}/publicado/index.html`;
+    const PUERTO2 = 4179, BASE2 = `http://localhost:${PUERTO2}/publicado/checklist/index.html`;
     fs3.rmSync("/tmp/gula-publicado", { recursive: true, force: true });
     fs3.mkdirSync("/tmp/gula-publicado", { recursive: true });
     fs3.cpSync("dist", "/tmp/gula-publicado/publicado", { recursive: true });
@@ -1356,7 +1621,7 @@ async function main() {
     const estado = encodeURIComponent(JSON.stringify({ evento: "produccion", pax: 25 }));
     await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
     await p.waitForTimeout(3000);
-    const dir = "/tmp/gula-publicado/publicado";
+    const dir = "/tmp/gula-publicado/publicado/checklist";
     // El nombre del bundle se saca del propio index.html, no de un patrón a mano: al
     // separar el formulario en su carpeta la entrada pasó a llamarse "checklist-…" y
     // una prueba que buscaba "index-…" se quedó sin encontrar nada.
@@ -1366,13 +1631,13 @@ async function main() {
     ok(!!jsViejo && await p.locator(".item-row").count() > 20, `la app queda instalada (bundle ${jsViejo})`);
     // Se "despliega" una versión nueva con un cambio visible
     const nuevo = "checklist-VERSIONNUEVA.js";
-    fs3.writeFileSync(`${dir}/assets/${nuevo}`,
-      fs3.readFileSync(`${dir}/assets/${jsViejo}`, "utf8").replaceAll("Cubo basura reciclaje", "CAMBIO VERSION NUEVA"));
-    fs3.rmSync(`${dir}/assets/${jsViejo}`);
+    fs3.writeFileSync(`${dir}/../assets/${nuevo}`,
+      fs3.readFileSync(`${dir}/../assets/${jsViejo}`, "utf8").replaceAll("Cubo basura reciclaje", "CAMBIO VERSION NUEVA"));
+    fs3.rmSync(`${dir}/../assets/${jsViejo}`);
     fs3.writeFileSync(`${dir}/index.html`, fs3.readFileSync(`${dir}/index.html`, "utf8").replace(jsViejo, nuevo));
-    const pre = JSON.parse(fs3.readFileSync(`${dir}/precache.json`, "utf8"));
-    fs3.writeFileSync(`${dir}/precache.json`, JSON.stringify({ id: "NUEVA", ficheros: pre.ficheros.map(f => f.replace(jsViejo, nuevo)) }));
-    fs3.writeFileSync(`${dir}/version.json`, JSON.stringify({ id: "NUEVA" }));
+    const pre = JSON.parse(fs3.readFileSync(`${dir}/../precache.json`, "utf8"));
+    fs3.writeFileSync(`${dir}/../precache.json`, JSON.stringify({ id: "NUEVA", ficheros: pre.ficheros.map(f => f.replace(jsViejo, nuevo)) }));
+    fs3.writeFileSync(`${dir}/../version.json`, JSON.stringify({ id: "NUEVA" }));
     // Se vuelve a abrir la app instalada, con cobertura
     await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
     await p.waitForTimeout(3000);
@@ -1828,6 +2093,36 @@ async function main() {
     await p.waitForTimeout(700);
     ok(await p.locator(".carga-marca-otra.is-cargado").count() === 1,
       "y preparando se ve lo que ya está subido al camión");
+
+    // Si algo sale en el camión es porque estaba preparado. Antes las dos listas podían
+    // contradecirse —"cargado" pero "sin preparar"— y quien miraba la de preparación
+    // volvía a buscar por el almacén algo que ya iba dentro del camión.
+    await pestana("Salida").click();
+    await p.waitForTimeout(700);
+    const sinPreparar = p.locator(".carga-row").nth(2);
+    const nombreSinPreparar = (await sinPreparar.locator(".carga-nombre").first().innerText()).trim();
+    ok(await sinPreparar.locator(".carga-marca-otra.is-preparado").count() === 0,
+      `"${nombreSinPreparar}" no estaba preparado`);
+    await sinPreparar.locator('input[type="checkbox"]').check({ force: true });
+    await p.waitForTimeout(900);
+    ok(await guardado("preparados") === 3,
+      `cargarlo en el camión lo da por preparado también (${await guardado("preparados")})`);
+    await pestana("Prep.").click();
+    await p.waitForTimeout(700);
+    ok(await p.locator(".carga-row", { hasText: nombreSinPreparar }).first().locator('input[type="checkbox"]').isChecked(),
+      "y en Preparación aparece ya marcado, sin tener que volver a buscarlo");
+
+    // Al revés NO: bajar algo del camión no deshace el trabajo de haberlo preparado
+    await pestana("Salida").click();
+    await p.waitForTimeout(700);
+    await p.locator(".carga-row", { hasText: nombreSinPreparar }).first().locator('input[type="checkbox"]').uncheck({ force: true });
+    await p.waitForTimeout(900);
+    // Se cuentan los marcados de verdad, no las claves: desmarcar deja la clave puesta
+    // con valor false, así que contar claves daría el mismo número que antes.
+    const marcados = (clave) => p.evaluate(k => Object.values(
+      JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}")[k] || {}).filter(Boolean).length, clave);
+    ok(await marcados("preparados") === 3 && await marcados("checkeados") === 1,
+      `pero desmarcar la salida no lo desprepara (preparados ${await marcados("preparados")}, cargados ${await marcados("checkeados")})`);
 
     // Cambiar la cantidad NO puede borrar lo ya marcado. Antes lo desmarcaba, y eso
     // era perder trabajo hecho: alguien había ido al almacén, lo había contado y lo

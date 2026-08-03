@@ -370,6 +370,28 @@ body {
 }
 .header-title-group > .btn-tema { margin-left: auto; }
 
+/* El logo de Gula en la cabecera. El hueco libre se lo come él, así que el logo y el
+   interruptor de tema quedan juntos en la esquina derecha en vez de separados. El
+   archivo es un PNG negro sobre transparente: se usa de máscara y el color lo pone el
+   degradado de debajo, que va quieto — en la cabecera un logo animado distrae. Con
+   aspect-ratio el alto manda y el ancho sale solo. */
+.header-title-group > .app-logo {
+  display: block;
+  flex: 0 0 auto;
+  margin-left: auto;
+  height: 26px;
+  aspect-ratio: 1536 / 758;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  background: linear-gradient(100deg, #6d28d9, #db2777, #f97316);
+  opacity: 0.92;
+}
+.header-title-group > .app-logo + .btn-tema { margin-left: 12px; }
+
 /* Todos los botones de la cabecera con el mismo aspecto: un "ghost" sin borde
    entre botones con borde se leía como texto suelto, no como un botón. */
 .header-actions > .btn-ghost {
@@ -2214,6 +2236,13 @@ hr {
     border-radius: var(--radius-md);
   }
 
+  /* En móvil la cabecera va justa —el subtítulo ya se recorta a dos líneas— así que
+     el logo se esconde antes que quitarle sitio al nombre del evento y a su fecha.
+     Al desaparecer se lleva su "margin-left: auto", que es lo que empujaba el
+     interruptor de tema a la derecha: se le devuelve aquí. */
+  .header-title-group > .app-logo { display: none; }
+  .header-title-group > .app-logo + .btn-tema { margin-left: auto; }
+
   /* El selector .config-sidebar .form-row (arriba, para el layout de 2 columnas en
      escritorio) tiene más especificidad que ".form-row" a secas: sin repetirlo aquí,
      esa regla de escritorio "ganaba" incluso dentro de este breakpoint móvil y dejaba
@@ -3239,6 +3268,26 @@ hr {
 
 .carga-row-vuelta {
   cursor: default;
+  /* El nombre y sus controles son la misma fila: se acercan y el aire de abajo lo
+     pone el grupo de controles, no este bloque. */
+  padding-bottom: 6px;
+}
+
+/* Los dos números de la vuelta ("vuelve" y "roturas"), en una fila y alineados entre
+   ellos. Antes iban sueltos, uno debajo de otro, y con sangrías distintas de la
+   pastilla "todo" —que además colgaba pegada al borde—: cada item ocupaba cuatro
+   líneas y recorrer la vuelta era bajar el triple. La sangría los pone bajo el nombre,
+   que arranca después de su icono. */
+.carga-vuelta-controles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  padding: 0 16px 14px 46px;
+}
+/* Dentro del grupo, cada bloque ya no pone su propia sangría: la pone el grupo */
+.carga-vuelta-controles > .carga-roturas {
+  padding: 0;
 }
 
 .carga-vuelve-cantidad {
@@ -3254,7 +3303,7 @@ hr {
 .carga-vino-todo {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 7px;
   flex-shrink: 0;
   font-size: 0.78rem;
   font-weight: 700;
@@ -3262,11 +3311,14 @@ hr {
   background: var(--card-bg);
   border: 1px solid var(--border-color-strong);
   border-radius: 999px;
-  padding: 4px 9px 4px 6px;
+  /* Iba a 4px por todos lados y con la casilla pegada al texto: se leía como un
+     apretujón, no como un botón. Con aire y una altura de dedo se pulsa sin apuntar. */
+  padding: 7px 14px 7px 10px;
+  min-height: 34px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.carga-vino-todo input[type="checkbox"] { width: 15px; height: 15px; margin: 0; accent-color: #16a34a; }
+.carga-vino-todo input[type="checkbox"] { width: 16px; height: 16px; min-width: 16px; margin: 0; accent-color: #16a34a; }
 .carga-vino-todo.is-on { color: var(--ok-texto); background: var(--ok-bg); border-color: #a7e3bf; }
 .carga-row.is-vino-todo { background: #f4fcf6; }
 .carga-todo-vuelto {
@@ -3282,10 +3334,17 @@ hr {
 @media (max-width: 480px) {
   .carga-row-principal.carga-row-vuelta {
     flex-wrap: wrap;
-    padding-bottom: 8px;
+    padding-bottom: 6px;
   }
 
-  .carga-roturas.carga-vuelve-cantidad,
+  /* En móvil los dos números pegan al borde: 46px de sangría se comen el ancho que
+     necesitan para caber en la misma fila. */
+  .carga-vuelta-controles {
+    padding-left: 16px;
+    padding-right: 14px;
+    gap: 10px 16px;
+  }
+
   .carga-row .carga-roturas {
     padding-left: 16px;
   }

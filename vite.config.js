@@ -43,11 +43,14 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // Dos apps, dos direcciones. El formulario tiene su propia carpeta (y por tanto su
-      // propio manifiesto y su propio ámbito), que es lo que hace que se instale aparte
-      // de la checklist en vez de abrirse dentro de ella.
+      // Dos apps, cada una en SU carpeta y ninguna dentro de la otra. El ámbito de un
+      // manifiesto es la carpeta donde vive, así que con la checklist en la raíz su
+      // ámbito se tragaba /formulario/: una app dentro del ámbito de otra no se puede
+      // instalar aparte, el navegador solo ofrece "abrir en la de fuera". Por eso la
+      // checklist también baja a su carpeta. La raíz se queda como desvío (ver
+      // public/index.html), que va en HTML suelto y no pasa por aquí.
       input: {
-        checklist: fileURLToPath(new URL('./index.html', import.meta.url)),
+        checklist: fileURLToPath(new URL('./checklist/index.html', import.meta.url)),
         formulario: fileURLToPath(new URL('./formulario/index.html', import.meta.url)),
       },
     },

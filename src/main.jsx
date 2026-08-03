@@ -23,16 +23,15 @@ function aplicarTemaInicial() {
 }
 aplicarTemaInicial()
 
-// El formulario de oficina se mudó a su propia carpeta (./formulario/) para que se
-// instale como una app aparte de la checklist: cuando compartían dirección compartían
-// también el ámbito del manifiesto, y el navegador los trataba como la MISMA app —quien
-// tenía la checklist instalada, al abrir el formulario se lo encontraba dentro de ella.
+// Este arranque es SOLO el de la checklist, que vive en su propia carpeta. El
+// formulario tiene la suya (y su propio arranque), porque el ámbito de un manifiesto
+// es la carpeta donde vive: mientras la checklist estuvo en la raíz, su ámbito se
+// tragaba el del formulario y el navegador los trataba como la MISMA app — no había
+// forma de instalar el formulario aparte.
 //
-// Aquí ya no se pinta el formulario: solo queda el desvío, para que los enlaces ya
-// repartidos por WhatsApp (?enviar=<código>) sigan funcionando, y para que quien lo
-// instaló ANTES de la mudanza (su icono abre ?formulario=1) acabe en su formulario y
-// no en el login del equipo. Se hace ANTES de montar nada: así no se ve un fogonazo de
-// la app que no es.
+// El desvío de los enlaces ya repartidos lo hace la raíz (ver public/index.html). Esto
+// de aquí es solo la red de seguridad para un ?enviar= que llegue a la carpeta de la
+// checklist: sin ella se quedaría mirando la checklist, que no es lo que pedía.
 function codigoGuardado() {
   try { return localStorage.getItem("gula_formulario_codigo") || "" } catch (e) { return "" }
 }
@@ -43,7 +42,7 @@ function desviarAlFormulario() {
   const iconoViejo = !!p.get("formulario")
   if (!conEnlace && !iconoViejo) return false
   const codigo = conEnlace || codigoGuardado()
-  const destino = new URL("./formulario/", window.location.href)
+  const destino = new URL("../formulario/", window.location.href)
   if (codigo) destino.searchParams.set("enviar", codigo)
   window.location.replace(destino.href)
   return true
@@ -104,10 +103,13 @@ if (!desviado) arrancar()
 // El service worker hace que la app abra sin cobertura (ver public/sw.js). Se registra
 // DESPUÉS de pintar para no retrasar el arranque, y si el navegador no lo soporta o
 // falla, la app funciona igual que siempre — solo pierde el modo sin conexión.
+// El service worker vive en la RAÍZ, no en esta carpeta: desde ahí cubre las dos apps
+// con una sola caché, y es él quien decide a qué documento se vuelve sin cobertura
+// según la dirección (ver public/sw.js).
 if (!desviado && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register(new URL("sw.js", window.location.href), { scope: "./" })
+      .register(new URL("../sw.js", window.location.href), { scope: "../" })
       .catch(() => {})
   })
 }
