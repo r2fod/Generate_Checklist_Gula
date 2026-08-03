@@ -6,7 +6,6 @@
 //   · Resto de casos → hay que iniciar sesión con el correo/contraseña del equipo.
 import { useState, useEffect } from "react";
 import App from "./App.jsx";
-import Formulario from "./formulario/Formulario.jsx";
 import { accesoActivo, iniciarSesion, cerrarSesion, observarSesion } from "./auth.js";
 import logoGula from "./assets/gula-logo.png";
 
@@ -15,42 +14,10 @@ function esLinkDeEvento() {
   return !!(p.get("evento") || p.get("c"));
 }
 
-// El link que se le pasa a la oficina: ?enviar=<código>. Abre SOLO el formulario —
-// desde ahí no se llega a la checklist, ni a la configuración, ni a los eventos.
-//
-// El código se recuerda en ESTE navegador porque si no, instalar la app desde el
-// formulario no serviría de nada: el icono abre la dirección de siempre (sin
-// ?enviar=) y quien lo instaló se encontraría la pantalla de login del equipo en
-// vez de su formulario. Con el código guardado, el icono abre lo que instaló.
-const CLAVE_CODIGO = "gula_formulario_codigo";
-
-function codigoEnLaUrl() {
-  const dela = new URLSearchParams(window.location.search).get("enviar") || "";
-  if (dela) {
-    try { localStorage.setItem(CLAVE_CODIGO, dela); } catch (e) { /* en privado no se guarda, da igual */ }
-  }
-  return dela;
-}
-
-function codigoGuardado() {
-  try { return localStorage.getItem(CLAVE_CODIGO) || ""; } catch (e) { return ""; }
-}
-
-// ¿Se está abriendo desde el icono instalado y no desde el navegador? Es la única
-// situación en la que el código guardado manda: el icono abre la dirección de siempre
-// (sin ?enviar=) y quien lo instaló espera SU formulario, no el login del equipo.
-// En una pestaña normal el código guardado se ignora, así que abrir el enlace una vez
-// para probarlo no deja el navegador atrapado en el formulario.
-function abiertaComoApp() {
-  try {
-    // La app instalada del formulario arranca en ?formulario=1, que es lo que dice su
-    // propio manifiesto: es la señal más fiable, no depende de cómo el navegador
-    // reporte el modo de pantalla.
-    if (new URLSearchParams(window.location.search).get("formulario")) return true;
-    if (window.navigator.standalone) return true;
-    return !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
-  } catch (e) { return false; }
-}
+// El formulario de oficina YA NO SE MONTA AQUÍ: vive en su propia dirección
+// (./formulario/) para que se instale como una app aparte. El enlace ?enviar=<código>
+// que llega a esta dirección se desvía allí antes de montar React (ver src/main.jsx),
+// así que esta puerta solo tiene que decidir entre la checklist y el login.
 
 // Traduce los códigos de error de Firebase a un mensaje claro en español
 function mensajeError(codigo) {
@@ -138,15 +105,6 @@ function PantallaLogin() {
 }
 
 export default function Acceso() {
-  // El formulario de oficina va por su cuenta: ni login ni app.
-  //   · Con ?enviar= en la dirección manda siempre, tengas sesión o no: es como se
-  //     abre el enlace, y también como lo compruebas tú desde la app.
-  //   · Sin él, vale el código guardado de la última vez, pero SOLO si se ha abierto
-  //     desde el icono instalado: es lo que hace que la app que instaló la oficina
-  //     abra su formulario. En una pestaña normal se ignora, así que abrir el enlace
-  //     para probarlo no deja el navegador atrapado.
-  const [codigoUrl] = useState(codigoEnLaUrl);
-  const [codigoRecordado] = useState(() => ((esLinkDeEvento() || !abiertaComoApp()) ? "" : codigoGuardado()));
   // omitirLogin se fija una sola vez al arrancar: si es un link de evento o no hay
   // acceso configurado, nunca se pide login.
   const [omitirLogin] = useState(() => !accesoActivo() || esLinkDeEvento());
@@ -158,8 +116,6 @@ export default function Acceso() {
     return unsub;
   }, [omitirLogin]);
 
-  if (codigoUrl) return <Formulario codigo={codigoUrl} />;
-
   if (omitirLogin) return <App />;
 
   if (sesion.cargando) {
@@ -168,12 +124,6 @@ export default function Acceso() {
         <div className="login-cargando">Cargando…</div>
       </div>
     );
-  }
-
-  // Sin sesión: si este navegador es el de la oficina (instaló el formulario), se
-  // abre su formulario en vez de un login que no le sirve de nada.
-  if (!sesion.usuario && codigoRecordado) {
-    return <Formulario codigo={codigoRecordado} />;
   }
 
   if (!sesion.usuario) return <PantallaLogin />;
