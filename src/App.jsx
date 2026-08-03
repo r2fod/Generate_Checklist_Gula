@@ -316,7 +316,13 @@ function sugerirCategoria(label, categoriasDisponibles) {
 function bateas(units, size) { return Math.ceil(units / size); }
 
 function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false) {
-  const barFactor = h / 4;
+  // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
+  // la de la comida— y eso antes se resolvía llamando aquí con un 2 fijo cuando no
+  // había barra. El efecto era absurdo: media hora de cóctel pedía MENOS que no tener
+  // barra (24 tercios contra 96), porque 0,5 caía por debajo de ese 2 que solo se
+  // aplicaba al caso "sin barra". Tratándolo como suelo, subir horas nunca baja nada.
+  const hVolumen = Math.max(2, h);
+  const barFactor = hVolumen / 4;
   const cervezaFactor = mesVerano ? 2.0 : 1.5;
   // El consumo de cerveza por pax no crece sin límite cuanto más dura la barra: a partir
   // de las 4h de referencia el consumo por persona se estabiliza (nadie bebe el doble de
@@ -352,6 +358,8 @@ function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = fals
   // (64 packs = 384 botellas para 80 pax, 7 L/pax — un disparate multiplicado ×6).
   const agua15 = Math.round(pax * 0.8);
   const agua15Packs = Math.max(2, Math.ceil(agua15 / 6));
+  // El Red Bull sí es cosa de la barra: sin barra no va ninguno. Por eso mira las horas
+  // DE VERDAD (h), no el suelo — si mirara el suelo, saldría en eventos sin barra.
   const redbull = h > 0 ? Math.max(6, Math.round(pax * 0.06 * barFactorTope)) : 0;
   // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
   const aguasPequenasUds = Math.round(pax * 3);
@@ -592,7 +600,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // su propio ratio (1 camarero cada X pax) en el formulario, manda ese.
   const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 18 : 12);
 
-  const bebidas    = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador, tieneBrindisCava);
+  const bebidas    = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito sí escalan con el total
@@ -851,7 +859,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
 
-  const bebidas = calcBebidas(pax, hayBarra ? horasBarraTotal : 2, mesVerano, hayCongelador, tieneBrindisCava);
+  const bebidas = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);

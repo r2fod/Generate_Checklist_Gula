@@ -216,6 +216,71 @@ async function main() {
       "el Word incluye Recogidas y Compras");
   } else ok(false, "el Word se descarga");
 
+  // ── Las horas de barra libre ────────────────────────────────────────────────
+  // Subir horas de barra NUNCA puede bajar una cantidad. Parece obvio y no lo era: el
+  // caso "sin barra" se calculaba aparte como si fueran 2 horas, así que media hora de
+  // cóctel caía por debajo de ese suelo y pedía 24 tercios de cerveza donde un evento
+  // SIN barra pedía 96. Cuatro veces menos por poner media hora de barra.
+  console.log("\n── Las horas de barra libre ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const cantidades = async (coctel, copas) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, barraCoctel: coctel > 0, horasCoctel: coctel, barraCopas: copas > 0, horasCopas: copas }),
+        { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1700);
+      const m = {};
+      for (const f of await listaItems(p)) {
+        const i = f.indexOf("=");
+        const n = parseFloat(String(f.slice(i + 1)).split("|")[0].replace(",", "."));
+        if (!isNaN(n)) m[f.slice(0, i)] = n;
+      }
+      return m;
+    };
+    const bajan = (medidas) => {
+      const malas = [];
+      for (const k of [...new Set(medidas.flatMap(([, m]) => Object.keys(m)))]) {
+        const serie = medidas.map(([h, m]) => [h, m[k]]);
+        for (let i = 1; i < serie.length; i++) {
+          const [h0, a] = serie[i - 1], [h1, b] = serie[i];
+          if (a !== undefined && b !== undefined && b < a) { malas.push(`${k} (${h0}h→${a}, ${h1}h→${b})`); break; }
+        }
+      }
+      return malas;
+    };
+
+    const porCoctel = [];
+    for (const h of [0, 0.5, 1.5, 3, 5]) porCoctel.push([h, await cantidades(h, 0)]);
+    const malasCoctel = bajan(porCoctel);
+    ok(malasCoctel.length === 0,
+      `subir las horas de cóctel no baja ninguna cantidad${malasCoctel.length ? ` → ${malasCoctel.join(" · ")}` : ""}`);
+
+    const porCopas = [];
+    for (const h of [0, 1, 3, 5, 8]) porCopas.push([h, await cantidades(3, h)]);
+    const malasCopas = bajan(porCopas);
+    ok(malasCopas.length === 0,
+      `ni subir las de copas${malasCopas.length ? ` → ${malasCopas.join(" · ")}` : ""}`);
+
+    // El caso concreto que lo destapó, con nombre y apellidos
+    const sinBarra = porCoctel[0][1]["Cerveza Alhambra (tercios)"];
+    const mediaHora = porCoctel[1][1]["Cerveza Alhambra (tercios)"];
+    ok(mediaHora >= sinBarra,
+      `media hora de cóctel no pide menos cerveza que no tener barra (${sinBarra} → ${mediaHora})`);
+
+    // Pero el Red Bull SÍ es cosa de la barra: sin barra no va ninguno
+    ok(porCoctel[0][1]["Redbull"] === undefined && porCoctel[1][1]["Redbull"] > 0,
+      "y el Red Bull solo aparece cuando hay barra, no por el suelo de las 2h");
+
+    // Los topes: a partir de cierto punto una barra más larga ya no pide más. Es a
+    // propósito (nadie bebe el doble porque la barra dure el doble), así que se fija
+    // aquí para que un cambio de fórmula no lo quite sin querer.
+    const ocho = await cantidades(3, 8), doce = await cantidades(6, 12);
+    ok(ocho["Ginebra (Seagrams/Tanqueray)"] === doce["Ginebra (Seagrams/Tanqueray)"],
+      `y de 7h en adelante los destilados ya no suben (${ocho["Ginebra (Seagrams/Tanqueray)"]})`);
+    await c.close();
+  }
+
   // ── Ningún botón puede partir su palabra ────────────────────────────────────
   // El control del barril de cerveza rompía "No lleva" en dos líneas, y esa pastilla
   // quedaba del doble de alto que "30L" y "50L": el control entero se veía torcido.
