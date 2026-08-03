@@ -23,6 +23,29 @@ function aplicarTemaInicial() {
 }
 aplicarTemaInicial()
 
+// Cuando el link trae un evento y ese evento NO se puede traer, antes se seguía en
+// silencio con lo que hubiera guardado en ese móvil: se abría OTRA checklist (o una
+// vacía) como si el link hubiera funcionado. Quien lo recibía se ponía a cargar el
+// camión con la lista equivocada sin enterarse. Ahora se dice y se deja elegir.
+function avisarEventoNoEncontrado(id, sinConexion) {
+  const raiz = document.getElementById('root')
+  raiz.innerHTML = ''
+  const caja = document.createElement('div')
+  caja.className = 'link-roto'
+  caja.innerHTML = `
+    <h1>No se ha podido abrir el evento</h1>
+    <p>${sinConexion
+      ? 'No hay conexión para traerlo. Con cobertura, vuelve a abrir el link.'
+      : 'Este link apunta a un evento que ya no está en la nube: puede que se borrara o que no llegara a subirse.'}</p>
+    <p class="link-roto-id">${id}</p>
+    <button type="button">Abrir la app igualmente</button>
+    <p class="link-roto-nota">Se abrirá lo último que hubiera en este móvil, que NO es el evento del link.</p>`
+  caja.querySelector('button').addEventListener('click', () => {
+    window.location.href = window.location.origin + window.location.pathname
+  })
+  raiz.appendChild(caja)
+}
+
 async function arrancar() {
   const id = new URLSearchParams(window.location.search).get("evento")
   if (id) {
@@ -31,8 +54,15 @@ async function arrancar() {
       if (estado) {
         estado.eventoNubeId = id
         localStorage.setItem("gula_checklist_estado", JSON.stringify(estado))
+      } else {
+        // El link es válido pero ahí no hay nada: no se puede seguir como si nada
+        avisarEventoNoEncontrado(id, false)
+        return
       }
-    } catch (e) { /* sin conexión o evento borrado: se sigue con lo guardado en local */ }
+    } catch (e) {
+      avisarEventoNoEncontrado(id, true)
+      return
+    }
   }
   createRoot(document.getElementById('root')).render(
     <StrictMode>

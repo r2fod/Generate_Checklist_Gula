@@ -49,7 +49,16 @@ function CampoHora({ etiqueta, valor, onCambio }) {
 function LogoGula({ grande = false, pequeno = false }) {
   return (
     <div className={`form-logo ${grande ? "es-grande" : ""} ${pequeno ? "es-pequeno" : ""}`}>
-      <img src={logoGula} alt="Gula" />
+      {/* El logo es un PNG negro sobre transparente, así que para darle color no vale
+          un filtro: se usa el propio dibujo como MÁSCARA y por debajo corre un degradado
+          que se mueve. La máscara va en línea porque la ruta del archivo la resuelve el
+          empaquetador al importarlo, y desde el CSS no se puede nombrar. */}
+      <span
+        className="form-logo-color"
+        role="img"
+        aria-label="Gula"
+        style={{ WebkitMaskImage: `url(${logoGula})`, maskImage: `url(${logoGula})` }}
+      />
     </div>
   );
 }
