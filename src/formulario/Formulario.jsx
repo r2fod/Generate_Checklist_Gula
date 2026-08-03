@@ -733,7 +733,7 @@ export default function Formulario({ codigo }) {
         {p.tipo === "texto-largo" && (
           <textarea
             className="form-input form-textarea" rows={4}
-            placeholder={p.ejemplo || "Alergias, peticiones, contacto en el sitio..."}
+            placeholder={p.ejemplo || "Peticiones del cliente, contacto en el sitio..."}
             value={respuestas[p.campo || "notas"] ?? ""}
             onChange={e => pon(p.campo || "notas", e.target.value)}
           />

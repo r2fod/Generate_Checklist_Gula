@@ -777,3 +777,45 @@ console.log("\n══ Frituras y el número de las preguntas de marcar ══");
   ok(resumirEnvio({ tipo: "boda", menu: ["frito"], numFrituras: 3 }).some(f2 => /3/.test(f2.respuesta)),
     "el repaso enseña cuántas sartenes son antes de mandarlo");
 }
+
+// ── Tarta y alergias ─────────────────────────────────────────────────────────
+// La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
+// tarta o no; en un cumpleaños no se cargaba mesa ninguna, y es donde siempre la hay;
+// y la pala y el cuchillo con los que se corta no se cargaban en ningún sitio.
+//
+// Las alergias vivían dentro del cajón de "algo que tener en cuenta", entre la petición
+// del cliente y con quién hablar al llegar. Ahora tienen pantalla propia y salen las
+// primeras y marcadas en las notas del evento, que es por donde llegan a la hoja, al
+// Word y al texto de WhatsApp.
+console.log("\n══ Tarta y alergias ══");
+{
+  const { aRespuestasDeLaApp, recogidasDelEnvio, resumirEnvio } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).llevaTarta === undefined,
+    "sin contestar lo de la tarta no se toca: el evento se queda como estaba");
+  ok(aRespuestasDeLaApp({ ...base, tarta: "si" }).llevaTarta === true,
+    "decir que sí carga su mesa redonda, los platos, la pala y el cuchillo");
+  ok(aRespuestasDeLaApp({ ...base, tarta: "no" }).llevaTarta === false,
+    "y decir que no los quita");
+  ok(recogidasDelEnvio({ tarta: "si" }).length === 0,
+    "la tarta no crea recogida: solo dice si la hay");
+
+  // Alergias: primero, marcadas, y sin pisar el resto de las notas
+  const dos = aRespuestasDeLaApp({ ...base, alergias: "2 celíacos", notas: "Llamar a Marta al llegar" });
+  ok(/^⚠️ ALERGIAS: 2 celíacos/.test(dos.notasEvento) && /Llamar a Marta/.test(dos.notasEvento),
+    `las alergias van las primeras y las notas detrás → ${JSON.stringify(dos.notasEvento)}`);
+  ok(aRespuestasDeLaApp({ ...base, alergias: "1 vegano" }).notasEvento === "⚠️ ALERGIAS: 1 vegano",
+    "sin más notas, van solas");
+  ok(aRespuestasDeLaApp({ ...base, notas: "Solo esto" }).notasEvento === "Solo esto",
+    "y sin alergias no se cuela ningún aviso vacío");
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin contestar ninguna de las dos, las notas del evento no se tocan");
+
+  // Las dos preguntas existen donde tienen que existir
+  const ids = (t) => resumirEnvio({ tipo: t }).map(f => f.id);
+  ok(ids("boda").includes("alergias") && ids("produccion").includes("alergias"),
+    "las alergias se preguntan en todos los tipos de evento");
+  ok(ids("boda").includes("tarta") && ids("cumpleanos").includes("tarta") && !ids("produccion").includes("tarta"),
+    "y la tarta en todos menos en un rodaje");
+}

@@ -606,6 +606,10 @@ body {
   transition: background 0.15s ease;
 }
 .logistica-add-rec:hover { background: #6d28d9; }
+/* Con el dedo estos botones ya crecen a 40px (ver "zonas táctiles en móvil"), pero con
+   ratón se quedaban en 20-27px de alto, por debajo del mínimo de 24px que se considera
+   pulsable sin apuntar. El suelo va aquí para que valga también en escritorio. */
+.logistica-add-rec, .btn-mantenimiento { min-height: 24px; }
 
 /* Toggle Nómina / Extra por persona de logística */
 .logistica-tipo-btn {
@@ -2370,6 +2374,11 @@ hr {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  /* Medido a 320px: el subtítulo entero eran cinco líneas metidas en dos, y lo que se
+     comía el recorte era el día, la hora y el sitio — justo lo que hace falta saber
+     para ir. El cóctel y el nº de conceptos se quitan del móvil: el recuento ya está
+     en su contador debajo y el cóctel en la configuración. */
+  .hdr-detalle { display: none; }
 }
 
 /* ─── Vista previa ────────────────────────────────────────────────────── */
@@ -4227,6 +4236,33 @@ hr {
    veías el principio. La fecha y la hora sí caben a media fila y siguen igual. */
 .form-group-ancho {
   grid-column: 1 / -1;
+}
+
+/* La ubicación con su botón de "Cómo llegar" al lado. El campo se queda todo el ancho
+   sobrante y el botón con lo justo; en móvil el botón cae debajo a ancho completo en
+   vez de estrujar el campo hasta dejar el nombre del sitio sin verse. */
+.ubicacion-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.ubicacion-row .form-input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.btn-mapa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  min-height: 40px;
+  text-decoration: none;
+}
+@media (max-width: 480px) {
+  .btn-mapa { flex: 1 1 100%; }
 }
 
 /* La categoría es un select, y su opción más larga ("Otros (añadidos manualmente)")

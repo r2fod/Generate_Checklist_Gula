@@ -392,6 +392,25 @@ async function main() {
     await page.waitForTimeout(500);
     ok(JSON.stringify(antesFrituras) !== JSON.stringify(await listaItems(page)),
       "y el nº de sartenes parisiene también mueve la carga");
+
+    // Los otros dos números que había sin red. El de barriles es el que destapó que en
+    // el formulario el número no llegaba a la app: aquí se comprueba el lado de la app.
+    await page.goto(url({ evento: "boda", pax: 100, ninos: 10, tamanoBarril: "30L", llevaChillOut: true }),
+      { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1900);
+    for (const [etiqueta, valor, trozo] of [["Nº barriles", "3", "Barril de cerveza"], ["Nº chill out", "4", null]]) {
+      const c = campo(etiqueta);
+      if (!await c.count()) { ok(false, `no se encuentra el campo "${etiqueta}"`); continue; }
+      const antes = await listaItems(page);
+      await c.fill(valor);
+      await page.waitForTimeout(500);
+      const despues = await listaItems(page);
+      ok(JSON.stringify(antes) !== JSON.stringify(despues), `"${etiqueta}" cambia la checklist`);
+      if (trozo) {
+        const fila = despues.find(i => i.includes(trozo)) || "";
+        ok(new RegExp(`=${valor}`).test(fila), `y con el número puesto → "${fila}"`);
+      }
+    }
   }
 
   // ── Los nombres de los items tienen que ser estables y limpios ──────────────
@@ -545,17 +564,28 @@ async function main() {
       return malos;
     });
     ok(cortados.length === 0, `${w}px: ningún campo recortado${cortados.length ? ` → ${cortados.join(", ")}` : ""}`);
+    // Se mide el CONTROL entero de cada uno, no solo su recuadro de texto: la ubicación
+    // lleva al lado el botón de "Cómo llegar", y el hueco que ocupa ese botón no es
+    // sitio perdido. Lo que no puede pasar es que entre los dos no llenen la fila, que
+    // era el fallo original (el nombre del evento en 145px en la barra lateral). Que el
+    // texto quepa de verdad lo garantiza la comprobación de arriba, "ningún campo
+    // recortado", que mide el ancho real de lo escrito.
     const anchos = await p.evaluate(() => {
       const fila = document.querySelector(".form-row");
       const ancho = fila ? fila.getBoundingClientRect().width : 0;
-      return [...document.querySelectorAll(".form-group-ancho input")].map(i => ({
-        et: (i.closest(".form-group").querySelector(".form-label") || {}).textContent,
-        parte: ancho ? +(i.getBoundingClientRect().width / ancho).toFixed(2) : 0,
-      }));
+      return [...document.querySelectorAll(".form-group-ancho input")].map(i => {
+        const control = i.closest(".ubicacion-row") || i;
+        return {
+          et: (i.closest(".form-group").querySelector(".form-label") || {}).textContent,
+          parte: ancho ? +(control.getBoundingClientRect().width / ancho).toFixed(2) : 0,
+          // Y el campo de escribir, por su cuenta, no puede quedarse en una rendija
+          suyo: ancho ? +(i.getBoundingClientRect().width / ancho).toFixed(2) : 0,
+        };
+      });
     });
-    const estrechos = anchos.filter(a => a.parte < 0.9);
+    const estrechos = anchos.filter(a => a.parte < 0.9 || a.suyo < 0.5);
     ok(anchos.length === 2 && estrechos.length === 0,
-      `${w}px: el nombre y la ubicación ocupan la fila entera${estrechos.length ? ` → ${estrechos.map(e => `${e.et} ${e.parte}`).join(", ")}` : ""}`);
+      `${w}px: el nombre y la ubicación ocupan la fila entera${estrechos.length ? ` → ${estrechos.map(e => `${e.et} ${e.parte} (campo ${e.suyo})`).join(", ")}` : ""}`);
     await c.close();
   }
 

@@ -414,6 +414,19 @@ export const PREGUNTAS = [
     ],
   },
   {
+    // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
+    // tarta o no; en un cumpleaños no se cargaba mesa ninguna; y la pala y el cuchillo
+    // con los que se corta no se cargaban nunca en ningún sitio. Con esta pregunta la
+    // mesa va donde hay tarta y no va donde no la hay.
+    id: "tarta", tipo: "opciones", texto: "¿Lleva tarta?",
+    nota: "Si la lleva, se carga su mesa redonda con la pala y el cuchillo.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
+  },
+  {
     id: "minutas", tipo: "opciones", texto: "¿Lleva minutas?",
     nota: "Igual que las flores: se añade a las recogidas con su día.",
     opciones: [
@@ -442,12 +455,24 @@ export const PREGUNTAS = [
 
   // ── Cierre ─────────────────────────────────────────────────────────────────
   {
-    id: "notas", tipo: "texto-largo", texto: "¿Algo que haya que tener en cuenta?",
+    // Las alergias iban dentro del cajón de "algo que tener en cuenta", entre la
+    // petición del cliente y con quién hablar al llegar. Ahí se leen en diagonal y se
+    // pierden, y son lo único de todo el formulario que puede acabar en un disgusto de
+    // verdad. Con pantalla propia se contestan mirándolas.
+    id: "alergias", tipo: "texto-largo", texto: "¿Hay alergias o intolerancias?",
+    campo: "alergias",
+    nota: "Cuántos comensales y de qué, si se sabe. Si no hay ninguna, se deja en blanco y se pasa.",
+    ejemplo: "Ej: 2 celíacos, 1 alérgico al marisco en la mesa 4, 1 vegano...",
+    noSe: false,
+  },
+  {
+    id: "notas", tipo: "texto-largo", texto: "¿Algo más que haya que tener en cuenta?",
     campo: "notas",
     // Aquí acaba todo lo que no tiene pregunta propia. Se dicen ejemplos de verdad
     // porque un campo libre sin ejemplos se queda en blanco: alguna bebida suelta que
-    // haya que añadir, alergias, o con quién hablar al llegar.
-    nota: "Alergias, peticiones del cliente, alguna bebida que haya que añadir, con quién hablar en el sitio...",
+    // haya que añadir, o con quién hablar al llegar. Las alergias ya no salen en los
+    // ejemplos: tienen su propia pantalla justo antes.
+    nota: "Peticiones del cliente, alguna bebida que haya que añadir, con quién hablar en el sitio...",
     noSe: false,
   },
 ];
@@ -560,7 +585,14 @@ export function aRespuestasDeLaApp(r = {}) {
   // La hora de FIN no es un campo del evento: en la app el horario vive en el equipo de
   // logística, persona a persona, y eso no lo decide la oficina. Viaja en el envío y la
   // bandeja la enseña para cuadrar el equipo al aceptarlo, pero no se escribe sola.
-  pon("notasEvento", r.notas);
+  // Las alergias van las primeras y marcadas dentro de las notas del evento, no en un
+  // campo aparte: así salen solas en la hoja, en el Word y en el texto de WhatsApp, que
+  // es por donde le llegan a quien está en el sitio. Y van arriba porque una alergia
+  // leída después de servir no sirve de nada.
+  const alergias = (r.alergias || "").trim();
+  const otras = (r.notas || "").trim();
+  const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras].filter(Boolean).join("\n");
+  pon("notasEvento", juntas);
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
@@ -646,6 +678,8 @@ export function aRespuestasDeLaApp(r = {}) {
   // verdad: dicen "déjalo como lo calcula la app", y por eso se escriben (Auto y 0) en
   // vez de no tocar nada — si el evento traía una talla puesta a mano y ahora dicen que
   // vale la de siempre, hay que quitarla.
+  // Si la lleva, la app carga su mesa redonda, los platos, la pala y el cuchillo.
+  if (puesto(r.tarta)) estado.llevaTarta = r.tarta === "si";
   if (puesto(r.tamanoPaella)) estado.tipoPaella = r.tamanoPaella;
   if (puesto(r.cuantasPaellas)) {
     estado.numPaellas = r.cuantasPaellas === "otras" && r.numPaellas > 0 ? r.numPaellas : 0;
