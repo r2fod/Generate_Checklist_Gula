@@ -31,7 +31,7 @@ import logoGula from "./assets/gula-logo.png";
 import {
   BATEA, bateas, conMargen, MARGEN_SEGURIDAD,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL, terciosConBarril,
-  calcBebidas, calcDestilados, calcCristaleria, champaneras,
+  calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
 } from "./calculos.js";
 
 
@@ -494,11 +494,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
   // los eventos se pasa algo en bandeja, lo normal era ir corto por no acordarse de
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
-  const bandejasPasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
-  const bandejasMadera = bandejasPasar
-    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = bandejasPasar
-    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
+  const { pasar: bandejasPasar, madera: bandejasMadera, plata: bandejasPl } =
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
   // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
@@ -731,11 +729,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
   // los eventos se pasa algo en bandeja, lo normal era ir corto por no acordarse de
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
-  const bandejasPasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
-  const bandejasMadera = bandejasPasar
-    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = bandejasPasar
-    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
+  const { pasar: bandejasPasar, madera: bandejasMadera, plata: bandejasPl } =
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -945,11 +941,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
   // los eventos se pasa algo en bandeja, lo normal era ir corto por no acordarse de
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
-  const bandejasPasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
-  const bandejasMadera = bandejasPasar
-    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Madera" ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasMadera;
-  const bandejasPl     = bandejasPasar
-    + (tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20)) : (tipoBandejas === "Plata"  ? Math.max(2, Math.ceil(pax / 10)) : 0)) + extraBandejasPlata;
+  // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
+  const { pasar: bandejasPasar, madera: bandejasMadera, plata: bandejasPl } =
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -1154,7 +1148,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // pax — un par de packs por día es de sobra.
     ["Aguas pequeñas (33cl)", conSufijo(
       Math.max(1, Math.ceil(paxConsumo * BOTELLAS_AGUA_POR_PAX[mesVerano ? "verano" : "invierno"] / 35)),
-      `cajas (35 uds) · ${mesVerano ? "verano" : "invierno"}, ${String(BOTELLAS_AGUA_POR_PAX[mesVerano ? "verano" : "invierno"]).replace(".", ",")}/pax`
+      // Corto a propósito: el sufijo va en la misma fila que el nombre y los botones,
+      // y uno largo empujaba los de editar y borrar fuera de la pantalla en un móvil.
+      `35 uds · ${mesVerano ? "verano" : "invierno"} ${String(BOTELLAS_AGUA_POR_PAX[mesVerano ? "verano" : "invierno"]).replace(".", ",")}/pax`
       + `${opts.tipoAguaPequena ? ` · ${opts.tipoAguaPequena.toLowerCase()}` : ""}`)],
     ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],

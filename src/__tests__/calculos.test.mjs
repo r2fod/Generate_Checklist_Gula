@@ -14,7 +14,7 @@
 // app.test.mjs (navegador) y en sincronizacion.test.mjs.
 import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras,
-  terciosConBarril, conMargen, bateas, BATEA,
+  terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
 } from "../calculos.js";
 
@@ -171,6 +171,26 @@ console.log("\n══ El agua de un rodaje ══");
   ok(cajas(90, true) === 17, `y tres días de 30 piden el triple (${cajas(90, true)})`);
   ok(BOTELLAS_AGUA_POR_PAX.verano * 0.33 >= 2,
     `en verano son al menos 2 litros por cabeza y día (${(BOTELLAS_AGUA_POR_PAX.verano * 0.33).toFixed(1)} L)`);
+}
+
+console.log("\n══ Bandejas ══");
+{
+  const b = (pax, opts) => calcBandejas(pax, opts);
+  ok(b(100, {}).pasar === 5, `las de pasar comida van por gente (100 → ${b(100, {}).pasar})`);
+  ok(b(0, {}).pasar === 2 && b(5, {}).pasar === 2, "con 2 de mínimo, que algo se pasa siempre");
+  ok(b(100, { soloBandeja: true }).pasar > b(100, {}).pasar,
+    "si el servicio es entero en bandeja hacen falta más");
+  // El tipo elegido suma sobre las de pasar
+  ok(b(100, { tipoBandejas: "Madera" }).madera > b(100, { tipoBandejas: "Madera" }).plata,
+    "eligiendo madera salen más de madera que de plata");
+  ok(b(100, { tipoBandejas: "Plata" }).plata > b(100, { tipoBandejas: "Plata" }).madera,
+    "y al revés con la plata");
+  ok(b(100, { tipoBandejas: "Mixto" }).madera === b(100, { tipoBandejas: "Mixto" }).plata,
+    "en mixto van las mismas de cada");
+  ok(b(100, { extraMadera: 7 }).madera === b(100, {}).madera + 7,
+    "y lo que se añada a mano se suma tal cual");
+  const curva = [0, 20, 50, 100, 200, 400].map(p => [p, b(p, {}).pasar]);
+  ok(!noBaja("bandejas", curva), "más gente nunca pide menos bandejas");
 }
 
 console.log("\n══ Casos límite: nada puede salir en negativo ni en NaN ══");

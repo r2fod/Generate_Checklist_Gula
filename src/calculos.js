@@ -186,3 +186,22 @@ export function calcCristaleria(pax, horasCoctel, horasCopas, dobleCopa, tieneBr
 export function champaneras(pax) {
   return Math.max(2, Math.ceil(pax / 50) + 1);
 }
+
+// ─── BANDEJAS ─────────────────────────────────────────────────────────────────
+// Cuántas bandejas van, por gente y por el tipo elegido. Estaba escrita TRES veces,
+// idéntica carácter por carácter, en los tres generadores: tres copias de la misma
+// fórmula son dos que se quedan atrás en cuanto alguien toque una.
+//
+//   · las de pasar comida van siempre (canapés, aperitivos, lo que sea)
+//   · si el servicio es entero en bandeja hacen falta bastantes más
+//   · y encima suman las del tipo elegido para el servicio (madera, plata o mixto)
+export function calcBandejas(pax, { soloBandeja = false, tipoBandejas = "Mixto", extraMadera = 0, extraPlata = 0 } = {}) {
+  const pasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
+  const delTipo = (suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20))
+    : (tipoBandejas === suyo ? Math.max(2, Math.ceil(pax / 10)) : 0);
+  return {
+    pasar,
+    madera: pasar + delTipo("Madera") + extraMadera,
+    plata: pasar + delTipo("Plata") + extraPlata,
+  };
+}
