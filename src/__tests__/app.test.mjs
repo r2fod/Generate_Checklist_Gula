@@ -67,14 +67,21 @@ async function arrancarServidor() {
   throw new Error("el servidor de pruebas no arrancó");
 }
 
+// Hay UN bloque que provoca un fallo de dibujado a propósito (para comprobar que la
+// red de seguridad da la cara). Ahí el error de JS es el resultado esperado, no un
+// defecto, así que se deja de contar mientras dura. Fuera de ese bloque nunca se
+// silencia nada: un error de JS suelto sigue tumbando la ejecución.
+let erroresEsperados = false;
+const apuntarError = (texto) => { if (!erroresEsperados) errores.push(texto); };
+
 async function nuevaPagina(ctx) {
   const page = await ctx.newPage();
-  page.on("pageerror", e => errores.push(e.message));
+  page.on("pageerror", e => apuntarError(e.message));
   page.on("console", m => {
     if (m.type() !== "error") return;
     // Los fallos de red hacia la nube son esperados aquí: se cortan a propósito.
     if (/firestore|net::|Failed to load resource/i.test(m.text())) return;
-    errores.push(m.text().slice(0, 140));
+    apuntarError(m.text().slice(0, 140));
   });
   return page;
 }
@@ -215,6 +222,72 @@ async function main() {
     ok(html.includes("Recogidas y devoluciones") && html.includes("Compras") && html.includes("Apollo paella"),
       "el Word incluye Recogidas y Compras");
   } else ok(false, "el Word se descarga");
+
+  // ── Un fallo no puede dejar la pantalla en blanco ───────────────────────────
+  // Si algo revienta al dibujar, React desmonta TODO. Y como el estado vive en este
+  // navegador, recargar vuelve a reventar: se queda uno fuera sin salida, con el camión
+  // a medio cargar. Se provoca el fallo a propósito y se exige que haya salida.
+  console.log("\n── Red de seguridad ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1200, height: 900 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    // Aquí el error de JS ES el resultado esperado: se está provocando a propósito para
+    // ver si hay salida. Se deja de contar solo durante este bloque.
+    erroresEsperados = true;
+    // Un estado con el tipo equivocado en un campo que la app recorre: es justo lo que
+    // llegaría de un ?c= corrupto o de un formato viejo.
+    await p.goto(url({ evento: "boda", pax: 100, recogidas: "esto no es una lista" }),
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const hayApp = await p.locator(".item-row").count() > 0;
+    const hayRed = await p.locator(".link-roto").count() > 0;
+    ok(hayApp || hayRed,
+      hayApp ? "un campo con el tipo equivocado no tumba la app" : "y si tumba la app, la red de seguridad da la cara");
+    if (hayRed) {
+      ok(await p.locator("button", { hasText: /Descargar/ }).count() === 1,
+        "con el botón para descargar lo guardado ANTES de tocar nada");
+      ok(await p.locator("button", { hasText: /Empezar de cero/ }).count() === 1,
+        "y con salida para volver a arrancar");
+    }
+    // Y el caso que de verdad importa: que la pantalla nunca se quede vacía del todo
+    ok((await p.locator("body").innerText()).trim().length > 0,
+      "en ningún caso se queda la pantalla en blanco");
+    await c.close();
+    erroresEsperados = false; // a partir de aquí, un error de JS vuelve a ser un fallo
+  }
+
+  // ── Nada se puede quedar fuera de la pantalla ───────────────────────────────
+  // La página no hace scroll horizontal, así que un control que se sale queda
+  // RECORTADO y no hay forma de pulsarlo. Pasó con la fila "Aguas pequeñas (33cl)":
+  // su sufijo largo no cedía —nowrap y sin encoger— y echaba los botones de editar y
+  // borrar fuera del móvil. Se mide el borde derecho de TODO lo pulsable, no solo si
+  // la página desborda: con overflow oculto, desbordar da 0 y el botón sigue perdido.
+  console.log("\n── Nada fuera de la pantalla ──");
+  {
+    const ESTADOS = {
+      boda: { evento: "boda", pax: 120, ninos: 10, barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, llevaPaella: true, tieneFrituras: true, tamanoBarril: "50L", llevaAguasPequenas: true },
+      produccion: { evento: "produccion", pax: 40, diasProduccion: ["40", "30"], llevaCarpas: true, llevaGenerador: true },
+    };
+    for (const [tipo, estado] of Object.entries(ESTADOS)) {
+      for (const ancho of [320, 390]) {
+        const c = await navegador.newContext({ viewport: { width: ancho, height: 1000 }, isMobile: true, hasTouch: true });
+        for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+        const p = await nuevaPagina(c);
+        await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+        await p.waitForTimeout(1500);
+        const fuera = await p.evaluate(() => {
+          const w = document.documentElement.clientWidth;
+          return [...document.querySelectorAll("button, input, select")]
+            .filter(e => e.getBoundingClientRect().right > w + 1)
+            .map(e => { const f = e.closest(".item-row"); const n = f && f.querySelector(".item-name"); return (n ? n.textContent : e.className).trim().slice(0, 30); });
+        });
+        ok(fuera.length === 0,
+          `${tipo} a ${ancho}px: nada pulsable se queda fuera de la pantalla${fuera.length ? ` → ${JSON.stringify([...new Set(fuera)])}` : ""}`);
+        await c.close();
+      }
+    }
+  }
 
   // ── Las horas de barra libre ────────────────────────────────────────────────
   // Subir horas de barra NUNCA puede bajar una cantidad. Parece obvio y no lo era: el
@@ -1715,8 +1788,12 @@ async function main() {
 
     await p.goto(url({ evento: "boda", pax: 120 }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2100);
+    // Con ancla: comprobar solo que algo NO está pasa igual si la cabecera no llegó a
+    // dibujarse. Primero se exige que la cabecera esté ahí con sus botones.
+    ok(await p.locator(".header-actions button", { hasText: "Modo carga" }).count() === 1,
+      "la cabecera se ha dibujado y tiene sus botones");
     ok(await p.locator(".header-actions button", { hasText: "Vista previa" }).count() === 0,
-      "la cabecera ya no lleva el botón de Vista previa");
+      "y ya no lleva el de Vista previa, que vive dentro de Compartir");
 
     const sinMarcas = await abrirHoja({ evento: "boda", pax: 120 });
     ok(sinMarcas.length === 2 && /Concepto/i.test(sinMarcas[0]) && /Cant/i.test(sinMarcas[1]),
@@ -1792,6 +1869,17 @@ async function main() {
   for (const [i, w] of [[0, 320], [1, 390], [1, 320]]) {
     const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    // CON eventos y plantillas guardadas. Sin esto, las listas salen vacías y sus
+    // botones de icono (el 🔗 de compartir y el ✕ de borrar) no existen, así que nunca
+    // se medían: se quedaron en 27px, y uno de ellos borra un evento entero.
+    await c.addInitScript(() => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        "Boda guardada": { evento: "boda", pax: 90, fechaEvento: "2027-09-04", nombreEvento: "Boda guardada" },
+      }));
+      localStorage.setItem("gula_plantillas", JSON.stringify({
+        "Boda estándar 100": { evento: "boda", pax: 100 },
+      }));
+    });
     const p = await nuevaPagina(c);
     await p.goto(url(PANTALLAS_TACTILES[i]), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
@@ -1915,7 +2003,10 @@ async function main() {
     const p = await nuevaPagina(c);
     await p.goto(url({ evento: "produccion", pax: 25 }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2300);
-    ok(await p.locator(".version-nueva-banner").count() === 0, "con la misma versión no avisa de nada");
+    // Con ancla, igual que arriba: "no hay banner" también se cumple si la app no ha
+    // cargado, y entonces la comprobación no dice nada.
+    ok(await p.locator(".item-row").count() > 20, "la app ha cargado su checklist");
+    ok(await p.locator(".version-nueva-banner").count() === 0, "y con la misma versión no avisa de nada");
     // Se publica una versión nueva con la app abierta
     fs2.writeFileSync("dist/version.json", JSON.stringify({ id: "2099-01-01T00:00:00.000Z" }));
     await p.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));

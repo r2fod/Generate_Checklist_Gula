@@ -2104,6 +2104,18 @@ body {
   flex-shrink: 0;
 }
 
+/* En móvil el sufijo SÍ cede. Con "nowrap" y sin encoger, uno largo —el del agua de un
+   rodaje, "cajas (35 uds) · verano 6,5/pax"— ensancha la fila entera y empuja fuera de
+   la pantalla los botones de editar y borrar. Y como la página no hace scroll
+   horizontal, quedaban recortados y no había forma de pulsarlos. */
+@media (max-width: 480px) {
+  .item-batea-info {
+    white-space: normal;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+}
+
 /* Botones ✎ (editar nombre) y ✕ (quitar) de cada item */
 .item-actions {
   display: flex;
@@ -4443,6 +4455,26 @@ hr {
   .add-item-alquiler-check input[type="checkbox"]::after,
   .checkbox-label input[type="checkbox"]::after,
   .logistica-furgo input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Los botones de icono de las listas (el 🔗 de compartir y el ✕ de borrar de cada
+     evento y cada plantilla) se quedaban en 27px. Uno de ellos BORRA, así que fallar
+     el dedo ahí cuesta caro. No los veía nadie porque la prueba de zonas táctiles
+     medía dos eventos sin nada guardado, y esos botones solo existen cuando hay
+     eventos o plantillas en la lista. */
+  .plantilla-link,
+  .plantilla-borrar {
+    position: relative;
+  }
+  .plantilla-link::after,
+  .plantilla-borrar::after {
     content: "";
     position: absolute;
     top: 50%;

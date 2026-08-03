@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import RedDeSeguridad from './RedDeSeguridad.jsx'
 import './index.css'
 import { cargarEventoNube } from './nube.js'
 import Acceso from './Acceso.jsx'
@@ -149,7 +150,7 @@ async function arrancar() {
 function montar() {
   createRoot(document.getElementById('root')).render(
     <StrictMode>
-      <Acceso />
+      <RedDeSeguridad><Acceso /></RedDeSeguridad>
     </StrictMode>,
   )
 }

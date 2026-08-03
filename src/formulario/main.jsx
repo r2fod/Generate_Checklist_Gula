@@ -9,6 +9,7 @@
 // login del equipo, ni a la configuración. Solo el formulario.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import RedDeSeguridad from '../RedDeSeguridad.jsx'
 import '../index.css'
 import Formulario from './Formulario.jsx'
 
@@ -60,7 +61,7 @@ if (!elCodigo) {
 } else {
   createRoot(document.getElementById('root')).render(
     <StrictMode>
-      <Formulario codigo={elCodigo} />
+      <RedDeSeguridad><Formulario codigo={elCodigo} /></RedDeSeguridad>
     </StrictMode>,
   )
 }
