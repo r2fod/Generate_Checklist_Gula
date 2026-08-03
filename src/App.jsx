@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown, Plus, Tag, Pencil, Undo2, RotateCcw, Euro,
   BarChart3, AlertTriangle, Info, ArrowRight, Asterisk, Bell, BellOff, Play, Pause, Copy, Search,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Moon, Sun, Download, Upload, Eye,
+  MapPin,
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
@@ -432,6 +433,14 @@ function calcMesasServicio(pax) {
   return { total: 13 };
 }
 
+// Buscar la ubicación del evento en Google Maps. Lo que se escribe es el nombre del
+// sitio ("Finca La Alquería"), no unas coordenadas, y Maps lo busca igual de bien: se
+// usa la URL de búsqueda, que funciona en el navegador, en Android y en iPhone (donde
+// abre la aplicación de Maps si está instalada) sin depender de ninguna clave.
+function enlaceMapa(sitio) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((sitio || "").trim())}`;
+}
+
 // Personal de sala: usa el nº de camareros importado del Excel si lo hay; si no,
 // lo calcula automáticamente por pax. El ratio del sector es 1 camarero cada 10-15
 // pax en banquete sentado (boda/comunión/corporativo) y 1 cada 20 en formato buffet
@@ -529,7 +538,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaMobiliarioAlquiler,
-    extraBandejasMadera, extraBandejasPlata, llevaJamonero,
+    extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoNevera, tipoCongelador, tipoPaella, numPaellas = 0, origenSillas = "Dealde",
@@ -603,12 +612,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Mesas de 1,8m", String(calcMesasTotal(evtKey, pax))],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
-    opt(evtKey === "boda", ["Mesa redonda especial para Tarta", "1"]),
+    opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
     ["Mesa 1x1 cuadrada", "—"], ["Mesa alta", mesasAltas > 0 ? String(mesasAltas) : "—"], ["Taburetes", "—"],
     ["Marcos para menú", "—"], ["Caja deco", "—"], ["Servilleteros de madera", "—"],
     opt(!esCorporativo, ["Guirnaldas de luces", "—"]),
     // Propio de Comunión / Bautizo
-    opt(esComunion, ["Mesa redonda (tarta comunión)", "1"]),
+    opt(esComunion && llevaTarta, ["Mesa redonda (tarta comunión)", "1"]),
     opt(esComunion, ["Candy bar / mesa dulce", "—"]),
     opt(esComunion, ["Photocall / atrezzo", "—"]),
     // Propio de Evento corporativo
@@ -666,6 +675,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Maletín de cuchillos", "1"], ["Tablas de corte", "2"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"],
     ["Olla mediana", "1"], ["Olla grande", "1"], ["Sartenes", "1"], ["Colador", "1"], ["Boles metálicos", "4"],
     ["Cucharones grandes", "3"], ["Pinzas largas", "2"], ["Copas metálicas", "Todas"],
+    // La mesa de la tarta y los platos ya se cargaban; la pala y el cuchillo con los que
+    // se corta, no. Es de esas cosas que solo se echan en falta con la tarta delante.
+    opt(llevaTarta, ["Pala de tarta", "1"]),
+    opt(llevaTarta, ["Cuchillo de tarta", "1"]),
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
@@ -696,7 +709,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
      se suman al recuento de "Platos postre" en vez de generar una línea aparte.
      El entrante sí se queda aparte porque suele llevar su propio plato de plato/bol distinto. */}
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0)
-    + (evtKey === "boda" ? totalPax : 0)
+    + (evtKey === "boda" && llevaTarta ? totalPax : 0)
     + (hayDesayuno ? totalPax : 0);
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
@@ -805,7 +818,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    tipoPaella, numPaellas = 0, tipoNevera, tipoCongelador, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, tipoNevera, tipoCongelador, llevaTarta = true, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
@@ -855,6 +868,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     opt(llevaPalomitera, ["Carrito palomitera", "1"]),
     opt(llevaChillOut, ["Chill out", String(numChillOut)]),
+    // En un cumpleaños siempre hay tarta y no se cargaba mesa para ella
+    opt(llevaTarta, ["Mesa redonda para tarta", "1"]),
     opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
     opt(tipoNevera !== "No lleva", [`Nevera (${tipoNevera})`, "1"]),
@@ -891,6 +906,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Olla mediana", "1"], ["Olla grande", "1"], ["Sartenes", "1"], ["Colador", "1"],
     ["Caja salsas y arroces", "1"], ["Boles metálicos", "4"], ["Cucharones grandes", "3"],
     ["Servilleteros de madera", "2"], ["Caja cocina (varios)", "1"],
+    // Con lo que se corta la tarta, que tampoco se cargaba aquí
+    opt(llevaTarta, ["Pala de tarta", "1"]),
+    opt(llevaTarta, ["Cuchillo de tarta", "1"]),
   ]});
 
   const usaTela = fuerzaTextilTela;
@@ -1285,7 +1303,7 @@ const ETIQUETAS_CAMPO = {
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
   llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
-  llevaJamonero: "Jamonero", personasPorPlatoEntrante: "Personas por plato de entrante",
+  llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
   llevaAguasPequenas: "Aguas pequeñas", tipoAguaPequena: "Envase de las aguas pequeñas", hayDesayuno: "Desayuno",
   tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
@@ -3107,6 +3125,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
   const [extraBandejasPlata, setExtraBandejasPlata]   = useState(estadoInicial.extraBandejasPlata ?? 0);
   const [llevaJamonero, setLlevaJamonero]             = useState(estadoInicial.llevaJamonero ?? false);
+  // Por defecto SÍ hay tarta: hasta ahora la mesa y los platos se cargaban siempre en
+  // boda y comunión, y un evento guardado antes de esto tiene que abrirse igual que
+  // estaba. Solo desmarcándolo se quitan (y con ellos la pala y el cuchillo).
+  const [llevaTarta, setLlevaTarta]                   = useState(estadoInicial.llevaTarta ?? true);
   const [personasPorPlatoEntrante, setPersonasPorPlatoEntrante] = useState(estadoInicial.personasPorPlatoEntrante ?? 4);
   const [llevaAguasPequenas, setLlevaAguasPequenas]   = useState(estadoInicial.llevaAguasPequenas ?? false);
   // En rodaje las aguas pequeñas van siempre: lo que se elige es el envase. Vacío =
@@ -3351,7 +3373,7 @@ export default function App({ onCerrarSesion } = {}) {
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava, colorManteles, porcentajeBeige,
-    extraBandejasMadera, extraBandejasPlata, llevaJamonero,
+    extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
@@ -3425,7 +3447,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
-    extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero,
+    extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
@@ -4205,7 +4227,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler,
-    extraBandejasMadera, extraBandejasPlata, llevaJamonero,
+    extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, tipoPaella, numPaellas, origenSillas,
@@ -4218,7 +4240,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
-    tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, personasPorPlatoEntrante,
+    tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
     diasProduccion, paxPorCamarero, logisticaEquipo,
@@ -4710,7 +4732,11 @@ export default function App({ onCerrarSesion } = {}) {
       fmtCompras(compras) ? `Compras: ${fmtCompras(compras)}` : null,
     ].filter(Boolean).join(" · ");
     const notas = notasEvento ? `\n\n📝 NOTAS: ${notasEvento}` : "";
-    return `${cabecera}\n${texto}${notas}`;
+    // El enlace del sitio va al final y en su línea: quien recibe esto por WhatsApp lo
+    // que quiere el día del montaje es tocar y que se abra el mapa, no copiar el nombre
+    // de la finca y buscarlo a mano.
+    const mapa = ubicacion.trim() ? `\n\n📍 Cómo llegar: ${enlaceMapa(ubicacion)}` : "";
+    return `${cabecera}\n${texto}${notas}${mapa}`;
   };
 
   const handleCompartirWord = () => {
@@ -4836,11 +4862,23 @@ export default function App({ onCerrarSesion } = {}) {
             <div className="header-icon">{React.createElement(EVENTO_ICON[evento] || Heart, { size: 24, strokeWidth: 2.2 })}</div>
             <div className="header-info">
               <h1>{nombreEvento || EVENTOS[evento]?.label || "Generador Checklist"}</h1>
+              {/* El subtítulo va en trozos con clase propia porque en móvil se limita a
+                  dos líneas: lo que sobraba se perdía por el final, y lo que se perdía
+                  era justo el día, la hora y el sitio. El cóctel y el nº de conceptos se
+                  esconden ahí (el recuento está abajo en su contador y el cóctel en la
+                  configuración) para que quepa lo que hace falta saber de un vistazo. */}
               <p>
-                {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{diasPaxValidos.length > 0 ? `${diasPaxValidos.join("+")} pax · ${diasPaxValidos.length} días` : `${pax} pax`}{evento !== "produccion" ? ` · cóctel ${barraCoctel ? horasCoctel : 0}h` : ""} · {totalConceptos} conceptos
-                {fechaEvento ? ` · ${new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}` : ""}
-                {horaInicio ? ` · ${horaInicio}h` : ""}
-                {ubicacion ? ` · ${ubicacion}` : ""}
+                <span className="hdr-quien">
+                  {nombreEvento ? `${EVENTOS[evento]?.label} · ` : ""}{diasPaxValidos.length > 0 ? `${diasPaxValidos.join("+")} pax · ${diasPaxValidos.length} días` : `${pax} pax`}
+                </span>
+                <span className="hdr-detalle">
+                  {evento !== "produccion" ? ` · cóctel ${barraCoctel ? horasCoctel : 0}h` : ""} · {totalConceptos} conceptos
+                </span>
+                <span className="hdr-cuando">
+                  {fechaEvento ? ` · ${new Date(fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" })}` : ""}
+                  {horaInicio ? ` · ${horaInicio}h` : ""}
+                  {ubicacion ? ` · ${ubicacion}` : ""}
+                </span>
               </p>
             </div>
             {/* El interruptor de tema va con el título, no en la rejilla de acciones:
@@ -5296,7 +5334,22 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
             <div className="form-group form-group-ancho">
               <span className="form-label">UBICACIÓN</span>
-              <input type="text" className="form-input" title={ubicacion || "Ubicación"} placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
+              <div className="ubicacion-row">
+                <input type="text" className="form-input" title={ubicacion || "Ubicación"} placeholder="Ej: Finca La Alquería" value={ubicacion} onChange={e => setUbicacion(e.target.value)} />
+                {/* Lo que escribe oficina es el nombre del sitio ("Finca La Alquería"),
+                    no unas coordenadas: Maps lo busca igual de bien y ahorra copiarlo,
+                    abrir la aplicación y pegarlo el día del montaje. Se abre en pestaña
+                    nueva para no perder la checklist a medio marcar. */}
+                {ubicacion.trim() && (
+                  <a
+                    className="btn btn-navy-outline btn-mapa"
+                    href={enlaceMapa(ubicacion)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Abrir "${ubicacion.trim()}" en Google Maps`}
+                  ><MapPin size={15} /> Cómo llegar</a>
+                )}
+              </div>
             </div>
           </div>
           <div className="form-group notas-group">
@@ -5698,6 +5751,11 @@ export default function App({ onCerrarSesion } = {}) {
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
               [llevaChillOut,        setLlevaChillOut,        "Lleva chill out",          llevaChillOut ? `${numChillOut} (ajusta abajo)` : "sofás/zona chill out"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
+              // La mesa y los platos de tarta se cargaban siempre, sin poder quitarlos, y
+              // la pala y el cuchillo no se cargaban nunca. Aquí se decide de una vez.
+              ...(evento !== "produccion"
+                ? [[llevaTarta,      setLlevaTarta,           "Hay tarta",                "mesa, platos, pala y cuchillo"]]
+                : []),
               ...(evento !== "produccion"
                 ? [[llevaAguasPequenas, setLlevaAguasPequenas, "Aguas pequeñas", "botellas individuales 33cl"]]
                 : []),
