@@ -250,6 +250,36 @@ async function main() {
       return malas;
     };
 
+    // Antes de la curva, lo más básico: que MOVER el deslizador cambie la carga. Se
+    // probaban los controles de opciones (los 11 de Equipamiento) pero no estos dos,
+    // y un deslizador que no guardara lo que marcas se vería igual que uno que sí.
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 1, barraCopas: true, horasCopas: 1 }),
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1800);
+    const deQue = async (nombre) => {
+      const f = (await listaItems(p)).find(i => i.startsWith(nombre)) || "";
+      return parseFloat(f.slice(f.indexOf("=") + 1));
+    };
+    const barras = p.locator('input[type="range"].range-slider');
+    ok(await barras.count() === 2, `están los dos deslizadores de barra (${await barras.count()})`);
+    const cervezaAntes = await deQue("Cerveza Alhambra");
+    await barras.nth(0).fill("4");
+    await p.waitForTimeout(800);
+    const cervezaDespues = await deQue("Cerveza Alhambra");
+    ok((await p.locator(".range-value").allInnerTexts())[0].trim() === "4h",
+      "mover el de cóctel actualiza lo que pone al lado");
+    ok(cervezaDespues > cervezaAntes,
+      `y sube la cerveza de verdad (${cervezaAntes} → ${cervezaDespues})`);
+
+    const ginebraAntes = await deQue("Ginebra (Seagrams");
+    await barras.nth(1).fill("6");
+    await p.waitForTimeout(800);
+    const ginebraDespues = await deQue("Ginebra (Seagrams");
+    ok((await p.locator(".range-value").allInnerTexts())[1].trim() === "6h",
+      "y el de copas igual");
+    ok(ginebraDespues > ginebraAntes,
+      `con los destilados subiendo con él (${ginebraAntes} → ${ginebraDespues})`);
+
     const porCoctel = [];
     for (const h of [0, 0.5, 1.5, 3, 5]) porCoctel.push([h, await cantidades(h, 0)]);
     const malasCoctel = bajan(porCoctel);
@@ -278,6 +308,29 @@ async function main() {
     const ocho = await cantidades(3, 8), doce = await cantidades(6, 12);
     ok(ocho["Ginebra (Seagrams/Tanqueray)"] === doce["Ginebra (Seagrams/Tanqueray)"],
       `y de 7h en adelante los destilados ya no suben (${ocho["Ginebra (Seagrams/Tanqueray)"]})`);
+
+    // Los barriles descuentan tercios (85% de rendimiento por la merma de barra), pero
+    // nunca hasta cero: con dos de 50L la cuenta salía sin una sola botella, y ahí el
+    // evento entero cuelga de que el tirador y el barril funcionen.
+    const conBarril = async (tipo, barril, n) => {
+      await p.goto(url({ evento: tipo, pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, tamanoBarril: barril, numBarriles: n }),
+        { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1700);
+      const f = (await listaItems(p)).find(i => i.startsWith("Cerveza Alhambra")) || "";
+      return f ? parseInt(f.slice(f.indexOf("=") + 1), 10) : 0;
+    };
+    const sinBarril192 = await conBarril("boda", "No lleva", 1);
+    const uno50 = await conBarril("boda", "50L", 1);
+    ok(uno50 < sinBarril192 && uno50 > 0,
+      `un barril de 50L descuenta tercios pero no todos (${sinBarril192} → ${uno50})`);
+    for (const tipo of ["boda", "cumpleanos"]) {
+      const dos50 = await conBarril(tipo, "50L", 2);
+      const tres50 = await conBarril(tipo, "50L", 3);
+      ok(dos50 === 24 && tres50 === 24,
+        `en ${tipo}, por muchos barriles que se lleven quedan 24 tercios de respaldo (${dos50}/${tres50})`);
+    }
+    ok(await conBarril("boda", "No lleva", 1) === sinBarril192,
+      `y sin barril no se toca nada (${sinBarril192})`);
     await c.close();
   }
 
@@ -1568,13 +1621,25 @@ async function main() {
       menu: ["paella"], horno: "Pequeño", extras: [], notas: "",
     });
     ok(produ.estado.llevaCarpas === true && produ.estado.llevaGenerador === true
-      && produ.estado.origenSillas === "Nuestras"
       && JSON.stringify(produ.estado.diasProduccion) === JSON.stringify(["12", "17", "12"]),
-      `el rodaje traduce días, carpas, generador y sillas propias → ${JSON.stringify(produ.estado.diasProduccion)}`);
+      `el rodaje traduce días, carpas y generador → ${JSON.stringify(produ.estado.diasProduccion)}`);
     ok(tiene(produ.nombres, "Carpas") && tiene(produ.nombres, "Generador"),
       "las carpas van con el generador y su gasolina");
-    ok(tiene(produ.nombres, "Sillas (nuestras)"),
-      "y las sillas del rodaje son las nuestras, sin alquiler");
+    // Las sillas de un rodaje se preguntan como en el resto. Antes se forzaban a
+    // "Nuestras" sin preguntar, y eso PISABA lo que hubiera puesto en la app: si tenías
+    // un alquiler, aplicar el envío te lo borraba junto con su recogida.
+    ok(produ.estado.origenSillas === undefined,
+      `sin contestar lo de las sillas, el rodaje no toca lo que haya en la app (${produ.estado.origenSillas})`);
+    const rodajeSillas = aRespuestasDeLaApp({
+      tipo: "produccion", nombre: "Produ S", dias: [20], sillas: "Carvillo",
+    });
+    ok(rodajeSillas.origenSillas === "Carvillo",
+      `y contestándolo, el rodaje también alquila (${rodajeSillas.origenSillas})`);
+    ok(recogidasConAlquileres({ ...rodajeSillas, fechaEvento: "2027-07-29" })
+      .some(r => r.concepto === "Sillas (Carvillo)"),
+      "con su recogida, que es lo que antes no podía existir en un rodaje");
+    ok(aRespuestasDeLaApp({ tipo: "produccion", dias: [20], sillas: "Nuestras" }).origenSillas === "Nuestras",
+      "y si son nuestras, se dice y no se alquila nada");
     ok(produ.estado.alquilaCarpas === false && produ.estado.numCarpas === 4,
       `4 carpas caben en el almacén: no se alquila ninguna (${JSON.stringify(produ.estado.alquilaCarpas)})`);
 
@@ -2300,6 +2365,19 @@ async function main() {
       JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}")[k] || {}).filter(Boolean).length, clave);
     ok(await marcados("preparados") === 3 && await marcados("checkeados") === 1,
       `pero desmarcar la salida no lo desprepara (preparados ${await marcados("preparados")}, cargados ${await marcados("checkeados")})`);
+
+    // Subir de golpe al camión todo lo que ya está preparado. Lo normal es que
+    // coincidan, y marcarlo uno a uno en una lista de 130 items es media hora. Es
+    // además la forma de rehacer una carga que se haya perdido.
+    const botonTodo = p.locator("button", { hasText: /Cargar todo lo preparado/ });
+    ok(await botonTodo.count() === 1 && /\(2\)/.test(await botonTodo.innerText()),
+      `en Salida sale el botón con lo que falta por cargar → "${(await botonTodo.innerText()).trim()}"`);
+    await botonTodo.click();
+    await p.waitForTimeout(1000);
+    ok(await marcados("checkeados") === 3 && await marcados("preparados") === 3,
+      `y sube al camión lo preparado sin tocar nada más (cargados ${await marcados("checkeados")} de ${await marcados("preparados")} preparados)`);
+    ok(await botonTodo.count() === 0,
+      "y desaparece cuando ya no queda nada preparado sin cargar");
 
     // Cambiar la cantidad NO puede borrar lo ya marcado. Antes lo desmarcaba, y eso
     // era perder trabajo hecho: alguien había ido al almacén, lo había contado y lo

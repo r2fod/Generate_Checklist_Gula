@@ -63,6 +63,22 @@ function LogoGula({ grande = false, pequeno = false }) {
   );
 }
 
+// La casita de "volver al inicio". Va dibujada aquí y no como texto porque en una
+// pantalla de preguntas la palabra "Inicio" compite con el título y con "Siguiente";
+// un icono se reconoce sin leerlo. El tejado y la puerta se mueven un poco al pasar
+// por encima o al pulsar — lo justo para que se vea que es un botón, sin que dé saltos
+// mientras alguien rellena el formulario.
+function IconoInicio() {
+  return (
+    <svg className="icono-inicio" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"
+         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path className="icono-inicio-tejado" d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" />
+      <path className="icono-inicio-puerta" d="M9.5 21v-5.5h5V21" />
+    </svg>
+  );
+}
+
 // "hace 10 min", "ayer": para saber de un vistazo si eso que mandaste es de hoy
 function fmtCuando(ms) {
   if (!ms) return "hace un rato";
@@ -467,7 +483,9 @@ export default function Formulario({ codigo }) {
         <FondoIconos pregunta="repaso" />
         <div className="form-cabecera">
           <LogoGula />
-          <button className="form-btn-inicio" onClick={irAlInicio}>Inicio</button>
+          <button className="form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
+            <IconoInicio />
+          </button>
         </div>
         <h1 className="form-titulo">¿Está todo bien?</h1>
         {eventoDestino
@@ -564,7 +582,9 @@ export default function Formulario({ codigo }) {
             lista de eventos o lo que ya se había mandado había que darle a Atrás una
             vez por pregunta. No borra nada — lo contestado sigue ahí y en el inicio
             sale un botón para seguir por donde se iba. */}
-        <button className="form-btn-inicio" onClick={irAlInicio}>Inicio</button>
+        <button className="form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
+          <IconoInicio />
+        </button>
       </div>
       <div className="form-progreso"><div style={{ width: `${avance}%` }} /></div>
       {/* De qué evento se está hablando. Son quince pantallas seguidas y sin esto es
