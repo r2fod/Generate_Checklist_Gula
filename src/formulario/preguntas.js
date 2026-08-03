@@ -294,14 +294,18 @@ export const PREGUNTAS = [
     id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
     // Cuántas no se pregunta: salen del pax. A quién se alquilan sí, porque cada
     // proveedor es una recogida distinta y es lo único que la app no puede deducir.
+    //
+    // En un rodaje TAMBIÉN se pregunta. Antes se daba por supuesto que eran nuestras y
+    // ni se preguntaba: el formulario forzaba "Nuestras" al aplicar el envío, así que
+    // si en la app habías puesto un alquiler te lo borraba, y con él su recogida.
     nota: "Si las alquilamos, se crea sola su recogida y su devolución.",
     opciones: [
-      { valor: "finca", texto: "Las pone la finca" },
+      { valor: "finca", texto: "Las pone el sitio" },
       { valor: "Dealde", texto: "Las alquilamos a Dealde" },
       { valor: "Carvillo", texto: "Las alquilamos a Carvillo" },
       { valor: "Nuestras", texto: "Llevamos las nuestras" },
     ],
-    soloEn: CON_BARRA,
+    soloEn: [...CON_BARRA, "produccion"],
   },
 
   // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
@@ -607,8 +611,11 @@ export function aRespuestasDeLaApp(r = {}) {
     }
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
     if (puesto(r.aguaPequena)) estado.tipoAguaPequena = r.aguaPequena;
-    // En un rodaje las sillas son nuestras: no se pregunta y no genera recogida
-    estado.origenSillas = "Nuestras";
+    // Las sillas de un rodaje se preguntan igual que en el resto. Antes se forzaban a
+    // "Nuestras" sin preguntar, y eso PISABA lo que hubiera en la app: si tenías un
+    // alquiler puesto, aplicar el envío te lo borraba junto con su recogida. Sin
+    // contestar no se toca nada, como todo lo demás del formulario.
+    if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
   } else {
     pon("pax", r.adultos);
     pon("ninos", r.ninos);

@@ -40,6 +40,11 @@ const ESPERA_SUBIDA_LINK = 4000;
 // nada a una de enero. Son ~2,1 litros por cabeza en verano y ~1,5 en invierno,
 // además de los refrescos y del agua de 1,5L que va aparte.
 const BOTELLAS_AGUA_POR_PAX = { verano: 6.5, invierno: 4.5 };
+
+// Tercios de respaldo que van SIEMPRE que se lleve barril. La cuenta de litros puede
+// dar cero (dos barriles de 50L cubren de sobra a 100 personas), y salir sin una sola
+// botella deja el evento entero colgando de que el tirador y el barril funcionen.
+const RESPALDO_TERCIOS_CON_BARRIL = 24;
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 // Qué tamaño de batea corresponde a cada tipo de vaso/copa, detectado por el nombre
 // del item. Así el nº de bateas se recalcula siempre en vivo a partir de la cantidad
@@ -789,8 +794,14 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const litrosBarrilUtil = litrosBarrilUd * Math.max(1, numBarriles) * RENDIMIENTO_BARRIL;
   const litrosCervezaNecesarios = bebidas.cerveza * 0.33;
   const litrosRestantes = Math.max(0, litrosCervezaNecesarios - litrosBarrilUtil);
-  // Se redondea a cajas de 24 tercios, igual que el cálculo original
-  const tercerosRestantes = Math.ceil(litrosRestantes / 0.33 / 24) * 24;
+  // Se redondea a cajas de 24 tercios, igual que el cálculo original. Y con barril
+  // nunca se baja de una caja: con dos barriles de 50L la cuenta salía a CERO tercios,
+  // así que si el tirador falla o el barril viene malo te quedas sin cerveza y sin
+  // plan B. Una caja de respaldo pesa poco y cubre el rato de resolverlo.
+  const tercerosRestantes = Math.max(
+    litrosBarrilUd > 0 ? RESPALDO_TERCIOS_CON_BARRIL : 0,
+    Math.ceil(litrosRestantes / 0.33 / 24) * 24,
+  );
   cats.push({ nombre: "Bebidas frías", items: [
     opt(litrosBarrilUd > 0, [`Barril de cerveza (${tamanoBarril})`, String(Math.max(1, numBarriles))]),
     opt(litrosBarrilUd > 0, ["Tirador de cerveza", "1"]),
@@ -991,7 +1002,12 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // los litros que da se descuentan de los tercios en vez de sumarse.
   const barrilLitros = tamanoBarril === "30L" ? 30 : tamanoBarril === "50L" ? 50 : 0;
   const litrosDeBarril = barrilLitros * Math.max(1, numBarriles) * 0.85;
-  const terciosCerveza = Math.ceil(Math.max(0, bebidas.cerveza * 0.33 - litrosDeBarril) / 0.33 / 24) * 24;
+  // Con barril, una caja de respaldo como mínimo (ver el mismo cálculo en la boda):
+  // si el barril falla, quedarse a cero es quedarse sin cerveza.
+  const terciosCerveza = Math.max(
+    barrilLitros > 0 ? RESPALDO_TERCIOS_CON_BARRIL : 0,
+    Math.ceil(Math.max(0, bebidas.cerveza * 0.33 - litrosDeBarril) / 0.33 / 24) * 24,
+  );
   cats.push({ nombre: "Bebidas", items: [
     opt(barrilLitros > 0, [`Barril de cerveza (${tamanoBarril})`, String(Math.max(1, numBarriles))]),
     opt(barrilLitros > 0, ["Tirador de cerveza", "1"]),
@@ -2055,6 +2071,13 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
   const todoVuelto = itemsMarcables.length > 0 && itemsMarcables.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
   const contarSi = (cumple) => checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => cumple(`${c.nombre}::${lo}`)).length, 0);
   const totalPreparados = contarSi(k => preparados[k]);
+  // Lo que está preparado pero todavía sin cargar. Es el camino normal —se prepara y
+  // luego se sube al camión— así que subirlo de golpe ahorra repasar la lista entera
+  // item a item. También es la vía para recuperar una carga que se haya perdido,
+  // porque lo preparado y lo cargado suelen ser lo mismo.
+  const preparadosSinCargar = checklist.flatMap(c => c.items
+    .map(([, , , lo]) => `${c.nombre}::${lo}`)
+    .filter(k => preparados[k] && !checkeados[k]));
   const totalMarcados = modo === "preparacion" ? totalPreparados
     : modo === "salida" ? contarSi(k => checkeados[k])
     : contarSi(k => { const v = vueltos[k]; return v !== undefined && v !== ""; });
@@ -2362,6 +2385,17 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                   con varios eventos medidos se puede afinar la hora de fin sugerida. */}
               {renderCrono("montaje", montajeMin, "Cronómetro de montaje")}
             </>
+          )}
+          {/* Subir al camión de golpe todo lo que ya está preparado. Lo normal es que
+              coincidan: lo que se ha preparado es justo lo que se carga. Marcarlo uno a
+              uno en una lista de 130 items es media hora, y además es la forma de
+              rehacer una carga que se haya perdido. NO desmarca nada: solo añade. */}
+          {modo === "salida" && preparadosSinCargar.length > 0 && (
+            <button
+              className="btn btn-outline carga-todo-vuelto"
+              onClick={() => preparadosSinCargar.forEach(k => onToggleSale(k))}
+              title="Da por cargado todo lo que ya está marcado como preparado. No quita ninguna marca."
+            ><Check size={15} /> Cargar todo lo preparado ({preparadosSinCargar.length})</button>
           )}
           {modo === "vuelta" && renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
           {modo === "vuelta" && (
@@ -5881,9 +5915,15 @@ export default function App({ onCerrarSesion } = {}) {
           </>)}
           {/* En producción no sale porque un rodaje no lleva alcohol. En cumpleaños sí:
               estaba oculto del lote en que este evento se trató como "ligero", el mismo
-              que le dejó sin vino, cerveza ni cava. */}
+              que le dejó sin vino, cerveza ni cava.
+              Va en controls-row y NO en form-row: form-row parte la barra lateral en dos
+              columnas iguales, así que al control le tocaban 171px necesitara lo que
+              necesitara — y con los 196 que pide se rompía por dentro (primero partiendo
+              "No lleva" en dos líneas, luego tirando "50L" a otra fila). controls-row
+              reparte por contenido: cada cosa ocupa lo suyo y, si no caben las dos, el
+              "Nº barriles" baja entero a la línea siguiente. */}
           {evento !== "produccion" && (
-            <div className="form-row" style={{ marginTop: 12, alignItems: "flex-end" }}>
+            <div className="controls-row" style={{ marginTop: 12 }}>
               <SegmentedControl label="Barril de cerveza" value={tamanoBarril} onChange={setTamanoBarril} options={["No lleva", "30L", "50L"]} />
               {tamanoBarril !== "No lleva" && (
                 <div className="form-group controls-mini">

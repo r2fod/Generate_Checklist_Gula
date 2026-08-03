@@ -73,6 +73,49 @@ function avisarEventoNoEncontrado(id, sinConexion) {
   raiz.appendChild(caja)
 }
 
+// Cuántas marcas de trabajo hecho lleva un estado: lo preparado, lo cargado, lo que ha
+// vuelto y las roturas contadas. Es la medida de "cuánto se perdería".
+function marcasDe(estado) {
+  if (!estado) return 0
+  const cuenta = (obj) => Object.values(obj || {}).filter(v => v !== undefined && v !== "" && v !== false && v !== 0).length
+  return cuenta(estado.preparados) + cuenta(estado.checkeados) + cuenta(estado.vueltos) + cuenta(estado.roturas)
+}
+
+// Abrir el link de un evento DESCARGA la nube y machaca lo que hubiera en este
+// dispositivo. Normalmente es lo que se quiere. Pero si aquí hay marcas que el link no
+// trae —alguien estuvo cargando el camión y eso aún no había subido— machacar es tirar
+// trabajo hecho, y encima en silencio: pasó de verdad, 93 items cargados a cero.
+// Así que cuando el local tiene MÁS marcas que lo que llega, se pregunta.
+function preguntarAntesDePisar(id, estadoNube, estadoLocal, seguir) {
+  const raiz = document.getElementById('root')
+  raiz.innerHTML = ''
+  const caja = document.createElement('div')
+  caja.className = 'link-roto'
+  const suyas = marcasDe(estadoLocal), llegan = marcasDe(estadoNube)
+  caja.innerHTML = `
+    <h1>Aquí hay trabajo sin subir</h1>
+    <p>En este dispositivo hay <strong>${suyas} marcas</strong> (preparado, cargado, vuelto o roturas)
+       y el link solo trae <strong>${llegan}</strong>. Abrirlo tal cual borraría la diferencia.</p>
+    <p class="link-roto-id">${(estadoLocal && estadoLocal.nombreEvento) || id}</p>
+    <button type="button" data-quedarse>Seguir con lo de este dispositivo</button>
+    <button type="button" data-pisar>Abrir el link igualmente</button>
+    <p class="link-roto-nota">Si sigues con lo de aquí, lo tuyo se subirá a la nube en cuanto haya conexión.</p>`
+  caja.querySelector('[data-quedarse]').addEventListener('click', () => {
+    // Se quita el ?evento= para que recargar no vuelva a preguntar
+    window.location.href = window.location.origin + window.location.pathname
+  })
+  caja.querySelector('[data-pisar]').addEventListener('click', () => {
+    localStorage.setItem("gula_checklist_estado", JSON.stringify(estadoNube))
+    seguir()
+  })
+  raiz.appendChild(caja)
+}
+
+function estadoGuardado() {
+  try { return JSON.parse(localStorage.getItem("gula_checklist_estado") || "null") }
+  catch (e) { return null }
+}
+
 async function arrancar() {
   const id = new URLSearchParams(window.location.search).get("evento")
   if (id) {
@@ -80,6 +123,15 @@ async function arrancar() {
       const estado = await cargarEventoNube(id)
       if (estado) {
         estado.eventoNubeId = id
+        const local = estadoGuardado()
+        // Solo se pregunta si es EL MISMO evento: abrir el link de otro evento distinto
+        // no pisa nada de este, y preguntar ahí sería ruido.
+        const mismoEvento = local && (local.eventoNubeId === id
+          || (local.nombreEvento && local.nombreEvento === estado.nombreEvento))
+        if (mismoEvento && marcasDe(local) > marcasDe(estado)) {
+          preguntarAntesDePisar(id, estado, local, montar)
+          return
+        }
         localStorage.setItem("gula_checklist_estado", JSON.stringify(estado))
       } else {
         // El link es válido pero ahí no hay nada: no se puede seguir como si nada
@@ -91,6 +143,10 @@ async function arrancar() {
       return
     }
   }
+  montar()
+}
+
+function montar() {
   createRoot(document.getElementById('root')).render(
     <StrictMode>
       <Acceso />

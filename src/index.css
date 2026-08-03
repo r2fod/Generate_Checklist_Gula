@@ -1239,6 +1239,20 @@ body {
   flex-wrap: wrap;
 }
 
+/* El control NUNCA se aprieta por debajo de sus botones. En la barra lateral de
+   escritorio (400px fijos) la etiqueta se llevaba el ancho y al control le quedaban
+   171px para 196 que necesita, así que se rompía por dentro: primero partiendo la
+   palabra ("No lleva" en dos líneas) y, tapado eso, tirando un botón a otra fila.
+   Ninguna de las dos es aceptable. Ahora manda el contenido del control y es la
+   ETIQUETA la que cede: si no caben los dos, el grupo ya envuelve y la etiqueta se
+   queda arriba con el control entero debajo, que se lee perfectamente. */
+.segment-group > .segmented-control {
+  flex: 0 0 auto;
+}
+.segment-group > .segment-label {
+  min-width: 0;
+}
+
 .segment-label {
   font-size: 0.8rem;
   color: var(--text-muted);
@@ -5052,12 +5066,15 @@ hr {
 
 /* Discreto a propósito: se usa poco y no puede competir con "Siguiente". Pero con
    altura de dedo, que se pulsa de pie y con prisa. */
+/* Redondo y del tamaño de un dedo: es un icono, no una etiqueta. */
 .form-btn-inicio {
   flex: 0 0 auto;
-  min-height: 40px;
-  padding: 8px 16px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   color: var(--text-muted);
   background: var(--card-bg);
   border: 1.5px solid var(--border-color);
@@ -5066,6 +5083,23 @@ hr {
   transition: var(--transition-smooth);
 }
 .form-btn-inicio:hover { border-color: var(--accent); color: var(--accent); }
+.form-btn-inicio:active { transform: scale(0.94); }
+
+/* El tejado se levanta un pelín y la puerta se abre: se ve que es un botón sin que
+   nada dé saltos mientras alguien está rellenando el formulario. */
+.icono-inicio-tejado, .icono-inicio-puerta {
+  transition: transform 0.25s ease;
+  transform-origin: center;
+}
+.form-btn-inicio:hover .icono-inicio-tejado { transform: translateY(-1.5px); }
+.form-btn-inicio:hover .icono-inicio-puerta { transform: scaleX(0.72); transform-origin: 9.5px 21px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .form-btn-inicio:active { transform: none; }
+  .icono-inicio-tejado, .icono-inicio-puerta { transition: none; }
+  .form-btn-inicio:hover .icono-inicio-tejado,
+  .form-btn-inicio:hover .icono-inicio-puerta { transform: none; }
+}
 
 /* Volver a lo que estabas rellenando: va el primero de la pantalla porque, si has
    venido aquí a media pregunta, es lo que más falta te hace. */

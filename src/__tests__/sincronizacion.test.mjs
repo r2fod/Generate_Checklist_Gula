@@ -533,6 +533,13 @@ console.log("\n══ Lo obligatorio del formulario ══");
     "no se puede contestar \"no lo sé\" al nombre ni al día");
   ok(dela("horno", "boda").noSe !== false,
     "pero al resto sí: una respuesta en blanco sigue siendo información buena");
+
+  // Las sillas se preguntan en TODOS los tipos, rodaje incluido. Antes el rodaje se
+  // saltaba la pregunta y al aplicar el envío forzaba "Nuestras", así que pisaba el
+  // alquiler que hubiera puesto en la app y se llevaba por delante su recogida.
+  for (const tipo of ["boda", "comunion", "corporativo", "cumpleanos", "produccion"]) {
+    ok(!!dela("sillas", tipo), `en ${tipo} se pregunta quién pone las sillas`);
+  }
 }
 
 // ── Manteles: la app pone cuántos, la oficina de qué color ────────────────────
