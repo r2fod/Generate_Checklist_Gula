@@ -27,8 +27,13 @@ import {
 } from "./nube.js";
 import { aRespuestasDeLaApp, resumirEnvio, recogidasDelEnvio, comprasDelEnvio, archivosDelEnvio, fmtFechaCorta, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
+import logoGula from "./assets/gula-logo.png";
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
+// Cuánto se espera a que el evento suba antes de avisar de que el link puede estar
+// muerto. Con cobertura normal la subida tarda menos de un segundo; si pasa de aquí,
+// más vale decirlo que dejar que manden un link que no abre nada.
+const ESPERA_SUBIDA_LINK = 4000;
 const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 // Qué tamaño de batea corresponde a cada tipo de vaso/copa, detectado por el nombre
 // del item. Así el nº de bateas se recalcula siempre en vivo a partir de la cantidad
@@ -2406,45 +2411,53 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                     : valorVuelta === true;
                   return (
                     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`} key={i}>
+                      {/* La pastilla "todo" va en la línea del nombre, que es donde está
+                          la casilla de marcar en Prep. y en Salida: es la misma acción y
+                          tiene que estar en el mismo sitio. Debajo se apilaba, y entre eso
+                          y los dos campos cada item ocupaba cuatro líneas — recorrer la
+                          vuelta de un rodaje era bajar el triple de lo necesario. */}
                       <div className="carga-row-principal carga-row-vuelta">
                         <span className="carga-nombre"><IconoItem label={label} /> {label}</span>
                         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+                        <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={vinoTodo}
+                            onChange={e => onVuelve(key, e.target.checked ? (cantidadCompleta !== null ? String(cantidadCompleta) : true) : "")}
+                          />
+                          <Check size={12} /> todo
+                        </label>
                       </div>
-                      <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={vinoTodo}
-                          onChange={e => onVuelve(key, e.target.checked ? (cantidadCompleta !== null ? String(cantidadCompleta) : true) : "")}
-                        />
-                        <Check size={12} /> todo
-                      </label>
-                      {/* Si la cantidad es un texto ("Todas") no hay número que contar:
-                          esa fila se marca solo con la casilla, sin campo numérico. */}
-                      {cantidadCompleta !== null && (
-                        <div className="carga-roturas carga-vuelve-cantidad">
-                          <span><Undo2 size={12} /> vuelve</span>
+                      {/* Y debajo, los dos números, alineados entre ellos */}
+                      <div className="carga-vuelta-controles">
+                        {/* Si la cantidad es un texto ("Todas") no hay número que contar:
+                            esa fila se marca solo con la casilla, sin campo numérico. */}
+                        {cantidadCompleta !== null && (
+                          <div className="carga-roturas carga-vuelve-cantidad">
+                            <span><Undo2 size={12} /> vuelve</span>
+                            <input
+                              type="number"
+                              min="0"
+                              className="carga-roturas-input"
+                              value={vueltaTexto}
+                              placeholder="0"
+                              onChange={e => onVuelve(key, e.target.value)}
+                              onClick={e => e.stopPropagation()}
+                            />
+                          </div>
+                        )}
+                        <div className="carga-roturas">
+                          <span><AlertTriangle size={12} /> roturas</span>
                           <input
                             type="number"
                             min="0"
                             className="carga-roturas-input"
-                            value={vueltaTexto}
+                            value={roturas[key] || ""}
                             placeholder="0"
-                            onChange={e => onVuelve(key, e.target.value)}
+                            onChange={e => onRoturas(key, e.target.value)}
                             onClick={e => e.stopPropagation()}
                           />
                         </div>
-                      )}
-                      <div className="carga-roturas">
-                        <span><AlertTriangle size={12} /> roturas</span>
-                        <input
-                          type="number"
-                          min="0"
-                          className="carga-roturas-input"
-                          value={roturas[key] || ""}
-                          placeholder="0"
-                          onChange={e => onRoturas(key, e.target.value)}
-                          onClick={e => e.stopPropagation()}
-                        />
                       </div>
                     </div>
                   );
@@ -3540,11 +3553,31 @@ export default function App({ onCerrarSesion } = {}) {
 
   // Si hay nombre de evento, se antepone al link copiado ("Boda Ana y Luis: https://...")
   // para poder distinguir de qué evento es al pegarlo en WhatsApp u otro chat.
+  // El aviso que sale en el propio botón de Compartir. Pasa por aquí por dos motivos:
+  //   · un aviso nuevo borra el temporizador del anterior, que si no el "✓" de hace dos
+  //     segundos apagaba el aviso que acababa de salir;
+  //   · y los avisos llevan prioridad, porque el "¡Link copiado!" y el "no ha subido"
+  //     compiten: el portapapeles y la subida terminan cada uno cuando quieren, y en
+  //     las pruebas se vio que el "✓" llegaba el último y tapaba el fallo. Un aviso de
+  //     más prioridad no se deja pisar por uno de menos.
+  const avisoCompartirRef = React.useRef(null);
+  const avisoPrioridadRef = React.useRef(0);
+  const avisarCompartir = (texto, ms = 3000, prioridad = 0) => {
+    if (prioridad < avisoPrioridadRef.current) return;
+    avisoPrioridadRef.current = prioridad;
+    if (avisoCompartirRef.current) clearTimeout(avisoCompartirRef.current);
+    setCompartirMsg(texto);
+    avisoCompartirRef.current = setTimeout(() => {
+      setCompartirMsg("");
+      avisoCompartirRef.current = null;
+      avisoPrioridadRef.current = 0;
+    }, ms);
+  };
+
   const copiarLink = (url, nombre) => {
     const texto = nombre ? `${nombre}: ${url}` : url;
     navigator.clipboard.writeText(texto).then(() => {
-      setCompartirMsg("¡Link copiado! ✓");
-      setTimeout(() => setCompartirMsg(""), 3000);
+      avisarCompartir("¡Link copiado! ✓");
     }).catch(() => {
       // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a mano
       window.prompt("No se pudo copiar automáticamente. Copia el link:", texto);
@@ -3616,6 +3649,9 @@ export default function App({ onCerrarSesion } = {}) {
     // puesto nombre aún.
     const etiquetaLink = nombreEvento || `${EVENTOS[evento]?.label} ${pax} pax`;
     const marca = paraMarcar ? "&solo=1" : "";
+    // Cada clic empieza limpio: si el anterior acabó en un aviso de fallo, ese aviso no
+    // puede quedarse mandando y tapar el resultado de este
+    avisoPrioridadRef.current = 0;
     if (nubeActiva()) {
       // Link corto con edición compartida: la checklist vive en la nube y los
       // cambios de cualquiera con el link se sincronizan
@@ -3623,17 +3659,34 @@ export default function App({ onCerrarSesion } = {}) {
       if (!eventoNubeId) setEventoNubeId(id);
       const estado = { ...getEstadoActual(), eventoNubeId: id };
       ultimoGuardadoNubeRef.current = JSON.stringify(estado);
-      // Se ESPERA a que suba antes de dar el link por bueno. Antes se lanzaba y se
-      // copiaba el link a la vez: si la subida fallaba (sin cobertura, permisos), el
-      // link se copiaba igual y quien lo abría no encontraba el evento — un link muerto
-      // que no avisaba de nada ni aquí ni allí. Ahora, si falla, se dice.
+      // El portapapeles se escribe AQUÍ, dentro del propio clic. El navegador solo deja
+      // copiar mientras dura el gesto de quien pulsa: al esperar antes a que el evento
+      // subiera, la copia caía fuera del gesto y el navegador la rechazaba — se cerraba
+      // el menú y no pasaba nada más. El respaldo (un prompt con el link) tampoco se ve
+      // en una app instalada, así que el fallo era invisible.
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`, etiquetaLink);
+      // Y la subida se comprueba DESPUÉS: el link está copiado, pero hasta que el evento
+      // no esté en la nube ese link no abre nada al otro lado. Eso hay que decirlo antes
+      // de que lo manden, que es como nacía un link muerto sin que se enterara nadie.
+      //
+      // Ojo con el plazo: Firestore NO rechaza la escritura cuando no hay conexión, la
+      // deja pendiente hasta que el servidor la confirme. Esperando solo al fallo, sin
+      // cobertura no llegaría el aviso nunca — que es el caso en el que más falta hace.
+      // Por eso se avisa también si tarda demasiado.
+      let resuelto = false;
+      const aTiempo = setTimeout(() => {
+        if (resuelto) return;
+        avisarCompartir("Copiado, pero el evento aún NO ha subido ⚠", 9000, 1);
+      }, ESPERA_SUBIDA_LINK);
       guardarEventoNube(id, estado)
-        .then(() => copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`, etiquetaLink))
+        .then(() => { resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
         .catch((e) => {
+          resuelto = true;
+          clearTimeout(aTiempo);
           avisarFalloNube(e);
-          // En el mismo sitio donde sale "¡Link copiado!", que es donde se está mirando
-          setCompartirMsg("No se pudo preparar el link (sin conexión) ✗");
-          setTimeout(() => setCompartirMsg(""), 5000);
+          // En el mismo sitio donde sale "¡Link copiado!", que es donde se está mirando,
+          // y con prioridad para que el "✓" del portapapeles no lo tape si llega después
+          avisarCompartir("Copiado, pero el evento NO ha subido ✗", 9000, 1);
         });
     } else {
       // Sin nube el link lleva la checklist dentro. Aquí el "solo marcar" también vale:
@@ -3914,7 +3967,10 @@ export default function App({ onCerrarSesion } = {}) {
     let cancelado = false;
     const comprobar = async () => {
       try {
-        const r = await fetch(`version.json?t=${Date.now()}`, { cache: "no-store" });
+        // version.json se publica en la RAÍZ, y esta app vive en su carpeta: sin el
+        // "../" se pediría /checklist/version.json, que no existe — y el aviso de
+        // versión nueva dejaría de saltar sin que se notara.
+        const r = await fetch(`../version.json?t=${Date.now()}`, { cache: "no-store" });
         if (!r.ok) return;
         const { id } = await r.json();
         if (!cancelado && id && id !== __BUILD_ID__) setVersionNueva(true);
@@ -4035,11 +4091,11 @@ export default function App({ onCerrarSesion } = {}) {
   // el buzón entero: lo ya revisado se guarda para consultarlo, no para dar la lata.
   const enviosPendientes = repartirEnvios(envios).pendientes;
   // El enlace que se le pasa a la oficina apunta a la carpeta del formulario, que es
-  // una app aparte (se instala sola, sin arrastrar la checklist). Los enlaces viejos
-  // —los que apuntan a esta misma dirección con ?enviar=— siguen valiendo: la raíz los
-  // desvía aquí (ver src/main.jsx).
+  // una app aparte y hermana de esta (por eso se instala sola, sin arrastrar la
+  // checklist). Los enlaces viejos —los que apuntan a la raíz con ?enviar=— siguen
+  // valiendo: la raíz los desvía aquí (ver public/index.html).
   const enlaceFormulario = codigoFormulario
-    ? `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, "")}formulario/?enviar=${codigoFormulario}`
+    ? `${new URL("../formulario/", window.location.href).href}?enviar=${codigoFormulario}`
     : "";
   const refrescarEnvios = async (codigo = codigoFormulario) => {
     if (!codigo || !nubeActiva()) return;
@@ -4477,7 +4533,18 @@ export default function App({ onCerrarSesion } = {}) {
     return next;
   });
   const handleTogglePreparado = (key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); };
-  const handleToggleCheckCarga = (key) => { revisado(key); setCheckeados(prev => ({ ...prev, [key]: !prev[key] })); };
+  // Si algo sale en el camión es porque estaba preparado: marcarlo en Salida lo da
+  // por preparado también. Antes las dos listas podían contradecirse —"cargado" pero
+  // "sin preparar"— y quien miraba la de preparación volvía a buscar por el almacén
+  // algo que ya iba dentro del camión.
+  // Al revés NO: desmarcar la salida (se baja algo del camión) no deshace el trabajo
+  // de haberlo preparado, que sigue hecho.
+  const handleToggleCheckCarga = (key) => {
+    revisado(key);
+    const marcando = !checkeados[key];
+    if (marcando) setPreparados(prev => (prev[key] ? prev : { ...prev, [key]: true }));
+    setCheckeados(prev => ({ ...prev, [key]: marcando }));
+  };
   const handleToggleNotaCarga = (texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] }));
   // Cronómetro de carga/descarga: arrancar acumula desde ahora, pausar suma el tramo
   // corrido al acumulado, reiniciar lo pone a cero. Se guarda/sincroniza con el evento.
@@ -4949,6 +5016,20 @@ export default function App({ onCerrarSesion } = {}) {
                 </span>
               </p>
             </div>
+            {/* El logo de Gula. Va aquí, al final del grupo del título y pegado al
+                interruptor de tema, porque es el único sitio de la cabecera que no le
+                quita espacio a nada: el nombre del evento y su subtítulo se quedan
+                donde estaban y los botones de acción no se mueven. Es el dibujo del
+                logo haciendo de máscara sobre un degradado, igual que en el formulario:
+                el archivo es negro sobre transparente y en tema oscuro no se vería.
+                En móvil se esconde — ahí la cabecera va justa y el subtítulo ya se
+                recorta a dos líneas, así que sería quitarle sitio a lo que importa. */}
+            <span
+              className="app-logo"
+              role="img"
+              aria-label="Gula"
+              style={{ WebkitMaskImage: `url(${logoGula})`, maskImage: `url(${logoGula})` }}
+            />
             {/* El interruptor de tema va con el título, no en la rejilla de acciones:
                 siendo un icono suelto dejaba una celda huérfana y descuadraba la fila
                 de botones en el móvil. Lleva texto para que se encuentre. */}

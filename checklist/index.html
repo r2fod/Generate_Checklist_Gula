@@ -1,16 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Pedimos al navegador que revalide el index.html: los .js llevan hash, así que
          un index.html cacheado sigue apuntando a la compilación vieja. No todos los
          navegadores lo respetan, por eso la app comprueba además version.json. -->
     <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
     <meta name="theme-color" content="#1f314d" />
+    <!-- La checklist vive en SU carpeta, igual que el formulario en la suya. No es
+         manía de orden: el ámbito de un manifiesto es la carpeta donde vive, y cuando
+         la checklist estaba en la raíz su ámbito se tragaba /formulario/ entero. Con
+         una app dentro del ámbito de otra, el navegador las trata como la misma cosa
+         y no ofrece instalar la de dentro — solo "abrir en la de fuera". Dos carpetas
+         hermanas es la única forma de que sean dos apps de verdad. -->
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./icono-192.png" />
+    <link rel="apple-touch-icon" href="../icono-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Checklist" />
     <title>Checklist Gula</title>

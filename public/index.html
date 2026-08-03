@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Gula</title>
+    <style>
+      html { background: #f6f7fb; }
+      @media (prefers-color-scheme: dark) { html { background: #101725; } }
+      body { margin: 0; }
+    </style>
+  </head>
+  <body>
+    <!--
+      Esta dirección ya no es ninguna app: es solo el desvío.
+
+      Las dos apps viven cada una en su carpeta —/checklist/ y /formulario/— porque el
+      ámbito de un manifiesto es la carpeta donde vive. Con la checklist en la raíz, su
+      ámbito se tragaba /formulario/ entero, y una app dentro del ámbito de otra no se
+      puede instalar aparte: el navegador solo ofrece "abrir en la de fuera".
+
+      Aquí se quedan los enlaces ya repartidos por WhatsApp, que apuntan a esta
+      dirección: los del formulario (?enviar=) van a su carpeta y todo lo demás
+      (?evento=, ?c=, o entrar a pelo) va a la checklist, con su consulta intacta.
+
+      Va en HTML suelto y sin nada más para que el salto sea inmediato: cargar el
+      paquete entero de la app solo para redirigir sería tardar segundos en un móvil
+      con mala cobertura.
+    -->
+    <script>
+      (function () {
+        var p = new URLSearchParams(window.location.search);
+        var esFormulario = p.get("enviar") || p.get("formulario");
+        var destino;
+        if (esFormulario) {
+          // El código puede venir en el enlace o estar guardado de la última vez (es lo
+          // que hace que el icono de quien instaló el formulario antes de la mudanza
+          // acabe en su formulario y no en el login del equipo)
+          var codigo = p.get("enviar") || "";
+          if (!codigo) { try { codigo = localStorage.getItem("gula_formulario_codigo") || ""; } catch (e) { codigo = ""; } }
+          destino = new URL("./formulario/", window.location.href);
+          if (codigo) destino.searchParams.set("enviar", codigo);
+        } else {
+          // La checklist se lleva la consulta tal cual: ahí van los links de los eventos
+          destino = new URL("./checklist/" + window.location.search + window.location.hash, window.location.href);
+        }
+        window.location.replace(destino.href);
+      })();
+    </script>
+    <noscript>
+      <p style="font-family: system-ui, sans-serif; padding: 24px">
+        Esta página necesita JavaScript. Abre <a href="./checklist/">la checklist</a> o
+        <a href="./formulario/">el formulario</a>.
+      </p>
+    </noscript>
+  </body>
+</html>
