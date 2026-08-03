@@ -216,6 +216,36 @@ async function main() {
       "el Word incluye Recogidas y Compras");
   } else ok(false, "el Word se descarga");
 
+  // ── El agua de un rodaje va por temporada ───────────────────────────────────
+  // Iban 3,5 botellas de 33cl por persona y día, fijas: poco más de un litro por
+  // cabeza en una jornada de doce horas al sol. Ahora 6,5 en verano y 4,5 en invierno,
+  // que la app ya sabe la temporada por la fecha del evento.
+  console.log("\n── El agua de un rodaje ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1400, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const cajas = async (estado) => {
+      await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      const f = (await listaItems(p)).find(i => i.startsWith("Aguas pequeñas (33cl)=")) || "";
+      return { n: parseInt(f.split("=")[1], 10), fila: f };
+    };
+    const enAgosto = await cajas({ evento: "produccion", pax: 30, fechaEvento: "2027-08-11" });
+    ok(enAgosto.n === 6, `30 personas en agosto → 6 cajas (${enAgosto.n})`);
+    ok(/verano/.test(enAgosto.fila) && /6,5/.test(enAgosto.fila),
+      `y la fila dice de dónde sale el número → "${enAgosto.fila.split("|")[1] || enAgosto.fila}"`);
+
+    const enEnero = await cajas({ evento: "produccion", pax: 30, fechaEvento: "2028-01-12" });
+    ok(enEnero.n === 4, `las mismas 30 en enero → 4 cajas (${enEnero.n})`);
+    ok(/invierno/.test(enEnero.fila) && /4,5/.test(enEnero.fila), "y lo dice también");
+
+    // Varios días: el agua es consumible, así que va por la SUMA de la gente
+    const tresDias = await cajas({ evento: "produccion", pax: 30, fechaEvento: "2027-08-11", diasProduccion: ["30", "30", "30"] });
+    ok(tresDias.n === 17, `y tres días de 30 piden el triple de agua (${tresDias.n} cajas)`);
+    await c.close();
+  }
+
   // ── La pestaña Vuelta tiene que respirar ────────────────────────────────────
   // Cada item apilaba cuatro líneas —nombre, la pastilla "todo", "vuelve" y "roturas"—
   // y encima con sangrías distintas: la pastilla pegada al borde y los dos campos
@@ -427,7 +457,12 @@ async function main() {
       ok(/\?evento=[a-z0-9]{8}/.test(copiado), `"${entrada}" deja el link en el portapapeles → ${copiado.slice(0, 90)}`);
       ok(copiado.includes("&solo=1") === marca,
         marca ? "y el de marcar lleva su &solo=1" : "y el de edición no lo lleva");
-      ok(copiado.includes("Boda Anna y Mario"), "con el nombre del evento delante, para saber cuál es al pegarlo");
+      // Se copia SOLO la dirección. Llevaba "Evento: https://…" delante para que en
+      // WhatsApp se supiera de cuál era, y con eso se rompía pegarlo en el navegador:
+      // al ver un texto con espacios lo BUSCA en vez de abrirlo. Parecía que el link
+      // no funcionaba, y no era el link — era lo que se copiaba.
+      ok(!/\s/.test(copiado) && /^https?:\/\//.test(copiado),
+        "y va pelado, sin nombre ni espacios: pegado en el navegador abre, no busca");
     }
     // Y como la nube está cortada, el evento no llega a subir: hay que decirlo, que si
     // no se manda un link que no abre nada al otro lado. El aviso tarda lo que dura el
@@ -1117,6 +1152,26 @@ async function main() {
     await p.locator(".form-input").nth(1).fill("Finca La Alquería");
     await p.locator(".form-btn-principal").click();
     await p.waitForTimeout(400);
+
+    // "Inicio" desde cualquier pregunta. Son quince pantallas: para mirar la lista de
+    // eventos o lo que ya se había mandado había que darle a Atrás una vez por
+    // pregunta. Lo importante es que NO borre nada — si al volver hubiera que
+    // rellenarlo otra vez, sería un botón para perder el trabajo hecho.
+    const tituloAhora = await p.locator(".form-titulo").innerText();
+    await p.locator(".form-btn-inicio").first().click();
+    await p.waitForTimeout(600);
+    ok(/De qué evento son los datos/i.test(await p.locator(".form-titulo").innerText()),
+      "\"Inicio\" vuelve a la lista de eventos desde media pregunta");
+    const seguir = p.locator(".form-btn-seguir");
+    ok(await seguir.count() === 1 && /Boda de Ana y Luis/.test(await seguir.innerText()),
+      `y ofrece seguir por donde ibas → "${(await seguir.innerText()).trim()}"`);
+    await seguir.click();
+    await p.waitForTimeout(600);
+    ok((await p.locator(".form-titulo").innerText()) === tituloAhora,
+      `y vuelve a la MISMA pregunta, no al principio → "${tituloAhora.slice(0, 40)}"`);
+    const nombreGuardado = await p.locator(".form-repaso-fila, .form-contexto").first().innerText().catch(() => "");
+    ok(/Boda de Ana y Luis/.test(nombreGuardado),
+      "con lo contestado intacto");
 
     // El nombre y el día no se pueden dejar en blanco (sin día no hay recogidas), así
     // que al pasar por esas dos pantallas hay que rellenarlas: en el resto vale "No lo sé".

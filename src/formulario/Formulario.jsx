@@ -7,7 +7,7 @@
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo, useRef } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, loQueFalta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
-import { leerProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
+import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.png";
 import FondoIconos from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
@@ -166,6 +166,14 @@ export default function Formulario({ codigo }) {
       setProximos(r.ok ? r.eventos : []);
       setAvisos(r.ok && Array.isArray(r.avisos) ? r.avisos : []);
     });
+    // Y a partir de ahí, en vivo: un evento creado en la app aparece aquí solo, sin
+    // recargar. La lectura de arriba se queda porque es la que distingue un código
+    // que no vale (hay que cerrar) de una mala cobertura (se sigue rellenando); la
+    // escucha no puede distinguirlos, así que no cierra nada por su cuenta.
+    return suscribirProximos(codigo, ({ eventos, avisos: av }) => {
+      setProximos(eventos);
+      setAvisos(av);
+    });
   }, [codigo]);
 
   // Antes aquí se cambiaba el manifiesto en caliente, porque el formulario compartía
@@ -238,6 +246,20 @@ export default function Formulario({ codigo }) {
   const salirDeLasPreguntas = () => {
     if (envioId) { setVerMios(true); return; }
     setPaso(-1);
+  };
+
+  // "Inicio" desde cualquier pregunta: son quince pantallas y volver a la lista de
+  // eventos (o a lo que ya se ha mandado) obligaba a darle a Atrás una vez por
+  // pantalla. NO se borra nada: las respuestas se quedan y en el inicio sale un botón
+  // para seguir por donde se iba, que si no volver sería empezar de cero.
+  const [pasoGuardado, setPasoGuardado] = useState(null);
+  const irAlInicio = () => {
+    setPasoGuardado(paso);
+    setPaso(-1);
+  };
+  const seguirDondeIba = () => {
+    setPaso(pasoGuardado ?? 0);
+    setPasoGuardado(null);
   };
 
   if (codigoMalo) {
@@ -350,6 +372,13 @@ export default function Formulario({ codigo }) {
         <FondoIconos pregunta="elegir" />
         <LogoGula grande />
         <h1 className="form-titulo">¿De qué evento son los datos?</h1>
+        {/* Si se ha venido al inicio a media pregunta, lo primero es poder volver:
+            las respuestas siguen ahí y sin esto habría que recorrerlas otra vez. */}
+        {pasoGuardado !== null && (
+          <button className="form-btn-principal form-btn-seguir" onClick={seguirDondeIba}>
+            ↩ Seguir con {respuestas.nombre || eventoDestino || "lo que estabas rellenando"}
+          </button>
+        )}
         {proximos === null && <p className="form-nota">Cargando los próximos eventos...</p>}
         {proximos !== null && proximos.length === 0 && (
           <p className="form-nota">No hay eventos próximos guardados. Sigue y lo creamos nuevo.</p>
@@ -362,6 +391,7 @@ export default function Formulario({ codigo }) {
               onClick={() => {
                 setEventoDestino(e.nombre);
                 setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
+                setPasoGuardado(null);
                 setPaso(0);
               }}
             >
@@ -379,7 +409,7 @@ export default function Formulario({ codigo }) {
             onChange={e => setBusca(e.target.value)}
           />
         )}
-        <button className="form-btn-principal" onClick={() => { setEventoDestino(""); setPaso(0); }}>
+        <button className="form-btn-principal" onClick={() => { setEventoDestino(""); setPasoGuardado(null); setPaso(0); }}>
           + Es un evento nuevo
         </button>
         {mios.length > 0 && (
@@ -435,7 +465,10 @@ export default function Formulario({ codigo }) {
     return (
       <div className="form-pantalla">
         <FondoIconos pregunta="repaso" />
-        <LogoGula />
+        <div className="form-cabecera">
+          <LogoGula />
+          <button className="form-btn-inicio" onClick={irAlInicio}>Inicio</button>
+        </div>
         <h1 className="form-titulo">¿Está todo bien?</h1>
         {eventoDestino
           ? <p className="form-nota">Son datos para <strong>{eventoDestino}</strong>.</p>
@@ -525,7 +558,14 @@ export default function Formulario({ codigo }) {
   return (
     <div className="form-pantalla">
       <FondoIconos pregunta={p.id} />
-      <LogoGula pequeno />
+      <div className="form-cabecera">
+        <LogoGula pequeno />
+        {/* Volver al inicio de un toque. Son quince pantallas: sin esto, para mirar la
+            lista de eventos o lo que ya se había mandado había que darle a Atrás una
+            vez por pregunta. No borra nada — lo contestado sigue ahí y en el inicio
+            sale un botón para seguir por donde se iba. */}
+        <button className="form-btn-inicio" onClick={irAlInicio}>Inicio</button>
+      </div>
       <div className="form-progreso"><div style={{ width: `${avance}%` }} /></div>
       {/* De qué evento se está hablando. Son quince pantallas seguidas y sin esto es
           fácil acabar mandando los datos de una boda al evento de otra. */}
