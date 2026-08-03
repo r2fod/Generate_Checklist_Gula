@@ -3333,6 +3333,10 @@ hr {
 .carga-marca-otra.is-cargado { background: #dbeafe; color: #1d4ed8; }
 :root[data-tema="oscuro"] .carga-marca-otra.is-preparado { background: rgba(13, 148, 136, 0.24); color: #5eead4; }
 :root[data-tema="oscuro"] .carga-marca-otra.is-cargado { background: rgba(37, 99, 235, 0.24); color: #93c5fd; }
+/* La cantidad cambió después de marcarlo: en ámbar, que es un "mira esto", no un error.
+   La marca verde de la fila sigue puesta — lo hecho no se borra, solo se señala. */
+.carga-marca-otra.is-revisar { background: #fef3c7; color: #b45309; }
+:root[data-tema="oscuro"] .carga-marca-otra.is-revisar { background: rgba(217, 119, 6, 0.26); color: #fcd34d; }
 @media (max-width: 420px) {
   /* En pantallas estrechas el nombre y la cantidad mandan: el aviso se queda en el icono */
   .carga-marca-otra { padding: 2px 5px; }
@@ -4444,6 +4448,14 @@ hr {
   min-height: 100dvh;
   position: relative;
   z-index: 1;
+  /* En un ordenador la pantalla es mucho más alta que las preguntas, y todo se quedaba
+     pegado arriba con un vacío enorme debajo. Centrado en vertical se lee como una
+     tarjeta y no como una página a medio cargar.
+     Va "safe": si una pregunta larga no cabe, en vez de centrarla (que recortaría el
+     principio, y con él el título, sin poder subir) se alinea arriba y se puede leer
+     entera. Un navegador que no entienda "safe" ignora la línea y se queda como estaba,
+     que es exactamente lo de antes. */
+  justify-content: safe center;
 }
 
 /* Iconos flotando detrás, distintos en cada pregunta. Va fijo y sin sitio propio:
@@ -4883,32 +4895,49 @@ hr {
   justify-content: center;
   animation: form-logo-entra 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.form-logo img {
-  height: 44px;
-  width: auto;
-  max-width: 70%;
-  object-fit: contain;
+/* El dibujo del logo hace de máscara y el color lo pone el degradado de debajo, que se
+   va moviendo. Al ser máscara no depende del tema: el color es el del degradado, así
+   que se ve igual de bien en claro y en oscuro sin invertir nada.
+   La proporción del archivo es 2:1, y con aspect-ratio el alto manda y el ancho sale
+   solo — así no hay que repetir medidas en cada tamaño. */
+.form-logo-color {
+  display: block;
+  height: 62px;
+  aspect-ratio: 1536 / 758;
+  max-width: 78%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  background: linear-gradient(100deg, #6d28d9, #db2777, #f97316, #16a34a, #0ea5e9, #6d28d9);
+  background-size: 320% 100%;
+  animation: form-logo-colores 11s linear infinite;
 }
-.form-logo.es-grande img { height: 62px; }
+@keyframes form-logo-colores {
+  from { background-position: 0% 50%; }
+  to   { background-position: 320% 50%; }
+}
+/* En la primera pantalla es el protagonista y se pone grande de verdad */
+.form-logo.es-grande .form-logo-color { height: 108px; }
 .form-logo.es-pequeno {
   justify-content: flex-start;
   margin-bottom: -2px;
 }
-.form-logo.es-pequeno img { height: 26px; opacity: 0.85; }
-:root[data-tema="oscuro"] .form-logo img { filter: brightness(0) invert(1); opacity: 0.92; }
+.form-logo.es-pequeno .form-logo-color { height: 26px; opacity: 0.9; }
+@media (max-width: 420px) {
+  .form-logo.es-grande .form-logo-color { height: 78px; }
+}
 
 @keyframes form-logo-entra {
   from { opacity: 0; transform: translateY(-8px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-/* Un latido muy suave al abrir, solo en la primera pantalla */
-.form-logo.es-grande img { animation: form-logo-late 4s ease-in-out 1s infinite; }
-@keyframes form-logo-late {
-  0%, 92%, 100% { transform: scale(1); }
-  96% { transform: scale(1.04); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .form-logo, .form-logo.es-grande img { animation: none; }
+  /* Quien pide menos movimiento se queda con el logo quieto y de un solo color */
+  .form-logo, .form-logo-color { animation: none; }
+  .form-logo-color { background: #6d28d9; }
 }
 
 /* Botón secundario del formulario: para lo que no es la acción principal */
@@ -5006,3 +5035,43 @@ hr {
   font-size: 1rem;
 }
 .form-hora-sep { font-weight: 800; color: var(--text-muted); }
+
+/* ─── LINK DE EVENTO QUE NO ABRE ───────────────────────────────────────────────
+   Antes, un link que apuntaba a un evento que no estaba en la nube abría en silencio
+   lo último que hubiera en ese móvil: otra checklist, como si el link hubiera ido
+   bien. Quien lo recibía cargaba el camión con la lista equivocada. Esto lo dice. */
+.link-roto {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  gap: 14px;
+  text-align: center;
+  font-family: inherit;
+  color: var(--text-main);
+}
+.link-roto h1 { font-size: 1.3rem; margin: 0; }
+.link-roto p { margin: 0; color: var(--text-muted); line-height: 1.5; }
+.link-roto-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 10px;
+  word-break: break-all;
+}
+.link-roto button {
+  min-height: 44px;
+  border: 1px solid var(--border-color-strong);
+  background: var(--card-bg);
+  color: var(--text-main);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.link-roto-nota { font-size: 0.8rem; }

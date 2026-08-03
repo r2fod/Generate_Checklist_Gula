@@ -533,7 +533,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
-    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
@@ -640,7 +640,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  const bombonas   = numPaella + numFritura + (llevaPlanchaGas ? 1 : 0);
+  const nPlanchas  = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
+  const bombonas   = numPaella + numFritura + nPlanchas;
   // Paella y fuego: todo el equipo de fuego/paella junto (paella, difusores, trípode,
   // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
   const paellaItems = [];
@@ -653,7 +654,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
     if (!llevaPaella) paellaItems.push(["Difusor", String(numFritura)], ["Trípode", String(numFritura)]);
   }
-  if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
+  if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", String(nPlanchas)]);
   // Sin fuego no hay bombonas: sin esto la categoría "Paella y fuego" se quedaba en
   // pantalla con una sola línea a 0, que no dice nada a quien carga.
   if (bombonas > 0) paellaItems.push(["Bombonas llenas", String(bombonas)]);
@@ -816,7 +817,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
-    llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     tipoPaella, numPaellas = 0, tipoNevera, tipoCongelador, llevaTarta = true, origenSillas = "Dealde",
     llevaChillOut, numChillOut = 1,
@@ -887,9 +888,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)], ["Paravientos", "1"]);
     if (!llevaPaella) paellaItems.push(["Trípode", String(numFritura)]);
   }
-  if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", "1"]);
+  const nPlanchasCumple = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
+  if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", String(nPlanchasCumple)]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0) + numFritura + (llevaPlanchaGas ? 1 : 0);
+  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0) + numFritura + nPlanchasCumple;
   if (bombonasCumple > 0) paellaItems.push(["Bombonas llenas", String(bombonasCumple)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
@@ -1016,7 +1018,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
-    llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos,
+    llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos, numPlanchasGas = 1,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
     soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -1146,10 +1148,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   paellaItems.push(["Trípode", String(1 + numFritura)]);
   if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
   if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)]);
-  // En producción la plancha de gas va fija: se muestra aquí y suma 1 bombona
-  paellaItems.push(["Plancha de gas", "1"]);
-  // 1 bombona por paella + 1 por cada sartén de fritura + 1 de la plancha de gas
-  paellaItems.push(["Bombonas llenas", String(numPaellaProd + numFritura + 1)]);
+  // En producción la plancha de gas va fija, pero puede ir más de una: cada una lleva
+  // su bombona, así que el número manda sobre las dos líneas.
+  const nPlanchasProd = Math.max(1, numPlanchasGas);
+  paellaItems.push(["Plancha de gas", String(nPlanchasProd)]);
+  // 1 bombona por paella + 1 por cada sartén de fritura + 1 por cada plancha de gas
+  paellaItems.push(["Bombonas llenas", String(numPaellaProd + numFritura + nPlanchasProd)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   cats.push({ nombre: "Cocina y sala", items: [
@@ -1215,6 +1219,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
+    // Las metálicas de un rodaje: se dimensionan como las demás de pasar comida,
+    // por gente, y la cantidad se ajusta a mano si hace falta.
+    ["Bandejas metálicas", String(bandejasPasar)],
+    ["Bandejas metálicas brillantes", String(bandejasPasar)],
     opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
   ]});
 
@@ -1295,7 +1303,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -1313,6 +1321,7 @@ const ETIQUETAS_CAMPO = {
   itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas", ordenCategorias: "Orden de las categorías",
   itemsAlquilerManual: "Items marcados como alquiler proveedor",
   preparados: "Items marcados como preparados", checkeados: "Items marcados como cargados",
+  marcasRevisar: "Items con la cantidad cambiada tras marcarlos",
   vueltos: "Items marcados como vueltos", roturas: "Roturas contadas",
   notasCheck: "Recordatorios de notas hechos",
   valoresCalculados: "Foto de cantidades automáticas",
@@ -1984,7 +1993,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, meta = {} }) {
+function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, meta = {} }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
@@ -2355,6 +2364,15 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                                   title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
                               {enPreparacion ? <Truck size={11} /> : <ClipboardCheck size={11} />}
                               <span className="carga-marca-otra-texto">{enPreparacion ? "cargado" : "prep."}</span>
+                            </span>
+                          )}
+                          {/* La cantidad cambió DESPUÉS de marcarlo: la marca se respeta
+                              (es trabajo hecho) pero hay que volver a contarlo. */}
+                          {marcado && marcasRevisar[key] && (
+                            <span className="carga-marca-otra is-revisar"
+                                  title="La cantidad ha cambiado desde que lo marcaste: conviene volver a contarlo">
+                              <AlertTriangle size={11} />
+                              <span className="carga-marca-otra-texto">revisar</span>
                             </span>
                           )}
                           <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
@@ -2857,10 +2875,14 @@ function guardarSincronizados(nombres) {
 // link y sepa quitarle el "?solo=1" vuelve a poder editar. Para impedirlo de verdad
 // haría falta que la nube distinguiera quién escribe cada campo, y eso son otras
 // reglas y otro día.
+// Basta con "solo=1". ANTES exigía ADEMÁS que hubiera "evento=", y eso lo dejaba
+// muerto justo cuando no hay nube: sin ella el link no lleva "evento=" sino la
+// checklist dentro ("?c=..."), así que "Link para marcar" copiaba un link que se abría
+// editable como cualquier otro, sin avisar de nada. Pidiendo solo "solo=1" funciona con
+// las dos formas de link.
 function esSoloMarcar() {
   try {
-    const p = new URLSearchParams(window.location.search);
-    return !!p.get("solo") && !!p.get("evento");
+    return !!new URLSearchParams(window.location.search).get("solo");
   } catch (e) { return false; }
 }
 
@@ -3073,6 +3095,9 @@ export default function App({ onCerrarSesion } = {}) {
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
   // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
   const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
+  // Cada plancha lleva SU bombona: antes la plancha era un sí/no y sumaba una sola, así
+  // que poner una segunda a mano no subía el gas y se salía con una bombona de menos.
+  const [numPlanchasGas, setNumPlanchasGas] = useState(estadoInicial.numPlanchasGas ?? 1);
   // Platos y cubiertos se pueden poner en "No llevan" para servicio de solo bandejas /
   // finger food (cóctel de pie). Van por separado por si solo se quita uno de los dos.
   const [llevaPlatos, setLlevaPlatos]       = useState(estadoInicial.llevaPlatos ?? true);
@@ -3180,6 +3205,10 @@ export default function App({ onCerrarSesion } = {}) {
   // distintos, muchas veces de personas distintas: llevan su propio check para poder
   // controlar la preparación sin mezclarla con lo que ya está subido al camión.
   const [preparados, setPreparados] = useState(estadoInicial.preparados ?? {}); // { "categoria::label": true } — marcados como preparados en "Modo carga"
+  // Items marcados en Modo carga a los que se les cambió la cantidad DESPUÉS de
+  // marcarlos: la marca se conserva (es trabajo hecho) pero se señalan para volver a
+  // contarlos. Se limpia al volver a tocar su casilla, que es cuando se han revisado.
+  const [marcasRevisar, setMarcasRevisar] = useState(estadoInicial.marcasRevisar ?? {});
   const [checkeados, setCheckeados] = useState(estadoInicial.checkeados ?? {}); // { "categoria::label": true } — marcados como "Sale" (cargado) en "Modo carga"
   // Foto de las cantidades AUTOMÁTICAS (sin edición manual) tal como estaban la última vez
   // que se guardó el evento. Sirve para que "Recalcular" pueda detectar si alguna cantidad
@@ -3368,7 +3397,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
+    llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
@@ -3377,7 +3406,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, notasCheck, cronos,
+    itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
@@ -3439,7 +3468,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -3454,7 +3483,7 @@ export default function App({ onCerrarSesion } = {}) {
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
-    itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, notasCheck: setNotasCheck, cronos: setCronos,
+    itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, marcasRevisar: setMarcasRevisar, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
   };
@@ -3572,6 +3601,7 @@ export default function App({ onCerrarSesion } = {}) {
     // y se puede distinguir de otros al pegarlo en WhatsApp, aunque no le hayas
     // puesto nombre aún.
     const etiquetaLink = nombreEvento || `${EVENTOS[evento]?.label} ${pax} pax`;
+    const marca = paraMarcar ? "&solo=1" : "";
     if (nubeActiva()) {
       // Link corto con edición compartida: la checklist vive en la nube y los
       // cambios de cualquiera con el link se sincronizan
@@ -3579,11 +3609,22 @@ export default function App({ onCerrarSesion } = {}) {
       if (!eventoNubeId) setEventoNubeId(id);
       const estado = { ...getEstadoActual(), eventoNubeId: id };
       ultimoGuardadoNubeRef.current = JSON.stringify(estado);
-      guardarEventoNube(id, estado).catch(avisarFalloNube);
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${paraMarcar ? "&solo=1" : ""}`, etiquetaLink);
+      // Se ESPERA a que suba antes de dar el link por bueno. Antes se lanzaba y se
+      // copiaba el link a la vez: si la subida fallaba (sin cobertura, permisos), el
+      // link se copiaba igual y quien lo abría no encontraba el evento — un link muerto
+      // que no avisaba de nada ni aquí ni allí. Ahora, si falla, se dice.
+      guardarEventoNube(id, estado)
+        .then(() => copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`, etiquetaLink))
+        .catch((e) => {
+          avisarFalloNube(e);
+          // En el mismo sitio donde sale "¡Link copiado!", que es donde se está mirando
+          setCompartirMsg("No se pudo preparar el link (sin conexión) ✗");
+          setTimeout(() => setCompartirMsg(""), 5000);
+        });
     } else {
-      // Sin nube: el link lleva la checklist dentro (solo lectura/copia local)
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}`, etiquetaLink);
+      // Sin nube el link lleva la checklist dentro. Aquí el "solo marcar" también vale:
+      // no se sincroniza con nadie, pero evita que quien carga cambie lo que ve.
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}${marca}`, etiquetaLink);
     }
     setMenuCompartir(false);
   };
@@ -4184,7 +4225,7 @@ export default function App({ onCerrarSesion } = {}) {
       const base = eventosGuardados[nombre];
       const nom = (nuevo || "").trim();
       if (!base || !nom) return;
-      const copia = { ...base, nombreEvento: nom, eventoNubeId: null, preparados: {}, checkeados: {}, vueltos: {}, roturas: {}, cronos: {} };
+      const copia = { ...base, nombreEvento: nom, eventoNubeId: null, preparados: {}, checkeados: {}, vueltos: {}, roturas: {}, marcasRevisar: {}, cronos: {} };
       guardarEventos({ ...eventosGuardados, [nom]: copia });
       setGuardadoEventoMsg(`✓ Duplicado como "${nom}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3000);
@@ -4224,7 +4265,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = useMemo(() => ({
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -4237,7 +4278,7 @@ export default function App({ onCerrarSesion } = {}) {
   }), [
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
-    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, llevaPlatos,
+    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
@@ -4398,31 +4439,27 @@ export default function App({ onCerrarSesion } = {}) {
       else next[key] = valor;
       return next;
     });
-    // Si la cantidad cambia, los checks de "Modo carga" (Preparado/Sale/Vuelve, si
-    // estaban marcados) dejan de ser fiables — se desmarcan para que se revisen de
-    // nuevo. Las roturas no se tocan: son un hecho ya ocurrido, no dependen de la
-    // cantidad pedida.
-    setPreparados(prev => {
-      if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    setCheckeados(prev => {
-      if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
-    setVueltos(prev => {
-      if (!prev[key]) return prev;
-      const next = { ...prev };
-      delete next[key];
-      return next;
+    // Si la cantidad cambia, lo ya marcado en "Modo carga" deja de ser fiable: lo que
+    // preparaste eran 20 y ahora pone 30. ANTES esto DESMARCABA el item, y eso borraba
+    // trabajo hecho — alguien había ido al almacén, lo había contado y lo había
+    // marcado, y con cambiar una cifra desde otro sitio se perdía. La marca se queda y
+    // el item se señala para revisar: se ve de un vistazo cuál hay que volver a contar
+    // sin haber perdido nada por el camino.
+    // Las roturas no se tocan: son un hecho ya ocurrido, no dependen de la cantidad.
+    setMarcasRevisar(prev => {
+      if (!preparados[key] && !checkeados[key] && vueltos[key] === undefined) return prev;
+      return { ...prev, [key]: true };
     });
   };
-  const handleTogglePreparado = (key) => setPreparados(prev => ({ ...prev, [key]: !prev[key] }));
-  const handleToggleCheckCarga = (key) => setCheckeados(prev => ({ ...prev, [key]: !prev[key] }));
+  // Tocar la casilla es haberlo revisado: se le quita el aviso de "la cantidad cambió"
+  const revisado = (key) => setMarcasRevisar(prev => {
+    if (!prev[key]) return prev;
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
+  const handleTogglePreparado = (key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); };
+  const handleToggleCheckCarga = (key) => { revisado(key); setCheckeados(prev => ({ ...prev, [key]: !prev[key] })); };
   const handleToggleNotaCarga = (texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] }));
   // Cronómetro de carga/descarga: arrancar acumula desde ahora, pausar suma el tramo
   // corrido al acumulado, reiniciar lo pone a cero. Se guarda/sincroniza con el evento.
@@ -4510,6 +4547,18 @@ export default function App({ onCerrarSesion } = {}) {
           delete next[key];
           return next;
         });
+        // Lo marcado en Modo carga va ligado al nombre igual que la cantidad, y al
+        // renombrar se quedaba huérfano: el item seguía en la lista pero sin su check,
+        // así que lo preparado, lo cargado, lo vuelto y las roturas desaparecían sin
+        // avisar. Se migran a la clave nueva.
+        const migrar = (setter) => setter(prev => {
+          if (prev[key] === undefined) return prev;
+          const next = { ...prev };
+          next[newKey] = next[key];
+          delete next[key];
+          return next;
+        });
+        [setPreparados, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
         keyFinal = newKey;
       } else {
         setNombresManuales(prev => ({ ...prev, [key]: nuevoLabel }));
@@ -4781,6 +4830,7 @@ export default function App({ onCerrarSesion } = {}) {
         <ModalModoCarga
           checklist={checklist}
           preparados={preparados}
+          marcasRevisar={marcasRevisar}
           checkeados={checkeados}
           vueltos={vueltos}
           roturas={roturas}
@@ -5773,7 +5823,11 @@ export default function App({ onCerrarSesion } = {}) {
               </label>
             ))}
           </div>
-          {(entranteCompartido || llevaPaella || tieneFrituras || llevaChillOut) && (
+          {/* La plancha de gas entra en la condición: en un rodaje va siempre y sin
+              esto, un rodaje sin paella ni frituras no enseñaba la fila entera y no
+              había forma de decir cuántas planchas van (ni, con ellas, las bombonas). */}
+          {(entranteCompartido || llevaPaella || tieneFrituras || llevaChillOut
+            || llevaPlanchaGas || evento === "produccion") && (
             <div className="controls-row" style={{ marginTop: 12 }}>
               {entranteCompartido && (
                 <>
@@ -5818,6 +5872,15 @@ export default function App({ onCerrarSesion } = {}) {
                   <span className="form-label">Nº sartenes parisiene (frituras)</span>
                   <input type="number" className="form-input" value={numFrituras} min="1" onChange={e => setNumFrituras(Math.max(1, parseInt(e.target.value) || 1))} />
                   <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Ajusta bombonas, difusor, trípode y espumadera</span>
+                </div>
+              )}
+              {/* En producción la plancha va fija, así que el número se ofrece siempre;
+                  en el resto, solo si la llevan. Cada plancha lleva su bombona. */}
+              {(llevaPlanchaGas || evento === "produccion") && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº planchas de gas</span>
+                  <input type="number" className="form-input" value={numPlanchasGas} min="1" onChange={e => setNumPlanchasGas(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Cada plancha suma su bombona</span>
                 </div>
               )}
               {llevaChillOut && (

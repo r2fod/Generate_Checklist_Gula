@@ -79,7 +79,9 @@ const desbordamiento = (page) =>
 
 async function main() {
   const srv = await arrancarServidor();
+  servidorGlobal = srv;
   const navegador = await chromium.launch({ executablePath: CHROMIUM, args: ["--no-sandbox"] });
+  navegadorGlobal = navegador;
 
   // ── Responsive: ningún ancho ni tema puede desbordar en ninguna pantalla ────
   console.log("\n── Responsive: 9 anchos × 2 temas × 5 pantallas ──");
@@ -392,6 +394,27 @@ async function main() {
     await page.waitForTimeout(500);
     ok(JSON.stringify(antesFrituras) !== JSON.stringify(await listaItems(page)),
       "y el nº de sartenes parisiene también mueve la carga");
+
+    // Cada plancha de gas lleva SU bombona. Antes la plancha era un sí/no y sumaba una
+    // sola: poniendo una segunda a mano el gas no subía y se salía con una de menos.
+    await page.goto(url({ evento: "produccion", pax: 40, diasProduccion: ["40"], llevaPaella: false, tieneFrituras: false }),
+      { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1900);
+    const bombonas = async () => {
+      const f = (await listaItems(page)).find(i => i.startsWith("Bombonas llenas=")) || "";
+      return parseInt(f.split("=")[1], 10);
+    };
+    const planchas = async () => {
+      const f = (await listaItems(page)).find(i => i.startsWith("Plancha de gas=")) || "";
+      return parseInt(f.split("=")[1], 10);
+    };
+    const bombonasAntes = await bombonas();
+    ok(await planchas() === 1, `de partida va una plancha (${await planchas()})`);
+    await campo("Nº planchas de gas").fill("3");
+    await page.waitForTimeout(600);
+    ok(await planchas() === 3, `poner 3 planchas se ve en la carga (${await planchas()})`);
+    ok(await bombonas() === bombonasAntes + 2,
+      `y las bombonas suben solas con ellas (${bombonasAntes} → ${await bombonas()})`);
 
     // Los otros dos números que había sin red. El de barriles es el que destapó que en
     // el formulario el número no llegaba a la app: aquí se comprueba el lado de la app.
@@ -1693,13 +1716,36 @@ async function main() {
     ok(await p.locator(".carga-marca-otra.is-cargado").count() === 1,
       "y preparando se ve lo que ya está subido al camión");
 
-    // Cambiar la cantidad invalida las marcas: lo que se preparó ya no cuadra
+    // Cambiar la cantidad NO puede borrar lo ya marcado. Antes lo desmarcaba, y eso
+    // era perder trabajo hecho: alguien había ido al almacén, lo había contado y lo
+    // había marcado, y con cambiar una cifra desde otro sitio se perdía sin avisar.
+    // Ahora la marca se queda y el item se señala para volver a contarlo.
     await p.locator(".preview-close-btn").first().click();
     await p.waitForTimeout(700);
+    const antesDeTocar = await guardado("preparados");
     await p.locator(".item-row", { hasText: nombrePrimero }).first().locator(".item-qty-input").fill("999");
     await p.waitForTimeout(1200);
-    ok(await guardado("preparados") === 1,
-      `cambiar la cantidad desmarca su preparación, que ya no cuadra (quedan ${await guardado("preparados")})`);
+    ok(await guardado("preparados") === antesDeTocar,
+      `cambiar la cantidad NO borra lo preparado (siguen ${await guardado("preparados")} de ${antesDeTocar})`);
+    ok(await guardado("marcasRevisar") === 1,
+      "pero el item queda señalado para volver a contarlo");
+
+    // Y el aviso se ve en Modo carga, junto a la marca que sigue puesta
+    await p.locator("button", { hasText: /Modo carga/i }).first().click();
+    await p.waitForTimeout(900);
+    const fila = p.locator(".carga-row", { hasText: nombrePrimero }).first();
+    ok(await fila.locator(".carga-marca-otra.is-revisar").count() === 1,
+      "y en Modo carga sale el aviso de \"revisar\" en esa fila");
+    ok(await fila.locator('input[type="checkbox"]').isChecked(),
+      "con su casilla todavía marcada: lo hecho no se ha perdido");
+
+    // Volver a tocarla es haberla revisado: el aviso desaparece
+    await fila.locator('input[type="checkbox"]').click();
+    await p.waitForTimeout(400);
+    await fila.locator('input[type="checkbox"]').click();
+    await p.waitForTimeout(900);
+    ok(await fila.locator(".carga-marca-otra.is-revisar").count() === 0,
+      "y al volver a marcarla el aviso se va, que ya está revisada");
     await c.close();
   }
 
@@ -1716,4 +1762,16 @@ async function main() {
   console.log("  Todo correcto.");
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+// Se recuerdan aquí para poder cerrarlos aunque la prueba reviente a mitad: si no, el
+// servidor se quedaba vivo con el puerto cogido y la siguiente ejecución no arrancaba.
+let servidorGlobal = null, navegadorGlobal = null;
+async function limpiar() {
+  try { if (navegadorGlobal) await navegadorGlobal.close(); } catch (e) { /* ya estaba cerrado */ }
+  try { if (servidorGlobal) servidorGlobal.kill(); } catch (e) { /* ya estaba muerto */ }
+}
+process.on("SIGINT", async () => { await limpiar(); process.exit(130); });
+process.on("SIGTERM", async () => { await limpiar(); process.exit(143); });
+
+main()
+  .catch(async (e) => { console.error(e); await limpiar(); process.exit(1); })
+  .finally(limpiar);
