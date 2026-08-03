@@ -30,7 +30,7 @@ const CACHE = `${VERSION}`;
 // vite.config.js): el service worker se registra cuando la página ya ha cargado, así que
 // esas peticiones ya han pasado sin él y no se guardarían solas.
 const ESENCIALES = [
-  "./", "./index.html", "./favicon.svg",
+  "./", "./index.html", "./manifest.webmanifest", "./favicon.svg",
   "./icono-192.png", "./icono-512.png", "./icono-maskable-512.png",
   // Cada app con su documento y su manifiesto: si solo se guardara uno, sin cobertura
   // se abriría la app equivocada, que es justo lo que no queremos.

@@ -1,4 +1,12 @@
 :root {
+  /* El degradado del logo, que corre por debajo del dibujo (que hace de máscara).
+     Es una gama de VERDES —teal, verde, lima— porque Gula es verde: antes iba de
+     morado a rosa y a naranja, y el verde era uno de cinco colores. Se mueven entre
+     ellos para que la animación se siga notando sin salirse de la marca. Los tonos
+     son medios a propósito: tienen que leerse igual sobre blanco y sobre oscuro.
+     Vive aquí porque lo usan el logo de la cabecera y el del formulario, y tenían
+     que ir a la vez. */
+  --gula-degradado: linear-gradient(100deg, #0d9488, #16a34a, #65a30d, #22c55e, #14b8a6, #0d9488);
   --primary-navy: #1f314d;
   --primary-navy-hover: #16233a;
   --accent: #4f46e5;
@@ -388,7 +396,7 @@ body {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  background: linear-gradient(100deg, #6d28d9, #db2777, #f97316, #16a34a, #0ea5e9, #6d28d9);
+  background: var(--gula-degradado);
   background-size: 320% 100%;
   animation: form-logo-colores 11s linear infinite;
 }
@@ -1239,6 +1247,10 @@ body {
 
 .segmented-control {
   display: flex;
+  /* Si los botones no caben en una fila, salta el botón entero a la siguiente. Es la
+     otra mitad del "nowrap" de arriba: sin esto la única salida sería partir la
+     palabra (feo) o salirse de la pantalla (peor). */
+  flex-wrap: wrap;
   background: var(--bg-color);
   border: 1px solid var(--border-color);
   border-radius: 999px;
@@ -1256,6 +1268,11 @@ body {
   cursor: pointer;
   color: var(--text-muted);
   transition: var(--transition-smooth);
+  /* Sin esto "No lleva" se parte en dos líneas y esa pastilla queda del doble de alto
+     que sus compañeras ("30L", "50L"): el control entero se ve descuadrado. Si no
+     caben en una fila salta el botón ENTERO a la siguiente (ver flex-wrap del
+     contenedor), que es mucho mejor que romper la palabra por la mitad. */
+  white-space: nowrap;
 }
 
 .segment-btn:hover {
@@ -1567,9 +1584,12 @@ body {
   .segmented-control {
     max-width: 100%;
   }
+  /* Reparten el ancho, pero nunca por debajo de su propio texto: con "min-width: 0"
+     y el texto sin partir, lo que se salía era la página. Así, cuando de verdad no
+     caben, el contenedor los baja a otra fila (flex-wrap) en vez de desbordar. */
   .segmented-control .segment-btn {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 1 1 auto;
+    min-width: min-content;
     text-align: center;
   }
 }
@@ -4972,7 +4992,7 @@ hr {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  background: linear-gradient(100deg, #6d28d9, #db2777, #f97316, #16a34a, #0ea5e9, #6d28d9);
+  background: var(--gula-degradado);
   background-size: 320% 100%;
   animation: form-logo-colores 11s linear infinite;
 }
@@ -4996,9 +5016,11 @@ hr {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  /* Quien pide menos movimiento se queda con el logo quieto y de un solo color */
-  .form-logo, .form-logo-color { animation: none; }
-  .form-logo-color { background: #6d28d9; }
+  /* Quien pide menos movimiento se queda con el logo quieto y de un solo color: el
+     verde de la marca, no el morado de antes. Vale para los dos logos, que ahora el
+     de la cabecera también se mueve. */
+  .form-logo, .form-logo-color, .app-logo { animation: none; }
+  .form-logo-color, .app-logo { background: #16a34a; }
 }
 
 /* Botón secundario del formulario: para lo que no es la acción principal */

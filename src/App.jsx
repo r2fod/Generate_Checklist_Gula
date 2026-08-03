@@ -5899,7 +5899,7 @@ export default function App({ onCerrarSesion } = {}) {
               [llevaPaella,          setLlevaPaella,          "Lleva paella",             "calcula paelleros completos"],
               /* El armario caliente es alquiler: vive en el bloque ALQUILERES, junto a
                  las sillas, porque además de cargarlo hay que ir a por él y devolverlo. */
-              [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} sartén parisiene (ajusta abajo)` : "sartén parisiene"],
+              [tieneFrituras,        setTieneFrituras,        "Hay frituras",             tieneFrituras ? `${numFrituras} ${numFrituras === 1 ? "sartén" : "sartenes"} parisiene (ajusta abajo)` : "sartén parisiene"],
               ...(evento !== "produccion"
                 ? [[llevaPlanchaGas, setLlevaPlanchaGas, "Plancha de gas", "suma 1 bombona"]]
                 : []),

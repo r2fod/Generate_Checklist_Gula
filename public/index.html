@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
+    <!--
+      Este manifiesto existe SOLO por las checklists ya instaladas. Se instalaron
+      cuando la app vivía aquí, así que su icono apunta a esta dirección y guardan el
+      manifiesto que había en ella. Al mudarse a /checklist/ esa dirección quedó en
+      404: sin nada que leer, la app instalada se queda para siempre con el ámbito
+      viejo (la raíz entera) y sigue tragándose /formulario/ — que es justo lo que
+      impide instalar el formulario aparte.
+
+      Lleva el MISMO "id" que tenía (que es lo que identifica a una app instalada) y
+      apunta ya a la carpeta nueva, así que quien la tenga instalada se muda solo. Si
+      el navegador no llega a actualizarlo, basta con reinstalar la checklist una vez.
+    -->
+    <link rel="manifest" href="./manifest.webmanifest" />
     <title>Gula</title>
     <style>
       html { background: #f6f7fb; }

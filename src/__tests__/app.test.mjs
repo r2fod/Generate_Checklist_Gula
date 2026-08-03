@@ -216,6 +216,46 @@ async function main() {
       "el Word incluye Recogidas y Compras");
   } else ok(false, "el Word se descarga");
 
+  // ── Ningún botón puede partir su palabra ────────────────────────────────────
+  // El control del barril de cerveza rompía "No lleva" en dos líneas, y esa pastilla
+  // quedaba del doble de alto que "30L" y "50L": el control entero se veía torcido.
+  // Le pasaba solo a ese porque los de Equipamiento ya llevaban nowrap y este no.
+  console.log("\n── Los botones de opciones ──");
+  {
+    const CONFIG = { evento: "boda", pax: 45, nombreEvento: "Boda Fiorella", barraCoctel: true, horasCoctel: 1.5, barraCopas: true, horasCopas: 5, tieneFrituras: true, numFrituras: 2 };
+    for (const ancho of [320, 390, 768, 1440]) {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 1000 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url(CONFIG), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      const m = await p.evaluate(() => {
+        // Un Range sobre el texto devuelve un rectángulo por cada línea que ocupa:
+        // más de uno significa que la palabra se ha partido. Medir el alto no vale,
+        // que el relleno lo enmascara.
+        const lineas = (el) => { const rg = document.createRange(); rg.selectNodeContents(el); return rg.getClientRects().length; };
+        const btns = [...document.querySelectorAll(".segment-btn")];
+        const barril = [...document.querySelectorAll(".segmented-control")]
+          .find(sc => /No lleva/.test(sc.textContent) && /30L/.test(sc.textContent));
+        return {
+          total: btns.length,
+          partidos: [...new Set(btns.filter(b => lineas(b) > 1).map(b => b.textContent.trim()))],
+          seSalen: [...new Set(btns.filter(b => b.getBoundingClientRect().right > document.documentElement.clientWidth + 1)
+            .map(b => b.textContent.trim()))],
+          altosBarril: barril ? [...barril.querySelectorAll(".segment-btn")].map(b => Math.round(b.getBoundingClientRect().height)) : [],
+          desborda: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+      ok(m.partidos.length === 0,
+        `a ${ancho}px ninguno de los ${m.total} botones parte su palabra${m.partidos.length ? ` → ${JSON.stringify(m.partidos)}` : ""}`);
+      ok(m.seSalen.length === 0 && m.desborda === 0,
+        `y ninguno se sale de la pantalla${m.seSalen.length ? ` → ${JSON.stringify(m.seSalen)}` : ""}`);
+      ok(m.altosBarril.length === 3 && new Set(m.altosBarril).size === 1,
+        `el barril tiene sus tres opciones a la misma altura (${m.altosBarril.join("/")})`);
+      await c.close();
+    }
+  }
+
   // ── El agua de un rodaje va por temporada ───────────────────────────────────
   // Iban 3,5 botellas de 33cl por persona y día, fijas: poco más de un litro por
   // cabeza en una jornada de doce horas al sol. Ahora 6,5 en verano y 4,5 en invierno,
@@ -1342,6 +1382,23 @@ async function main() {
     // es el "id", y se deja clavado al que tenía cuando vivía en la raíz.
     ok(mChecklist.id === "/index.html",
       `la checklist conserva su identidad de siempre, así nadie tiene que reinstalarla (${mChecklist.id})`);
+
+    // Las checklists instaladas ANTES de la mudanza guardan el manifiesto que había en
+    // la raíz, y su icono sigue apuntando ahí. Si esa dirección se queda en 404 no
+    // tienen de dónde enterarse del cambio: conservan el ámbito viejo (la raíz entera),
+    // que se traga /formulario/, y el formulario no hay forma de instalarlo aparte.
+    // Por eso en la raíz tiene que seguir habiendo un manifiesto, con el MISMO id y ya
+    // apuntando a la carpeta nueva.
+    const viejo = await (await fetch(RAIZ + "manifest.webmanifest")).json().catch(() => null);
+    ok(!!viejo, "la dirección vieja del manifiesto sigue respondiendo, no es un 404");
+    if (viejo) {
+      const abs = RAIZ + "manifest.webmanifest";
+      ok(new URL(viejo.id, abs).pathname === "/index.html",
+        `y lleva el id de siempre, que es lo que identifica a la app ya instalada (${new URL(viejo.id, abs).pathname})`);
+      ok(new URL(viejo.scope, abs).pathname === "/checklist/"
+        && new URL(viejo.start_url, abs).pathname === "/checklist/index.html",
+        "apuntando ya a la carpeta nueva, para que la instalada se mude sola");
+    }
     ok(mChecklist.nombre === "Checklist Gula" && mForm.nombre === "Formulario Gula",
       `y cada una se instala con su nombre ("${mChecklist.nombre}" / "${mForm.nombre}")`);
     // Los iconos tienen que existir de verdad: una app instalada con el icono roto es
