@@ -15,7 +15,13 @@
 //   · /assets/... → primero la caché. Llevan hash en el nombre, así que el contenido de
 //     un fichero concreto NUNCA cambia: si está guardado, es válido para siempre.
 //   · todo lo demás (Firebase, Google...) → se deja pasar sin tocarlo.
-const VERSION = "gula-v1";
+//
+// Este fichero vive en la RAÍZ y cubre las DOS apps: la checklist (/) y el formulario
+// (/formulario/). Para el navegador son dos apps distintas —cada una con su manifiesto
+// y su ámbito, por eso se instalan por separado— pero comparten dominio y assets, así
+// que con una sola caché basta. Lo único que cambia entre ellas es a qué documento se
+// vuelve cuando no hay red, y eso se decide mirando la dirección (ver suIndice).
+const VERSION = "gula-v2";
 const CACHE = `${VERSION}`;
 
 // Lo que hay que guardar sí o sí para poder abrir sin cobertura. Los .js y .css llevan
@@ -25,7 +31,16 @@ const CACHE = `${VERSION}`;
 const ESENCIALES = [
   "./", "./index.html", "./manifest.webmanifest", "./favicon.svg",
   "./icono-192.png", "./icono-512.png", "./icono-maskable-512.png",
+  // El formulario es otra app, con su documento y su manifiesto: sin esto abriría
+  // la checklist cuando no hay cobertura, que es justo lo que no queremos.
+  "./formulario/", "./formulario/index.html", "./formulario/manifest.webmanifest",
 ];
+
+// De qué app es esta dirección. Se usa para no cruzar las dos sin cobertura: el
+// respaldo del formulario es el documento del formulario, no el de la checklist.
+function suIndice(url) {
+  return url.pathname.includes("/formulario/") ? "./formulario/index.html" : "./index.html";
+}
 
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
@@ -77,7 +92,7 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       fetch(request)
         .then((res) => guardar(request, res))
-        .catch(async () => (await caches.match(request)) || (await caches.match("./index.html")) || Response.error()),
+        .catch(async () => (await caches.match(request)) || (await caches.match(suIndice(url))) || Response.error()),
     );
     return;
   }

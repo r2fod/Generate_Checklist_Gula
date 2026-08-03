@@ -23,6 +23,34 @@ function aplicarTemaInicial() {
 }
 aplicarTemaInicial()
 
+// El formulario de oficina se mudó a su propia carpeta (./formulario/) para que se
+// instale como una app aparte de la checklist: cuando compartían dirección compartían
+// también el ámbito del manifiesto, y el navegador los trataba como la MISMA app —quien
+// tenía la checklist instalada, al abrir el formulario se lo encontraba dentro de ella.
+//
+// Aquí ya no se pinta el formulario: solo queda el desvío, para que los enlaces ya
+// repartidos por WhatsApp (?enviar=<código>) sigan funcionando, y para que quien lo
+// instaló ANTES de la mudanza (su icono abre ?formulario=1) acabe en su formulario y
+// no en el login del equipo. Se hace ANTES de montar nada: así no se ve un fogonazo de
+// la app que no es.
+function codigoGuardado() {
+  try { return localStorage.getItem("gula_formulario_codigo") || "" } catch (e) { return "" }
+}
+
+function desviarAlFormulario() {
+  const p = new URLSearchParams(window.location.search)
+  const conEnlace = p.get("enviar") || ""
+  const iconoViejo = !!p.get("formulario")
+  if (!conEnlace && !iconoViejo) return false
+  const codigo = conEnlace || codigoGuardado()
+  const destino = new URL("./formulario/", window.location.href)
+  if (codigo) destino.searchParams.set("enviar", codigo)
+  window.location.replace(destino.href)
+  return true
+}
+
+const desviado = desviarAlFormulario()
+
 // Cuando el link trae un evento y ese evento NO se puede traer, antes se seguía en
 // silencio con lo que hubiera guardado en ese móvil: se abría OTRA checklist (o una
 // vacía) como si el link hubiera funcionado. Quien lo recibía se ponía a cargar el
@@ -71,12 +99,12 @@ async function arrancar() {
   )
 }
 
-arrancar()
+if (!desviado) arrancar()
 
 // El service worker hace que la app abra sin cobertura (ver public/sw.js). Se registra
 // DESPUÉS de pintar para no retrasar el arranque, y si el navegador no lo soporta o
 // falla, la app funciona igual que siempre — solo pierde el modo sin conexión.
-if ("serviceWorker" in navigator) {
+if (!desviado && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(new URL("sw.js", window.location.href), { scope: "./" })

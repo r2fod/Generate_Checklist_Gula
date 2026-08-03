@@ -168,18 +168,12 @@ export default function Formulario({ codigo }) {
     });
   }, [codigo]);
 
-  // Mientras se está en el formulario, el manifiesto que se ofrece a instalar es el
-  // SUYO: la app instalada se llama "Formulario Gula" y arranca en el formulario,
-  // no en la checklist del equipo. Sin esto se instalaría la app de logística con
-  // su nombre, que es lo que menos espera quien está rellenando esto.
-  useEffect(() => {
-    const link = document.querySelector('link[rel="manifest"]');
-    if (!link) return;
-    const antes = link.getAttribute("href");
-    link.setAttribute("href", "./formulario.webmanifest");
-    document.title = "Formulario Gula";
-    return () => { if (antes) link.setAttribute("href", antes); };
-  }, []);
+  // Antes aquí se cambiaba el manifiesto en caliente, porque el formulario compartía
+  // dirección con la checklist. No servía de nada: los dos manifiestos tenían el mismo
+  // ámbito, y para el navegador dos manifiestos con el mismo ámbito son la MISMA app —
+  // por eso el formulario se abría dentro de la checklist ya instalada. Ahora el
+  // formulario vive en su propia carpeta, con su manifiesto en ella (ver
+  // formulario/index.html), y se instala solo.
 
   // Se guarda según escriben: si cierran el navegador a media pregunta, vuelven donde
   // lo dejaron. Es un formulario que se rellena de pie y con prisa.

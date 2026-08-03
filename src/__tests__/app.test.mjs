@@ -14,6 +14,10 @@ import { existsSync } from "fs";
 const CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const PUERTO = 4178;
 const BASE = `http://localhost:${PUERTO}/index.html`;
+// El formulario es otra app, en su propia carpeta: por eso se instala aparte de la
+// checklist en vez de abrirse dentro de ella (ver formulario/index.html).
+const RAIZ = `http://localhost:${PUERTO}/`;
+const BASE_FORM = `http://localhost:${PUERTO}/formulario/index.html`;
 // Las llamadas a la nube se cortan: la prueba va sobre lo que la app hace en local,
 // que es lo que tiene que aguantar aunque no haya conexión. La sincronización tiene
 // su propia prueba (sincronizacion.test.mjs).
@@ -436,6 +440,46 @@ async function main() {
     }
   }
 
+  // ── Cantidades que iban fijas y no debían ───────────────────────────────────
+  // Números que estaban puestos a ojo y salían mal en la punta pequeña: en un rodaje
+  // de 40 personas se cargaban 4 champaneras (el doble de las que se usan) y, en
+  // cambio, solo 2 bandejas metálicas (la mitad de las que se acaban usando).
+  console.log("\n── Cantidades que iban fijas ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1400, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const cantidad = async (nombre) => {
+      const f = (await listaItems(p)).find(i => i.startsWith(nombre + "=")) || "";
+      return f ? parseInt(f.split("=")[1], 10) : null;
+    };
+    const abrir = async (estado) => {
+      await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+    };
+
+    await abrir({ evento: "produccion", pax: 40, diasProduccion: ["40"] });
+    ok(await cantidad("Champanera metálica grande") === 2,
+      `40 personas → 2 champaneras, no 4 (${await cantidad("Champanera metálica grande")})`);
+    ok(await cantidad("Bandejas metálicas") === 10 && await cantidad("Bandejas metálicas brillantes") === 8,
+      `las bandejas metálicas van las del almacén (${await cantidad("Bandejas metálicas")} y ${await cantidad("Bandejas metálicas brillantes")})`);
+    // Y ya que se mira un rodaje: las dos líneas que sobraban tienen que haberse ido
+    const items = await listaItems(p);
+    ok(!items.some(i => /^Mesa larga=/.test(i)),
+      "la mesa larga ya no está: las largas son las de 1,8m");
+    ok(!items.some(i => /^Butano=/.test(i)) && items.some(i => /^Bombonas llenas=/.test(i)),
+      "y el butano tampoco, que era la misma bombona contada dos veces");
+
+    // Y en los eventos grandes, más: antes iban 4 aunque fueran 200 personas, así que
+    // esto no es solo quitar. Los números son los que ha dado quien carga el camión.
+    for (const [gente, cuantas] of [[100, 3], [150, 4], [200, 5]]) {
+      await abrir({ evento: "boda", pax: gente, ninos: 0 });
+      ok(await cantidad("Champanera metálica grande") === cuantas,
+        `una boda de ${gente} lleva ${cuantas} (${await cantidad("Champanera metálica grande")})`);
+    }
+    await c.close();
+  }
+
   // ── Los nombres de los items tienen que ser estables y limpios ──────────────
   // La identidad de cada item ES su nombre: los checks de Modo carga, las cantidades
   // editadas a mano y los nombres corregidos se guardan como "categoría::nombre". Si el
@@ -804,7 +848,7 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2400);
 
     ok(await p.locator(".app-header").count() === 0 && await p.locator(".item-row").count() === 0
@@ -903,7 +947,7 @@ async function main() {
       return false;
     };
     await p.evaluate(() => localStorage.clear());
-    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2400);
     await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
     await p.waitForTimeout(400);
@@ -937,7 +981,7 @@ async function main() {
 
     // El borrador sobrevive a cerrar el navegador a media pregunta
     await p.evaluate(() => localStorage.clear());
-    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2400);
     await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
     await p.waitForTimeout(400);
@@ -964,6 +1008,70 @@ async function main() {
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
       "y si cierran y vuelven, siguen donde lo dejaron");
+    await c.close();
+  }
+
+  // ── Dos apps separadas ──────────────────────────────────────────────────────
+  // La checklist y el formulario tienen que poder instalarse por separado. Antes
+  // compartían dirección y, con ella, el ámbito del manifiesto: para el navegador dos
+  // manifiestos con el mismo ámbito son la MISMA app, así que quien tenía la checklist
+  // instalada, al abrir el formulario se lo encontraba dentro de ella. Aquí se comprueba
+  // justo eso —que ya no comparten ámbito— y que los enlaces ya repartidos con la
+  // dirección vieja siguen llevando al formulario.
+  console.log("\n── Dos apps separadas ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+
+    const manifiestoDe = async (dir) => {
+      await p.goto(dir, { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(300);
+      const href = await p.locator('link[rel="manifest"]').getAttribute("href");
+      const abs = new URL(href, p.url()).href;
+      const m = await (await fetch(abs)).json();
+      return { abs, ambito: new URL(m.scope, abs).pathname, arranque: new URL(m.start_url, abs).pathname, nombre: m.name };
+    };
+
+    const mChecklist = await manifiestoDe(BASE);
+    const mForm = await manifiestoDe(BASE_FORM);
+    ok(mChecklist.ambito !== mForm.ambito,
+      `cada app tiene su propio ámbito (checklist ${mChecklist.ambito} · formulario ${mForm.ambito})`);
+    ok(mForm.ambito === "/formulario/" && mForm.arranque === "/formulario/index.html",
+      `el formulario arranca y vive en su carpeta (${mForm.arranque})`);
+    ok(mChecklist.nombre === "Checklist Gula" && mForm.nombre === "Formulario Gula",
+      `y cada una se instala con su nombre ("${mChecklist.nombre}" / "${mForm.nombre}")`);
+    // Los iconos tienen que existir de verdad: una app instalada con el icono roto es
+    // lo primero que se ve y no hay forma de arreglarlo desde el móvil
+    const iconosOk = await p.evaluate(async (dir) => {
+      const m = await (await fetch(dir)).json();
+      const rs = await Promise.all(m.icons.map(i => fetch(new URL(i.src, dir).href)));
+      return rs.every(r => r.ok);
+    }, mForm.abs);
+    ok(iconosOk, "y sus iconos se descargan (no quedan rotos al instalarla)");
+
+    // La checklist ya no monta el formulario: quien llegue con el enlace se desvía
+    await p.goto(BASE + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1800);
+    ok(p.url().includes("/formulario/") && p.url().includes("enviar=PRUEBA1"),
+      `un enlace viejo (?enviar=) acaba en el formulario → ${p.url().replace(RAIZ, "…/")}`);
+    ok(await p.locator(".form-titulo").count() > 0,
+      "y llega funcionando, no a una pantalla en blanco");
+
+    // Quien instaló el formulario ANTES de la mudanza tiene un icono que abre
+    // "?formulario=1". Ese icono no puede acabar en el login del equipo.
+    await p.evaluate(() => localStorage.setItem("gula_formulario_codigo", "PRUEBA1"));
+    await p.goto(BASE + "?formulario=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1800);
+    ok(p.url().includes("/formulario/") && await p.locator(".login-tarjeta").count() === 0,
+      "el icono viejo del formulario tampoco cae en el login del equipo");
+
+    // Y al revés: desde la carpeta del formulario no se llega a la checklist
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1500);
+    ok(await p.locator(".app-header").count() === 0 && await p.locator(".item-row").count() === 0
+      && await p.locator(".config-card").count() === 0,
+      "y en la carpeta del formulario no hay checklist por ningún lado");
     await c.close();
   }
 
@@ -1249,10 +1357,15 @@ async function main() {
     await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
     await p.waitForTimeout(3000);
     const dir = "/tmp/gula-publicado/publicado";
-    const jsViejo = fs3.readdirSync(`${dir}/assets`).find(f => /^index-.*\.js$/.test(f));
+    // El nombre del bundle se saca del propio index.html, no de un patrón a mano: al
+    // separar el formulario en su carpeta la entrada pasó a llamarse "checklist-…" y
+    // una prueba que buscaba "index-…" se quedó sin encontrar nada.
+    const entrada = (fs3.readFileSync(`${dir}/index.html`, "utf8")
+      .match(/src="[^"]*assets\/([^"]+\.js)"/) || [])[1];
+    const jsViejo = entrada;
     ok(!!jsViejo && await p.locator(".item-row").count() > 20, `la app queda instalada (bundle ${jsViejo})`);
     // Se "despliega" una versión nueva con un cambio visible
-    const nuevo = "index-VERSIONNUEVA.js";
+    const nuevo = "checklist-VERSIONNUEVA.js";
     fs3.writeFileSync(`${dir}/assets/${nuevo}`,
       fs3.readFileSync(`${dir}/assets/${jsViejo}`, "utf8").replaceAll("Cubo basura reciclaje", "CAMBIO VERSION NUEVA"));
     fs3.rmSync(`${dir}/assets/${jsViejo}`);
@@ -1264,10 +1377,10 @@ async function main() {
     await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
     await p.waitForTimeout(3000);
     const conRed = await p.evaluate(() => ({
-      bundles: performance.getEntriesByType("resource").map(e => e.name.split("/").pop()).filter(n => /^index-.*\.js$/.test(n)),
+      bundles: performance.getEntriesByType("resource").map(e => e.name.split("/").pop()).filter(n => /^checklist-.*\.js$/.test(n)),
       cambio: [...document.querySelectorAll(".item-name")].some(n => /CAMBIO VERSION NUEVA/.test(n.textContent)),
     }));
-    ok(conRed.cambio && conRed.bundles.includes("index-VERSIONNUEVA.js"),
+    ok(conRed.cambio && conRed.bundles.includes("checklist-VERSIONNUEVA.js"),
       `al reabrirla con cobertura carga la versión nueva (${conRed.bundles.join(", ")})`);
     // Y a partir de ahí, sin cobertura abre con la NUEVA
     await c.setOffline(true);

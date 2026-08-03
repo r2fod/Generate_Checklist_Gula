@@ -427,6 +427,14 @@ function calcCristaleria(pax, horasCoctel, horasCopas, dobleCopa, tieneBrindisCa
   };
 }
 
+// Champaneras: iban fijas a 4 en todos los eventos, y en un día de 40 personas eso son
+// dos de más ocupando sitio en el camión — mientras que en una boda de 200 se quedaban
+// cortas. Van por gente: 2 de mínimo y una más por cada 50 personas.
+//   40 → 2 · 100 → 3 · 150 → 4 · 200 → 5
+function champaneras(pax) {
+  return Math.max(2, Math.ceil(pax / 50) + 1);
+}
+
 function calcMesasServicio(pax) {
   if (pax <= 50) return { total: 7 };
   if (pax <= 100) return { total: 11 };
@@ -692,7 +700,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(llevaJarrasCristal, ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]),
     // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
-    ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
+    ["Champanera metálica grande", String(champaneras(pax))], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     ["Sacacorchos", "2"], ["Abridores de cerveza", "2"], ["Palangana cerveza/agua", String(Math.max(2, Math.ceil(pax / 25)))],
   ]});
 
@@ -952,7 +960,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
     // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
-    ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"], ["Abridores de cerveza", "2"],
+    ["Champanera metálica grande", String(champaneras(pax))], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"], ["Abridores de cerveza", "2"],
     ["Pinzas largas", "2"], ["Copas metálicas", "—"], ["Conchas", "—"],
   ]});
 
@@ -1111,7 +1119,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mobiliario", items: [
     ["Mesas de 1,8m", String(mesasServicio + MESAS_BUFFET + MESA_CAMION)],
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
-    ["Mesa redonda", "—"], ["Mesa larga", "—"],
+    // Mesa larga fuera: las largas del rodaje son las de 1,8m de arriba, así que era
+    // una línea repetida que solo hacía dudar de si había que cargar algo más.
+    ["Mesa redonda", "—"],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA), esAlquilerSillas]),
     // En un rodaje se separa mucho más residuo que en un banquete: van 3 de reciclaje
     ["Cubo basura reciclaje", "3"], ["Cubo basura cocina", "1"],
@@ -1166,7 +1176,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(tipoHorno === "grande" || tipoHorno === "ambos", ["Horno grande", "1"]),
     ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
-    ["Vitro", "1"], ["Butano", "1"], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
+    // "Butano" fuera: era la misma bombona que ya sale contada en "Paella y fuego"
+    // (una por paella, una por sartén de fritura y una por plancha de gas), así que
+    // aparecía dos veces con dos nombres distintos.
+    ["Vitro", "1"], ["Termos con tapa", String(Math.max(2, Math.ceil(pax / 25)))],
     ["Exprimidor", "1"], ["Sandwichera", "1"], ["Neveras playa grandes (llenar de hielo)", "2"],
     ["Neveras playa pequeñas", "2"], ["Chafers", String(numChafers)],
     opt(llevaArmarioCaliente, ["Armario caliente (alquiler Dealde)", "1", true]),
@@ -1216,13 +1229,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
       ["Cucharas postre", String(cubiertosProdu)],
     ] : []),
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))], ["Abridores de cerveza", "2"],
-    ["Champanera metálica grande", "4"], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
+    ["Champanera metálica grande", String(champaneras(pax))], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"],
     opt(bandejasMadera > 0, ["Bandejas de madera", String(bandejasMadera)]),
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
-    // Las metálicas de un rodaje: se dimensionan como las demás de pasar comida,
-    // por gente, y la cantidad se ajusta a mano si hace falta.
-    ["Bandejas metálicas", String(bandejasPasar)],
-    ["Bandejas metálicas brillantes", String(bandejasPasar)],
+    // Las metálicas van fijas, no por gente: son las que hay en el almacén y se cargan
+    // todas. En un rodaje se usan para todo, y por gente salían 2 en un día de 40
+    // personas, que es la mitad de las que de verdad se acaban usando.
+    ["Bandejas metálicas", "10"],
+    ["Bandejas metálicas brillantes", "8"],
     opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
   ]});
 
@@ -4020,8 +4034,12 @@ export default function App({ onCerrarSesion } = {}) {
   // Pendiente = lo que aún no se ha revisado. El aviso y el contador cuentan eso, no
   // el buzón entero: lo ya revisado se guarda para consultarlo, no para dar la lata.
   const enviosPendientes = repartirEnvios(envios).pendientes;
+  // El enlace que se le pasa a la oficina apunta a la carpeta del formulario, que es
+  // una app aparte (se instala sola, sin arrastrar la checklist). Los enlaces viejos
+  // —los que apuntan a esta misma dirección con ?enviar=— siguen valiendo: la raíz los
+  // desvía aquí (ver src/main.jsx).
   const enlaceFormulario = codigoFormulario
-    ? `${window.location.origin}${window.location.pathname}?enviar=${codigoFormulario}`
+    ? `${window.location.origin}${window.location.pathname.replace(/[^/]*$/, "")}formulario/?enviar=${codigoFormulario}`
     : "";
   const refrescarEnvios = async (codigo = codigoFormulario) => {
     if (!codigo || !nubeActiva()) return;

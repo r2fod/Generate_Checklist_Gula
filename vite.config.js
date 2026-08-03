@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 
 // Identificador de esta compilación. Va DENTRO del bundle y también se publica en
 // version.json, así la app puede comparar lo que tiene cargado con lo que hay en el
@@ -39,6 +40,17 @@ export default defineConfig({
   ],
   define: {
     __BUILD_ID__: JSON.stringify(BUILD_ID),
+  },
+  build: {
+    rollupOptions: {
+      // Dos apps, dos direcciones. El formulario tiene su propia carpeta (y por tanto su
+      // propio manifiesto y su propio ámbito), que es lo que hace que se instale aparte
+      // de la checklist en vez de abrirse dentro de ella.
+      input: {
+        checklist: fileURLToPath(new URL('./index.html', import.meta.url)),
+        formulario: fileURLToPath(new URL('./formulario/index.html', import.meta.url)),
+      },
+    },
   },
   base: './'
 })
