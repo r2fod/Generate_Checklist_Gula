@@ -138,13 +138,33 @@ export function calcDestilados(pax, h) {
   const r  = (base) => Math.max(1, Math.round(base * f));
   // Estos licores no se compran de uno en uno: mínimo 2 botellas
   const r2 = (base) => Math.max(2, Math.round(base * f));
+  // ─── Reparto entre destilados ───────────────────────────────────────────────
+  // La referencia del sector para una barra libre española es 40% ginebra, 30% ron,
+  // 20% whisky, 10% vodka. La ginebra ya iba por encima de esa referencia (47% del
+  // total) y se deja como está: es la que de verdad se bebe aquí y bajarla sería
+  // arriesgar quedarse corto. Lo que se sube es lo que iba por DEBAJO — ron 28%,
+  // whisky 17%, vodka 8% — hasta cuadrar con el sector tomando la ginebra de ancla.
+  //
+  // Los divisores salen de ahí: con la ginebra fija, ron = 0,75 × ginebra,
+  // whisky = 0,5 × ginebra, vodka = 0,25 × ginebra. De 65 pax en adelante el reparto
+  // cae en 40/30/20/10 clavado; por debajo los mínimos de 2 botellas lo distorsionan,
+  // que es inevitable (no se compran medias botellas) y siempre hacia arriba.
+  //
+  // Ojo: esto NO está calibrado con consumo real vuestro, porque los datos de los
+  // eventos guardados todavía no son fiables. Cuando haya dos o tres eventos con lo
+  // que volvió sin abrir apuntado de verdad, estos números se reajustan con eso.
   return {
-    // Calibrado con datos reales (65 pax, barra libre de copas 4h → Seagrams+Tanqueray 9,
-    // Bacardí 1, tequila 2, tequila rosa 2-3, Ballantines 4, Barceló 4). Sin margen extra:
-    // los mínimos de 2 botellas y el redondeo ya cubren de sobra el rango del sector.
-    ginebraPremium: r2(pax / 7.2), ginebraSabor: r(pax / 35), ron: r(pax / 60),
-    ronBlanco: r2(pax / 50), tequila: r2(pax / 33), tequilaSabor: r2(pax / 26),
-    vodka: r(pax / 40), ballantines: r2(pax / 16), barcelo: r2(pax / 16),
+    // La ginebra se queda como estaba: calibrada con datos reales (65 pax, barra
+    // libre de copas 4h → Seagrams+Tanqueray 9). El resto va al reparto del sector.
+    ginebraPremium: r2(pax / 7.2), ginebraSabor: r(pax / 35),
+    // Ron: los tres se reparten el 30% manteniendo su peso relativo (Barceló es el
+    // que más se mueve, Bacardí y Negrita van detrás).
+    ron: r(pax / 44), ronBlanco: r2(pax / 40), barcelo: r2(pax / 13),
+    // Whisky (20%) y vodka (10%)
+    ballantines: r2(pax / 12), vodka: r(pax / 24),
+    // El tequila no entra en el reparto del sector (no es un destilado de barra
+    // libre clásico, se pide aparte para chupitos): se queda como estaba.
+    tequila: r2(pax / 33), tequilaSabor: r2(pax / 26),
     // Estos licores curiosos se piden fijos, sin escalar con el pax (no tiene sentido
     // aplicarles margen: ya son la cantidad mínima de compra)
     mistela: 2, baileys: 1, tiaMaria: 1, limoncello: 1, jagger: 1, peach: 1,

@@ -12,25 +12,38 @@ import { createRoot } from 'react-dom/client'
 import RedDeSeguridad from '../RedDeSeguridad.jsx'
 import '../index.css'
 import Formulario from './Formulario.jsx'
+import { leerGuardado, guardar, codigoDeTexto, direccionConCodigo } from './codigo.js'
 
 // El código del enlace (?enviar=<código>) se recuerda en ESTE navegador porque si no,
-// instalar la app no serviría de nada: el icono abre la dirección de siempre (sin
-// ?enviar=) y quien lo instaló se encontraría una pantalla vacía en vez de su
-// formulario. Aquí sí manda siempre el código guardado — a diferencia de antes, esta
-// dirección es EXCLUSIVAMENTE el formulario, así que no atrapa a nadie en ningún sitio.
-const CLAVE_CODIGO = "gula_formulario_codigo";
-
+// instalar la app no serviría de nada: el icono abre la dirección de siempre y quien
+// lo instaló se encontraría una pantalla vacía en vez de su formulario.
+//
+// Y además se devuelve a la DIRECCIÓN. Esto no es manía de limpieza: al añadir a la
+// pantalla de inicio, el móvil se guarda la dirección que hay en ese momento, y en iOS
+// la app que sale de ahí estrena un almacén vacío que NO ve nada de lo guardado en el
+// navegador. Sin el código en la dirección, el icono abría un formulario que no sabía
+// a qué buzón mandar: "Falta el enlace" después de haber hecho todos los pasos bien.
+// En Android no se notaba porque allí la app instalada sí comparte el almacén.
 function codigo() {
   const dela = new URLSearchParams(window.location.search).get("enviar") || "";
   if (dela) {
-    try { localStorage.setItem(CLAVE_CODIGO, dela); } catch (e) { /* en privado no se guarda, da igual */ }
+    guardar(window.localStorage, dela);
     return dela;
   }
-  try { return localStorage.getItem(CLAVE_CODIGO) || ""; } catch (e) { return ""; }
+  const guardado = leerGuardado(window.localStorage);
+  const conCodigo = direccionConCodigo(window.location.href, guardado);
+  if (conCodigo) {
+    // Sin recargar: solo para que lo que se guarde en la pantalla de inicio lo lleve.
+    try { window.history.replaceState(null, "", conCodigo); } catch (e) { /* da igual */ }
+  }
+  return guardado;
 }
 
 // Sin código no hay nada que enseñar: ni formulario en blanco (no sabría a qué buzón
-// mandar) ni la app del equipo. Se dice lo que pasa y qué hacer.
+// mandar) ni la app del equipo. Se dice lo que pasa, qué hacer, y se da una salida:
+// pegar el enlace a mano. Antes esto era un callejón sin salida, y el peor sitio para
+// tenerlo — quien llegaba aquí desde el icono de la pantalla de inicio volvía a lo
+// mismo una y otra vez, sin nada que tocar.
 function pedirElEnlace() {
   const raiz = document.getElementById('root')
   raiz.innerHTML = ''
@@ -39,8 +52,29 @@ function pedirElEnlace() {
   caja.innerHTML = `
     <h1>Falta el enlace</h1>
     <p>Este formulario se abre con el enlace que da logística. Búscalo en el WhatsApp y ábrelo desde ahí.</p>
-    <p class="link-roto-nota">Al abrirlo una vez, este móvil lo recuerda y ya puedes instalarlo en la pantalla de inicio.</p>`
+    <label class="link-roto-etiqueta" for="pegar-enlace">O pega aquí el enlace y lo abro yo:</label>
+    <div class="link-roto-pegar">
+      <input id="pegar-enlace" class="form-input" type="text" inputmode="url" autocomplete="off"
+             placeholder="https://..." aria-label="Enlace del formulario" />
+      <button type="button" class="form-btn-principal">Abrir</button>
+    </div>
+    <p class="link-roto-error" hidden>Ese enlace no lleva código. Copia entero el que da logística, desde https hasta el final.</p>
+    <p class="link-roto-nota">Al abrirlo una vez, este móvil lo recuerda y ya puedes guardarlo en la pantalla de inicio.</p>`
   raiz.appendChild(caja)
+
+  const campo = caja.querySelector('#pegar-enlace')
+  const error = caja.querySelector('.link-roto-error')
+  const abrir = () => {
+    const suCodigo = codigoDeTexto(campo.value)
+    if (!suCodigo) { error.hidden = false; campo.focus(); return }
+    guardar(window.localStorage, suCodigo)
+    // Se recarga CON el código en la dirección, que es como tiene que quedarse para
+    // que guardarlo en la pantalla de inicio sirva de algo.
+    window.location.search = "?enviar=" + encodeURIComponent(suCodigo)
+  }
+  caja.querySelector('.form-btn-principal').addEventListener('click', abrir)
+  campo.addEventListener('input', () => { error.hidden = true })
+  campo.addEventListener('keydown', (e) => { if (e.key === 'Enter') abrir() })
 }
 
 // El tema se pone en el <html> ANTES de montar React, igual que en la checklist: si no,
