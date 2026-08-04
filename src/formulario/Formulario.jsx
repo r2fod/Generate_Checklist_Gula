@@ -197,7 +197,10 @@ export default function Formulario({ codigo }) {
           <>
             <span>En el iPhone se guarda a mano, en tres toques:</span>
             <ol className="form-instalar-pasos">
-              <li>Dale a Compartir, abajo en el centro de Safari.</li>
+              {/* Vale tanto Safari como Chrome o Firefox del iPhone: los tres saben
+                  hacerlo. Por eso no se nombra ninguno — decir "Safari" mandaba a
+                  buscar en el sitio equivocado a quien usa Chrome. */}
+              <li>Dale a Compartir (el cuadrado con la flecha hacia arriba).</li>
               <li>Baja y busca "Añadir a pantalla de inicio".</li>
               <li>Dale a Añadir: queda como una app más.</li>
             </ol>

@@ -5271,3 +5271,26 @@ hr {
   cursor: pointer;
 }
 .link-roto-nota { font-size: 0.8rem; }
+/* Pegar el enlace a mano. Es la salida de quien llega aquí desde el icono de la
+   pantalla de inicio: sin esto vuelve a la misma pantalla una y otra vez. */
+.link-roto-etiqueta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.link-roto-pegar {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.link-roto-pegar .form-input {
+  flex: 1;
+  min-width: 0;   /* sin esto el input no baja de su ancho por defecto y desborda en 320px */
+  text-align: left;
+}
+.link-roto-pegar button { flex: 0 0 auto; padding: 0 16px; }
+.link-roto-error {
+  font-size: 0.82rem;
+  color: var(--peligro, #dc2626);
+}
+.link-roto-error[hidden] { display: none; }

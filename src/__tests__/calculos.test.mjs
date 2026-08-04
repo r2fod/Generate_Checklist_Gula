@@ -19,6 +19,7 @@ import {
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
+import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 
 let pasan = 0;
 const fallos = [];
@@ -361,6 +362,47 @@ console.log("\n══ Instalar el formulario: qué aviso toca en cada móvil ═
   ok(yaEsApp({ matchMedia: () => ({ matches: false }), navigator: {} }) === false,
     "en el navegador normal sí se ofrece");
   ok(yaEsApp(null) === false, "y sin ventana no revienta");
+}
+
+console.log("\n══ El código del buzón: que no se pierda al guardar la app ══");
+{
+  // Lo que pasó de verdad: se abre el enlace desde WhatsApp, se guarda en la pantalla
+  // de inicio siguiendo los pasos, y al abrir el icono sale "Falta el enlace". En iOS
+  // la app guardada estrena su propio almacén y no ve el código que dejó el navegador,
+  // así que el código TIENE que ir en la dirección.
+  ok(codigoDeTexto("https://r2fod.github.io/Generate_Checklist_Gula/formulario/?enviar=ABC123") === "ABC123",
+    "del enlace entero se saca el código");
+  ok(codigoDeTexto("  https://ejemplo.com/formulario/index.html?enviar=ABC123&otra=1  ") === "ABC123",
+    "aunque venga con espacios, index.html y más parámetros detrás");
+  ok(codigoDeTexto("https://ejemplo.com/formulario/?x=1&enviar=ABC123#final") === "ABC123",
+    "y aunque el código no sea el primer parámetro");
+  ok(codigoDeTexto("ABC123") === "ABC123", "y si pegan el código a pelo, también vale");
+  ok(codigoDeTexto("https://ejemplo.com/formulario/") === "",
+    "un enlace SIN código no cuela: mejor decirlo que abrir un formulario mudo");
+  ok(codigoDeTexto("") === "" && codigoDeTexto(null) === "" && codigoDeTexto(undefined) === "",
+    "y con el campo vacío no se inventa nada");
+  ok(codigoDeTexto("hola que tal") === "", "ni con texto suelto que no es un código");
+
+  // La dirección tiene que acabar llevando el código, porque es lo que el móvil se
+  // guarda al añadir a la pantalla de inicio.
+  ok(direccionConCodigo("https://ejemplo.com/formulario/", "ABC123") === "https://ejemplo.com/formulario/?enviar=ABC123",
+    "sin código en la dirección, se le pone");
+  ok(direccionConCodigo("https://ejemplo.com/formulario/?enviar=ABC123", "ABC123") === null,
+    "si ya lo lleva, no se toca nada");
+  ok(direccionConCodigo("https://ejemplo.com/formulario/?enviar=VIEJO", "ABC123") === "https://ejemplo.com/formulario/?enviar=ABC123",
+    "y si lleva otro distinto, manda el bueno");
+  ok(direccionConCodigo("https://ejemplo.com/formulario/", "") === null,
+    "sin código guardado no hay nada que poner");
+  ok(direccionConCodigo("no es una dirección", "ABC123") === null,
+    "y una dirección rara no revienta");
+
+  // Leer y guardar nunca pueden tumbar el arranque, ni en modo privado
+  const roto = { getItem: () => { throw new Error("modo privado"); }, setItem: () => { throw new Error("modo privado"); } };
+  ok(leerGuardado(roto) === "" && leerGuardado(null) === "",
+    "si el navegador no deja leer lo guardado, se sigue sin código en vez de reventar");
+  let exploto = false;
+  try { guardar(roto, "ABC123"); guardar(null, "ABC123"); } catch (e) { exploto = true; }
+  ok(!exploto, "y guardar tampoco revienta cuando no se puede guardar");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

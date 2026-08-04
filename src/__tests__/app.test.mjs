@@ -2442,6 +2442,53 @@ async function main() {
     }
 
     {
+      // "Falta el enlace" era un callejón sin salida, y justo donde peor caía: quien
+      // guardaba el formulario en la pantalla de inicio del iPhone y le daba al icono
+      // aterrizaba aquí, porque en iOS la app guardada estrena su propio almacén y no
+      // ve el código que dejó el navegador. Sin nada que tocar, volvía a lo mismo.
+      const { c, p } = await abrirComo(SAFARI_IPHONE, 390);
+      await p.evaluate(() => localStorage.clear());
+      await p.goto(BASE_FORM, { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(900);
+
+      ok(await p.locator(".link-roto h1").count() === 1, "sin código sale la pantalla de \"Falta el enlace\"");
+      const campo = p.locator("#pegar-enlace");
+      ok(await campo.count() === 1, "y ahora hay dónde pegar el enlace, que antes era un callejón sin salida");
+
+      // Un enlace sin código no puede colar: abriría un formulario que no sabe a
+      // dónde manda lo que se escriba
+      await campo.fill("https://ejemplo.com/formulario/");
+      await p.locator(".link-roto .form-btn-principal").click();
+      await p.waitForTimeout(400);
+      ok(await p.locator(".link-roto-error").isVisible(), "un enlace sin código avisa en vez de dejar pasar");
+
+      const desb = await desbordamiento(p);
+      ok(desb <= 0, `y la pantalla cabe en 390px (sobra ${desb}px)`);
+
+      await campo.fill(BASE_FORM + "?enviar=PRUEBA1");
+      await p.locator(".link-roto .form-btn-principal").click();
+      await p.waitForTimeout(2400);
+      ok(await p.locator(".link-roto h1").count() === 0 && await p.locator(".form-titulo").count() === 1,
+        "y pegando el bueno entra al formulario");
+      ok(/enviar=PRUEBA1/.test(p.url()),
+        "con el código en la dirección, que es lo que se guarda al añadirlo a la pantalla de inicio");
+      await c.close();
+    }
+
+    {
+      // El código tiene que volver a la DIRECCIÓN aunque se abra sin él: si no, lo que
+      // el móvil guarda al añadir a la pantalla de inicio no lo lleva, y el icono abre
+      // un formulario mudo. Esto es lo que fallaba en el iPhone.
+      const { c, p } = await abrirComo(SAFARI_IPHONE, 390);
+      await p.goto(BASE_FORM, { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      ok(/enviar=PRUEBA1/.test(p.url()),
+        "abriendo sin código, el que ya estaba guardado vuelve solo a la dirección");
+      ok(await p.locator(".form-titulo").count() === 1, "y el formulario abre normal");
+      await c.close();
+    }
+
+    {
       // Android no toca: ahí el navegador avisa por su cuenta y sale el botón de verdad
       const c = await navegador.newContext({ viewport: { width: 412, height: 900 }, isMobile: true, hasTouch: true });
       for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
