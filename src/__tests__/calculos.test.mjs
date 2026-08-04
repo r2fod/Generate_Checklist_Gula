@@ -103,6 +103,63 @@ console.log("\n══ Destilados: solo dependen de las copas ══");
     "y los que se compran de dos en dos nunca bajan de dos");
 }
 
+console.log("\n══ Destilados: el reparto del sector (40/30/20/10) ══");
+{
+  // Referencia de barra libre española: 40% ginebra, 30% ron, 20% whisky, 10% vodka.
+  // La ginebra iba por encima y se dejó; ron, whisky y vodka se subieron hasta cuadrar.
+  // Este test es el que impide que un retoque suelto vuelva a descuadrar el reparto.
+  const reparto = (pax, h) => {
+    const d = calcDestilados(pax, h);
+    const gin = d.ginebraPremium + d.ginebraSabor;
+    const ron = d.ron + d.ronBlanco + d.barcelo;   // Bacardí + Negrita + Barceló
+    const total = gin + ron + d.ballantines + d.vodka;
+    return { gin, ron, whisky: d.ballantines, vodka: d.vodka, total };
+  };
+  const OBJETIVO = { gin: 40, ron: 30, whisky: 20, vodka: 10 };
+  // Margen de 3 puntos: son botellas enteras, el redondeo no da para más fino. Y solo
+  // se comprueba en pedidos con cuerpo (10+ botellas de ginebra): en un evento chico
+  // los mínimos de 2 botellas mandan sobre el ratio, y eso es a propósito — antes se
+  // queda uno con dos botellas de vodka de sobra que sin vodka a media boda.
+  const fuera = [];
+  let comprobadas = 0;
+  for (const pax of [65, 80, 100, 150, 200, 300]) {
+    for (const h of [2, 4, 6]) {
+      const r = reparto(pax, h);
+      if (r.gin < 10) continue;
+      comprobadas++;
+      for (const k of Object.keys(OBJETIVO)) {
+        const pct = Math.round((r[k] / r.total) * 100);
+        if (Math.abs(pct - OBJETIVO[k]) > 3) fuera.push(`${pax}pax ${h}h ${k}=${pct}% (esperado ${OBJETIVO[k]}%)`);
+      }
+    }
+  }
+  ok(fuera.length === 0,
+    `en pedidos con cuerpo el reparto cuadra con el sector${fuera.length ? ` → ${fuera.slice(0, 4).join(" · ")}` : ` (${comprobadas} combinaciones)`}`);
+
+  const cien = reparto(100, 4);
+  ok(cien.gin === 17 && cien.ron === 13 && cien.whisky === 8 && cien.vodka === 4,
+    `100 pax y 4h de copas: ginebra ${cien.gin}, ron ${cien.ron}, whisky ${cien.whisky}, vodka ${cien.vodka}`);
+
+  // El ajuste solo podía SUBIR: si alguna de las tres bajase respecto a lo que había,
+  // saldríamos cortos en un evento ya presupuestado. Se fijan los mínimos de antes.
+  const antes = (pax, h) => {
+    const f = Math.min(1.75, h / 4);
+    const r = (b) => Math.max(1, Math.round(b * f)), r2 = (b) => Math.max(2, Math.round(b * f));
+    return { ron: r(pax / 60) + r2(pax / 50) + r2(pax / 16), whisky: r2(pax / 16), vodka: r(pax / 40) };
+  };
+  const bajadas = [];
+  for (const pax of [10, 30, 50, 65, 80, 100, 150, 200, 300, 500]) {
+    for (const h of [0, 1, 2, 4, 6, 8, 12]) {
+      const a = antes(pax, h), d = reparto(pax, h);
+      for (const k of ["ron", "whisky", "vodka"]) {
+        if (d[k] < a[k]) bajadas.push(`${pax}pax ${h}h ${k}: ${a[k]} → ${d[k]}`);
+      }
+    }
+  }
+  ok(bajadas.length === 0,
+    `y ron, whisky y vodka solo suben, nunca bajan de lo que ya se pedía${bajadas.length ? ` → ${bajadas.slice(0, 4).join(" · ")}` : " (70 combinaciones)"}`);
+}
+
 console.log("\n══ Cristalería ══");
 {
   const copas = (hc, hp) => calcCristaleria(100, hc, hp, false, false, false);
