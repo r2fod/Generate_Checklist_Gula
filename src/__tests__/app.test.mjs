@@ -2368,6 +2368,92 @@ async function main() {
     }
   }
 
+  // ── Guardar el formulario en el iPhone ─────────────────────────────────────
+  // En el iPhone no existe ningún botón de "Instalar": la única forma es Compartir →
+  // "Añadir a pantalla de inicio". Y el enlace llega por WhatsApp, que lo abre DENTRO
+  // de su propio navegador, donde esa opción no está por ningún lado. Ahí se puede
+  // seguir la instrucción al pie de la letra y no encontrarla nunca.
+  console.log("\n── Guardar el formulario en el iPhone ──");
+  {
+    const SAFARI_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+    const WHATSAPP_IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
+
+    const abrirComo = async (ua, ancho) => {
+      const c = await navegador.newContext({
+        viewport: { width: ancho, height: 844 }, isMobile: true, hasTouch: true, userAgent: ua,
+      });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(2400);
+      return { c, p };
+    };
+
+    {
+      const { c, p } = await abrirComo(SAFARI_IPHONE, 390);
+      const caja = p.locator(".form-instalar");
+      ok(await caja.count() === 1, "en el Safari del iPhone sale el aviso de guardarlo (ahí no hay botón que valga)");
+      const texto = await caja.innerText();
+      ok(/Compartir/i.test(texto) && /pantalla de inicio/i.test(texto),
+        "y dice exactamente dónde tocar");
+      ok(await p.locator(".form-instalar-pasos li").count() === 3,
+        "en tres pasos numerados, no en un párrafo");
+      await c.close();
+    }
+
+    {
+      const { c, p } = await abrirComo(WHATSAPP_IPHONE, 390);
+      const caja = p.locator(".form-instalar");
+      ok(await caja.count() === 1, "abierto desde WhatsApp también sale");
+      const texto = await caja.innerText();
+      // Lo importante: NO mandarle a buscar "Compartir" de primeras, porque desde
+      // dentro de WhatsApp esa opción no existe y se queda dando vueltas.
+      ok(/Safari/i.test(texto) && /dentro de otra app/i.test(texto),
+        "pero aquí lo primero que dice es que lo abra en Safari, no que busque Compartir");
+      const boton = p.locator(".form-instalar .form-btn-principal");
+      ok(await boton.count() === 1 && /Copiar enlace/i.test(await boton.innerText()),
+        "y le da el enlace copiado, que es lo único que siempre funciona");
+
+      // Nada de esto sirve si se sale de la pantalla
+      const desb = await desbordamiento(p);
+      ok(desb <= 0, `el aviso cabe en 390px sin desbordar (sobra ${desb}px)`);
+
+      // "Ahora no" lo quita, pero ya no para siempre: antes un toque sin querer dejaba
+      // a alguien sin saber nunca cómo instalarlo, y no había forma de recuperarlo.
+      await p.locator(".form-instalar .form-btn-atras").click();
+      await p.waitForTimeout(300);
+      ok(await p.locator(".form-instalar").count() === 0, '"Ahora no" lo quita de en medio');
+      const guardado = await p.evaluate(() => localStorage.getItem("gula_formulario_instalar"));
+      ok(guardado && Number(guardado) > 0,
+        "y se apunta cuándo se dijo que no, para poder volver a ofrecerlo dentro de un mes");
+      await c.close();
+    }
+
+    {
+      // La pantalla más estrecha que se ve en la calle
+      const { c, p } = await abrirComo(WHATSAPP_IPHONE, 320);
+      const desb = await desbordamiento(p);
+      ok(desb <= 0, `y en 320px tampoco (sobra ${desb}px)`);
+      const chico = await p.locator(".form-instalar button").evaluateAll(
+        bs => bs.filter(b => b.getBoundingClientRect().height < 44).map(b => b.innerText.trim()));
+      ok(chico.length === 0,
+        `sus botones se pueden pulsar con el dedo${chico.length ? ` → ${chico.join(", ")}` : ""}`);
+      await c.close();
+    }
+
+    {
+      // Android no toca: ahí el navegador avisa por su cuenta y sale el botón de verdad
+      const c = await navegador.newContext({ viewport: { width: 412, height: 900 }, isMobile: true, hasTouch: true });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(2400);
+      ok(await p.locator(".form-instalar").count() === 0,
+        "y en un navegador que no es de iPhone no se le dan instrucciones que no le sirven");
+      await c.close();
+    }
+  }
+
   // ── El check de preparación ────────────────────────────────────────────────
   // Preparar (sacarlo del almacén y dejarlo listo) y cargarlo en el camión son dos
   // momentos distintos, a menudo de personas distintas. Con un solo check no había

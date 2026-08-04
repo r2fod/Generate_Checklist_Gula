@@ -4870,6 +4870,19 @@ hr {
 .form-instalar-texto span { font-size: 0.84rem; line-height: 1.4; color: var(--text-muted); }
 .form-instalar-acciones { display: flex; gap: 8px; }
 .form-instalar-acciones .form-btn-principal { flex: 1; }
+/* Los pasos para guardarlo en el iPhone, que ahí no hay botón de instalar y hay que
+   explicarlo. Numerados y con aire entre ellos: se leen con el móvil en una mano. */
+.form-instalar-pasos {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.form-instalar-pasos li { padding-left: 2px; }
 
 .form-salir {
   align-self: center;

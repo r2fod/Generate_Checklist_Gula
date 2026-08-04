@@ -18,6 +18,7 @@ import {
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS } from "../estado.js";
+import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 
 let pasan = 0;
 const fallos = [];
@@ -299,6 +300,67 @@ console.log("\n══ Sanear el estado que entra ══");
   // Todos los campos vigilados están cubiertos por uno de los dos tipos
   ok(CAMPOS_VIGILADOS.LISTAS.length >= 6 && CAMPOS_VIGILADOS.MAPAS.length >= 13,
     `vigila ${CAMPOS_VIGILADOS.LISTAS.length} listas y ${CAMPOS_VIGILADOS.MAPAS.length} mapas`);
+}
+
+console.log("\n══ Instalar el formulario: qué aviso toca en cada móvil ══");
+{
+  // Agentes de verdad, copiados de dispositivos reales
+  const UA = {
+    safariIphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    whatsappIphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+    instagramIphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 302.0.0.23.113",
+    chromeIphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/125.0 Mobile/15E148 Safari/604.1",
+    chromeAndroid: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36",
+    ipadOS: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    macDeVerdad: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+  };
+  const aviso = (ua, tactiles = 0) => queAvisoToca({ ua, puntosTactiles: tactiles });
+
+  ok(aviso(UA.safariIphone) === "iphone",
+    "en Safari del iPhone se explican los pasos a mano (ahí no hay botón de instalar)");
+  // Este es el caso que dejaba a la gente sin poder instalar: el enlace llega por
+  // WhatsApp, se abre en SU navegador y "Añadir a pantalla de inicio" no existe allí.
+  ok(aviso(UA.whatsappIphone) === "enSafari",
+    "abierto desde WhatsApp, primero manda abrirlo en Safari, no a buscar Compartir");
+  ok(aviso(UA.instagramIphone) === "enSafari",
+    "y lo mismo con las apps que sí se identifican (Instagram)");
+  ok(aviso(UA.chromeIphone) === "iphone",
+    "Chrome en iPhone sí es un navegador de verdad: se explican los pasos");
+  ok(aviso(UA.chromeAndroid) === null,
+    "en Android no se dice nada hasta que el navegador avisa de que se puede instalar");
+  ok(queAvisoToca({ ua: UA.chromeAndroid, hayEventoDelNavegador: true }) === "puede",
+    "y cuando avisa, sale el botón de instalar de verdad");
+  ok(queAvisoToca({ ua: UA.whatsappIphone, hayEventoDelNavegador: true }) === "puede",
+    "si el navegador deja pedirlo, eso manda sobre cualquier otra cosa");
+  // iPadOS 13+ se hace pasar por Mac: sin mirar el táctil, el iPad se quedaba sin aviso
+  ok(aviso(UA.ipadOS, 5) === "iphone", "un iPad, aunque diga que es un Mac, recibe los pasos");
+  ok(aviso(UA.macDeVerdad, 0) === null, "y un Mac de verdad, que no tiene táctil, no");
+  ok(aviso("") === null && aviso(undefined) === null,
+    "sin agente conocido no se inventa nada");
+
+  // El "Ahora no" ya no es para siempre: un toque sin querer dejaba a alguien sin
+  // saber nunca cómo instalarlo, y no había forma de recuperar el aviso.
+  const almacen = (v) => ({ getItem: () => v, setItem: () => {} });
+  const AHORA = 1770000000000;
+  const dias = (n) => n * 24 * 60 * 60 * 1000;
+  ok(estaSilenciado(almacen(null), AHORA) === false, "sin silenciar, el aviso sale");
+  ok(estaSilenciado(almacen(String(AHORA - dias(3))), AHORA) === true,
+    "recién silenciado, no molesta");
+  ok(estaSilenciado(almacen(String(AHORA - dias(DIAS_SILENCIO + 1))), AHORA) === false,
+    `pasados ${DIAS_SILENCIO} días vuelve a ofrecerse`);
+  ok(estaSilenciado(almacen("no"), AHORA) === false,
+    'quien lo silenció "para siempre" con la versión vieja recupera el aviso');
+  ok(estaSilenciado({ getItem: () => { throw new Error("modo privado"); } }, AHORA) === false,
+    "y si el navegador no deja leer nada guardado, tampoco se calla");
+
+  // Ya instalado: no se ofrece instalar otra vez
+  ok(yaEsApp({ matchMedia: () => ({ matches: true }), navigator: {} }) === true,
+    "abierto ya como app, no se ofrece instalarlo");
+  ok(yaEsApp({ matchMedia: () => ({ matches: false }), navigator: { standalone: true } }) === true,
+    "y el iPhone lo dice a su manera (navigator.standalone)");
+  ok(yaEsApp({ matchMedia: () => ({ matches: false }), navigator: {} }) === false,
+    "en el navegador normal sí se ofrece");
+  ok(yaEsApp(null) === false, "y sin ventana no revienta");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

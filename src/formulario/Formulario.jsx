@@ -12,6 +12,7 @@ import logoGula from "../assets/gula-logo.png";
 import FondoIconos from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
 import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
+import { queAvisoToca, yaEsApp, estaSilenciado, silenciar } from "./instalar.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -132,24 +133,41 @@ export default function Formulario({ codigo }) {
   // Instalar el formulario en la pantalla de inicio: así no hay que buscar el enlace
   // en el WhatsApp cada vez. En Android y en el ordenador el navegador nos deja
   // pedirlo; en iPhone no hay forma de pedirlo desde la web y hay que explicarlo.
-  const [avisoInstalar, setAvisoInstalar] = useState(null); // null | "puede" | "iphone"
+  const [avisoInstalar, setAvisoInstalar] = useState(null); // null | "puede" | "iphone" | "enSafari"
   const [pedirInstalar, setPedirInstalar] = useState(null); // el evento del navegador
+  const [enlaceCopiado, setEnlaceCopiado] = useState(false);
 
   useEffect(() => {
-    try { if (localStorage.getItem("gula_formulario_instalar") === "no") return; } catch (e) { /* da igual */ }
-    // Ya instalado: no se dice nada
-    if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) return;
-    if (window.navigator.standalone) return;
+    if (estaSilenciado(window.localStorage)) return;
+    // Ya instalado y abierto como app: no se dice nada
+    if (yaEsApp(window)) return;
     const alPoder = (e) => { e.preventDefault(); setPedirInstalar(e); setAvisoInstalar("puede"); };
     window.addEventListener("beforeinstallprompt", alPoder);
-    const esIphone = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (esIphone) setAvisoInstalar("iphone");
+    setAvisoInstalar(queAvisoToca({
+      ua: navigator.userAgent,
+      puntosTactiles: navigator.maxTouchPoints || 0,
+    }));
     return () => window.removeEventListener("beforeinstallprompt", alPoder);
   }, []);
 
   const noInstalar = () => {
-    try { localStorage.setItem("gula_formulario_instalar", "no"); } catch (e) { /* da igual */ }
+    silenciar(window.localStorage);
     setAvisoInstalar(null);
+  };
+  // En el navegador de WhatsApp no hay "Añadir a pantalla de inicio" ni, muchas veces,
+  // forma fácil de encontrar "Abrir en Safari". Copiar el enlace y pegarlo en Safari
+  // siempre funciona, así que se da hecho. La copia va DENTRO del toque: detrás de un
+  // await el navegador la rechaza por no venir de un gesto.
+  const copiarParaSafari = () => {
+    const url = window.location.href;
+    try {
+      navigator.clipboard.writeText(url).then(
+        () => setEnlaceCopiado(true),
+        () => setEnlaceCopiado(false),
+      );
+    } catch (e) {
+      setEnlaceCopiado(false);
+    }
   };
   const instalar = async () => {
     if (!pedirInstalar) return;
@@ -162,12 +180,40 @@ export default function Formulario({ codigo }) {
     <div className="form-instalar">
       <div className="form-instalar-texto">
         <strong>Ténlo a mano</strong>
-        {avisoInstalar === "iphone"
-          ? <span>Dale a Compartir y luego a "Añadir a pantalla de inicio": se queda como una app y no hay que buscar el enlace.</span>
-          : <span>Instálalo y se queda como una app, sin buscar el enlace cada vez.</span>}
+        {avisoInstalar === "enSafari" && (
+          <>
+            {/* Este es el caso de siempre: el enlace llega por WhatsApp y se abre en SU
+                navegador, donde "Añadir a pantalla de inicio" no existe. Decir "dale a
+                Compartir" aquí es mandar a buscar una opción que no está. */}
+            <span>Has abierto esto dentro de otra app, y desde aquí el iPhone no deja guardarlo. Ábrelo en Safari y ya podrás:</span>
+            <ol className="form-instalar-pasos">
+              <li>Copia el enlace con el botón de abajo.</li>
+              <li>Pégalo en Safari.</li>
+              <li>Dale a Compartir y luego a "Añadir a pantalla de inicio".</li>
+            </ol>
+          </>
+        )}
+        {avisoInstalar === "iphone" && (
+          <>
+            <span>En el iPhone se guarda a mano, en tres toques:</span>
+            <ol className="form-instalar-pasos">
+              <li>Dale a Compartir, abajo en el centro de Safari.</li>
+              <li>Baja y busca "Añadir a pantalla de inicio".</li>
+              <li>Dale a Añadir: queda como una app más.</li>
+            </ol>
+          </>
+        )}
+        {avisoInstalar === "puede" && (
+          <span>Instálalo y se queda como una app, sin buscar el enlace cada vez.</span>
+        )}
       </div>
       <div className="form-instalar-acciones">
         {avisoInstalar === "puede" && <button className="form-btn-principal" onClick={instalar}>Instalar</button>}
+        {avisoInstalar === "enSafari" && (
+          <button className="form-btn-principal" onClick={copiarParaSafari}>
+            {enlaceCopiado ? "✓ Copiado, ábrelo en Safari" : "Copiar enlace"}
+          </button>
+        )}
         <button className="form-btn-atras" onClick={noInstalar}>Ahora no</button>
       </div>
     </div>
