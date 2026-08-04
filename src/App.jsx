@@ -28,6 +28,7 @@ import {
 import { aRespuestasDeLaApp, resumirEnvio, recogidasDelEnvio, comprasDelEnvio, archivosDelEnvio, fmtFechaCorta, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 import logoGula from "./assets/gula-logo.png";
+import { sanearEstado } from "./estado.js";
 import {
   BATEA, bateas, conMargen, MARGEN_SEGURIDAD,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL, terciosConBarril,
@@ -2812,9 +2813,12 @@ function leerEstadoGuardado() {
   try {
     const params = new URLSearchParams(window.location.search);
     const c = params.get("c");
-    if (c) return { estado: JSON.parse(decodeURIComponent(c)), desdeLink: true };
+    // Se sanea SIEMPRE al entrar: un campo con el tipo equivocado (de un ?c= viejo o
+    // manipulado) tumbaba la app al dibujar, y como el estado se guarda, recargar
+    // volvía a tumbarla. Ver src/estado.js.
+    if (c) return { estado: sanearEstado(JSON.parse(decodeURIComponent(c))), desdeLink: true };
     const guardado = localStorage.getItem("gula_checklist_estado");
-    if (guardado) return { estado: JSON.parse(guardado), desdeLink: false };
+    if (guardado) return { estado: sanearEstado(JSON.parse(guardado)), desdeLink: false };
   } catch (e) { /* link corrupto, localStorage no disponible, o JSON inválido: se ignora */ }
   return { estado: {}, desdeLink: false };
 }
@@ -3420,7 +3424,8 @@ export default function App({ onCerrarSesion } = {}) {
     const unsub = suscribirEventoNube(eventoNubeId, (remotoJSON) => {
       if (remotoJSON === estadoActualJSONRef.current || remotoJSON === ultimoGuardadoNubeRef.current) return;
       let remoto, previo;
-      try { remoto = JSON.parse(remotoJSON); previo = JSON.parse(estadoActualJSONRef.current); }
+      // También lo que llega de la nube: puede venir de una versión distinta
+      try { remoto = sanearEstado(JSON.parse(remotoJSON)); previo = JSON.parse(estadoActualJSONRef.current); }
       catch (e) { return; /* estado remoto corrupto: se ignora */ }
       const cambios = resumirCambios(previo, remoto);
       // Marcar ANTES de aplicar: así el guardado automático que provocará este

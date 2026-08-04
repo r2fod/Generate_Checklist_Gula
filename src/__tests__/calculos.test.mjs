@@ -17,6 +17,7 @@ import {
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
 } from "../calculos.js";
+import { sanearEstado, CAMPOS_VIGILADOS } from "../estado.js";
 
 let pasan = 0;
 const fallos = [];
@@ -210,6 +211,37 @@ console.log("\n══ Casos límite: nada puede salir en negativo ni en NaN ═�
     }
   }
   ok(raros.length === 0, `ninguna cantidad sale negativa ni inválida${raros.length ? ` → ${raros.slice(0, 5).join(" · ")}` : " (16 combinaciones)"}`);
+}
+
+
+console.log("\n══ Sanear el estado que entra ══");
+{
+  // Un campo con el tipo equivocado tumbaba la app al dibujar, y como el estado se
+  // guarda, recargar volvía a tumbarla: se quedaba uno fuera sin salida.
+  ok(JSON.stringify(sanearEstado({ evento: "boda", pax: 100 })) === JSON.stringify({ evento: "boda", pax: 100 }),
+    "un estado bueno pasa entero, sin tocar nada");
+  const roto = sanearEstado({ evento: "boda", pax: 100, recogidas: "esto no es una lista" });
+  ok(roto.recogidas === undefined && roto.evento === "boda" && roto.pax === 100,
+    "una lista que llega como texto se descarta, y el resto del evento se salva");
+  ok(sanearEstado({ checkeados: [1, 2, 3] }).checkeados === undefined,
+    "un mapa que llega como lista también se descarta");
+  ok(sanearEstado({ preparados: 7 }).preparados === undefined,
+    "y un mapa que llega como número");
+  ok(sanearEstado({ recogidas: [] }).recogidas !== undefined
+    && sanearEstado({ checkeados: {} }).checkeados !== undefined,
+    "pero una lista vacía y un mapa vacío son válidos: no se tiran");
+  // Lo que no vigila no se toca: un campo de una versión futura no se puede perder
+  ok(sanearEstado({ campoQueAunNoExiste: "algo" }).campoQueAunNoExiste === "algo",
+    "los campos que no vigila pasan tal cual, que mañana puede haber otros");
+  // Y la entrada basura no revienta
+  for (const basura of [null, undefined, "texto", 42, [1, 2]]) {
+    const r = sanearEstado(basura);
+    if (r === null || typeof r !== "object" || Array.isArray(r)) { ok(false, `sanearEstado(${JSON.stringify(basura)}) no devuelve un objeto`); break; }
+  }
+  ok(true, "y con basura de entrada (null, texto, número, lista) devuelve un objeto vacío, no un error");
+  // Todos los campos vigilados están cubiertos por uno de los dos tipos
+  ok(CAMPOS_VIGILADOS.LISTAS.length >= 6 && CAMPOS_VIGILADOS.MAPAS.length >= 13,
+    `vigila ${CAMPOS_VIGILADOS.LISTAS.length} listas y ${CAMPOS_VIGILADOS.MAPAS.length} mapas`);
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
