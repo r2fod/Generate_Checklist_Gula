@@ -385,25 +385,33 @@ async function main() {
     // Los barriles descuentan tercios (85% de rendimiento por la merma de barra), pero
     // nunca hasta cero: con dos de 50L la cuenta salía sin una sola botella, y ahí el
     // evento entero cuelga de que el tirador y el barril funcionen.
+    // La fecha va fijada en julio a propósito: la cerveza depende de la temporada
+    // (3 tercios/pax en verano, 2 en invierno) y sin fijarla esta prueba daría números
+    // distintos según el día en que se ejecute.
     const conBarril = async (tipo, barril, n) => {
-      await p.goto(url({ evento: tipo, pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, tamanoBarril: barril, numBarriles: n }),
+      await p.goto(url({ evento: tipo, pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, tamanoBarril: barril, numBarriles: n }),
         { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1700);
       const f = (await listaItems(p)).find(i => i.startsWith("Cerveza Alhambra")) || "";
       return f ? parseInt(f.slice(f.indexOf("=") + 1), 10) : 0;
     };
-    const sinBarril192 = await conBarril("boda", "No lleva", 1);
+    const sinBarril = await conBarril("boda", "No lleva", 1);
     const uno50 = await conBarril("boda", "50L", 1);
-    ok(uno50 < sinBarril192 && uno50 > 0,
-      `un barril de 50L descuenta tercios pero no todos (${sinBarril192} → ${uno50})`);
+    ok(uno50 < sinBarril && uno50 > 0,
+      `un barril de 50L descuenta tercios pero no todos (${sinBarril} → ${uno50})`);
+    // Y dos tampoco lo cubren todo con el ratio de verano: hacen falta ~103 L y dos
+    // barriles dan 85 útiles. Que siga saliendo cerveza embotellada aquí es correcto.
+    const dos50 = await conBarril("boda", "50L", 2);
+    ok(dos50 < uno50 && dos50 > 24,
+      `dos descuentan más, pero todavía no llegan a cubrir la barra (${uno50} → ${dos50})`);
     for (const tipo of ["boda", "cumpleanos"]) {
-      const dos50 = await conBarril(tipo, "50L", 2);
       const tres50 = await conBarril(tipo, "50L", 3);
-      ok(dos50 === 24 && tres50 === 24,
-        `en ${tipo}, por muchos barriles que se lleven quedan 24 tercios de respaldo (${dos50}/${tres50})`);
+      const cuatro50 = await conBarril(tipo, "50L", 4);
+      ok(tres50 === 24 && cuatro50 === 24,
+        `en ${tipo}, por muchos barriles que se lleven quedan 24 tercios de respaldo (${tres50}/${cuatro50})`);
     }
-    ok(await conBarril("boda", "No lleva", 1) === sinBarril192,
-      `y sin barril no se toca nada (${sinBarril192})`);
+    ok(await conBarril("boda", "No lleva", 1) === sinBarril,
+      `y sin barril no se toca nada (${sinBarril})`);
     await c.close();
   }
 
@@ -676,7 +684,14 @@ async function main() {
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
     const portapapeles = () => p.evaluate(() => navigator.clipboard.readText());
-    for (const [entrada, marca] of [["Link para marcar", true], ["Link con edición", false]]) {
+    // Tres links, cada uno para una persona: el de carga entra directo a marcar lo que
+    // sube al camión, el de marcar enseña la checklist entera sin poder tocarla, y el
+    // de edición no lleva candado ninguno.
+    for (const [entrada, solo, carga] of [
+      ["Link para marcar", true, false],
+      ["Link de Modo carga", true, true],
+      ["Link con edición", false, false],
+    ]) {
       await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1900);
       await p.evaluate(() => navigator.clipboard.writeText("(vacío)"));
@@ -686,8 +701,12 @@ async function main() {
       await p.waitForTimeout(900);
       const copiado = await portapapeles();
       ok(/\?evento=[a-z0-9]{8}/.test(copiado), `"${entrada}" deja el link en el portapapeles → ${copiado.slice(0, 90)}`);
-      ok(copiado.includes("&solo=1") === marca,
-        marca ? "y el de marcar lleva su &solo=1" : "y el de edición no lo lleva");
+      ok(copiado.includes("&solo=1") === solo,
+        solo ? `"${entrada}" bloquea la edición (&solo=1)` : `"${entrada}" no lleva candado`);
+      // Solo el de Modo carga entra directo a marcar. Los otros dos siguen abriendo
+      // donde abrían siempre: añadir un link no puede cambiar los que ya se usan.
+      ok(copiado.includes("&carga=1") === carga,
+        carga ? `y abre directo en Modo carga (&carga=1)` : `y abre la checklist, no el Modo carga`);
       // Se copia SOLO la dirección. Llevaba "Evento: https://…" delante para que en
       // WhatsApp se supiera de cuál era, y con eso se rompía pegarlo en el navegador:
       // al ver un texto con espacios lo BUSCA en vez de abrirlo. Parecía que el link
@@ -2068,6 +2087,162 @@ async function main() {
   t = await chips(a2.p);
   ok(t.some(x => /Devolución/.test(x)), `devolución atrasada: se avisa aunque no se marcara la recogida → ${JSON.stringify(t)}`);
   await a2.c.close();
+
+  // ── El link que se le pasa a logística ─────────────────────────────────────
+  // Es un link NUEVO, que se suma a los dos de siempre sin tocarlos. Quien carga el
+  // camión lo abre desde el WhatsApp y lo único que hace es ir marcando: sin aterrizar
+  // en la checklist entera ni buscar "Modo carga" entre los botones de la cabecera,
+  // que con el móvil en una mano y una caja en la otra no es un detalle menor.
+  console.log("\n── El link que se le pasa a logística ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" };
+
+    await p.goto(url(evento) + "&solo=1&carga=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+
+    ok(await p.locator(".segmented-control .segment-salida").count() === 1,
+      "el link de marcar entra DIRECTO en Modo carga, sin pasar por la checklist entera");
+    ok(await p.locator(".segment-salida.active").count() === 1,
+      "y cae en Salida, que es lo que se marca al cargar el camión");
+    // Vuelta es la otra mitad de su trabajo: lo que baja del camión al volver
+    ok(await p.locator(".segment-vuelta").count() === 1,
+      "con la Vuelta a un toque, para marcar lo que vuelve");
+
+    // Puede marcar, que es a lo que viene
+    const primera = p.locator(".carga-row-principal input[type=checkbox]").first();
+    await primera.click();
+    await p.waitForTimeout(500);
+    ok(await primera.isChecked(), "puede marcar lo que sube al camión");
+
+    // Pero no cambiar cantidades: para eso está el otro link
+    await p.locator(".segment-btn", { hasText: "Prep." }).click();
+    await p.waitForTimeout(400);
+    ok(await p.locator(".segment-preparacion.active").count() === 1,
+      "y si le toca preparar también, la pestaña está ahí");
+
+    const desb = await desbordamiento(p);
+    ok(desb <= 0, `todo cabe en la pantalla del móvil (sobra ${desb}px)`);
+    await c.close();
+  }
+
+  {
+    // Los links que YA se mandaron llevan solo "solo=1". Tienen que seguir abriéndose
+    // como se abrían: si un link viejo cambiara de sitio al abrirse, quien lo tenga
+    // guardado se encontraría otra cosa distinta sin que nadie se lo haya dicho.
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100 }) + "&solo=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2000);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 0
+      && await p.locator(".item-row").count() > 20,
+      "y un link viejo, solo con &solo=1, sigue abriendo la checklist como siempre");
+    await c.close();
+  }
+
+  // ── El aviso de "actualizado desde otro dispositivo" ───────────────────────
+  // Se veía cortado por la derecha ("Actualizado desde otro di…"), justo el aviso que
+  // hay que leer entero porque dice qué te ha cambiado alguien por debajo.
+  //
+  // La causa era fina: el aviso se centraba con transform: translateX(-50%), y su
+  // animación de entrada anima TRANSFORM con fill-mode "both". Al acabar, el último
+  // fotograma (translateY(0)) pisaba el centrado y lo dejaba pisado para siempre: el
+  // aviso se quedaba clavado empezando en mitad de la pantalla. Por eso se mide DESPUÉS
+  // de que termine la animación — antes de terminar se veía bien y no se notaba nada.
+  console.log("\n── El aviso de cambios desde otro dispositivo ──");
+  for (const ancho of [320, 390, 412, 1440]) {
+    const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Comunión Daniela Cuevas Peñarrubia" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // El aviso solo sale cuando llega un cambio de la nube, y aquí la nube está
+    // cortada: se monta el mismo bloque con sus clases para medir SU css, que es
+    // exactamente lo que estaba roto.
+    await p.evaluate(() => {
+      const d = document.createElement("div");
+      d.className = "cambios-remotos-banner";
+      d.innerHTML = `<div class="cambios-remotos-detalle">
+          <strong>🔄 Actualizado desde otro dispositivo:</strong>
+          <span>cronos: 0 → 1</span>
+        </div>
+        <button class="cambios-remotos-cerrar" aria-label="Cerrar aviso">✕</button>`;
+      document.body.appendChild(d);
+    });
+    // Que termine la animación de entrada: el fallo aparecía justo al acabar
+    await p.waitForTimeout(700);
+
+    const caja = await p.locator(".cambios-remotos-banner").evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return { izq: Math.round(r.left), der: Math.round(r.right), ancho: Math.round(r.width) };
+    });
+    ok(caja.der <= ancho, `${ancho}px: el aviso no se sale por la derecha (acaba en ${caja.der})`);
+    ok(caja.izq >= 0, `${ancho}px: ni por la izquierda (empieza en ${caja.izq})`);
+    // Y centrado de verdad: el hueco de un lado y del otro tienen que ser iguales
+    const descuadre = Math.abs(caja.izq - (ancho - caja.der));
+    ok(descuadre <= 2, `${ancho}px: y queda centrado (${descuadre}px de diferencia entre los lados)`);
+
+    const desb = await desbordamiento(p);
+    ok(desb <= 0, `${ancho}px: sin desbordar la página (sobra ${desb}px)`);
+    await c.close();
+  }
+
+  // ── El aviso, en un móvil de verdad ────────────────────────────────────────
+  // En el móvil el botón "✓ Hecho" salía cortado a media palabra: se leía "Hech"
+  // dentro de un círculo verde que se salía de su ficha. El botón no llevaba
+  // flex-shrink: 0, así que cuando el texto de la recogida ocupaba el ancho, el botón
+  // se estrechaba por debajo de su propia etiqueta. Un botón con texto dentro no se
+  // puede encoger, y menos éste: es el que da por hecha una devolución.
+  for (const ancho of [320, 390, 412]) {
+    const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const estado = {
+      evento: "produccion", pax: 25, nombreEvento: "Boda Anna y Mario", fechaEvento: dia(1),
+      // Un concepto largo de verdad, de los que parten el texto en tres líneas
+      recogidas: [{ concepto: "Apollo paella y jamonero — recoger en casa de los padres de Rocío", fecha: dia(-2), fechaDevolucion: dia(-1) }],
+      compras: [],
+    };
+    await c.addInitScript(e => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        "Boda Anna y Mario": e,
+        // Un segundo evento con nombre largo, para el botón de "Pendientes en otros
+        // eventos": llevaba nowrap y con un nombre así se salía de la pantalla.
+        "Comunión Daniela Cuevas Peñarrubia": { ...e, nombreEvento: "Comunión Daniela Cuevas Peñarrubia" },
+      }));
+      localStorage.setItem("gula_evento_activo", "Boda Anna y Mario");
+    }, estado);
+    const p = await nuevaPagina(c);
+    await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2600);
+
+    const boton = p.locator(".aviso-recogida-hecho").first();
+    ok(await boton.count() === 1, `${ancho}px: el aviso enseña su botón de dar por hecha la devolución`);
+
+    // Que la etiqueta quepa DENTRO del botón: esto es exactamente lo que fallaba
+    const cortado = await boton.evaluate(b => b.scrollWidth > b.clientWidth + 1);
+    ok(!cortado, `${ancho}px: "✓ Hecho" cabe entero en su botón, sin cortarse a media palabra`);
+
+    // Y que el botón no se salga de su ficha
+    const fuera = await boton.evaluate(b => {
+      const ficha = b.closest(".aviso-recogida-chip").getBoundingClientRect();
+      const r = b.getBoundingClientRect();
+      return Math.round(Math.max(r.right - ficha.right, ficha.left - r.left));
+    });
+    ok(fuera <= 0, `${ancho}px: y se queda dentro de su ficha (se sale ${fuera}px)`);
+
+    const desb = await desbordamiento(p);
+    ok(desb <= 0, `${ancho}px: el aviso entero cabe en la pantalla (sobra ${desb}px)`);
+
+    // Se sigue pudiendo pulsar con el dedo
+    const alto = await boton.evaluate(b => Math.round(b.getBoundingClientRect().height));
+    ok(alto >= 40, `${ancho}px: y sigue siendo pulsable con el dedo (${alto}px de alto)`);
+
+    await c.close();
+  }
 
   // ── Verano o invierno, según la fecha ───────────────────────────────────────
   // El dato existía en el código pero no se podía cambiar desde ningún sitio: estaba

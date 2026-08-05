@@ -538,10 +538,15 @@ body {
 }
 
 .avisos-recogidas-lista {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  /* Que ocupe el ancho del aviso: las fichas de recogida son de línea entera y sin
+     esto se quedaban encajadas en el ancho de su propio texto, partiéndolo en tres
+     líneas aunque sobrara sitio al lado. */
+  width: 100%;
+  min-width: 0;
 }
 
 /* Un grupo por evento dentro del banner de avisos: nombre del evento arriba
@@ -550,14 +555,17 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .aviso-evento-grupo {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  align-items: flex-start;
+  align-items: stretch;
+  min-width: 0;
 }
 
 .aviso-otro-evento-btn {
@@ -566,11 +574,19 @@ body {
   color: var(--aviso-texto);
   font-size: 0.78rem;
   font-weight: 700;
-  border-radius: 999px;
-  padding: 4px 12px;
+  /* Mismo radio que las fichas de recogida, no el de píldora: estos botones llevan
+     el nombre del evento y en un móvil estrecho ocupan dos líneas, donde los
+     extremos completamente redondos quedan como dos globos a los lados. */
+  border-radius: 14px;
+  padding: 5px 12px;
   cursor: pointer;
-  white-space: nowrap;
   min-height: 26px;
+  /* Sin nowrap: hay eventos con nombres largos ("Comunión Daniela Cuevas
+     Peñarrubia") que en un móvil estrecho se salían de la pantalla entera en vez
+     de partirse en dos líneas. */
+  white-space: normal;
+  text-align: left;
+  max-width: 100%;
 }
 
 .aviso-otro-evento-btn:hover {
@@ -590,14 +606,19 @@ body {
 }
 
 .aviso-recogida-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  width: 100%;
   max-width: 100%;
   gap: 8px;
   background: var(--aviso-bg);
   border: 1px solid var(--aviso-borde);
-  border-radius: 999px;
-  padding: 3px 6px 3px 12px;
+  /* Radio moderado, no 999px: una recogida con nombre largo ocupa dos o tres líneas
+     en el móvil, y los extremos completamente redondos de una píldora sobre un bloque
+     de tres líneas quedaban como dos globos a los lados. */
+  border-radius: 14px;
+  padding: 6px 8px 6px 12px;
+  box-sizing: border-box;
 }
 .aviso-recogida-chip.is-hoy { background: var(--hoy-bg); border-color: var(--hoy-borde); }
 .aviso-recogida-chip.is-atrasado { background: var(--error-bg); border-color: var(--error-borde); }
@@ -661,6 +682,12 @@ body {
 .logistica-tipo-btn:hover { filter: brightness(0.97); }
 
 .aviso-recogida-hecho {
+  /* flex: 0 0 auto es lo que impide que se encoja. Sin esto, cuando el texto de la
+     recogida ocupaba el ancho, el botón se estrechaba por debajo de su propia
+     etiqueta y "✓ Hecho" salía cortado a media palabra: en el móvil se leía "Hech"
+     dentro de un círculo verde. Encogerse nunca fue una opción para un botón con
+     texto dentro. */
+  flex: 0 0 auto;
   border: none;
   background: #16a34a;
   color: #fff;
@@ -753,11 +780,20 @@ body {
    todo, y se ve estés donde estés. */
 .cambios-remotos-banner {
   position: fixed;
-  left: 50%;
+  /* Se centra con left+right+margin auto, NO con transform: translateX(-50%).
+     Con el transform, la animación de entrada (slideUpFade, que anima transform y
+     lleva fill-mode "both") pisaba el centrado al terminar y lo dejaba pisado para
+     siempre: el aviso se quedaba clavado en left:50% sin corregir, o sea empezando
+     en mitad de la pantalla y saliéndose por la derecha. Se veía cortado
+     ("Actualizado desde otro di…") justo cuando más falta hace leerlo entero.
+     Centrando por márgenes, la animación puede mover lo que quiera sin romper nada. */
+  left: 12px;
+  right: 12px;
   bottom: 16px;
-  transform: translateX(-50%);
+  margin-inline: auto;
   z-index: 1100;               /* por encima del panel de Modo carga (1000) */
-  width: min(560px, calc(100vw - 24px));
+  width: auto;
+  max-width: 560px;
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   color: var(--accent);

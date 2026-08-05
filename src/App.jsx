@@ -2809,6 +2809,21 @@ function esSoloMarcar() {
   } catch (e) { return false; }
 }
 
+// "Link para marcar" abre DIRECTO en Modo carga, en Salida. Antes aterrizaba en la
+// checklist entera y había que encontrar y pulsar "Modo carga": para quien recibe el
+// link por WhatsApp y solo tiene que ir marcando lo que sube al camión, eso es una
+// pantalla de más y una que no le hace falta. Dentro tiene Salida y Vuelta, que es lo
+// que marca logística, y sigue pudiendo salir de ahí si necesita mirar otra cosa.
+//
+// Va en su propia marca ("carga=1") y no colgado de "solo=1" a propósito: los links
+// que ya se mandaron llevan solo "solo=1" y tienen que seguir abriéndose como se
+// abrían. Los nuevos llevan las dos.
+function abreEnModoCarga() {
+  try {
+    return !!new URLSearchParams(window.location.search).get("carga");
+  } catch (e) { return false; }
+}
+
 function leerEstadoGuardado() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3146,7 +3161,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [vueltos, setVueltos] = useState(estadoInicial.vueltos ?? {}); // { "categoria::label": true } — marcados como "Vuelve" (devuelto tras el evento)
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
-  const [modoCarga, setModoCarga] = useState(false);
+  const [modoCarga, setModoCarga] = useState(abreEnModoCarga);
   const [soloMarcar] = useState(esSoloMarcar);
   // Barra fina pegada arriba en móvil: la cabecera con los botones ocupa casi un tercio
   // de la pantalla, así que dejarla fija entera sería peor. En su lugar, al bajar de la
@@ -3546,8 +3561,17 @@ export default function App({ onCerrarSesion } = {}) {
       ? { ...x, ...cambios, ...(tocaFechas && x.fechasAuto ? { fechasAuto: false } : {}) }
       : x));
 
-  const handleGenerarLink = (paraMarcar = false) => {
-    const marca = paraMarcar ? "&solo=1" : "";
+  // Tres links, cada uno para una persona distinta:
+  //   "edicion" — sin marcas. Quien lo abre puede cambiarlo todo.
+  //   "marcar"  — "solo=1". La checklist entera, sin poder tocar cantidades.
+  //   "carga"   — "solo=1&carga=1". Además entra DIRECTO en Modo carga (Salida), que
+  //               es a lo único que va quien carga el camión: marcar lo que sube y,
+  //               al volver, lo que baja. Sin buscar el botón de Modo carga en la
+  //               cabecera con el móvil en una mano.
+  // "carga=1" va aparte de "solo=1" y no colgado de él a propósito: los links que ya
+  // se mandaron llevan solo "solo=1" y tienen que seguir abriéndose como se abrían.
+  const handleGenerarLink = (tipo = "edicion") => {
+    const marca = tipo === "carga" ? "&solo=1&carga=1" : tipo === "marcar" ? "&solo=1" : "";
     // Cada clic empieza limpio: si el anterior acabó en un aviso de fallo, ese aviso no
     // puede quedarse mandando y tapar el resultado de este
     avisoPrioridadRef.current = 0;
@@ -4971,8 +4995,10 @@ export default function App({ onCerrarSesion } = {}) {
                   <div className="compartir-menu">
                     <button onClick={() => { setMenuCompartir(false); setModalPrevia(true); }}><Eye size={15} /> Ver la hoja</button>
                     <div className="compartir-menu-sep" />
-                    <button onClick={() => handleGenerarLink(true)}><Link2 size={15} /> Link para marcar</button>
-                    <button onClick={() => handleGenerarLink(false)}><Link2 size={15} /> Link con edición</button>
+                    <button onClick={() => handleGenerarLink("marcar")} title="La checklist entera, sin poder cambiar cantidades"><Link2 size={15} /> Link para marcar</button>
+                    {/* El de logística: entra directo a marcar lo que sube al camión */}
+                    <button onClick={() => handleGenerarLink("carga")} title="Abre directo en Modo carga (Salida): para quien carga el camión"><Package size={15} /> Link de Modo carga</button>
+                    <button onClick={() => handleGenerarLink("edicion")} title="Quien lo abra puede cambiarlo todo"><Link2 size={15} /> Link con edición</button>
                     <button onClick={handleCompartirWord}><FileText size={15} /> Word</button>
                     <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>
                     <button onClick={handleCompartirWhatsapp}><MessageCircle size={15} /> WhatsApp (texto)</button>

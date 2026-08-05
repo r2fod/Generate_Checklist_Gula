@@ -56,11 +56,17 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // aplicaba al caso "sin barra". Tratándolo como suelo, subir horas nunca baja nada.
   const hVolumen = Math.max(2, h);
   const barFactor = hVolumen / 4;
-  const cervezaFactor = mesVerano ? 2.0 : 1.5;
+  // Tercios por pax. Estos SÍ son números de casa, dictados por quien lleva los
+  // eventos: 3 en verano y 2 en invierno. Van por encima del rango que dan los
+  // manuales del sector (1,5-2/pax) a propósito — aquí se bebe más cerveza que la
+  // media, y quedarse corto en agosto no tiene arreglo a media boda. La cerveza que
+  // sobra vuelve sin abrir y se reutiliza, así que pasarse cuesta poco; quedarse
+  // corto, mucho.
+  const cervezaFactor = mesVerano ? 3.0 : 2.0;
   // El consumo de cerveza por pax no crece sin límite cuanto más dura la barra: a partir
   // de las 4h de referencia el consumo por persona se estabiliza (nadie bebe el doble de
-  // cerveza solo porque la barra esté abierta el doble de horas). Se limita el factor a 1
-  // para no superar el techo real del sector (1,5-2 tercios/pax) en eventos largos.
+  // cerveza solo porque la barra esté abierta el doble de horas). Por eso el factor de
+  // horas se limita a 1: el ratio de arriba ya es el techo, no un punto de partida.
   const cerveza = Math.round((pax * cervezaFactor * Math.min(1, barFactor)) / 24) * 24;
   // Vino: calibrado con datos reales (65 pax → 30 blanco, 16-17 tinto)
   const vinoTotal = Math.round(pax * 0.72);
@@ -107,9 +113,9 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // Tinto de verano: bebida de verano habitual, más presente en meses cálidos
   const tintoVerano = Math.max(2, Math.round(pax * (mesVerano ? 0.25 : 0.12)));
   return {
-    // Sin margen extra: los ratios ya están calibrados con eventos reales por encima
-    // de los rangos del sector (vino 0,72 bot/pax vs 0,33-0,5 estándar; cerveza en el
-    // techo de 1,5-2/pax; cava 0,2 vs 0,17). Añadir un 10% encima era pasarse.
+    // Sin margen extra: los ratios ya van por encima de los rangos del sector (vino
+    // 0,72 bot/pax vs 0,33-0,5 estándar; cerveza 3/pax en verano vs 1,5-2; cava 0,2
+    // vs 0,17). Añadir un 10% encima era pasarse.
     cerveza, vinoBlanco, vinoTinto,
     cava, tonica, agua15, agua15Packs, redbull,
     aguasPequenasCajas, aguasPequenasUds,

@@ -77,6 +77,26 @@ console.log("\n══ Cerveza: las horas no pueden restar ══");
   // En verano se bebe más cerveza que en invierno, a igualdad de todo lo demás
   ok(calcBebidas(100, 4, true, false).cerveza > calcBebidas(100, 4, false, false).cerveza,
     "en verano entra más cerveza que en invierno");
+
+  // Los ratios los dicta quien lleva los eventos, no los manuales: 3 tercios por pax
+  // en verano y 2 en invierno. Van por encima del rango del sector (1,5-2) a propósito.
+  // Se fijan aquí para que no se muevan sin que nadie se entere: un cambio de ratio es
+  // dinero en cerveza que sobra o una boda de agosto que se queda seca.
+  const verano = calcBebidas(100, 4, true, false).cerveza;
+  const invierno = calcBebidas(100, 4, false, false).cerveza;
+  ok(verano === 312, `100 pax con 4h de barra en verano: ${verano} tercios (${verano / 24} cajas, ~3/pax)`);
+  ok(invierno === 192, `y en invierno: ${invierno} tercios (${invierno / 24} cajas, ~2/pax)`);
+  // Que el ratio se mantenga a cualquier tamaño, no solo en el caso de 100
+  const fuera = [];
+  for (const pax of [40, 65, 150, 200, 300, 500]) {
+    for (const [esVerano, ratio] of [[true, 3], [false, 2]]) {
+      const t = calcBebidas(pax, 4, esVerano, false).cerveza;
+      // Media caja de margen por el redondeo a cajas de 24
+      if (Math.abs(t - pax * ratio) > 12) fuera.push(`${pax}pax ${esVerano ? "verano" : "invierno"}: ${t} (esperado ~${pax * ratio})`);
+    }
+  }
+  ok(fuera.length === 0,
+    `y el ratio se mantiene a cualquier tamaño${fuera.length ? ` → ${fuera.slice(0, 4).join(" · ")}` : " (12 combinaciones)"}`);
 }
 
 console.log("\n══ Red Bull: eso sí es de la barra ══");
