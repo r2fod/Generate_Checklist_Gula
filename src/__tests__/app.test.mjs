@@ -682,6 +682,10 @@ async function main() {
       permissions: ["clipboard-read", "clipboard-write"],
     });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    // En el móvil se usa el botón de compartir del sistema; en el ordenador no existe
+    // y se copia. Aquí se quita a propósito para probar SIEMPRE el camino de copiar,
+    // que es el que se puede romper en silencio (el del móvil se prueba aparte).
+    await c.addInitScript(() => { try { delete Navigator.prototype.share; } catch (e) { /* ya no está */ } });
     const p = await nuevaPagina(c);
     const portapapeles = () => p.evaluate(() => navigator.clipboard.readText());
     // Tres links, cada uno para una persona: el de carga entra directo a marcar lo que
@@ -707,12 +711,24 @@ async function main() {
       // donde abrían siempre: añadir un link no puede cambiar los que ya se usan.
       ok(copiado.includes("&carga=1") === carga,
         carga ? `y abre directo en Modo carga (&carga=1)` : `y abre la checklist, no el Modo carga`);
-      // Se copia SOLO la dirección. Llevaba "Evento: https://…" delante para que en
-      // WhatsApp se supiera de cuál era, y con eso se rompía pegarlo en el navegador:
-      // al ver un texto con espacios lo BUSCA en vez de abrirlo. Parecía que el link
-      // no funcionaba, y no era el link — era lo que se copiaba.
-      ok(!/\s/.test(copiado) && /^https?:\/\//.test(copiado),
-        "y va pelado, sin nombre ni espacios: pegado en el navegador abre, no busca");
+      // El nombre del evento tiene que ir, o en el WhatsApp queda un link suelto entre
+      // veinte mensajes que nadie encuentra al día siguiente. Pero llevarlo DELANTE, en
+      // la misma línea ("Evento: https://…"), es lo que ya rompió los links una vez: al
+      // pegar un texto con espacios, el navegador BUSCA en vez de abrir.
+      //
+      // Por eso el nombre va arriba y la DIRECCIÓN SOLA en la última línea: en el
+      // WhatsApp se lee el nombre y el link sale tocable, y quien copie solo esa línea
+      // tiene la dirección limpia.
+      const lineas = copiado.split("\n");
+      const ultima = lineas[lineas.length - 1];
+      ok(!/\s/.test(ultima) && /^https?:\/\//.test(ultima),
+        "la dirección va sola en su línea, sin espacios: pegada en el navegador abre, no busca");
+      ok(lineas.length === 2 && /Boda Anna y Mario/.test(lineas[0]),
+        `y encima el nombre del evento, para encontrarlo en el WhatsApp → "${lineas[0]}"`);
+      // Tres links del mismo evento el mismo día: hay que poder distinguirlos
+      const queEs = { "Link para marcar": /para marcar/, "Link de Modo carga": /carga del cami/, "Link con edición": /para editar/ };
+      ok(queEs[entrada].test(lineas[0]),
+        `y qué link es, que del mismo evento salen tres → "${lineas[0]}"`);
     }
     // Y como la nube está cortada, el evento no llega a subir: hay que decirlo, que si
     // no se manda un link que no abre nada al otro lado. El aviso tarda lo que dura el
@@ -722,6 +738,37 @@ async function main() {
       .waitFor({ timeout: 12000 }).catch(() => {});
     ok(/no ha subido/i.test(await p.locator(".btn-green").first().innerText()),
       `y avisa de que el evento no ha subido → "${(await p.locator(".btn-green").first().innerText()).trim()}"`);
+    await c.close();
+  }
+
+  // En el MÓVIL no se copia: sale el botón de compartir del sistema y se elige WhatsApp
+  // directamente. Es mejor camino que copiar y pegar, y además manda el nombre y la
+  // dirección por separado, así que el link llega tocable pase lo que pase con el texto.
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => {
+      window.__compartido = null;
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: (datos) => { window.__compartido = datos; return Promise.resolve(); },
+      });
+    });
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Compartir" }).first().click();
+    await p.waitForTimeout(400);
+    await p.locator(".compartir-menu button", { hasText: "Link de Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+
+    const datos = await p.evaluate(() => window.__compartido);
+    ok(datos !== null, "en el móvil se abre el compartir del sistema, sin pasar por el portapapeles");
+    ok(/Boda Anna y Mario/.test(datos.title || "") && /carga del cami/.test(datos.title || ""),
+      `con el nombre del evento y qué link es → "${datos.title}"`);
+    // Y la dirección va en su campo, aparte del texto: así WhatsApp la trata como link
+    ok(/^https?:\/\//.test(datos.url || "") && !/\s/.test(datos.url || "") && /carga=1/.test(datos.url || ""),
+      `y la dirección aparte, en su propio campo → ${(datos.url || "").slice(0, 60)}…`);
     await c.close();
   }
 
@@ -2143,6 +2190,86 @@ async function main() {
     await c.close();
   }
 
+  // ── La tónica es cosa de las copas ─────────────────────────────────────────
+  // Salían botellas de tónica con solo barra de cóctel, y hasta sin barra ninguna. La
+  // tónica es mezcla de ginebra: en el aperitivo se sirve vermut, cerveza y refresco.
+  // Una línea a cero en una lista de compra es una línea que alguien acaba comprando.
+  console.log("\n── La tónica es cosa de las copas ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const hayTonica = async (estado) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", ...estado }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      return (await listaItems(p)).filter(i => i.startsWith("Tónica"));
+    };
+
+    ok((await hayTonica({})).length === 0,
+      "sin barra ninguna, la tónica no sale en la lista");
+    ok((await hayTonica({ barraCoctel: true, horasCoctel: 3 })).length === 0,
+      "con solo barra de cóctel tampoco: ahí no se sirve ginebra");
+    const conCopas = await hayTonica({ barraCopas: true, horasCopas: 4 });
+    ok(conCopas.length === 1 && !/=0(\||$)/.test(conCopas[0]),
+      `y con barra de copas sí, con su cantidad → ${conCopas[0]}`);
+    // Las dos juntas: sigue saliendo, y más que con solo copas
+    const ambas = await hayTonica({ barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5 });
+    const n = (t) => parseInt(t.slice(t.indexOf("=") + 1), 10);
+    ok(ambas.length === 1 && n(ambas[0]) > n(conCopas[0]),
+      `y con cóctel + copas pide más que con copas solas (${n(conCopas[0])} → ${n(ambas[0])})`);
+    await c.close();
+  }
+
+  // ── Lo que pone al lado de la cantidad ─────────────────────────────────────
+  // "5" y al lado "1 cajas de 24" se lee como dos cantidades distintas: ¿hay que
+  // llevar 5 o 24? Y "1 cajas" en plural obliga a pararse a leerlo dos veces. En una
+  // lista de compra eso no es un detalle de estilo, es un pedido equivocado.
+  console.log("\n── Lo que pone al lado de la cantidad ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 4 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    const infoDe = async (nombre) => {
+      const fila = p.locator(".item-row", { hasText: nombre }).first();
+      const i = fila.locator(".item-batea-info");
+      return await i.count() ? (await i.innerText()).trim() : "";
+    };
+    const cantidadDe = (nombre) => p.locator(".item-row", { hasText: nombre }).first().locator(".item-qty-input");
+
+    // Se baja el Nestea a 5: cinco unidades siguen siendo UNA caja, no cinco
+    await cantidadDe("Nestea").fill("5");
+    await p.waitForTimeout(900);
+    const cinco = await infoDe("Nestea");
+    ok(/^=/.test(cinco),
+      `con "=" delante, para que se lea como la misma cantidad en envases y no como otra distinta → "${cinco}"`);
+    ok(/1 caja de 24/.test(cinco) && !/1 cajas/.test(cinco),
+      `y en singular: "1 caja de 24", no "1 cajas de 24" → "${cinco}"`);
+
+    // Y al cambiarla, el de al lado la sigue
+    await cantidadDe("Nestea").fill("50");
+    await p.waitForTimeout(900);
+    const cincuenta = await infoDe("Nestea");
+    ok(/3 cajas de 24/.test(cincuenta),
+      `cambiar la cantidad recalcula las cajas al momento (50 → "${cincuenta}")`);
+    ok(/cajas/.test(cincuenta),
+      "y con más de una vuelve al plural");
+
+    // Las bateas de cristalería, igual
+    const copas = await infoDe("Copas de vino");
+    ok(/^= \d+ batea/.test(copas), `las bateas siguen la misma regla → "${copas}"`);
+
+    // Donde el número YA son packs, no lleva "=": ahí el texto es la etiqueta de lo
+    // que se cuenta, no una conversión. Mezclar las dos cosas es lo que liaba.
+    const agua = await infoDe("Agua 1,5L");
+    ok(agua.length > 0 && !/^=/.test(agua),
+      `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+
+    await c.close();
+  }
+
   // ── El aviso de "actualizado desde otro dispositivo" ───────────────────────
   // Se veía cortado por la derecha ("Actualizado desde otro di…"), justo el aviso que
   // hay que leer entero porque dice qué te ha cambiado alguien por debajo.
@@ -2801,6 +2928,33 @@ async function main() {
     ok(await fila.locator('input[type="checkbox"]').isChecked(),
       "con su casilla todavía marcada: lo hecho no se ha perdido");
 
+    // Pero ese aviso vive en SU fila, y en una lista de más de cien ítems eso es no
+    // verlo nunca: quien está cargando no va a recorrerla entera por si acaso. Tiene
+    // que decirse arriba, que es lo único que se mira sin bajar.
+    const contador = p.locator(".carga-por-revisar");
+    ok(await contador.count() === 1,
+      "y arriba, junto al recuento, se dice cuántos hay con la cantidad cambiada");
+    ok(/1 con la cantidad cambiada/.test(await contador.innerText()),
+      `con el número exacto → "${(await contador.innerText()).replace(/\s+/g, " ").trim()}"`);
+
+    // Y lleva a la fila de un toque: buscarla a mano entre cien no es plan.
+    // Se baja del todo primero, porque si no la fila ya se ve y el salto no se nota:
+    // sin esto la comprobación pasaba sola sin llegar a probar nada.
+    // El que hace scroll es .carga-modal (max-height + overflow-y), no el fondo. Moviendo
+    // el fondo no pasaba nada y la fila seguía a la vista, así que la comprobación de
+    // abajo se cumplía sola sin llegar a probar el salto.
+    await p.locator(".carga-modal").evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await p.waitForTimeout(500);
+    const aLaVista = () => fila.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return r.bottom > 0 && r.top < window.innerHeight;
+    });
+    ok(!(await aLaVista()), "bajando del todo, la fila con la cantidad cambiada se pierde de vista");
+    await contador.click();
+    await p.waitForTimeout(1200);
+    ok(await aLaVista(),
+      "y al pulsar el aviso de arriba, la pantalla salta hasta ella");
+
     // Volver a tocarla es haberla revisado: el aviso desaparece
     await fila.locator('input[type="checkbox"]').click();
     await p.waitForTimeout(400);
@@ -2808,6 +2962,8 @@ async function main() {
     await p.waitForTimeout(900);
     ok(await fila.locator(".carga-marca-otra.is-revisar").count() === 0,
       "y al volver a marcarla el aviso se va, que ya está revisada");
+    ok(await p.locator(".carga-por-revisar").count() === 0,
+      "y el contador de arriba también, que ya no queda ninguno");
     await c.close();
   }
 

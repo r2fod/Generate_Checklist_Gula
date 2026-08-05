@@ -52,3 +52,34 @@ export function sanearEstado(estado) {
 
 // Para saber, en las pruebas y desde fuera, qué campos vigila esto
 export const CAMPOS_VIGILADOS = { LISTAS, MAPAS };
+
+// ─── QUÉ CANTIDAD HA CAMBIADO, Y DE CUÁNTO A CUÁNTO ───────────────────────────
+// Cuando alguien cambia una cantidad desde la oficina, quien está cargando el camión
+// tiene que enterarse. El aviso decía "Cantidades editadas a mano (modificado)": ni
+// qué item, ni de cuánto a cuánto. Para alguien con el móvil en una mano y una caja
+// en la otra, eso no es un aviso, es ruido.
+//
+// Las claves son "categoría::etiqueta". Se enseña solo la etiqueta: la categoría ya
+// se ve al llegar a la fila, y el aviso tiene que caber en una línea de móvil.
+const soloEtiqueta = (clave) => {
+  const corte = String(clave).indexOf("::");
+  return corte === -1 ? String(clave) : String(clave).slice(corte + 2);
+};
+
+// "auto" es una cantidad que vuelve a calcularse sola: quitar el número escrito a mano
+// no es dejarlo en blanco, es devolverlo a lo que dice la checklist.
+const AUTO = "auto";
+
+export function cambiosDeCantidad(antes, despues) {
+  const a = esMapa(antes) ? antes : {};
+  const b = esMapa(despues) ? despues : {};
+  const cambios = [];
+  for (const clave of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const va = a[clave], vb = b[clave];
+    if (String(va ?? "") === String(vb ?? "")) continue;
+    const de = va === undefined || va === "" ? AUTO : va;
+    const to = vb === undefined || vb === "" ? AUTO : vb;
+    cambios.push(`${soloEtiqueta(clave)}: ${de} → ${to}`);
+  }
+  return cambios.sort();
+}

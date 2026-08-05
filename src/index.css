@@ -704,6 +704,35 @@ body {
   background: #15803d;
 }
 
+/* "3 con la cantidad cambiada · Ver →" en la cabecera de Modo carga. Va arriba porque
+   es lo único que se ve sin bajar, y quien está cargando no va a recorrer 130 filas
+   buscando un aviso pequeño. */
+.carga-por-revisar {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  min-height: 40px;
+}
+.carga-por-revisar:hover { filter: brightness(0.97); }
+.carga-por-revisar > span:not(.carga-por-revisar-ir) { min-width: 0; }
+.carga-por-revisar svg { flex: 0 0 auto; }
+.carga-por-revisar-ir {
+  flex: 0 0 auto;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
 /* Días de producción (pax por día, solo evento Producción) */
 .dia-produccion-row {
   display: flex;

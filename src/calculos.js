@@ -48,7 +48,11 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
   );
 }
 
-export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false) {
+// "h" son las horas de barra TOTALES (cóctel + copas) y mandan el volumen general.
+// "horasCopas" se pasa aparte para lo que solo existe en la barra de copas: la tónica,
+// que es mezcla de ginebra y en el aperitivo no se sirve. Por defecto vale lo mismo que
+// h, para que quien llame sin ese dato siga viendo lo de siempre.
+export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h) {
   // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
   // la de la comida— y eso antes se resolvía llamando aquí con un 2 fijo cuando no
   // había barra. El efecto era absurdo: media hora de cóctel pedía MENOS que no tener
@@ -89,7 +93,11 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // El factor de horas se acota (máx. 1,75) para que una barra muy larga no dispare
   // la tónica/refrescos de mezcla por encima de lo real, igual que en la cristalería.
   const barFactorTope = Math.min(1.75, barFactor);
-  const tonica = Math.max(6, Math.round(pax * 0.15 * barFactorTope));
+  // La tónica es MEZCLA DE GINEBRA: sin barra libre de copas no se sirve ni una. Salía
+  // igual con solo cóctel —donde no hay destilados— y hasta sin barra ninguna, porque
+  // el mínimo de 6 botellas se aplicaba siempre. En el aperitivo se sirve vermut,
+  // cerveza y refresco; la ginebra no aparece hasta las copas.
+  const tonica = horasCopas > 0 ? Math.max(6, Math.round(pax * 0.15 * barFactorTope)) : 0;
   // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
   // Agua Vidaqua de personal, que se calcula aparte en calcPersonal(). El ratio es
   // 0,8 BOTELLAS por pax (~1,2 L/pax, en el rango alto del sector: 0,5-1 L/pax);

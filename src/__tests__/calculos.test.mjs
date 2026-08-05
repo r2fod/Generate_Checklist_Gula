@@ -17,7 +17,7 @@ import {
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
 } from "../calculos.js";
-import { sanearEstado, CAMPOS_VIGILADOS } from "../estado.js";
+import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 
@@ -105,6 +105,24 @@ console.log("\n══ Red Bull: eso sí es de la barra ══");
     "sin barra no va ni uno");
   ok(calcBebidas(100, 0.5, true, false).redbull > 0,
     "con barra, aunque sea media hora, ya va");
+}
+
+console.log("\n══ Tónica: solo con barra de COPAS ══");
+{
+  // La tónica es mezcla de ginebra. Salían 8 botellas sin barra ninguna y 11 con solo
+  // cóctel, porque el mínimo de 6 se aplicaba siempre y las horas que miraba eran las
+  // TOTALES. En el aperitivo se sirve vermut, cerveza y refresco; ginebra no.
+  const tonica = (total, copas) => calcBebidas(100, total, true, false, false, copas).tonica;
+  ok(tonica(0, 0) === 0, "sin barra ninguna no va ni una botella");
+  ok(tonica(3, 0) === 0, "y con solo cóctel tampoco, que ahí no se sirve ginebra");
+  ok(tonica(4, 4) > 0, "con barra de copas sí");
+  ok(tonica(8, 5) > tonica(4, 4),
+    `y una barra más larga pide más (${tonica(4, 4)} → ${tonica(8, 5)})`);
+  // Media hora de copas ya cuenta: el mínimo de 6 botellas es de compra, no de consumo
+  ok(tonica(0.5, 0.5) >= 6, `media hora de copas ya lleva el mínimo de compra (${tonica(0.5, 0.5)})`);
+  // Quien llame sin el dato de copas sigue viendo lo de siempre: no se rompe nada
+  ok(calcBebidas(100, 4, true, false).tonica > 0,
+    "y llamando sin decir las horas de copas se comporta como antes");
 }
 
 console.log("\n══ Destilados: solo dependen de las copas ══");
@@ -423,6 +441,32 @@ console.log("\n══ El código del buzón: que no se pierda al guardar la app 
   let exploto = false;
   try { guardar(roto, "ABC123"); guardar(null, "ABC123"); } catch (e) { exploto = true; }
   ok(!exploto, "y guardar tampoco revienta cuando no se puede guardar");
+}
+
+console.log("\n══ Qué cantidad ha cambiado, y de cuánto a cuánto ══");
+{
+  // Quien está cargando el camión tiene que enterarse de que le han cambiado una
+  // cantidad de algo que ya había marcado. El aviso decía "Cantidades editadas a mano
+  // (modificado)": ni qué item, ni de cuánto a cuánto. Eso no es un aviso.
+  const c = (a, b) => cambiosDeCantidad(a, b);
+  ok(JSON.stringify(c({}, { "Electricidad y camión::Regletas": "5" })) === JSON.stringify(["Regletas: auto → 5"]),
+    "poner una cantidad a mano se dice con nombre y valor");
+  ok(JSON.stringify(c({ "Electricidad y camión::Regletas": "3" }, { "Electricidad y camión::Regletas": "5" })) === JSON.stringify(["Regletas: 3 → 5"]),
+    "y cambiarla dice de cuánto a cuánto, que es lo que hay que volver a contar");
+  ok(JSON.stringify(c({ "Barra::Hielo": "8" }, {})) === JSON.stringify(["Hielo: 8 → auto"]),
+    'quitar el número escrito a mano no es dejarlo en blanco: vuelve a "auto"');
+  ok(c({ "A::Uno": "1" }, { "A::Uno": "1" }).length === 0,
+    "y si no cambia nada, no se dice nada");
+  // Varios a la vez, ordenados para que el aviso salga siempre igual
+  const varios = c({ "A::Sillas": "10", "B::Mesas": "4" }, { "A::Sillas": "12", "B::Mesas": "6" });
+  ok(varios.length === 2 && varios[0] === "Mesas: 4 → 6" && varios[1] === "Sillas: 10 → 12",
+    `varios cambios salen todos y en orden fijo → ${JSON.stringify(varios)}`);
+  // La categoría no se enseña: ya se ve al llegar a la fila y el aviso tiene que caber
+  ok(!c({}, { "Electricidad y camión::Regletas": "5" })[0].includes("::"),
+    "sin la categoría delante, que el aviso tiene que caber en una línea de móvil");
+  // Nada de esto puede tumbar el arranque si llega basura desde la nube
+  ok(c(null, undefined).length === 0 && c("texto", 7).length === 0 && c([1, 2], {}).length === 0,
+    "y con basura de entrada devuelve una lista vacía, no un error");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

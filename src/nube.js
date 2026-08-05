@@ -55,14 +55,19 @@ export function nuevoIdEvento() {
   return Array.from({ length: 8 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
 }
 
+// Devuelve la marca de tiempo con la que se ha guardado. Quien llama la apunta para
+// reconocer DESPUÉS su propio eco cuando vuelva por la suscripción: es la única forma
+// de distinguir "esto lo escribí yo hace un momento" de "esto lo ha cambiado otro".
 export async function guardarEventoNube(id, estado) {
   const conexion = await getDb();
-  if (!conexion) return;
+  if (!conexion) return null;
   const { db, fs } = conexion;
+  const actualizado = Date.now();
   await fs.setDoc(fs.doc(db, "eventos", id), {
     estado: JSON.stringify(estado),
-    actualizado: Date.now(),
+    actualizado,
   });
+  return actualizado;
 }
 
 export async function cargarEventoNube(id) {
@@ -75,6 +80,13 @@ export async function cargarEventoNube(id) {
 
 // Avisa (cb) cada vez que alguien guarda cambios en este evento. Devuelve una
 // función para cancelar la suscripción.
+//
+// Además del estado se pasa CUÁNDO se guardó y si el aviso viene de una escritura
+// nuestra todavía sin confirmar. Antes solo se pasaba el estado, y sin saber la hora
+// no había forma de distinguir un cambio de otra persona del eco tardío de uno
+// nuestro: al mover un deslizador varias veces seguidas (4 → 5 → 6), el eco del "5"
+// llegaba cuando ya ibas por el 6 y lo pisaba. Se veía como que las horas de barra
+// se cambiaban solas, sin que nadie tocara nada desde ningún otro sitio.
 export function suscribirEventoNube(id, cb) {
   let unsub = () => {};
   let cancelado = false;
@@ -84,7 +96,17 @@ export function suscribirEventoNube(id, cb) {
     const { db, fs } = conexion;
     unsub = fs.onSnapshot(
       fs.doc(db, "eventos", id),
-      (snap) => { if (snap.exists()) cb(snap.data().estado); },
+      (snap) => {
+        if (!snap.exists()) return;
+        const d = snap.data();
+        cb(d.estado, {
+          actualizado: typeof d.actualizado === "number" ? d.actualizado : 0,
+          // Firestore avisa DOS veces de cada escritura: primero con lo que acabas de
+          // escribir sin confirmar (pendiente) y luego con lo que ha guardado el
+          // servidor. La primera es siempre nuestra y no hay nada que aplicar.
+          pendiente: Boolean(snap.metadata && snap.metadata.hasPendingWrites),
+        });
+      },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
     );
   })();
