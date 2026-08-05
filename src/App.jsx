@@ -28,7 +28,7 @@ import {
 import { aRespuestasDeLaApp, resumirEnvio, recogidasDelEnvio, comprasDelEnvio, archivosDelEnvio, fmtFechaCorta, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 import logoGula from "./assets/gula-logo.png";
-import { sanearEstado } from "./estado.js";
+import { sanearEstado, cambiosDeCantidad } from "./estado.js";
 import {
   BATEA, bateas, conMargen, MARGEN_SEGURIDAD,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL, terciosConBarril,
@@ -67,11 +67,15 @@ function bateaSizeDe(label) {
 }
 // "200" + tamaño 25 → "200 (8 bateas de 25)"; si la cantidad no es un número
 // (ej. "—") o el item no es de cristalería, se muestra tal cual sin más.
+// "1 caja" y no "1 cajas". Parece una tontería hasta que se lee "1 cajas de 24" al
+// lado de un número y hay que pararse a pensar qué está diciendo.
+function plural(n, singular, plural_) { return `${n} ${n === 1 ? singular : plural_}`; }
+
 function conBateas(label, qtyTexto) {
   const size = bateaSizeDe(label);
   const num = parseFloat(String(qtyTexto).replace(",", "."));
   if (!size || isNaN(num)) return qtyTexto;
-  return `${qtyTexto} (${Math.ceil(num / size)} bateas de ${size})`;
+  return `${qtyTexto} (${plural(Math.ceil(num / size), "batea", "bateas")} de ${size})`;
 }
 // Mismo mecanismo que las bateas, para bebidas que se piden en cajas de tamaño fijo:
 // cerveza (24 tercios/caja), vino y tinto de verano (6 botellas/caja) y refrescos
@@ -91,7 +95,7 @@ function conCajas(label, qtyTexto) {
   const size = cajaSizeDe(label);
   const num = parseFloat(String(qtyTexto).replace(",", "."));
   if (!size || isNaN(num)) return qtyTexto;
-  return `${qtyTexto} (${Math.ceil(num / size)} cajas de ${size})`;
+  return `${qtyTexto} (${plural(Math.ceil(num / size), "caja", "cajas")} de ${size})`;
 }
 // Empareja un número editable con el texto fijo del envase (packs, cajas, paq.,
 // cargas...), para que al corregir la cantidad a mano no haya que retocar también
@@ -467,7 +471,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // su propio ratio (1 camarero cada X pax) en el formulario, manda ese.
   const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 18 : 12);
 
-  const bebidas    = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava);
+  const bebidas    = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito sí escalan con el total
@@ -665,7 +669,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)], ["Aquarius", String(bebidas.aquarius)],
     ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
-    ["Tónica", conSufijo(bebidas.tonica, "botellas")], ["Agua con gas", String(bebidas.aguaConGas)],
+    // La tónica solo existe si hay barra libre de COPAS: es mezcla de ginebra, y en el
+    // aperitivo no se sirve. Sin copas no aparece la línea siquiera — una línea a cero
+    // en la lista de compra es una línea que alguien acaba comprando por si acaso.
+    opt(horasCopas > 0, ["Tónica", conSufijo(bebidas.tonica, "botellas")]),
+    ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
     opt(!hayCongelador, ["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]),
@@ -721,7 +729,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
 
-  const bebidas = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava);
+  const bebidas = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
@@ -1233,6 +1241,16 @@ function resumirCambios(prev, nuevo) {
     const a = prev?.[k], b = nuevo?.[k];
     if (JSON.stringify(a) === JSON.stringify(b)) return;
     const etiqueta = ETIQUETAS_CAMPO[k] || k;
+    // Las cantidades se dicen UNA A UNA, con nombre y con el antes y el después. Es lo
+    // que de verdad tiene que ver quien está cargando el camión: "Regletas: 3 → 5" le
+    // dice qué volver a contar; "Cantidades editadas a mano (modificado)", nada.
+    if (k === "overridesManuales") {
+      cambiosDeCantidad(a, b).forEach(t => cambios.push(t));
+      return;
+    }
+    // Y esta es la consecuencia de la anterior, no un cambio aparte: decirla también
+    // sería contar dos veces lo mismo en un aviso que solo enseña las cuatro primeras.
+    if (k === "marcasRevisar") return;
     if (typeof b === "boolean" || typeof a === "boolean") {
       cambios.push(`${etiqueta}: ${b ? "sí" : "no"}`);
     } else if (Array.isArray(a) || Array.isArray(b) || typeof a === "object" || typeof b === "object") {
@@ -1926,6 +1944,18 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
     : modo === "salida" ? contarSi(k => checkeados[k])
     : contarSi(k => { const v = vueltos[k]; return v !== undefined && v !== ""; });
   const palabraModo = modo === "preparacion" ? "preparados" : modo === "salida" ? "cargados" : "vueltos";
+  // Items marcados a los que alguien les ha cambiado la cantidad DESPUÉS: siguen
+  // marcados (es trabajo hecho, no se borra) pero hay que volver a contarlos. El aviso
+  // de "revisar" vive en su fila, y en una lista de 130 ítems eso es no verlo nunca:
+  // quien carga no va a recorrer la lista entera por si acaso. Aquí se cuentan para
+  // poder decirlo arriba, donde sí se mira, y llevar de un toque al primero.
+  const porRevisar = checklist.flatMap(c => c.items
+    .map(([, , , lo]) => `${c.nombre}::${lo}`)
+    .filter(k => marcasRevisar[k] && (modo === "preparacion" ? preparados[k] : modo === "salida" ? checkeados[k] : vueltos[k] !== undefined && vueltos[k] !== "")));
+  const irAlPrimeroPorRevisar = () => {
+    const fila = document.querySelector(`[data-revisar="${CSS.escape(porRevisar[0] || "")}"]`);
+    if (fila) fila.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
   // Tiempos estimados (Preparación / Carga / Descarga). El criterio vive en
@@ -2073,6 +2103,21 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
               {modo === "salida" && totalPreparados > 0 ? ` · ${totalPreparados} preparados` : ""}
               {totalRoturas > 0 ? ` · ${totalRoturas} roturas` : ""}
             </div>
+            {/* Alguien ha cambiado una cantidad de algo que ya estaba marcado. Va aquí
+                arriba, junto al recuento, porque es lo único que se mira sin scroll —
+                y lleva de un toque a la fila, que buscarla entre 130 no es plan. */}
+            {porRevisar.length > 0 && (
+              <button type="button" className="carga-por-revisar" onClick={irAlPrimeroPorRevisar}
+                      title="Se les cambió la cantidad después de marcarlos: hay que volver a contarlos">
+                <AlertTriangle size={13} />
+                <span>
+                  {porRevisar.length === 1
+                    ? "1 con la cantidad cambiada"
+                    : `${porRevisar.length} con la cantidad cambiada`}
+                </span>
+                <span className="carga-por-revisar-ir">Ver →</span>
+              </button>
+            )}
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
             {totalItems > 0 && (
               <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.\nMontaje in situ (todo el equipo) = 45 + pax × 1,1 + ítems × 0,4.`}>
@@ -2266,7 +2311,8 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                     const marcado = enPreparacion ? !!preparados[key] : !!checkeados[key];
                     const otroMarcado = enPreparacion ? !!checkeados[key] : !!preparados[key];
                     return (
-                      <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}>
+                      <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}
+                           data-revisar={marcado && marcasRevisar[key] ? key : undefined}>
                         <label className="carga-row-principal">
                           <input
                             type="checkbox"
@@ -2809,6 +2855,32 @@ function esSoloMarcar() {
   } catch (e) { return false; }
 }
 
+// "Link para marcar" abre DIRECTO en Modo carga, en Salida. Antes aterrizaba en la
+// checklist entera y había que encontrar y pulsar "Modo carga": para quien recibe el
+// link por WhatsApp y solo tiene que ir marcando lo que sube al camión, eso es una
+// pantalla de más y una que no le hace falta. Dentro tiene Salida y Vuelta, que es lo
+// que marca logística, y sigue pudiendo salir de ahí si necesita mirar otra cosa.
+//
+// Va en su propia marca ("carga=1") y no colgado de "solo=1" a propósito: los links
+// que ya se mandaron llevan solo "solo=1" y tienen que seguir abriéndose como se
+// abrían. Los nuevos llevan las dos.
+function abreEnModoCarga() {
+  try {
+    return !!new URLSearchParams(window.location.search).get("carga");
+  } catch (e) { return false; }
+}
+
+// Solo ver: la checklist entera para consultarla, sin poder marcar NADA. Es el link
+// del metre — necesita saber qué hay y cuánto, pero las marcas de carga son de
+// logística y una casilla tocada por error deja a alguien pensando que algo está
+// cargado cuando no lo está. Lleva "solo=1" además (misma lectura, sin edición) y lo
+// único que quita de más es la entrada a Modo carga.
+function esSoloVista() {
+  try {
+    return !!new URLSearchParams(window.location.search).get("vista");
+  } catch (e) { return false; }
+}
+
 function leerEstadoGuardado() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -2936,12 +3008,17 @@ const FilaItem = React.memo(function FilaItem({
         onFocus={e => e.target.select()}
         size={Math.max(2, displayQty.length)}
       />
+      {/* El "=" no es adorno: sin él, "5" y al lado "1 caja de 24" se lee como dos
+          cantidades distintas y no se sabe si hay que llevar 5 o 24. Con el igual
+          queda claro que es la MISMA cantidad dicha en envases: 5 uds = 1 caja.
+          Y donde el número ya son cajas o packs (envase fijo, columna de la derecha
+          sin "="), el texto es solo la etiqueta de lo que se cuenta. */}
       {bateaCount !== null ? (
-        <span className="item-batea-info" title="Bateas recalculadas automáticamente según la cantidad">{bateaCount} bateas de {bateaSize}</span>
+        <span className="item-batea-info" title={`${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`}>= {bateaCount === 1 ? "1 batea" : `${bateaCount} bateas`} de {bateaSize}</span>
       ) : cajaCount !== null ? (
-        <span className="item-batea-info" title="Cajas recalculadas automáticamente según la cantidad">{cajaCount} cajas de {cajaSize}</span>
+        <span className="item-batea-info" title={`${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`}>= {cajaCount === 1 ? "1 caja" : `${cajaCount} cajas`} de {cajaSize}</span>
       ) : sufijo ? (
-        <span className="item-batea-info" title="Envase fijo: no cambia aunque edites la cantidad">{sufijo}</span>
+        <span className="item-batea-info" title="El número de la izquierda ya va en este envase: no cambia aunque edites la cantidad">{sufijo}</span>
       ) : null}
       {/* Renombrar y quitar items cambian la checklist para todo el mundo: con el
           link de solo marcar no se ofrecen. */}
@@ -3146,8 +3223,12 @@ export default function App({ onCerrarSesion } = {}) {
   const [vueltos, setVueltos] = useState(estadoInicial.vueltos ?? {}); // { "categoria::label": true } — marcados como "Vuelve" (devuelto tras el evento)
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
-  const [modoCarga, setModoCarga] = useState(false);
-  const [soloMarcar] = useState(esSoloMarcar);
+  const [soloVista] = useState(esSoloVista);
+  // Con el link de solo ver no se entra en Modo carga ni por la puerta de atrás
+  const [modoCarga, setModoCarga] = useState(() => abreEnModoCarga() && !esSoloVista());
+  // "Solo ver" es "solo marcar" y además sin marcar: hereda todo lo que aquel bloquea
+  // (cantidades, nombres, configuración, añadir y quitar items).
+  const [soloMarcar] = useState(() => esSoloMarcar() || esSoloVista());
   // Barra fina pegada arriba en móvil: la cabecera con los botones ocupa casi un tercio
   // de la pantalla, así que dejarla fija entera sería peor. En su lugar, al bajar de la
   // cabecera aparece una tira de ~50px con lo único que se usa mientras se recorre la
@@ -3375,12 +3456,28 @@ export default function App({ onCerrarSesion } = {}) {
   estadoActualJSONRef.current = estadoActualJSON;
   const ultimoGuardadoNubeRef = React.useRef(null);
 
+  // Las marcas de tiempo de NUESTROS últimos guardados. Sirven para reconocer el eco de
+  // lo que hemos escrito nosotros cuando vuelve por la suscripción.
+  //
+  // No se compara con la hora del móvil de nadie más a propósito: dos teléfonos con el
+  // reloj desajustado unos minutos —que es de lo más normal— harían que los cambios de
+  // uno se descartaran en el otro sin que nadie entendiera por qué. Solo se reconocen
+  // las marcas propias, y para eso el reloj es siempre el mismo.
+  const nuestrosGuardadosRef = React.useRef([]);
+  const apuntarGuardadoPropio = (ts) => {
+    if (!ts) return;
+    // Diez llegan de sobra: el eco tarda un segundo, no media hora
+    nuestrosGuardadosRef.current = [...nuestrosGuardadosRef.current.slice(-9), ts];
+  };
+
   // Cada cambio local se sube a la nube con un pequeño retardo (evita subir por cada tecla)
   useEffect(() => {
     if (!nubeActiva() || !eventoNubeId) return;
     const t = setTimeout(() => {
       ultimoGuardadoNubeRef.current = estadoActualJSON;
-      guardarEventoNube(eventoNubeId, getEstadoActual()).then(() => setErrorNube(null)).catch(avisarFalloNube);
+      guardarEventoNube(eventoNubeId, getEstadoActual())
+        .then((ts) => { apuntarGuardadoPropio(ts); setErrorNube(null); })
+        .catch(avisarFalloNube);
     }, 1200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3421,8 +3518,19 @@ export default function App({ onCerrarSesion } = {}) {
   // el detalle de lo que ha cambiado
   useEffect(() => {
     if (!nubeActiva() || !eventoNubeId) return;
-    const unsub = suscribirEventoNube(eventoNubeId, (remotoJSON) => {
+    const unsub = suscribirEventoNube(eventoNubeId, (remotoJSON, meta = {}) => {
       if (remotoJSON === estadoActualJSONRef.current || remotoJSON === ultimoGuardadoNubeRef.current) return;
+      // El primer aviso de cada escritura es la nuestra sin confirmar: no hay nada que
+      // aplicar, ya lo tenemos delante.
+      if (meta.pendiente) return;
+      // Y aquí está lo que hacía que las horas de barra "se cambiaran solas", sin que
+      // nadie tocara nada desde ningún otro sitio: al mover un deslizador varias veces
+      // seguidas se suben varios estados, y el eco del penúltimo llega cuando ya vas
+      // por el último. Solo se comparaba el texto con el ÚLTIMO guardado nuestro, así
+      // que el eco del anterior colaba y te devolvía el valor viejo — el deslizador
+      // saltaba solo hacia atrás un segundo después de soltarlo.
+      // Reconociendo la marca de tiempo como nuestra, ese eco se descarta entero.
+      if (meta.actualizado && nuestrosGuardadosRef.current.includes(meta.actualizado)) return;
       let remoto, previo;
       // También lo que llega de la nube: puede venir de una versión distinta
       try { remoto = sanearEstado(JSON.parse(remotoJSON)); previo = JSON.parse(estadoActualJSONRef.current); }
@@ -3479,11 +3587,39 @@ export default function App({ onCerrarSesion } = {}) {
   // pegarlo en la barra del navegador: al ver un texto con espacios, el navegador lo
   // BUSCA en vez de abrirlo, y parecía que el link no funcionaba. En WhatsApp da
   // igual, que ahí la dirección se detecta sola y de qué evento es se escribe al lado.
-  const copiarLink = (url) => {
-    navigator.clipboard.writeText(url).then(() => {
-      avisarCompartir("¡Link copiado! ✓");
+  // Compartir un link tiene dos caminos, y el orden importa:
+  //
+  // 1) El botón de compartir del móvil (navigator.share). Manda el NOMBRE y la
+  //    DIRECCIÓN por separado, así que en el WhatsApp llega "Boda Anna y Mario ·
+  //    carga" con su link debajo, tocable, y sin pasar por el portapapeles. Es lo
+  //    que hacía falta: un link suelto entre veinte mensajes no hay quien lo
+  //    encuentre después.
+  // 2) Si el móvil o el navegador no lo tienen, se copia al portapapeles.
+  //
+  // Y aquí está la trampa que ya nos costó una vez: se copiaba "Nombre: https://…"
+  // y quien pegaba ESO en la barra del navegador no abría nada — al ver un texto con
+  // espacios, el navegador BUSCA en vez de abrir. Por eso, cuando toca copiar, la
+  // dirección va SOLA y en su propia línea, la última, y el nombre encima. Pegado en
+  // el WhatsApp se ve el nombre y el link tocable; y si alguien copia solo la última
+  // línea, tiene la dirección limpia.
+  const copiarLink = (url, nombre = "", queEs = "") => {
+    const titulo = [nombre, queEs].filter(Boolean).join(" · ");
+    // El share del móvil tiene que salir DENTRO del toque, igual que la copia: detrás
+    // de un await el navegador lo rechaza por no venir de un gesto.
+    if (navigator.share) {
+      navigator.share({ title: titulo || "Checklist Gula", text: titulo, url })
+        .then(() => avisarCompartir("¡Compartido! ✓"))
+        // Cancelar el menú de compartir no es un fallo: no se dice nada y no se copia
+        // nada a la espalda de nadie.
+        .catch(() => {});
+      return;
+    }
+    const texto = titulo ? `${titulo}\n${url}` : url;
+    navigator.clipboard.writeText(texto).then(() => {
+      avisarCompartir(nombre ? `¡Link de "${nombre}" copiado! ✓` : "¡Link copiado! ✓");
     }).catch(() => {
-      // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a mano
+      // Sin permiso de portapapeles (o sin HTTPS): se muestra el link para copiarlo a
+      // mano. Aquí va la dirección sola: es lo que hay que poder seleccionar de un tirón.
       window.prompt("No se pudo copiar automáticamente. Copia el link:", url);
     });
   };
@@ -3512,6 +3648,32 @@ export default function App({ onCerrarSesion } = {}) {
       return prev.filter((_, idx) => idx !== i);
     });
   };
+  // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo se creaba si
+  // alguien tocaba el selector con el dedo. Un evento nuevo, o uno que llega del
+  // formulario de la oficina con las sillas ya puestas, se quedaba con sillas de
+  // alquiler y sin recogida: nadie sabía cuándo había que ir a por ellas ni cuándo
+  // devolverlas, que es justo lo que se olvida.
+  const sillasVistasRef = React.useRef(null);
+  useEffect(() => {
+    // La fecha entra en la clave porque un evento sin fecha todavía no puede crear su
+    // recogida: al ponerla, esto se vuelve a mirar y ya se crea con sus dos días.
+    const clave = `${origenSillas}::${fechaEvento || ""}`;
+    if (sillasVistasRef.current === clave) return;
+    const primeraVez = sillasVistasRef.current === null;
+    sillasVistasRef.current = clave;
+    // Sin fecha de evento no hay nada que decir: una recogida sin día no responde a
+    // "¿cuándo hay que ir?", que es justo para lo que existe, y sí saldría contada
+    // como pendiente en el resumen. Se espera a que haya fecha.
+    if (!fechaEvento) return;
+    // Al ABRIR un evento ya pasado tampoco se toca nada: crear ahora su recogida sería
+    // sacar un aviso rojo de algo que se hizo hace meses, y quitarla sería borrar el
+    // registro de lo que ocurrió. Solo se sincroniza al cambiarlo de verdad.
+    if (primeraVez && fechaEvento < hoyISO()) return;
+    const esAlquiler = origenSillas === "Dealde" || origenSillas === "Carvillo";
+    sincronizaAlquiler("sillas", esAlquiler, conceptoAlquiler("sillas", origenSillas));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origenSillas, fechaEvento]);
+
   // El generador de las producciones viene marcado de serie (siempre se lleva uno), así
   // que su recogida se crea al elegir el tipo de evento, que es cuando entra en juego —
   // si no, el único alquiler que nadie llega a pulsar sería justo el que más se olvida.
@@ -3546,8 +3708,24 @@ export default function App({ onCerrarSesion } = {}) {
       ? { ...x, ...cambios, ...(tocaFechas && x.fechasAuto ? { fechasAuto: false } : {}) }
       : x));
 
-  const handleGenerarLink = (paraMarcar = false) => {
-    const marca = paraMarcar ? "&solo=1" : "";
+  // Tres links, cada uno para una persona distinta:
+  //   "edicion" — sin marcas. Quien lo abre puede cambiarlo todo.
+  //   "marcar"  — "solo=1". La checklist entera, sin poder tocar cantidades.
+  //   "carga"   — "solo=1&carga=1". Además entra DIRECTO en Modo carga (Salida), que
+  //               es a lo único que va quien carga el camión: marcar lo que sube y,
+  //               al volver, lo que baja. Sin buscar el botón de Modo carga en la
+  //               cabecera con el móvil en una mano.
+  // "carga=1" va aparte de "solo=1" y no colgado de él a propósito: los links que ya
+  // se mandaron llevan solo "solo=1" y tienen que seguir abriéndose como se abrían.
+  const handleGenerarLink = (tipo = "edicion") => {
+    const marca = tipo === "carga" ? "&solo=1&carga=1"
+      : tipo === "vista" ? "&solo=1&vista=1"
+      : tipo === "marcar" ? "&solo=1" : "";
+    // Qué link es, para que en el WhatsApp se distinga de los otros del mismo evento.
+    // Sin esto, cuatro links iguales del mismo día y a ver quién acierta.
+    const queEs = tipo === "carga" ? "carga del camión"
+      : tipo === "vista" ? "solo ver"
+      : tipo === "marcar" ? "para marcar" : "para editar";
     // Cada clic empieza limpio: si el anterior acabó en un aviso de fallo, ese aviso no
     // puede quedarse mandando y tapar el resultado de este
     avisoPrioridadRef.current = 0;
@@ -3563,7 +3741,7 @@ export default function App({ onCerrarSesion } = {}) {
       // subiera, la copia caía fuera del gesto y el navegador la rechazaba — se cerraba
       // el menú y no pasaba nada más. El respaldo (un prompt con el link) tampoco se ve
       // en una app instalada, así que el fallo era invisible.
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}${marca}`, nombreEvento, queEs);
       // Y la subida se comprueba DESPUÉS: el link está copiado, pero hasta que el evento
       // no esté en la nube ese link no abre nada al otro lado. Eso hay que decirlo antes
       // de que lo manden, que es como nacía un link muerto sin que se enterara nadie.
@@ -3578,7 +3756,7 @@ export default function App({ onCerrarSesion } = {}) {
         avisarCompartir("Copiado, pero el evento aún NO ha subido ⚠", 9000, 1);
       }, ESPERA_SUBIDA_LINK);
       guardarEventoNube(id, estado)
-        .then(() => { resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
+        .then((ts) => { apuntarGuardadoPropio(ts); resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
         .catch((e) => {
           resuelto = true;
           clearTimeout(aTiempo);
@@ -3590,7 +3768,7 @@ export default function App({ onCerrarSesion } = {}) {
     } else {
       // Sin nube el link lleva la checklist dentro. Aquí el "solo marcar" también vale:
       // no se sincroniza con nadie, pero evita que quien carga cambie lo que ve.
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}${marca}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}${marca}`, nombreEvento, queEs);
     }
     setMenuCompartir(false);
   };
@@ -4167,9 +4345,9 @@ export default function App({ onCerrarSesion } = {}) {
       const estado = { ...guardado, eventoNubeId: id };
       guardarEventoNube(id, estado).catch(avisarFalloNube);
       if (!guardado.eventoNubeId) guardarEventos({ ...eventosGuardados, [nombre]: estado });
-      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?evento=${id}`, nombre, "para editar");
     } else {
-      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`);
+      copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`, nombre, "para editar");
     }
   };
   const handleBorrarEvento = (nombre) => setDialogo({
@@ -4885,9 +5063,12 @@ export default function App({ onCerrarSesion } = {}) {
             value={filtro}
             onChange={e => setFiltro(e.target.value)}
           />
-          <button className="barra-fija-carga" onClick={() => setModoCarga(true)} title="Modo carga">
-            <Package size={15} /><span className="barra-fija-carga-texto">Carga</span>
-          </button>
+          {/* Con el link de solo ver no hay entrada a Modo carga: marcar es de logística */}
+          {!soloVista && (
+            <button className="barra-fija-carga" onClick={() => setModoCarga(true)} title="Modo carga">
+              <Package size={15} /><span className="barra-fija-carga-texto">Carga</span>
+            </button>
+          )}
         </div>
 
         {/* HEADER */}
@@ -4962,7 +5143,9 @@ export default function App({ onCerrarSesion } = {}) {
                 el PDF, así que su sitio es dentro de Compartir, un segundo antes de
                 exportar. Además libera un botón de una cabecera que ocupaba casi un
                 tercio de la pantalla del móvil. */}
-            <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
+            {!soloVista && (
+              <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
+            )}
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
               {menuCompartir && (
@@ -4971,8 +5154,14 @@ export default function App({ onCerrarSesion } = {}) {
                   <div className="compartir-menu">
                     <button onClick={() => { setMenuCompartir(false); setModalPrevia(true); }}><Eye size={15} /> Ver la hoja</button>
                     <div className="compartir-menu-sep" />
-                    <button onClick={() => handleGenerarLink(true)}><Link2 size={15} /> Link para marcar</button>
-                    <button onClick={() => handleGenerarLink(false)}><Link2 size={15} /> Link con edición</button>
+                    <button onClick={() => handleGenerarLink("marcar")} title="La checklist entera, sin poder cambiar cantidades"><Link2 size={15} /> Link para marcar</button>
+                    {/* El de logística: entra directo a marcar lo que sube al camión */}
+                    <button onClick={() => handleGenerarLink("carga")} title="Abre directo en Modo carga (Salida): para quien carga el camión"><Package size={15} /> Link de Modo carga</button>
+                    {/* El del metre: mira la lista y ya. Las marcas de carga son de
+                        logística, y una casilla tocada por error deja a alguien
+                        creyendo que algo va en el camión cuando no va. */}
+                    <button onClick={() => handleGenerarLink("vista")} title="Solo para consultar la checklist: no deja marcar nada"><Eye size={15} /> Link de solo ver</button>
+                    <button onClick={() => handleGenerarLink("edicion")} title="Quien lo abra puede cambiarlo todo"><Link2 size={15} /> Link con edición</button>
                     <button onClick={handleCompartirWord}><FileText size={15} /> Word</button>
                     <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>
                     <button onClick={handleCompartirWhatsapp}><MessageCircle size={15} /> WhatsApp (texto)</button>

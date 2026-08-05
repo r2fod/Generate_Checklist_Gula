@@ -385,25 +385,33 @@ async function main() {
     // Los barriles descuentan tercios (85% de rendimiento por la merma de barra), pero
     // nunca hasta cero: con dos de 50L la cuenta salía sin una sola botella, y ahí el
     // evento entero cuelga de que el tirador y el barril funcionen.
+    // La fecha va fijada en julio a propósito: la cerveza depende de la temporada
+    // (3 tercios/pax en verano, 2 en invierno) y sin fijarla esta prueba daría números
+    // distintos según el día en que se ejecute.
     const conBarril = async (tipo, barril, n) => {
-      await p.goto(url({ evento: tipo, pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, tamanoBarril: barril, numBarriles: n }),
+      await p.goto(url({ evento: tipo, pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, tamanoBarril: barril, numBarriles: n }),
         { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1700);
       const f = (await listaItems(p)).find(i => i.startsWith("Cerveza Alhambra")) || "";
       return f ? parseInt(f.slice(f.indexOf("=") + 1), 10) : 0;
     };
-    const sinBarril192 = await conBarril("boda", "No lleva", 1);
+    const sinBarril = await conBarril("boda", "No lleva", 1);
     const uno50 = await conBarril("boda", "50L", 1);
-    ok(uno50 < sinBarril192 && uno50 > 0,
-      `un barril de 50L descuenta tercios pero no todos (${sinBarril192} → ${uno50})`);
+    ok(uno50 < sinBarril && uno50 > 0,
+      `un barril de 50L descuenta tercios pero no todos (${sinBarril} → ${uno50})`);
+    // Y dos tampoco lo cubren todo con el ratio de verano: hacen falta ~103 L y dos
+    // barriles dan 85 útiles. Que siga saliendo cerveza embotellada aquí es correcto.
+    const dos50 = await conBarril("boda", "50L", 2);
+    ok(dos50 < uno50 && dos50 > 24,
+      `dos descuentan más, pero todavía no llegan a cubrir la barra (${uno50} → ${dos50})`);
     for (const tipo of ["boda", "cumpleanos"]) {
-      const dos50 = await conBarril(tipo, "50L", 2);
       const tres50 = await conBarril(tipo, "50L", 3);
-      ok(dos50 === 24 && tres50 === 24,
-        `en ${tipo}, por muchos barriles que se lleven quedan 24 tercios de respaldo (${dos50}/${tres50})`);
+      const cuatro50 = await conBarril(tipo, "50L", 4);
+      ok(tres50 === 24 && cuatro50 === 24,
+        `en ${tipo}, por muchos barriles que se lleven quedan 24 tercios de respaldo (${tres50}/${cuatro50})`);
     }
-    ok(await conBarril("boda", "No lleva", 1) === sinBarril192,
-      `y sin barril no se toca nada (${sinBarril192})`);
+    ok(await conBarril("boda", "No lleva", 1) === sinBarril,
+      `y sin barril no se toca nada (${sinBarril})`);
     await c.close();
   }
 
@@ -674,9 +682,21 @@ async function main() {
       permissions: ["clipboard-read", "clipboard-write"],
     });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    // En el móvil se usa el botón de compartir del sistema; en el ordenador no existe
+    // y se copia. Aquí se quita a propósito para probar SIEMPRE el camino de copiar,
+    // que es el que se puede romper en silencio (el del móvil se prueba aparte).
+    await c.addInitScript(() => { try { delete Navigator.prototype.share; } catch (e) { /* ya no está */ } });
     const p = await nuevaPagina(c);
     const portapapeles = () => p.evaluate(() => navigator.clipboard.readText());
-    for (const [entrada, marca] of [["Link para marcar", true], ["Link con edición", false]]) {
+    // Tres links, cada uno para una persona: el de carga entra directo a marcar lo que
+    // sube al camión, el de marcar enseña la checklist entera sin poder tocarla, y el
+    // de edición no lleva candado ninguno.
+    for (const [entrada, solo, carga, vista] of [
+      ["Link para marcar", true, false, false],
+      ["Link de Modo carga", true, true, false],
+      ["Link de solo ver", true, false, true],
+      ["Link con edición", false, false, false],
+    ]) {
       await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1900);
       await p.evaluate(() => navigator.clipboard.writeText("(vacío)"));
@@ -686,14 +706,32 @@ async function main() {
       await p.waitForTimeout(900);
       const copiado = await portapapeles();
       ok(/\?evento=[a-z0-9]{8}/.test(copiado), `"${entrada}" deja el link en el portapapeles → ${copiado.slice(0, 90)}`);
-      ok(copiado.includes("&solo=1") === marca,
-        marca ? "y el de marcar lleva su &solo=1" : "y el de edición no lo lleva");
-      // Se copia SOLO la dirección. Llevaba "Evento: https://…" delante para que en
-      // WhatsApp se supiera de cuál era, y con eso se rompía pegarlo en el navegador:
-      // al ver un texto con espacios lo BUSCA en vez de abrirlo. Parecía que el link
-      // no funcionaba, y no era el link — era lo que se copiaba.
-      ok(!/\s/.test(copiado) && /^https?:\/\//.test(copiado),
-        "y va pelado, sin nombre ni espacios: pegado en el navegador abre, no busca");
+      ok(copiado.includes("&solo=1") === solo,
+        solo ? `"${entrada}" bloquea la edición (&solo=1)` : `"${entrada}" no lleva candado`);
+      // Solo el de Modo carga entra directo a marcar. Los otros dos siguen abriendo
+      // donde abrían siempre: añadir un link no puede cambiar los que ya se usan.
+      ok(copiado.includes("&carga=1") === carga,
+        carga ? `y abre directo en Modo carga (&carga=1)` : `y abre la checklist, no el Modo carga`);
+      ok(copiado.includes("&vista=1") === vista,
+        vista ? `y no deja marcar nada (&vista=1)` : `y no lleva el candado de solo ver`);
+      // El nombre del evento tiene que ir, o en el WhatsApp queda un link suelto entre
+      // veinte mensajes que nadie encuentra al día siguiente. Pero llevarlo DELANTE, en
+      // la misma línea ("Evento: https://…"), es lo que ya rompió los links una vez: al
+      // pegar un texto con espacios, el navegador BUSCA en vez de abrir.
+      //
+      // Por eso el nombre va arriba y la DIRECCIÓN SOLA en la última línea: en el
+      // WhatsApp se lee el nombre y el link sale tocable, y quien copie solo esa línea
+      // tiene la dirección limpia.
+      const lineas = copiado.split("\n");
+      const ultima = lineas[lineas.length - 1];
+      ok(!/\s/.test(ultima) && /^https?:\/\//.test(ultima),
+        "la dirección va sola en su línea, sin espacios: pegada en el navegador abre, no busca");
+      ok(lineas.length === 2 && /Boda Anna y Mario/.test(lineas[0]),
+        `y encima el nombre del evento, para encontrarlo en el WhatsApp → "${lineas[0]}"`);
+      // Tres links del mismo evento el mismo día: hay que poder distinguirlos
+      const queEs = { "Link para marcar": /para marcar/, "Link de Modo carga": /carga del cami/, "Link de solo ver": /solo ver/, "Link con edición": /para editar/ };
+      ok(queEs[entrada].test(lineas[0]),
+        `y qué link es, que del mismo evento salen tres → "${lineas[0]}"`);
     }
     // Y como la nube está cortada, el evento no llega a subir: hay que decirlo, que si
     // no se manda un link que no abre nada al otro lado. El aviso tarda lo que dura el
@@ -703,6 +741,37 @@ async function main() {
       .waitFor({ timeout: 12000 }).catch(() => {});
     ok(/no ha subido/i.test(await p.locator(".btn-green").first().innerText()),
       `y avisa de que el evento no ha subido → "${(await p.locator(".btn-green").first().innerText()).trim()}"`);
+    await c.close();
+  }
+
+  // En el MÓVIL no se copia: sale el botón de compartir del sistema y se elige WhatsApp
+  // directamente. Es mejor camino que copiar y pegar, y además manda el nombre y la
+  // dirección por separado, así que el link llega tocable pase lo que pase con el texto.
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => {
+      window.__compartido = null;
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: (datos) => { window.__compartido = datos; return Promise.resolve(); },
+      });
+    });
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Compartir" }).first().click();
+    await p.waitForTimeout(400);
+    await p.locator(".compartir-menu button", { hasText: "Link de Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+
+    const datos = await p.evaluate(() => window.__compartido);
+    ok(datos !== null, "en el móvil se abre el compartir del sistema, sin pasar por el portapapeles");
+    ok(/Boda Anna y Mario/.test(datos.title || "") && /carga del cami/.test(datos.title || ""),
+      `con el nombre del evento y qué link es → "${datos.title}"`);
+    // Y la dirección va en su campo, aparte del texto: así WhatsApp la trata como link
+    ok(/^https?:\/\//.test(datos.url || "") && !/\s/.test(datos.url || "") && /carga=1/.test(datos.url || ""),
+      `y la dirección aparte, en su propio campo → ${(datos.url || "").slice(0, 60)}…`);
     await c.close();
   }
 
@@ -2047,19 +2116,24 @@ async function main() {
     return { c, p };
   };
 
-  // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución
+  // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución.
+  // Ojo: en la lista sale también la recogida de las sillas, que ahora se crea sola
+  // porque son de alquiler de serie. Es correcto que esté, así que las comprobaciones
+  // van sobre el generador por su nombre en vez de contar cuántos avisos hay.
   const a1 = await abrirConAvisos([{ concepto: "Recoger generador", fecha: dia(0), fechaDevolucion: dia(2) }]);
   let t = await chips(a1.p);
-  ok(t.length === 2 && t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
-    `sin recoger: solo recogida y compra, sin devolución → ${JSON.stringify(t)}`);
+  ok(t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
+    `sin recoger: se avisa de la recogida, no de la devolución → ${JSON.stringify(t)}`);
+  ok(t.some(x => /Recogida: "Sillas/.test(x)),
+    "y las sillas de alquiler traen la suya sin que nadie la escriba");
   const ficha = await a1.p.locator(".resumen-ficha.is-aviso .resumen-ficha-valor").innerText().catch(() => "");
   ok(parseInt(ficha, 10) === t.length, `la ficha PENDIENTES (${parseInt(ficha, 10)}) coincide con los avisos (${t.length})`);
 
   // 2) Al marcar la recogida como hecha aparece la devolución, ya sin el verbo delante
-  await a1.p.locator(".aviso-recogida-chip", { hasText: "Recogida" }).locator(".aviso-recogida-hecho").click();
+  await a1.p.locator(".aviso-recogida-chip", { hasText: "Recoger generador" }).locator(".aviso-recogida-hecho").click();
   await a1.p.waitForTimeout(1500);
   t = await chips(a1.p);
-  ok(t.length === 2 && t.some(x => /Devolución: "generador"/.test(x)) && !t.some(x => /Recogida:/.test(x)),
+  ok(t.some(x => /Devolución: "generador"/.test(x)) && !t.some(x => /Recogida: "Recoger generador"/.test(x)),
     `tras recogerlo: aparece la devolución sin repetir el verbo → ${JSON.stringify(t)}`);
   await a1.c.close();
 
@@ -2068,6 +2142,274 @@ async function main() {
   t = await chips(a2.p);
   ok(t.some(x => /Devolución/.test(x)), `devolución atrasada: se avisa aunque no se marcara la recogida → ${JSON.stringify(t)}`);
   await a2.c.close();
+
+  // ── El link que se le pasa a logística ─────────────────────────────────────
+  // Es un link NUEVO, que se suma a los dos de siempre sin tocarlos. Quien carga el
+  // camión lo abre desde el WhatsApp y lo único que hace es ir marcando: sin aterrizar
+  // en la checklist entera ni buscar "Modo carga" entre los botones de la cabecera,
+  // que con el móvil en una mano y una caja en la otra no es un detalle menor.
+  console.log("\n── El link que se le pasa a logística ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" };
+
+    await p.goto(url(evento) + "&solo=1&carga=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+
+    ok(await p.locator(".segmented-control .segment-salida").count() === 1,
+      "el link de marcar entra DIRECTO en Modo carga, sin pasar por la checklist entera");
+    ok(await p.locator(".segment-salida.active").count() === 1,
+      "y cae en Salida, que es lo que se marca al cargar el camión");
+    // Vuelta es la otra mitad de su trabajo: lo que baja del camión al volver
+    ok(await p.locator(".segment-vuelta").count() === 1,
+      "con la Vuelta a un toque, para marcar lo que vuelve");
+
+    // Puede marcar, que es a lo que viene
+    const primera = p.locator(".carga-row-principal input[type=checkbox]").first();
+    await primera.click();
+    await p.waitForTimeout(500);
+    ok(await primera.isChecked(), "puede marcar lo que sube al camión");
+
+    // Pero no cambiar cantidades: para eso está el otro link
+    await p.locator(".segment-btn", { hasText: "Prep." }).click();
+    await p.waitForTimeout(400);
+    ok(await p.locator(".segment-preparacion.active").count() === 1,
+      "y si le toca preparar también, la pestaña está ahí");
+
+    const desb = await desbordamiento(p);
+    ok(desb <= 0, `todo cabe en la pantalla del móvil (sobra ${desb}px)`);
+    await c.close();
+  }
+
+  {
+    // El link del metre: la checklist entera para consultarla y nada más. Las marcas
+    // de carga son de logística, y una casilla tocada por error deja a alguien creyendo
+    // que algo va en el camión cuando no va.
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" };
+
+    await p.goto(url(evento) + "&solo=1&vista=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+
+    ok(await p.locator(".item-row").count() > 20,
+      `el metre ve la checklist entera (${await p.locator(".item-row").count()} items)`);
+    // Ni el botón de la cabecera ni el de la barra fina: ninguna puerta a marcar
+    ok(await p.locator("button", { hasText: /Modo carga/i }).count() === 0
+      && await p.locator(".barra-fija-carga").count() === 0,
+      "pero no tiene por dónde entrar en Modo carga");
+    // Y sigue sin poder tocar cantidades ni la configuración, igual que el de marcar
+    ok(await p.locator(".item-qty-input").first().evaluate(e => e.readOnly),
+      "las cantidades se leen pero no se tocan");
+    ok(await p.locator(".add-item-card").count() === 0,
+      "y no puede añadir ni quitar nada de la lista");
+
+    // Ni forzándolo por la dirección: solo ver manda sobre carga
+    await p.goto(url(evento) + "&solo=1&vista=1&carga=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 0,
+      "y aunque el link lleve también carga=1, solo ver manda: no entra a marcar");
+    await c.close();
+  }
+
+  {
+    // Los links que YA se mandaron llevan solo "solo=1". Tienen que seguir abriéndose
+    // como se abrían: si un link viejo cambiara de sitio al abrirse, quien lo tenga
+    // guardado se encontraría otra cosa distinta sin que nadie se lo haya dicho.
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100 }) + "&solo=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2000);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 0
+      && await p.locator(".item-row").count() > 20,
+      "y un link viejo, solo con &solo=1, sigue abriendo la checklist como siempre");
+    await c.close();
+  }
+
+  // ── La tónica es cosa de las copas ─────────────────────────────────────────
+  // Salían botellas de tónica con solo barra de cóctel, y hasta sin barra ninguna. La
+  // tónica es mezcla de ginebra: en el aperitivo se sirve vermut, cerveza y refresco.
+  // Una línea a cero en una lista de compra es una línea que alguien acaba comprando.
+  console.log("\n── La tónica es cosa de las copas ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const hayTonica = async (estado) => {
+      await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", ...estado }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      return (await listaItems(p)).filter(i => i.startsWith("Tónica"));
+    };
+
+    ok((await hayTonica({})).length === 0,
+      "sin barra ninguna, la tónica no sale en la lista");
+    ok((await hayTonica({ barraCoctel: true, horasCoctel: 3 })).length === 0,
+      "con solo barra de cóctel tampoco: ahí no se sirve ginebra");
+    const conCopas = await hayTonica({ barraCopas: true, horasCopas: 4 });
+    ok(conCopas.length === 1 && !/=0(\||$)/.test(conCopas[0]),
+      `y con barra de copas sí, con su cantidad → ${conCopas[0]}`);
+    // Las dos juntas: sigue saliendo, y más que con solo copas
+    const ambas = await hayTonica({ barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5 });
+    const n = (t) => parseInt(t.slice(t.indexOf("=") + 1), 10);
+    ok(ambas.length === 1 && n(ambas[0]) > n(conCopas[0]),
+      `y con cóctel + copas pide más que con copas solas (${n(conCopas[0])} → ${n(ambas[0])})`);
+    await c.close();
+  }
+
+  // ── Lo que pone al lado de la cantidad ─────────────────────────────────────
+  // "5" y al lado "1 cajas de 24" se lee como dos cantidades distintas: ¿hay que
+  // llevar 5 o 24? Y "1 cajas" en plural obliga a pararse a leerlo dos veces. En una
+  // lista de compra eso no es un detalle de estilo, es un pedido equivocado.
+  console.log("\n── Lo que pone al lado de la cantidad ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 4 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    const infoDe = async (nombre) => {
+      const fila = p.locator(".item-row", { hasText: nombre }).first();
+      const i = fila.locator(".item-batea-info");
+      return await i.count() ? (await i.innerText()).trim() : "";
+    };
+    const cantidadDe = (nombre) => p.locator(".item-row", { hasText: nombre }).first().locator(".item-qty-input");
+
+    // Se baja el Nestea a 5: cinco unidades siguen siendo UNA caja, no cinco
+    await cantidadDe("Nestea").fill("5");
+    await p.waitForTimeout(900);
+    const cinco = await infoDe("Nestea");
+    ok(/^=/.test(cinco),
+      `con "=" delante, para que se lea como la misma cantidad en envases y no como otra distinta → "${cinco}"`);
+    ok(/1 caja de 24/.test(cinco) && !/1 cajas/.test(cinco),
+      `y en singular: "1 caja de 24", no "1 cajas de 24" → "${cinco}"`);
+
+    // Y al cambiarla, el de al lado la sigue
+    await cantidadDe("Nestea").fill("50");
+    await p.waitForTimeout(900);
+    const cincuenta = await infoDe("Nestea");
+    ok(/3 cajas de 24/.test(cincuenta),
+      `cambiar la cantidad recalcula las cajas al momento (50 → "${cincuenta}")`);
+    ok(/cajas/.test(cincuenta),
+      "y con más de una vuelve al plural");
+
+    // Las bateas de cristalería, igual
+    const copas = await infoDe("Copas de vino");
+    ok(/^= \d+ batea/.test(copas), `las bateas siguen la misma regla → "${copas}"`);
+
+    // Donde el número YA son packs, no lleva "=": ahí el texto es la etiqueta de lo
+    // que se cuenta, no una conversión. Mezclar las dos cosas es lo que liaba.
+    const agua = await infoDe("Agua 1,5L");
+    ok(agua.length > 0 && !/^=/.test(agua),
+      `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+
+    await c.close();
+  }
+
+  // ── El aviso de "actualizado desde otro dispositivo" ───────────────────────
+  // Se veía cortado por la derecha ("Actualizado desde otro di…"), justo el aviso que
+  // hay que leer entero porque dice qué te ha cambiado alguien por debajo.
+  //
+  // La causa era fina: el aviso se centraba con transform: translateX(-50%), y su
+  // animación de entrada anima TRANSFORM con fill-mode "both". Al acabar, el último
+  // fotograma (translateY(0)) pisaba el centrado y lo dejaba pisado para siempre: el
+  // aviso se quedaba clavado empezando en mitad de la pantalla. Por eso se mide DESPUÉS
+  // de que termine la animación — antes de terminar se veía bien y no se notaba nada.
+  console.log("\n── El aviso de cambios desde otro dispositivo ──");
+  for (const ancho of [320, 390, 412, 1440]) {
+    const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Comunión Daniela Cuevas Peñarrubia" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // El aviso solo sale cuando llega un cambio de la nube, y aquí la nube está
+    // cortada: se monta el mismo bloque con sus clases para medir SU css, que es
+    // exactamente lo que estaba roto.
+    await p.evaluate(() => {
+      const d = document.createElement("div");
+      d.className = "cambios-remotos-banner";
+      d.innerHTML = `<div class="cambios-remotos-detalle">
+          <strong>🔄 Actualizado desde otro dispositivo:</strong>
+          <span>cronos: 0 → 1</span>
+        </div>
+        <button class="cambios-remotos-cerrar" aria-label="Cerrar aviso">✕</button>`;
+      document.body.appendChild(d);
+    });
+    // Que termine la animación de entrada: el fallo aparecía justo al acabar
+    await p.waitForTimeout(700);
+
+    const caja = await p.locator(".cambios-remotos-banner").evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return { izq: Math.round(r.left), der: Math.round(r.right), ancho: Math.round(r.width) };
+    });
+    ok(caja.der <= ancho, `${ancho}px: el aviso no se sale por la derecha (acaba en ${caja.der})`);
+    ok(caja.izq >= 0, `${ancho}px: ni por la izquierda (empieza en ${caja.izq})`);
+    // Y centrado de verdad: el hueco de un lado y del otro tienen que ser iguales
+    const descuadre = Math.abs(caja.izq - (ancho - caja.der));
+    ok(descuadre <= 2, `${ancho}px: y queda centrado (${descuadre}px de diferencia entre los lados)`);
+
+    const desb = await desbordamiento(p);
+    ok(desb <= 0, `${ancho}px: sin desbordar la página (sobra ${desb}px)`);
+    await c.close();
+  }
+
+  // ── El aviso, en un móvil de verdad ────────────────────────────────────────
+  // En el móvil el botón "✓ Hecho" salía cortado a media palabra: se leía "Hech"
+  // dentro de un círculo verde que se salía de su ficha. El botón no llevaba
+  // flex-shrink: 0, así que cuando el texto de la recogida ocupaba el ancho, el botón
+  // se estrechaba por debajo de su propia etiqueta. Un botón con texto dentro no se
+  // puede encoger, y menos éste: es el que da por hecha una devolución.
+  for (const ancho of [320, 390, 412]) {
+    const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const estado = {
+      evento: "produccion", pax: 25, nombreEvento: "Boda Anna y Mario", fechaEvento: dia(1),
+      // Un concepto largo de verdad, de los que parten el texto en tres líneas
+      recogidas: [{ concepto: "Apollo paella y jamonero — recoger en casa de los padres de Rocío", fecha: dia(-2), fechaDevolucion: dia(-1) }],
+      compras: [],
+    };
+    await c.addInitScript(e => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        "Boda Anna y Mario": e,
+        // Un segundo evento con nombre largo, para el botón de "Pendientes en otros
+        // eventos": llevaba nowrap y con un nombre así se salía de la pantalla.
+        "Comunión Daniela Cuevas Peñarrubia": { ...e, nombreEvento: "Comunión Daniela Cuevas Peñarrubia" },
+      }));
+      localStorage.setItem("gula_evento_activo", "Boda Anna y Mario");
+    }, estado);
+    const p = await nuevaPagina(c);
+    await p.goto(url(estado), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2600);
+
+    const boton = p.locator(".aviso-recogida-hecho").first();
+    ok(await boton.count() === 1, `${ancho}px: el aviso enseña su botón de dar por hecha la devolución`);
+
+    // Que la etiqueta quepa DENTRO del botón: esto es exactamente lo que fallaba
+    const cortado = await boton.evaluate(b => b.scrollWidth > b.clientWidth + 1);
+    ok(!cortado, `${ancho}px: "✓ Hecho" cabe entero en su botón, sin cortarse a media palabra`);
+
+    // Y que el botón no se salga de su ficha
+    const fuera = await boton.evaluate(b => {
+      const ficha = b.closest(".aviso-recogida-chip").getBoundingClientRect();
+      const r = b.getBoundingClientRect();
+      return Math.round(Math.max(r.right - ficha.right, ficha.left - r.left));
+    });
+    ok(fuera <= 0, `${ancho}px: y se queda dentro de su ficha (se sale ${fuera}px)`);
+
+    const desb = await desbordamiento(p);
+    ok(desb <= 0, `${ancho}px: el aviso entero cabe en la pantalla (sobra ${desb}px)`);
+
+    // Se sigue pudiendo pulsar con el dedo
+    const alto = await boton.evaluate(b => Math.round(b.getBoundingClientRect().height));
+    ok(alto >= 40, `${ancho}px: y sigue siendo pulsable con el dedo (${alto}px de alto)`);
+
+    await c.close();
+  }
 
   // ── Verano o invierno, según la fecha ───────────────────────────────────────
   // El dato existía en el código pero no se podía cambiar desde ningún sitio: estaba
@@ -2280,6 +2622,60 @@ async function main() {
     await p.waitForTimeout(800);
     ok(await p.locator(".item-row").filter({ hasText: "Armario caliente de Dealde" }).count() === 1,
       "el nombre corregido de un item de alquiler se queda puesto");
+
+    // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo aparecía si
+    // alguien tocaba el selector con el dedo. Un evento nuevo —o uno que llega del
+    // formulario de la oficina con las sillas ya puestas— se quedaba con sillas de
+    // alquiler y sin recogida: nadie sabía cuándo ir a por ellas ni cuándo devolverlas.
+    {
+      const c2 = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+      for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
+      const p2 = await nuevaPagina(c2);
+      const tarj = () => p2.locator(".logistica-block").filter({ hasText: /RECOGIDAS \(/ })
+        .locator(".recogida-card").evaluateAll(cs => cs.map(x => ({
+          concepto: (x.querySelector('input[type="text"]') || {}).value || "",
+          fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),
+        })));
+
+      // Un evento nuevo, sin tocar nada: las sillas vienen de Dealde de serie
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin tocar nada", fechaEvento: "2027-08-11" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      const conSillas = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
+      ok(conSillas.length === 1,
+        `sin tocar el selector, las sillas de alquiler ya traen su recogida → ${JSON.stringify((await tarj()).map(x => x.concepto))}`);
+      ok(conSillas[0].fechas[0] === "2027-08-10" && conSillas[0].fechas[1] === "2027-08-12",
+        `con el día de ir y el de devolver sacados de la fecha del evento → ${JSON.stringify(conSillas[0].fechas)}`);
+
+      // Con sillas propias no se inventa ninguna
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Con sillas nuestras", fechaEvento: "2027-08-11", origenSillas: "Nuestras" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "y con sillas nuestras no se inventa ninguna recogida");
+
+      // Un evento YA PASADO no se toca: crearle ahora la recogida sería sacar un aviso
+      // rojo de algo que se hizo hace meses.
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda del año pasado", fechaEvento: "2020-05-09" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "y abrir un evento ya pasado no le inventa una recogida atrasada");
+
+      // Sin fecha de evento tampoco: una recogida sin día no responde a "¿cuándo hay
+      // que ir?", que es para lo único que existe, y encima saldría contada como
+      // pendiente en el resumen. Al poner la fecha, aparece con sus dos días.
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin fecha" }), { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "sin fecha de evento no se crea todavía: no sabría qué día decir");
+      await p2.locator(".form-group", { hasText: "FECHA" }).first().locator('input[type="date"]').fill("2027-10-15");
+      await p2.waitForTimeout(1200);
+      const traFecha = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
+      ok(traFecha.length === 1 && traFecha[0].fechas[0] === "2027-10-14" && traFecha[0].fechas[1] === "2027-10-16",
+        `y en cuanto se pone la fecha aparece con sus dos días → ${JSON.stringify(traFecha[0] && traFecha[0].fechas)}`);
+      await c2.close();
+    }
 
     // Mobiliario extra: lo puede pedir el cliente en cualquier evento menos en un
     // rodaje (los chill out son nuestros y van aparte, sin recogida)
@@ -2626,6 +3022,33 @@ async function main() {
     ok(await fila.locator('input[type="checkbox"]').isChecked(),
       "con su casilla todavía marcada: lo hecho no se ha perdido");
 
+    // Pero ese aviso vive en SU fila, y en una lista de más de cien ítems eso es no
+    // verlo nunca: quien está cargando no va a recorrerla entera por si acaso. Tiene
+    // que decirse arriba, que es lo único que se mira sin bajar.
+    const contador = p.locator(".carga-por-revisar");
+    ok(await contador.count() === 1,
+      "y arriba, junto al recuento, se dice cuántos hay con la cantidad cambiada");
+    ok(/1 con la cantidad cambiada/.test(await contador.innerText()),
+      `con el número exacto → "${(await contador.innerText()).replace(/\s+/g, " ").trim()}"`);
+
+    // Y lleva a la fila de un toque: buscarla a mano entre cien no es plan.
+    // Se baja del todo primero, porque si no la fila ya se ve y el salto no se nota:
+    // sin esto la comprobación pasaba sola sin llegar a probar nada.
+    // El que hace scroll es .carga-modal (max-height + overflow-y), no el fondo. Moviendo
+    // el fondo no pasaba nada y la fila seguía a la vista, así que la comprobación de
+    // abajo se cumplía sola sin llegar a probar el salto.
+    await p.locator(".carga-modal").evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await p.waitForTimeout(500);
+    const aLaVista = () => fila.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      return r.bottom > 0 && r.top < window.innerHeight;
+    });
+    ok(!(await aLaVista()), "bajando del todo, la fila con la cantidad cambiada se pierde de vista");
+    await contador.click();
+    await p.waitForTimeout(1200);
+    ok(await aLaVista(),
+      "y al pulsar el aviso de arriba, la pantalla salta hasta ella");
+
     // Volver a tocarla es haberla revisado: el aviso desaparece
     await fila.locator('input[type="checkbox"]').click();
     await p.waitForTimeout(400);
@@ -2633,6 +3056,8 @@ async function main() {
     await p.waitForTimeout(900);
     ok(await fila.locator(".carga-marca-otra.is-revisar").count() === 0,
       "y al volver a marcarla el aviso se va, que ya está revisada");
+    ok(await p.locator(".carga-por-revisar").count() === 0,
+      "y el contador de arriba también, que ya no queda ninguno");
     await c.close();
   }
 
