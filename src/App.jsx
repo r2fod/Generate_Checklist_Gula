@@ -2870,6 +2870,17 @@ function abreEnModoCarga() {
   } catch (e) { return false; }
 }
 
+// Solo ver: la checklist entera para consultarla, sin poder marcar NADA. Es el link
+// del metre — necesita saber qué hay y cuánto, pero las marcas de carga son de
+// logística y una casilla tocada por error deja a alguien pensando que algo está
+// cargado cuando no lo está. Lleva "solo=1" además (misma lectura, sin edición) y lo
+// único que quita de más es la entrada a Modo carga.
+function esSoloVista() {
+  try {
+    return !!new URLSearchParams(window.location.search).get("vista");
+  } catch (e) { return false; }
+}
+
 function leerEstadoGuardado() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -3212,8 +3223,12 @@ export default function App({ onCerrarSesion } = {}) {
   const [vueltos, setVueltos] = useState(estadoInicial.vueltos ?? {}); // { "categoria::label": true } — marcados como "Vuelve" (devuelto tras el evento)
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
-  const [modoCarga, setModoCarga] = useState(abreEnModoCarga);
-  const [soloMarcar] = useState(esSoloMarcar);
+  const [soloVista] = useState(esSoloVista);
+  // Con el link de solo ver no se entra en Modo carga ni por la puerta de atrás
+  const [modoCarga, setModoCarga] = useState(() => abreEnModoCarga() && !esSoloVista());
+  // "Solo ver" es "solo marcar" y además sin marcar: hereda todo lo que aquel bloquea
+  // (cantidades, nombres, configuración, añadir y quitar items).
+  const [soloMarcar] = useState(() => esSoloMarcar() || esSoloVista());
   // Barra fina pegada arriba en móvil: la cabecera con los botones ocupa casi un tercio
   // de la pantalla, así que dejarla fija entera sería peor. En su lugar, al bajar de la
   // cabecera aparece una tira de ~50px con lo único que se usa mientras se recorre la
@@ -3633,6 +3648,32 @@ export default function App({ onCerrarSesion } = {}) {
       return prev.filter((_, idx) => idx !== i);
     });
   };
+  // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo se creaba si
+  // alguien tocaba el selector con el dedo. Un evento nuevo, o uno que llega del
+  // formulario de la oficina con las sillas ya puestas, se quedaba con sillas de
+  // alquiler y sin recogida: nadie sabía cuándo había que ir a por ellas ni cuándo
+  // devolverlas, que es justo lo que se olvida.
+  const sillasVistasRef = React.useRef(null);
+  useEffect(() => {
+    // La fecha entra en la clave porque un evento sin fecha todavía no puede crear su
+    // recogida: al ponerla, esto se vuelve a mirar y ya se crea con sus dos días.
+    const clave = `${origenSillas}::${fechaEvento || ""}`;
+    if (sillasVistasRef.current === clave) return;
+    const primeraVez = sillasVistasRef.current === null;
+    sillasVistasRef.current = clave;
+    // Sin fecha de evento no hay nada que decir: una recogida sin día no responde a
+    // "¿cuándo hay que ir?", que es justo para lo que existe, y sí saldría contada
+    // como pendiente en el resumen. Se espera a que haya fecha.
+    if (!fechaEvento) return;
+    // Al ABRIR un evento ya pasado tampoco se toca nada: crear ahora su recogida sería
+    // sacar un aviso rojo de algo que se hizo hace meses, y quitarla sería borrar el
+    // registro de lo que ocurrió. Solo se sincroniza al cambiarlo de verdad.
+    if (primeraVez && fechaEvento < hoyISO()) return;
+    const esAlquiler = origenSillas === "Dealde" || origenSillas === "Carvillo";
+    sincronizaAlquiler("sillas", esAlquiler, conceptoAlquiler("sillas", origenSillas));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [origenSillas, fechaEvento]);
+
   // El generador de las producciones viene marcado de serie (siempre se lleva uno), así
   // que su recogida se crea al elegir el tipo de evento, que es cuando entra en juego —
   // si no, el único alquiler que nadie llega a pulsar sería justo el que más se olvida.
@@ -3677,10 +3718,14 @@ export default function App({ onCerrarSesion } = {}) {
   // "carga=1" va aparte de "solo=1" y no colgado de él a propósito: los links que ya
   // se mandaron llevan solo "solo=1" y tienen que seguir abriéndose como se abrían.
   const handleGenerarLink = (tipo = "edicion") => {
-    const marca = tipo === "carga" ? "&solo=1&carga=1" : tipo === "marcar" ? "&solo=1" : "";
-    // Qué link es, para que en el WhatsApp se distinga de los otros dos del mismo
-    // evento. Sin esto, tres links iguales del mismo día y a ver quién acierta.
-    const queEs = tipo === "carga" ? "carga del camión" : tipo === "marcar" ? "para marcar" : "para editar";
+    const marca = tipo === "carga" ? "&solo=1&carga=1"
+      : tipo === "vista" ? "&solo=1&vista=1"
+      : tipo === "marcar" ? "&solo=1" : "";
+    // Qué link es, para que en el WhatsApp se distinga de los otros del mismo evento.
+    // Sin esto, cuatro links iguales del mismo día y a ver quién acierta.
+    const queEs = tipo === "carga" ? "carga del camión"
+      : tipo === "vista" ? "solo ver"
+      : tipo === "marcar" ? "para marcar" : "para editar";
     // Cada clic empieza limpio: si el anterior acabó en un aviso de fallo, ese aviso no
     // puede quedarse mandando y tapar el resultado de este
     avisoPrioridadRef.current = 0;
@@ -5018,9 +5063,12 @@ export default function App({ onCerrarSesion } = {}) {
             value={filtro}
             onChange={e => setFiltro(e.target.value)}
           />
-          <button className="barra-fija-carga" onClick={() => setModoCarga(true)} title="Modo carga">
-            <Package size={15} /><span className="barra-fija-carga-texto">Carga</span>
-          </button>
+          {/* Con el link de solo ver no hay entrada a Modo carga: marcar es de logística */}
+          {!soloVista && (
+            <button className="barra-fija-carga" onClick={() => setModoCarga(true)} title="Modo carga">
+              <Package size={15} /><span className="barra-fija-carga-texto">Carga</span>
+            </button>
+          )}
         </div>
 
         {/* HEADER */}
@@ -5095,7 +5143,9 @@ export default function App({ onCerrarSesion } = {}) {
                 el PDF, así que su sitio es dentro de Compartir, un segundo antes de
                 exportar. Además libera un botón de una cabecera que ocupaba casi un
                 tercio de la pantalla del móvil. */}
-            <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
+            {!soloVista && (
+              <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
+            )}
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
               {menuCompartir && (
@@ -5107,6 +5157,10 @@ export default function App({ onCerrarSesion } = {}) {
                     <button onClick={() => handleGenerarLink("marcar")} title="La checklist entera, sin poder cambiar cantidades"><Link2 size={15} /> Link para marcar</button>
                     {/* El de logística: entra directo a marcar lo que sube al camión */}
                     <button onClick={() => handleGenerarLink("carga")} title="Abre directo en Modo carga (Salida): para quien carga el camión"><Package size={15} /> Link de Modo carga</button>
+                    {/* El del metre: mira la lista y ya. Las marcas de carga son de
+                        logística, y una casilla tocada por error deja a alguien
+                        creyendo que algo va en el camión cuando no va. */}
+                    <button onClick={() => handleGenerarLink("vista")} title="Solo para consultar la checklist: no deja marcar nada"><Eye size={15} /> Link de solo ver</button>
                     <button onClick={() => handleGenerarLink("edicion")} title="Quien lo abra puede cambiarlo todo"><Link2 size={15} /> Link con edición</button>
                     <button onClick={handleCompartirWord}><FileText size={15} /> Word</button>
                     <button onClick={handleCompartirPDF}><Printer size={15} /> PDF</button>

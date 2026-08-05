@@ -691,10 +691,11 @@ async function main() {
     // Tres links, cada uno para una persona: el de carga entra directo a marcar lo que
     // sube al camión, el de marcar enseña la checklist entera sin poder tocarla, y el
     // de edición no lleva candado ninguno.
-    for (const [entrada, solo, carga] of [
-      ["Link para marcar", true, false],
-      ["Link de Modo carga", true, true],
-      ["Link con edición", false, false],
+    for (const [entrada, solo, carga, vista] of [
+      ["Link para marcar", true, false, false],
+      ["Link de Modo carga", true, true, false],
+      ["Link de solo ver", true, false, true],
+      ["Link con edición", false, false, false],
     ]) {
       await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1900);
@@ -711,6 +712,8 @@ async function main() {
       // donde abrían siempre: añadir un link no puede cambiar los que ya se usan.
       ok(copiado.includes("&carga=1") === carga,
         carga ? `y abre directo en Modo carga (&carga=1)` : `y abre la checklist, no el Modo carga`);
+      ok(copiado.includes("&vista=1") === vista,
+        vista ? `y no deja marcar nada (&vista=1)` : `y no lleva el candado de solo ver`);
       // El nombre del evento tiene que ir, o en el WhatsApp queda un link suelto entre
       // veinte mensajes que nadie encuentra al día siguiente. Pero llevarlo DELANTE, en
       // la misma línea ("Evento: https://…"), es lo que ya rompió los links una vez: al
@@ -726,7 +729,7 @@ async function main() {
       ok(lineas.length === 2 && /Boda Anna y Mario/.test(lineas[0]),
         `y encima el nombre del evento, para encontrarlo en el WhatsApp → "${lineas[0]}"`);
       // Tres links del mismo evento el mismo día: hay que poder distinguirlos
-      const queEs = { "Link para marcar": /para marcar/, "Link de Modo carga": /carga del cami/, "Link con edición": /para editar/ };
+      const queEs = { "Link para marcar": /para marcar/, "Link de Modo carga": /carga del cami/, "Link de solo ver": /solo ver/, "Link con edición": /para editar/ };
       ok(queEs[entrada].test(lineas[0]),
         `y qué link es, que del mismo evento salen tres → "${lineas[0]}"`);
     }
@@ -2113,19 +2116,24 @@ async function main() {
     return { c, p };
   };
 
-  // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución
+  // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución.
+  // Ojo: en la lista sale también la recogida de las sillas, que ahora se crea sola
+  // porque son de alquiler de serie. Es correcto que esté, así que las comprobaciones
+  // van sobre el generador por su nombre en vez de contar cuántos avisos hay.
   const a1 = await abrirConAvisos([{ concepto: "Recoger generador", fecha: dia(0), fechaDevolucion: dia(2) }]);
   let t = await chips(a1.p);
-  ok(t.length === 2 && t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
-    `sin recoger: solo recogida y compra, sin devolución → ${JSON.stringify(t)}`);
+  ok(t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
+    `sin recoger: se avisa de la recogida, no de la devolución → ${JSON.stringify(t)}`);
+  ok(t.some(x => /Recogida: "Sillas/.test(x)),
+    "y las sillas de alquiler traen la suya sin que nadie la escriba");
   const ficha = await a1.p.locator(".resumen-ficha.is-aviso .resumen-ficha-valor").innerText().catch(() => "");
   ok(parseInt(ficha, 10) === t.length, `la ficha PENDIENTES (${parseInt(ficha, 10)}) coincide con los avisos (${t.length})`);
 
   // 2) Al marcar la recogida como hecha aparece la devolución, ya sin el verbo delante
-  await a1.p.locator(".aviso-recogida-chip", { hasText: "Recogida" }).locator(".aviso-recogida-hecho").click();
+  await a1.p.locator(".aviso-recogida-chip", { hasText: "Recoger generador" }).locator(".aviso-recogida-hecho").click();
   await a1.p.waitForTimeout(1500);
   t = await chips(a1.p);
-  ok(t.length === 2 && t.some(x => /Devolución: "generador"/.test(x)) && !t.some(x => /Recogida:/.test(x)),
+  ok(t.some(x => /Devolución: "generador"/.test(x)) && !t.some(x => /Recogida: "Recoger generador"/.test(x)),
     `tras recogerlo: aparece la devolución sin repetir el verbo → ${JSON.stringify(t)}`);
   await a1.c.close();
 
@@ -2172,6 +2180,38 @@ async function main() {
 
     const desb = await desbordamiento(p);
     ok(desb <= 0, `todo cabe en la pantalla del móvil (sobra ${desb}px)`);
+    await c.close();
+  }
+
+  {
+    // El link del metre: la checklist entera para consultarla y nada más. Las marcas
+    // de carga son de logística, y una casilla tocada por error deja a alguien creyendo
+    // que algo va en el camión cuando no va.
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" };
+
+    await p.goto(url(evento) + "&solo=1&vista=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+
+    ok(await p.locator(".item-row").count() > 20,
+      `el metre ve la checklist entera (${await p.locator(".item-row").count()} items)`);
+    // Ni el botón de la cabecera ni el de la barra fina: ninguna puerta a marcar
+    ok(await p.locator("button", { hasText: /Modo carga/i }).count() === 0
+      && await p.locator(".barra-fija-carga").count() === 0,
+      "pero no tiene por dónde entrar en Modo carga");
+    // Y sigue sin poder tocar cantidades ni la configuración, igual que el de marcar
+    ok(await p.locator(".item-qty-input").first().evaluate(e => e.readOnly),
+      "las cantidades se leen pero no se tocan");
+    ok(await p.locator(".add-item-card").count() === 0,
+      "y no puede añadir ni quitar nada de la lista");
+
+    // Ni forzándolo por la dirección: solo ver manda sobre carga
+    await p.goto(url(evento) + "&solo=1&vista=1&carga=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 0,
+      "y aunque el link lleve también carga=1, solo ver manda: no entra a marcar");
     await c.close();
   }
 
@@ -2582,6 +2622,60 @@ async function main() {
     await p.waitForTimeout(800);
     ok(await p.locator(".item-row").filter({ hasText: "Armario caliente de Dealde" }).count() === 1,
       "el nombre corregido de un item de alquiler se queda puesto");
+
+    // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo aparecía si
+    // alguien tocaba el selector con el dedo. Un evento nuevo —o uno que llega del
+    // formulario de la oficina con las sillas ya puestas— se quedaba con sillas de
+    // alquiler y sin recogida: nadie sabía cuándo ir a por ellas ni cuándo devolverlas.
+    {
+      const c2 = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+      for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
+      const p2 = await nuevaPagina(c2);
+      const tarj = () => p2.locator(".logistica-block").filter({ hasText: /RECOGIDAS \(/ })
+        .locator(".recogida-card").evaluateAll(cs => cs.map(x => ({
+          concepto: (x.querySelector('input[type="text"]') || {}).value || "",
+          fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),
+        })));
+
+      // Un evento nuevo, sin tocar nada: las sillas vienen de Dealde de serie
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin tocar nada", fechaEvento: "2027-08-11" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      const conSillas = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
+      ok(conSillas.length === 1,
+        `sin tocar el selector, las sillas de alquiler ya traen su recogida → ${JSON.stringify((await tarj()).map(x => x.concepto))}`);
+      ok(conSillas[0].fechas[0] === "2027-08-10" && conSillas[0].fechas[1] === "2027-08-12",
+        `con el día de ir y el de devolver sacados de la fecha del evento → ${JSON.stringify(conSillas[0].fechas)}`);
+
+      // Con sillas propias no se inventa ninguna
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Con sillas nuestras", fechaEvento: "2027-08-11", origenSillas: "Nuestras" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "y con sillas nuestras no se inventa ninguna recogida");
+
+      // Un evento YA PASADO no se toca: crearle ahora la recogida sería sacar un aviso
+      // rojo de algo que se hizo hace meses.
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda del año pasado", fechaEvento: "2020-05-09" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "y abrir un evento ya pasado no le inventa una recogida atrasada");
+
+      // Sin fecha de evento tampoco: una recogida sin día no responde a "¿cuándo hay
+      // que ir?", que es para lo único que existe, y encima saldría contada como
+      // pendiente en el resumen. Al poner la fecha, aparece con sus dos días.
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin fecha" }), { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "sin fecha de evento no se crea todavía: no sabría qué día decir");
+      await p2.locator(".form-group", { hasText: "FECHA" }).first().locator('input[type="date"]').fill("2027-10-15");
+      await p2.waitForTimeout(1200);
+      const traFecha = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
+      ok(traFecha.length === 1 && traFecha[0].fechas[0] === "2027-10-14" && traFecha[0].fechas[1] === "2027-10-16",
+        `y en cuanto se pone la fecha aparece con sus dos días → ${JSON.stringify(traFecha[0] && traFecha[0].fechas)}`);
+      await c2.close();
+    }
 
     // Mobiliario extra: lo puede pedir el cliente en cualquier evento menos en un
     // rodaje (los chill out son nuestros y van aparte, sin recogida)

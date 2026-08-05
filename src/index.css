@@ -1520,10 +1520,17 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Las recogidas de alquiler llevan además la etiqueta "Alquiler" delante, y en un
+     móvil estrecho eso dejaba el nombre en 72px: "Sillas (Dealde)" se leía cortado.
+     Dejando que la fila parta, el nombre se queda con la línea entera y la etiqueta
+     y los botones bajan debajo, en vez de repartirse un sitio que no hay. */
+  flex-wrap: wrap;
 }
 
 .recogida-card-top .form-input {
-  flex: 1;
+  /* La base de 180px es lo que hace que el campo baje a su propia línea cuando no
+     queda sitio: con flex:1 a secas se encogía hasta donde hiciera falta. */
+  flex: 1 1 180px;
   min-width: 0;
 }
 
