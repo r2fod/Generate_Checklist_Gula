@@ -691,8 +691,10 @@ async function main() {
     // Tres links, cada uno para una persona: el de carga entra directo a marcar lo que
     // sube al camión, el de marcar enseña la checklist entera sin poder tocarla, y el
     // de edición no lleva candado ninguno.
+    // "Link para marcar" ya no se ofrece: entre el de solo ver y el de Modo carga
+    // estaba de más, y tres links parecidos del mismo evento es una equivocación
+    // esperando a pasar. Los que ya se mandaron con &solo=1 siguen valiendo.
     for (const [entrada, solo, carga, vista] of [
-      ["Link para marcar", true, false, false],
       ["Link de Modo carga", true, true, false],
       ["Link de solo ver", true, false, true],
       ["Link con edición", false, false, false],
@@ -729,7 +731,7 @@ async function main() {
       ok(lineas.length === 2 && /Boda Anna y Mario/.test(lineas[0]),
         `y encima el nombre del evento, para encontrarlo en el WhatsApp → "${lineas[0]}"`);
       // Tres links del mismo evento el mismo día: hay que poder distinguirlos
-      const queEs = { "Link para marcar": /para marcar/, "Link de Modo carga": /carga del cami/, "Link de solo ver": /solo ver/, "Link con edición": /para editar/ };
+      const queEs = { "Link de Modo carga": /carga del cami/, "Link de solo ver": /solo ver/, "Link con edición": /para editar/ };
       ok(queEs[entrada].test(lineas[0]),
         `y qué link es, que del mismo evento salen tres → "${lineas[0]}"`);
     }
@@ -2172,11 +2174,21 @@ async function main() {
     await p.waitForTimeout(500);
     ok(await primera.isChecked(), "puede marcar lo que sube al camión");
 
-    // Pero no cambiar cantidades: para eso está el otro link
+    // Y si le toca preparar también, la pestaña está ahí
     await p.locator(".segment-btn", { hasText: "Prep." }).click();
     await p.waitForTimeout(400);
     ok(await p.locator(".segment-preparacion.active").count() === 1,
       "y si le toca preparar también, la pestaña está ahí");
+
+    // Modo carga ES la app con este link: no hay ✕ ni fondo que tocar para salir.
+    // Cerrarlo dejaría a quien carga el camión delante de una checklist que no puede
+    // tocar y sin forma clara de volver.
+    ok(await p.locator(".preview-close-btn").count() === 0,
+      "no hay ✕ para salir: con este link, Modo carga es la app entera");
+    await p.locator(".preview-overlay").click({ position: { x: 5, y: 5 } });
+    await p.waitForTimeout(500);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 1,
+      "y tocar el fondo tampoco lo cierra");
 
     const desb = await desbordamiento(p);
     ok(desb <= 0, `todo cabe en la pantalla del móvil (sobra ${desb}px)`);
@@ -2195,17 +2207,42 @@ async function main() {
     await p.goto(url(evento) + "&solo=1&vista=1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
 
-    ok(await p.locator(".item-row").count() > 20,
-      `el metre ve la checklist entera (${await p.locator(".item-row").count()} items)`);
-    // Ni el botón de la cabecera ni el de la barra fina: ninguna puerta a marcar
+    // Abre DIRECTO en la hoja: es la vista buena para quien lleva el servicio, no la
+    // lista de carga con sus casillas.
+    ok(await p.locator(".preview-table").count() > 0,
+      "el link del metre abre directo en la hoja, no en la lista de carga");
+    // Y lo alquilado, junto y arriba: fila a fila ya iba marcado, pero repartido entre
+    // catorce categorías. Es lo que tiene que devolver al acabar.
+    const alq = p.locator(".preview-alquileres");
+    ok(await alq.count() === 1, "con lo alquilado destacado arriba del todo");
+    const textoAlq = await alq.innerText();
+    ok(/hay que devolverlo/i.test(textoAlq) && /Sillas/i.test(textoAlq),
+      `diciendo qué es de otros → "${textoAlq.split("\n")[0]}"`);
+    ok(await alq.locator("li").count() > 0,
+      `con su lista y sus cantidades (${await alq.locator("li").count()} cosas)`);
+
+    // La hoja ES la pantalla: detrás no hay nada. Ni checklist, ni ✕, ni forma de
+    // salir tocando el fondo — cerrarla solo dejaría al metre delante de una lista
+    // que no es la que necesita.
+    ok(await p.locator(".item-row").count() === 0,
+      "y detrás no hay checklist ninguna: la hoja es todo lo que hay");
+    ok(await p.locator(".preview-close-btn").count() === 0,
+      "sin ✕, porque no hay a dónde volver");
+    await p.locator(".preview-overlay").click({ position: { x: 5, y: 5 } });
+    await p.waitForTimeout(500);
+    ok(await p.locator(".preview-table").count() > 0,
+      "y tocar el fondo tampoco la cierra");
+    ok(await p.locator(".config-card").count() === 0 && await p.locator(".app-header").count() === 0,
+      "ni configuración ni cabecera de la app: solo la hoja");
+    // Ni el botón de la cabecera ni el de la barra fina: ninguna puerta a marcar.
+    // Tampoco hay campos de cantidad que comprobar — no hay checklist detrás — así que
+    // no queda nada editable por definición.
     ok(await p.locator("button", { hasText: /Modo carga/i }).count() === 0
       && await p.locator(".barra-fija-carga").count() === 0,
       "pero no tiene por dónde entrar en Modo carga");
-    // Y sigue sin poder tocar cantidades ni la configuración, igual que el de marcar
-    ok(await p.locator(".item-qty-input").first().evaluate(e => e.readOnly),
-      "las cantidades se leen pero no se tocan");
-    ok(await p.locator(".add-item-card").count() === 0,
-      "y no puede añadir ni quitar nada de la lista");
+    ok(await p.locator(".item-qty-input").count() === 0
+      && await p.locator(".add-item-card").count() === 0,
+      "y no hay ni un campo que tocar: ni cantidades ni añadir items");
 
     // Ni forzándolo por la dirección: solo ver manda sobre carga
     await p.goto(url(evento) + "&solo=1&vista=1&carga=1", { waitUntil: "domcontentloaded" });
@@ -2669,11 +2706,23 @@ async function main() {
       await p2.waitForTimeout(2400);
       ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
         "sin fecha de evento no se crea todavía: no sabría qué día decir");
+      // …y en cuanto se le pone la fecha, aparece con sus dos días
       await p2.locator(".form-group", { hasText: "FECHA" }).first().locator('input[type="date"]').fill("2027-10-15");
       await p2.waitForTimeout(1200);
       const traFecha = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
       ok(traFecha.length === 1 && traFecha[0].fechas[0] === "2027-10-14" && traFecha[0].fechas[1] === "2027-10-16",
         `y en cuanto se pone la fecha aparece con sus dos días → ${JSON.stringify(traFecha[0] && traFecha[0].fechas)}`);
+
+      // Si ya hay una escrita a mano para lo mismo, manda la suya: dos avisos para una
+      // sola cosa es peor que ninguno, porque nadie sabe cuál mirar.
+      await p2.goto(url({
+        evento: "boda", pax: 80, nombreEvento: "Con la suya a mano", fechaEvento: "2027-08-11",
+        recogidas: [{ concepto: "Recoger sillas Dealde", fecha: "2027-08-12" }],
+      }), { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      const deSillas = (await tarj()).filter(x => /silla/i.test(x.concepto));
+      ok(deSillas.length === 1 && deSillas[0].concepto === "Recoger sillas Dealde",
+        `con una recogida de sillas escrita a mano no se añade otra al lado → ${JSON.stringify(deSillas.map(x => x.concepto))}`);
       await c2.close();
     }
 
