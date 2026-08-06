@@ -2794,6 +2794,120 @@ hr {
 }
 .preview-alquileres-fechas svg { flex: 0 0 auto; }
 
+/* ─── RESUMEN DEL EVENTO ──────────────────────────────────────────────────────
+   La tabla de siete columnas tiene todo el detalle, pero para saber "cómo ha ido" no
+   hay que leer 150 filas. Arriba van las tres cifras que se miran de verdad y un
+   reparto por categoría; la tabla se queda igual, debajo. */
+.resumen-fichas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
+}
+.resumen-fichita {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  text-align: left;
+  font: inherit;
+  min-width: 0;
+}
+.resumen-fichita-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+.resumen-fichita-valor {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+.resumen-fichita-pie { font-size: 0.76rem; color: var(--text-muted); }
+.resumen-fichita.is-total { border-color: var(--accent); background: var(--accent-soft); }
+.resumen-fichita.is-total .resumen-fichita-valor,
+.resumen-fichita.is-total .resumen-fichita-label { color: var(--accent); }
+.resumen-fichita.is-roturas { border-color: var(--error-borde); background: var(--error-bg); }
+.resumen-fichita.is-roturas .resumen-fichita-valor { color: var(--error-texto-fuerte); }
+/* La de "sin precio" es un botón: lleva a poner los que faltan, que es lo único que
+   se puede hacer con esa información. */
+.resumen-fichita.is-falta {
+  border-color: var(--aviso-borde);
+  background: var(--aviso-bg);
+  cursor: pointer;
+  min-height: 44px;
+}
+.resumen-fichita.is-falta:hover { background: var(--aviso-bg-fuerte); }
+.resumen-fichita.is-falta .resumen-fichita-valor,
+.resumen-fichita.is-falta .resumen-fichita-label { color: var(--aviso-texto); }
+
+/* Reparto por categoría: una barra por cada una, del color de la categoría. Enseña de
+   un vistazo dónde se va el dinero, que sumando columnas no se ve. */
+.resumen-ranking { display: flex; flex-direction: column; gap: 7px; }
+.resumen-ranking-fila {
+  display: grid;
+  grid-template-columns: minmax(90px, 1.4fr) minmax(40px, 2fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+}
+.resumen-ranking-nombre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-main);
+}
+.resumen-ranking-barra {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--border-color);
+  overflow: hidden;
+  min-width: 0;
+}
+.resumen-ranking-relleno { display: block; height: 100%; border-radius: 999px; }
+.resumen-ranking-cifra { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-main); }
+.resumen-ranking-pct { font-size: 0.76rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+@media (max-width: 480px) {
+  /* En móvil la barra sobra antes que el número: se apila nombre arriba, cifra abajo */
+  .resumen-ranking-fila { grid-template-columns: 1fr auto auto; }
+  .resumen-ranking-barra { display: none; }
+}
+
+/* En la tabla, lo que hay que ver a la primera */
+.resumen-celda-rotura { color: var(--error-texto-fuerte); font-weight: 800; }
+.resumen-celda-sinprecio { color: var(--aviso-texto); font-weight: 700; }
+
+/* "faltan 10" junto al campo de roturas. Un toque y se apunta, en vez de restar de
+   cabeza mientras se descarga el camión. No se rellena solo a propósito: lo que no
+   vuelve no siempre es una rotura — de 100 tercios vuelven 20 y los otros 80 están
+   bebidos. Ahí no se toca y ya está. */
+.carga-faltan {
+  flex: 0 0 auto;
+  border: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg);
+  color: var(--aviso-texto);
+  font-size: 0.72rem;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-left: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 32px;
+}
+.carga-faltan:hover { background: var(--aviso-bg-fuerte); }
+@media (hover: none), (max-width: 767px) {
+  .carga-faltan { min-height: 40px; padding: 4px 12px; }
+}
+
 .preview-notes {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -3550,6 +3664,17 @@ hr {
   align-items: center;
   gap: 8px;
 }
+/* El nombre del material va en su propio elemento y no como texto suelto dentro del
+   flex. Suelto era un "item anónimo" que no baja de su ancho natural: a 320px
+   "Cinta aislante americana" se quedaba en 38px de los 65 que necesita, cortado y sin
+   puntos suspensivos — o sea, sin forma de saber que faltaba texto. Y aquí importa:
+   se está marcando material con el móvil en una mano.
+   Se parte en dos líneas en vez de recortarse: cargando un camión hace falta el nombre
+   entero, no una pista de cuál era. */
+.carga-nombre-texto {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .carga-nombre .item-icon { flex-shrink: 0; }
 .carga-row:hover .item-icon { transform: scale(1.18) rotate(-5deg); }
 /* Icono en la tabla de resumen: alineado con el texto del producto */
@@ -4001,7 +4126,9 @@ hr {
    se parte junto, sin que el asterisco caiga solo a una línea aparte. */
 .item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1; }
 .item-name-lead > .item-icon { margin-top: 2px; }
-.item-label-text { min-width: 0; }
+/* Igual que en Modo carga: el nombre se parte antes que recortarse. A 390px se
+   quedaba en 79px de los 145 que necesita. */
+.item-label-text { min-width: 0; overflow-wrap: anywhere; }
 /* Títulos de modales con icono alineado. Van en "flex" (no "inline-flex") para
    que el subtítulo caiga debajo del título en vez de pegarse a su derecha. */
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: flex; align-items: center; gap: 7px; }
