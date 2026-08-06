@@ -1812,7 +1812,7 @@ function Dialogo({ config, onCerrar }) {
 }
 
 // ─── MODAL VISTA PREVIA ───────────────────────────────────────────────────────
-function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, meta = {}, onClose }) {
+function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, meta = {}, onClose, sinCerrar = false }) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   // Las columnas Sale/Vuelve/Roturas solo aparecen si hay algo marcado. Antes salían
   // siempre y en el móvil se comían 78px de ancho y 68 de alto (con las cabeceras
@@ -1823,8 +1823,19 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
   const hayMarcas = algo(meta.preparados) || algo(meta.checkeados) || algo(meta.vueltos) || algo(meta.roturas);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
   const fechaEventoFmt = meta.fechaEvento ? new Date(meta.fechaEvento + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" }) : null;
+  // Todo lo que NO es nuestro, junto y arriba. Estaba marcado fila a fila, pero repartido
+  // entre catorce categorías: para saber qué hay que devolver había que recorrer la hoja
+  // entera. Es lo primero que necesita quien lleva el servicio, porque de eso responde
+  // cuando acaba el evento.
+  const alquileres = checklist.flatMap(cat => cat.items
+    .filter(([label, , , , esAlquilerManual]) =>
+      esAlquilerManual || PALABRAS_ALQUILER.some(pl => String(label).toLowerCase().includes(pl)))
+    .map(([label, qty, , , , sufijo]) => ({
+      label,
+      cantidad: fmtCantidadCompleta(label, qty && qty.u ? qty.u : qty, sufijo),
+    })));
   return (
-    <div className="preview-overlay" onClick={onClose}>
+    <div className={`preview-overlay ${sinCerrar ? "is-pantalla" : ""}`} onClick={sinCerrar ? undefined : onClose}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header">
           <div>
@@ -1847,9 +1858,28 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
               <div className="preview-header-subtitle"><ShoppingCart size={14} /> Compras: {fmtCompras(meta.compras)}</div>
             )}
           </div>
-          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar"><X size={14} /></button>
+          {!sinCerrar && (
+            <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar vista previa" title="Cerrar"><X size={14} /></button>
+          )}
         </div>
         <div className="preview-body">
+          {alquileres.length > 0 && (
+            <div className="preview-alquileres">
+              <div className="preview-alquileres-titulo">
+                <Tag size={14} /> No es nuestro — hay que devolverlo ({alquileres.length})
+              </div>
+              <ul className="preview-alquileres-lista">
+                {alquileres.map((a, i) => (
+                  <li key={i}><span>{a.label}</span><strong>{a.cantidad}</strong></li>
+                ))}
+              </ul>
+              {fmtRecogidas(meta.recogidas) && (
+                <div className="preview-alquileres-fechas">
+                  <Package size={13} /> {fmtRecogidas(meta.recogidas)}
+                </div>
+              )}
+            </div>
+          )}
           {checklist.map(cat => (
             <div className="preview-category" key={cat.nombre}>
               <div className="preview-category-header" style={{ borderLeftColor: infoCategoria(cat.nombre).color }}>
@@ -1908,7 +1938,7 @@ function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, me
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, meta = {} }) {
+function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {} }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
@@ -2093,7 +2123,7 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
     URL.revokeObjectURL(url);
   };
   return (
-    <div className="preview-overlay" onClick={onClose}>
+    <div className={`preview-overlay ${sinCerrar ? "is-pantalla" : ""}`} onClick={sinCerrar ? undefined : onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header">
           <div>
@@ -2146,7 +2176,9 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
               </div>
             )}
           </div>
-          <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
+          {!sinCerrar && (
+            <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
+          )}
         </div>
         {/* Esta tira se queda fija al hacer scroll: marcando 150 items, el recuento y el
             cambio Salida/Vuelta son lo único que se usa todo el rato, y antes había que
@@ -3044,6 +3076,14 @@ const FilaItem = React.memo(function FilaItem({
 
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App({ onCerrarSesion } = {}) {
+  // El archivo de eventos (colección "indice") es del EQUIPO y sus reglas piden sesión
+  // iniciada. Quien abre un link de un evento no la tiene —a propósito: el link se manda
+  // al móvil del personal sin darles la app entera— así que sus intentos de sincronizar
+  // el archivo se rechazaban siempre y salía un "No se ha podido guardar en la nube"
+  // rojo en cada cambio. El evento SÍ se guardaba (sus reglas no piden sesión); lo que
+  // fallaba era el archivo, que no es suyo y no tiene por qué tocar.
+  // Acceso.jsx solo pasa onCerrarSesion cuando hay sesión de verdad: por eso vale de señal.
+  const haySesionEquipo = !!onCerrarSesion;
   const [{ estado: estadoInicial, desdeLink: linkAbiertoInicial }] = useState(leerEstadoGuardado);
   const [evento, setEvento]         = useState(estadoInicial.evento ?? "boda");
   const [nombreEvento, setNombreEvento] = useState(estadoInicial.nombreEvento ?? "");
@@ -3189,7 +3229,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
   const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
-  const [modalPrevia, setModalPrevia]   = useState(false);
+  // El link de solo ver (el del metre) abre DIRECTO en la hoja: es la vista buena para
+  // quien tiene que saber qué hay y qué se devuelve, no la lista de carga con sus
+  // casillas. Al cerrarla queda la checklist, también de solo lectura.
+  const [modalPrevia, setModalPrevia]   = useState(esSoloVista);
   const [modalAgregar, setModalAgregar] = useState(false);
   const [compartirMsg, setCompartirMsg] = useState("");
   const [menuCompartir, setMenuCompartir] = useState(false);
@@ -3224,6 +3267,8 @@ export default function App({ onCerrarSesion } = {}) {
   const [roturas, setRoturas] = useState(estadoInicial.roturas ?? {}); // { "categoria::label": "2" } — nº de roturas/pérdidas contadas a la vuelta
   const [notasCheck, setNotasCheck] = useState(estadoInicial.notasCheck ?? {}); // { "texto de la nota": true } — recordatorios de las notas marcados como hechos en "Modo carga"
   const [soloVista] = useState(esSoloVista);
+  // El link de logística: entra en Modo carga y ahí se queda, sin puerta de salida
+  const [soloCarga] = useState(() => abreEnModoCarga() && !esSoloVista());
   // Con el link de solo ver no se entra en Modo carga ni por la puerta de atrás
   const [modoCarga, setModoCarga] = useState(() => abreEnModoCarga() && !esSoloVista());
   // "Solo ver" es "solo marcar" y además sin marcar: hereda todo lo que aquel bloquea
@@ -3435,11 +3480,21 @@ export default function App({ onCerrarSesion } = {}) {
   // Firestore) la app parecía haber guardado. Ahora el fallo se ve y no desaparece
   // solo, para poder actuar antes de perder el trabajo hecho.
   const [errorNube, setErrorNube] = useState(null);
+  // El aviso decía SIEMPRE "revisa la conexión", fuera cual fuera el fallo. Con una
+  // sesión caducada eso manda a mirar el wifi durante un rato largo mientras lo que
+  // hace falta es volver a entrar. Cada causa tiene su frase y su arreglo.
   const avisarFalloNube = (e) => {
+    const codigo = String(e?.code || "");
     const msg = String(e?.message || e || "");
-    setErrorNube(/longer than|exceeds|maximum|too large|invalid-argument/i.test(msg)
-      ? "El archivo de eventos ya no cabe en la nube. Borra o archiva eventos antiguos para poder seguir guardando."
-      : "No se ha podido guardar en la nube. Los cambios están en este dispositivo; revisa la conexión.");
+    if (/permission-denied|unauthenticated/i.test(codigo + " " + msg)) {
+      setErrorNube("La sesión del equipo ha caducado. Los cambios están guardados en este dispositivo: vuelve a entrar para subirlos.");
+      return;
+    }
+    if (/longer than|exceeds|maximum|too large|invalid-argument|resource-exhausted/i.test(codigo + " " + msg)) {
+      setErrorNube("El archivo de eventos ya no cabe en la nube. Borra o archiva eventos antiguos para poder seguir guardando.");
+      return;
+    }
+    setErrorNube("No se ha podido guardar en la nube. Los cambios están en este dispositivo; revisa la conexión.");
   };
   const primerGuardadoRef = React.useRef(true);
   useEffect(() => {
@@ -3630,9 +3685,17 @@ export default function App({ onCerrarSesion } = {}) {
   // recogidas escritas a mano no se rozan nunca. Y si ya se marcó como recogida o
   // devuelta, no se borra aunque se apague el interruptor — el material está de por
   // medio y hay que devolverlo igual.
-  const sincronizaAlquiler = (clave, activo, concepto) => {
+  // "yaEscritaAMano" es un patrón para reconocer una recogida que ya escribió alguien
+  // para lo mismo. Sin esto, la de las sillas salía DUPLICADA en los eventos donde ya
+  // había una a mano ("Recoger sillas Dealde"): la automática no la reconocía como
+  // suya y creaba otra al lado, con otra fecha. Dos avisos para una sola cosa.
+  const sincronizaAlquiler = (clave, activo, concepto, yaEscritaAMano = null) => {
     setRecogidas(prev => {
       const i = prev.findIndex(r => r.auto === clave);
+      if (activo && i === -1 && yaEscritaAMano
+          && prev.some(r => !r.auto && yaEscritaAMano.test(String(r.concepto || "")))) {
+        return prev; // ya hay una escrita a mano para esto: manda la suya
+      }
       if (activo) {
         // Ya existe: solo se refresca el nombre (p. ej. al cambiar de proveedor), nunca
         // las fechas, que a estas alturas pueden estar puestas a mano
@@ -3670,7 +3733,7 @@ export default function App({ onCerrarSesion } = {}) {
     // registro de lo que ocurrió. Solo se sincroniza al cambiarlo de verdad.
     if (primeraVez && fechaEvento < hoyISO()) return;
     const esAlquiler = origenSillas === "Dealde" || origenSillas === "Carvillo";
-    sincronizaAlquiler("sillas", esAlquiler, conceptoAlquiler("sillas", origenSillas));
+    sincronizaAlquiler("sillas", esAlquiler, conceptoAlquiler("sillas", origenSillas), /silla/i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origenSillas, fechaEvento]);
 
@@ -3871,7 +3934,7 @@ export default function App({ onCerrarSesion } = {}) {
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
     // Con la nube activa el archivo se sincroniza evento a evento: se ve igual desde
     // cualquier dispositivo y, al no ir todo en un solo documento, no hay techo.
-    if (nubeActiva()) {
+    if (nubeActiva() && haySesionEquipo) {
       ultimaEscrituraLocalRef.current = Date.now();
       sincronizarArchivoNube(anterior, obj).then(() => setErrorNube(null)).catch(avisarFalloNube);
     }
@@ -3965,10 +4028,15 @@ export default function App({ onCerrarSesion } = {}) {
         });
         guardarLocal(fusionado);
         ultimaEscrituraLocalRef.current = Date.now();
-        // La lista de "ya subidos" solo se actualiza si la subida ha ido bien: marcar
-        // como subido algo que falló haría que se diera por borrado la próxima vez.
-        await sincronizarArchivoNube(enArchivo, fusionado);
-        guardarSincronizados(Object.keys(fusionado));
+        // Sin sesión del equipo no se sube nada del archivo: sus reglas la exigen y el
+        // intento acaba siempre en un rechazo. Quien abre un link de un evento solo
+        // trabaja sobre ese evento.
+        if (haySesionEquipo) {
+          // La lista de "ya subidos" solo se actualiza si la subida ha ido bien: marcar
+          // como subido algo que falló haría que se diera por borrado la próxima vez.
+          await sincronizarArchivoNube(enArchivo, fusionado);
+          guardarSincronizados(Object.keys(fusionado));
+        }
       } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
       finally { primeraSincroHechaRef.current = true; }
     };
@@ -4033,7 +4101,7 @@ export default function App({ onCerrarSesion } = {}) {
         // cambiado" compara contra un mapa desfasado.
         eventosGuardadosRef.current = actualizado;
         try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
-        if (nubeActiva()) { ultimaEscrituraLocalRef.current = Date.now(); sincronizarArchivoNube(prev, actualizado).catch(avisarFalloNube); }
+        if (nubeActiva() && haySesionEquipo) { ultimaEscrituraLocalRef.current = Date.now(); sincronizarArchivoNube(prev, actualizado).catch(avisarFalloNube); }
         return actualizado;
       });
     }, esElActivo ? 1200 : 3000);
@@ -4985,9 +5053,23 @@ export default function App({ onCerrarSesion } = {}) {
     setMenuCompartir(false);
   };
 
+  const metaHoja = { nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, preparados, checkeados, vueltos, roturas };
+
+  // Con el link de solo ver, la hoja NO es una ventana encima de la checklist: es todo
+  // lo que hay. Detrás no queda nada que mirar ni que tocar, así que tampoco lleva ✕ —
+  // cerrarla solo dejaría al metre delante de una lista que no es la que necesita.
+  if (soloVista) {
+    return (
+      <ModalVistaPrevia
+        checklist={checklist} evtKey={evento} pax={pax} ninos={ninos}
+        meta={metaHoja} sinCerrar
+      />
+    );
+  }
+
   return (
     <>
-      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={{ nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, diasProduccion, preparados, checkeados, vueltos, roturas }} onClose={() => setModalPrevia(false)} />}
+      {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={metaHoja} onClose={() => setModalPrevia(false)} />}
       {modoCarga && (
         <ModalModoCarga
           checklist={checklist}
@@ -5016,6 +5098,10 @@ export default function App({ onCerrarSesion } = {}) {
             horasJornada: horasJornadaEquipo,
           }}
           onClose={() => setModoCarga(false)}
+          // Con el link de logística, Modo carga es la app entera: no hay ✕ ni fondo
+          // que tocar para salir. Cerrarlo dejaría a quien está cargando el camión
+          // delante de una checklist que no puede tocar y sin forma clara de volver.
+          sinCerrar={soloCarga}
         />
       )}
       {modalFormulario && (
@@ -5154,7 +5240,6 @@ export default function App({ onCerrarSesion } = {}) {
                   <div className="compartir-menu">
                     <button onClick={() => { setMenuCompartir(false); setModalPrevia(true); }}><Eye size={15} /> Ver la hoja</button>
                     <div className="compartir-menu-sep" />
-                    <button onClick={() => handleGenerarLink("marcar")} title="La checklist entera, sin poder cambiar cantidades"><Link2 size={15} /> Link para marcar</button>
                     {/* El de logística: entra directo a marcar lo que sube al camión */}
                     <button onClick={() => handleGenerarLink("carga")} title="Abre directo en Modo carga (Salida): para quien carga el camión"><Package size={15} /> Link de Modo carga</button>
                     {/* El del metre: mira la lista y ya. Las marcas de carga son de

@@ -2723,6 +2723,77 @@ hr {
   vertical-align: middle;
 }
 
+/* Con el link de solo ver, la hoja no es una ventana encima de nada: es la pantalla.
+   Sin fondo oscurecido ni desenfoque —no hay nada detrás que insinuar— y pegada a los
+   bordes en el móvil, que es donde se mira. */
+.preview-overlay.is-pantalla {
+  background: var(--bg-color);
+  backdrop-filter: none;
+  padding: 0;
+  align-items: stretch;
+}
+.preview-overlay.is-pantalla .preview-modal {
+  border-radius: 0;
+  max-width: 900px;
+  min-height: 100dvh;
+  box-shadow: none;
+}
+
+/* Lo alquilado, junto y arriba de la hoja. Fila a fila ya iba marcado, pero repartido
+   entre catorce categorías: para saber qué hay que devolver había que recorrerla entera.
+   Va en ámbar, el mismo color que la etiqueta ALQUILER de cada fila. */
+.preview-alquileres {
+  border: 1.5px solid var(--aviso-borde);
+  background: var(--aviso-bg);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.preview-alquileres-titulo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--aviso-texto);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.preview-alquileres-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.preview-alquileres-lista li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.88rem;
+  color: var(--text-main);
+  /* Puntos de guía entre el nombre y la cantidad: con nombres de largos distintos, la
+     columna de cantidades se lee mucho peor sin ellos. */
+  border-bottom: 1px dotted var(--border-color);
+  padding-bottom: 3px;
+}
+.preview-alquileres-lista li:last-child { border-bottom: 0; padding-bottom: 0; }
+.preview-alquileres-lista li > span { min-width: 0; }
+.preview-alquileres-lista li > strong { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+.preview-alquileres-fechas {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--aviso-texto-suave, var(--text-muted));
+}
+.preview-alquileres-fechas svg { flex: 0 0 auto; }
+
 .preview-notes {
   background: var(--card-bg);
   border: 1px solid var(--border-color);
