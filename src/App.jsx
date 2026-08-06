@@ -4087,6 +4087,28 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { clearInterval(cadaRato); document.removeEventListener("visibilitychange", alVolver); };
   }, [preferenciaTema]);
   useEffect(() => { document.documentElement.dataset.tema = tema; }, [tema]);
+  // ─── LO QUE SE QUEDÓ SIN SUBIR ────────────────────────────────────────────────
+  // Si falla la subida del archivo —sesión caducada, sin cobertura, el móvil en un
+  // sótano— los cambios se quedaban SOLO en este dispositivo y no volvían a intentarse
+  // nunca: había que acordarse de tocar algo otra vez para que se reintentara. Aquí se
+  // guarda el archivo que no llegó a subir y se reintenta cuando hay ocasión.
+  //
+  // Solo se guarda la ÚLTIMA versión, no una cola de cambios: el archivo entero se
+  // manda de una pieza, así que la última contiene todo lo anterior. Una cola sería
+  // pelearse por reproducir el orden de cosas que ya vienen resueltas.
+  const pendienteSubirRef = React.useRef(null);
+  const subirArchivo = (anterior, obj) => {
+    ultimaEscrituraLocalRef.current = Date.now();
+    return sincronizarArchivoNube(anterior, obj)
+      .then(() => { pendienteSubirRef.current = null; setErrorNube(null); })
+      .catch((e) => {
+        // El "anterior" que se guarda es el de la primera vez que falló: desde ahí es
+        // desde donde hay que calcular qué mandar cuando por fin entre.
+        pendienteSubirRef.current = { anterior: pendienteSubirRef.current?.anterior ?? anterior, obj };
+        avisarFalloNube(e);
+      });
+  };
+
   const guardarEventos = (obj) => {
     const anterior = eventosGuardadosRef.current;
     eventosGuardadosRef.current = obj;
@@ -4094,11 +4116,32 @@ export default function App({ onCerrarSesion } = {}) {
     try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
     // Con la nube activa el archivo se sincroniza evento a evento: se ve igual desde
     // cualquier dispositivo y, al no ir todo en un solo documento, no hay techo.
-    if (nubeActiva() && haySesionEquipo) {
-      ultimaEscrituraLocalRef.current = Date.now();
-      sincronizarArchivoNube(anterior, obj).then(() => setErrorNube(null)).catch(avisarFalloNube);
-    }
+    if (nubeActiva() && haySesionEquipo) subirArchivo(anterior, obj);
   };
+
+  // Reintento: al recuperar la conexión y cada minuto mientras quede algo pendiente.
+  // Sin esto, quien perdió la sesión a media carga tenía que acordarse de volver a
+  // tocar algo para que se subiera, y nadie se acuerda de eso descargando un camión.
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    const reintentar = () => {
+      const p = pendienteSubirRef.current;
+      if (!p || !navigator.onLine) return;
+      subirArchivo(p.anterior, eventosGuardadosRef.current || p.obj);
+    };
+    window.addEventListener("online", reintentar);
+    const cada = setInterval(reintentar, 60000);
+    // Y al volver a la app desde otra pestaña o tras desbloquear el móvil, que es
+    // justo cuando se ha recuperado la cobertura sin que salte el evento "online".
+    const alVolver = () => { if (document.visibilityState === "visible") reintentar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      window.removeEventListener("online", reintentar);
+      document.removeEventListener("visibilitychange", alVolver);
+      clearInterval(cada);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [haySesionEquipo]);
 
   useEffect(() => {
     if (!nubeActiva()) return;
@@ -4261,7 +4304,7 @@ export default function App({ onCerrarSesion } = {}) {
         // cambiado" compara contra un mapa desfasado.
         eventosGuardadosRef.current = actualizado;
         try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
-        if (nubeActiva() && haySesionEquipo) { ultimaEscrituraLocalRef.current = Date.now(); sincronizarArchivoNube(prev, actualizado).catch(avisarFalloNube); }
+        if (nubeActiva() && haySesionEquipo) subirArchivo(prev, actualizado);
         return actualizado;
       });
     }, esElActivo ? 1200 : 3000);
