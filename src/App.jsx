@@ -1583,6 +1583,37 @@ const PRECIOS_BASE = {
   "Jagger (Jägermeister)": 15,
   "Crema de orujo": 7.8,
   "Crema de arroz": 6,
+  // ─── Vajilla ────────────────────────────────────────────────────────────────
+  // Todo este catálogo va SIN IVA, igual que las bebidas. Ojo con IKEA: publica sus
+  // precios CON IVA (es venta a particular), así que hay que quitárselo antes de
+  // apuntarlo aquí o el coste del evento sale un 21% inflado frente al resto.
+  // STRIMMIG, plato de gres gris-verde claro de 27 cm: 16,99€ el paquete de 4 con IVA
+  // → 4,25€/ud con IVA → 3,51€/ud sin IVA. Comprobado en ikea.es (agosto 2026).
+  // La etiqueta lleva el estilo dentro porque el selector de platos lo cambia; el precio
+  // va sobre el nombre completo, así que solo aplica al verde.
+  "Platos trinchero (Verde)": 3.51,
+  // STRIMMIG plato de postre, mismo gres gris-verde claro, 21 cm: 14,99€ el paquete de
+  // 4 con IVA → 3,75€/ud con IVA → 3,10€/ud sin IVA.
+  "Platos postre (Verde)": 3.10,
+  // ─── Cristalería (Makro) ────────────────────────────────────────────────────
+  // Makro es venta a profesional: sus precios YA vienen sin IVA, así que van tal cual,
+  // sin dividir entre 1,21 como los de IKEA.
+  //   Copa de vino Lena 53cl ... 9,78€ / 6 → 1,63€
+  //   Vaso de cubata 50cl ...... 7,22€ / 6 → 1,20€
+  //   Vaso de agua 36cl ........ 7,92€ / 6 → 1,32€
+  // Van por duplicado con y sin "(doble)" porque el interruptor de doble servicio
+  // cambia la ETIQUETA del item ("Copas de vino" → "Copas de vino (doble)"), y el
+  // precio se busca por el nombre completo: sin las dos, el evento que más copas
+  // gasta sería justo el que sale sin coste.
+  "Copas de vino": 1.63,
+  "Copas de vino (doble)": 1.63,
+  "Vasos de agua": 1.32,
+  "Vasos de agua (doble)": 1.32,
+  "Vasos de cubata": 1.20,
+  //   Copa de cava ............. 9,78€ / 6  → 1,63€
+  //   Vaso de chupito cristal .. 12,88€ / 12 → 1,07€
+  "Copas de cava": 1.63,
+  "Vasos chupito cristal (entrante)": 1.07,
 };
 function leerPrecios() {
   try { return { ...PRECIOS_BASE, ...JSON.parse(localStorage.getItem("gula_precios_items") || "{}") }; }
@@ -2084,10 +2115,15 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
       // Si el item se renombró a mano, se busca el precio por su nombre original
       // para que el coste no se pierda al cambiarle la etiqueta.
       const precio = precios[label] ?? precios[labelOriginal];
-      // Coste = (lo consumido + lo roto) × precio. Las roturas cuentan aunque no se
-      // haya registrado la vuelta (una rotura ya es un coste de reposición seguro).
+      // Se cobra lo que FALTA, y las roturas son parte de eso, no algo aparte. Antes se
+      // sumaban las dos cosas: apuntar "vuelven 90 de 100" y "10 roturas" —que son las
+      // mismas 10 copas— cobraba 20. Con el máximo sale bien en los cuatro casos:
+      //   vuelven 100 y 5 rotas (vuelven rotas en la caja) → faltan 0, roturas 5 → 5
+      //   vuelven 90 y 10 rotas (las que faltan)           → faltan 10, roturas 10 → 10
+      //   vuelven 90 sin apuntar roturas                   → faltan 10             → 10
+      //   sin apuntar la vuelta pero con 3 rotas           → roturas 3             → 3
       const costeTotal = (precio !== undefined && (consumoReal !== null || rot > 0))
-        ? ((consumoReal || 0) + rot) * precio
+        ? Math.max(consumoReal || 0, rot) * precio
         : null;
       return { key, label, sufijo, cargaInicial, vuelta, consumoReal, roturas: rot, precio, costeTotal };
     });
@@ -2096,6 +2132,21 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
   }).filter(c => c.filas.length > 0);
   const granTotal = filasPorCategoria.reduce((acc, c) => acc + c.subtotal, 0);
   const porPax = meta.totalPax > 0 ? granTotal / meta.totalPax : null;
+  // Cuántas líneas se están quedando fuera del coste por no tener precio. Es el dato que
+  // convierte "el total pone 340€" en "el total pone 340€ y le faltan 60 líneas": sin
+  // esto, un total corto parece un evento barato en vez de un catálogo incompleto.
+  const sinPrecio = filasPorCategoria.flatMap(c => c.filas)
+    .filter(f => f.cargaInicial !== null && f.precio === undefined);
+  const conPrecio = filasPorCategoria.flatMap(c => c.filas).filter(f => f.precio !== undefined).length;
+  // Lo que cuestan solo las roturas, aparte de lo consumido: es el dato que dice si
+  // conviene comprar cristalería más resistente o cambiar de cajas de transporte.
+  const costeRoturas = filasPorCategoria.flatMap(c => c.filas)
+    .reduce((acc, f) => acc + (f.precio !== undefined ? f.roturas * f.precio : 0), 0);
+  const totalRoturasUds = filasPorCategoria.flatMap(c => c.filas).reduce((acc, f) => acc + f.roturas, 0);
+  // Las categorías que más pesan, para verlo de un vistazo en vez de sumar columnas
+  const ranking = filasPorCategoria
+    .filter(c => c.subtotal > 0)
+    .sort((a, b) => b.subtotal - a.subtotal);
   const handleGuardarPrecios = (texto) => {
     const nuevos = { ...precios, ...parsePreciosPegados(texto) };
     setPrecios(nuevos);
@@ -2251,6 +2302,61 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
             {filasPorCategoria.length === 0 ? (
               <p className="resumen-vacio">No hay items con cantidad para resumir.</p>
             ) : (
+              <>
+              {/* Las cifras grandes primero. La tabla de siete columnas tiene todo el
+                  detalle, pero para saber "cómo ha ido" no hay que leer 150 filas. */}
+              <div className="resumen-fichas">
+                <div className="resumen-fichita is-total">
+                  <span className="resumen-fichita-label">Coste del evento</span>
+                  <strong className="resumen-fichita-valor">{fmtEur(granTotal)}</strong>
+                  {porPax !== null && <span className="resumen-fichita-pie">{fmtEur(porPax)} por persona</span>}
+                </div>
+                <div className={`resumen-fichita ${totalRoturasUds > 0 ? "is-roturas" : ""}`}>
+                  <span className="resumen-fichita-label">Roturas y pérdidas</span>
+                  <strong className="resumen-fichita-valor">{totalRoturasUds}</strong>
+                  <span className="resumen-fichita-pie">{costeRoturas > 0 ? `${fmtEur(costeRoturas)} de reposición` : "sin coste apuntado"}</span>
+                </div>
+                {sinPrecio.length > 0 && (
+                  <button
+                    type="button"
+                    className="resumen-fichita is-falta"
+                    onClick={() => setEditandoPrecios(true)}
+                    title={`Sin precio: ${sinPrecio.slice(0, 12).map(f => f.label).join(", ")}${sinPrecio.length > 12 ? "…" : ""}`}
+                  >
+                    <span className="resumen-fichita-label">Sin precio todavía</span>
+                    <strong className="resumen-fichita-valor">{sinPrecio.length}</strong>
+                    <span className="resumen-fichita-pie">de {sinPrecio.length + conPrecio} · pon los precios →</span>
+                  </button>
+                )}
+              </div>
+
+              {/* En qué se va el dinero, sin sumar columnas a mano */}
+              {ranking.length > 0 && (
+                <div className="resumen-bloque">
+                  <div className="resumen-titulo">En qué se va</div>
+                  <div className="resumen-ranking">
+                    {ranking.map(c => (
+                      <div className="resumen-ranking-fila" key={c.nombre}>
+                        <span className="resumen-ranking-nombre">
+                          <span className="cat-icon-mini" style={{ background: infoCategoria(c.nombre).color, color: infoCategoria(c.nombre).texto }}>
+                            <IconoCategoria nombre={c.nombre} size={11} />
+                          </span>
+                          {c.nombre}
+                        </span>
+                        <span className="resumen-ranking-barra">
+                          <span
+                            className="resumen-ranking-relleno"
+                            style={{ width: `${granTotal > 0 ? Math.max(2, (c.subtotal / granTotal) * 100) : 0}%`, background: infoCategoria(c.nombre).color }}
+                          />
+                        </span>
+                        <span className="resumen-ranking-cifra">{fmtEur(c.subtotal)}</span>
+                        <span className="resumen-ranking-pct">{granTotal > 0 ? Math.round((c.subtotal / granTotal) * 100) : 0}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="resumen-tabla-wrap">
                 <table className="resumen-tabla">
                   <thead>
@@ -2275,8 +2381,11 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                           <td>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</td>
                           <td>{f.vuelta ?? "—"}</td>
                           <td>{f.consumoReal ?? "—"}</td>
-                          <td>{f.roturas > 0 ? f.roturas : "—"}</td>
-                          <td>{f.precio !== undefined ? fmtEur(f.precio) : "—"}</td>
+                          <td className={f.roturas > 0 ? "resumen-celda-rotura" : ""}>{f.roturas > 0 ? f.roturas : "—"}</td>
+                          <td className={f.precio === undefined && f.cargaInicial !== null ? "resumen-celda-sinprecio" : ""}
+                              title={f.precio === undefined && f.cargaInicial !== null ? "Sin precio: esta línea no suma al total" : undefined}>
+                            {f.precio !== undefined ? fmtEur(f.precio) : "—"}
+                          </td>
                           <td>{f.costeTotal !== null ? fmtEur(f.costeTotal) : "—"}</td>
                         </tr>
                       ))}
@@ -2294,6 +2403,7 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                   </tfoot>
                 </table>
               </div>
+              </>
             )}
           </div>
         ) : (
@@ -2351,7 +2461,7 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                             checked={marcado}
                             onChange={() => (enPreparacion ? onTogglePreparado && onTogglePreparado(key) : onToggleSale(key))}
                           />
-                          <span className="carga-nombre"><IconoItem label={label} /> {label}</span>
+                          <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
                           {otroMarcado && (
                             <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
                                   title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
@@ -2383,6 +2493,15 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                   const vinoTodo = cantidadCompleta !== null
                     ? parseFloat(String(vueltaTexto).replace(",", ".")) === cantidadCompleta
                     : valorVuelta === true;
+                  // Lo que salió menos lo que ha vuelto. Si de 100 copas vuelven 90, esas
+                  // 10 no están: da igual si se rompieron o se quedaron por ahí, hay que
+                  // reponerlas. Se ofrece con un toque en vez de rellenarlo solo, porque
+                  // no siempre es una rotura: de 100 tercios vuelven 20 y los otros 80
+                  // están bebidos, no rotos. Ahí no se toca el botón y ya está.
+                  const vueltaNum = parseFloat(String(vueltaTexto).replace(",", "."));
+                  const faltan = (cantidadCompleta !== null && !isNaN(vueltaNum))
+                    ? Math.max(0, cantidadCompleta - vueltaNum) : 0;
+                  const sugerirRoturas = faltan > 0 && !roturas[key];
                   return (
                     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`} key={i}>
                       {/* La pastilla "todo" va en la línea del nombre, que es donde está
@@ -2391,7 +2510,7 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                           y los dos campos cada item ocupaba cuatro líneas — recorrer la
                           vuelta de un rodaje era bajar el triple de lo necesario. */}
                       <div className="carga-row-principal carga-row-vuelta">
-                        <span className="carga-nombre"><IconoItem label={label} /> {label}</span>
+                        <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
                         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
                         <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
                           <input
@@ -2431,6 +2550,14 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                             onChange={e => onRoturas(key, e.target.value)}
                             onClick={e => e.stopPropagation()}
                           />
+                          {sugerirRoturas && (
+                            <button
+                              type="button"
+                              className="carga-faltan"
+                              title={`Han vuelto ${vueltaNum} de ${cantidadCompleta}: apuntar las ${faltan} que faltan como roturas`}
+                              onClick={e => { e.stopPropagation(); onRoturas(key, String(faltan)); }}
+                            >faltan {faltan}</button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2975,13 +3102,37 @@ const FilaItem = React.memo(function FilaItem({
   const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
   const keyId = `${categoria}::${labelOriginal ?? label}`;
   const esItemManual = manualIdx !== undefined;
+
+  // ─── La cantidad se escribe en local y se confirma con una pausa ───────────
+  // Cada tecla escribía en el estado del evento entero: eso reconstruye la checklist
+  // (150 y pico filas), la vuelve a guardar y programa la subida a la nube. Medido:
+  // unos 100 ms por pulsación, que escribiendo rápido se nota y se comen letras.
+  //
+  // Ahora lo que se teclea vive AQUÍ mientras dura, y sube al evento cuando se para de
+  // escribir (o al salir del campo). Lo de fuera no cambia: la cantidad acaba en el
+  // mismo sitio, marca el item para revisar igual y se sincroniza igual.
+  const [tecleando, setTecleando] = React.useState(null);
+  const temporizadorRef = React.useRef(null);
+  // Mientras no se esté tecleando manda lo que venga de fuera: así un cambio de otro
+  // dispositivo (o un recálculo) se ve al momento, como hasta ahora.
+  const qty = tecleando ?? displayQty;
+  const confirmar = (valor) => {
+    clearTimeout(temporizadorRef.current);
+    acciones.current.editarCantidad(categoria, labelOriginal ?? label, valor);
+  };
+  // Al desmontar la fila (cambiar de evento, ocultar el item) no se puede perder lo
+  // último tecleado: se confirma antes de irse.
+  React.useEffect(() => () => {
+    if (temporizadorRef.current) clearTimeout(temporizadorRef.current);
+  }, []);
+
   // Nº de bateas recalculado siempre en vivo a partir de lo que se esté mostrando
   // (aunque la cantidad se edite a mano), no de un texto fijado
   const bateaSize = bateaSizeDe(label);
-  const bateaCount = bateaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / bateaSize) : null;
+  const bateaCount = bateaSize ? Math.ceil((parseFloat(qty.replace(",", ".")) || 0) / bateaSize) : null;
   // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza, vino, refrescos)
   const cajaSize = bateaSize ? null : cajaSizeDe(label);
-  const cajaCount = cajaSize ? Math.ceil((parseFloat(displayQty.replace(",", ".")) || 0) / cajaSize) : null;
+  const cajaCount = cajaSize ? Math.ceil((parseFloat(qty.replace(",", ".")) || 0) / cajaSize) : null;
   return (
     <div className={`item-row ${alq ? "is-alquiler" : ""}`}>
       {editando && !soloMarcar ? (
@@ -3023,22 +3174,31 @@ const FilaItem = React.memo(function FilaItem({
       <input
         type="text"
         className="item-qty-input"
-        value={displayQty}
+        value={qty}
         // Con el link de solo marcar la cantidad se lee pero no se toca: quien carga
         // el camión no tiene por qué cambiar QUÉ se carga, y un cambio suyo se
         // sincronizaría a todo el mundo.
         readOnly={soloMarcar}
         title={soloMarcar ? "Con este link las cantidades no se cambian" : "Click para editar la cantidad"}
         onChange={e => {
-          acciones.current.editarCantidad(categoria, labelOriginal ?? label, e.target.value);
+          const valor = e.target.value;
+          setTecleando(valor);
+          // Medio segundo sin teclear = ya está. Lo justo para no ir por detrás de los
+          // dedos y lo bastante corto para que nadie note que hay un retardo.
+          clearTimeout(temporizadorRef.current);
+          temporizadorRef.current = setTimeout(() => confirmar(valor), 500);
           // Parpadeo verde de confirmación: se reinicia la animación en cada tecla
           e.target.classList.remove("qty-flash");
           void e.target.offsetWidth;
           e.target.classList.add("qty-flash");
         }}
+        // Al salir del campo se confirma ya, sin esperar: si alguien escribe y cierra
+        // la app en el mismo segundo, lo tecleado no se puede quedar por el camino.
+        onBlur={e => { if (tecleando !== null) { confirmar(e.target.value); setTecleando(null); } }}
+        onKeyDown={e => { if (e.key === "Enter") e.target.blur(); }}
         onAnimationEnd={e => e.target.classList.remove("qty-flash")}
         onFocus={e => e.target.select()}
-        size={Math.max(2, displayQty.length)}
+        size={Math.max(2, qty.length)}
       />
       {/* El "=" no es adorno: sin él, "5" y al lado "1 caja de 24" se lee como dos
           cantidades distintas y no se sabe si hay que llevar 5 o 24. Con el igual

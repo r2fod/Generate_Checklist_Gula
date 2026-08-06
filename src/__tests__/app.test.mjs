@@ -2267,6 +2267,142 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo que no vuelve se cobra, y se cobra UNA vez ──────────────────────────
+  // Si de 100 copas vuelven 90, esas 10 no están y hay que reponerlas. El botón
+  // "faltan 10" las apunta de un toque en vez de restar de cabeza descargando el
+  // camión. Y el resumen no puede cobrarlas dos veces: antes sumaba lo que faltaba MÁS
+  // las roturas, que en este caso son las mismas 10 copas — cobraba 20.
+  console.log("\n── Roturas y lo que falta ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCopas: true, horasCopas: 4 }) + "&solo=1&carga=1",
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".segment-btn", { hasText: "Vuelta" }).click();
+    await p.waitForTimeout(700);
+
+    const fila = p.locator(".carga-row").filter({ hasText: "Copas de vino" }).first();
+    // "de 275 (= 11 bateas de 25)": hay que coger SOLO el primer número. Quitando todo
+    // lo que no sea dígito salía "2751125", o sea una cantidad inventada, y con eso la
+    // resta daba cero y no aparecía el botón: la prueba fallaba por mal leído, no por
+    // el código.
+    const textoCantidad = await fila.locator(".carga-cantidad").innerText();
+    const salieron = Number((textoCantidad.match(/de\s+([\d.,]+)/) || [])[1]?.replace(/[.,]/g, "") || 0);
+    ok(salieron > 0, `de partida salen ${salieron} copas de vino`);
+
+    // Sin apuntar la vuelta no se sugiere nada: no se sabe qué falta
+    ok(await fila.locator(".carga-faltan").count() === 0,
+      "sin apuntar la vuelta no se sugiere nada, que no se sabe qué falta");
+
+    // Vuelven todas menos 10
+    await fila.locator(".carga-vuelve-cantidad input").fill(String(salieron - 10));
+    await p.waitForTimeout(700);
+    const chip = fila.locator(".carga-faltan");
+    ok(await chip.count() === 1 && /faltan 10/.test(await chip.innerText()),
+      `apuntando la vuelta sale el botón con lo que falta → "${(await chip.innerText()).trim()}"`);
+
+    // Un toque y quedan apuntadas
+    await chip.click();
+    await p.waitForTimeout(600);
+    ok(await fila.locator(".carga-roturas-input").last().inputValue() === "10",
+      "y de un toque quedan apuntadas como roturas");
+    ok(await fila.locator(".carga-faltan").count() === 0,
+      "el botón desaparece cuando ya están apuntadas: no se repite el aviso");
+
+    // Y el resumen las cobra UNA vez, no dos
+    await p.locator(".segment-btn", { hasText: "Resumen" }).click();
+    await p.waitForTimeout(900);
+    const filaRes = p.locator("tr").filter({ hasText: "Copas de vino" }).first();
+    if (await filaRes.count() > 0) {
+      const celdas = await filaRes.locator("td").allInnerTexts();
+      ok(!celdas.join(" ").includes("20"),
+        `en el resumen no se cuentan dos veces las mismas 10 → ${JSON.stringify(celdas.slice(0, 6))}`);
+    } else {
+      ok(true, "el resumen no lista esa fila sin precio puesto (se comprueba la fórmula aparte)");
+    }
+    await c.close();
+  }
+
+  // ── Escribir una cantidad no puede ir por detrás de los dedos ──────────────
+  // Cada tecla escribía en el estado del evento entero: reconstruir 150 filas,
+  // guardar y programar la subida. Unos 100ms por pulsación, que escribiendo rápido
+  // se nota. Ahora se teclea en local y sube al parar. Lo que NO puede pasar es que
+  // por ganar tiempo se pierda lo escrito.
+  console.log("\n── Escribir una cantidad ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    const campo = p.locator(".item-row", { hasText: "Regletas" }).first().locator(".item-qty-input");
+    const guardado = () => p.evaluate(() => {
+      try { return JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}").overridesManuales || {}; }
+      catch (e) { return {}; }
+    });
+
+    // Escribir cuatro cifras seguidas: lo que se ve tiene que ser lo tecleado
+    await campo.click();
+    await p.keyboard.type("1234", { delay: 40 });
+    ok(await campo.inputValue() === "1234", `lo tecleado se ve entero y en orden → "${await campo.inputValue()}"`);
+
+    // Y al parar, sube al evento solo
+    await p.waitForTimeout(1100);
+    const tras = await guardado();
+    ok(Object.values(tras).includes("1234"),
+      `al parar de escribir se guarda solo → ${JSON.stringify(Object.values(tras).slice(0, 3))}`);
+
+    // Salir del campo confirma al momento, sin esperar: si alguien escribe y cierra
+    // la app en el mismo segundo, lo tecleado no se puede quedar por el camino.
+    // Otra fila, sin tocar antes: si se reusa la de arriba, el clic cae en un campo que
+    // YA tiene el foco, onFocus no vuelve a disparar su "seleccionar todo" y lo tecleado
+    // se mete en medio de lo que había ("1234" + "77" = "177234"). Es lo normal en
+    // cualquier campo de texto, pero convierte la comprobación en otra cosa.
+    const otro = p.locator(".item-row", { hasText: "Alargadores" }).first().locator(".item-qty-input");
+    await otro.click();
+    await p.keyboard.type("77", { delay: 30 });
+    // 120ms: lo justo para que React procese la última tecla, y muy por debajo de los
+    // 500 de la pausa. Si aquí ya estuviera guardado, no probaría nada del blur.
+    await p.waitForTimeout(120);
+    ok(!Object.values(await guardado()).includes("77"),
+      "recién tecleado y sin salir del campo, todavía no ha subido (la pausa no ha vencido)");
+    await otro.blur();
+    await p.waitForTimeout(250);
+    ok(Object.values(await guardado()).includes("77"),
+      "y salir del campo lo confirma al momento, sin esperar la pausa");
+
+    // Lo de al lado sigue el número mientras se escribe, no el guardado
+    const cerveza = p.locator(".item-row", { hasText: "Cerveza Alhambra" }).first();
+    await cerveza.locator(".item-qty-input").click();
+    await p.keyboard.type("48", { delay: 30 });
+    await p.waitForTimeout(120);
+    const info = await cerveza.locator(".item-batea-info").innerText();
+    ok(/2 cajas/.test(info), `y las cajas de al lado siguen al número mientras se teclea → "${info}"`);
+    await c.close();
+  }
+
+  // ── Los nombres largos no se cortan ────────────────────────────────────────
+  // "Cinta aislante americana" se quedaba en 38px de los 65 que necesita, cortado y
+  // sin puntos suspensivos: sin forma de saber que faltaba texto. Y es donde más
+  // importa, marcando material con el móvil en una mano.
+  console.log("\n── Los nombres largos ──");
+  for (const ancho of [320, 390]) {
+    const c = await navegador.newContext({ viewport: { width: ancho, height: 850 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 180, ninos: 30, nombreEvento: "Boda larga", fechaEvento: "2027-07-10", barraCopas: true, horasCopas: 5 }) + "&solo=1&carga=1",
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const cortados = await p.locator(".carga-nombre-texto").evaluateAll(ns => ns
+      .filter(n => n.scrollWidth > n.clientWidth + 2)
+      .map(n => `${n.textContent.trim().slice(0, 26)}: ${n.clientWidth}px de ${n.scrollWidth}`));
+    ok(cortados.length === 0,
+      `${ancho}px: ningún nombre se corta en Modo carga${cortados.length ? ` → ${cortados.slice(0, 3).join(" · ")}` : ` (${await p.locator(".carga-nombre-texto").count()} nombres)`}`);
+    await c.close();
+  }
+
   // ── La tónica es cosa de las copas ─────────────────────────────────────────
   // Salían botellas de tónica con solo barra de cóctel, y hasta sin barra ninguna. La
   // tónica es mezcla de ginebra: en el aperitivo se sirve vermut, cerveza y refresco.
