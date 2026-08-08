@@ -624,8 +624,10 @@ export function aRespuestasDeLaApp(r = {}) {
     if (puesto(r.copas)) { estado.barraCopas = r.copas > 0; estado.horasCopas = r.copas || 0; }
     if (puesto(r.servicio)) {
       estado.soloBandeja = r.servicio === "bandeja";
-      // De pie se sirve con menos camareros que un banquete sentado (1÷18 frente a 1÷12)
-      estado.paxPorCamarero = r.servicio === "bandeja" ? 18 : 12;
+      // De pie se sirve con muchos menos camareros que un banquete sentado: el sector
+      // da 1 cada 25-30 para cóctel de pie y 1 cada 12-15 sentado. Iba a 18, que para
+      // 100 personas son seis camareros donde se ponen tres o cuatro.
+      estado.paxPorCamarero = r.servicio === "bandeja" ? 25 : 12;
     }
     // Los dos entrantes son independientes: un menú puede llevar chupito Y compartido
     if (Array.isArray(r.entrante)) {

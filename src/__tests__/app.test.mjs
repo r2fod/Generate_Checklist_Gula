@@ -140,6 +140,38 @@ async function main() {
     ok(desbordan.length === 0, `${tema}: sin desbordamiento en ${ANCHOS.length} anchos${desbordan.length ? ` → ${desbordan.join(", ")}` : ""}`);
   }
 
+  // ── El contenedor acompaña al ancho de la ventana ───────────────────────────
+  // Estaba clavado en 1320px: en un monitor de 1920 sobraban 300px muertos a cada lado
+  // y la lista se quedaba en 868px por grande que fuera la pantalla. Se comprueba con
+  // cifras, no "es responsive": al estirar la ventana el contenido tiene que crecer.
+  console.log("\n── El contenedor sigue a la ventana ──");
+  {
+    const mideAncho = async (w) => {
+      const ctx = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+      const page = await nuevaPagina(ctx);
+      await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(1800);
+      const m = await page.evaluate(() => {
+        const caja = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().width) : 0; };
+        return { wrapper: caja(".app-wrapper"), lista: caja(".checklist-main") };
+      });
+      await ctx.close();
+      return m;
+    };
+    const a1280 = await mideAncho(1280), a1600 = await mideAncho(1600), a1920 = await mideAncho(1920);
+
+    ok(a1600.wrapper > a1280.wrapper && a1920.wrapper > a1600.wrapper,
+      `el contenedor crece con la ventana: 1280→${a1280.wrapper}px, 1600→${a1600.wrapper}px, 1920→${a1920.wrapper}px`);
+    ok(a1920.lista > 1150,
+      `y la lista aprovecha el ancho en un monitor grande: ${a1920.lista}px (antes se plantaba en 868)`);
+    // El tope existe a propósito: sin él una fila mide 2400px en un monitor muy ancho y
+    // el nombre queda en una punta y su cantidad en la otra.
+    const a2560 = await mideAncho(2560);
+    ok(a2560.wrapper === a1920.wrapper && a2560.wrapper <= 1800,
+      `pero no crece sin freno: a 2560px se queda en los mismos ${a2560.wrapper}px`);
+  }
+
   // ── Las cifras del resumen caben en una fila en el móvil ────────────────────
   console.log("\n── Resumen del evento ──");
   for (const w of [320, 412]) {
@@ -2267,6 +2299,78 @@ async function main() {
     await c.close();
   }
 
+  // ── Borrar un evento se lleva su copia de la nube ──────────────────────────
+  // Cada evento que se comparte alguna vez deja un documento en la nube. Al borrar el
+  // evento, ese documento se quedaba PARA SIEMPRE: nadie lo referencia, nadie lo ve y
+  // nadie lo podía borrar. Ahora se borra con él — y como eso SÍ rompe el link que ya
+  // se haya mandado, lo que se comprueba aquí es que el aviso lo dice antes.
+  console.log("\n── Borrar un evento y su copia en la nube ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        // Uno con copia en la nube (se compartió su link) y otro que nunca se compartió
+        "Boda compartida": { evento: "boda", pax: 100, nombreEvento: "Boda compartida", eventoNubeId: "abc12345" },
+        "Boda sin compartir": { evento: "boda", pax: 80, nombreEvento: "Boda sin compartir" },
+      }));
+    });
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+
+    const borrar = (nombre) => p.locator(".plantilla-borrar").and(p.locator(`[aria-label="Borrar evento guardado ${nombre}"]`));
+
+    // El que SÍ tiene link: hay que avisar de que ese link dejará de abrir
+    await borrar("Boda compartida").click();
+    await p.waitForTimeout(500);
+    const conLink = await p.locator(".dialogo-mensaje").innerText();
+    ok(/dejará de abrir/i.test(conLink) && /nube/i.test(conLink),
+      `si el evento tiene link compartido, se avisa de que dejará de abrir → "${conLink.slice(0, 70)}…"`);
+    await p.locator("button", { hasText: /Cancelar/i }).first().click();
+    await p.waitForTimeout(400);
+
+    // El que NO: no se le mete un miedo que no viene a cuento
+    await borrar("Boda sin compartir").click();
+    await p.waitForTimeout(500);
+    const sinLink = await p.locator(".dialogo-mensaje").innerText();
+    ok(!/dejará de abrir/i.test(sinLink),
+      `y si nunca se compartió, no se avisa de nada que no vaya a pasar → "${sinLink.slice(0, 60)}…"`);
+    await p.locator("button", { hasText: /Cancelar/i }).first().click();
+    await p.waitForTimeout(400);
+
+    // Y cancelar no borra nada
+    const quedan = await p.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")).length);
+    ok(quedan === 2, `cancelar no borra nada (siguen ${quedan} eventos)`);
+    await c.close();
+  }
+
+  // ── Las mesas de cocina de un banquete ─────────────────────────────────────
+  // Dicho por quien las monta: de 4 a 6 según el tamaño de la boda. Antes salían de la
+  // cuenta de "servicio" (7/11/13), que además se plantaba en 13 a partir de 100 pax —
+  // una boda de 120 y una de 300 cargaban las mismas.
+  console.log("\n── Mesas de un banquete ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const mesas = async (pax) => {
+      await p.goto(url({ evento: "boda", pax, ninos: 0, fechaEvento: "2027-07-10" }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1800);
+      const f = (await listaItems(p)).find(i => i.startsWith("Mesas de 1,8m")) || "";
+      return Number((f.match(/=(\d+)/) || [])[1] || 0);
+    };
+    // Comensales (pax/7, rectangular de 1,80) + cocina (4/5/6)
+    const cien = await mesas(100), dosc = await mesas(200), tresc = await mesas(300);
+    ok(cien === 19, `100 pax: 15 de comensales + 4 de cocina = ${cien}`);
+    ok(dosc === 34, `200 pax: 29 + 5 = ${dosc}`);
+    ok(tresc === 49, `300 pax: 43 + 6 = ${tresc}`);
+    // Lo que fallaba antes: dejar de crecer a partir de 100 pax
+    ok(tresc > dosc && dosc > cien,
+      "y una boda más grande lleva más mesas, que antes se plantaban a partir de 100 pax");
+    await c.close();
+  }
+
   // ── Lo que no vuelve se cobra, y se cobra UNA vez ──────────────────────────
   // Si de 100 copas vuelven 90, esas 10 no están y hay que reponerlas. El botón
   // "faltan 10" las apunta de un toque en vez de restar de cabeza descargando el
@@ -2626,10 +2730,14 @@ async function main() {
 
   // ── El brindis con cava ─────────────────────────────────────────────────────
   // Marcarlo hace dos cosas distintas y conviene no confundirlas: suma 4 botellas (la
-  // referencia del sector para un brindis es 1 copa por cabeza) y DOBLA las copas,
-  // porque en el brindis todo el mundo coge copa a la vez. Antes subía el ratio de
-  // botellas a 0,28 y salían 28 para 100 pax: dos copas por cabeza, el techo de lo que
-  // alguien bebe en un brindis, no la media.
+  // referencia del sector para un brindis es 1 copa por cabeza) y sube las copas a 1,5
+  // por cabeza, porque en el brindis todo el mundo coge copa a la vez y hay que tener
+  // repuesto delante. Antes subía el ratio de botellas a 0,28 y salían 28 para 100 pax:
+  // dos copas por cabeza, el techo de lo que alguien bebe en un brindis, no la media.
+  //
+  // Las copas tampoco se doblan ya. Doblar daba 2 copas por cabeza SOLO para el brindis,
+  // encima del 10% de margen que lleva todo: 252 copas de cava para 100 personas que
+  // brindan una vez. Con 1,5 salen 180, que son 1,8 por cabeza contando el margen.
   console.log("\n── Brindis con cava ──");
   {
     const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
@@ -2649,10 +2757,11 @@ async function main() {
     const sin = await cava(false), con = await cava(true);
     ok(sin.botellas === 20 && con.botellas === 24,
       `el brindis suma 4 botellas de cava, no un ratio entero (${sin.botellas} → ${con.botellas})`);
-    // El cálculo dobla (110 → 220 copas), pero lo que se carga va redondeado a bateas
-    // completas de 36, así que en pantalla se ve 144 → 252
-    ok(con.copas >= sin.copas * 1.7,
-      `y dobla las copas, que en el brindis todo el mundo coge una a la vez — en bateas de 36 (${sin.copas} → ${con.copas})`);
+    // Cifras exactas a propósito: 100 pax son 110 copas con margen (144 en bateas de 36)
+    // y 165 con brindis (180 en bateas). Un umbral del tipo "sube algo" deja pasar
+    // cualquier cosa, y esta línea existe justo para avisar si el ratio se mueve.
+    ok(sin.copas === 144 && con.copas === 180,
+      `y sube las copas a 1,5 por cabeza, que en el brindis todo el mundo coge una a la vez — en bateas de 36 (${sin.copas} → ${con.copas})`);
     await c.close();
   }
 

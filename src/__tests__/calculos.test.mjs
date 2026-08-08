@@ -202,28 +202,35 @@ console.log("\n══ Destilados: el reparto del sector (40/30/20/10) ══");
 
 console.log("\n══ Cristalería ══");
 {
-  const copas = (hc, hp) => calcCristaleria(100, hc, hp, false, false, false);
-  // Las copas de mesa dependen del TOTAL de horas (cóctel + copas), así que la curva
-  // se ordena por ese total. Mezclar los dos ejes sin ordenar comparaba 3 horas contra
-  // 2 y daba un falso positivo: ese fallo era de la prueba, no del cálculo.
-  const curva = [[0,0],[1,0],[0,2],[2,0],[3,0],[0,4],[2,4],[3,5],[4,8],[6,12]]
-    .sort((x, y) => (x[0] + x[1]) - (y[0] + y[1]))
-    .map(([a, b]) => [`${a}+${b}`, copas(a, b).vino.u]);
-  const mal = noBaja("copas de vino", curva);
-  ok(!mal, `más horas de barra nunca piden menos copas de vino${mal ? ` → ${mal}` : ""}`);
-  ok(copas(0, 0).vino.u > 0, "sin barra siguen haciendo falta copas: se come y se bebe igual");
-  ok(copas(3, 5).cubata.u > copas(3, 0).cubata.u,
-    "los vasos de cubata solo aparecen con barra de copas, no con el cóctel");
-  ok(copas(3, 0).cubata.u === 0, "sin copas no se llevan vasos de cubata");
-  ok(copas(2, 2).vino.u % BATEA.vino === 0,
+  const copas = (hp) => calcCristaleria(100, hp, false, false, false);
+  // El vino, el agua y el cava NO miran las horas de barra, y esto es lo que se
+  // comprueba. Antes se multiplicaban por un factor de horas y dos bodas iguales de 100
+  // personas —mismo vino, misma comida— salían con 500 y con 200 copas según si había
+  // barra de copas detrás. Se bebe el mismo vino en las dos.
+  //
+  // La prueba de antes decía "más horas nunca piden MENOS copas de vino". Con el
+  // cálculo de ahora esa frase es cierta pase lo que pase (la cifra es constante), así
+  // que no comprobaba nada: pasaría igual si el vino se calculara mal. Ahora se exige
+  // que sea la MISMA cifra, que es lo que de verdad se decidió.
+  const porHoras = [0, 2, 4, 5, 8, 12].map(h => [h, copas(h).vino.u]);
+  const distintas = porHoras.filter(([, v]) => v !== porHoras[0][1]);
+  ok(distintas.length === 0,
+    `las copas de vino no cambian con las horas de barra: ${porHoras.map(([h, v]) => `${h}h:${v}`).join(" ")}`);
+  ok(copas(0).vino.u > 0, "sin barra siguen haciendo falta copas: se come y se bebe igual");
+  ok(copas(5).cubata.u > copas(0).cubata.u,
+    "los vasos de cubata sí crecen con la barra de copas");
+  ok(copas(0).cubata.u === 0, "sin copas no se llevan vasos de cubata");
+  ok(copas(2).vino.u % BATEA.vino === 0,
     "las copas se piden por bateas completas, que es como se transportan");
   // Doble servicio dobla la cristalería de mesa
-  const normal = copas(3, 5), doble = calcCristaleria(100, 3, 5, true, false, false);
+  const normal = copas(5), doble = calcCristaleria(100, 5, true, false, false);
   ok(doble.vino.u > normal.vino.u, "el doble servicio dobla las copas de mesa");
-  // El brindis dobla las copas de cava (todo el mundo coge copa a la vez)
-  const conBrindis = calcCristaleria(100, 3, 5, false, true, false);
-  ok(conBrindis.cava.u > normal.cava.u, "y el brindis dobla las de cava");
-  ok(normal.chupito === null && calcCristaleria(100, 3, 5, false, false, true).chupito !== null,
+  // El brindis sube las copas de cava de 1 a 1,5 por cabeza (todos cogen copa a la vez).
+  // Cifras exactas: 110 con margen → 144 en bateas de 36; 165 → 180.
+  const conBrindis = calcCristaleria(100, 5, false, true, false);
+  ok(normal.cava.u === 144 && conBrindis.cava.u === 180,
+    `y el brindis sube las de cava a 1,5 por cabeza (${normal.cava.u} → ${conBrindis.cava.u})`);
+  ok(normal.chupito === null && calcCristaleria(100, 5, false, false, true).chupito !== null,
     "los vasos de chupito solo salen si hay entrante de chupito");
 }
 
@@ -297,7 +304,7 @@ console.log("\n══ Casos límite: nada puede salir en negativo ni en NaN ═�
   for (const pax of [0, 1, 7, 1000]) {
     for (const h of [0, 0.5, 4, 24]) {
       const b = calcBebidas(pax, h, true, false);
-      const c = calcCristaleria(pax, h / 2, h / 2, false, false, false);
+      const c = calcCristaleria(pax, h / 2, false, false, false);
       const d = calcDestilados(pax, h);
       for (const [nombre, valor] of [...Object.entries(b), ...Object.entries(d)]) {
         if (typeof valor === "number" && (isNaN(valor) || valor < 0)) raros.push(`${nombre}=${valor} (pax ${pax}, ${h}h)`);
