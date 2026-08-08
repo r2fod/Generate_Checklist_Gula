@@ -2053,8 +2053,13 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
     return h > 0 ? (min > 0 ? `${h} h ${min} min` : `${h} h`) : `${min} min`;
   };
   // Cronómetro en vivo: refresco cada segundo mientras algún cronómetro esté corriendo.
+  //
+  // Vigila las CUATRO fases. Antes solo miraba carga y descarga, así que el cronómetro
+  // de preparación y el de montaje corrían por dentro pero el número se quedaba clavado
+  // en pantalla: solo saltaba cuando algo repintaba por otro motivo. Un cronómetro que
+  // no se ve correr es un cronómetro que no funciona.
   const [ahoraTick, setAhoraTick] = useState(Date.now());
-  const algunoCorriendo = ["carga", "descarga"].some(f => cronos[f] && cronos[f].running);
+  const algunoCorriendo = FASES_TIEMPO.some(f => cronos[f] && cronos[f].running);
   useEffect(() => {
     if (!algunoCorriendo) return;
     setAhoraTick(Date.now()); // sincroniza YA al arrancar, si no el primer frame daría un valor raro
@@ -2076,6 +2081,37 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
     const pad = (n) => String(n).padStart(2, "0");
     return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
   };
+  // ─── CRONÓMETROS QUE SE QUEDAN PUESTOS ──────────────────────────────────────
+  // Cada cronómetro solo se ve en SU pestaña (el de preparación en Preparación, el de
+  // montaje en Salida, el de descarga en Vuelta), así que en cuanto cambias de pestaña
+  // deja de estar delante y es facilísimo olvidárselo corriendo.
+  //
+  // Y no es un dato inocente que se quede mal: los tiempos cronometrados alimentan la
+  // calibración de los estimados (ver estimarTiemposCarga). Una carga que marque catorce
+  // horas porque nadie paró el reloj no da solo un dato malo — desajusta las
+  // estimaciones de todos los eventos siguientes.
+  //
+  // Por eso el aviso va arriba del todo, FUERA de las pestañas, y trae el botón de parar
+  // dentro: si hay que ir a buscar el cronómetro para pararlo, no se para.
+  const ESTIMADO_MIN_FASE = { prep: prepMin, carga: cargaMin, descarga: descargaMin, montaje: montajeMin };
+  const NOMBRE_FASE = { prep: "preparación", carga: "carga", descarga: "descarga", montaje: "montaje" };
+  // Sin estimado con el que comparar, cuatro horas seguidas ya es olvido: ninguna de
+  // estas fases dura tanto.
+  const OLVIDO_MS = 4 * 60 * 60 * 1000;
+  const cronosPasados = FASES_TIEMPO
+    .filter(f => cronos[f] && cronos[f].running)
+    .map(f => {
+      const ms = cronoMs(f);
+      const estMs = (ESTIMADO_MIN_FASE[f] || 0) * 60000;
+      return {
+        fase: f, ms, estMs,
+        pasado: estMs > 0 && ms > estMs,
+        // Pasarse un poco es ir con retraso; pasar del triple es que se quedó puesto, y
+        // el aviso cambia de tono porque la acción que toca es distinta.
+        olvidado: estMs > 0 ? ms > estMs * 3 : ms > OLVIDO_MS,
+      };
+    })
+    .filter(x => x.pasado || x.olvidado);
   // Recordatorios del evento: cada línea de las notas se convierte en una tarea con
   // su propio check (coger comida del congelador, hielo, taxis, un material extra…).
   // Se marcan a mano según se van haciendo y todo queda guardado/sincronizado con el
@@ -2219,6 +2255,22 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                 <span className="carga-por-revisar-ir">Ver →</span>
               </button>
             )}
+            {/* Cronómetros pasados de tiempo o directamente olvidados. Aquí arriba
+                porque es lo único que se ve sin scroll y sin cambiar de pestaña. */}
+            {cronosPasados.map(({ fase, ms, estMs, olvidado }) => (
+              <div key={fase} className={`carga-crono-aviso${olvidado ? " is-olvidado" : ""}`}>
+                <AlertTriangle size={13} />
+                <span className="carga-crono-aviso-texto">
+                  {olvidado
+                    ? `El cronómetro de ${NOMBRE_FASE[fase]} lleva ${fmtCrono(ms)} en marcha. ¿Se ha quedado puesto?`
+                    : `Cronómetro de ${NOMBRE_FASE[fase]}: ${fmtCrono(ms)}, pasado de los ~${fmtMin(Math.round(estMs / 60000))} estimados.`}
+                </span>
+                <button type="button" className="carga-crono-aviso-parar"
+                        onClick={() => onCronoPause && onCronoPause(fase)}>
+                  Pararlo
+                </button>
+              </div>
+            ))}
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
             {totalItems > 0 && (
               <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.\nMontaje in situ (todo el equipo) = 45 + pax × 1,1 + ítems × 0,4.`}>

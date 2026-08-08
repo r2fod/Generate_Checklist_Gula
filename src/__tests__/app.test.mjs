@@ -3355,6 +3355,74 @@ async function main() {
     await c.close();
   }
 
+  // ── Cronómetros que se quedan puestos ───────────────────────────────────────
+  // Cada cronómetro solo se ve en SU pestaña, así que al cambiar de pestaña se pierde de
+  // vista y es facilísimo dejárselo corriendo. No es inocente: los tiempos cronometrados
+  // calibran los estimados, o sea que una carga de catorce horas porque nadie paró el
+  // reloj desajusta las estimaciones de los eventos siguientes.
+  console.log("\n── Cronómetros olvidados ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+
+    const abrirCon = async (cronos) => {
+      await p.goto(url({ ...EVENTO_COMPLETO, nombreEvento: "Boda cronómetros", cronos }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(2200);
+      await p.locator("button", { hasText: "Modo carga" }).first().click();
+      await p.waitForTimeout(1400);
+    };
+    const aviso = () => p.locator(".carga-crono-aviso").first();
+
+    // Recién arrancado no molesta: avisar por un cronómetro que acaba de empezar sería
+    // ruido, y el ruido se aprende a ignorar justo antes de que haga falta de verdad.
+    await abrirCon({ carga: { ms: 0, running: true, since: Date.now() - 5000 } });
+    ok(await p.locator(".carga-crono-aviso").count() === 0,
+      "un cronómetro recién puesto en marcha no avisa de nada");
+
+    // Diez horas es olvido con cualquier estimado: ninguna de estas fases dura tanto
+    await abrirCon({ carga: { ms: 0, running: true, since: Date.now() - 10 * 3600 * 1000 } });
+    const texto = (await aviso().innerText()).replace(/\s+/g, " ").trim();
+    ok(await p.locator(".carga-crono-aviso").count() === 1,
+      "pero uno que lleva diez horas corriendo avisa arriba del todo");
+    ok(/carga/i.test(texto) && /10:0/.test(texto),
+      `el aviso dice cuál es y cuánto lleva → "${texto}"`);
+    ok(await p.locator(".carga-crono-aviso.is-olvidado").count() === 1,
+      "y con el tono de olvido, no con el de simple retraso");
+
+    // El aviso vive FUERA de las pestañas: el cronómetro de carga está en Salida, y aquí
+    // se ve estando en Vuelta. Ese es justo el caso en que uno se lo deja puesto.
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(800);
+    ok(await p.locator(".carga-crono-aviso").count() === 1,
+      "y se sigue viendo desde otra pestaña, que es donde se olvidan");
+
+    // Y se para desde el propio aviso: si hay que ir a buscarlo, no se para
+    await p.locator(".carga-crono-aviso-parar").first().click();
+    await p.waitForTimeout(1000);
+    ok(await p.locator(".carga-crono-aviso").count() === 0,
+      'el botón "Pararlo" lo para sin ir a buscarlo, y el aviso se va');
+    ok(await p.evaluate(() => {
+      const cr = (JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}").cronos || {}).carga || {};
+      return cr.running === false && cr.ms > 0;
+    }), "y queda parado de verdad, con el tiempo que llevaba guardado");
+
+    // El cronómetro de preparación se quedaba clavado: el refresco de cada segundo solo
+    // vigilaba carga y descarga, así que prep y montaje corrían por dentro sin verse
+    // correr. Se comprueba que el número CAMBIA solo, sin tocar nada.
+    await abrirCon({});
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Prep." }).first().click();
+    await p.waitForTimeout(700);
+    await p.locator(".crono-btn-start").first().click();
+    await p.waitForTimeout(900);
+    const t1 = await p.locator(".crono-tiempo").first().innerText();
+    await p.waitForTimeout(2600);
+    const t2 = await p.locator(".crono-tiempo").first().innerText();
+    ok(t1 !== t2,
+      `el cronómetro de preparación corre a la vista, no congelado (${t1} → ${t2})`);
+    await c.close();
+  }
+
   await navegador.close();
   srv.kill();
 
