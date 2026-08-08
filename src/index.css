@@ -753,6 +753,68 @@ body {
   text-decoration: underline;
 }
 
+/* Aviso de cronómetro pasado de tiempo u olvidado en marcha. Mismo lenguaje visual que
+   el de "cantidad cambiada" de arriba, pero NO es un botón entero: el texto informa y
+   solo "Pararlo" actúa. Parar un cronómetro por tocar donde no tocaba sería peor que el
+   olvido, porque el tiempo perdido ya no se recupera. Se apilan si hay varios. */
+.carga-crono-aviso {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: left;
+  min-height: 40px;
+}
+
+.carga-crono-aviso svg { flex: 0 0 auto; }
+
+/* El texto cede y parte; el botón nunca se encoge, que es lo único accionable */
+.carga-crono-aviso-texto { min-width: 0; }
+
+.carga-crono-aviso-parar {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 5px 12px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.carga-crono-aviso-parar:hover { filter: brightness(0.94); }
+
+/* Cuando ya no es "vamos con retraso" sino "esto se ha quedado puesto", el aviso pesa
+   más, para que no se confunda con el de retraso. */
+.carga-crono-aviso.is-olvidado {
+  border-color: var(--error-borde);
+  background: var(--error-bg);
+  color: var(--error-texto);
+}
+
+/* En móvil el botón no cabe en la misma línea sin dejar el texto en dos palabras por
+   renglón: se baja debajo y ocupa el ancho, que además es más fácil de acertar. */
+@media (max-width: 480px) {
+  .carga-crono-aviso {
+    flex-wrap: wrap;
+  }
+  .carga-crono-aviso-parar {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* Días de producción (pax por día, solo evento Producción) */
 .dia-produccion-row {
   display: flex;
