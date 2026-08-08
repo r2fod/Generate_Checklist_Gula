@@ -20,7 +20,7 @@ import {
   sumaDias, conceptoAlquiler, recogidasConAlquileres,
 } from "./alquileres.js";
 import {
-  nubeActiva, nuevoIdEvento, guardarEventoNube, suscribirEventoNube,
+  nubeActiva, nuevoIdEvento, guardarEventoNube, borrarEventoNube, suscribirEventoNube,
   cargarIndiceEventosNube,
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
   leerConfigFormulario, guardarConfigFormulario,
@@ -30,7 +30,7 @@ import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio,
 import logoGula from "./assets/gula-logo.png";
 import { sanearEstado, cambiosDeCantidad } from "./estado.js";
 import {
-  BATEA, bateas, conMargen, MARGEN_SEGURIDAD,
+  BATEA, bateas, conMargen,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL, terciosConBarril,
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
 } from "./calculos.js";
@@ -325,10 +325,17 @@ function sugerirCategoria(label, categoriasDisponibles) {
 
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
 
-function calcMesasServicio(pax) {
-  if (pax <= 50) return { total: 7 };
-  if (pax <= 100) return { total: 11 };
-  return { total: 13 };
+// Las mesas de trabajo: las de cocina. Dicho por quien las monta, son de 4 a 6 según el
+// tamaño del evento, no más. En producción el buffet y la del camión se cuentan aparte,
+// en su propio bloque, porque allí esa línea no es solo cocina.
+//
+// Antes salían de una tabla 7/11/13 que además se plantaba en 13 a partir de 100 pax:
+// una boda de 120 y una de 300 cargaban las mismas. Para 100 personas pedía 11 mesas de
+// cocina donde se montan 4 — siete de más en el camión, con sus manteles.
+function calcMesasCocina(pax) {
+  if (pax <= 100) return 4;
+  if (pax <= 200) return 5;
+  return 6;
 }
 
 // Buscar la ubicación del evento en Google Maps. Lo que se escribe es el nombre del
@@ -364,12 +371,18 @@ function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20, minimoSala 
   };
 }
 
+// Las mesas donde se SIENTA la gente. Rectangulares de 1,80: siete por mesa, que es
+// el punto medio de lo que admiten (6 cómodo, 8 apretando, ~60cm por comensal) y lo
+// razonable en un banquete, donde cada uno lleva varios platos y copas delante.
+//
+// Antes solo se contaban en boda y comunión. En un cumpleaños y en un rodaje la gente
+// también se sienta a comer, así que llevan las suyas igual.
 function calcMesasComensales(evtKey, pax) {
-  return evtKey === "boda" || evtKey === "comunion" ? Math.ceil(pax / 7) : 0;
+  return Math.ceil(pax / 7);
 }
 
 function calcMesasTotal(evtKey, pax) {
-  return calcMesasServicio(pax).total + calcMesasComensales(evtKey, pax);
+  return calcMesasCocina(pax) + calcMesasComensales(evtKey, pax);
 }
 
 // Categoría de Café, compartida por los 3 tipos de evento
@@ -466,17 +479,19 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // banderas activan/ocultan lo que es propio de cada uno (ver items con opt() abajo).
   const esComunion = evtKey === "comunion";
   const esCorporativo = evtKey === "corporativo";
-  // Corporativo suele ser cóctel de pie (menos camareros que un banquete sentado):
-  // 1 cada 18 pax; boda y comunión (servicio en mesa) 1 cada 12. Si el usuario fija
-  // su propio ratio (1 camarero cada X pax) en el formulario, manda ese.
-  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 18 : 12);
+  // Corporativo suele ser cóctel de pie; boda y comunión, servicio en mesa.
+  // Banquete sentado: 1 camarero cada 12, el extremo generoso del rango del sector
+  // (12-15). Cóctel de PIE: 1 cada 25, que es lo que dice el sector (25-30) — antes
+  // iba a 1 cada 18, o sea seis camareros donde se ponen tres o cuatro. Si el usuario
+  // fija su propio ratio en el formulario, manda el suyo.
+  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 25 : 12);
 
   const bebidas    = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
-  // el cóctel/aperitivo no sirve cubatas. Vino/agua/cava/chupito sí escalan con el total
-  // de horas de barra libre (cóctel + copas), igual que otros caterings.
-  const cristal    = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
+  // se bebe el mismo vino con la misma comida haya barra detrás o no.
+  const cristal    = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -732,7 +747,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const bebidas = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
-  const cristal = calcCristaleria(pax, horasCoctel, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
   // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
@@ -757,7 +772,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mobiliario", items: [
-    ["Mesas de 1,8m", String(calcMesasServicio(pax).total)],
+    // Igual que un banquete: las de cocina más las de la gente que se sienta
+    ["Mesas de 1,8m", String(calcMesasTotal("cumpleanos", pax))],
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
@@ -810,7 +826,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ...repartoManteles(calcMesasServicio(pax).total + 1, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
+    ...repartoManteles(calcMesasTotal("cumpleanos", pax) + 1, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ...(usaTela
@@ -991,18 +1007,22 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const faltanCarpas = carpasPorAlquilar(carpasIdeal);
   const PAREDES_POR_CARPA = 3;
   const numChafers = Math.max(2, Math.ceil(pax / 40));
-  // Las mesas de 1,8m van todas en un único total: cocina/servicio (por pax) + 4 de
-  // buffet + 1 para el camión. La cuadrada 1x1 de la zona de cajas sucias va aparte
-  // porque es otro tipo de mesa.
-  const mesasServicio = calcMesasServicio(pax).total;
-  const MESAS_BUFFET = 4;
+  // Las mesas de 1,8m van todas en un único total: las del BUFFET (4 en rodajes
+  // normales, 5 en los grandes) + 1 para el camión + las de la gente que se sienta a
+  // comer. La cuadrada 1x1 de la zona de cajas sucias va aparte porque es otro tipo.
+  //
+  // Antes la base salía de una tabla por pax (7/11/13, plantada en 13 por encima de 100)
+  // y las de comer no se contaban: un rodaje de 25 personas cargaba 16 mesas sin que
+  // ninguna fuera para sentarse. Ahora es al revés y cuadra con lo que se monta.
+  const MESAS_BUFFET = pax <= 100 ? 4 : 5;
   const MESA_CAMION = 1;
+  const mesasComer = calcMesasComensales("produccion", pax);
   // En rodajes siempre aparece gente que no estaba en la lista (técnicos, productora,
   // visitas), así que las sillas se piden con 5 de más sobre el pax del día.
   // (con 0 pax no se suman: un evento aún sin rellenar no debe pedir 5 sillas)
   const SILLAS_EXTRA = totalPax > 0 ? 5 : 0;
   cats.push({ nombre: "Mobiliario", items: [
-    ["Mesas de 1,8m", String(mesasServicio + MESAS_BUFFET + MESA_CAMION)],
+    ["Mesas de 1,8m", String(MESAS_BUFFET + MESA_CAMION + mesasComer)],
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
     // Mesa larga fuera: las largas del rodaje son las de 1,8m de arriba, así que era
     // una línea repetida que solo hacía dudar de si había que cargar algo más.
@@ -1082,7 +1102,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     // Un mantel por mesa de servicio y de buffet (la del camión y la de cajas
     // sucias van sin vestir) + 1 de repuesto
-    ...repartoManteles(mesasServicio + MESAS_BUFFET + 1, opts.colorManteles || colorPorDefecto("produccion"), opts.porcentajeBeige),
+    ...repartoManteles(MESAS_BUFFET + MESA_CAMION + mesasComer + 1, opts.colorManteles || colorPorDefecto("produccion"), opts.porcentajeBeige),
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(nSala + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ["Bandeja camareros", String(nSala)],
@@ -4621,18 +4641,33 @@ export default function App({ onCerrarSesion } = {}) {
       copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(JSON.stringify(guardado))}`, nombre, "para editar");
     }
   };
-  const handleBorrarEvento = (nombre) => setDialogo({
-    tipo: "confirm",
-    titulo: `¿Borrar el evento guardado "${nombre}"?`,
-    mensaje: "Los links que ya hayas compartido seguirán funcionando (llevan la checklist dentro).",
-    textoConfirmar: "Borrar",
-    peligro: true,
-    onConfirm: () => {
-      const next = { ...eventosGuardados };
-      delete next[nombre];
-      guardarEventos(next);
-    },
-  });
+  const handleBorrarEvento = (nombre) => {
+    // Si el evento tiene copia en la nube (la que leen los links "?evento="), se borra
+    // con él. Antes se quedaba ahí para siempre: cada evento compartido alguna vez
+    // dejaba su documento aunque el evento ya no existiera en ningún sitio. Nadie los
+    // referencia, nadie los ve y nadie los podía borrar — solo ocupaban.
+    const idNube = eventosGuardados[nombre]?.eventoNubeId;
+    return setDialogo({
+      tipo: "confirm",
+      titulo: `¿Borrar el evento guardado "${nombre}"?`,
+      // Se dice la verdad de lo que va a pasar con los links, que no es lo mismo según
+      // el tipo: el "?evento=" lee de la nube y dejará de abrir; el viejo "?c=" lleva la
+      // checklist dentro y sigue funcionando pase lo que pase.
+      mensaje: idNube
+        ? "Se borrará también su copia en la nube, así que el link que hayas compartido de ESTE evento dejará de abrir. Los links antiguos que llevan la checklist dentro siguen funcionando."
+        : "Los links que ya hayas compartido seguirán funcionando (llevan la checklist dentro).",
+      textoConfirmar: "Borrar",
+      peligro: true,
+      onConfirm: () => {
+        const next = { ...eventosGuardados };
+        delete next[nombre];
+        guardarEventos(next);
+        // Si falla no se avisa: el evento ya está borrado de donde importa y volver
+        // atrás por esto sería peor. Queda un documento suelto, como hasta ahora.
+        if (idNube && nubeActiva()) borrarEventoNube(idNube).catch(() => {});
+      },
+    });
+  };
 
   // Duplica un evento guardado: copia toda su configuración con otro nombre, pero como
   // evento independiente y "en limpio" (sin los checks de carga/vuelta/roturas ni el link).

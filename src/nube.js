@@ -70,6 +70,21 @@ export async function guardarEventoNube(id, estado) {
   return actualizado;
 }
 
+// Borra la copia compartida de un evento. Se llama al borrar el evento guardado: sin
+// esto, cada evento que se comparte alguna vez deja su documento en la nube PARA
+// SIEMPRE, aunque el evento ya no exista en ningún sitio. Nadie los referencia y nadie
+// los ve — solo ocupan.
+//
+// Ojo con lo que implica: el link "?evento=<id>" lee de aquí, así que al borrarlo ese
+// link deja de abrir. Los links viejos que llevan la checklist dentro ("?c=...") no se
+// tocan, porque no dependen de la nube.
+export async function borrarEventoNube(id) {
+  const conexion = await getDb();
+  if (!conexion || !id) return;
+  const { db, fs } = conexion;
+  await fs.deleteDoc(fs.doc(db, "eventos", id));
+}
+
 export async function cargarEventoNube(id) {
   const conexion = await getDb();
   if (!conexion) return null;

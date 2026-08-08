@@ -12,7 +12,10 @@
 // buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan pedir un
 // 10-20% extra de copas y platos). Las bebidas, licores y cápsulas NO llevan margen
 // extra: sus ratios ya vienen calibrados por encima de los rangos del sector.
-export const MARGEN_SEGURIDAD = 1.1;
+//
+// Aquí no hay una constante 1.1 que usar, y es a propósito: multiplicar por 1,1 es justo
+// lo que da el error de abajo. El 10% se aplica SIEMPRE con conMargen().
+//
 // Se multiplica por 11 y se divide entre 10, no por 1,1. Parece lo mismo y no lo es:
 // en coma flotante 100 * 1.1 da 110.00000000000001, así que el redondeo hacia arriba
 // se llevaba una unidad de más SIEMPRE que la cuenta caía justo en un entero — 100
@@ -82,8 +85,9 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // cada 5-6 personas, 7-8 copas por botella), y con la base ya puesta eso son unas
   // cuatro botellas de más. Se probó subiendo el ratio a 0,28 y salían 28 botellas para
   // 100 pax — dos copas por cabeza, que es el techo de lo que alguien bebe en un
-  // brindis, no la media. Las COPAS sí se doblan (ver calcCristaleria): en el brindis
-  // todo el mundo coge copa a la vez, que es cosa distinta de cuánto se bebe.
+  // brindis, no la media. Las COPAS sí suben (ver calcCristaleria: de 1 a 1,5 por
+  // cabeza), porque en el brindis todo el mundo coge copa a la vez — que es cosa
+  // distinta de cuánto se bebe.
   const BOTELLAS_EXTRA_BRINDIS = 4;
   const cava = Math.round(pax * 0.2) + (tieneBrindisCava ? BOTELLAS_EXTRA_BRINDIS : 0);
   // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
@@ -186,25 +190,41 @@ export function calcDestilados(pax, h) {
   };
 }
 
-export function calcCristaleria(pax, horasCoctel, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
-  // Vasos de cubata calibrados con el estándar del sector: ~4 vasos/pax para una
-  // barra de 4h (los alquileres recomiendan 3-4/pax porque los camareros friegan
-  // y reutilizan durante el servicio), escalando con las horas y con techo en 6.
-  // Solo depende de las horas de COPAS: el cóctel/aperitivo no sirve cubatas.
-  const copasBarraPorPax = horasCopas > 0 ? Math.min(6, 1 + horasCopas * 0.75) : 0;
+// Ojo: ya NO recibe las horas de cóctel. Cuando el vino, el agua y el cava dejaron de
+// depender de las horas de barra, ese parámetro se quedó sin usar — y un hueco muerto en
+// medio de siete argumentos posicionales es una bomba de relojería: al primero que le
+// estorbe y lo quite, todos los de detrás se corren un sitio y "dobleCopa" pasa a leer
+// las horas de copas. Fuera antes de que pase.
+export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
+  // ─── CRISTALERÍA, AL EXTREMO ALTO DEL SECTOR ────────────────────────────────
+  // Antes las copas de vino, agua y cava se multiplicaban por un factor de horas que
+  // sumaba cóctel + copas, con tope 1,75. El razonamiento no se sostenía: durante la
+  // barra de COPAS se beben cubatas —que tienen su cuenta aparte— no vino. Dos bodas
+  // iguales de 100 personas, mismo vino y misma comida, salían con 500 y con 200 copas
+  // de vino según si había barra de copas detrás. Se bebe el mismo vino en las dos.
+  //
+  // Ahora cada cosa va por su ratio del sector, cogiendo el extremo ALTO del rango, y
+  // encima el 10% de siempre para roturas:
+  //   vino   3/pax   (rango 2-3)
+  //   agua   2/pax   (rango 1-2)
+  //   cava   1,5/pax con brindis, 1 sin él (rango 1-1,5)
+  //   cubata 4/pax   (rango 3-4), lo único que sí depende de las horas de barra
+  const COPAS_VINO_POR_PAX = 3;
+  const VASOS_AGUA_POR_PAX = 2;
+  const COPAS_CAVA_POR_PAX = 1;
+  const COPAS_CAVA_CON_BRINDIS = 1.5;
+  const VASOS_CUBATA_TOPE = 4;
+
+  // El cubata sí es de la barra: sin barra de copas no va ninguno, y crece con las
+  // horas hasta el tope del sector. A las 4h ya está en 4/pax; de ahí no sube, porque
+  // los camareros friegan y reutilizan durante el servicio.
+  const copasBarraPorPax = horasCopas > 0 ? Math.min(VASOS_CUBATA_TOPE, 1 + horasCopas * 0.75) : 0;
   const mult = dobleCopa ? 2 : 1;
-  // Copas de vino/agua/cava: cuantas más horas de barra libre (cóctel + copas
-  // sumadas), más rondas y más roturas/pérdidas hay que cubrir — igual que otros
-  // caterings calculan la cristalería sobre el total de horas de servicio, no
-  // sobre el pax en seco. Se calibra con 4h de barra total = factor 1 (mismos
-  // ratios de antes), con suelo en eventos breves y techo en eventos muy largos.
-  const horasBarraTotal = horasCoctel + horasCopas;
-  const barFactor = Math.min(1.75, Math.max(0.65, horasBarraTotal / 4));
   // Margen de seguridad del 10% para cubrir roturas/pérdidas de cristalería durante el servicio
-  const vino = conMargen(pax * 2.5 * barFactor * mult);
-  const agua = conMargen(pax * 1.5 * barFactor * mult) + extraAguaDesayuno;
+  const vino = conMargen(pax * COPAS_VINO_POR_PAX * mult);
+  const agua = conMargen(pax * VASOS_AGUA_POR_PAX * mult) + extraAguaDesayuno;
   const cubata = conMargen(pax * copasBarraPorPax);
-  const cavaCopas = conMargen(pax * (tieneBrindisCava ? 2.0 : 1.0) * barFactor);
+  const cavaCopas = conMargen(pax * (tieneBrindisCava ? COPAS_CAVA_CON_BRINDIS : COPAS_CAVA_POR_PAX));
   const fmt = (u, size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
   return {
     agua: fmt(agua, BATEA.agua), cubata: fmt(cubata, BATEA.cubata),
