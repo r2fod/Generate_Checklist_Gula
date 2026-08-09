@@ -826,3 +826,70 @@ console.log("\n══ Tarta y alergias ══");
   ok(ids("boda").includes("tarta") && ids("cumpleanos").includes("tarta") && !ids("produccion").includes("tarta"),
     "y la tarta en todos menos en un rodaje");
 }
+
+// ── Lo que se sale de lo normal ──────────────────────────────────────────────
+// El formulario no preguntaba por los platos, los platos de postre, los cubiertos, las
+// bandejas ni la plancha de gas. Un evento creado desde aquí se quedaba con los valores
+// por defecto de la app sin que nadie los hubiera confirmado, y no había forma de decir
+// que ESTA boda va sin cubiertos o con bandejas solo de plata.
+//
+// Va en una pantalla de casillas y no en cuatro preguntas: la respuesta es "lo de
+// siempre" en casi todos los eventos, y el formulario ya pasa de veinte pantallas.
+console.log("\n══ Algo distinto de lo normal ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  const campos = ["llevaPlatos", "llevaPlatosPostre", "llevaCubiertos", "llevaPlanchaGas", "tipoBandejas"];
+  const solo = (e) => Object.fromEntries(campos.filter(k => k in e).map(k => [k, e[k]]));
+
+  // Sin contestar no se toca NADA: la app se queda con lo que ya tuviera. Es la regla de
+  // todo el formulario y aquí importa el doble, porque son campos que ya tienen valor.
+  ok(Object.keys(solo(aRespuestasDeLaApp(base))).length === 0,
+    "sin contestar la pantalla, ninguno de esos campos se toca");
+
+  // Contestarla sin marcar nada SÍ es una respuesta: "va lo de siempre"
+  const normal = solo(aRespuestasDeLaApp({ ...base, distinto: [] }));
+  ok(normal.llevaPlatos === true && normal.llevaPlatosPostre === true
+    && normal.llevaCubiertos === true && normal.tipoBandejas === "Mixto",
+    `contestarla sin marcar nada deja lo de siempre → ${JSON.stringify(normal)}`);
+
+  const sinCubiertos = aRespuestasDeLaApp({ ...base, distinto: ["sinCubiertos"] });
+  ok(sinCubiertos.llevaCubiertos === false && sinCubiertos.llevaPlatos === true,
+    "marcar una casilla quita solo lo suyo, no arrastra al resto");
+
+  // Sin platos tampoco hay platos de postre: servir el postre en plato cuando no se
+  // llevan platos no existe, y dejarlo suelto cargaba unos sin los otros.
+  const sinPlatos = aRespuestasDeLaApp({ ...base, distinto: ["sinPlatos"] });
+  ok(sinPlatos.llevaPlatos === false && sinPlatos.llevaPlatosPostre === false,
+    "quitar los platos quita también los de postre");
+  ok(aRespuestasDeLaApp({ ...base, distinto: ["sinPlatosPostre"] }).llevaPlatos === true,
+    "pero quitar solo los de postre deja los principales");
+
+  // Las bandejas son una elección de tres metida en casillas
+  const tipo = (marcadas) => aRespuestasDeLaApp({ ...base, distinto: marcadas }).tipoBandejas;
+  ok(tipo(["bandejasMadera"]) === "Madera" && tipo(["bandejasPlata"]) === "Plata",
+    "marcar un tipo de bandeja manda");
+  ok(tipo(["bandejasMadera", "bandejasPlata"]) === "Mixto",
+    "y marcar los dos es llevar de los dos: mixtas, igual que no marcar ninguno");
+
+  const plancha = aRespuestasDeLaApp({ ...base, distinto: ["planchaGas"], numPlanchasGas: 3 });
+  ok(plancha.llevaPlanchaGas === true && plancha.numPlanchasGas === 3,
+    `la plancha de gas se pide con su número → ${plancha.numPlanchasGas}`);
+  ok(aRespuestasDeLaApp({ ...base, distinto: [] }).llevaPlanchaGas === false,
+    "y sin marcarla no va, que es lo normal");
+
+  // Un rodaje también carga platos, cubiertos y bandejas: la pantalla no puede quedarse
+  // fuera. La plancha sí, que producción no la lee.
+  const rodaje = aRespuestasDeLaApp({ tipo: "produccion", distinto: ["sinPlatos", "bandejasPlata"] });
+  ok(rodaje.llevaPlatos === false && rodaje.tipoBandejas === "Plata",
+    "en un rodaje también manda: allí se cargan platos y bandejas igual");
+  ok(!("llevaPlanchaGas" in rodaje),
+    "pero la plancha de gas no se le toca, que producción no la usa");
+
+  const ids = (t) => resumirEnvio({ tipo: t }).map(f => f.id);
+  ok(ids("boda").includes("distinto") && ids("produccion").includes("distinto"),
+    "la pantalla se pregunta en todos los tipos de evento");
+  const opts = PREGUNTAS.find(q => q.id === "distinto").opciones.map(o => o.valor);
+  ok(opts.length === 6 && opts.includes("sinPlatos") && opts.includes("bandejasPlata"),
+    `y son seis casillas en UNA pantalla, no cuatro preguntas sueltas → ${opts.join(", ")}`);
+}

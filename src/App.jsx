@@ -2181,7 +2181,14 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
       const costeTotal = (precio !== undefined && (consumoReal !== null || rot > 0))
         ? Math.max(consumoReal || 0, rot) * precio
         : null;
-      return { key, label, sufijo, cargaInicial, vuelta, consumoReal, roturas: rot, precio, costeTotal };
+      // Volver más de lo que salió es imposible, y sin embargo pasaba: "cargadas 24,
+      // vuelven 27". Normalmente es que la cantidad se recalculó DESPUÉS de apuntar la
+      // vuelta (salieron 30, volvieron 27, y luego el pax bajó y la carga quedó en 24),
+      // aunque también puede ser un número mal tecleado. En los dos casos la línea es
+      // mentira y hay que verla: el consumo sale 0 y el coste 0, así que si no se marca
+      // pasa por buena y esa merma no se cobra a nadie.
+      const vueltaImposible = cargaInicial !== null && vuelta !== null && vuelta > cargaInicial;
+      return { key, label, sufijo, cargaInicial, vuelta, consumoReal, roturas: rot, precio, costeTotal, vueltaImposible };
     });
     const subtotal = filas.reduce((acc, f) => acc + (f.costeTotal || 0), 0);
     return { nombre: cat.nombre, filas, subtotal };
@@ -2451,7 +2458,10 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                         <tr key={f.key}>
                           <td className="resumen-tabla-producto" title={f.label}><IconoItem label={f.label} size={13} /> {f.label}</td>
                           <td>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</td>
-                          <td>{f.vuelta ?? "—"}</td>
+                          <td className={f.vueltaImposible ? "resumen-celda-imposible" : ""}
+                              title={f.vueltaImposible ? `Vuelven ${f.vuelta} de ${f.cargaInicial} cargadas: imposible. Suele pasar cuando la cantidad se recalcula después de apuntar la vuelta. Revísalo, porque así esta línea no cobra la merma.` : undefined}>
+                            {f.vuelta ?? "—"}{f.vueltaImposible ? " ⚠️" : ""}
+                          </td>
                           <td>{f.consumoReal ?? "—"}</td>
                           <td className={f.roturas > 0 ? "resumen-celda-rotura" : ""}>{f.roturas > 0 ? f.roturas : "—"}</td>
                           <td className={f.precio === undefined && f.cargaInicial !== null ? "resumen-celda-sinprecio" : ""}
@@ -2600,13 +2610,26 @@ function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkea
                         {cantidadCompleta !== null && (
                           <div className="carga-roturas carga-vuelve-cantidad">
                             <span><Undo2 size={12} /> vuelve</span>
+                            {/* No se puede devolver más de lo que salió. Sin tope se
+                                apuntaban cosas como "cargadas 24, vuelven 27", que
+                                además salen gratis: el consumo se queda en 0 y la merma
+                                no se cobra. Se recorta al vuelo a la cantidad cargada,
+                                que es el único número que puede ser verdad. */}
                             <input
                               type="number"
                               min="0"
+                              max={cantidadCompleta}
+                              title={`Como mucho pueden volver las ${cantidadCompleta} que salieron`}
                               className="carga-roturas-input"
                               value={vueltaTexto}
                               placeholder="0"
-                              onChange={e => onVuelve(key, e.target.value)}
+                              onChange={e => {
+                                const texto = e.target.value;
+                                if (texto === "") return onVuelve(key, "");
+                                const n = Number(texto);
+                                if (isNaN(n)) return;
+                                onVuelve(key, String(Math.min(Math.max(0, n), cantidadCompleta)));
+                              }}
                               onClick={e => e.stopPropagation()}
                             />
                           </div>
