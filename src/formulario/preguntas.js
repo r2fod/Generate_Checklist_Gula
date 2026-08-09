@@ -279,6 +279,35 @@ export const PREGUNTAS = [
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
     ],
   },
+  // ── Lo que se sale de lo normal ────────────────────────────────────────────
+  // Platos, platos de postre, cubiertos y bandejas mixtas van SIEMPRE salvo que se diga
+  // lo contrario, y la plancha de gas no va salvo que se diga que sí. El formulario no
+  // preguntaba por nada de esto, así que un evento creado desde aquí se quedaba con esos
+  // valores sin que nadie los hubiera confirmado — y no había forma de decir que esta
+  // boda concreta va sin cubiertos, o con bandejas solo de plata.
+  //
+  // Va en UNA pantalla de casillas y no en cuatro preguntas a propósito: la respuesta es
+  // "lo de siempre" en casi todos los eventos, y el formulario ya son más de veinte
+  // pantallas para una boda. Cuatro preguntas más cuya respuesta no cambia nunca es la
+  // mejor forma de que se empiece a contestar sin leer.
+  {
+    id: "distinto", tipo: "marcar", texto: "¿Algo distinto de lo normal?",
+    nota: "Sin marcar nada va lo de siempre: platos, platos de postre, cubiertos y bandejas de los dos tipos.",
+    opciones: [
+      { valor: "sinPlatos", texto: "No llevamos platos" },
+      { valor: "sinPlatosPostre", texto: "No llevamos platos de postre" },
+      { valor: "sinCubiertos", texto: "No llevamos cubiertos" },
+      // La plancha solo en banquetes: un rodaje no la lee, y enseñar una casilla que no
+      // hace nada es peor que no enseñarla.
+      { valor: "planchaGas", texto: "Lleva plancha de gas", conNumero: "¿Cuántas?", campoNumero: "numPlanchasGas", soloEn: CON_BARRA },
+      // Las bandejas no son un sí/no sino una elección de tres. Marcando una va esa;
+      // sin marcar ninguna —o marcando las dos, que es llevar de los dos tipos— quedan
+      // mixtas, que es lo de siempre. Así entra aquí en vez de gastar otra pantalla.
+      { valor: "bandejasMadera", texto: "Bandejas solo de madera" },
+      { valor: "bandejasPlata", texto: "Bandejas solo de plata" },
+    ],
+    // En todos los tipos: un rodaje también carga platos, cubiertos y bandejas.
+  },
   {
     // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
     // devolverlo. Al marcarlo se crea su recogida sola. En un rodaje no se lleva.
@@ -655,6 +684,29 @@ export function aRespuestasDeLaApp(r = {}) {
       if (estado.tamanoBarril !== "No lleva" && r.numBarriles > 0) estado.numBarriles = r.numBarriles;
       estado.llevaJarrasCristal = marcado("extras", "jarras");
     }
+  }
+
+  // Lo que se sale de lo normal. Va fuera del reparto rodaje/banquete porque los platos,
+  // los cubiertos y las bandejas los carga también un rodaje.
+  //
+  // Solo se toca si la pantalla se ha contestado: sin contestar, la app se queda con lo
+  // que ya tuviera, igual que el resto del formulario. Marcar la casilla es decir "esto
+  // NO va", así que se niega.
+  if (Array.isArray(r.distinto)) {
+    estado.llevaPlatos = !marcado("distinto", "sinPlatos");
+    // Los de postre pueden quitarse aparte, pero si no van los platos tampoco van estos:
+    // servir postre en plato cuando no se llevan platos no existe.
+    estado.llevaPlatosPostre = estado.llevaPlatos && !marcado("distinto", "sinPlatosPostre");
+    estado.llevaCubiertos = !marcado("distinto", "sinCubiertos");
+    if (tipo !== "produccion") {
+      estado.llevaPlanchaGas = marcado("distinto", "planchaGas");
+      if (estado.llevaPlanchaGas && r.numPlanchasGas > 0) estado.numPlanchasGas = r.numPlanchasGas;
+    }
+    // Una sola marcada manda; ninguna o las dos = de los dos tipos, que es lo normal
+    const soloMadera = marcado("distinto", "bandejasMadera");
+    const soloPlata = marcado("distinto", "bandejasPlata");
+    estado.tipoBandejas = soloMadera && !soloPlata ? "Madera"
+      : soloPlata && !soloMadera ? "Plata" : "Mixto";
   }
 
   if (puesto(r.manteles)) {
