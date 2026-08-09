@@ -2966,6 +2966,14 @@ hr {
 /* En la tabla, lo que hay que ver a la primera */
 .resumen-celda-rotura { color: var(--error-texto-fuerte); font-weight: 800; }
 .resumen-celda-sinprecio { color: var(--aviso-texto); font-weight: 700; }
+/* Vuelven más de las que salieron: dato imposible, casi siempre porque la cantidad se
+   recalculó después de apuntar la vuelta. Va en rojo y con fondo porque además es una
+   línea que NO cobra la merma: si pasa desapercibida, se pierde dinero sin enterarse. */
+.resumen-celda-imposible {
+  color: var(--error-texto-fuerte);
+  background: var(--error-bg);
+  font-weight: 800;
+}
 
 /* "faltan 10" junto al campo de roturas. Un toque y se apunta, en vez de restar de
    cabeza mientras se descarga el camión. No se rellena solo a propósito: lo que no
@@ -3547,10 +3555,38 @@ hr {
 
 .resumen-tabla-wrap {
   overflow-x: auto;
+  /* Inercia al arrastrar en iOS: sin esto el gesto se siente pegajoso, y en el móvil
+     esta tabla se arrastra sí o sí (siete columnas no caben en 380px). */
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--card-bg);
 }
+
+/* ─── LA COLUMNA DEL PRODUCTO SE QUEDA FIJA ─────────────────────────────────────
+   En el móvil hay que arrastrar de lado para llegar al coste, y al hacerlo el nombre
+   del producto se iba por la izquierda: te quedabas mirando "5 · 1 · 4 · 12,87€" sin
+   saber de qué. Fijándola, el nombre siempre está delante y las cifras pasan por
+   detrás. Es LA diferencia entre una tabla que se arrastra bien y una que no.
+
+   Solo las filas de producto y la cabecera. Las bandas de categoría y los subtotales
+   ocupan el ancho entero con colSpan, así que fijarlas dejaría su texto colgado a la
+   izquierda siguiendo el dedo. */
+.resumen-tabla thead th:first-child,
+.resumen-tabla tbody tr:not(.resumen-cat-header):not(.resumen-subtotal-row) td:first-child {
+  position: sticky;
+  left: 0;
+  /* Fondo opaco obligatorio: si no, las cifras se ven por debajo al pasar */
+  background: var(--card-bg);
+  /* La rayita hace de borde de la columna fija; sin ella el nombre y la primera cifra
+     se tocan mientras se arrastra y se leen como una sola cosa. */
+  box-shadow: 1px 0 0 var(--border-color);
+  z-index: 2;
+}
+
+/* La celda de la esquina se queda fija en los dos ejes a la vez, así que va por encima
+   de las otras dos que también se fijan */
+.resumen-tabla thead th:first-child { z-index: 4; }
 
 .resumen-tabla {
   width: 100%;
@@ -3582,8 +3618,12 @@ hr {
   background: var(--card-bg);
 }
 
+/* 190 y no 220: con 220 la tabla medía 813px dentro de 810 y la última columna quedaba
+   cortada por 3px — justo el "€" del coste total, que es la cifra que se mira. Tres
+   píxeles de más obligaban a arrastrar la tabla en escritorio para ver el número
+   completo. Con 190 sobran ~33px y entra entera. */
 .resumen-tabla-producto {
-  max-width: 220px;
+  max-width: 190px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3643,13 +3683,31 @@ hr {
   gap: 10px;
 }
 
+/* En el móvil son siete columnas —producto y seis cifras— dentro de unos 380px. No caben
+   sin dejarse una por el camino, y quitarla con CSS no vale: los subtotales van con
+   colSpan={6}, así que esconder una columna descuadra la tabla entera y el navegador se
+   inventa una fantasma. Lo que sí se puede es apretarla mucho:
+     · los títulos parten en dos líneas ("CARGA / INICIAL"), y así la columna mide lo que
+       la palabra más larga en vez de lo que la frase entera
+     · menos aire a los lados de cada celda
+   Con eso el arrastre lateral pasa de más de 300px a poco más de la última columna. */
 @media (max-width: 480px) {
   .resumen-tabla {
     font-size: 0.76rem;
   }
 
   .resumen-tabla-producto {
-    max-width: 140px;
+    max-width: 132px;
+  }
+
+  .resumen-tabla th {
+    white-space: normal;
+    line-height: 1.15;
+  }
+
+  .resumen-tabla th,
+  .resumen-tabla td {
+    padding: 8px 5px;
   }
 }
 
@@ -4291,11 +4349,18 @@ hr {
   font-weight: 700;
 }
 
-/* Interruptor de tema: va en la fila del título, alineado arriba a la derecha, con
-   texto para que se encuentre a la primera. Compacto para no competir con el nombre. */
+/* Interruptor de tema: va en la fila del título, a la derecha, con texto para que se
+   encuentre a la primera.
+   Va a la MISMA altura y al mismo centro que los botones de al lado. Antes llevaba
+   align-self: flex-start, que lo pegaba al borde de arriba del grupo del título: quedaba
+   7px por encima de la fila de botones y con 31px de alto contra sus 36 — dos descuadres
+   a la vez, y a simple vista parecía que bailaba.
+   El min-height iguala el alto de .btn (9px de padding + 0,88rem de texto + borde). La
+   píldora y la letra más pequeña se quedan a propósito: es un control secundario y tiene
+   que leerse como tal, pero alineado. */
 .btn-tema {
   flex: 0 0 auto;
-  align-self: flex-start;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: 6px;

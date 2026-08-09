@@ -2426,6 +2426,25 @@ async function main() {
     } else {
       ok(true, "el resumen no lista esa fila sin precio puesto (se comprueba la fórmula aparte)");
     }
+
+    // No pueden volver más de las que salieron. Pasaba: "cargadas 24, vuelven 27". Y no
+    // es solo que quede raro — el consumo se queda en 0 y esa merma NO se cobra, así que
+    // el dato imposible sale gratis y nadie se entera.
+    await p.locator(".segment-btn", { hasText: "Vuelta" }).click();
+    await p.waitForTimeout(700);
+    const campoVuelta = fila.locator(".carga-vuelve-cantidad input");
+    await campoVuelta.fill(String(salieron + 50));
+    await p.waitForTimeout(700);
+    ok(Number(await campoVuelta.inputValue()) === salieron,
+      `escribir más de lo que salió se recorta a la cantidad cargada (${salieron + 50} → ${await campoVuelta.inputValue()})`);
+    ok(Number(await campoVuelta.getAttribute("max")) === salieron,
+      "y el tope va también en el campo, para que las flechas no lo pasen");
+
+    // Por debajo se sigue pudiendo escribir cualquier cosa: el tope es solo por arriba
+    await campoVuelta.fill(String(salieron - 3));
+    await p.waitForTimeout(600);
+    ok(Number(await campoVuelta.inputValue()) === salieron - 3,
+      "y por debajo no estorba: se apunta lo que de verdad volvió");
     await c.close();
   }
 
