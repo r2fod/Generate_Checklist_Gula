@@ -491,13 +491,26 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 190px;
+  /* max-content y no un min-width a ojo: con 190px fijos, "Link de Modo carga" y
+     "Formulario del evento" partían en dos líneas y el menú quedaba desigual, unas
+     opciones altas y otras bajas. Así el menú mide lo que mide su opción más larga.
+     El tope evita que en un móvil estrecho se salga de la pantalla. */
+  width: max-content;
+  max-width: min(88vw, 320px);
+  /* Entra desde arriba, que es de donde sale el botón */
+  transform-origin: top right;
+  animation: compartir-menu-entra 0.16s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes compartir-menu-entra {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
 }
 
 .compartir-menu button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 9px 12px;
   border: none;
   background: transparent;
@@ -507,12 +520,55 @@ body {
   color: var(--text-main);
   cursor: pointer;
   text-align: left;
-  transition: var(--transition-smooth);
+  /* El texto no parte nunca: una opción de menú en dos líneas se lee peor y descuadra
+     la lista entera. */
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+/* Las opciones aparecen escalonadas, no todas de golpe: el ojo recorre la lista de
+   arriba abajo y encuentra antes lo que busca. Son 18ms de diferencia, lo justo para
+   que se note el orden sin que se sienta lento. */
+.compartir-menu > button { animation: compartir-opcion-entra 0.18s ease both; }
+.compartir-menu > button:nth-child(1) { animation-delay: 0.00s; }
+.compartir-menu > button:nth-child(2) { animation-delay: 0.018s; }
+.compartir-menu > button:nth-child(3) { animation-delay: 0.036s; }
+.compartir-menu > button:nth-child(4) { animation-delay: 0.054s; }
+.compartir-menu > button:nth-child(5) { animation-delay: 0.072s; }
+.compartir-menu > button:nth-child(6) { animation-delay: 0.09s; }
+.compartir-menu > button:nth-child(7) { animation-delay: 0.108s; }
+.compartir-menu > button:nth-child(8) { animation-delay: 0.126s; }
+.compartir-menu > button:nth-child(n+9) { animation-delay: 0.144s; }
+
+@keyframes compartir-opcion-entra {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* El icono va en color y el texto en negro: así la lista se recorre por los iconos,
+   que es como se busca en un menú que ya te sabes. */
+.compartir-menu button svg {
+  color: var(--accent);
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .compartir-menu button:hover {
   background: var(--accent-soft);
   color: var(--accent);
+  transform: translateX(2px);
+}
+
+/* El icono crece un poco al pasar por encima: confirma cuál está señalado sin mover
+   el texto de sitio. */
+.compartir-menu button:hover svg { transform: scale(1.18); }
+
+/* Quien tenga el móvil en modo de movimiento reducido lo ve quieto. Una animación que
+   no se puede apagar es un problema de accesibilidad, no un detalle. */
+@media (prefers-reduced-motion: reduce) {
+  .compartir-menu,
+  .compartir-menu > button { animation: none; }
+  .compartir-menu button:hover { transform: none; }
+  .compartir-menu button:hover svg { transform: none; }
 }
 
 .archivado-banner {

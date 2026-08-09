@@ -43,7 +43,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // Dos apps, cada una en SU carpeta y ninguna dentro de la otra. El ámbito de un
+      // Tres apps, cada una en SU carpeta y ninguna dentro de la otra. El ámbito de un
       // manifiesto es la carpeta donde vive, así que con la checklist en la raíz su
       // ámbito se tragaba /formulario/: una app dentro del ámbito de otra no se puede
       // instalar aparte, el navegador solo ofrece "abrir en la de fuera". Por eso la
@@ -52,6 +52,7 @@ export default defineConfig({
       input: {
         checklist: fileURLToPath(new URL('./checklist/index.html', import.meta.url)),
         formulario: fileURLToPath(new URL('./formulario/index.html', import.meta.url)),
+        calendario: fileURLToPath(new URL('./calendario/index.html', import.meta.url)),
       },
     },
   },

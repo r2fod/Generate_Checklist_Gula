@@ -1,0 +1,483 @@
+/* ─── EL CALENDARIO ───────────────────────────────────────────────────────────
+   Escrito de móvil hacia arriba, no al revés. Un calendario son siete columnas sí o sí,
+   y en un móvil de 320px eso son 45px por columna: ahí no cabe "Boda Eucaris y Pedro".
+   Así que la casilla enseña el número y unos puntos de color, y el nombre entero vive
+   en el panel del día, que es a lo que se llega tocando. De 560px para arriba, donde ya
+   caben, los chips con el nombre aparecen dentro de la casilla.
+
+   Nada de anchos fijos: todo con minmax(0, 1fr) para que las columnas cedan en vez de
+   desbordar. Un "grid blowout" en un calendario deja la página moviéndose de lado. */
+
+.cal-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ─── BARRA DE ARRIBA ─────────────────────────────────────────────────────── */
+.cal-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Cuadrados y con 44px de lado: son los botones que más se pulsan del calendario y en
+   el móvil se van a usar con el pulgar. */
+.cal-nav-btn {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.cal-titulo {
+  font-size: 1.05rem;
+  min-width: 0;
+  /* El nombre del mes no parte nunca: "Sep- tiembre" en dos líneas movería toda la
+     barra al cambiar de mes. */
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.cal-hoy, .cal-nuevo { min-height: 44px; }
+.cal-vistas { margin-left: auto; }
+
+/* ─── LA REJILLA DEL MES ──────────────────────────────────────────────────── */
+.cal-mes {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.cal-cabecera, .cal-semana {
+  display: grid;
+  /* minmax(0, 1fr) y no 1fr: con 1fr una casilla con contenido ancho estira la columna
+     por encima del viewport y la página entera se mueve de lado. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.cal-dia-nombre {
+  padding: 8px 2px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cal-celda {
+  /* aspect-ratio en vez de alto fijo: la casilla crece con el ancho de la pantalla y
+     el mes se ve proporcionado en un móvil y en un monitor sin tocar nada. */
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 3px;
+  border: 0;
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cal-semana > .cal-celda:last-child { border-right: 0; }
+.cal-celda:disabled { cursor: default; }
+.cal-celda.es-hueco { background: var(--bg-subtle); }
+.cal-celda:not(:disabled):hover { background: var(--bg-subtle); }
+
+.cal-numero {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+/* Hoy se ve de lejos: es el ancla para leer el resto del mes */
+.cal-celda.es-hoy { background: var(--aviso-bg-fuerte); }
+.cal-celda.es-hoy .cal-numero {
+  color: var(--aviso-texto);
+  font-weight: 900;
+}
+
+/* Dos eventos el mismo día. No es un error, pero es lo que hay que ver con tiempo. */
+.cal-celda.es-choque { box-shadow: inset 0 0 0 2px var(--error-borde); }
+.cal-celda.es-abierto { box-shadow: inset 0 0 0 2px var(--primario, var(--text-main)); }
+
+/* ─── PUNTOS Y CHIPS ──────────────────────────────────────────────────────── */
+.cal-puntos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding-top: 2px;
+}
+
+.cal-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--text-muted);
+}
+
+.cal-chip {
+  display: none; /* de 560px para arriba se enseñan */
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.cal-chip-texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-chip-pax {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  font-weight: 800;
+}
+
+/* ─── COLOR POR TIPO ──────────────────────────────────────────────────────────
+   Cinco tipos de evento y tres capas que NO son eventos (vacaciones, recogidas y días
+   cerrados). Los eventos van en colores llenos y las capas en gris o rayado: de un
+   vistazo tiene que verse qué es trabajo de catering y qué es información de apoyo. */
+.tipo-boda        { --cal-color: #d6336c; }
+.tipo-comunion    { --cal-color: #7048e8; }
+.tipo-corporativo { --cal-color: #1c7ed6; }
+.tipo-cumpleanos  { --cal-color: #f08c00; }
+.tipo-produccion  { --cal-color: #0ca678; }
+.tipo-vacaciones  { --cal-color: #868e96; }
+.tipo-recogida    { --cal-color: #495057; }
+.tipo-cerrado     { --cal-color: #adb5bd; }
+
+.cal-punto.tipo-boda, .cal-punto.tipo-comunion, .cal-punto.tipo-corporativo,
+.cal-punto.tipo-cumpleanos, .cal-punto.tipo-produccion, .cal-punto.tipo-vacaciones,
+.cal-punto.tipo-recogida, .cal-punto.tipo-cerrado { background: var(--cal-color); }
+
+.cal-chip { background: color-mix(in srgb, var(--cal-color) 16%, transparent); color: var(--cal-color); }
+
+/* ─── VISTA DE AÑO ────────────────────────────────────────────────────────────
+   Doce mini-meses. En el móvil van de dos en dos, que de uno en uno obliga a hacer
+   scroll todo el rato y se pierde la gracia de ver el año de un vistazo. */
+.cal-anio {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr));
+  gap: 10px;
+}
+
+.cal-mini {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-mini:hover { border-color: var(--border-color-strong); background: var(--bg-subtle); }
+
+.cal-mini-titulo {
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.cal-mini-cabecera, .cal-mini-semana {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+}
+
+.cal-mini-cabecera span {
+  text-align: center;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.cal-mini-dia {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  border-radius: 3px;
+}
+
+.cal-mini-dia.es-hoy {
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-weight: 900;
+}
+
+.cal-mini-dia.tiene { font-weight: 800; color: var(--text-main); }
+
+.cal-mini-puntos {
+  position: absolute;
+  bottom: 1px;
+  display: flex;
+  gap: 1px;
+}
+
+.cal-mini-puntos .cal-punto { width: 4px; height: 4px; }
+
+/* ─── LO QUE VIENE ────────────────────────────────────────────────────────── */
+.cal-viene {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px 12px;
+}
+
+.cal-viene-vacio { color: var(--text-muted); font-size: 0.85rem; }
+
+.cal-viene-titulo {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.cal-viene-fila {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.cal-viene-nombre {
+  font-weight: 700;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-viene-cuando { color: var(--text-muted); flex: 0 0 auto; }
+.cal-viene-fila.es-urgente .cal-viene-cuando { color: var(--error-texto-fuerte); font-weight: 800; }
+
+.cal-viene-falta {
+  flex: 0 0 auto;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--aviso-texto);
+  background: var(--aviso-bg-fuerte);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.cal-viene-sin { flex: 0 0 auto; font-size: 0.76rem; color: var(--text-muted); }
+.cal-viene-ir { flex: 0 0 auto; min-height: 36px; }
+
+/* ─── CHOQUES ─────────────────────────────────────────────────────────────── */
+.cal-choques { display: flex; flex-direction: column; gap: 6px; }
+
+.cal-choque {
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--error-borde);
+  background: var(--error-bg);
+  color: var(--error-texto);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ─── PANEL DEL DÍA Y EDITOR ──────────────────────────────────────────────────
+   En el móvil suben desde abajo y ocupan el ancho entero: es donde llega el pulgar.
+   En pantallas grandes se centran como una tarjeta. */
+.cal-editor-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0;
+}
+
+.cal-dia-panel, .cal-editor {
+  width: 100%;
+  max-width: 520px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cal-dia-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.cal-dia-titulo em {
+  font-style: normal;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: none;
+}
+
+.cal-dia-cerrar {
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.cal-dia-vacio { color: var(--text-muted); font-size: 0.86rem; padding: 6px 0; }
+
+.cal-dia-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--cal-color, var(--border-color));
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.cal-dia-item-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 140px;
+}
+
+.cal-dia-item-texto small { color: var(--text-muted); font-size: 0.74rem; }
+.cal-dia-btn { min-height: 38px; flex: 0 0 auto; }
+.cal-dia-anadir { min-height: 44px; }
+
+.cal-campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.cal-campo > span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.cal-campo > span em { font-style: normal; text-transform: none; font-weight: 600; opacity: 0.8; }
+
+.cal-campo input, .cal-campo select {
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font: inherit;
+  /* Sin esto, iOS hace zoom al enfocar cualquier campo de menos de 16px y deja la
+     pantalla descolocada al salir. */
+  font-size: 16px;
+  min-width: 0;
+}
+
+/* Dos campos por fila cuando caben, apilados cuando no. Sin media query: el propio
+   grid decide con el ancho que tenga el panel. */
+.cal-campos-fila {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 10px;
+}
+
+.cal-editor-titulo { font-weight: 800; font-size: 1rem; }
+
+.cal-editor-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.cal-editor-acciones .btn { min-height: 44px; }
+.cal-editor-hueco { flex: 1 1 auto; }
+.cal-borrar { color: var(--error-texto-fuerte); border-color: var(--error-borde); }
+
+/* ─── DE 560px PARA ARRIBA ────────────────────────────────────────────────────
+   Ya cabe el nombre dentro de la casilla, así que los chips sustituyen a los puntos.
+   Y la casilla deja de ser cuadrada: con siete columnas anchas, un cuadrado sería una
+   casilla enorme y el mes no cabría en la pantalla de alto. */
+@media (min-width: 560px) {
+  .cal-celda {
+    aspect-ratio: auto;
+    min-height: 92px;
+  }
+  .cal-chip { display: flex; }
+  .cal-puntos { display: none; }
+  .cal-numero { font-size: 0.82rem; }
+}
+
+/* En pantalla grande los paneles dejan de venir de abajo y se centran */
+@media (min-width: 700px) {
+  .cal-editor-fondo { align-items: center; padding: 20px; }
+  .cal-dia-panel, .cal-editor { border-radius: var(--radius-lg); }
+}
+
+@media (min-width: 900px) {
+  .cal-celda { min-height: 112px; }
+}
+
+/* ─── MUY ESTRECHO ────────────────────────────────────────────────────────────
+   320px: la barra de arriba no cabe en una línea y el título del mes se lleva el hueco.
+   Se reparte en dos filas en vez de encoger los botones por debajo del dedo. */
+@media (max-width: 380px) {
+  .cal-vistas { margin-left: 0; }
+  .cal-nav { width: 100%; }
+  .cal-titulo { flex: 1 1 auto; text-align: center; font-size: 0.95rem; }
+  .cal-nuevo { flex: 1 1 auto; }
+  .cal-celda { padding: 3px 2px; }
+  .cal-punto { width: 6px; height: 6px; }
+}

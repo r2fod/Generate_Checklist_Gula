@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Igual que en las otras dos: los .js llevan hash, así que un index.html cacheado
+         seguiría apuntando a la compilación vieja. -->
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <meta name="theme-color" content="#1f314d" />
+    <!-- El manifiesto vive EN ESTA CARPETA y su ámbito es esta carpeta: por eso el
+         calendario se instala como app aparte de la checklist y del formulario. Si
+         compartieran ámbito, el navegador los trataría como la misma app. -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="../icono-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Calendario" />
+    <title>Calendario Gula</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/calendario/main.jsx"></script>
+  </body>
+</html>

@@ -297,3 +297,57 @@ export function suscribirArchivoNube(cb) {
   })();
   return () => { cancelado = true; unsub(); };
 }
+
+// ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
+// Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
+// llama. Van en UN documento porque son pocos y pequeños — un año entero son unos
+// sesenta apuntes de cuatro campos, muy lejos del MiB por documento de Firestore. El
+// archivo de eventos sí tuvo que partirse en un documento por evento, pero eso es
+// porque cada uno lleva su checklist entera dentro.
+//
+// Cuelga de "indice/", así que las reglas que ya hay lo cubren tal cual: solo el equipo
+// con sesión iniciada. No hace falta tocar firestore.rules.
+const DOC_CALENDARIO = "indice/calendario";
+
+export async function guardarCalendarioNube(apuntes) {
+  const conexion = await getDb();
+  if (!conexion) return 0;
+  const { db, fs } = conexion;
+  const actualizado = Date.now();
+  await fs.setDoc(fs.doc(db, DOC_CALENDARIO), { apuntes: JSON.stringify(apuntes), actualizado });
+  return actualizado;
+}
+
+export async function cargarCalendarioNube() {
+  const conexion = await getDb();
+  if (!conexion) return null;
+  const { db, fs } = conexion;
+  const snap = await fs.getDoc(fs.doc(db, DOC_CALENDARIO));
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  try { return { apuntes: JSON.parse(d.apuntes), actualizado: d.actualizado ?? 0 }; }
+  catch (e) { return null; } // documento corrupto: mejor sin calendario que reventando
+}
+
+// Igual que el resto de suscripciones: se avisa con el timestamp para poder distinguir
+// el eco de lo que uno mismo acaba de escribir de un cambio de otro dispositivo.
+export function suscribirCalendarioNube(cb) {
+  let unsub = () => {};
+  let cancelado = false;
+  (async () => {
+    const conexion = await getDb();
+    if (!conexion || cancelado) return;
+    const { db, fs } = conexion;
+    unsub = fs.onSnapshot(
+      fs.doc(db, DOC_CALENDARIO),
+      (snap) => {
+        if (!snap.exists()) return;
+        const d = snap.data();
+        try { cb({ apuntes: JSON.parse(d.apuntes), actualizado: d.actualizado ?? 0, pendiente: snap.metadata.hasPendingWrites }); }
+        catch (e) { /* documento corrupto: se ignora */ }
+      },
+      () => { /* sin conexión: se ignora, la app sigue en local */ },
+    );
+  })();
+  return () => { cancelado = true; unsub(); };
+}
