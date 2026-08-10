@@ -481,3 +481,22 @@
   .cal-celda { padding: 3px 2px; }
   .cal-punto { width: 6px; height: 6px; }
 }
+
+/* Ofrecimiento de traer lo de la hoja de Google. Sale solo con el calendario vacío y
+   desaparece en cuanto hay algo: no es un ajuste, es un empujón de una vez. */
+.cal-traer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--aviso-borde);
+  border-radius: var(--radius-md);
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.86rem;
+}
+
+.cal-traer .btn { align-self: flex-start; min-height: 44px; }
+
+.cal-cargando { padding: 24px; text-align: center; color: var(--text-muted); }

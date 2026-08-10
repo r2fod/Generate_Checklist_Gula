@@ -189,3 +189,46 @@ export function semanasDelMes(anio, mes) {
 export const NOMBRE_MES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 export const INICIAL_DIA = ["L", "M", "X", "J", "V", "S", "D"];
+
+// ─── EL EQUIPO ────────────────────────────────────────────────────────────────
+// Quién puede estar de vacaciones o librar. Sin esta lista no se puede avisar de que
+// un día hay dos bodas y falta gente, que es la mitad de la gracia del calendario.
+//
+// En la hoja de pared cada uno se apunta como le sale: "VACAS IRENE", "VACAS RO",
+// "LIBRA ANTO", "Vacas Anna". Los apodos van aquí para que todo eso caiga en la misma
+// persona en vez de crear cuatro fantasmas distintos.
+export const EQUIPO = [
+  { nombre: "Irene", apodos: ["irene"] },
+  { nombre: "Anna", apodos: ["anna", "ana"] },
+  { nombre: "Rocío", apodos: ["rocio", "roci", "ro"] },
+  { nombre: "Antonella", apodos: ["antonella", "anto"] },
+  { nombre: "Raúl", apodos: ["raul"] },
+];
+
+const sinAcentos = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// Saca la persona de un texto suelto. Se busca por palabras completas y no por trozos:
+// con "contiene" a secas, "ro" cazaba dentro de "Rodrigo" y "Roberto", y media hoja se
+// habría convertido en vacaciones de Rocío.
+//
+// Se prueban los apodos de más largo a más corto para que "rocio" gane a "ro" y no
+// dependa del orden en que estén escritos arriba.
+export function personaDeTexto(texto) {
+  const palabras = new Set(sinAcentos(texto).split(/[^a-z0-9]+/).filter(Boolean));
+  let mejor = null;
+  for (const p of EQUIPO) {
+    for (const apodo of p.apodos) {
+      if (palabras.has(apodo) && (!mejor || apodo.length > mejor.largo)) {
+        mejor = { nombre: p.nombre, largo: apodo.length };
+      }
+    }
+  }
+  return mejor ? mejor.nombre : null;
+}
+
+// Quién queda para trabajar un día: el equipo menos quien esté de vacaciones. Es lo que
+// convierte "el 10 hay dos bodas" en "el 10 hay dos bodas y solo estáis tres".
+export function disponiblesEn(apuntes, dia) {
+  const fuera = new Set(ausentesEn(apuntes, dia).map(t => personaDeTexto(t) || t));
+  return EQUIPO.map(p => p.nombre).filter(n => !fuera.has(n));
+}
