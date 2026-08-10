@@ -20,15 +20,18 @@
 // eventos: son las capas que hacen falta para poder anticipar de verdad, y salen de lo
 // que ya apuntáis a mano en la hoja (vacaciones del equipo, recogidas de camión y
 // generadores, y días que no se cogen).
+// El icono es el mismo vocabulario que ya usa el formulario (FondoIconos.jsx): corazón
+// para boda, iglesia para comunión, tarta para cumpleaños... En una casilla de móvil de
+// 45px no cabe texto, pero un corazón se reconoce sin leer.
 export const TIPOS = {
-  boda: { nombre: "Boda", esEvento: true },
-  comunion: { nombre: "Comunión", esEvento: true },
-  corporativo: { nombre: "Corporativo", esEvento: true },
-  cumpleanos: { nombre: "Cumpleaños", esEvento: true },
-  produccion: { nombre: "Producción", esEvento: true },
-  vacaciones: { nombre: "Vacaciones", esEvento: false },
-  recogida: { nombre: "Recogida / devolución", esEvento: false },
-  cerrado: { nombre: "Día cerrado", esEvento: false },
+  boda: { nombre: "Boda", esEvento: true, icono: "Heart" },
+  comunion: { nombre: "Comunión", esEvento: true, icono: "Church" },
+  corporativo: { nombre: "Corporativo", esEvento: true, icono: "Briefcase" },
+  cumpleanos: { nombre: "Cumpleaños", esEvento: true, icono: "Cake" },
+  produccion: { nombre: "Producción", esEvento: true, icono: "Clapperboard" },
+  vacaciones: { nombre: "Vacaciones", esEvento: false, icono: "Palmtree" },
+  recogida: { nombre: "Recogida / devolución", esEvento: false, icono: "Truck" },
+  cerrado: { nombre: "Día cerrado", esEvento: false, icono: "Ban" },
 };
 
 export const esTipoEvento = (tipo) => !!(TIPOS[tipo] && TIPOS[tipo].esEvento);

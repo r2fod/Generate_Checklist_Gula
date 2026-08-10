@@ -10,10 +10,20 @@
 // calendario y la pantalla dentro de la checklist) sin duplicar nada, y se puede probar
 // dándole una lista a mano.
 import React, { useMemo, useState } from "react";
+import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban } from "lucide-react";
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn,
 } from "./apuntes.js";
+
+const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban };
+
+// El icono del tipo. Va con su clase de color, así que hereda el mismo tono que el
+// punto y el chip: un solo color por tipo en todas partes.
+function IconoTipo({ tipo, size = 13, className = "" }) {
+  const Icono = ICONOS[(TIPOS[tipo] || {}).icono] || Heart;
+  return <Icono size={size} className={`cal-icono tipo-${tipo} ${className}`} aria-hidden="true" />;
+}
 
 const hoyISO = () => aISO(new Date());
 
@@ -78,12 +88,12 @@ export default function Calendario({
             setCursor({ anio: f.getFullYear(), mes: f.getMonth() + 1 });
           }}>Hoy</button>
         </div>
-        <div className="cal-vistas segment">
-          <button className={`segment-btn ${vista === "mes" ? "is-activo" : ""}`} onClick={() => setVista("mes")}>Mes</button>
-          <button className={`segment-btn ${vista === "anio" ? "is-activo" : ""}`} onClick={() => setVista("anio")}>Año</button>
+        <div className="cal-vistas segmented-control">
+          <button className={`segment-btn ${vista === "mes" ? "active" : ""}`} onClick={() => setVista("mes")}>Mes</button>
+          <button className={`segment-btn ${vista === "anio" ? "active" : ""}`} onClick={() => setVista("anio")}>Año</button>
         </div>
         {puedeEditar && (
-          <button className="btn btn-primary cal-nuevo" onClick={() => setEditando(enBlanco(hoy))}>+ Apunte</button>
+          <button className="btn btn-green cal-nuevo" onClick={() => setEditando(enBlanco(hoy))}>+ Apunte</button>
         )}
       </div>
 
@@ -158,11 +168,12 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                 {dia && <span className="cal-numero">{Number(dia.slice(8))}</span>}
                 {del.length > 0 && (
                   <span className="cal-puntos">
-                    {del.slice(0, 4).map(a => <i key={a.id} className={`cal-punto tipo-${a.tipo}`} />)}
+                    {del.slice(0, 4).map(a => <IconoTipo key={a.id} tipo={a.tipo} size={12} />)}
                   </span>
                 )}
                 {del.map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
+                    <IconoTipo tipo={a.tipo} size={11} />
                     <span className="cal-chip-texto">{a.titulo}</span>
                     {a.pax ? <span className="cal-chip-pax">{a.pax}</span> : null}
                   </span>
@@ -198,7 +209,7 @@ function PanelDia({ dia, apuntes, puedeEditar, soloAnadir, onCerrar, onEditar, o
           ? <div className="cal-dia-vacio">No hay nada apuntado este día.</div>
           : apuntes.map(a => (
             <div className={`cal-dia-item tipo-${a.tipo}`} key={a.id}>
-              <span className={`cal-punto tipo-${a.tipo}`} />
+              <IconoTipo tipo={a.tipo} size={17} />
               <span className="cal-dia-item-texto">
                 <strong>{a.titulo}</strong>
                 <small>
@@ -218,7 +229,7 @@ function PanelDia({ dia, apuntes, puedeEditar, soloAnadir, onCerrar, onEditar, o
           ))}
 
         {puedeEditar && (
-          <button className="btn btn-primary cal-dia-anadir" onClick={onAnadir}>+ Añadir a este día</button>
+          <button className="btn btn-green cal-dia-anadir" onClick={onAnadir}>+ Añadir a este día</button>
         )}
       </div>
     </div>
@@ -375,7 +386,7 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
           {onBorrar && <button className="btn btn-outline cal-borrar" onClick={onBorrar}>Borrar</button>}
           <span className="cal-editor-hueco" />
           <button className="btn btn-outline" onClick={onCerrar}>Cancelar</button>
-          <button className="btn btn-primary" disabled={!listo}
+          <button className="btn btn-green" disabled={!listo}
                   title={listo ? "" : "Hace falta al menos el día y el nombre"}
                   onClick={() => onGuardar({ ...listo, id: apunte.id || idDeApunte(listo.fecha, listo.titulo) })}>
             Guardar

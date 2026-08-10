@@ -43,7 +43,7 @@ function PegarApuntes({ onTraer }) {
         placeholder='[{"fecha":"2026-09-13","titulo":"Boda ...","tipo":"boda"}]'
       />
       {error && <span className="cal-traer-error">{error}</span>}
-      <button className="btn btn-primary" disabled={!texto.trim()} onClick={traer}>Traer los apuntes</button>
+      <button className="btn btn-green" disabled={!texto.trim()} onClick={traer}>Traer los apuntes</button>
     </div>
   );
 }
