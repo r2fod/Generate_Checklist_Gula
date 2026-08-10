@@ -87,9 +87,14 @@
   align-items: stretch;
   gap: 2px;
   padding: 4px 3px;
-  border: 0;
-  border-right: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  /* appearance:none y los cuatro bordes a cero explícitos: la casilla es un <button>, y
+     el navegador le pone su borde por defecto a los deshabilitados (los huecos del
+     principio y del final del mes). Salían recuadrados en negro grueso. */
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0 solid var(--border-color);
+  border-right-width: 1px;
+  border-bottom-width: 1px;
   background: var(--card-bg);
   color: var(--text-main);
   font: inherit;
@@ -516,3 +521,69 @@
 }
 
 .cal-traer-error { color: var(--error-texto-fuerte); font-weight: 700; font-size: 0.82rem; }
+
+/* ─── ICONOS Y MOVIMIENTO ─────────────────────────────────────────────────────
+   El icono lleva el color de su tipo, igual que el punto y el chip: un solo tono por
+   tipo en toda la app, para que se reconozca sin leer. */
+.cal-icono { color: var(--cal-color); flex: 0 0 auto; }
+
+/* El mes entra de abajo, y las semanas escalonadas. Al cambiar de mes se nota que ha
+   cambiado algo sin tener que mirar el título. */
+.cal-semana { animation: cal-semana-entra 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.cal-semana:nth-child(2) { animation-delay: 0.00s; }
+.cal-semana:nth-child(3) { animation-delay: 0.03s; }
+.cal-semana:nth-child(4) { animation-delay: 0.06s; }
+.cal-semana:nth-child(5) { animation-delay: 0.09s; }
+.cal-semana:nth-child(6) { animation-delay: 0.12s; }
+.cal-semana:nth-child(7) { animation-delay: 0.15s; }
+
+@keyframes cal-semana-entra {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Al pulsar una casilla se hunde un poco: confirma el toque en el móvil, donde no hay
+   ratón que se pose encima. */
+.cal-celda:not(:disabled):active { transform: scale(0.97); }
+.cal-celda { transition: background 0.15s ease, transform 0.1s ease; }
+
+/* El icono crece al pasar por encima de su casilla */
+.cal-celda:not(:disabled):hover .cal-icono { transform: scale(1.15); }
+.cal-icono { transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Los mini-meses del año entran escalonados, en orden de lectura */
+.cal-mini { animation: cal-semana-entra 0.24s ease both; transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease; }
+.cal-mini:nth-child(1) { animation-delay: 0.00s; } .cal-mini:nth-child(2) { animation-delay: 0.02s; }
+.cal-mini:nth-child(3) { animation-delay: 0.04s; } .cal-mini:nth-child(4) { animation-delay: 0.06s; }
+.cal-mini:nth-child(5) { animation-delay: 0.08s; } .cal-mini:nth-child(6) { animation-delay: 0.10s; }
+.cal-mini:nth-child(7) { animation-delay: 0.12s; } .cal-mini:nth-child(8) { animation-delay: 0.14s; }
+.cal-mini:nth-child(9) { animation-delay: 0.16s; } .cal-mini:nth-child(10) { animation-delay: 0.18s; }
+.cal-mini:nth-child(11) { animation-delay: 0.20s; } .cal-mini:nth-child(12) { animation-delay: 0.22s; }
+.cal-mini:hover { transform: translateY(-2px); }
+
+/* El panel del día sube desde abajo en el móvil */
+.cal-dia-panel, .cal-editor { animation: cal-panel-sube 0.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes cal-panel-sube {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.cal-editor-fondo { animation: cal-fondo-entra 0.15s ease both; }
+@keyframes cal-fondo-entra { from { opacity: 0; } to { opacity: 1; } }
+
+/* El aviso de choque late UNA vez al aparecer. Solo una: un aviso que parpadea siempre
+   se aprende a ignorar a los dos días, y este es el que no puede pasar desapercibido. */
+.cal-choque { animation: cal-choque-late 0.7s ease-out 1 both; }
+@keyframes cal-choque-late {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.015); }
+  100% { transform: scale(1); }
+}
+
+/* Y todo se apaga si el móvil está en modo de movimiento reducido. Una animación que no
+   se puede quitar es un problema de accesibilidad, no un adorno. */
+@media (prefers-reduced-motion: reduce) {
+  .cal-semana, .cal-mini, .cal-dia-panel, .cal-editor, .cal-editor-fondo, .cal-choque { animation: none; }
+  .cal-celda, .cal-icono, .cal-mini { transition: none; }
+  .cal-celda:not(:disabled):active, .cal-mini:hover { transform: none; }
+  .cal-celda:not(:disabled):hover .cal-icono { transform: none; }
+}

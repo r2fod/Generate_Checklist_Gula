@@ -53,6 +53,9 @@ export default defineConfig({
         checklist: fileURLToPath(new URL('./checklist/index.html', import.meta.url)),
         formulario: fileURLToPath(new URL('./formulario/index.html', import.meta.url)),
         calendario: fileURLToPath(new URL('./calendario/index.html', import.meta.url)),
+        // Banco de pruebas del calendario: el mismo componente con datos inventados y
+        // sin login, para que la batería pueda comprobar que la rejilla se pinta.
+        pruebaCalendario: fileURLToPath(new URL('./pruebas/calendario.html', import.meta.url)),
       },
     },
   },
