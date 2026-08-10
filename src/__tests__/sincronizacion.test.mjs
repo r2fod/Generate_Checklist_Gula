@@ -476,8 +476,10 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
 console.log("\n══ Avisos por WhatsApp ══");
 {
   const { limpiarAvisos } = await import("../formulario/envios.js");
-  const l = limpiarAvisos([{ nombre: "  Raúl · Jefe de logística ", tel: "+34 656 47 47 01" }]);
-  ok(l[0].tel === "34656474701", `el número se limpia para el enlace → ${l[0].tel}`);
+  const l = limpiarAvisos([{ nombre: "  Raúl · Jefe de logística ", tel: "+34 600 11 22 33" }]);
+  // Número INVENTADO a propósito: el repositorio es público. Los de verdad viven
+  // en Firestore, puestos una vez desde la app.
+  ok(l[0].tel === "34600112233", `el número se limpia para el enlace → ${l[0].tel}`);
   ok(l[0].nombre === "Raúl · Jefe de logística", "y el nombre se queda sin espacios de más");
   ok(limpiarAvisos([{ nombre: "Sin número", tel: "" }]).length === 0,
     "un contacto sin número no viaja: sería un botón que no lleva a ningún sitio");

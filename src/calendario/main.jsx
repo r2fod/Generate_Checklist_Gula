@@ -14,8 +14,39 @@ import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import { saneaLista } from "./apuntes.js";
-import { TODO_DE_LA_HOJA } from "./deLaHoja.js";
 import { nubeActiva, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube } from "../nube.js";
+
+// Pegar una lista de apuntes en JSON para rellenar el calendario de una vez. Se usa
+// para traer lo que hubiera en otro sitio (una hoja, otro calendario) sin que esos
+// datos —clientes, vacaciones del equipo— tengan que pasar por el repositorio.
+function PegarApuntes({ onTraer }) {
+  const [texto, setTexto] = useState("");
+  const [error, setError] = useState("");
+  const traer = () => {
+    try {
+      const lista = saneaLista(JSON.parse(texto));
+      if (!lista.length) return setError("No he encontrado ningún apunte válido. Cada uno necesita al menos fecha y título.");
+      onTraer(lista);
+    } catch (e) {
+      setError("Eso no es JSON válido. Tiene que ser una lista entre corchetes.");
+    }
+  };
+  return (
+    <div className="cal-traer">
+      <strong>El calendario está vacío.</strong>
+      <span>Puedes apuntar los eventos uno a uno, o pegar aquí una lista para traerlos todos de golpe.</span>
+      <textarea
+        className="cal-traer-texto"
+        rows={4}
+        value={texto}
+        onChange={e => { setTexto(e.target.value); setError(""); }}
+        placeholder='[{"fecha":"2026-09-13","titulo":"Boda ...","tipo":"boda"}]'
+      />
+      {error && <span className="cal-traer-error">{error}</span>}
+      <button className="btn btn-primary" disabled={!texto.trim()} onClick={traer}>Traer los apuntes</button>
+    </div>
+  );
+}
 
 function AppCalendario() {
   const [apuntes, setApuntes] = useState([]);
@@ -58,19 +89,11 @@ function AppCalendario() {
 
   return (
     <div className="app-wrapper">
-      {/* El calendario vacío no se rellena solo: escribir 22 apuntes en la nube del
-          equipo sin que nadie lo pida es justo lo que no se hace. Se ofrece una vez, y
-          en cuanto haya algo apuntado el botón desaparece para siempre. */}
-      {apuntes.length === 0 && (
-        <div className="cal-traer">
-          <strong>El calendario está vacío.</strong>
-          <span>Se puede traer lo que había en la hoja de Google: los eventos de septiembre a noviembre,
-                las vacaciones del equipo, las recogidas del camión y los días cerrados.</span>
-          <button className="btn btn-primary" onClick={() => escribir(TODO_DE_LA_HOJA)}>
-            Traer lo de la hoja ({TODO_DE_LA_HOJA.length} apuntes)
-          </button>
-        </div>
-      )}
+      {/* Traer apuntes de golpe PEGÁNDOLOS, no desde un archivo del repositorio.
+          Los nombres de clientes y las vacaciones del equipo son datos personales y el
+          repositorio es público: eso vive en Firestore, que para eso está. Se pega una
+          vez, se guarda en la nube del equipo, y el repositorio no se entera. */}
+      {apuntes.length === 0 && <PegarApuntes onTraer={escribir} />}
       <Calendario apuntes={apuntes} onGuardar={guardar} onBorrar={borrar} onAbrirEvento={abrirEvento} />
     </div>
   );

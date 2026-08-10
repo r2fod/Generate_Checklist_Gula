@@ -4,7 +4,7 @@
 //
 // Son DOS cosas distintas y conviene no mezclarlas:
 //
-//   · APUNTE   — "13 sep, boda Eucaris y Pedro". Tres datos. Se apunta en cuanto se
+//   · APUNTE   — "13 sep, boda de los Fulanitos". Tres datos. Se apunta en cuanto se
 //                cierra la fecha, meses antes, y no necesita nada más.
 //   · EVENTO   — la checklist entera con sus cantidades, su logística y su carga.
 //
@@ -197,13 +197,15 @@ export const INICIAL_DIA = ["L", "M", "X", "J", "V", "S", "D"];
 // En la hoja de pared cada uno se apunta como le sale: "VACAS IRENE", "VACAS RO",
 // "LIBRA ANTO", "Vacas Anna". Los apodos van aquí para que todo eso caiga en la misma
 // persona en vez de crear cuatro fantasmas distintos.
-export const EQUIPO = [
-  { nombre: "Irene", apodos: ["irene"] },
-  { nombre: "Anna", apodos: ["anna", "ana"] },
-  { nombre: "Rocío", apodos: ["rocio", "roci", "ro"] },
-  { nombre: "Antonella", apodos: ["antonella", "anto"] },
-  { nombre: "Raúl", apodos: ["raul"] },
-];
+// VA VACÍO EN EL CÓDIGO A PROPÓSITO. El repositorio es público, y los nombres de la
+// plantilla con sus vacaciones son datos personales de gente real: eso vive en
+// Firestore, junto al calendario, y se configura desde la app.
+//
+// Aquí solo queda la FORMA que tiene que tener:
+//   [{ nombre: "Fulanita", apodos: ["fulanita", "fula"] }]
+// Los apodos son para que "VACAS FULA" y "Vacas Fulanita" caigan en la misma persona
+// en vez de crear dos fantasmas distintos.
+export const EQUIPO = [];
 
 const sinAcentos = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -213,10 +215,10 @@ const sinAcentos = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 //
 // Se prueban los apodos de más largo a más corto para que "rocio" gane a "ro" y no
 // dependa del orden en que estén escritos arriba.
-export function personaDeTexto(texto) {
+export function personaDeTexto(texto, equipo = EQUIPO) {
   const palabras = new Set(sinAcentos(texto).split(/[^a-z0-9]+/).filter(Boolean));
   let mejor = null;
-  for (const p of EQUIPO) {
+  for (const p of equipo) {
     for (const apodo of p.apodos) {
       if (palabras.has(apodo) && (!mejor || apodo.length > mejor.largo)) {
         mejor = { nombre: p.nombre, largo: apodo.length };
@@ -228,7 +230,7 @@ export function personaDeTexto(texto) {
 
 // Quién queda para trabajar un día: el equipo menos quien esté de vacaciones. Es lo que
 // convierte "el 10 hay dos bodas" en "el 10 hay dos bodas y solo estáis tres".
-export function disponiblesEn(apuntes, dia) {
-  const fuera = new Set(ausentesEn(apuntes, dia).map(t => personaDeTexto(t) || t));
-  return EQUIPO.map(p => p.nombre).filter(n => !fuera.has(n));
+export function disponiblesEn(apuntes, dia, equipo = EQUIPO) {
+  const fuera = new Set(ausentesEn(apuntes, dia).map(t => personaDeTexto(t, equipo) || t));
+  return equipo.map(p => p.nombre).filter(n => !fuera.has(n));
 }

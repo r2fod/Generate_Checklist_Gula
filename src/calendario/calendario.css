@@ -500,3 +500,19 @@
 .cal-traer .btn { align-self: flex-start; min-height: 44px; }
 
 .cal-cargando { padding: 24px; text-align: center; color: var(--text-muted); }
+
+.cal-traer-texto {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font-family: monospace;
+  /* 16px para que iOS no haga zoom al enfocar */
+  font-size: 16px;
+  resize: vertical;
+}
+
+.cal-traer-error { color: var(--error-texto-fuerte); font-weight: 700; font-size: 0.82rem; }
