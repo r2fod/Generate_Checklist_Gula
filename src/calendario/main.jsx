@@ -14,6 +14,7 @@ import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import { saneaLista } from "./apuntes.js";
+import { TODO_DE_LA_HOJA } from "./deLaHoja.js";
 import { nubeActiva, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube } from "../nube.js";
 
 function AppCalendario() {
@@ -57,6 +58,19 @@ function AppCalendario() {
 
   return (
     <div className="app-wrapper">
+      {/* El calendario vacío no se rellena solo: escribir 22 apuntes en la nube del
+          equipo sin que nadie lo pida es justo lo que no se hace. Se ofrece una vez, y
+          en cuanto haya algo apuntado el botón desaparece para siempre. */}
+      {apuntes.length === 0 && (
+        <div className="cal-traer">
+          <strong>El calendario está vacío.</strong>
+          <span>Se puede traer lo que había en la hoja de Google: los eventos de septiembre a noviembre,
+                las vacaciones del equipo, las recogidas del camión y los días cerrados.</span>
+          <button className="btn btn-primary" onClick={() => escribir(TODO_DE_LA_HOJA)}>
+            Traer lo de la hoja ({TODO_DE_LA_HOJA.length} apuntes)
+          </button>
+        </div>
+      )}
       <Calendario apuntes={apuntes} onGuardar={guardar} onBorrar={borrar} onAbrirEvento={abrirEvento} />
     </div>
   );
