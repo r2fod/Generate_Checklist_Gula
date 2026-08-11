@@ -309,12 +309,22 @@ export function suscribirArchivoNube(cb) {
 // con sesión iniciada. No hace falta tocar firestore.rules.
 const DOC_CALENDARIO = "indice/calendario";
 
-export async function guardarCalendarioNube(apuntes) {
+// El equipo va en el MISMO documento que los apuntes, no en otro: son dos listas
+// pequeñas que se leen siempre juntas (para saber quién falta un día hacen falta las
+// dos), y separarlas obligaría a dos lecturas y a resolver que una llegue sin la otra.
+//
+// Y va en Firestore y no en el código porque son nombres de personas de verdad, y el
+// repositorio es público.
+export async function guardarCalendarioNube(apuntes, equipo = []) {
   const conexion = await getDb();
   if (!conexion) return 0;
   const { db, fs } = conexion;
   const actualizado = Date.now();
-  await fs.setDoc(fs.doc(db, DOC_CALENDARIO), { apuntes: JSON.stringify(apuntes), actualizado });
+  await fs.setDoc(fs.doc(db, DOC_CALENDARIO), {
+    apuntes: JSON.stringify(apuntes),
+    equipo: JSON.stringify(equipo),
+    actualizado,
+  });
   return actualizado;
 }
 
@@ -325,7 +335,15 @@ export async function cargarCalendarioNube() {
   const snap = await fs.getDoc(fs.doc(db, DOC_CALENDARIO));
   if (!snap.exists()) return null;
   const d = snap.data();
-  try { return { apuntes: JSON.parse(d.apuntes), actualizado: d.actualizado ?? 0 }; }
+  try {
+    return {
+      apuntes: JSON.parse(d.apuntes),
+      // Los documentos guardados antes de que existiera el equipo no traen el campo:
+      // se devuelve lista vacía en vez de reventar la carga entera.
+      equipo: d.equipo ? JSON.parse(d.equipo) : [],
+      actualizado: d.actualizado ?? 0,
+    };
+  }
   catch (e) { return null; } // documento corrupto: mejor sin calendario que reventando
 }
 
@@ -343,7 +361,14 @@ export function suscribirCalendarioNube(cb) {
       (snap) => {
         if (!snap.exists()) return;
         const d = snap.data();
-        try { cb({ apuntes: JSON.parse(d.apuntes), actualizado: d.actualizado ?? 0, pendiente: snap.metadata.hasPendingWrites }); }
+        try {
+          cb({
+            apuntes: JSON.parse(d.apuntes),
+            equipo: d.equipo ? JSON.parse(d.equipo) : [],
+            actualizado: d.actualizado ?? 0,
+            pendiente: snap.metadata.hasPendingWrites,
+          });
+        }
         catch (e) { /* documento corrupto: se ignora */ }
       },
       () => { /* sin conexión: se ignora, la app sigue en local */ },

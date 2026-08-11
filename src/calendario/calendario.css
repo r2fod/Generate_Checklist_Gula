@@ -587,3 +587,168 @@
   .cal-celda:not(:disabled):active, .cal-mini:hover { transform: none; }
   .cal-celda:not(:disabled):hover .cal-icono { transform: none; }
 }
+
+/* Cuando de un día queda una persona o ninguna, el aviso deja de ser informativo */
+.cal-viene-falta.es-critico {
+  background: var(--error-bg);
+  color: var(--error-texto-fuerte);
+  border: 1px solid var(--error-borde);
+}
+
+/* ─── EL EQUIPO ───────────────────────────────────────────────────────────────
+   Un ajuste que se toca una vez y luego estorba, así que vive plegado en una barra de
+   una línea. Sin nadie configurado se pinta en amarillo y arranca abierto: es lo único
+   que falta para que el calendario pueda avisar de cuánta gente queda. */
+.cal-equipo {
+  margin-bottom: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.cal-equipo.es-vacio {
+  border-color: var(--aviso-borde);
+  background: var(--aviso-bg-fuerte);
+}
+
+.cal-equipo-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;          /* el mínimo cómodo para un dedo */
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-equipo.es-vacio .cal-equipo-cab { color: var(--aviso-texto); }
+
+.cal-equipo-titulo { flex: 1 1 auto; min-width: 0; }
+
+.cal-equipo-flecha { flex: 0 0 auto; transition: transform 0.18s ease; }
+.cal-equipo-flecha.es-abierta { transform: rotate(180deg); }
+
+.cal-equipo-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.cal-equipo-nota {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.cal-equipo.es-vacio .cal-equipo-nota { color: var(--aviso-texto); }
+
+.cal-equipo-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cal-persona {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--card-bg);
+  font-size: 0.82rem;
+}
+
+.cal-persona-nombre { font-weight: 700; color: var(--text-main); }
+
+.cal-persona-apodos {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  /* Los apodos son la letra pequeña: si un nombre trae cinco, que se corten antes de
+     empujar el chip fuera de la pantalla. */
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-persona-quitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cal-persona-quitar:hover {
+  background: var(--error-bg);
+  color: var(--error-texto-fuerte);
+}
+
+/* En el móvil los tres campos van uno debajo de otro: dos inputs y un botón en 320px
+   de ancho no caben sin quedarse en dos caracteres visibles. */
+.cal-equipo-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.cal-equipo-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.cal-equipo-campo em { font-style: normal; font-weight: 400; opacity: 0.8; }
+
+.cal-equipo-campo input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  /* 16px para que iOS no haga zoom al enfocar */
+  font-size: 16px;
+}
+
+.cal-equipo-anadir { min-height: 44px; }
+
+@media (min-width: 560px) {
+  .cal-equipo-form {
+    grid-template-columns: 1fr 1fr auto;
+    align-items: end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-equipo-flecha, .cal-persona-quitar { transition: none; }
+}
