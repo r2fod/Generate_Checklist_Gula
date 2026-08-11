@@ -2147,6 +2147,16 @@ async function main() {
     const p = await nuevaPagina(c);
     await p.goto(url(estado), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2600);
+    // Y además se espera a que los chips y la ficha PENDIENTES cuadren. Los pinta el
+    // mismo render, pero la lectura puede caer justo entre medias: con solo los 2.600 ms
+    // de arriba, en una máquina cargada se leían 2 chips mientras la ficha ya decía 3, y
+    // fallaba una comprobación que no tenía nada de malo. Si no llegan a cuadrar se
+    // sigue igual: quien decide son las comprobaciones de abajo, no esta espera.
+    await p.waitForFunction(() => {
+      const cuantos = document.querySelectorAll(".aviso-recogida-chip .aviso-recogida-texto").length;
+      const ficha = document.querySelector(".resumen-ficha.is-aviso .resumen-ficha-valor");
+      return cuantos > 0 && ficha && parseInt(ficha.textContent, 10) === cuantos;
+    }, null, { timeout: 8000 }).catch(() => { /* se comprueba abajo */ });
     return { c, p };
   };
 
@@ -3442,6 +3452,48 @@ async function main() {
     await c.close();
   }
 
+  // ─── EL CALENDARIO DESDE LA CHECKLIST ──────────────────────────────────────
+  console.log("\n══ El calendario desde la checklist: ?abrir= y quién ve el botón ══");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+    await c.route(HOSTS_NUBE[0], r => r.abort());
+    const p = await c.newPage();
+    p.on("pageerror", e => errores.push(`abrir: ${e}`));
+
+    // El botón del calendario NO sale con un link de evento. Los apuntes viven en
+    // indice/, que las reglas solo abren al equipo con sesión: a quien entra por un link
+    // se le estaría ofreciendo una pantalla que no puede cargar.
+    await p.goto(url({ evento: "boda", pax: 80 }), { waitUntil: "networkidle" });
+    await p.waitForSelector(".app-wrapper");
+    ok(await p.locator("button", { hasText: /^Calendario$/ }).count() === 0,
+      "con un link de evento no se ofrece el calendario, que sin sesión no puede leerse");
+
+    // "?abrir=" es como el calendario (otra app, otra carpeta) manda aquí a un evento
+    // concreto. Antes no se leía siquiera: su botón "Abrir" traía a la checklist y no
+    // pasaba absolutamente nada.
+    await p.evaluate(() => {
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        "Boda de prueba": { evento: "boda", pax: 90, nombreEvento: "Boda de prueba" },
+      }));
+    });
+    await p.goto(url({ evento: "boda", pax: 80 }) + "&abrir=" + encodeURIComponent("Boda de prueba"), { waitUntil: "networkidle" });
+    await p.waitForSelector(".dialogo-modal", { timeout: 12000 });
+    ok(/Boda de prueba/.test(await p.locator(".dialogo-titulo").innerText()),
+      "con ?abrir= y el evento guardado, la checklist ofrece abrirlo");
+    await p.locator(".dialogo-acciones .btn-green").click();
+    await p.waitForTimeout(1500);
+    ok(await p.evaluate(() => JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}").nombreEvento) === "Boda de prueba",
+      "y al confirmar queda abierto de verdad, no solo cerrado el diálogo");
+
+    // Y si no está, se dice. Callarse deja pensando que el botón del calendario no va.
+    await p.goto(url({ evento: "boda", pax: 80 }) + "&abrir=" + encodeURIComponent("Evento que no existe"), { waitUntil: "networkidle" });
+    await p.waitForSelector(".dialogo-modal", { timeout: 12000 });
+    const txt = await p.locator(".dialogo-modal").innerText();
+    ok(/No encuentro ese evento/.test(txt) && /Evento que no existe/.test(txt),
+      "y si el evento no está, se dice con su nombre en vez de no hacer nada");
+    await c.close();
+  }
+
   // ─── EL CALENDARIO ─────────────────────────────────────────────────────────
   // Va contra el banco de pruebas (pruebas/calendario.html), que monta los mismos
   // componentes con apuntes inventados y sin login: el calendario de verdad pide sesión
@@ -3490,6 +3542,30 @@ async function main() {
       ok(await p.locator(".cal-persona").count() === 3 && /3 personas/.test(await p.locator(".cal-equipo-titulo").innerText()),
         `${w}px · quitar a alguien lo quita de la lista y de la cuenta`);
 
+      await c.close();
+    }
+
+    // La pantalla completa que monta la checklist por dentro. Aquella va detrás del
+    // login del equipo y aquí no se puede cruzar, así que se prueba su maquetación: que
+    // ocupe la pantalla, que la barra no se vaya al hacer scroll, y que el que scrollea
+    // sea el cuerpo y no la página (si scrollea la página, al cerrar el calendario la
+    // checklist reaparece a media altura, donde la dejó el mes).
+    for (const w of [320, 768]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 720 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`calendario pantalla ${w}px: ${e}`));
+      await p.goto(BANCO + "?pantalla=1", { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-pantalla-cuerpo");
+      ok(!await seMueveDeLado(p), `${w}px · a pantalla completa tampoco se mueve de lado`);
+      ok(await p.evaluate(() => {
+        const cuerpo = document.querySelector(".cal-pantalla-cuerpo");
+        return cuerpo.scrollHeight > cuerpo.clientHeight
+          && document.documentElement.scrollHeight <= document.documentElement.clientHeight + 1;
+      }), `${w}px · scrollea el cuerpo del calendario, no la página de debajo`);
+      await p.evaluate(() => { document.querySelector(".cal-pantalla-cuerpo").scrollTop = 600; });
+      await p.waitForTimeout(150);
+      ok(await p.evaluate(() => document.querySelector(".cal-pantalla-barra").getBoundingClientRect().top <= 1),
+        `${w}px · y la barra de cerrar se queda arriba al bajar por el mes`);
       await c.close();
     }
 

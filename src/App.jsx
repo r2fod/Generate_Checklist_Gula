@@ -35,12 +35,33 @@ import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
 } from "./calculos.js";
 
+// El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
+// app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
+// él, y la checklist no engorda para todos por una pantalla que se usa a ratos. El CSS
+// del calendario se importa dentro de ese archivo, así que viaja con él.
+const CalendarioEnChecklist = React.lazy(() => import("./calendario/EnChecklist.jsx"));
+
+// Qué evento pide abrir la dirección, si es que pide alguno. Es como el calendario (que
+// es otra app, en otra carpeta) manda a la checklist a un evento concreto: sin esto, su
+// botón "Abrir" traía aquí y no pasaba nada de nada.
+function eventoQuePideElEnlace() {
+  try {
+    return new URLSearchParams(window.location.search).get("abrir") || "";
+  } catch (e) { return ""; }
+}
+
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
 // Cuánto se espera a que el evento suba antes de avisar de que el link puede estar
 // muerto. Con cobertura normal la subida tarda menos de un segundo; si pasa de aquí,
 // más vale decirlo que dejar que manden un link que no abre nada.
 const ESPERA_SUBIDA_LINK = 4000;
+
+// Cuánto se espera al archivo de eventos antes de abrir el que pide "?abrir=". Con
+// cobertura normal llega en menos de un segundo; sin ella, la lectura de Firestore puede
+// quedarse colgada mucho rato, y sin tope el botón "Abrir" del calendario parecería roto
+// para siempre. Pasado esto se tira con lo que haya guardado en el propio móvil.
+const ESPERA_ARCHIVO_ABRIR = 6000;
 
 // Botellas de 33cl por persona y DÍA en un rodaje. Va por temporada porque la
 // diferencia es enorme: una jornada de doce horas al sol en agosto no se parece en
@@ -3529,6 +3550,8 @@ export default function App({ onCerrarSesion } = {}) {
   // "Solo ver" es "solo marcar" y además sin marcar: hereda todo lo que aquel bloquea
   // (cantidades, nombres, configuración, añadir y quitar items).
   const [soloMarcar] = useState(() => esSoloMarcar() || esSoloVista());
+  // El calendario del equipo, a pantalla completa por encima de la checklist
+  const [modalCalendario, setModalCalendario] = useState(false);
   // Barra fina pegada arriba en móvil: la cabecera con los botones ocupa casi un tercio
   // de la pantalla, así que dejarla fija entera sería peor. En su lugar, al bajar de la
   // cabecera aparece una tira de ~50px con lo único que se usa mientras se recorre la
@@ -4153,6 +4176,10 @@ export default function App({ onCerrarSesion } = {}) {
   // Mientras la primera sincronización está en marcha llegan fotos incompletas del
   // archivo: hasta que termina, no se deja que sustituyan la lista local.
   const primeraSincroHechaRef = React.useRef(false);
+  // Lo mismo, pero como estado y no como ref: quien tiene que ESPERAR a que el archivo
+  // esté (abrir el evento que pide "?abrir=") necesita que React vuelva a pintar cuando
+  // termine, y un ref no repinta nada.
+  const [archivoListo, setArchivoListo] = useState(false);
   // Nombre del evento "activo" (el que has abierto o guardado en esta sesión). Solo ese
   // se auto-guarda, para no sobrescribir un evento bueno con un borrador del mismo nombre.
   const eventoActivoRef = React.useRef((() => { try { return localStorage.getItem("gula_evento_activo") || ""; } catch (e) { return ""; } })());
@@ -4239,7 +4266,10 @@ export default function App({ onCerrarSesion } = {}) {
   }, [haySesionEquipo]);
 
   useEffect(() => {
-    if (!nubeActiva()) return;
+    // Sin nube el archivo es el localStorage, que ya está desde el primer render: no hay
+    // nada que esperar, y dejar "listo" en falso colgaría para siempre a quien espera al
+    // archivo (el "?abrir=" del calendario).
+    if (!nubeActiva()) { setArchivoListo(true); return; }
     let cancelado = false;
     const guardarLocal = (mapa) => {
       eventosGuardadosRef.current = mapa;
@@ -4336,7 +4366,7 @@ export default function App({ onCerrarSesion } = {}) {
           guardarSincronizados(Object.keys(fusionado));
         }
       } catch (e) { /* sin conexión: se sigue con lo que haya en local */ }
-      finally { primeraSincroHechaRef.current = true; }
+      finally { primeraSincroHechaRef.current = true; setArchivoListo(true); }
     };
     sincronizar();
     const unsub = suscribirArchivoNube(aplicarCambios);
@@ -4700,6 +4730,39 @@ export default function App({ onCerrarSesion } = {}) {
       },
     });
   };
+  // El calendario (que es otra app, en otra carpeta) manda aquí con "?abrir=<nombre>".
+  // Se espera a que el archivo esté cargado: los eventos guardados vienen de la nube y
+  // al primer render todavía no están, así que mirar antes de tiempo daba siempre "no
+  // existe". Se dispara UNA vez —handleCargarEvento recarga la página sin el
+  // parámetro— y si el nombre no aparece se dice, en vez de dejar la pantalla como si
+  // no se hubiera pulsado nada.
+  const pidioAbrir = React.useRef(false);
+  // El tope de espera. Se arma solo si la dirección pide abrir algo, para no dejar un
+  // temporizador suelto en cada arranque normal de la app.
+  const [esperaAbrirVencida, setEsperaAbrirVencida] = useState(false);
+  useEffect(() => {
+    if (!eventoQuePideElEnlace()) return;
+    const t = setTimeout(() => setEsperaAbrirVencida(true), ESPERA_ARCHIVO_ABRIR);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    const quiere = eventoQuePideElEnlace();
+    if (!quiere || pidioAbrir.current) return;
+    if (!archivoListo && !esperaAbrirVencida) return;
+    pidioAbrir.current = true;
+    if (eventosGuardados[quiere]) { handleCargarEvento(quiere); return; }
+    // No existe: se dice. El Dialogo siempre lleva confirmación, así que se usa como
+    // aviso con un "Entendido" que no hace nada — antes que dejar la pantalla igual y
+    // que parezca que el botón del calendario está roto.
+    setDialogo({
+      tipo: "confirm",
+      titulo: "No encuentro ese evento",
+      mensaje: `El calendario pedía abrir "${quiere}", pero no está entre los eventos guardados. Puede que se haya borrado, o que todavía no se haya guardado desde el móvil donde se creó.`,
+      textoConfirmar: "Entendido",
+      onConfirm: () => {},
+    });
+  }, [archivoListo, esperaAbrirVencida, eventosGuardados]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Copia el link público del evento guardado: quien lo abra ve la checklist
   // en la web (GitHub Pages) sin necesitar nada instalado. Con la nube activa
   // el link es corto y con edición compartida.
@@ -5383,6 +5446,25 @@ export default function App({ onCerrarSesion } = {}) {
   return (
     <>
       {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={metaHoja} onClose={() => setModalPrevia(false)} />}
+      {/* El calendario llega por import() perezoso, así que la primera vez hay un
+          instante de descarga. El respaldo dice qué está pasando en vez de dejar la
+          pantalla en blanco, y va con estilos EN LÍNEA: las clases del calendario viajan
+          dentro del trozo que se está descargando, así que mientras carga todavía no
+          existen y la pantalla saldría sin colocar. */}
+      {modalCalendario && (
+        <React.Suspense fallback={
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 1000, display: "flex",
+            alignItems: "center", justifyContent: "center",
+            background: "var(--bg-main, #fff)", color: "var(--text-muted, #666)",
+          }}>Abriendo el calendario…</div>
+        }>
+          <CalendarioEnChecklist
+            onCerrar={() => setModalCalendario(false)}
+            onAbrirEvento={(nombre) => { setModalCalendario(false); handleCargarEvento(nombre); }}
+          />
+        </React.Suspense>
+      )}
       {modoCarga && (
         <ModalModoCarga
           checklist={checklist}
@@ -5544,6 +5626,14 @@ export default function App({ onCerrarSesion } = {}) {
                 tercio de la pantalla del móvil. */}
             {!soloVista && (
               <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
+            )}
+            {/* El calendario del equipo. Solo con sesión: los apuntes viven en indice/,
+                que las reglas abren únicamente al equipo, así que a quien entra por un
+                link se le ofrecería una pantalla que no puede cargar. */}
+            {haySesionEquipo && !soloMarcar && (
+              <button className="btn btn-outline" onClick={() => setModalCalendario(true)} title="El calendario del equipo: eventos, vacaciones y recogidas">
+                <CalendarDays size={15} /> Calendario
+              </button>
             )}
             <div className="compartir-menu-wrap">
               <button className="btn btn-green" onClick={() => setMenuCompartir(v => !v)}>{compartirMsg || "Compartir"}</button>
