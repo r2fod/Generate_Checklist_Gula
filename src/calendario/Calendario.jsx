@@ -13,7 +13,7 @@ import React, { useMemo, useState } from "react";
 import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban } from "lucide-react";
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
-  aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn,
+  aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
 } from "./apuntes.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban };
@@ -33,6 +33,7 @@ const enBlanco = (fecha) => ({ id: "", fecha, titulo: "", tipo: "boda", hasta: "
 
 export default function Calendario({
   apuntes = [],
+  equipo = [],
   onGuardar,
   onBorrar,
   onAbrirEvento,
@@ -98,7 +99,7 @@ export default function Calendario({
       </div>
 
       {losChoques.length > 0 && vista === "mes" && (
-        <ChoquesAviso choques={losChoques} apuntes={apuntes} onIr={(dia) => {
+        <ChoquesAviso choques={losChoques} apuntes={apuntes} equipo={equipo} onIr={(dia) => {
           const f = aFecha(dia);
           if (f) { setCursor({ anio: f.getFullYear(), mes: f.getMonth() + 1 }); setVista("mes"); }
         }} />
@@ -112,7 +113,7 @@ export default function Calendario({
               onMes={(m) => { setCursor({ anio: cursor.anio, mes: m }); setVista("mes"); }} />
       )}
 
-      <LoQueViene proximos={proximos} apuntes={apuntes} onAbrirEvento={onAbrirEvento} />
+      <LoQueViene proximos={proximos} apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} />
 
       {diaAbierto && (
         <PanelDia
@@ -155,6 +156,11 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
         <div className="cal-semana" key={i}>
           {semana.map((dia, j) => {
             const del = (dia && mapa[dia]) || [];
+            // El "dia &&" del día abierto no sobra: los huecos del principio y del final
+            // del mes son null, y "ningún día abierto" también es null, así que sin él
+            // null === null marcaba TODOS los huecos como el día abierto y salían
+            // recuadrados en oscuro nada más entrar en el calendario.
+            const esAbierto = Boolean(dia) && dia === abierto;
             return (
               <button
                 type="button"
@@ -162,7 +168,7 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                 disabled={!dia}
                 aria-label={dia ? `${Number(dia.slice(8))}: ${del.length ? del.map(a => a.titulo).join(", ") : "sin nada"}` : undefined}
                 className={`cal-celda${!dia ? " es-hueco" : ""}${dia === hoy ? " es-hoy" : ""}`
-                  + `${dia && enChoque.has(dia) ? " es-choque" : ""}${dia === abierto ? " es-abierto" : ""}`}
+                  + `${dia && enChoque.has(dia) ? " es-choque" : ""}${esAbierto ? " es-abierto" : ""}`}
                 onClick={() => onDia(dia)}
               >
                 {dia && <span className="cal-numero">{Number(dia.slice(8))}</span>}
@@ -278,7 +284,7 @@ function Anio({ anio, mapa, hoy, onMes }) {
 // Los eventos de las próximas dos semanas, con lo que queda y quién falta. Es el panel
 // que convierte el calendario en control: no es "qué hay en octubre", es "de qué me
 // tengo que ocupar esta semana".
-function LoQueViene({ proximos, apuntes, onAbrirEvento }) {
+function LoQueViene({ proximos, apuntes, equipo, onAbrirEvento }) {
   if (proximos.length === 0) {
     return <div className="cal-viene cal-viene-vacio">No hay eventos en los próximos 14 días.</div>;
   }
@@ -288,16 +294,24 @@ function LoQueViene({ proximos, apuntes, onAbrirEvento }) {
       <div className="cal-viene-titulo">Lo que viene</div>
       {proximos.map(a => {
         const fuera = ausentesEn(apuntes, a.fecha);
+        // Cuánta gente queda ese día. Sin equipo configurado no se puede decir, así que
+        // no se enseña nada en vez de inventarse un número.
+        const quedan = equipo.length ? disponiblesEn(apuntes, a.fecha, equipo) : null;
         return (
           <div className={`cal-viene-fila${a.faltan <= 3 ? " es-urgente" : ""}`} key={a.id}>
             <span className={`cal-punto tipo-${a.tipo}`} />
             <span className="cal-viene-nombre">{a.titulo}</span>
             <span className="cal-viene-cuando">{cuandoTexto(a.faltan)}</span>
-            {fuera.length > 0 && (
-              <span className="cal-viene-falta" title={`De vacaciones ese día: ${fuera.join(", ")}`}>
-                sin {fuera.join(", ")}
-              </span>
-            )}
+            {quedan
+              ? <span className={`cal-viene-falta${quedan.length <= 1 ? " es-critico" : ""}`}
+                      title={`Ese día están: ${quedan.join(", ") || "nadie"}${fuera.length ? `. Fuera: ${fuera.join(", ")}` : ""}`}>
+                  {quedan.length} de {equipo.length}
+                </span>
+              : fuera.length > 0 && (
+                <span className="cal-viene-falta" title={`De vacaciones ese día: ${fuera.join(", ")}`}>
+                  sin {fuera.join(", ")}
+                </span>
+              )}
             {a.evento
               ? <button className="btn btn-outline cal-viene-ir" onClick={() => onAbrirEvento && onAbrirEvento(a.evento)}>Abrir</button>
               : <span className="cal-viene-sin">sin checklist</span>}
@@ -309,11 +323,12 @@ function LoQueViene({ proximos, apuntes, onAbrirEvento }) {
 }
 
 // ─── AVISO DE CHOQUES ─────────────────────────────────────────────────────────
-function ChoquesAviso({ choques: lista, apuntes, onIr }) {
+function ChoquesAviso({ choques: lista, apuntes, equipo, onIr }) {
   return (
     <div className="cal-choques">
       {lista.map(c => {
         const fuera = ausentesEn(apuntes, c.dia);
+        const quedan = equipo.length ? disponiblesEn(apuntes, c.dia, equipo) : null;
         const f = aFecha(c.dia);
         const cuando = diasHasta(c.dia);
         // Los choques que ya pasaron no son un aviso, son historia
@@ -322,7 +337,7 @@ function ChoquesAviso({ choques: lista, apuntes, onIr }) {
           <button type="button" className="cal-choque" key={c.dia} onClick={() => onIr(c.dia)}>
             <strong>{f.getDate()} {NOMBRE_MES[f.getMonth()].toLowerCase()}</strong>
             {` · ${c.apuntes.length} eventos el mismo día: ${c.apuntes.map(a => a.titulo).join(" + ")}`}
-            {fuera.length > 0 ? ` · y falta ${fuera.join(", ")}` : ""}
+            {quedan ? ` · y solo estáis ${quedan.length} de ${equipo.length}` : (fuera.length > 0 ? ` · y falta ${fuera.join(", ")}` : "")}
           </button>
         );
       })}

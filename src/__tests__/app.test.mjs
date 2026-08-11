@@ -3442,6 +3442,69 @@ async function main() {
     await c.close();
   }
 
+  // ─── EL CALENDARIO ─────────────────────────────────────────────────────────
+  // Va contra el banco de pruebas (pruebas/calendario.html), que monta los mismos
+  // componentes con apuntes inventados y sin login: el calendario de verdad pide sesión
+  // de equipo y la prueba se quedaba en la puerta.
+  console.log("\n══ El calendario: la rejilla, el equipo y el responsive ══");
+  {
+    const BANCO = `http://localhost:${PUERTO}/pruebas/calendario.html`;
+    const seMueveDeLado = (p) => p.evaluate(() =>
+      document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+
+    for (const w of [320, 390, 768, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`calendario ${w}px: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+
+      ok(!await seMueveDeLado(p), `${w}px · el mes no mueve la página de lado`);
+
+      // Los huecos del principio y del final del mes son null, y "ningún día abierto"
+      // también era null: null === null les ponía la marca del día abierto y salían
+      // todos recuadrados en oscuro nada más entrar. Llegó a producción así.
+      ok(await p.locator(".cal-celda.es-hueco.es-abierto").count() === 0,
+        `${w}px · las casillas vacías del mes no salen marcadas como el día abierto`);
+
+      // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda
+      ok(/4 personas/.test(await p.locator(".cal-equipo-titulo").innerText()),
+        `${w}px · la barra del equipo dice cuánta gente hay configurada`);
+      ok(await p.locator(".cal-equipo-cuerpo").count() === 0,
+        `${w}px · y arranca plegada, que el mes es lo que se viene a ver`);
+
+      await p.locator(".cal-equipo-cab").click();
+      await p.waitForSelector(".cal-equipo-cuerpo");
+      ok(await p.locator(".cal-persona").count() === 4,
+        `${w}px · abierta se ve a las cuatro personas`);
+      ok(!await seMueveDeLado(p),
+        `${w}px · y con el panel abierto la página sigue sin moverse de lado`);
+
+      // Los campos, a 16px: por debajo iOS hace zoom al enfocar y se descoloca todo
+      ok(await p.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".cal-equipo-campo input")).fontSize) >= 16),
+        `${w}px · los campos del equipo van a 16px, sin zoom de iOS al escribir`);
+
+      // Quitar a alguien tiene que quitarlo de verdad, no solo de la lista de arriba
+      await p.locator(".cal-persona-quitar").first().click();
+      await p.waitForTimeout(200);
+      ok(await p.locator(".cal-persona").count() === 3 && /3 personas/.test(await p.locator(".cal-equipo-titulo").innerText()),
+        `${w}px · quitar a alguien lo quita de la lista y de la cuenta`);
+
+      await c.close();
+    }
+
+    // El aviso que justifica todo esto: dos eventos el mismo día Y media plantilla fuera
+    const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+    const p = await c.newPage();
+    p.on("pageerror", e => errores.push(`calendario choque: ${e}`));
+    await p.goto(BANCO, { waitUntil: "networkidle" });
+    await p.waitForSelector(".cal-choque");
+    const choque = (await p.locator(".cal-choque").first().innerText()).replace(/\s+/g, " ").trim();
+    ok(/2 eventos el mismo d[ií]a/.test(choque) && /solo est[aá]is 2 de 4/.test(choque),
+      `el aviso de choque dice cuántos eventos y cuánta gente queda → "${choque}"`);
+    await c.close();
+  }
+
   await navegador.close();
   srv.kill();
 

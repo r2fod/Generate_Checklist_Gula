@@ -219,11 +219,11 @@ const sinAcentos = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toL
 // Se prueban los apodos de más largo a más corto para que "rocio" gane a "ro" y no
 // dependa del orden en que estén escritos arriba.
 export function personaDeTexto(texto, equipo = EQUIPO) {
-  const palabras = new Set(sinAcentos(texto).split(/[^a-z0-9]+/).filter(Boolean));
+  const palabras = enPalabras(texto);
   let mejor = null;
   for (const p of equipo) {
     for (const apodo of p.apodos) {
-      if (palabras.has(apodo) && (!mejor || apodo.length > mejor.largo)) {
+      if (apodo.length > (mejor ? mejor.largo : 0) && contieneSeguidas(palabras, enPalabras(apodo))) {
         mejor = { nombre: p.nombre, largo: apodo.length };
       }
     }
@@ -231,9 +231,45 @@ export function personaDeTexto(texto, equipo = EQUIPO) {
   return mejor ? mejor.nombre : null;
 }
 
+const enPalabras = (t) => sinAcentos(t).split(/[^a-z0-9]+/).filter(Boolean);
+
+// ¿Están estas palabras seguidas dentro de aquellas? Un apodo de una palabra es el caso
+// de siempre; uno de varias ("ana maria") hace falta porque un nombre compuesto no cabe
+// en una sola palabra, y buscándolo palabra a palabra no se encontraba NUNCA: se podía
+// configurar a Ana María en el equipo y sus vacaciones no se le asignaban jamás, sin
+// que nada avisara de que no funcionaba.
+function contieneSeguidas(donde, que) {
+  if (!que.length || que.length > donde.length) return false;
+  for (let i = 0; i <= donde.length - que.length; i++) {
+    if (que.every((w, j) => donde[i + j] === w)) return true;
+  }
+  return false;
+}
+
 // Quién queda para trabajar un día: el equipo menos quien esté de vacaciones. Es lo que
 // convierte "el 10 hay dos bodas" en "el 10 hay dos bodas y solo estáis tres".
 export function disponiblesEn(apuntes, dia, equipo = EQUIPO) {
   const fuera = new Set(ausentesEn(apuntes, dia).map(t => personaDeTexto(t, equipo) || t));
   return equipo.map(p => p.nombre).filter(n => !fuera.has(n));
+}
+
+// Limpia la lista del equipo que llega de la nube. Un nombre basta; los apodos son
+// opcionales y sirven para que "VACAS FULA" y "Vacas Fulanita" caigan en la misma
+// persona. Si no se ponen, se usa el propio nombre en minúsculas.
+export function saneaEquipo(lista) {
+  if (!Array.isArray(lista)) return [];
+  const vistos = new Set();
+  const limpio = [];
+  for (const p of lista) {
+    const nombre = typeof p === "string" ? p.trim() : (p && typeof p.nombre === "string" ? p.nombre.trim() : "");
+    if (!nombre || vistos.has(nombre.toLowerCase())) continue;
+    vistos.add(nombre.toLowerCase());
+    const apodos = Array.isArray(p && p.apodos)
+      ? [...new Set(p.apodos.map(a => String(a).trim().toLowerCase()).filter(Boolean))]
+      : [];
+    // El nombre siempre vale como apodo: si no, "Fulanita" no se reconocería a sí misma
+    const suyo = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    limpio.push({ nombre, apodos: [...new Set([suyo, ...apodos])] });
+  }
+  return limpio;
 }

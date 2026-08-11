@@ -13,7 +13,8 @@ import PuertaSesion from "../PuertaSesion.jsx";
 import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
-import { saneaLista } from "./apuntes.js";
+import Equipo from "./Equipo.jsx";
+import { saneaLista, saneaEquipo } from "./apuntes.js";
 import { nubeActiva, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube } from "../nube.js";
 
 // Pegar una lista de apuntes en JSON para rellenar el calendario de una vez. Se usa
@@ -50,34 +51,44 @@ function PegarApuntes({ onTraer }) {
 
 function AppCalendario() {
   const [apuntes, setApuntes] = useState([]);
+  const [equipo, setEquipo] = useState([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     if (!nubeActiva()) { setCargando(false); return; }
     let vivo = true;
     cargarCalendarioNube()
-      .then(d => { if (vivo && d) setApuntes(saneaLista(d.apuntes)); })
+      .then(d => { if (vivo && d) { setApuntes(saneaLista(d.apuntes)); setEquipo(saneaEquipo(d.equipo)); } })
       .catch(() => { /* sin conexión: se queda vacío y la suscripción lo traerá */ })
       .finally(() => { if (vivo) setCargando(false); });
     // Y en vivo: si alguien apunta una boda desde otro móvil, aparece sola. Es un
     // calendario de equipo; tener que recargar para ver lo que acaba de poner otro lo
     // convertiría otra vez en una hoja que hay que refrescar.
-    const corta = suscribirCalendarioNube(({ apuntes: nuevos }) => {
-      if (vivo) setApuntes(saneaLista(nuevos));
+    const corta = suscribirCalendarioNube(({ apuntes: nuevos, equipo: suEquipo }) => {
+      if (!vivo) return;
+      setApuntes(saneaLista(nuevos));
+      setEquipo(saneaEquipo(suEquipo));
     });
     return () => { vivo = false; corta(); };
   }, []);
 
   // Se guarda la lista entera, no el apunte suelto: son sesenta apuntes de cuatro
   // campos, cabe de sobra en un documento, y así no hay que resolver mezclas raras.
-  const escribir = (siguiente) => {
-    const limpia = saneaLista(siguiente);
-    setApuntes(limpia);              // se pinta ya, sin esperar a la nube
-    guardarCalendarioNube(limpia).catch(() => { /* se reintenta al siguiente cambio */ });
+  //
+  // Apuntes y equipo van en el MISMO documento, así que cada escritura manda las dos
+  // listas. Se pasan explícitas —y no se leen del estado dentro de la función— para que
+  // guardar el equipo no suba una foto vieja de los apuntes, ni al revés.
+  const escribir = (siguienteApuntes, siguienteEquipo) => {
+    const apuntesLimpios = saneaLista(siguienteApuntes);
+    const equipoLimpio = saneaEquipo(siguienteEquipo);
+    setApuntes(apuntesLimpios);      // se pinta ya, sin esperar a la nube
+    setEquipo(equipoLimpio);
+    guardarCalendarioNube(apuntesLimpios, equipoLimpio).catch(() => { /* se reintenta al siguiente cambio */ });
   };
 
-  const guardar = (apunte) => escribir([...apuntes.filter(a => a.id !== apunte.id), apunte]);
-  const borrar = (id) => escribir(apuntes.filter(a => a.id !== id));
+  const guardar = (apunte) => escribir([...apuntes.filter(a => a.id !== apunte.id), apunte], equipo);
+  const borrar = (id) => escribir(apuntes.filter(a => a.id !== id), equipo);
+  const cambiarEquipo = (siguiente) => escribir(apuntes, siguiente);
 
   // Abrir el evento de la checklist desde el calendario. Es otra app, así que se va por
   // dirección; el nombre del evento viaja en el parámetro que ya entiende la checklist.
@@ -93,8 +104,9 @@ function AppCalendario() {
           Los nombres de clientes y las vacaciones del equipo son datos personales y el
           repositorio es público: eso vive en Firestore, que para eso está. Se pega una
           vez, se guarda en la nube del equipo, y el repositorio no se entera. */}
-      {apuntes.length === 0 && <PegarApuntes onTraer={escribir} />}
-      <Calendario apuntes={apuntes} onGuardar={guardar} onBorrar={borrar} onAbrirEvento={abrirEvento} />
+      {apuntes.length === 0 && <PegarApuntes onTraer={(lista) => escribir(lista, equipo)} />}
+      <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
+      <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} onAbrirEvento={abrirEvento} />
     </div>
   );
 }

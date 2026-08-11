@@ -20,6 +20,7 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn } from "../calendario/apuntes.js";
 
 let pasan = 0;
 const fallos = [];
@@ -474,6 +475,65 @@ console.log("\n══ Qué cantidad ha cambiado, y de cuánto a cuánto ══")
   // Nada de esto puede tumbar el arranque si llega basura desde la nube
   ok(c(null, undefined).length === 0 && c("texto", 7).length === 0 && c([1, 2], {}).length === 0,
     "y con basura de entrada devuelve una lista vacía, no un error");
+}
+
+console.log("\n══ El equipo del calendario: quién queda un día ══");
+{
+  // Nombres inventados: esto se sube al repositorio, que es público.
+  const equipo = saneaEquipo([
+    "Fulanita",
+    { nombre: "Menganito", apodos: ["Mengano", "MENGANO"] },
+    { nombre: "  " },
+    "fulanita",
+  ]);
+  ok(equipo.length === 2, `las repetidas y las vacías no cuentan → ${equipo.length} personas`);
+  ok(equipo[0].apodos.includes("fulanita"),
+    "el propio nombre entra siempre como apodo, aunque no se escriba ninguno");
+  ok(equipo[1].apodos.includes("mengano") && equipo[1].apodos.filter(a => a === "mengano").length === 1,
+    "los apodos van en minúsculas y sin repetir");
+
+  // La razón de ser de los apodos: en la hoja cada uno se apunta como le sale.
+  ok(personaDeTexto("VACAS MENGANO", equipo) === "Menganito",
+    'el apodo en mayúsculas cae en su persona: "VACAS MENGANO" → Menganito');
+  ok(personaDeTexto("Vacaciones Menganito", equipo) === "Menganito",
+    "y el nombre completo cae en la misma, no crea un segundo fantasma");
+  // El fallo que hubo que arreglar: buscar por trozos convertía media hoja en
+  // vacaciones de quien tuviera el apodo más corto.
+  const conRo = saneaEquipo([{ nombre: "Rocío", apodos: ["ro"] }, "Rodrigo"]);
+  ok(personaDeTexto("Boda de Rodrigo", conRo) === "Rodrigo",
+    '"Rodrigo" no es "ro": se busca por palabras completas, no por trozos');
+  ok(personaDeTexto("VACAS RO", conRo) === "Rocío",
+    "pero el apodo suelto sí cae donde toca");
+  ok(personaDeTexto("Boda de unos clientes", equipo) === null,
+    "y un texto sin nadie del equipo no inventa a nadie");
+
+  // Nombre compuesto: buscándolo palabra a palabra no se encontraba nunca, así que se
+  // podía configurar a alguien en el equipo y no asignarle sus vacaciones jamás.
+  const compuesto = saneaEquipo(["Ana María", "Ana"]);
+  ok(personaDeTexto("VACAS ANA MARIA", compuesto) === "Ana María",
+    "un nombre de dos palabras se reconoce entero, no se pierde");
+  ok(personaDeTexto("Vacaciones Ana", compuesto) === "Ana",
+    "y la Ana a secas sigue siendo la otra persona, no la compuesta");
+  // Sin la Ana suelta en el equipo, para que lo único que pueda casar sea el compuesto
+  const soloCompuesto = saneaEquipo(["Ana María"]);
+  ok(personaDeTexto("Maria y Ana libran", soloCompuesto) === null,
+    "las dos palabras tienen que ir seguidas y en orden, no sueltas por el texto");
+  ok(personaDeTexto("Vacas Ana", soloCompuesto) === null,
+    "y media parte del nombre no basta: media plantilla se llamaría igual");
+
+  // Lo que de verdad se enseña en pantalla: cuánta gente queda un día con dos eventos.
+  const apuntes = [
+    { id: "a", fecha: "2026-09-12", titulo: "Vacas Mengano", tipo: "vacaciones" },
+    { id: "b", fecha: "2026-09-12", titulo: "Boda de prueba", tipo: "boda" },
+  ];
+  const quedan = disponiblesEn(apuntes, "2026-09-12", equipo);
+  ok(quedan.length === 1 && quedan[0] === "Fulanita",
+    `el que está de vacaciones no cuenta ese día → quedan ${JSON.stringify(quedan)}`);
+  ok(disponiblesEn(apuntes, "2026-09-13", equipo).length === 2,
+    "y al día siguiente vuelve a estar el equipo entero");
+  // Sin equipo configurado no puede quedar nadie: el aviso se calla, no miente.
+  ok(disponiblesEn(apuntes, "2026-09-12", []).length === 0,
+    "sin equipo configurado no se inventa gente disponible");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
