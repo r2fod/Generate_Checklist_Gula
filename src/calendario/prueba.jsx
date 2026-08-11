@@ -48,12 +48,31 @@ function Banco() {
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
   const guardar = (a) => setApuntes(p => saneaLista([...p.filter(x => x.id !== a.id), a]));
   const borrar = (id) => setApuntes(p => p.filter(x => x.id !== id));
-  return (
-    <div className="app-wrapper">
+
+  const dentro = (
+    <>
       <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
       <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
-    </div>
+    </>
   );
+
+  // Con "?pantalla=1" se monta la MISMA maquetación que usa la checklist por dentro
+  // (EnChecklist.jsx): pantalla completa, barra fija arriba y el scroll dentro del
+  // cuerpo. Aquella va detrás del login del equipo, así que la batería no puede llegar;
+  // esto deja al menos su colocación probada a todos los anchos.
+  if (new URLSearchParams(window.location.search).get("pantalla")) {
+    return (
+      <div className="cal-pantalla">
+        <div className="cal-pantalla-barra">
+          <strong>Calendario</strong>
+          <button type="button" className="cal-pantalla-cerrar" aria-label="Cerrar el calendario">✕</button>
+        </div>
+        <div className="cal-pantalla-cuerpo">{dentro}</div>
+      </div>
+    );
+  }
+
+  return <div className="app-wrapper">{dentro}</div>;
 }
 
 createRoot(document.getElementById("root")).render(<StrictMode><Banco /></StrictMode>);

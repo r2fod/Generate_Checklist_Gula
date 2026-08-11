@@ -5,7 +5,8 @@
 //
 // Los mismos componentes los usa también la checklist desde dentro, para que el equipo
 // pueda ir del mes a la boda sin cambiar de app. Por eso Calendario.jsx no sabe nada de
-// Firestore: recibe los apuntes y avisa de los cambios. Lo de la nube se monta aquí.
+// Firestore: recibe los apuntes y avisa de los cambios. Lo de la nube va en el hook
+// useCalendarioNube, que comparten los dos sitios para que no se separen.
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import RedDeSeguridad from "../RedDeSeguridad.jsx";
@@ -14,8 +15,9 @@ import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
-import { saneaLista, saneaEquipo } from "./apuntes.js";
-import { nubeActiva, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube } from "../nube.js";
+import useCalendarioNube from "./useCalendarioNube.js";
+import { saneaLista } from "./apuntes.js";
+import { leerApuntesDelEnlace, limpiaEnlace } from "./traer.js";
 
 // Pegar una lista de apuntes en JSON para rellenar el calendario de una vez. Se usa
 // para traer lo que hubiera en otro sitio (una hoja, otro calendario) sin que esos
@@ -49,46 +51,33 @@ function PegarApuntes({ onTraer }) {
   );
 }
 
+// Lo que trae un enlace de importación, ANTES de meterlo. Un enlace que escribiera solo
+// en el calendario del equipo sería un enlace que cualquiera puede mandar; aquí se ve
+// qué trae y lo mete quien lo abre. Sin tocar el botón, no entra nada.
+function TraerDelEnlace({ apuntes, onTraer, onDescartar }) {
+  const muestra = apuntes.slice(0, 3).map(a => a.titulo).join(", ");
+  return (
+    <div className="cal-traer">
+      <strong>Este enlace trae {apuntes.length} {apuntes.length === 1 ? "apunte" : "apuntes"}.</strong>
+      <span>{muestra}{apuntes.length > 3 ? `, y ${apuntes.length - 3} más` : ""}.</span>
+      <span>Se añaden a lo que ya haya, y los que ya estén no se duplican.</span>
+      <div className="cal-traer-botones">
+        <button className="btn btn-green" onClick={onTraer}>Traerlos al calendario</button>
+        <button className="btn btn-ghost" onClick={onDescartar}>No, gracias</button>
+      </div>
+    </div>
+  );
+}
+
 function AppCalendario() {
-  const [apuntes, setApuntes] = useState([]);
-  const [equipo, setEquipo] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  const { apuntes, equipo, cargando, traer, guardar, borrar, cambiarEquipo } = useCalendarioNube();
+  // Apuntes que vienen dentro del enlace, todavía sin meter
+  const [delEnlace, setDelEnlace] = useState(() => leerApuntesDelEnlace());
 
-  useEffect(() => {
-    if (!nubeActiva()) { setCargando(false); return; }
-    let vivo = true;
-    cargarCalendarioNube()
-      .then(d => { if (vivo && d) { setApuntes(saneaLista(d.apuntes)); setEquipo(saneaEquipo(d.equipo)); } })
-      .catch(() => { /* sin conexión: se queda vacío y la suscripción lo traerá */ })
-      .finally(() => { if (vivo) setCargando(false); });
-    // Y en vivo: si alguien apunta una boda desde otro móvil, aparece sola. Es un
-    // calendario de equipo; tener que recargar para ver lo que acaba de poner otro lo
-    // convertiría otra vez en una hoja que hay que refrescar.
-    const corta = suscribirCalendarioNube(({ apuntes: nuevos, equipo: suEquipo }) => {
-      if (!vivo) return;
-      setApuntes(saneaLista(nuevos));
-      setEquipo(saneaEquipo(suEquipo));
-    });
-    return () => { vivo = false; corta(); };
-  }, []);
-
-  // Se guarda la lista entera, no el apunte suelto: son sesenta apuntes de cuatro
-  // campos, cabe de sobra en un documento, y así no hay que resolver mezclas raras.
-  //
-  // Apuntes y equipo van en el MISMO documento, así que cada escritura manda las dos
-  // listas. Se pasan explícitas —y no se leen del estado dentro de la función— para que
-  // guardar el equipo no suba una foto vieja de los apuntes, ni al revés.
-  const escribir = (siguienteApuntes, siguienteEquipo) => {
-    const apuntesLimpios = saneaLista(siguienteApuntes);
-    const equipoLimpio = saneaEquipo(siguienteEquipo);
-    setApuntes(apuntesLimpios);      // se pinta ya, sin esperar a la nube
-    setEquipo(equipoLimpio);
-    guardarCalendarioNube(apuntesLimpios, equipoLimpio).catch(() => { /* se reintenta al siguiente cambio */ });
-  };
-
-  const guardar = (apunte) => escribir([...apuntes.filter(a => a.id !== apunte.id), apunte], equipo);
-  const borrar = (id) => escribir(apuntes.filter(a => a.id !== id), equipo);
-  const cambiarEquipo = (siguiente) => escribir(apuntes, siguiente);
+  // La dirección se limpia nada más leerla, no al aceptar: así una recarga no vuelve a
+  // preguntar, y el enlace con los datos dentro no se queda en la barra de direcciones
+  // a la vista de quien pase por al lado.
+  useEffect(() => { if (delEnlace) limpiaEnlace(); }, [delEnlace]);
 
   // Abrir el evento de la checklist desde el calendario. Es otra app, así que se va por
   // dirección; el nombre del evento viaja en el parámetro que ya entiende la checklist.
@@ -100,11 +89,17 @@ function AppCalendario() {
 
   return (
     <div className="app-wrapper">
-      {/* Traer apuntes de golpe PEGÁNDOLOS, no desde un archivo del repositorio.
-          Los nombres de clientes y las vacaciones del equipo son datos personales y el
-          repositorio es público: eso vive en Firestore, que para eso está. Se pega una
-          vez, se guarda en la nube del equipo, y el repositorio no se entera. */}
-      {apuntes.length === 0 && <PegarApuntes onTraer={(lista) => escribir(lista, equipo)} />}
+      {/* Traer apuntes de golpe pegándolos o por enlace, NUNCA desde un archivo del
+          repositorio. Los nombres de clientes y las vacaciones del equipo son datos de
+          personas, y tanto el repositorio como lo publicado en GitHub Pages son
+          públicos: eso vive en Firestore, que para eso está. */}
+      {delEnlace
+        ? <TraerDelEnlace
+            apuntes={delEnlace}
+            onTraer={() => { traer([...apuntes, ...delEnlace]); setDelEnlace(null); }}
+            onDescartar={() => setDelEnlace(null)}
+          />
+        : apuntes.length === 0 && <PegarApuntes onTraer={(lista) => traer([...apuntes, ...lista])} />}
       <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
       <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} onAbrirEvento={abrirEvento} />
     </div>

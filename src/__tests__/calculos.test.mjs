@@ -20,7 +20,8 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn } from "../calendario/apuntes.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista } from "../calendario/apuntes.js";
+import { codificaApuntes, descodificaApuntes, enlaceParaTraer } from "../calendario/traer.js";
 
 let pasan = 0;
 const fallos = [];
@@ -534,6 +535,42 @@ console.log("\n══ El equipo del calendario: quién queda un día ══");
   // Sin equipo configurado no puede quedar nadie: el aviso se calla, no miente.
   ok(disponiblesEn(apuntes, "2026-09-12", []).length === 0,
     "sin equipo configurado no se inventa gente disponible");
+}
+
+console.log("\n══ Traer apuntes por enlace ══");
+{
+  // Títulos inventados, pero con tildes, eñes y símbolos: es lo que tienen los de
+  // verdad, y es donde se rompen los codificadores.
+  const lista = saneaLista([
+    { fecha: "2026-09-13", titulo: "Boda Ángel y Begoña", tipo: "boda", sitio: "Molí" },
+    { fecha: "2026-09-25", titulo: "Recoger generadores 7K, furgo 18:00", tipo: "recogida" },
+    { fecha: "2026-08-04", hasta: "2026-08-30", titulo: "Fulanita", tipo: "vacaciones" },
+  ]);
+  const vuelta = descodificaApuntes(codificaApuntes(lista));
+  ok(JSON.stringify(vuelta) === JSON.stringify(lista),
+    `lo que sale del enlace es exactamente lo que entró, tildes incluidas (${vuelta.length} apuntes)`);
+  // Por fecha y no por posición: saneaLista ordena, así que el primero no es el primero
+  // que se escribió arriba.
+  const laBoda = vuelta.find(a => a.fecha === "2026-09-13");
+  ok(laBoda && laBoda.titulo === "Boda Ángel y Begoña" && laBoda.sitio === "Molí",
+    "las tildes y las eñes llegan enteras (btoa a secas revienta con ellas)");
+
+  // Los enlaces se mandan por WhatsApp, y +, / y = se los come al copiarlos
+  const codigo = codificaApuntes(lista);
+  ok(!/[+/=]/.test(codigo),
+    "el código no lleva +, / ni =, que se pierden al copiar el enlace de un chat");
+  ok(enlaceParaTraer("https://ejemplo/calendario/", lista).includes("#traer="),
+    "los datos van detrás de #, que el navegador no manda a ningún servidor");
+
+  // Un enlace cortado a mitad no puede tumbar la app: se trata como si no trajera nada
+  ok(descodificaApuntes(codigo.slice(0, Math.floor(codigo.length / 2))).length === 0,
+    "un enlace cortado a mitad no trae nada, no revienta");
+  ok(descodificaApuntes("").length === 0 && descodificaApuntes("no-es-base64!!").length === 0,
+    "y con basura tampoco");
+  // Lo que se cuela por el enlace pasa por el mismo saneado que todo lo demás: un
+  // apunte sin fecha o con una fecha imposible no entra al calendario del equipo.
+  ok(descodificaApuntes(codificaApuntes([{ titulo: "sin fecha" }, { fecha: "2026-02-31", titulo: "31 de febrero" }])).length === 0,
+    "y los apuntes sin fecha o con fecha imposible se quedan fuera");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

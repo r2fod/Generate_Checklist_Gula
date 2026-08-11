@@ -504,6 +504,19 @@
 
 .cal-traer .btn { align-self: flex-start; min-height: 44px; }
 
+/* Traer o descartar. En un móvil estrecho van uno debajo de otro antes que partirse. */
+.cal-traer-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cal-traer-botones .btn { align-self: auto; flex: 1 1 auto; min-width: 0; }
+
+@media (min-width: 420px) {
+  .cal-traer-botones .btn { flex: 0 0 auto; }
+}
+
 .cal-cargando { padding: 24px; text-align: center; color: var(--text-muted); }
 
 .cal-traer-texto {
@@ -751,4 +764,60 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cal-equipo-flecha, .cal-persona-quitar { transition: none; }
+}
+
+/* ─── EL CALENDARIO DENTRO DE LA CHECKLIST ────────────────────────────────────
+   Pantalla completa y no una ventanita: el mes son siete columnas y en un móvil no
+   sobra ni un píxel. La barra de arriba se queda fija para poder salir sin tener que
+   subir hasta el principio del año. */
+.cal-pantalla {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main, var(--card-bg));
+}
+
+.cal-pantalla-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 10px clamp(12px, 3vw, 24px);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-main);
+  font-size: 1rem;
+  /* Por debajo de la muesca y la barra de estado en los móviles con pantalla completa */
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+.cal-pantalla-barra strong { flex: 1 1 auto; min-width: 0; }
+
+.cal-pantalla-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.cal-pantalla-cerrar:hover { background: var(--bg-subtle); }
+
+/* El scroll va aquí dentro, no en el body: si scrollea el body, al cerrar el calendario
+   la checklist aparece a media altura, donde la dejó el mes. */
+.cal-pantalla-cuerpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px clamp(12px, 3vw, 24px) max(24px, env(safe-area-inset-bottom));
 }
