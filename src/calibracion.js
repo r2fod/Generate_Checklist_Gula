@@ -1,0 +1,91 @@
+import { estimarTiemposCarga, FASES_TIEMPO } from "./tiempos-carga.js";
+import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
+import { buildChecklist } from "./checklist-generadores.js";
+
+// ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
+// Las estimaciones de tiempos-carga.js son de sector. En cuanto hay eventos con el
+// cronómetro usado, se comparan con lo estimado y se saca un factor por fase: si de
+// verdad se tarda un 20% más cargando, las próximas estimaciones lo reflejan.
+// Se usa la MEDIANA (no la media) para que un evento raro no descoloque el ajuste, y
+// hacen falta al menos 3 eventos medidos por fase para fiarse.
+const MIN_EVENTOS_CALIBRAR = 3;
+function medianaFactor(valores) {
+  if (valores.length < MIN_EVENTOS_CALIBRAR) return null;
+  const orden = [...valores].sort((a, b) => a - b);
+  const m = orden.length % 2
+    ? orden[(orden.length - 1) / 2]
+    : (orden[orden.length / 2 - 1] + orden[orden.length / 2]) / 2;
+  // Se acota entre la mitad y el triple: un factor fuera de ahí es un cronómetro
+  // que se dejó corriendo, no un dato real.
+  return Math.min(3, Math.max(0.5, m));
+}
+export function calcularCalibracion(eventosGuardados = {}) {
+  const ratios = { prep: [], carga: [], descarga: [], montaje: [] };
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.cronos) return;
+    const items = (ev.totalItemsCarga ?? 0) || contarItemsCarga(ev);
+    if (!items) return;
+    const est = estimarTiemposCarga({
+      totalItems: items,
+      pax: (ev.pax || 0) + (ev.ninos || 0),
+      numLogistica: numLogisticaDe(ev),
+      horasJornada: horasJornadaDe(ev),
+    }, null);
+    FASES_TIEMPO.forEach(f => {
+      const real = (ev.cronos[f] && ev.cronos[f].ms) || 0;
+      const estimado = est[`${f}Min`] * 60000;
+      if (real > 60000 && estimado > 0) ratios[f].push(real / estimado);
+    });
+  });
+  const factores = {};
+  let nMedidos = 0;
+  FASES_TIEMPO.forEach(f => {
+    const factor = medianaFactor(ratios[f]);
+    if (factor !== null) { factores[f] = factor; nMedidos = Math.max(nMedidos, ratios[f].length); }
+  });
+  return Object.keys(factores).length ? { factores, nMedidos } : null;
+}
+function numLogisticaDe(ev) {
+  const n = (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length;
+  return n > 0 ? n : Math.max(1, Math.ceil((ev.pax || 0) / 60));
+}
+function horasJornadaDe(ev) {
+  return (ev.logisticaEquipo || []).reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0);
+}
+// Nº de items que se cargan de verdad en un evento guardado (sin los que no llevan
+// cantidad y sin "Personal"), para poder comparar su tiempo real con el estimado.
+function contarItemsCarga(ev) {
+  try {
+    return quitarItemsSinCantidad(checklistDeEventoGuardado(ev))
+      .filter(c => !/personal/i.test(c.nombre))
+      .reduce((a, c) => a + c.items.length, 0);
+  } catch (e) { return 0; }
+}
+
+// ─── REVISIÓN DE DATOS GUARDADOS ──────────────────────────────────────────────
+// Reconstruye la checklist (categorías + items) de un evento GUARDADO a partir de
+// su configuración, para poder comparar sus marcas con los items que tendría hoy
+// sin necesidad de abrirlo. Aplica las categorías renombradas y añade los items
+// puestos a mano (la clave usa la etiqueta base del item).
+export function checklistDeEventoGuardado(ev) {
+  if (!ev || !ev.evento) return [];
+  const opts = {
+    ...ev,
+    tipoBBQ: (ev.tipoBBQ || "").toLowerCase(),
+    tipoHorno: (ev.tipoHorno || "").toLowerCase(),
+    numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
+  };
+  let cats;
+  try {
+    cats = buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
+  } catch (e) { return []; }
+  const renom = ev.categoriasRenombradas || {};
+  const salida = cats.map(c => ({ nombre: renom[c.nombre] ?? c.nombre, items: c.items.map(it => it[0]) }));
+  (ev.itemsManuales || []).forEach(it => {
+    const nombreCat = renom[it.categoria] ?? it.categoria ?? "Otros";
+    let destino = salida.find(c => c.nombre === nombreCat);
+    if (!destino) { destino = { nombre: nombreCat, items: [] }; salida.push(destino); }
+    destino.items.push(it.label);
+  });
+  return salida;
+}

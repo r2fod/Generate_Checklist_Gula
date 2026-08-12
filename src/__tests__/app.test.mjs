@@ -11,7 +11,20 @@ import { recogidasConAlquileres } from "../alquileres.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
-const CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+function obtenerRutaChromium() {
+  if (process.env.CHROMIUM_PATH && existsSync(process.env.CHROMIUM_PATH)) {
+    return process.env.CHROMIUM_PATH;
+  }
+  const rutasPosibles = [
+    "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  ];
+  return rutasPosibles.find(r => existsSync(r)) || undefined;
+}
+
+const CHROMIUM = obtenerRutaChromium();
 const PUERTO = 4178;
 // Cada app en SU carpeta y ninguna dentro de la otra: el ámbito de un manifiesto es la
 // carpeta donde vive, y una app dentro del ámbito de otra no se puede instalar aparte
@@ -105,7 +118,10 @@ const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
 async function main() {
   const srv = await arrancarServidor();
   servidorGlobal = srv;
-  const navegador = await chromium.launch({ executablePath: CHROMIUM, args: ["--no-sandbox"] });
+  const opcionesLaunch = { args: ["--no-sandbox"] };
+  if (CHROMIUM) opcionesLaunch.executablePath = CHROMIUM;
+  else opcionesLaunch.channel = "chrome";
+  const navegador = await chromium.launch(opcionesLaunch);
   navegadorGlobal = navegador;
 
   // ── Responsive: ningún ancho ni tema puede desbordar en ninguna pantalla ────

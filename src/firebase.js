@@ -6,8 +6,6 @@ import { firebaseConfig } from "./firebaseConfig.js";
 
 let appPromise = null;
 
-export const firebaseDisponible = () => !!firebaseConfig;
-
 export function getFirebaseApp() {
   if (!firebaseConfig) return null;
   if (!appPromise) {

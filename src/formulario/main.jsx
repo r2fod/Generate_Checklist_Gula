@@ -13,6 +13,7 @@ import RedDeSeguridad from '../RedDeSeguridad.jsx'
 import '../index.css'
 import Formulario from './Formulario.jsx'
 import { leerGuardado, guardar, codigoDeTexto, direccionConCodigo } from './codigo.js'
+import { leerPreferenciaTema, temaSegunPreferencia } from '../tema.js'
 
 // El código del enlace (?enviar=<código>) se recuerda en ESTE navegador porque si no,
 // instalar la app no serviría de nada: el icono abre la dirección de siempre y quien
@@ -80,12 +81,7 @@ function pedirElEnlace() {
 // El tema se pone en el <html> ANTES de montar React, igual que en la checklist: si no,
 // hay un fogonazo de blanco al arrancar de noche.
 function aplicarTemaInicial() {
-  let pref = "auto";
-  try { const g = localStorage.getItem("gula_tema"); if (g === "claro" || g === "oscuro" || g === "auto") pref = g; }
-  catch (e) { /* localStorage no disponible */ }
-  const h = new Date().getHours();
-  const tema = pref === "claro" || pref === "oscuro" ? pref : (h >= 20 || h < 7 ? "oscuro" : "claro");
-  document.documentElement.dataset.tema = tema;
+  document.documentElement.dataset.tema = temaSegunPreferencia(leerPreferenciaTema());
 }
 aplicarTemaInicial()
 
