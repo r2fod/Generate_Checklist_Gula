@@ -4,6 +4,7 @@ import RedDeSeguridad from './RedDeSeguridad.jsx'
 import './index.css'
 import { cargarEventoNube } from './nube.js'
 import Acceso from './Acceso.jsx'
+import { leerPreferenciaTema, temaSegunPreferencia } from './tema.js'
 
 // Si el link es de la nube (?evento=id) se descarga la checklist ANTES de montar
 // la app y se deja en localStorage: así el arranque síncrono de App la restaura
@@ -12,15 +13,7 @@ import Acceso from './Acceso.jsx'
 // El tema se pone en el <html> ANTES de montar React: así no hay un fogonazo de
 // blanco al arrancar y la pantalla de acceso también sale en oscuro.
 function aplicarTemaInicial() {
-  // Mismo criterio que dentro de la app (ver temaSegunPreferencia en App.jsx): lo que
-  // esté fijado a mano manda, y en automático va por hora. Se hace ANTES de montar React
-  // para que no haya un fogonazo de blanco al arrancar de noche.
-  let pref = "auto";
-  try { const g = localStorage.getItem("gula_tema"); if (g === "claro" || g === "oscuro" || g === "auto") pref = g; }
-  catch (e) { /* localStorage no disponible */ }
-  const h = new Date().getHours();
-  const tema = pref === "claro" || pref === "oscuro" ? pref : (h >= 20 || h < 7 ? "oscuro" : "claro");
-  document.documentElement.dataset.tema = tema;
+  document.documentElement.dataset.tema = temaSegunPreferencia(leerPreferenciaTema());
 }
 aplicarTemaInicial()
 
