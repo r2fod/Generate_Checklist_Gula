@@ -50,7 +50,7 @@ export default function Equipo({ equipo, onCambiar }) {
           <p className="cal-equipo-nota">
             {equipo.length === 0
               ? "Apunta aquí a quien trabaja. Con la lista puesta, el calendario avisa de cuánta gente queda un día con dos eventos."
-              : "Los apodos son para que “VACAS ANTO” y “Vacaciones Antonella” cuenten como la misma persona."}
+              : "Los apodos son para que “VACAS FULA” y “Vacaciones Fulanita” cuenten como la misma persona."}
           </p>
 
           {equipo.length > 0 && (

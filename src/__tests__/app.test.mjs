@@ -3569,6 +3569,40 @@ async function main() {
       await c.close();
     }
 
+    // Traer apuntes por enlace. Es como entra de golpe lo que había en la hoja de pared
+    // sin que nadie copie y pegue, y sin que esos nombres pasen por el repositorio.
+    {
+      const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`calendario traer: ${e}`));
+      // El mismo código que genera enlaceParaTraer, hecho aquí para no depender de él
+      const lista = [
+        { fecha: "2027-05-01", titulo: "Boda Ángel y Begoña", tipo: "boda" },
+        { fecha: "2027-05-08", titulo: "Recoger camión", tipo: "recogida" },
+      ];
+      const codigo = Buffer.from(JSON.stringify(lista), "utf8").toString("base64")
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+      await p.goto(`${BANCO}?vacio=1#traer=${codigo}`, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-traer");
+      const panel = (await p.locator(".cal-traer").innerText()).replace(/\s+/g, " ");
+      ok(/trae 2 apuntes/.test(panel) && /Boda Ángel y Begoña/.test(panel),
+        `el enlace enseña qué trae ANTES de meterlo → "${panel.slice(0, 70)}…"`);
+      // Y la dirección se limpia en cuanto se lee: ni recargando vuelve a preguntar, y
+      // los nombres no se quedan en la barra a la vista de quien pase por al lado.
+      ok(await p.evaluate(() => window.location.hash) === "",
+        "y los datos desaparecen de la barra de direcciones nada más leerlos");
+
+      await p.locator(".cal-traer-botones .btn-green").click();
+      await p.waitForTimeout(300);
+      ok(await p.locator(".cal-traer").count() === 0,
+        "al traerlos, el panel se va solo: no hay que quitarlo a mano después");
+      await p.locator(".cal-nav-btn").first().click();  // el calendario abre en el mes de hoy
+      ok(await p.locator(".cal-viene, .cal-mes").count() > 0,
+        "y el calendario sigue en pie con los apuntes dentro");
+      await c.close();
+    }
+
     // El aviso que justifica todo esto: dos eventos el mismo día Y media plantilla fuera
     const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
     const p = await c.newPage();

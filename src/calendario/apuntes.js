@@ -166,7 +166,7 @@ export function choques(apuntes) {
 }
 
 // Quién NO está disponible un día. Cruzar esto con los choques es lo que convierte el
-// calendario en algo que evita sustos: "el 10 tienes dos bodas y Irene está de
+// calendario en algo que evita sustos: "el 10 tienes dos bodas y Fulanita está de
 // vacaciones" es un aviso que hoy no da nadie.
 export function ausentesEn(apuntes, dia) {
   const mapa = porDia(apuntes.filter(a => a.tipo === "vacaciones"));
@@ -197,9 +197,9 @@ export const INICIAL_DIA = ["L", "M", "X", "J", "V", "S", "D"];
 // Quién puede estar de vacaciones o librar. Sin esta lista no se puede avisar de que
 // un día hay dos bodas y falta gente, que es la mitad de la gracia del calendario.
 //
-// En la hoja de pared cada uno se apunta como le sale: "VACAS IRENE", "VACAS RO",
-// "LIBRA ANTO", "Vacas Anna". Los apodos van aquí para que todo eso caiga en la misma
-// persona en vez de crear cuatro fantasmas distintos.
+// En la hoja de pared cada uno se apunta como le sale: "VACAS FULANITA", "VACAS FULA",
+// "LIBRA FULI", "Vacas Fulanita". Los apodos van aquí para que todo eso caiga en la
+// misma persona en vez de crear cuatro fantasmas distintos.
 // VA VACÍO EN EL CÓDIGO A PROPÓSITO. El repositorio es público, y los nombres de la
 // plantilla con sus vacaciones son datos personales de gente real: eso vive en
 // Firestore, junto al calendario, y se configura desde la app.
@@ -213,10 +213,11 @@ export const EQUIPO = [];
 const sinAcentos = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 // Saca la persona de un texto suelto. Se busca por palabras completas y no por trozos:
-// con "contiene" a secas, "ro" cazaba dentro de "Rodrigo" y "Roberto", y media hoja se
-// habría convertido en vacaciones de Rocío.
+// con "contiene" a secas, un apodo de dos letras como "fu" cazaba dentro de "Fulgencio"
+// y de "Furgoneta", y media hoja se habría convertido en vacaciones de quien tuviera el
+// apodo más corto.
 //
-// Se prueban los apodos de más largo a más corto para que "rocio" gane a "ro" y no
+// Se prueban los apodos de más largo a más corto para que "fulanita" gane a "fu" y no
 // dependa del orden en que estén escritos arriba.
 export function personaDeTexto(texto, equipo = EQUIPO) {
   const palabras = enPalabras(texto);

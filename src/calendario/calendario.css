@@ -1,6 +1,6 @@
 /* ─── EL CALENDARIO ───────────────────────────────────────────────────────────
    Escrito de móvil hacia arriba, no al revés. Un calendario son siete columnas sí o sí,
-   y en un móvil de 320px eso son 45px por columna: ahí no cabe "Boda Eucaris y Pedro".
+   y en un móvil de 320px eso son 45px por columna: ahí no cabe "Boda Fulanita y Mengano".
    Así que la casilla enseña el número y unos puntos de color, y el nombre entero vive
    en el panel del día, que es a lo que se llega tocando. De 560px para arriba, donde ya
    caben, los chips con el nombre aparecen dentro de la casilla.

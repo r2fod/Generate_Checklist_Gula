@@ -12,6 +12,7 @@ import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
+import Traer from "./Traer.jsx";
 import { saneaLista, saneaEquipo } from "./apuntes.js";
 
 const HOY = new Date();
@@ -44,13 +45,17 @@ const EQUIPO_DEMO = [
 ];
 
 function Banco() {
-  const [apuntes, setApuntes] = useState(() => saneaLista(DEMO));
+  // Con "?vacio=1" se arranca sin nada, que es como se ve el cuadro de pegar y como se
+  // prueba un enlace de importación que llega a un calendario recién estrenado.
+  const arrancaVacio = new URLSearchParams(window.location.search).get("vacio");
+  const [apuntes, setApuntes] = useState(() => (arrancaVacio ? [] : saneaLista(DEMO)));
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
   const guardar = (a) => setApuntes(p => saneaLista([...p.filter(x => x.id !== a.id), a]));
   const borrar = (id) => setApuntes(p => p.filter(x => x.id !== id));
 
   const dentro = (
     <>
+      <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
       <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
       <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
     </>

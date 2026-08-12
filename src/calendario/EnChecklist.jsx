@@ -11,10 +11,11 @@ import { X } from "lucide-react";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
+import Traer from "./Traer.jsx";
 import useCalendarioNube from "./useCalendarioNube.js";
 
 export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento }) {
-  const { apuntes, equipo, cargando, guardar, borrar, cambiarEquipo } = useCalendarioNube();
+  const { apuntes, equipo, cargando, traer, guardar, borrar, cambiarEquipo } = useCalendarioNube();
 
   // Con Escape se sale, como en el resto de pantallas grandes de la app
   useEffect(() => {
@@ -36,6 +37,10 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento }) {
           ? <div className="cal-cargando">Cargando el calendario…</div>
           : (
             <>
+              {/* Traer apuntes también desde aquí. Estaba solo en la app suelta, así que
+                  quien abría el calendario desde la checklist se encontraba un mes vacío
+                  y ninguna forma de rellenarlo. */}
+              <Traer apuntes={apuntes} onTraer={traer} />
               <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
               {/* onAbrirEvento aquí NO cambia de página: abre el evento guardado en esta
                   misma app, que es justo lo que se venía a hacer. */}
