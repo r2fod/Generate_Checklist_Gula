@@ -56,8 +56,8 @@ const ev = (n) => ({ evento:'boda', pax:n });
 console.log('══ ESCENARIO REAL: móvil con todo, PC con lo viejo ══');
 almacen.clear(); limpiarPrevios();
 // El índice antiguo tiene lo que había ANTES de que las escrituras se bloquearan
-almacen.set('indice/eventosGuardados', { mapa: JSON.stringify({'Produccion Carlos':ev(20),'Boda Anna y Mario':ev(100),'Cena Pluto':ev(50)}), actualizado: 1000 });
-const movil = crearDispositivo('móvil', {'Produccion Carlos':ev(20),'Boda Anna y Mario':ev(100),'Cena Pluto':ev(50),'Produ kitten':ev(20),'Produccion Movistar':ev(30),'Boda nueva':ev(120)});
+almacen.set('indice/eventosGuardados', { mapa: JSON.stringify({'Produccion Carlos':ev(20),'Boda Fulanita y Mengano':ev(100),'Cena Pluto':ev(50)}), actualizado: 1000 });
+const movil = crearDispositivo('móvil', {'Produccion Carlos':ev(20),'Boda Fulanita y Mengano':ev(100),'Cena Pluto':ev(50),'Produ kitten':ev(20),'Produccion Movistar':ev(30),'Boda nueva':ev(120)});
 const pc = crearDispositivo('PC', {});
 
 await pc.arrancar();

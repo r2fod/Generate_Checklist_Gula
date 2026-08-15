@@ -151,11 +151,13 @@
    vacaciones tenía catorce barras grises y las bodas se perdían entre ellas. */
 .cal-celda.tipo-vacaciones::before,
 .cal-celda.tipo-recogida::before,
-.cal-celda.tipo-cerrado::before { opacity: 0.4; height: 2px; }
+.cal-celda.tipo-cerrado::before,
+.cal-celda.tipo-tarea::before { opacity: 0.4; height: 2px; }
 
 .cal-celda.tipo-vacaciones,
 .cal-celda.tipo-recogida,
-.cal-celda.tipo-cerrado { background: var(--card-bg); }
+.cal-celda.tipo-cerrado,
+.cal-celda.tipo-tarea { background: var(--card-bg); }
 
 /* El icono de "lo que viene" late si el evento cae en tres días o menos */
 .cal-viene-fila .cal-icono { flex: 0 0 auto; }
@@ -301,10 +303,12 @@
 .tipo-vacaciones  { --cal-color: #868e96; }
 .tipo-recogida    { --cal-color: #495057; }
 .tipo-cerrado     { --cal-color: #adb5bd; }
+.tipo-tarea       { --cal-color: #5c7cfa; }
 
 .cal-punto.tipo-boda, .cal-punto.tipo-comunion, .cal-punto.tipo-corporativo,
 .cal-punto.tipo-cumpleanos, .cal-punto.tipo-produccion, .cal-punto.tipo-vacaciones,
-.cal-punto.tipo-recogida, .cal-punto.tipo-cerrado { background: var(--cal-color); }
+.cal-punto.tipo-recogida, .cal-punto.tipo-cerrado,
+.cal-punto.tipo-tarea { background: var(--cal-color); }
 
 .cal-chip { background: color-mix(in srgb, var(--cal-color) 16%, transparent); color: var(--cal-color); }
 

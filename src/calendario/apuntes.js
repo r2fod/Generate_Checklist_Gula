@@ -32,6 +32,12 @@ export const TIPOS = {
   vacaciones: { nombre: "Vacaciones", esEvento: false, icono: "Palmtree" },
   recogida: { nombre: "Recogida / devolución", esEvento: false, icono: "Truck" },
   cerrado: { nombre: "Día cerrado", esEvento: false, icono: "Ban" },
+  // Lo que hay que hacer ese día y no es un servicio: una prueba de menú, una visita
+  // técnica a la finca, una reunión con el cliente. En la hoja de pared son la mitad de
+  // lo apuntado y aquí no tenían dónde ir, así que se quedaban fuera del calendario —
+  // que es tanto como no tenerlas. No es un evento: no genera checklist ni cuenta para
+  // el aviso de "dos eventos el mismo día".
+  tarea: { nombre: "Tarea / visita", esEvento: false, icono: "ClipboardList" },
 };
 
 export const esTipoEvento = (tipo) => !!(TIPOS[tipo] && TIPOS[tipo].esEvento);

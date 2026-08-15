@@ -20,7 +20,7 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista } from "../calendario/apuntes.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques } from "../calendario/apuntes.js";
 import { codificaApuntes, descodificaApuntes, enlaceParaTraer } from "../calendario/traer.js";
 
 let pasan = 0;
@@ -510,16 +510,16 @@ console.log("\n══ El equipo del calendario: quién queda un día ══");
 
   // Nombre compuesto: buscándolo palabra a palabra no se encontraba nunca, así que se
   // podía configurar a alguien en el equipo y no asignarle sus vacaciones jamás.
-  const compuesto = saneaEquipo(["Ana María", "Ana"]);
-  ok(personaDeTexto("VACAS ANA MARIA", compuesto) === "Ana María",
+  const compuesto = saneaEquipo(["Zutana Mengana", "Zutana"]);
+  ok(personaDeTexto("VACAS ZUTANA MENGANA", compuesto) === "Zutana Mengana",
     "un nombre de dos palabras se reconoce entero, no se pierde");
-  ok(personaDeTexto("Vacaciones Ana", compuesto) === "Ana",
-    "y la Ana a secas sigue siendo la otra persona, no la compuesta");
+  ok(personaDeTexto("Vacaciones Zutana", compuesto) === "Zutana",
+    "y la Zutana a secas sigue siendo la otra persona, no la compuesta");
   // Sin la Ana suelta en el equipo, para que lo único que pueda casar sea el compuesto
-  const soloCompuesto = saneaEquipo(["Ana María"]);
-  ok(personaDeTexto("Maria y Ana libran", soloCompuesto) === null,
+  const soloCompuesto = saneaEquipo(["Zutana Mengana"]);
+  ok(personaDeTexto("Mengana y Zutana libran", soloCompuesto) === null,
     "las dos palabras tienen que ir seguidas y en orden, no sueltas por el texto");
-  ok(personaDeTexto("Vacas Ana", soloCompuesto) === null,
+  ok(personaDeTexto("Vacas Zutana", soloCompuesto) === null,
     "y media parte del nombre no basta: media plantilla se llamaría igual");
 
   // Lo que de verdad se enseña en pantalla: cuánta gente queda un día con dos eventos.
@@ -535,6 +535,29 @@ console.log("\n══ El equipo del calendario: quién queda un día ══");
   // Sin equipo configurado no puede quedar nadie: el aviso se calla, no miente.
   ok(disponiblesEn(apuntes, "2026-09-12", []).length === 0,
     "sin equipo configurado no se inventa gente disponible");
+}
+
+console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");
+{
+  // La hoja de pared está llena de pruebas de menú y visitas técnicas. Antes no tenían
+  // tipo, así que no cabían en el calendario — que es tanto como no tenerlas.
+  const lista = saneaLista([
+    { fecha: "2026-09-03", titulo: "Prueba de menú", tipo: "tarea" },
+    { fecha: "2026-09-03", titulo: "Visita técnica", tipo: "tarea" },
+    { fecha: "2026-09-12", titulo: "Boda una", tipo: "boda" },
+    { fecha: "2026-09-12", titulo: "Boda otra", tipo: "boda" },
+  ]);
+  ok(lista.length === 4 && lista.filter(a => a.tipo === "tarea").length === 2,
+    "una tarea se guarda como tarea, no se convierte en boda por defecto");
+  // Lo importante: dos tareas el mismo día NO son un choque. Si contaran, el aviso de
+  // "dos eventos el mismo día" saltaría por dos llamadas de teléfono y dejaría de
+  // mirarse justo el día que hay dos bodas de verdad.
+  const dias = choques(lista).map(c => c.dia);
+  ok(dias.length === 1 && dias[0] === "2026-09-12",
+    `solo choca el día de las dos bodas, no el de las dos tareas → ${JSON.stringify(dias)}`);
+  // Y un tipo que no existe cae en boda, que es el comportamiento de siempre
+  ok(saneaLista([{ fecha: "2026-09-03", titulo: "X", tipo: "inventado" }])[0].tipo === "boda",
+    "un tipo desconocido sigue cayendo en boda, como antes");
 }
 
 console.log("\n══ Traer apuntes por enlace ══");

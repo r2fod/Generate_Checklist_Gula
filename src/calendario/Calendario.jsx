@@ -10,13 +10,13 @@
 // calendario y la pantalla dentro de la checklist) sin duplicar nada, y se puede probar
 // dándole una lista a mano.
 import React, { useMemo, useState } from "react";
-import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban } from "lucide-react";
+import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList } from "lucide-react";
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
 } from "./apuntes.js";
 
-const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban };
+const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
 // El icono del tipo. Va con su clase de color, así que hereda el mismo tono que el
 // punto y el chip: un solo color por tipo en todas partes.

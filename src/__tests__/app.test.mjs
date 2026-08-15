@@ -41,10 +41,10 @@ const ANCHOS = [320, 360, 390, 412, 480, 768, 1024, 1280, 1920];
 const TIPOS = ["boda", "comunion", "cumpleanos", "corporativo", "produccion"];
 
 const EVENTO_COMPLETO = {
-  evento: "boda", pax: 100, ninos: 20, nombreEvento: "Boda Anna y Mario",
+  evento: "boda", pax: 100, ninos: 20, nombreEvento: "Boda Fulanita y Mengano",
   fechaEvento: "2027-08-11", horaInicio: "12:30", ubicacion: "Mas de león",
   barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4,
-  logisticaEquipo: [{ nombre: "Raúl", inicio: "08:00", fin: "20:00" }, { nombre: "Ana", inicio: "08:00", fin: "20:00" }],
+  logisticaEquipo: [{ nombre: "Mengano", inicio: "08:00", fin: "20:00" }, { nombre: "Zutana", inicio: "08:00", fin: "20:00" }],
   tarifaLogistica: 12, plusFurgoneta: 30,
   recogidas: [{ concepto: "Apollo paella y jamonero", fecha: "2027-08-12" }],
   compras: [{ concepto: "Hielo", cantidad: "20 sacos" }],
@@ -469,7 +469,7 @@ async function main() {
   // Le pasaba solo a ese porque los de Equipamiento ya llevaban nowrap y este no.
   console.log("\n── Los botones de opciones ──");
   {
-    const CONFIG = { evento: "boda", pax: 45, nombreEvento: "Boda Fiorella", barraCoctel: true, horasCoctel: 1.5, barraCopas: true, horasCopas: 5, tieneFrituras: true, numFrituras: 2 };
+    const CONFIG = { evento: "boda", pax: 45, nombreEvento: "Boda Fulanita", barraCoctel: true, horasCoctel: 1.5, barraCopas: true, horasCopas: 5, tieneFrituras: true, numFrituras: 2 };
     for (const ancho of [320, 390, 768, 1440]) {
       const c = await navegador.newContext({ viewport: { width: ancho, height: 1000 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
       for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
@@ -680,7 +680,7 @@ async function main() {
       const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
       for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
       const p = await nuevaPagina(c);
-      await p.goto(url({ ...EVENTO_COMPLETO, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+      await p.goto(url({ ...EVENTO_COMPLETO, nombreEvento: "Boda Fulanita y Mengano" }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1800);
       const m = await p.evaluate(() => {
         const caja = (s) => { const e = document.querySelector(s); return e ? e.getBoundingClientRect() : null; };
@@ -747,7 +747,7 @@ async function main() {
       ["Link de solo ver", true, false, true],
       ["Link con edición", false, false, false],
     ]) {
-      await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+      await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1900);
       await p.evaluate(() => navigator.clipboard.writeText("(vacío)"));
       await p.locator("button", { hasText: "Compartir" }).first().click();
@@ -776,7 +776,7 @@ async function main() {
       const ultima = lineas[lineas.length - 1];
       ok(!/\s/.test(ultima) && /^https?:\/\//.test(ultima),
         "la dirección va sola en su línea, sin espacios: pegada en el navegador abre, no busca");
-      ok(lineas.length === 2 && /Boda Anna y Mario/.test(lineas[0]),
+      ok(lineas.length === 2 && /Boda Fulanita y Mengano/.test(lineas[0]),
         `y encima el nombre del evento, para encontrarlo en el WhatsApp → "${lineas[0]}"`);
       // Tres links del mismo evento el mismo día: hay que poder distinguirlos
       const queEs = { "Link de Modo carga": /carga del cami/, "Link de solo ver": /solo ver/, "Link con edición": /para editar/ };
@@ -808,7 +808,7 @@ async function main() {
       });
     });
     const p = await nuevaPagina(c);
-    await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+    await p.goto(url({ evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(1900);
     await p.locator("button", { hasText: "Compartir" }).first().click();
     await p.waitForTimeout(400);
@@ -817,7 +817,7 @@ async function main() {
 
     const datos = await p.evaluate(() => window.__compartido);
     ok(datos !== null, "en el móvil se abre el compartir del sistema, sin pasar por el portapapeles");
-    ok(/Boda Anna y Mario/.test(datos.title || "") && /carga del cami/.test(datos.title || ""),
+    ok(/Boda Fulanita y Mengano/.test(datos.title || "") && /carga del cami/.test(datos.title || ""),
       `con el nombre del evento y qué link es → "${datos.title}"`);
     // Y la dirección va en su campo, aparte del texto: así WhatsApp la trata como link
     ok(/^https?:\/\//.test(datos.url || "") && !/\s/.test(datos.url || "") && /carga=1/.test(datos.url || ""),
@@ -829,12 +829,12 @@ async function main() {
   console.log("\n── Eventos guardados ──");
   const ctx2 = await navegador.newContext({ viewport: { width: 1440, height: 1100 } });
   for (const h of HOSTS_NUBE) await ctx2.route(h, r => r.abort());
-  const guardados = { "Boda Anna y Mario": EVENTO_COMPLETO };
+  const guardados = { "Boda Fulanita y Mengano": EVENTO_COMPLETO };
   for (let i = 0; i < 3; i++) guardados[`Próximo ${i}`] = { evento: "boda", pax: 80, fechaEvento: `2027-0${i + 1}-01` };
   for (let i = 0; i < 3; i++) guardados[`Pasado ${i}`] = { evento: "boda", pax: 80, fechaEvento: `2024-0${i + 1}-01` };
   await ctx2.addInitScript(e => {
     localStorage.setItem("gula_eventos_guardados", e);
-    localStorage.setItem("gula_evento_activo", "Boda Anna y Mario");
+    localStorage.setItem("gula_evento_activo", "Boda Fulanita y Mengano");
   }, JSON.stringify(guardados));
   const page2 = await nuevaPagina(ctx2);
   await page2.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
@@ -848,7 +848,7 @@ async function main() {
   await page2.locator(".carga-row").nth(0).locator("input[type=checkbox], .carga-check, button").first().click();
   await page2.waitForTimeout(2500);
   ok(await cuenta() === 7, `marcar en Modo carga tampoco (${await cuenta()})`);
-  const ev = await page2.evaluate(() => JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")["Boda Anna y Mario"]);
+  const ev = await page2.evaluate(() => JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}")["Boda Fulanita y Mengano"]);
   ok(ev && ev.pax === 175 && Object.keys(ev.checkeados || {}).length > 0,
     `y los cambios se guardan en su evento (pax=${ev?.pax}, ${Object.keys(ev?.checkeados || {}).length} checks)`);
 
@@ -933,7 +933,7 @@ async function main() {
     await p.goto(url({
       evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: "2027-07-29",
       notasEvento: "Coger comida del congelador\nHielo",
-      logisticaEquipo: [{ nombre: "Irene", inicio: "10:00", fin: "17:10" }],
+      logisticaEquipo: [{ nombre: "Fulanita", inicio: "10:00", fin: "17:10" }],
       recogidas: [{ concepto: "Recoger generador", fecha: "2027-07-28", fechaDevolucion: "2027-07-30" }],
       compras: [{ concepto: "Aguas", cantidad: "5 cajas", fecha: "2027-07-28" }],
     }), { waitUntil: "domcontentloaded" });
@@ -1198,7 +1198,7 @@ async function main() {
   const CON_FECHAS = {
     evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: "2027-07-29",
     horaInicio: "07:00", ubicacion: "Solo Houses",
-    logisticaEquipo: [{ nombre: "Irene", inicio: "10:00", fin: "17:10" }, { nombre: "Raúl", inicio: "10:00", fin: "17:10" }],
+    logisticaEquipo: [{ nombre: "Fulanita", inicio: "10:00", fin: "17:10" }, { nombre: "Mengano", inicio: "10:00", fin: "17:10" }],
     tarifaLogistica: 10, plusFurgoneta: 25,
     recogidas: [{ concepto: "Recoger generador", fecha: "2027-07-28", hora: "12:00", fechaDevolucion: "2027-07-30" }],
     compras: [{ concepto: "Aguas Makro", cantidad: "5 cajas", fecha: "2027-07-28" }],
@@ -1361,7 +1361,7 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    await p.goto(url({ evento: "boda", pax: 120, ninos: 10, nombreEvento: "Boda Anna y Mario" }), { waitUntil: "domcontentloaded" });
+    await p.goto(url({ evento: "boda", pax: 120, ninos: 10, nombreEvento: "Boda Fulanita y Mengano" }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     const visible = async () => (await p.locator(".barra-fija").evaluate(e => getComputedStyle(e).opacity)) === "1";
     ok(!await visible(), "arriba del todo la barra fina no estorba");
@@ -1980,7 +1980,7 @@ async function main() {
     {
       evento: "boda", pax: 120, ninos: 15, fechaEvento: "2027-12-11",
       barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 5, llevaPaella: true,
-      logisticaEquipo: [{ nombre: "Raúl", inicio: "08:00", fin: "20:00", furgoneta: true }],
+      logisticaEquipo: [{ nombre: "Mengano", inicio: "08:00", fin: "20:00", furgoneta: true }],
       recogidas: [{ concepto: "Camión plataforma", fecha: "2027-12-09", fechaDevolucion: "2027-12-13" }],
       compras: [{ concepto: "Hielo", cantidad: "20 sacos", fecha: "2027-12-10" }],
     },
@@ -2213,7 +2213,7 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" };
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" };
 
     await p.goto(url(evento) + "&solo=1&carga=1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
@@ -2260,7 +2260,7 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Anna y Mario" };
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" };
 
     await p.goto(url(evento) + "&solo=1&vista=1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
@@ -2690,19 +2690,19 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const estado = {
-      evento: "produccion", pax: 25, nombreEvento: "Boda Anna y Mario", fechaEvento: dia(1),
+      evento: "produccion", pax: 25, nombreEvento: "Boda Fulanita y Mengano", fechaEvento: dia(1),
       // Un concepto largo de verdad, de los que parten el texto en tres líneas
       recogidas: [{ concepto: "Apollo paella y jamonero — recoger en casa de los padres de Rocío", fecha: dia(-2), fechaDevolucion: dia(-1) }],
       compras: [],
     };
     await c.addInitScript(e => {
       localStorage.setItem("gula_eventos_guardados", JSON.stringify({
-        "Boda Anna y Mario": e,
+        "Boda Fulanita y Mengano": e,
         // Un segundo evento con nombre largo, para el botón de "Pendientes en otros
         // eventos": llevaba nowrap y con un nombre así se salía de la pantalla.
         "Comunión Daniela Cuevas Peñarrubia": { ...e, nombreEvento: "Comunión Daniela Cuevas Peñarrubia" },
       }));
-      localStorage.setItem("gula_evento_activo", "Boda Anna y Mario");
+      localStorage.setItem("gula_evento_activo", "Boda Fulanita y Mengano");
     }, estado);
     const p = await nuevaPagina(c);
     await p.goto(url(estado), { waitUntil: "domcontentloaded" });

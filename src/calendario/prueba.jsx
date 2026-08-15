@@ -34,6 +34,9 @@ const DEMO = [
   // que de verdad importa —dos eventos y media plantilla fuera— y no solo el bonito.
   { fecha: dia(7), hasta: dia(10), titulo: "Vacas Mengano", tipo: "vacaciones" },
   { fecha: dia(9), titulo: "Libra Zutana", tipo: "vacaciones" },
+  // Una tarea: ni genera checklist ni cuenta para el aviso de dos eventos el mismo día,
+  // pero tiene fecha y se olvida igual que lo demás.
+  { fecha: dia(5), titulo: "Prueba de menú de prueba", tipo: "tarea" },
 ];
 
 // Nombres inventados, como los apuntes: esto se compila y se publica.

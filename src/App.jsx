@@ -945,7 +945,7 @@ export default function App({ onCerrarSesion } = {}) {
   // Compartir un link tiene dos caminos, y el orden importa:
   //
   // 1) El botón de compartir del móvil (navigator.share). Manda el NOMBRE y la
-  //    DIRECCIÓN por separado, así que en el WhatsApp llega "Boda Anna y Mario ·
+  //    DIRECCIÓN por separado, así que en el WhatsApp llega "Boda Fulanita y Mengano ·
   //    carga" con su link debajo, tocable, y sin pasar por el portapapeles. Es lo
   //    que hacía falta: un link suelto entre veinte mensajes no hay quien lo
   //    encuentre después.
