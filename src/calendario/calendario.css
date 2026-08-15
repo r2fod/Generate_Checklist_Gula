@@ -661,19 +661,6 @@
 
 .cal-traer .btn { align-self: flex-start; min-height: 44px; }
 
-/* Traer o descartar. En un móvil estrecho van uno debajo de otro antes que partirse. */
-.cal-traer-botones {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cal-traer-botones .btn { align-self: auto; flex: 1 1 auto; min-width: 0; }
-
-@media (min-width: 420px) {
-  .cal-traer-botones .btn { flex: 0 0 auto; }
-}
-
 .cal-cargando { padding: 24px; text-align: center; color: var(--text-muted); }
 
 .cal-traer-texto {
