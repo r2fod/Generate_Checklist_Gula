@@ -177,12 +177,24 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // banderas activan/ocultan lo que es propio de cada uno (ver items con opt() abajo).
   const esComunion = evtKey === "comunion";
   const esCorporativo = evtKey === "corporativo";
-  // Corporativo suele ser cóctel de pie; boda y comunión, servicio en mesa.
-  // Banquete sentado: 1 camarero cada 12, el extremo generoso del rango del sector
-  // (12-15). Cóctel de PIE: 1 cada 25, que es lo que dice el sector (25-30) — antes
-  // iba a 1 cada 18, o sea seis camareros donde se ponen tres o cuatro. Si el usuario
-  // fija su propio ratio en el formulario, manda el suyo.
-  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 25 : 12);
+  // Los ratios NO salen de los manuales del sector: salen de contar el personal que se
+  // puso DE VERDAD en 19 eventos (la hoja de costes por evento). Los del sector se
+  // quedaban cortos para cómo se trabaja aquí:
+  //
+  //   Banquete    iba a 1 cada 12 → la boda de 135 pax pedía 12 camareros y se
+  //               pusieron 15; la de 100 pedía 9 y se pusieron 14.
+  //               Medido: 9,0 · 7,1 · 9,0 · 6,7 · 8,7 pax por camarero → 1 cada 9.
+  //
+  //   Corporativo iba a 1 cada 25, pensado para cóctel de pie. Pero los de aquí no son
+  //               de pie: 150 pax llevaron 13 camareros y la app pedía 6.
+  //               Medido: 11,5 · 7,2 · 5,0 · 10,7 → 1 cada 10.
+  //
+  // Quedarse corto no es solo poner menos gente: de este número salen también los
+  // delantales, las bandejas, los litos y los menús de personal.
+  //
+  // La excepción son los almuerzos ligeros (1 cada 22 medido). Para eso está el ratio
+  // a mano del formulario, que sigue mandando sobre esto.
+  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 10 : 9);
 
   const bebidas    = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
@@ -650,11 +662,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const paxConsumo = diasPax.length ? diasPax.reduce((a, b) => a + b, 0) : totalPax;
   // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
-  // Producciones pequeñas (hasta 30 pax): 1 de sala/office y 1 de cocina. El ratio de
-  // banquete (1 cada 20 pax) y el mínimo de 2 daban 2 y 2 para un rodaje de 25 pax, que
-  // es más gente de la que hace falta. A partir de ahí escala como siempre.
+  // Producciones pequeñas (hasta 30 pax): 2 de sala/office y 1 de cocina. Estuvo en 1 y
+  // 1 porque 2 y 2 parecía demasiado para un rodaje de 25 pax, pero al contar lo que se
+  // puso de verdad salen 2 de sala en los dos casos medidos —un rodaje de 20 pax y una
+  // producción de 30—, y en la de 30 exactamente 2 de sala y 1 de cocina. Se ajusta a
+  // eso: los dos únicos datos que hay dicen lo mismo.
   const produPequena = pax <= 30;
-  const nSala = numCamareros > 0 ? numCamareros : (produPequena ? 1 : personalSala(pax, numCamareros, divisorCam));
+  const nSala = numCamareros > 0 ? numCamareros : (produPequena ? 2 : personalSala(pax, numCamareros, divisorCam));
   const nCocina = produPequena ? 1 : Math.max(2, Math.ceil(pax * 2 / 50));
   // En producciones no hay barra libre (ni cóctel ni copas): solo refrescos, agua
   // con gas y aguas (cajas de 33cl y botellas de 1,5L) — nada de alcohol ni cristalería

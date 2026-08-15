@@ -21,6 +21,7 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques } from "../calendario/apuntes.js";
+import { personalNecesario } from "../personal.js";
 
 let pasan = 0;
 const fallos = [];
@@ -534,6 +535,57 @@ console.log("\n══ El equipo del calendario: quién queda un día ══");
   // Sin equipo configurado no puede quedar nadie: el aviso se calla, no miente.
   ok(disponiblesEn(apuntes, "2026-09-12", []).length === 0,
     "sin equipo configurado no se inventa gente disponible");
+}
+
+console.log("\n══ Cuánta gente hace falta: contra lo que se puso de verdad ══");
+{
+  // Los 19 eventos de la hoja de costes, con el personal que se puso realmente.
+  // No son nombres: son cuentas. [tipo, pax, sala, cocina, logistica]
+  const REALES = [
+    ["boda", 135, 15, 4, 2], ["boda", 100, 14, 5, 2], ["boda", 45, 5, 3, 2],
+    ["boda", 40, 6, 2, 2], ["comunion", 26, 3, 2, 2],
+    ["corporativo", 150, 13, 5, 2], ["corporativo", 65, 9, 5, 2],
+    ["corporativo", 32, 3, 3, 0], ["corporativo", 20, 4, 2, 1],
+  ];
+
+  // Lo que importa no es clavar cada evento —eso depende del formato de cada uno— sino
+  // no quedarse corto SIEMPRE, que es lo que pasaba: con 1 cada 12 en boda y 1 cada 25
+  // en corporativo, el cálculo iba por debajo en todos y cada uno de los casos medidos.
+  let bajo = 0, desvios = [];
+  for (const [tipo, pax, sala] of REALES) {
+    const n = personalNecesario(tipo, pax).sala;
+    desvios.push(n - sala);
+    if (n < sala) bajo++;
+  }
+  const medio = desvios.reduce((a, b) => a + Math.abs(b), 0) / desvios.length;
+  ok(medio <= 1.5, `el cálculo de sala se acerca a lo que se puso de verdad (desvío medio ${medio.toFixed(1)} personas)`);
+  ok(bajo <= REALES.length / 2,
+    `y ya no se queda corto de forma sistemática (${bajo} de ${REALES.length}, antes eran los ${REALES.length})`);
+
+  // Los dos casos que destaparon el problema, fijados con su cifra exacta
+  ok(personalNecesario("boda", 135).sala === 15,
+    "la boda de 135 pax pide 15 camareros, que son los que se pusieron (antes pedía 12)");
+  ok(personalNecesario("corporativo", 150).sala === 15,
+    "y el corporativo de 150 pide 15, no los 6 de antes");
+
+  // Cocina y logística, que antes no se calculaban en ningún sitio
+  ok(personalNecesario("boda", 40).cocina === 2 && personalNecesario("boda", 150).cocina === 5,
+    "la cocina va por tramos: 2 hasta 40 pax y 5 de 120 en adelante");
+  ok(personalNecesario("boda", 60).logistica === 2 && personalNecesario("boda", 150).logistica === 2,
+    "y logística son 2 tanto en 60 como en 150: no depende de los comensales, depende del camión");
+  ok(personalNecesario("boda", 0).total === 0,
+    "sin comensales no hace falta nadie");
+
+  // Un banquete nunca sale con una sola persona de sala
+  ok(personalNecesario("boda", 5).sala === 2, "y por pequeño que sea, nunca menos de dos de sala");
+
+  // El ratio a mano del formulario manda: los almuerzos ligeros van a 1 cada 22 medido
+  ok(personalNecesario("corporativo", 66, 22).sala === 3,
+    "si se fija el ratio a mano, manda el suyo (66 pax a 1 cada 22 → 3)");
+
+  // Lo que NO está medido se dice, en vez de dar un número por bueno
+  ok(personalNecesario("cumpleanos", 100).sinMedir && !personalNecesario("boda", 100).sinMedir,
+    "cumpleaños y producción se marcan como no medidos: nadie ha comprobado su ratio");
 }
 
 console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");
