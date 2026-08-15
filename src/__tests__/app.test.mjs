@@ -3535,6 +3535,25 @@ async function main() {
       ok(await p.locator(".cal-celda.es-hueco.es-abierto").count() === 0,
         `${w}px · las casillas vacías del mes no salen marcadas como el día abierto`);
 
+      // En el móvil el nombre de la boda no cabe, así que la casilla tiene que decir
+      // igualmente para cuánta gente es. Sin esto, un día con tres bodas eran tres
+      // iconos y ninguna pista de si son 40 comensales o 330.
+      ok(await p.locator(".cal-pax-dia").count() > 0,
+        `${w}px · los días con eventos enseñan cuánta gente hay`);
+      // Y nada de lo que va dentro de la casilla se sale de ella: con los iconos
+      // envolviendo, la segunda fila salía cortada por la mitad y el número se perdía.
+      ok(await p.evaluate(() => {
+        let fuera = 0;
+        document.querySelectorAll(".cal-celda").forEach(cel => {
+          const c = cel.getBoundingClientRect();
+          cel.querySelectorAll(".cal-puntos .cal-icono, .cal-pax-dia, .cal-mas").forEach(e => {
+            const r = e.getBoundingClientRect();
+            if (r.width && (r.right > c.right + 0.5 || r.bottom > c.bottom + 0.5)) fuera++;
+          });
+        });
+        return fuera === 0;
+      }), `${w}px · ni los iconos ni el número se salen de su casilla`);
+
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda
       ok(/4 personas/.test(await p.locator(".cal-equipo-titulo").innerText()),
         `${w}px · la barra del equipo dice cuánta gente hay configurada`);

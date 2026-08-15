@@ -81,6 +81,7 @@
   /* aspect-ratio en vez de alto fijo: la casilla crece con el ancho de la pantalla y
      el mes se ve proporcionado en un móvil y en un monitor sin tocar nada. */
   aspect-ratio: 1 / 1;
+  position: relative;   /* para la barra de color de arriba */
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -122,16 +123,137 @@
   font-weight: 900;
 }
 
+/* ─── UN DÍA CON ALGO APUNTADO ────────────────────────────────────────────────
+   En un móvil el nombre de la boda no cabe, así que la casilla tiene que decir de un
+   vistazo tres cosas: que hay algo, de qué tipo es, y para cuánta gente. El fondo
+   apenas teñido y la barra de color dan las dos primeras; el número, la tercera. */
+.cal-celda.tiene-cosas {
+  background: color-mix(in srgb, var(--cal-color) 8%, var(--card-bg));
+}
+
+.cal-celda.tiene-cosas::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--cal-color);
+  /* Entra creciendo desde la izquierda al cambiar de mes: da la sensación de que el mes
+     "se rellena", en vez de aparecer de golpe. */
+  transform-origin: left center;
+  animation: cal-barra-entra 0.32s ease both;
+}
+
+/* Hoy manda sobre el tinte del tipo: es el ancla para leer el resto del mes */
+.cal-celda.es-hoy.tiene-cosas { background: var(--aviso-bg-fuerte); }
+
+/* Lo que NO es un evento —vacaciones, recogidas, días cerrados— es información de
+   apoyo: se marca, pero flojito. Con todo al mismo peso, un mes con dos semanas de
+   vacaciones tenía catorce barras grises y las bodas se perdían entre ellas. */
+.cal-celda.tipo-vacaciones::before,
+.cal-celda.tipo-recogida::before,
+.cal-celda.tipo-cerrado::before { opacity: 0.4; height: 2px; }
+
+.cal-celda.tipo-vacaciones,
+.cal-celda.tipo-recogida,
+.cal-celda.tipo-cerrado { background: var(--card-bg); }
+
+/* El icono de "lo que viene" late si el evento cae en tres días o menos */
+.cal-viene-fila .cal-icono { flex: 0 0 auto; }
+.cal-viene-fila.es-urgente .cal-icono { animation: cal-icono-late 2.4s ease-in-out infinite; }
+
+@keyframes cal-icono-late {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.18); }
+}
+
+/* Cuánta gente hay ese día, sumando todo lo que tenga pax. Es EL número de logística:
+   "el 19 hay tres bodas" no dice nada, "el 19 hay 330" lo dice todo. */
+/* Va FUERA del flujo, pegado a la esquina. En el flujo, un día con cuatro apuntes metía
+   dos filas de iconos y empujaba el número fuera de la casilla, que tiene overflow
+   oculto: se veía la mitad de arriba de un "65" y nada más. */
+.cal-pax-dia {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  padding: 0 2px;
+  border-radius: 3px;
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1.25;
+  color: var(--cal-color);
+  background: var(--card-bg);
+  letter-spacing: -0.02em;
+  pointer-events: none;
+}
+
+.cal-celda.es-hoy .cal-pax-dia { background: var(--aviso-bg-fuerte); }
+.cal-celda.es-choque .cal-pax-dia { background: var(--error-bg); }
+
+
+/* Cuántas cosas hay ese día. Solo sale en pantallas muy estrechas, donde los iconos no
+   caben (ver más abajo); a partir de 420px se ven los iconos y sobra. */
+.cal-mas {
+  display: none;
+  font-size: 0.6rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--cal-color);
+  align-self: center;
+  flex: 0 0 auto;
+}
+
+/* En 320px la casilla mide unos 35px: ahí caben DOS iconos, no cuatro. Antes el cuarto
+   se quedaba cortado por la mitad contra el borde y parecía un fallo. Se deja el icono
+   del tipo que manda ese día y al lado el total. */
+@media (max-width: 419px) {
+  .cal-puntos .cal-icono:nth-of-type(n+2) { display: none; }
+  .cal-mas { display: inline-block; }
+}
+
+@keyframes cal-barra-entra {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
 /* Dos eventos el mismo día. No es un error, pero es lo que hay que ver con tiempo. */
-.cal-celda.es-choque { box-shadow: inset 0 0 0 2px var(--error-borde); }
+.cal-celda.es-choque {
+  box-shadow: inset 0 0 0 2px var(--error-borde);
+  background: color-mix(in srgb, var(--error-bg) 70%, var(--card-bg));
+}
+
+/* Y late despacio, una vez cada tres segundos: lo justo para que el ojo lo encuentre al
+   entrar en el mes sin que moleste mientras se trabaja. */
+.cal-celda.es-choque::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--error-texto-fuerte);
+  opacity: 0;
+  animation: cal-choque-respira 3s ease-in-out infinite;
+}
+
+@keyframes cal-choque-respira {
+  0%, 70%, 100% { opacity: 0; }
+  85%           { opacity: 0.55; }
+}
 .cal-celda.es-abierto { box-shadow: inset 0 0 0 2px var(--primario, var(--text-main)); }
 
 /* ─── PUNTOS Y CHIPS ──────────────────────────────────────────────────────── */
+/* En UNA fila y sin envolver: envolviendo salía una segunda fila cortada por la mitad
+   por el overflow de la casilla, y se veía rota. Con los iconos a 10px en móvil caben
+   los cuatro hasta en una pantalla de 320px. */
 .cal-puntos {
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 2px;
   padding-top: 2px;
+}
+
+@media (max-width: 559px) {
+  /* Manda sobre el width/height que lucide pone como atributo en el propio SVG */
+  .cal-puntos .cal-icono { width: 10px; height: 10px; }
 }
 
 .cal-punto {
@@ -275,14 +397,45 @@
   margin-bottom: 6px;
 }
 
+/* Cada evento con su carril de color a la izquierda: el mismo tono que en el mes, para
+   reconocer "esto es una boda" sin leer. Y entran escalonadas, que hace que la lista se
+   lea de arriba abajo en vez de aparecer como un bloque. */
 .cal-viene-fila {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 0;
+  padding: 8px 0 8px 10px;
   border-top: 1px solid var(--border-color);
   font-size: 0.85rem;
   flex-wrap: wrap;
+  position: relative;
+  animation: cal-viene-entra 0.3s ease both;
+  animation-delay: calc(var(--fila, 0) * 45ms);
+}
+
+.cal-viene-fila::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--cal-color, var(--border-color));
+}
+
+/* Lo que cae en tres días o menos late despacio. Es el único sitio del calendario donde
+   algo se mueve solo, y por eso se nota. */
+.cal-viene-fila.es-urgente::before { animation: cal-urgente-late 2.4s ease-in-out infinite; }
+
+@keyframes cal-viene-entra {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes cal-urgente-late {
+  0%, 100% { opacity: 1; transform: scaleY(1); }
+  50%      { opacity: 0.45; transform: scaleY(0.82); }
 }
 
 .cal-viene-nombre {
@@ -599,6 +752,14 @@
   .cal-celda, .cal-icono, .cal-mini { transition: none; }
   .cal-celda:not(:disabled):active, .cal-mini:hover { transform: none; }
   .cal-celda:not(:disabled):hover .cal-icono { transform: none; }
+  /* Lo nuevo también se apaga: una animación que no se puede quitar es un problema de
+     accesibilidad, y el latido del día con dos bodas es justo de las que marean. */
+  .cal-celda.tiene-cosas::before,
+  .cal-celda.es-choque::after,
+  .cal-viene-fila,
+  .cal-viene-fila.es-urgente::before,
+  .cal-viene-fila.es-urgente .cal-icono { animation: none; }
+  .cal-celda.es-choque::after { opacity: 0.5; }
 }
 
 /* Cuando de un día queda una persona o ninguna, el aviso deja de ser informativo */

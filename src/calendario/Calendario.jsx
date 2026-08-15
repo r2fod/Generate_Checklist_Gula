@@ -161,13 +161,23 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             // null === null marcaba TODOS los huecos como el día abierto y salían
             // recuadrados en oscuro nada más entrar en el calendario.
             const esAbierto = Boolean(dia) && dia === abierto;
+            // Cuánta gente hay ese día en total. En un móvil el nombre de la boda no cabe
+            // y solo se veían unos iconos: en un día con tres bodas eso son tres corazones
+            // y ninguna pista de si son 40 comensales o 330. El número es lo que de verdad
+            // dice si el día es un problema.
+            const paxDia = del.reduce((s, a) => s + (a.pax || 0), 0);
+            // El color de la casilla lo manda el primer EVENTO del día, no el primer
+            // apunte: si no, un día con una boda y unas vacaciones se pintaría del gris
+            // de las vacaciones y la boda desaparecería del mes.
+            const dominante = (del.find(a => esTipoEvento(a.tipo)) || del[0] || {}).tipo || "";
             return (
               <button
                 type="button"
                 key={j}
                 disabled={!dia}
-                aria-label={dia ? `${Number(dia.slice(8))}: ${del.length ? del.map(a => a.titulo).join(", ") : "sin nada"}` : undefined}
+                aria-label={dia ? `${Number(dia.slice(8))}: ${del.length ? del.map(a => a.titulo).join(", ") : "sin nada"}${paxDia ? `, ${paxDia} personas` : ""}` : undefined}
                 className={`cal-celda${!dia ? " es-hueco" : ""}${dia === hoy ? " es-hoy" : ""}`
+                  + `${dominante ? ` tipo-${dominante} tiene-cosas` : ""}`
                   + `${dia && enChoque.has(dia) ? " es-choque" : ""}${esAbierto ? " es-abierto" : ""}`}
                 onClick={() => onDia(dia)}
               >
@@ -175,8 +185,13 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                 {del.length > 0 && (
                   <span className="cal-puntos">
                     {del.slice(0, 4).map(a => <IconoTipo key={a.id} tipo={a.tipo} size={12} />)}
+                    {/* El total. En pantallas muy estrechas (320px son 35px de casilla)
+                        no caben cuatro iconos, así que el CSS deja solo el primero y
+                        enseña esto: "×4" dice más que cuatro glifos cortados. */}
+                    {del.length > 1 && <span className="cal-mas">×{del.length}</span>}
                   </span>
                 )}
+                {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
                 {del.map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
@@ -292,14 +307,23 @@ function LoQueViene({ proximos, apuntes, equipo, onAbrirEvento }) {
   return (
     <div className="cal-viene">
       <div className="cal-viene-titulo">Lo que viene</div>
-      {proximos.map(a => {
+      {proximos.map((a, i) => {
         const fuera = ausentesEn(apuntes, a.fecha);
         // Cuánta gente queda ese día. Sin equipo configurado no se puede decir, así que
         // no se enseña nada en vez de inventarse un número.
         const quedan = equipo.length ? disponiblesEn(apuntes, a.fecha, equipo) : null;
         return (
-          <div className={`cal-viene-fila${a.faltan <= 3 ? " es-urgente" : ""}`} key={a.id}>
-            <span className={`cal-punto tipo-${a.tipo}`} />
+          // El tipo va en la FILA, no solo en el punto: así --cal-color cae en cascada y
+          // el carril de la izquierda se pinta del color de la boda sin repetirlo.
+          // --fila es el turno en la entrada escalonada.
+          <div
+            className={`cal-viene-fila tipo-${a.tipo}${a.faltan <= 3 ? " es-urgente" : ""}`}
+            style={{ "--fila": i }}
+            key={a.id}
+          >
+            {/* El icono del tipo, no un punto de color: se reconoce "esto es una boda"
+                sin leer, y es el mismo icono que en el mes. */}
+            <IconoTipo tipo={a.tipo} size={15} />
             <span className="cal-viene-nombre">{a.titulo}</span>
             <span className="cal-viene-cuando">{cuandoTexto(a.faltan)}</span>
             {quedan
