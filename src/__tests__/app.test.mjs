@@ -3604,14 +3604,57 @@ async function main() {
       await c.close();
     }
 
-    // El aviso que justifica todo esto: dos eventos el mismo día Y media plantilla fuera
+    // La vista de equipo: cuánta gente hace falta, a qué hora entra y cuánta queda.
+    // Es la que convierte el calendario en control de logística.
+    {
+      const c = await navegador.newContext({ viewport: { width: 390, height: 1200 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`vista equipo: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+      await p.locator(".segment-btn", { hasText: "Equipo" }).click();
+      await p.waitForSelector(".cal-jornada");
+
+      ok(!await seMueveDeLado(p), "la vista de equipo no mueve la página de lado");
+
+      // Las flechas de mes no pintan nada aquí: son siempre los próximos 14 días
+      ok(await p.locator(".cal-nav-btn").count() === 0 && /Próximos 14 días/.test(await p.locator(".cal-titulo").innerText()),
+        "sin flechas de mes, y el título dice de qué periodo habla");
+
+      // El día con tres eventos: lo que hace falta es la SUMA de los tres
+      const jornada = p.locator(".cal-jornada").filter({ hasText: "3 eventos" }).first();
+      const suma = (await jornada.locator(".cal-jornada-suma").innerText()).replace(/\s+/g, " ");
+      ok(/3 eventos/.test(suma) && /245 pax/.test(suma) && /41 personas/.test(suma),
+        `el día con tres eventos suma pax y personas de los tres → "${suma}"`);
+
+      // Y lo que de verdad se viene a ver: que no llegáis
+      const gente = (await jornada.locator(".cal-jornada-gente").innerText()).replace(/\s+/g, " ");
+      ok(/te faltan 39 personas/.test(gente),
+        `dice cuánta gente falta por buscar fuera → "${gente}"`);
+
+      // Los turnos salen de la hora del banquete: sala 6h antes, logística 7h
+      const turnos = await p.locator(".cal-turnos").first().innerText();
+      ok(/07:00/.test(turnos) && /08:00/.test(turnos) && /14:00/.test(turnos),
+        `con el banquete a las 14:00, sala entra a las 08:00 y logística a las 07:00 → "${turnos.replace(/\s+/g, " ")}"`);
+
+      // Un evento sin hora no inventa un turno: ofrece ponerla
+      ok(await p.locator("button.cal-turnos.es-vacia").count() > 0,
+        "y sin hora no se inventa el turno: se ofrece ponerla");
+
+      // Un ratio que nadie ha comprobado se dice en pantalla, no se da por bueno
+      ok(await p.locator(".cal-sin-medir").count() > 0,
+        "el ratio sin comprobar de producción se avisa en la propia tarjeta");
+      await c.close();
+    }
+
+    // El aviso que justifica todo esto: tres eventos el mismo día Y media plantilla fuera
     const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
     const p = await c.newPage();
     p.on("pageerror", e => errores.push(`calendario choque: ${e}`));
     await p.goto(BANCO, { waitUntil: "networkidle" });
     await p.waitForSelector(".cal-choque");
     const choque = (await p.locator(".cal-choque").first().innerText()).replace(/\s+/g, " ").trim();
-    ok(/2 eventos el mismo d[ií]a/.test(choque) && /solo est[aá]is 2 de 4/.test(choque),
+    ok(/3 eventos el mismo d[ií]a/.test(choque) && /solo est[aá]is 2 de 4/.test(choque),
       `el aviso de choque dice cuántos eventos y cuánta gente queda → "${choque}"`);
     await c.close();
   }

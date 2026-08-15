@@ -14,7 +14,9 @@ import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, Cli
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
+  turnosDe, DIAS_ANTICIPACION,
 } from "./apuntes.js";
+import { personalNecesario } from "../personal.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
@@ -27,9 +29,13 @@ function IconoTipo({ tipo, size = 13, className = "" }) {
 
 const hoyISO = () => aISO(new Date());
 
+// Cuánto falta, en cristiano. A nivel de módulo porque lo usan los dos sitios que
+// enseñan cuentas atrás: "Lo que viene" y la vista de equipo.
+const cuandoTexto = (d) => d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
+
 // Un apunte nuevo hereda el día en el que se ha pulsado: casi siempre se apunta
 // mirando el calendario, no escribiendo la fecha.
-const enBlanco = (fecha) => ({ id: "", fecha, titulo: "", tipo: "boda", hasta: "", pax: "", sitio: "", notas: "" });
+const enBlanco = (fecha) => ({ id: "", fecha, titulo: "", tipo: "boda", hasta: "", hora: "", pax: "", sitio: "", notas: "" });
 
 export default function Calendario({
   apuntes = [],
@@ -71,7 +77,7 @@ export default function Calendario({
   const editarApunte = (a) => {
     // Quien solo puede añadir no toca lo que ya hay: podría borrar una boda entera
     if (!puedeEditar || soloAnadir) return;
-    setEditando({ ...a, hasta: a.hasta || "", pax: a.pax || "", sitio: a.sitio || "", notas: a.notas || "" });
+    setEditando({ ...a, hasta: a.hasta || "", hora: a.hora || "", pax: a.pax || "", sitio: a.sitio || "", notas: a.notas || "" });
     setDiaAbierto(null);
   };
 
@@ -79,19 +85,31 @@ export default function Calendario({
     <div className="cal-wrap">
       <div className="cal-barra">
         <div className="cal-nav">
-          <button className="btn btn-outline cal-nav-btn" onClick={() => mover(-1)} aria-label="Mes anterior">‹</button>
+          {/* Las flechas y el "Hoy" mueven el mes, y en la vista de equipo no hay mes
+              que mover: son siempre los próximos catorce días. Dejarlas ahí sin efecto
+              es peor que quitarlas. */}
+          {vista !== "equipo" && (
+            <button className="btn btn-outline cal-nav-btn" onClick={() => mover(-1)} aria-label="Mes anterior">‹</button>
+          )}
           <strong className="cal-titulo">
-            {vista === "mes" ? `${NOMBRE_MES[cursor.mes - 1]} ${cursor.anio}` : cursor.anio}
+            {vista === "mes" ? `${NOMBRE_MES[cursor.mes - 1]} ${cursor.anio}`
+              : vista === "anio" ? cursor.anio
+              : `Próximos ${DIAS_ANTICIPACION} días`}
           </strong>
-          <button className="btn btn-outline cal-nav-btn" onClick={() => mover(1)} aria-label="Mes siguiente">›</button>
-          <button className="btn btn-outline cal-hoy" onClick={() => {
-            const f = new Date();
-            setCursor({ anio: f.getFullYear(), mes: f.getMonth() + 1 });
-          }}>Hoy</button>
+          {vista !== "equipo" && (
+            <>
+              <button className="btn btn-outline cal-nav-btn" onClick={() => mover(1)} aria-label="Mes siguiente">›</button>
+              <button className="btn btn-outline cal-hoy" onClick={() => {
+                const f = new Date();
+                setCursor({ anio: f.getFullYear(), mes: f.getMonth() + 1 });
+              }}>Hoy</button>
+            </>
+          )}
         </div>
         <div className="cal-vistas segmented-control">
           <button className={`segment-btn ${vista === "mes" ? "active" : ""}`} onClick={() => setVista("mes")}>Mes</button>
           <button className={`segment-btn ${vista === "anio" ? "active" : ""}`} onClick={() => setVista("anio")}>Año</button>
+          <button className={`segment-btn ${vista === "equipo" ? "active" : ""}`} onClick={() => setVista("equipo")}>Equipo</button>
         </div>
         {puedeEditar && (
           <button className="btn btn-green cal-nuevo" onClick={() => setEditando(enBlanco(hoy))}>+ Apunte</button>
@@ -105,15 +123,19 @@ export default function Calendario({
         }} />
       )}
 
-      {vista === "mes" ? (
+      {vista === "mes" && (
         <Mes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
              onDia={abrirDia} abierto={diaAbierto} />
-      ) : (
+      )}
+      {vista === "anio" && (
         <Anio anio={cursor.anio} mapa={mapa} hoy={hoy}
               onMes={(m) => { setCursor({ anio: cursor.anio, mes: m }); setVista("mes"); }} />
       )}
+      {vista === "equipo" && (
+        <VistaEquipo apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} onEditar={editarApunte} />
+      )}
 
-      <LoQueViene proximos={proximos} apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} />
+      {vista !== "equipo" && <LoQueViene proximos={proximos} apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} />}
 
       {diaAbierto && (
         <PanelDia
@@ -303,7 +325,6 @@ function LoQueViene({ proximos, apuntes, equipo, onAbrirEvento }) {
   if (proximos.length === 0) {
     return <div className="cal-viene cal-viene-vacio">No hay eventos en los próximos 14 días.</div>;
   }
-  const cuandoTexto = (d) => d === 0 ? "hoy" : d === 1 ? "mañana" : `en ${d} días`;
   return (
     <div className="cal-viene">
       <div className="cal-viene-titulo">Lo que viene</div>
@@ -409,16 +430,33 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
         </div>
 
         {esTipoEvento(f.tipo) && (
-          <div className="cal-campos-fila">
-            <label className="cal-campo">
-              <span>Pax <em>(si se sabe)</em></span>
-              <input type="number" min="0" value={f.pax} onChange={pon("pax")} placeholder="—" />
-            </label>
-            <label className="cal-campo">
-              <span>Sitio <em>(si se sabe)</em></span>
-              <input value={f.sitio} onChange={pon("sitio")} placeholder="—" />
-            </label>
-          </div>
+          <>
+            <div className="cal-campos-fila">
+              <label className="cal-campo">
+                <span>Pax <em>(si se sabe)</em></span>
+                <input type="number" min="0" value={f.pax} onChange={pon("pax")} placeholder="—" />
+              </label>
+              <label className="cal-campo">
+                <span>Sitio <em>(si se sabe)</em></span>
+                <input value={f.sitio} onChange={pon("sitio")} placeholder="—" />
+              </label>
+            </div>
+            <div className="cal-campos-fila">
+              {/* De esta hora salen los turnos: en los eventos medidos, sala entra 6h
+                  antes de sentar a la gente. Con este dato la app propone el horario. */}
+              <label className="cal-campo">
+                <span>Hora del banquete <em>(para los turnos)</em></span>
+                <input type="time" value={f.hora} onChange={pon("hora")} />
+              </label>
+              {turnosDe({ hora: f.hora })
+                ? <span className="cal-turnos-pista">
+                    Sala entra a las <strong>{turnosDe({ hora: f.hora }).sala}</strong>
+                    {turnosDe({ hora: f.hora }).salaVispera ? " (víspera)" : ""}
+                    {" · logística a las "}<strong>{turnosDe({ hora: f.hora }).logistica}</strong>
+                  </span>
+                : <span className="cal-turnos-pista es-vacia">Sin hora no se pueden proponer turnos.</span>}
+            </div>
+          </>
         )}
 
         <div className="cal-editor-acciones">
@@ -432,6 +470,131 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── VISTA DE EQUIPO: LOS PRÓXIMOS 14 DÍAS ────────────────────────────────────
+// La vista de logística. El mes dice QUÉ hay; esta dice CUÁNTA GENTE hace falta, A QUÉ
+// HORA entra y CUÁNTA queda disponible. Es la que convierte el calendario en control.
+//
+// Se agrupa por DÍA y no por evento a propósito: la gente no se reparte por evento, se
+// reparte por jornada. El 19 de septiembre no son "tres bodas de 180, 100 y 50": son
+// 400 comensales y 44 personas que hay que tener ese sábado.
+function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar }) {
+  const hoy = hoyISO();
+  const porDia = useMemo(() => {
+    const dias = new Map();
+    for (const a of apuntes) {
+      if (!esTipoEvento(a.tipo)) continue;
+      const faltan = diasHasta(a.fecha);
+      if (faltan === null || faltan < 0 || faltan > DIAS_ANTICIPACION) continue;
+      if (!dias.has(a.fecha)) dias.set(a.fecha, []);
+      dias.get(a.fecha).push(a);
+    }
+    return [...dias.entries()].sort((x, y) => x[0].localeCompare(y[0]));
+  }, [apuntes]);
+
+  if (porDia.length === 0) {
+    return (
+      <div className="cal-viene cal-viene-vacio">
+        No hay eventos en los próximos {DIAS_ANTICIPACION} días.
+      </div>
+    );
+  }
+
+  return (
+    <div className="cal-equipo-vista">
+      {porDia.map(([dia, delDia]) => {
+        const f = aFecha(dia);
+        const faltan = diasHasta(dia);
+        // Lo que hace falta ese día es la SUMA de sus eventos. Sumar sala/cocina/
+        // logística de cada uno, y no calcular sobre el pax total, es lo correcto:
+        // dos bodas de 100 en sitios distintos necesitan dos equipos, no uno de 200.
+        const suma = delDia.reduce((acc, a) => {
+          const n = personalNecesario(a.tipo, a.pax || 0);
+          return {
+            sala: acc.sala + n.sala, cocina: acc.cocina + n.cocina,
+            logistica: acc.logistica + n.logistica, pax: acc.pax + (a.pax || 0),
+            sinMedir: acc.sinMedir || n.sinMedir,
+          };
+        }, { sala: 0, cocina: 0, logistica: 0, pax: 0, sinMedir: false });
+        const total = suma.sala + suma.cocina + suma.logistica;
+        const quedan = equipo.length ? disponiblesEn(apuntes, dia, equipo) : null;
+        const faltaGente = quedan !== null && total > quedan.length;
+        return (
+          <div className={`cal-jornada${faltan <= 3 ? " es-urgente" : ""}`} key={dia}>
+            <div className="cal-jornada-cab">
+              <strong className="cal-jornada-dia">
+                {f.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}
+              </strong>
+              <span className="cal-jornada-cuando">{cuandoTexto(faltan)}</span>
+            </div>
+
+            {delDia.map(a => {
+              const n = personalNecesario(a.tipo, a.pax || 0);
+              const t = turnosDe(a);
+              return (
+                <div className={`cal-evento tipo-${a.tipo}`} key={a.id}>
+                  <div className="cal-evento-cab">
+                    <IconoTipo tipo={a.tipo} size={15} />
+                    <button type="button" className="cal-evento-nombre" onClick={() => onEditar && onEditar(a)}>
+                      {a.titulo}
+                    </button>
+                    {a.pax ? <span className="cal-evento-pax">{a.pax} pax</span> : <span className="cal-evento-sinpax">sin pax</span>}
+                  </div>
+                  {a.sitio && <div className="cal-evento-sitio">{a.sitio}</div>}
+
+                  {a.pax > 0 && (
+                    <div className="cal-necesita">
+                      <span><b>{n.sala}</b> sala</span>
+                      <span><b>{n.cocina}</b> cocina</span>
+                      <span><b>{n.logistica}</b> logística</span>
+                      <span className="cal-necesita-total">= {n.total}</span>
+                      {n.sinMedir && (
+                        <span className="cal-sin-medir" title="Este tipo de evento no tiene ratio comprobado: no había ninguno en la hoja de costes">
+                          ratio sin comprobar
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {t
+                    ? <div className="cal-turnos">
+                        Logística <b>{t.logistica}</b>{t.logisticaVispera ? " (víspera)" : ""}
+                        {" · sala "}<b>{t.sala}</b>{t.salaVispera ? " (víspera)" : ""}
+                        {" · banquete "}<b>{t.banquete}</b>
+                      </div>
+                    : <button type="button" className="cal-turnos es-vacia" onClick={() => onEditar && onEditar(a)}>
+                        Sin hora: ponla y te digo a qué hora entra cada uno
+                      </button>}
+
+                  {a.evento
+                    ? <button className="btn btn-outline cal-evento-ir" onClick={() => onAbrirEvento && onAbrirEvento(a.evento)}>Abrir checklist</button>
+                    : <span className="cal-evento-sin">sin checklist</span>}
+                </div>
+              );
+            })}
+
+            {/* El total del día. Solo cuando hay más de un evento: con uno solo repetiría
+                lo de arriba, y una cifra repetida deja de leerse. */}
+            {delDia.length > 1 && suma.pax > 0 && (
+              <div className="cal-jornada-suma">
+                {delDia.length} eventos · <b>{suma.pax} pax</b> · hacen falta <b>{total} personas</b>
+                {" "}({suma.sala} sala, {suma.cocina} cocina, {suma.logistica} logística)
+              </div>
+            )}
+
+            {quedan !== null && (
+              <div className={`cal-jornada-gente${faltaGente ? " es-critico" : ""}`}>
+                {faltaGente
+                  ? <>Del equipo estáis <b>{quedan.length}</b> ese día: te faltan <b>{total - quedan.length}</b> personas por buscar fuera.</>
+                  : <>Del equipo estáis <b>{quedan.length}</b> ese día.</>}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

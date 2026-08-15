@@ -85,6 +85,13 @@ export function saneaApunte(bruto) {
   // Hasta es para lo que dura varios días (unas vacaciones, un rodaje de tres jornadas).
   // Si viene antes que la fecha de inicio se tira: un rango al revés no existe.
   if (typeof bruto.hasta === "string" && aFecha(bruto.hasta) && bruto.hasta >= fecha) limpio.hasta = bruto.hasta;
+  // La hora del banquete (o del inicio, en lo que no es banquete). De ella salen los
+  // turnos: en los eventos medidos, sala entra 6 horas antes de sentar a la gente, con
+  // una constancia asombrosa (6,0 · 6,0 · 6,0 · 6,5). Sin este dato no hay horarios que
+  // proponer, y organizar logística se queda en "cuánta gente" sin el "a qué hora".
+  if (typeof bruto.hora === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(bruto.hora.trim())) {
+    limpio.hora = bruto.hora.trim();
+  }
   if (Number.isFinite(bruto.pax) && bruto.pax > 0) limpio.pax = Math.round(bruto.pax);
   if (typeof bruto.sitio === "string" && bruto.sitio.trim()) limpio.sitio = bruto.sitio.trim();
   if (typeof bruto.notas === "string" && bruto.notas.trim()) limpio.notas = bruto.notas.trim();
@@ -279,4 +286,41 @@ export function saneaEquipo(lista) {
     limpio.push({ nombre, apodos: [...new Set([suyo, ...apodos])] });
   }
   return limpio;
+}
+
+// ─── LOS TURNOS ───────────────────────────────────────────────────────────────
+// A qué hora entra cada uno, a partir de la hora del banquete. Los números salen de
+// contar los horarios reales de la hoja de costes por evento:
+//
+//   Sala      6,0 · 6,0 · 6,0 · 6,5 horas antes del banquete. La constancia es tal que
+//             se puede proponer el turno con solo saber la hora de sentar a la gente.
+//   Logística más repartido, de entrar a la vez que sala hasta 2,5h antes. Se toma una
+//             hora por delante de sala, que es lo que sale de descontar los casos raros
+//             (uno marca las 2:00, que o es carga de la noche anterior o es un error).
+//
+// Se devuelve null cuando no hay hora: es mejor no enseñar turno que enseñar uno
+// inventado, porque de esto cuelga a qué hora se levanta la gente.
+export const HORAS_ANTES_SALA = 6;
+export const HORAS_ANTES_LOGISTICA = 7;
+
+export function turnosDe(apunte, antesSala = HORAS_ANTES_SALA, antesLogistica = HORAS_ANTES_LOGISTICA) {
+  if (!apunte || typeof apunte.hora !== "string") return null;
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(apunte.hora);
+  if (!m) return null;
+  const minutos = Number(m[1]) * 60 + Number(m[2]);
+  // Con módulo, no restando a secas: un banquete a las 2:00 con sala 6h antes es a las
+  // 20:00 del día anterior, no una hora negativa.
+  const enReloj = (min) => {
+    const t = ((min % 1440) + 1440) % 1440;
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  };
+  return {
+    banquete: apunte.hora,
+    sala: enReloj(minutos - antesSala * 60),
+    logistica: enReloj(minutos - antesLogistica * 60),
+    // Si el turno cae en el día anterior hay que decirlo: "entrar a las 20:00" con el
+    // evento a las 2:00 es la víspera, y quien lo lea tiene que saberlo.
+    salaVispera: minutos - antesSala * 60 < 0,
+    logisticaVispera: minutos - antesLogistica * 60 < 0,
+  };
 }

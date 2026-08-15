@@ -46,7 +46,9 @@
   /* El nombre del mes no parte nunca: "Sep- tiembre" en dos líneas movería toda la
      barra al cambiar de mes. */
   white-space: nowrap;
-  text-transform: capitalize;
+  /* Sin capitalize: los meses ya vienen con su mayúscula desde NOMBRE_MES, así que
+     aquí solo sobraba... y en la vista de equipo estropeaba el título, que salía como
+     "Próximos 14 Días" con la D en mayúscula. */
 }
 
 .cal-hoy, .cal-nuevo { min-height: 44px; }
@@ -972,4 +974,158 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 14px clamp(12px, 3vw, 24px) max(24px, env(safe-area-inset-bottom));
+}
+
+/* ─── VISTA DE EQUIPO: LOS PRÓXIMOS 14 DÍAS ───────────────────────────────────
+   La vista de logística: cuánta gente hace falta, a qué hora entra y cuánta queda.
+   Agrupada por jornada y no por evento, porque la gente se reparte por día. */
+.cal-equipo-vista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cal-jornada {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: cal-viene-entra 0.3s ease both;
+}
+
+/* Lo que cae en tres días o menos lleva el borde de aviso: ahí ya no hay margen */
+.cal-jornada.es-urgente { border-color: var(--error-borde); }
+
+.cal-jornada-cab {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cal-jornada-dia { font-size: 0.95rem; }
+/* Solo la primera letra: con text-transform:capitalize salía "Lunes, 17 De Agosto",
+   porque pone en mayúscula todas las palabras, preposiciones incluidas. */
+.cal-jornada-dia::first-letter { text-transform: uppercase; }
+.cal-jornada-cuando { color: var(--text-muted); font-size: 0.8rem; margin-left: auto; }
+.cal-jornada.es-urgente .cal-jornada-cuando { color: var(--error-texto-fuerte); font-weight: 800; }
+
+.cal-evento {
+  border-left: 3px solid var(--cal-color);
+  padding: 6px 0 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cal-evento-cab { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* El nombre es un botón: tocarlo abre el apunte para editarlo, que es lo que se quiere
+   hacer nada más verlo ("le falta la hora", "el pax ha cambiado"). */
+.cal-evento-nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.cal-evento-nombre:hover { text-decoration-color: var(--cal-color); }
+
+.cal-evento-pax { font-weight: 800; color: var(--cal-color); font-size: 0.82rem; }
+.cal-evento-sinpax { font-size: 0.76rem; color: var(--text-muted); font-style: italic; }
+.cal-evento-sitio { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Las tres cifras que se vienen a ver */
+.cal-necesita {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.cal-necesita b { color: var(--text-main); font-size: 0.92rem; }
+.cal-necesita-total { font-weight: 800; color: var(--cal-color); }
+
+/* Un ratio que nadie ha comprobado se dice, en vez de darlo por bueno */
+.cal-sin-medir {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--aviso-texto);
+  background: var(--aviso-bg-fuerte);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.cal-turnos { font-size: 0.78rem; color: var(--text-muted); }
+.cal-turnos b { color: var(--text-main); }
+
+/* Sin hora no hay turnos: se ofrece ponerla ahí mismo en vez de dejar un hueco */
+button.cal-turnos.es-vacia {
+  align-self: flex-start;
+  padding: 4px 0;
+  min-height: 32px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--aviso-texto-suave, var(--text-muted));
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.cal-evento-ir { align-self: flex-start; min-height: 36px; }
+.cal-evento-sin { font-size: 0.76rem; color: var(--text-muted); }
+
+/* El total del día: la línea que hace falta cuando hay dos o tres eventos a la vez */
+.cal-jornada-suma {
+  border-top: 1px solid var(--border-color);
+  padding-top: 7px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.cal-jornada-suma b { color: var(--text-main); }
+
+.cal-jornada-gente {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.cal-jornada-gente.es-critico {
+  color: var(--error-texto-fuerte);
+  background: var(--error-bg);
+  border: 1px solid var(--error-borde);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font-weight: 600;
+}
+
+.cal-jornada-gente b { color: inherit; font-weight: 900; }
+
+/* La pista de turnos del editor, debajo de la hora */
+.cal-turnos-pista {
+  align-self: end;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  padding-bottom: 10px;
+}
+
+.cal-turnos-pista.es-vacia { font-style: italic; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-jornada { animation: none; }
 }
