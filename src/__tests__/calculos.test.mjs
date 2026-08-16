@@ -21,7 +21,7 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques } from "../calendario/apuntes.js";
-import { personalNecesario } from "../personal.js";
+import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados } from "../personal.js";
 
 let pasan = 0;
 const fallos = [];
@@ -586,6 +586,44 @@ console.log("\n══ Cuánta gente hace falta: contra lo que se puso de verdad 
   // Lo que NO está medido se dice, en vez de dar un número por bueno
   ok(personalNecesario("cumpleanos", 100).sinMedir && !personalNecesario("boda", 100).sinMedir,
     "cumpleaños y producción se marcan como no medidos: nadie ha comprobado su ratio");
+}
+
+console.log("\n══ Quién va a cada evento: horas e importe ══");
+{
+  // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,
+  // no menos catorce: restando a secas el total salía negativo y el coste, disparatado.
+  ok(horasEntre("17:00", "03:00") === 10, "un turno que acaba de madrugada cuenta las horas bien (17:00→03:00 = 10h)");
+  ok(horasEntre("08:00", "14:30") === 6.5, "y uno normal también (08:00→14:30 = 6,5h)");
+  ok(horasEntre("08:00", "") === null && horasEntre("", "") === null,
+    "sin las dos horas no se inventa una duración");
+
+  // Un asignado sin nombre no es nadie: no se guarda
+  ok(saneaAsignados([{ nombre: "Fulanita", rol: "sala" }, { nombre: "  ", rol: "sala" }, null]).length === 1,
+    "un asignado sin nombre no se guarda");
+  ok(saneaAsignados([{ nombre: "Mengano", rol: "inventado" }])[0].rol === "sala",
+    "un rol que no existe cae en sala");
+
+  const gente = [
+    { nombre: "Fulanita", rol: "sala", inicio: "15:00", fin: "01:00", importe: 110 },
+    { nombre: "Mengano", rol: "logistica", inicio: "07:30", fin: "23:00", importe: 130 },
+    { nombre: "Zutana", rol: "cocina" },
+  ];
+  const r = resumenAsignados(gente);
+  ok(r.total === 3 && r.porRol.sala === 1 && r.porRol.cocina === 1 && r.porRol.logistica === 1,
+    "se cuenta cuánta gente hay de cada rol");
+  ok(r.horas === 25.5 && r.importe === 240,
+    `y se suman horas e importe solo de quien los tiene (${r.horas}h · ${r.importe}€)`);
+  // Un total a medias se dice, no se disfraza de total: si no, se cierra un evento
+  // creyendo que cuesta 240 cuando falta por meter a un tercio de la gente.
+  ok(r.sinHoras === 1 && r.sinImporte === 1,
+    "y se avisa de cuántos van sin horario y sin importe");
+
+  // Lo que falta por cubrir, contra lo que hace falta de verdad
+  const falta = loQueFalta(personalNecesario("boda", 135), gente);
+  ok(falta.sala === 14 && falta.cocina === 4 && falta.logistica === 1,
+    `de una boda de 135 pax, con tres asignados faltan ${falta.sala} de sala`);
+  ok(loQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
+    "y si sobra gente de un rol, no sale un número negativo");
 }
 
 console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");

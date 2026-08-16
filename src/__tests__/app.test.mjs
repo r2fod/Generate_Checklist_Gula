@@ -3644,6 +3644,46 @@ async function main() {
       // Un ratio que nadie ha comprobado se dice en pantalla, no se da por bueno
       ok(await p.locator(".cal-sin-medir").count() > 0,
         "el ratio sin comprobar de producción se avisa en la propia tarjeta");
+
+      // ── Asignar gente: nombre, horario e importe, como en la hoja de costes ──
+      await p.locator(".cal-asignados-cab").first().click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      await p.locator(".cal-asignados-anadir .btn").first().click();
+      // La fila recién añadida NO tiene nombre todavía, y el saneado tira a quien no lo
+      // tenga: si no viviera en el componente hasta tenerlo, desaparecería al instante y
+      // sería imposible dar de alta a nadie.
+      ok(await p.locator(".cal-asignado-nombre").count() === 1,
+        "la fila nueva se queda mientras se escribe, aunque aún no tenga nombre");
+
+      // El turno del rol viene puesto: en una boda casi todos entran a la misma hora
+      ok(await p.locator(".cal-asignado-hora").first().inputValue() === "08:00",
+        "y hereda la hora de entrada de su rol, para no teclearla quince veces");
+
+      await p.locator(".cal-asignado-nombre").first().fill("Fulanita");
+      await p.locator(".cal-asignado-hora").nth(1).fill("02:00");
+      await p.locator(".cal-asignado-importe").first().fill("110");
+      await p.waitForTimeout(300);
+
+      ok(/18 h/.test(await p.locator(".cal-asignado-horas").first().innerText()),
+        "las horas salen solas, contando bien el turno que acaba de madrugada (08:00→02:00 = 18h)");
+      const sumaGente = (await p.locator(".cal-asignados-suma").first().innerText()).replace(/\s+/g, " ");
+      ok(/18 h en total/.test(sumaGente) && /110 €/.test(sumaGente),
+        `y se suman horas e importe del evento → "${sumaGente}"`);
+      ok(/Asignados 1 de 20/.test((await p.locator(".cal-asignados-cab").first().innerText()).replace(/\s+/g, " ")),
+        "la cabecera dice cuántos hay de los que hacen falta, sin abrirla");
+
+      // Nada de la fila se sale de su sitio a ningún ancho
+      ok(await p.evaluate(() => {
+        let fuera = 0;
+        document.querySelectorAll(".cal-asignado").forEach(fila => {
+          const r = fila.getBoundingClientRect();
+          fila.querySelectorAll("input, select, button").forEach(e => {
+            const x = e.getBoundingClientRect();
+            if (x.width && (x.right > r.right + 0.5 || x.left < r.left - 0.5)) fuera++;
+          });
+        });
+        return fuera === 0;
+      }), "y ningún campo de la fila se sale de ella");
       await c.close();
     }
 

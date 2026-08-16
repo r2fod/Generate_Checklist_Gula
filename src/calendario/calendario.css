@@ -1129,3 +1129,162 @@ button.cal-turnos.es-vacia {
 @media (prefers-reduced-motion: reduce) {
   .cal-jornada { animation: none; }
 }
+
+/* ─── QUIÉN VA A ESTE EVENTO ──────────────────────────────────────────────────
+   Plegado por defecto: la vista se viene a leer, no a rellenar. Se abre cuando toca
+   repartir gente, que es un rato concreto y no cada vez que se mira el día. */
+.cal-asignados {
+  border-top: 1px dashed var(--border-color);
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.cal-asignados-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-asignados-cab > span:first-child { flex: 1 1 auto; min-width: 0; }
+.cal-asignados-cab b { color: var(--text-main); }
+
+.cal-asignados-falta {
+  flex: 0 0 auto;
+  font-weight: 800;
+  font-size: 0.74rem;
+  color: var(--error-texto-fuerte);
+  background: var(--error-bg);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.cal-asignados-flecha { flex: 0 0 auto; transition: transform 0.18s ease; }
+.cal-asignados-flecha.es-abierta { transform: rotate(180deg); }
+
+.cal-asignados-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+/* Una persona por fila, en rejilla y no envolviendo a su aire: dejándolo al wrap, la
+   ✕ se quedaba sola en una línea y los campos de hora salían cortados. En móvil van el
+   nombre y el rol arriba, y el horario entero debajo; de 560px para arriba, todo en una.
+   El nombre va en minmax(0,1fr) para que ceda en vez de estirar la rejilla. */
+.cal-asignado {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px 32px;
+  grid-template-areas:
+    "nombre  rol      quitar"
+    "horario horario  horario";
+  gap: 4px;
+  align-items: center;
+}
+
+.cal-asignado-nombre  { grid-area: nombre; }
+.cal-asignado-rol     { grid-area: rol; }
+.cal-asignado-quitar  { grid-area: quitar; }
+
+.cal-asignado-horario {
+  grid-area: horario;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+@media (min-width: 560px) {
+  .cal-asignado {
+    grid-template-columns: minmax(0, 1fr) 104px auto 32px;
+    grid-template-areas: "nombre rol horario quitar";
+  }
+}
+
+.cal-asignado input,
+.cal-asignado select {
+  min-height: 38px;
+  padding: 4px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  /* 16px para que iOS no haga zoom al enfocar */
+  font-size: 16px;
+  min-width: 0;
+}
+
+/* Los de hora, anchos de sobra: según el idioma del móvil el navegador los pinta en
+   12 horas con su "AM/PM" y su iconito, y en 96px se veía "00 AM" cortado. */
+.cal-asignado-hora { flex: 1 1 112px; min-width: 0; }
+.cal-asignado-importe { flex: 0 1 78px; min-width: 0; }
+
+.cal-asignado-horas {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 42px;
+}
+
+.cal-asignado-quitar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cal-asignado-quitar:hover { background: var(--error-bg); color: var(--error-texto-fuerte); }
+
+/* Los botones llevan entre paréntesis cuántos faltan de ese rol: se añade al que hace
+   falta sin tener que ir contando arriba. */
+.cal-asignados-anadir {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cal-asignados-anadir .btn { min-height: 38px; font-size: 0.8rem; }
+
+.cal-asignados-suma {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  border-top: 1px solid var(--border-color);
+  padding-top: 6px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.cal-asignados-suma b { color: var(--text-main); }
+
+.cal-asignados-parcial {
+  color: var(--aviso-texto);
+  background: var(--aviso-bg-fuerte);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-asignados-flecha { transition: none; }
+}

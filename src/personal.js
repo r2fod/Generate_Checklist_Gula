@@ -58,3 +58,81 @@ export function personalNecesario(tipo, pax, paxPorCamarero = 0) {
   const logistica = logisticaNecesaria(pax);
   return { sala, cocina, logistica, total: sala + cocina + logistica, sinMedir: SIN_MEDIR.includes(tipo) };
 }
+
+// ─── QUIÉN VA A CADA EVENTO ───────────────────────────────────────────────────
+// Lo mismo que el bloque "HORARIO PERSONAL EN EVENTO" de la hoja de costes: nombre,
+// rol, hora de entrada, hora de salida e importe. Con eso salen solas las horas
+// trabajadas y lo que cuesta el evento en personal, que es lo que hoy se cuadra a mano.
+//
+// El nombre es texto libre a propósito, aunque en pantalla se elija de un desplegable:
+// en la hoja hay tanto gente del equipo como externos ("Camarero Paqui", el equipo de
+// Edu), y obligar a que todos estén dados de alta dejaría fuera justo a los que se
+// contratan para el día.
+export const ROLES = { sala: "Sala", cocina: "Cocina", logistica: "Logística" };
+
+const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const enMinutos = (h) => {
+  const m = HORA.exec(String(h || "").trim());
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
+
+// Horas entre dos horas del reloj. Si la salida es MENOR que la entrada, es que se
+// termina de madrugada: entrar a las 17:00 y salir a las 3:00 son diez horas, no menos
+// catorce. En una boda es el caso normal, no la excepción.
+export function horasEntre(inicio, fin) {
+  const a = enMinutos(inicio), b = enMinutos(fin);
+  if (a === null || b === null) return null;
+  const min = b >= a ? b - a : b + 1440 - a;
+  return Math.round((min / 60) * 100) / 100;
+}
+
+export function saneaAsignado(bruto) {
+  if (!bruto || typeof bruto !== "object") return null;
+  const nombre = typeof bruto.nombre === "string" ? bruto.nombre.trim() : "";
+  if (!nombre) return null;
+  const limpio = { nombre, rol: ROLES[bruto.rol] ? bruto.rol : "sala" };
+  if (HORA.test(String(bruto.inicio || "").trim())) limpio.inicio = String(bruto.inicio).trim();
+  if (HORA.test(String(bruto.fin || "").trim())) limpio.fin = String(bruto.fin).trim();
+  // El importe es lo que se le paga por ESE evento, como en la hoja: un número suelto,
+  // no una tarifa por hora. Cero no se guarda: es lo mismo que no haberlo puesto.
+  if (Number.isFinite(bruto.importe) && bruto.importe > 0) limpio.importe = Math.round(bruto.importe * 100) / 100;
+  return limpio;
+}
+
+export function saneaAsignados(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista.map(saneaAsignado).filter(Boolean);
+}
+
+// Lo que se enseña debajo de la lista: cuántos hay de cada rol, cuántas horas suman y
+// cuánto cuesta. Las horas solo cuentan a quien tenga las dos horas puestas; el importe
+// solo a quien lo tenga. Así una lista a medio rellenar da un total honesto en vez de
+// uno que parece completo.
+export function resumenAsignados(lista) {
+  const asignados = saneaAsignados(lista);
+  const porRol = { sala: 0, cocina: 0, logistica: 0 };
+  let horas = 0, importe = 0, sinHoras = 0, sinImporte = 0;
+  for (const a of asignados) {
+    porRol[a.rol] = (porRol[a.rol] || 0) + 1;
+    const h = horasEntre(a.inicio, a.fin);
+    if (h === null) sinHoras++; else horas += h;
+    if (a.importe) importe += a.importe; else sinImporte++;
+  }
+  return {
+    total: asignados.length, porRol,
+    horas: Math.round(horas * 100) / 100,
+    importe: Math.round(importe * 100) / 100,
+    sinHoras, sinImporte,
+  };
+}
+
+// Qué falta por cubrir de cada rol. Negativo no existe: si hay más gente de la que la
+// cuenta pedía, es que ese evento la necesitaba y el que sobra es el cálculo.
+export function loQueFalta(necesario, asignados) {
+  const r = resumenAsignados(asignados);
+  return {
+    sala: Math.max(0, necesario.sala - r.porRol.sala),
+    cocina: Math.max(0, necesario.cocina - r.porRol.cocina),
+    logistica: Math.max(0, necesario.logistica - r.porRol.logistica),
+  };
+}

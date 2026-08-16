@@ -10,13 +10,13 @@
 // calendario y la pantalla dentro de la checklist) sin duplicar nada, y se puede probar
 // dándole una lista a mano.
 import React, { useMemo, useState } from "react";
-import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList } from "lucide-react";
+import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList, ChevronDown, X } from "lucide-react";
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
   turnosDe, DIAS_ANTICIPACION,
 } from "./apuntes.js";
-import { personalNecesario } from "../personal.js";
+import { personalNecesario, resumenAsignados, loQueFalta, horasEntre, ROLES } from "../personal.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
@@ -132,7 +132,8 @@ export default function Calendario({
               onMes={(m) => { setCursor({ anio: cursor.anio, mes: m }); setVista("mes"); }} />
       )}
       {vista === "equipo" && (
-        <VistaEquipo apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} onEditar={editarApunte} />
+        <VistaEquipo apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} onEditar={editarApunte}
+                     onGuardar={puedeEditar ? onGuardar : null} />
       )}
 
       {vista !== "equipo" && <LoQueViene proximos={proximos} apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} />}
@@ -481,7 +482,7 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
 // Se agrupa por DÍA y no por evento a propósito: la gente no se reparte por evento, se
 // reparte por jornada. El 19 de septiembre no son "tres bodas de 180, 100 y 50": son
 // 400 comensales y 44 personas que hay que tener ese sábado.
-function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar }) {
+function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar, onGuardar }) {
   const hoy = hoyISO();
   const porDia = useMemo(() => {
     const dias = new Map();
@@ -569,6 +570,16 @@ function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar }) {
                         Sin hora: ponla y te digo a qué hora entra cada uno
                       </button>}
 
+                  {onGuardar && a.pax > 0 && (
+                    <Asignados
+                      apunte={a}
+                      equipo={equipo}
+                      necesario={n}
+                      turnos={t}
+                      onCambiar={(personal) => onGuardar({ ...a, personal })}
+                    />
+                  )}
+
                   {a.evento
                     ? <button className="btn btn-outline cal-evento-ir" onClick={() => onAbrirEvento && onAbrirEvento(a.evento)}>Abrir checklist</button>
                     : <span className="cal-evento-sin">sin checklist</span>}
@@ -595,6 +606,126 @@ function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ─── QUIÉN VA A ESTE EVENTO ───────────────────────────────────────────────────
+// El mismo bloque que la hoja de costes llama "HORARIO PERSONAL EN EVENTO": nombre,
+// rol, entrada, salida e importe. De ahí salen solas las horas y lo que cuesta.
+//
+// El nombre se elige del equipo, pero se puede escribir a mano: en la hoja hay tanto
+// gente de casa como externos que se contratan para el día, y obligar a darlos de alta
+// dejaría fuera justo a los que hacen falta cuando no llegas.
+function Asignados({ apunte, equipo, necesario, turnos, onCambiar }) {
+  const [abierto, setAbierto] = useState(false);
+  // La lista en curso vive AQUÍ, no en el apunte guardado. El saneado tira a quien no
+  // tenga nombre —y hace bien, un asignado sin nombre no es nadie—, así que la fila
+  // recién añadida desaparecía antes de poder escribir en ella: era imposible añadir a
+  // nadie. Se guarda hacia arriba en cada cambio; lo que aún está a medias se queda
+  // aquí hasta que tenga nombre.
+  const [borrador, setBorrador] = useState(() => apunte.personal || []);
+  const idRef = React.useRef(apunte.id);
+  if (idRef.current !== apunte.id) {   // otro evento: se recarga su gente
+    idRef.current = apunte.id;
+    setBorrador(apunte.personal || []);
+  }
+  const lista = borrador;
+  const aplicar = (siguiente) => { setBorrador(siguiente); onCambiar(siguiente); };
+  const r = resumenAsignados(lista);
+  const falta = loQueFalta(necesario, lista);
+  const faltanTotal = falta.sala + falta.cocina + falta.logistica;
+
+  const cambiar = (i, campo, valor) => aplicar(lista.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
+  // Quien se añade hereda el turno propuesto de su rol: en una boda casi todos entran a
+  // la misma hora, y rellenarlo quince veces a mano es lo que hace que no se rellene.
+  const anadir = (rol) => aplicar([...lista, {
+    nombre: "", rol,
+    inicio: turnos ? (rol === "logistica" ? turnos.logistica : turnos.sala) : "",
+    fin: "",
+  }]);
+
+  return (
+    <div className="cal-asignados">
+      <button type="button" className="cal-asignados-cab" aria-expanded={abierto} onClick={() => setAbierto(v => !v)}>
+        <span>
+          {r.total > 0
+            ? <>Asignados <b>{r.total}</b> de <b>{necesario.total}</b></>
+            : <>Sin nadie asignado <b>({necesario.total} por cubrir)</b></>}
+        </span>
+        {faltanTotal > 0 && <span className="cal-asignados-falta">faltan {faltanTotal}</span>}
+        <ChevronDown size={15} aria-hidden="true" className={`cal-asignados-flecha${abierto ? " es-abierta" : ""}`} />
+      </button>
+
+      {abierto && (
+        <div className="cal-asignados-cuerpo">
+          {lista.map((p, i) => {
+            const h = horasEntre(p.inicio, p.fin);
+            return (
+              <div className="cal-asignado" key={i}>
+                {/* Lista del equipo + "otro" para los externos, sin dejar de poder
+                    escribir: el desplegable ahorra teclear, no encierra. */}
+                <input
+                  className="cal-asignado-nombre"
+                  list="cal-lista-equipo"
+                  value={p.nombre}
+                  placeholder="Nombre"
+                  onChange={e => cambiar(i, "nombre", e.target.value)}
+                />
+                <select className="cal-asignado-rol" value={p.rol} onChange={e => cambiar(i, "rol", e.target.value)}>
+                  {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+                {/* Horario e importe agrupados: en un móvil caen a su propia línea
+                    enteros, en vez de repartirse a trozos entre dos filas. */}
+                <div className="cal-asignado-horario">
+                  <input type="time" className="cal-asignado-hora" aria-label="Hora de entrada"
+                         value={p.inicio || ""} onChange={e => cambiar(i, "inicio", e.target.value)} />
+                  <input type="time" className="cal-asignado-hora" aria-label="Hora de salida"
+                         value={p.fin || ""} onChange={e => cambiar(i, "fin", e.target.value)} />
+                  <input
+                    type="number" min="0" step="5" className="cal-asignado-importe" aria-label="Importe en euros"
+                    value={p.importe || ""} placeholder="€"
+                    onChange={e => cambiar(i, "importe", Number(e.target.value) || undefined)}
+                  />
+                  <span className="cal-asignado-horas">{h === null ? "—" : `${h} h`}</span>
+                </div>
+                <button type="button" className="cal-asignado-quitar" aria-label={`Quitar a ${p.nombre || "esta persona"}`}
+                        onClick={() => aplicar(lista.filter((_, j) => j !== i))}>
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
+
+          <datalist id="cal-lista-equipo">
+            {equipo.map(p => <option key={p.nombre} value={p.nombre} />)}
+          </datalist>
+
+          <div className="cal-asignados-anadir">
+            {Object.entries(ROLES).map(([k, v]) => (
+              <button type="button" key={k} className="btn btn-outline" onClick={() => anadir(k)}>
+                + {v}{falta[k] > 0 ? ` (${falta[k]})` : ""}
+              </button>
+            ))}
+          </div>
+
+          {r.total > 0 && (
+            <div className="cal-asignados-suma">
+              <span><b>{r.porRol.sala}</b> sala · <b>{r.porRol.cocina}</b> cocina · <b>{r.porRol.logistica}</b> logística</span>
+              <span><b>{r.horas}</b> h en total</span>
+              <span><b>{r.importe.toLocaleString("es-ES", { minimumFractionDigits: 0 })} €</b></span>
+              {/* Un total a medias se dice, no se disfraza de total */}
+              {(r.sinHoras > 0 || r.sinImporte > 0) && (
+                <span className="cal-asignados-parcial">
+                  {r.sinHoras > 0 && `${r.sinHoras} sin horario`}
+                  {r.sinHoras > 0 && r.sinImporte > 0 && " · "}
+                  {r.sinImporte > 0 && `${r.sinImporte} sin importe`}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -16,6 +16,8 @@
 // Aquí dentro no hay React ni navegador: entra un dato, sale un dato. Se prueba con
 // node en milisegundos.
 
+import { saneaAsignados } from "../personal.js";
+
 // Los cinco tipos de evento son los mismos que genera la app. Los otros tres no son
 // eventos: son las capas que hacen falta para poder anticipar de verdad, y salen de lo
 // que ya apuntáis a mano en la hoja (vacaciones del equipo, recogidas de camión y
@@ -98,6 +100,11 @@ export function saneaApunte(bruto) {
   // El nombre del evento de la app que salió de este apunte. Es lo que impide que se
   // vuelva a crear una y otra vez cada vez que se abre el calendario.
   if (typeof bruto.evento === "string" && bruto.evento.trim()) limpio.evento = bruto.evento.trim();
+  // Quién va a este evento, con su rol, su horario y lo que se le paga. Es el mismo
+  // bloque que la hoja de costes llama "HORARIO PERSONAL EN EVENTO". Solo se guarda si
+  // hay alguien: un array vacío en cada uno de los sesenta apuntes es peso muerto.
+  const personal = saneaAsignados(bruto.personal);
+  if (personal.length) limpio.personal = personal;
   return limpio;
 }
 
