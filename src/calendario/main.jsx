@@ -42,6 +42,19 @@ function AppCalendario() {
   );
 }
 
+// El service worker hace que la app abra sin cobertura y es lo que hace que Chrome
+// ofrezca instalarla: sin él, el calendario tenía manifiesto e iconos pero Android no
+// daba la opción de "instalar", solo el "añadir a pantalla de inicio" pelado de iOS.
+// Vive en la RAÍZ y cubre las tres apps con una sola caché; es él quien decide a qué
+// documento volver sin red según la dirección (ver public/sw.js).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register(new URL("../sw.js", window.location.href), { scope: "../" })
+      .catch(() => { /* sin service worker la app funciona igual, solo pierde el offline */ });
+  });
+}
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <RedDeSeguridad>

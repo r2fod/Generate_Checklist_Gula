@@ -16,13 +16,13 @@
 //     un fichero concreto NUNCA cambia: si está guardado, es válido para siempre.
 //   · todo lo demás (Firebase, Google...) → se deja pasar sin tocarlo.
 //
-// Este fichero vive en la RAÍZ y cubre las DOS apps: la checklist (/checklist/) y el
-// formulario (/formulario/). Para el navegador son dos apps distintas —cada una en su
-// carpeta, con su manifiesto y su ámbito, por eso se instalan por separado— pero
-// comparten dominio y assets, así que con una sola caché basta. Lo único que cambia
-// entre ellas es a qué documento se vuelve cuando no hay red, y eso se decide mirando
-// la dirección (ver suIndice).
-const VERSION = "gula-v3";
+// Este fichero vive en la RAÍZ y cubre las TRES apps: la checklist (/checklist/), el
+// formulario (/formulario/) y el calendario (/calendario/). Para el navegador son tres
+// apps distintas —cada una en su carpeta, con su manifiesto y su ámbito, por eso se
+// instalan por separado— pero comparten dominio y assets, así que con una sola caché
+// basta. Lo único que cambia entre ellas es a qué documento se vuelve cuando no hay red,
+// y eso se decide mirando la dirección (ver suIndice).
+const VERSION = "gula-v4";
 const CACHE = `${VERSION}`;
 
 // Lo que hay que guardar sí o sí para poder abrir sin cobertura. Los .js y .css llevan
@@ -36,6 +36,7 @@ const ESENCIALES = [
   // se abriría la app equivocada, que es justo lo que no queremos.
   "./checklist/", "./checklist/index.html", "./checklist/manifest.webmanifest",
   "./formulario/", "./formulario/index.html", "./formulario/manifest.webmanifest",
+  "./calendario/", "./calendario/index.html", "./calendario/manifest.webmanifest",
 ];
 
 // De qué app es esta dirección. Se usa para no cruzar las dos sin cobertura: el
@@ -45,6 +46,7 @@ const ESENCIALES = [
 function suIndice(url) {
   if (url.pathname.includes("/formulario/")) return "./formulario/index.html";
   if (url.pathname.includes("/checklist/")) return "./checklist/index.html";
+  if (url.pathname.includes("/calendario/")) return "./calendario/index.html";
   return "./index.html";
 }
 

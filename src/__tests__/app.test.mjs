@@ -3701,6 +3701,46 @@ async function main() {
       await c.close();
     }
 
+    // ── LAS TRES APPS SE INSTALAN Y ABREN SIN COBERTURA ──
+    // Cada una en su carpeta con su manifiesto: eso es lo que hace que el móvil las
+    // instale por separado. Y el service worker es lo que hace que Chrome OFREZCA
+    // instalarlas: el calendario tenía manifiesto e iconos pero no lo registraba, así
+    // que en Android no salía la opción de instalar y sin cobertura no abría.
+    for (const app of ["checklist", "formulario", "calendario"]) {
+      const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+      const p = await c.newPage();
+      await p.goto(`http://localhost:${PUERTO}/${app}/`, { waitUntil: "networkidle" });
+
+      const manifiesto = await p.evaluate(async () => {
+        const l = document.querySelector("link[rel=manifest]");
+        if (!l) return null;
+        const m = await (await fetch(l.href)).json();
+        return { display: m.display, iconos: (m.icons || []).length, nombre: m.name, ambito: m.scope };
+      });
+      ok(manifiesto && manifiesto.display === "standalone" && manifiesto.iconos >= 3,
+        `${app}: manifiesto instalable (${manifiesto ? `${manifiesto.nombre}, ${manifiesto.iconos} iconos` : "SIN MANIFIESTO"})`);
+      ok(manifiesto && manifiesto.ambito === "./",
+        `${app}: con su ámbito propio, que es lo que la hace una app aparte`);
+
+      const activo = await p.evaluate(() => Promise.race([
+        navigator.serviceWorker.ready.then(() => true),
+        new Promise(r => setTimeout(() => r(false), 8000)),
+      ]).catch(() => false));
+      ok(activo, `${app}: registra el service worker, sin el cual Chrome no ofrece instalarla`);
+
+      // Y lo que de verdad importa de estar instalada: abrir en una finca sin cobertura
+      await p.waitForTimeout(2000);
+      await c.setOffline(true);
+      let abre = false;
+      try {
+        await p.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
+        abre = await p.evaluate(() => !!document.getElementById("root"));
+      } catch (e) { /* se reporta abajo */ }
+      ok(abre, `${app}: abre sin cobertura`);
+      await c.setOffline(false);
+      await c.close();
+    }
+
     // El aviso que justifica todo esto: tres eventos el mismo día Y media plantilla fuera
     const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
     const p = await c.newPage();
