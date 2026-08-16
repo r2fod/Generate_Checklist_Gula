@@ -15,7 +15,7 @@
 //   corporativo    11,5 · 7,2 · 5,0 · 10,7       → 1 cada 10
 // Cumpleaños y producción grande NO tienen medición propia: se quedan donde estaban y
 // se marcan aquí para no dar por bueno un número que nadie ha comprobado.
-export const PAX_POR_CAMARERO = {
+const PAX_POR_CAMARERO = {
   boda: 9,
   comunion: 9,
   corporativo: 10,
@@ -23,12 +23,12 @@ export const PAX_POR_CAMARERO = {
   produccion: 20,   // sin medir por encima de 30 pax
 };
 
-export const SIN_MEDIR = ["cumpleanos", "produccion"];
+const SIN_MEDIR = ["cumpleanos", "produccion"];
 
 // Cocina, por tramos. Medido: 2 hasta 40 pax, 3 hasta 60, 4-5 de 100 en adelante.
 // Por tramos y no con una división porque los saltos reales no son proporcionales: de
 // 26 a 40 pax siempre fueron 2, y de 100 a 150 siempre 4 o 5.
-export function cocinaNecesaria(pax) {
+function cocinaNecesaria(pax) {
   if (pax <= 0) return 0;
   if (pax <= 40) return 2;
   if (pax <= 60) return 3;
@@ -39,13 +39,13 @@ export function cocinaNecesaria(pax) {
 // Logística es el número más estable de toda la hoja: 2 personas en casi todo, sea de
 // 40 o de 150 pax, y 1 en lo pequeño. No escala con los comensales porque no depende de
 // ellos, sino del camión: cargarlo y descargarlo cuesta lo mismo con 60 que con 140.
-export function logisticaNecesaria(pax) {
+function logisticaNecesaria(pax) {
   if (pax <= 0) return 0;
   return pax <= 30 ? 1 : 2;
 }
 
 // Sala. Un banquete nunca sale con menos de dos personas.
-export function salaNecesaria(tipo, pax, paxPorCamarero = 0) {
+function salaNecesaria(tipo, pax, paxPorCamarero = 0) {
   if (pax <= 0) return 0;
   const divisor = paxPorCamarero > 0 ? paxPorCamarero : (PAX_POR_CAMARERO[tipo] || 9);
   return Math.max(2, Math.ceil(pax / divisor));
@@ -70,11 +70,24 @@ export function personalNecesario(tipo, pax, paxPorCamarero = 0) {
 // contratan para el día.
 export const ROLES = { sala: "Sala", cocina: "Cocina", logistica: "Logística" };
 
-const HORA = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const enMinutos = (h) => {
-  const m = HORA.exec(String(h || "").trim());
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-};
+// La hora del reloj, en un solo sitio. Estuvo escrita en tres —dos veces en apuntes.js
+// y una aquí—, que es como se consigue que un día una acepte "24:00" y las otras no.
+export const esHora = (h) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(h || "").trim());
+
+// Minutos desde medianoche, o null si no es una hora. Devolver null y no 0 importa: las
+// 00:00 son una hora válida y "no hay hora" no lo es.
+export function enMinutos(h) {
+  if (!esHora(h)) return null;
+  const [hh, mm] = String(h).trim().split(":").map(Number);
+  return hh * 60 + mm;
+}
+
+// Y la vuelta: minutos a "HH:MM", dando la vuelta al reloj. Un turno seis horas antes de
+// un banquete a las 2:00 son las 20:00 del día anterior, no una hora negativa.
+export function enReloj(min) {
+  const t = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
 
 // Horas entre dos horas del reloj. Si la salida es MENOR que la entrada, es que se
 // termina de madrugada: entrar a las 17:00 y salir a las 3:00 son diez horas, no menos
@@ -86,13 +99,13 @@ export function horasEntre(inicio, fin) {
   return Math.round((min / 60) * 100) / 100;
 }
 
-export function saneaAsignado(bruto) {
+function saneaAsignado(bruto) {
   if (!bruto || typeof bruto !== "object") return null;
   const nombre = typeof bruto.nombre === "string" ? bruto.nombre.trim() : "";
   if (!nombre) return null;
   const limpio = { nombre, rol: ROLES[bruto.rol] ? bruto.rol : "sala" };
-  if (HORA.test(String(bruto.inicio || "").trim())) limpio.inicio = String(bruto.inicio).trim();
-  if (HORA.test(String(bruto.fin || "").trim())) limpio.fin = String(bruto.fin).trim();
+  if (esHora(bruto.inicio)) limpio.inicio = String(bruto.inicio).trim();
+  if (esHora(bruto.fin)) limpio.fin = String(bruto.fin).trim();
   // El importe es lo que se le paga por ESE evento, como en la hoja: un número suelto,
   // no una tarifa por hora. Cero no se guarda: es lo mismo que no haberlo puesto.
   if (Number.isFinite(bruto.importe) && bruto.importe > 0) limpio.importe = Math.round(bruto.importe * 100) / 100;

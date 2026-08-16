@@ -3577,6 +3577,20 @@ async function main() {
       ok(await p.locator(".cal-persona").count() === 3 && /3 personas/.test(await p.locator(".cal-equipo-titulo").innerText()),
         `${w}px · quitar a alguien lo quita de la lista y de la cuenta`);
 
+      // Y se puede CORREGIR a alguien, no solo darlo de alta y de baja: un nombre mal
+      // escrito obligaba antes a borrar a la persona y volver a meterla.
+      await p.locator(".cal-persona-editar").first().click();
+      await p.waitForTimeout(150);
+      ok(/Guardar/.test(await p.locator(".cal-equipo-anadir").first().innerText()),
+        `${w}px · al tocar a alguien, el botón pasa a decir Guardar`);
+      const antes = await p.locator(".cal-persona-nombre").allInnerTexts();
+      await p.locator(".cal-equipo-campo input").first().fill("Renombrada");
+      await p.locator(".cal-equipo-anadir").first().click();
+      await p.waitForTimeout(250);
+      const despues = await p.locator(".cal-persona-nombre").allInnerTexts();
+      ok(despues.length === antes.length && despues.includes("Renombrada"),
+        `${w}px · cambiarle el nombre a alguien lo cambia sin duplicarlo (${antes.length} → ${despues.length})`);
+
       await c.close();
     }
 

@@ -13,13 +13,12 @@ import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
 import Traer from "./Traer.jsx";
-import { saneaLista, saneaEquipo } from "./apuntes.js";
+import { saneaLista, saneaEquipo, aISO } from "./apuntes.js";
 
 const HOY = new Date();
-const dia = (n) => {
-  const f = new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n);
-  return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
-};
+// aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no
+// se habría enterado si la de verdad cambiara.
+const dia = (n) => aISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n));
 
 const DEMO = [
   { fecha: dia(2), titulo: "Boda de prueba uno", tipo: "boda", pax: 120, sitio: "Finca de ejemplo", hora: "14:00" },

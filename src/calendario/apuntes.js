@@ -16,7 +16,7 @@
 // Aquí dentro no hay React ni navegador: entra un dato, sale un dato. Se prueba con
 // node en milisegundos.
 
-import { saneaAsignados } from "../personal.js";
+import { saneaAsignados, esHora, enMinutos, enReloj } from "../personal.js";
 
 // Los cinco tipos de evento son los mismos que genera la app. Los otros tres no son
 // eventos: son las capas que hacen falta para poder anticipar de verdad, y salen de lo
@@ -91,9 +91,7 @@ export function saneaApunte(bruto) {
   // turnos: en los eventos medidos, sala entra 6 horas antes de sentar a la gente, con
   // una constancia asombrosa (6,0 · 6,0 · 6,0 · 6,5). Sin este dato no hay horarios que
   // proponer, y organizar logística se queda en "cuánta gente" sin el "a qué hora".
-  if (typeof bruto.hora === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(bruto.hora.trim())) {
-    limpio.hora = bruto.hora.trim();
-  }
+  if (esHora(bruto.hora)) limpio.hora = bruto.hora.trim();
   if (Number.isFinite(bruto.pax) && bruto.pax > 0) limpio.pax = Math.round(bruto.pax);
   if (typeof bruto.sitio === "string" && bruto.sitio.trim()) limpio.sitio = bruto.sitio.trim();
   if (typeof bruto.notas === "string" && bruto.notas.trim()) limpio.notas = bruto.notas.trim();
@@ -311,16 +309,8 @@ export const HORAS_ANTES_SALA = 6;
 export const HORAS_ANTES_LOGISTICA = 7;
 
 export function turnosDe(apunte, antesSala = HORAS_ANTES_SALA, antesLogistica = HORAS_ANTES_LOGISTICA) {
-  if (!apunte || typeof apunte.hora !== "string") return null;
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(apunte.hora);
-  if (!m) return null;
-  const minutos = Number(m[1]) * 60 + Number(m[2]);
-  // Con módulo, no restando a secas: un banquete a las 2:00 con sala 6h antes es a las
-  // 20:00 del día anterior, no una hora negativa.
-  const enReloj = (min) => {
-    const t = ((min % 1440) + 1440) % 1440;
-    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-  };
+  const minutos = enMinutos(apunte && apunte.hora);
+  if (minutos === null) return null;
   return {
     banquete: apunte.hora,
     sala: enReloj(minutos - antesSala * 60),

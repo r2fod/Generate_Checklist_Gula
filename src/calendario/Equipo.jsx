@@ -18,16 +18,36 @@ export default function Equipo({ equipo, onCambiar }) {
   const [abierto, setAbierto] = useState(equipo.length === 0);
   const [nombre, setNombre] = useState("");
   const [apodos, setApodos] = useState("");
+  // A quién se está editando. Sin esto solo se podía añadir y quitar: cambiar un nombre
+  // mal escrito obligaba a borrar a la persona y volver a darla de alta, y corregirle un
+  // apodo funcionaba —reescribiendo el mismo nombre— pero no había forma de saberlo.
+  const [editando, setEditando] = useState("");
+
+  const empezarAEditar = (p) => {
+    setEditando(p.nombre);
+    setNombre(p.nombre);
+    // El primer apodo es siempre el propio nombre, puesto por saneaEquipo: no se enseña
+    // porque no lo escribió nadie.
+    setApodos(p.apodos.slice(1).join(", "));
+  };
+
+  const cancelar = () => { setEditando(""); setNombre(""); setApodos(""); };
 
   const anadir = () => {
     const limpio = nombre.trim();
     if (!limpio) return;
-    // Si ya estaba, se sustituye en vez de duplicarse: así este mismo formulario sirve
-    // para corregirle los apodos a alguien sin tener que quitarlo primero.
-    const resto = equipo.filter(p => p.nombre.toLowerCase() !== limpio.toLowerCase());
-    onCambiar([...resto, { nombre: limpio, apodos: apodos.split(/[,;]/).map(a => a.trim()).filter(Boolean) }]);
-    setNombre("");
-    setApodos("");
+    // Fuera el que se está editando (por su nombre VIEJO, que es el que puede haber
+    // cambiado) y fuera cualquiera que ya se llame igual, para no duplicar.
+    const resto = equipo.filter(p =>
+      p.nombre.toLowerCase() !== limpio.toLowerCase()
+      && p.nombre.toLowerCase() !== editando.toLowerCase());
+    const nuevo = { nombre: limpio, apodos: apodos.split(/[,;]/).map(a => a.trim()).filter(Boolean) };
+    // Se conserva el sitio que ocupaba, para que al corregir una letra no salte al final
+    const donde = equipo.findIndex(p => p.nombre.toLowerCase() === editando.toLowerCase());
+    if (editando && donde >= 0) resto.splice(Math.min(donde, resto.length), 0, nuevo);
+    else resto.push(nuevo);
+    onCambiar(resto);
+    cancelar();
   };
 
   return (
@@ -56,16 +76,25 @@ export default function Equipo({ equipo, onCambiar }) {
           {equipo.length > 0 && (
             <ul className="cal-equipo-lista">
               {equipo.map(p => (
-                <li className="cal-persona" key={p.nombre}>
-                  <span className="cal-persona-nombre">{p.nombre}</span>
-                  {p.apodos.length > 1 && (
-                    <span className="cal-persona-apodos">{p.apodos.slice(1).join(", ")}</span>
-                  )}
+                <li className={`cal-persona${editando === p.nombre ? " es-editando" : ""}`} key={p.nombre}>
+                  {/* Tocar a alguien lo carga en el formulario para corregirlo. Antes el
+                      chip no hacía nada y no había forma de cambiar un nombre. */}
+                  <button
+                    type="button"
+                    className="cal-persona-editar"
+                    aria-label={`Editar a ${p.nombre}`}
+                    onClick={() => empezarAEditar(p)}
+                  >
+                    <span className="cal-persona-nombre">{p.nombre}</span>
+                    {p.apodos.length > 1 && (
+                      <span className="cal-persona-apodos">{p.apodos.slice(1).join(", ")}</span>
+                    )}
+                  </button>
                   <button
                     type="button"
                     className="cal-persona-quitar"
                     aria-label={`Quitar a ${p.nombre} del equipo`}
-                    onClick={() => onCambiar(equipo.filter(q => q.nombre !== p.nombre))}
+                    onClick={() => { if (editando === p.nombre) cancelar(); onCambiar(equipo.filter(q => q.nombre !== p.nombre)); }}
                   >
                     <X size={14} aria-hidden="true" />
                   </button>
@@ -96,8 +125,11 @@ export default function Equipo({ equipo, onCambiar }) {
               />
             </label>
             <button type="button" className="btn btn-green cal-equipo-anadir" disabled={!nombre.trim()} onClick={anadir}>
-              Añadir
+              {editando ? "Guardar" : "Añadir"}
             </button>
+            {editando && (
+              <button type="button" className="btn btn-ghost cal-equipo-anadir" onClick={cancelar}>Cancelar</button>
+            )}
           </div>
         </div>
       )}

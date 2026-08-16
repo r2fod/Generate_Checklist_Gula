@@ -840,6 +840,26 @@
   font-size: 0.82rem;
 }
 
+/* El chip entero es el botón de editar: tocar a alguien lo carga en el formulario */
+.cal-persona-editar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-persona.es-editando {
+  border-color: var(--primario, var(--text-main));
+  box-shadow: 0 0 0 1px var(--primario, var(--text-main));
+}
+
 .cal-persona-nombre { font-weight: 700; color: var(--text-main); }
 
 .cal-persona-apodos {
@@ -1199,6 +1219,7 @@ button.cal-turnos.es-vacia {
 .cal-asignado-horario {
   grid-area: horario;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   min-width: 0;
@@ -1224,10 +1245,16 @@ button.cal-turnos.es-vacia {
   min-width: 0;
 }
 
-/* Los de hora, anchos de sobra: según el idioma del móvil el navegador los pinta en
-   12 horas con su "AM/PM" y su iconito, y en 96px se veía "00 AM" cortado. */
-.cal-asignado-hora { flex: 1 1 112px; min-width: 0; }
-.cal-asignado-importe { flex: 0 1 78px; min-width: 0; }
+/* Los de hora, con SUELO de ancho y no solo con base flexible. Según el idioma del
+   móvil el navegador los pinta en 12 horas —"08:00 AM" más su iconito— y encogiéndolos
+   se veía "08 :" y "AM" cortados: el elemento cabía en su hueco, pero su contenido no.
+   Con min-width no encogen; si no caben los cuatro campos en una línea, el importe y las
+   horas bajan a la siguiente, que es mejor que cortar una hora por la mitad. */
+/* Sin crecer (0 1, no 1 1): creciendo, el primero se comía la línea entera —259px— y
+   el segundo bajaba a la siguiente hecho un enano. Los dos iguales, y si no caben los
+   dos juntos bajan juntos. */
+.cal-asignado-hora { flex: 0 1 130px; min-width: 130px; }
+.cal-asignado-importe { flex: 0 1 78px; min-width: 72px; }
 
 .cal-asignado-horas {
   flex: 0 0 auto;
