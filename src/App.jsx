@@ -2649,9 +2649,10 @@ export default function App({ onCerrarSesion } = {}) {
             {!soloVista && (
               <button className="btn btn-outline" onClick={() => setModoCarga(true)}><Package size={15} /> Modo carga</button>
             )}
-            {/* El calendario del equipo. Solo con sesión: los apuntes viven en indice/,
-                que las reglas abren únicamente al equipo, así que a quien entra por un
-                link se le ofrecería una pantalla que no puede cargar. */}
+            {/* El calendario del equipo. Solo con sesión: los apuntes viven ya en su
+                propia colección, pero el CÓDIGO para llegar a ellos sigue en indice/,
+                que las reglas abren únicamente al equipo. A quien entra por un link de
+                evento se le ofrecería una pantalla que no puede cargar. */}
             {haySesionEquipo && !soloMarcar && (
               <button className="btn btn-outline" onClick={() => setModalCalendario(true)} title="El calendario del equipo: eventos, vacaciones y recogidas">
                 <CalendarDays size={15} /> Calendario

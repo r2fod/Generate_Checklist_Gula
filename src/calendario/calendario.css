@@ -762,6 +762,150 @@
   border: 1px solid var(--error-borde);
 }
 
+/* ─── SOLO LECTURA ────────────────────────────────────────────────────────────
+   Lo primero que se ve al entrar por el enlace de mirar. No es decorativo: sin esto, el
+   que abre el calendario y no encuentra el botón de añadir cree que la app está rota. */
+.cal-aviso-lectura {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.cal-aviso-lectura svg { flex: 0 0 auto; }
+.cal-aviso-lectura b { color: var(--text-main); }
+
+/* ─── COMPARTIR ───────────────────────────────────────────────────────────────
+   Plegado como el equipo, por lo mismo: se usa el día que se reparten los enlaces y
+   luego estorba. Los dos enlaces son largos y el móvil es estrecho, así que cada fila
+   se apila (qué es / enlace / copiar) y solo se pone en línea cuando hay sitio. */
+.cal-compartir {
+  margin-bottom: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.cal-compartir-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-compartir-titulo { flex: 1 1 auto; min-width: 0; }
+
+.cal-compartir-flecha { flex: 0 0 auto; transition: transform 0.18s ease; }
+.cal-compartir-flecha.es-abierta { transform: rotate(180deg); }
+
+.cal-compartir-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+
+.cal-compartir-fila {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+/* Un color por enlace, el mismo que su icono: verde el de mirar, morado el de tocar.
+   Se distinguen de un vistazo, que es justo lo que hace falta antes de pegar uno en un
+   grupo de WhatsApp. */
+.cal-compartir-fila.es-ver { border-left-color: var(--ok-texto); }
+.cal-compartir-fila.es-editar { border-left-color: var(--lila-icono); }
+.cal-compartir-fila.es-ver svg { color: var(--ok-texto); }
+.cal-compartir-fila.es-editar svg { color: var(--lila-icono); }
+
+.cal-compartir-que {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  font-size: 0.82rem;
+}
+
+.cal-compartir-que svg { flex: 0 0 auto; }
+.cal-compartir-que strong { color: var(--text-main); }
+
+.cal-compartir-que small {
+  flex: 1 1 100%;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.cal-compartir-url {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-muted);
+  /* 16px para que iOS no haga zoom al enfocar. El enlace es largo: se corta con puntos
+     suspensivos en vez de estirar la caja y sacar la página de la pantalla. */
+  font-size: 16px;
+  text-overflow: ellipsis;
+}
+
+.cal-compartir-copiar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.cal-compartir-aviso {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.cal-compartir-aviso b { color: var(--text-main); }
+
+@media (min-width: 560px) {
+  .cal-compartir-fila {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .cal-compartir-que { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-compartir-flecha { transition: none; }
+}
+
 /* ─── EL EQUIPO ───────────────────────────────────────────────────────────────
    Un ajuste que se toca una vez y luego estorba, así que vive plegado en una barra de
    una línea. Sin nadie configurado se pinta en amarillo y arranca abierto: es lo único

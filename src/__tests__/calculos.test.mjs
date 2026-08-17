@@ -22,6 +22,7 @@ import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formula
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques } from "../calendario/apuntes.js";
 import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados } from "../personal.js";
+import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario } from "../calendario/enlace.js";
 
 let pasan = 0;
 const fallos = [];
@@ -647,6 +648,70 @@ console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");
   // Y un tipo que no existe cae en boda, que es el comportamiento de siempre
   ok(saneaLista([{ fecha: "2026-09-03", titulo: "X", tipo: "inventado" }])[0].tipo === "boda",
     "un tipo desconocido sigue cayendo en boda, como antes");
+}
+
+console.log("\n══ Los dos enlaces del calendario ══");
+{
+  // Qué modo abre cada dirección. El que se equivoque aquí abre el calendario de verdad
+  // a quien solo tenía que mirar, así que se comprueban los tres casos y los bordes.
+  ok(enlaceDeLaUrl("") === null, "sin parámetros es el equipo, que entra por login");
+  ok(enlaceDeLaUrl("?abrir=Boda%20X") === null, "un parámetro de otra app no abre ningún modo de enlace");
+
+  const editar = enlaceDeLaUrl("?cal=kq7mfp2xd4rj");
+  ok(editar && editar.modo === MODOS.EDICION && editar.codigo === "kq7mfp2xd4rj",
+    "?cal= abre en modo edición con su código");
+
+  const mirar = enlaceDeLaUrl("?ver=wz3nbh8tsy6c");
+  ok(mirar && mirar.modo === MODOS.LECTURA && mirar.codigo === "wz3nbh8tsy6c",
+    "?ver= abre en modo solo lectura");
+
+  // Un código vacío NO es un modo: "?ver=" entraría en solo lectura contra el documento
+  // "", que no existe, y se quedaría en un calendario en blanco sin explicación.
+  ok(enlaceDeLaUrl("?ver=") === null && enlaceDeLaUrl("?cal=%20%20") === null,
+    "un código vacío o en blanco no cuenta como enlace");
+
+  // Con los dos puestos manda el de editar: es el más restrictivo de conceder por error
+  // en la dirección contraria (quedarse mirando cuando podías editar se nota; poder
+  // editar cuando solo tenías que mirar, no).
+  const ambos = enlaceDeLaUrl("?ver=aaa&cal=bbb");
+  ok(ambos.modo === MODOS.EDICION, "con los dos parámetros gana el de edición");
+
+  // La dirección de la app del calendario, se copie el enlace desde donde se copie
+  const casos = [
+    ["https://x.github.io/Repo/calendario/index.html", "https://x.github.io/Repo/calendario/"],
+    ["https://x.github.io/Repo/calendario/", "https://x.github.io/Repo/calendario/"],
+    // Desde dentro de la checklist: el enlace tiene que salir apuntando al CALENDARIO,
+    // no a la checklist. Es el caso que más se va a usar.
+    ["https://x.github.io/Repo/checklist/index.html", "https://x.github.io/Repo/calendario/"],
+    ["https://x.github.io/Repo/formulario/", "https://x.github.io/Repo/calendario/"],
+    ["http://localhost:4178/pruebas/calendario.html", "http://localhost:4178/calendario/"],
+    ["https://x.github.io/Repo/", "https://x.github.io/Repo/calendario/"],
+  ];
+  casos.forEach(([desde, espera]) => {
+    ok(direccionDelCalendario(desde) === espera,
+      `desde ${desde} → ${direccionDelCalendario(desde)}`);
+  });
+  ok(direccionDelCalendario("esto no es una dirección") === "",
+    "una dirección rota devuelve vacío, no revienta el panel entero");
+
+  // Y los enlaces completos, que es lo que se pega en un WhatsApp
+  const es = enlacesDeCalendario("https://x.github.io/Repo/checklist/index.html", { codigo: "aaa", ver: "bbb" });
+  ok(es.editar === "https://x.github.io/Repo/calendario/?cal=aaa", `el editable: ${es.editar}`);
+  ok(es.ver === "https://x.github.io/Repo/calendario/?ver=bbb", `el de mirar: ${es.ver}`);
+  // Lo importante de los dos enlaces: el de mirar NO lleva dentro el código de editar.
+  // Si lo llevara, cualquiera que reciba el de ver podría cambiarse el parámetro y
+  // ponerse a editar, y los dos enlaces serían el mismo con otra pintura.
+  ok(!es.ver.includes("aaa"), "el enlace de mirar no contiene el código de edición");
+
+  // Y de vuelta: lo que se genera se entiende igual al abrirlo
+  ok(enlaceDeLaUrl(new URL(es.ver).search).modo === MODOS.LECTURA
+     && enlaceDeLaUrl(new URL(es.editar).search).modo === MODOS.EDICION,
+    "los enlaces generados se leen de vuelta en el modo que les toca");
+
+  // Sin códigos todavía (recién estrenado, o sin nube) no se ofrece un enlace roto
+  ok(enlacesDeCalendario("https://x.github.io/Repo/calendario/", null) === null
+     && enlacesDeCalendario("https://x.github.io/Repo/calendario/", { codigo: "aaa", ver: "" }) === null,
+    "sin los dos códigos no se ofrece ningún enlace");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

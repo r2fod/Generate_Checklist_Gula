@@ -97,6 +97,76 @@ ok(Object.keys(sinSesion.local).length===1, 'lo local NO se pierde aunque la nub
 ok(sinSesion.errores.length>0, `y el error se detecta para poder avisar: ${JSON.stringify(sinSesion.errores)}`);
 setSesion(true);
 
+console.log('\n══ El calendario se muda a su carpeta propia ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+
+  // Lo que hay hoy en producción: el calendario del equipo dentro de indice/, con sus
+  // apuntes y su equipo, y sin códigos porque todavía no existían.
+  const APUNTES = JSON.stringify([{ id: '2026-09-19_boda-una', fecha: '2026-09-19', titulo: 'Boda una', tipo: 'boda', pax: 180 }]);
+  const EQUIPO = JSON.stringify([{ nombre: 'Fulanita', apodos: ['fulanita'] }]);
+  almacen.set('indice/calendario', { apuntes: APUNTES, equipo: EQUIPO, actualizado: 111 });
+
+  const cs = await N.resolverCalendario();
+  ok(cs.codigo.length === 12 && cs.ver.length === 12 && cs.codigo !== cs.ver,
+    `salen dos códigos distintos de 12 caracteres → ${cs.codigo} / ${cs.ver}`);
+
+  // LO QUE MÁS IMPORTA: el documento de siempre se queda ENTERO. Si la mudanza saliera
+  // mal, los apuntes siguen exactamente donde han estado siempre.
+  const viejo = almacen.get('indice/calendario');
+  ok(viejo.apuntes === APUNTES && viejo.equipo === EQUIPO,
+    'el documento viejo conserva sus apuntes y su equipo, intactos');
+  ok(viejo.codigo === cs.codigo && viejo.ver === cs.ver,
+    'y se le añaden los dos códigos, sin quitarle nada');
+
+  // La copia llega completa a los dos documentos nuevos
+  const bueno = await N.cargarCalendarioNube(cs.codigo);
+  const copia = await N.cargarCalendarioNube(cs.ver);
+  ok(bueno.apuntes.length === 1 && bueno.apuntes[0].titulo === 'Boda una' && bueno.equipo.length === 1,
+    'el calendario de verdad llega con sus apuntes y su equipo');
+  ok(JSON.stringify(copia.apuntes) === JSON.stringify(bueno.apuntes),
+    'y la copia de mirar arranca con lo mismo');
+  ok(bueno.ver === cs.ver && copia.ver === '',
+    'el de verdad sabe cuál es su copia; la copia NO sabe de quién es copia');
+
+  // Segunda vez: NO se vuelve a mudar. Si se mudara, cada arranque estrenaría códigos
+  // nuevos y los enlaces repartidos dejarían de abrir.
+  const otra = await N.resolverCalendario();
+  ok(otra.codigo === cs.codigo && otra.ver === cs.ver,
+    'abrir otra vez devuelve los MISMOS códigos: los enlaces repartidos siguen valiendo');
+
+  // Guardar refresca las dos: quien edita por enlace no puede dejar a los que miran con
+  // los turnos de la semana pasada.
+  await N.guardarCalendarioNube(cs.codigo, [
+    { id: '2026-09-19_boda-una', fecha: '2026-09-19', titulo: 'Boda una', tipo: 'boda', pax: 180 },
+    { id: '2026-10-10_boda-dos', fecha: '2026-10-10', titulo: 'Boda dos', tipo: 'boda', pax: 90 },
+  ], [{ nombre: 'Fulanita', apodos: ['fulanita'] }], cs.ver);
+  ok((await N.cargarCalendarioNube(cs.codigo)).apuntes.length === 2
+     && (await N.cargarCalendarioNube(cs.ver)).apuntes.length === 2,
+    'al guardar se refrescan las dos, la de verdad y la de mirar');
+
+  // LA GARANTÍA DE LOS DOS ENLACES: quien solo tiene el de mirar escribe en OTRO
+  // documento. Aunque lo pisara entero, el calendario de verdad no se entera — y como
+  // nunca se lee de vuelta, el siguiente guardado lo deja como estaba.
+  almacen.set(`calendario/${cs.ver}`, { apuntes: '[]', equipo: '[]', actualizado: 999 });
+  ok((await N.cargarCalendarioNube(cs.codigo)).apuntes.length === 2,
+    'destrozar la copia de mirar NO toca el calendario de verdad');
+  await N.guardarCalendarioNube(cs.codigo, (await N.cargarCalendarioNube(cs.codigo)).apuntes, [], cs.ver);
+  ok((await N.cargarCalendarioNube(cs.ver)).apuntes.length === 2,
+    'y el siguiente guardado la deja otra vez como estaba');
+
+  // Y lo que sostiene todo: sin cuenta se puede abrir el calendario por su código, pero
+  // NO llegar a los códigos. Por eso el que recibe el enlace de mirar no puede
+  // ascender al de editar.
+  setSesion(false);
+  ok((await N.cargarCalendarioNube(cs.ver)).apuntes.length === 2,
+    'sin cuenta el enlace abre el calendario: para eso está');
+  let tapado = false;
+  try { await N.resolverCalendario(); } catch (e) { tapado = true; }
+  ok(tapado, 'pero sin cuenta NO se puede llegar a los códigos: de mirar no se pasa a editar');
+  setSesion(true);
+}
+
 console.log('\n══ Escenarios duros ══');
 // 1. Borrar un evento en un dispositivo llega al otro
 almacen.clear(); limpiarPrevios();

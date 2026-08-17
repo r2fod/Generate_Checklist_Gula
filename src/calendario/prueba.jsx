@@ -8,10 +8,12 @@
 // repositorio no entra el nombre de ningún cliente.
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Eye } from "lucide-react";
 import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
+import Compartir from "./Compartir.jsx";
 import Traer from "./Traer.jsx";
 import { saneaLista, saneaEquipo, aISO } from "./apuntes.js";
 
@@ -48,22 +50,42 @@ const EQUIPO_DEMO = [
   { nombre: "Perengano", apodos: ["peren"] },
 ];
 
+// Códigos inventados con la pinta de los de verdad (12 caracteres del mismo alfabeto),
+// para poder comprobar cómo se ve el panel de compartir y que los enlaces salen bien
+// formados. No abren nada: aquí no hay nube.
+const CODIGOS_DEMO = { codigo: "kq7mfp2xd4rj", ver: "wz3nbh8tsy6c" };
+
 function Banco() {
   // Con "?vacio=1" se arranca sin nada, que es como se ve el cuadro de pegar y como se
   // prueba un enlace de importación que llega a un calendario recién estrenado.
   const arrancaVacio = new URLSearchParams(window.location.search).get("vacio");
+  // Con "?solover=1" se monta como lo ve quien entra por el enlace de mirar: sin traer,
+  // sin equipo y sin poder tocar un apunte. Es la mitad de la función de compartir, y
+  // sin esto la batería no podía llegar a ella (va detrás de un código de Firestore).
+  const soloVer = Boolean(new URLSearchParams(window.location.search).get("solover"));
   const [apuntes, setApuntes] = useState(() => (arrancaVacio ? [] : saneaLista(DEMO)));
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
   const guardar = (a) => setApuntes(p => saneaLista([...p.filter(x => x.id !== a.id), a]));
   const borrar = (id) => setApuntes(p => p.filter(x => x.id !== id));
 
-  const dentro = (
-    <>
-      <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
-      <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
-      <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
-    </>
-  );
+  const dentro = soloVer
+    ? (
+      <>
+        <div className="cal-aviso-lectura">
+          <Eye size={15} aria-hidden="true" />
+          <span>Estás viendo el calendario en <b>solo lectura</b>. Los cambios los hace el equipo.</span>
+        </div>
+        <Calendario apuntes={apuntes} equipo={equipo} soloVer />
+      </>
+    )
+    : (
+      <>
+        <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
+        <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
+        <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
+        <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
+      </>
+    );
 
   // Con "?pantalla=1" se monta la MISMA maquetación que usa la checklist por dentro
   // (EnChecklist.jsx): pantalla completa, barra fija arriba y el scroll dentro del

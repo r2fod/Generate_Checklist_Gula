@@ -18,6 +18,39 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // ─── EL CALENDARIO ───────────────────────────────────────────────────────
+    // Dos documentos por calendario, y la diferencia entre ellos es lo que hace que
+    // haya de verdad un enlace de mirar y otro de tocar:
+    //
+    //   calendario/<codigo>  el de verdad. Enlace "?cal=" — se lee y se escribe.
+    //   calendario/<ver>     una copia. Enlace "?ver=" — es lo que se manda a quien
+    //                        solo mira. Aunque escribiera en ella, el calendario de
+    //                        verdad no se entera: es otro documento y esta copia no se
+    //                        lee nunca de vuelta.
+    //
+    // Los dos códigos se guardan en indice/calendario, que pide sesión: por eso quien
+    // tiene el enlace de mirar no puede llegar desde él al de editar.
+    //
+    // Lo que esto NO puede impedir, y hay que saberlo antes de repartir enlaces: quien
+    // recibe el de editar puede reenviarlo, y Firestore no distingue a quién se lo dio
+    // uno de a quién se lo pasó él. Retirárselo a una persona es cambiar el código, y
+    // eso deja fuera a todos. Igual que un evento compartido: el enlace es la llave.
+    //
+    // No se puede listar la colección: sin conocer el código no hay forma de dar con un
+    // calendario, ni de saber cuántos hay.
+    match /calendario/{codigo} {
+      allow get: if true;
+      allow list: if false;
+      // Los campos justos y acotados, para que un calendario no se pueda usar como
+      // almacén de otra cosa. 900 kB deja sitio de sobra (un año son unos 30 kB) sin
+      // acercarse al MiB por documento de Firestore.
+      allow write: if request.resource.data.keys().hasOnly(["apuntes", "equipo", "ver", "actualizado"])
+                   && request.resource.data.apuntes is string
+                   && request.resource.data.equipo is string
+                   && request.resource.data.apuntes.size() < 900000
+                   && request.resource.data.equipo.size() < 100000;
+    }
+
     // ─── FORMULARIO DE OFICINA ───────────────────────────────────────────────
     // La lista corta de los próximos eventos que ve quien rellena el formulario:
     // SOLO nombre, día y sitio de los 8 siguientes, para que pueda elegir a cuál

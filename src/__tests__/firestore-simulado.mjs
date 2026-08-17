@@ -5,6 +5,9 @@ const oyentes = [];
 export function reglasPermiten(ruta, op, auth = true) {
   const [col] = ruta.split('/');
   if (col === 'eventos') return op === 'get' || op === 'write';
+  // El calendario: quien conoce el nombre del documento entra, con o sin cuenta. Es lo
+  // que hace que funcionen los dos enlaces compartidos. Listar la colección, no.
+  if (col === 'calendario') return op === 'get' || op === 'write';
   if (col === 'indice') return auth;       // read+write solo con sesión
   return false;                            // todo lo demás denegado
 }
@@ -58,6 +61,24 @@ export const fakeFs = {
   async getDocs(ref) {
     if (!reglasPermiten(ref.col + '/x', 'read', sesionIniciada)) throw new Error('Missing or insufficient permissions.');
     return snapDe(ref.col);
+  },
+  // Lo justo que usa el proyecto: leer un documento y dejarlo escrito sin que se cuele
+  // nadie en medio. Sirve para estrenar el calendario, donde dos móviles a la vez
+  // generarían cada uno su pareja de códigos.
+  async runTransaction(_db, cuerpo) {
+    const escrituras = [];
+    const tx = {
+      get: (ref) => fakeFs.getDoc(ref),
+      set: (ref, data, opciones) => { escrituras.push([ref, data, opciones]); },
+    };
+    const r = await cuerpo(tx);
+    for (const [ref, data, opciones] of escrituras) {
+      if (!reglasPermiten(ref.ruta, 'write', sesionIniciada)) throw new Error('Missing or insufficient permissions.');
+      const previo = (opciones && opciones.merge) ? (almacen.get(ref.ruta) || {}) : {};
+      almacen.set(ref.ruta, { ...previo, ...data });
+      notificar(ref.col);
+    }
+    return r;
   },
   onSnapshot(ref, cb) {
     const o = { col: ref.col, cb }; oyentes.push(o);

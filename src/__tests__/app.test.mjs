@@ -3701,6 +3701,97 @@ async function main() {
       await c.close();
     }
 
+    // ── LOS DOS ENLACES PARA COMPARTIR ──
+    // Uno de mirar y otro de tocar, y la diferencia entre ellos tiene que aguantar: si
+    // el de mirar llevara dentro el código de editar, cualquiera que lo reciba se
+    // cambia el parámetro y los dos enlaces son el mismo con otra pintura.
+    console.log("\n══ Compartir el calendario: los dos enlaces ══");
+    for (const w of [320, 390, 768, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      await c.grantPermissions(["clipboard-read", "clipboard-write"], { origin: `http://localhost:${PUERTO}` });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`compartir ${w}px: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-compartir-cab");
+
+      ok(await p.locator(".cal-compartir-cuerpo").count() === 0,
+        `${w}px · compartir arranca plegado: se usa el día que se reparten los enlaces`);
+      await p.locator(".cal-compartir-cab").click();
+      await p.waitForSelector(".cal-compartir-cuerpo");
+
+      const urls = await p.locator(".cal-compartir-url").evaluateAll(es => es.map(e => e.value));
+      ok(urls.length === 2, `${w}px · salen los dos enlaces, no uno`);
+      const [verUrl, editarUrl] = urls;
+      ok(/\/calendario\/\?ver=/.test(verUrl) && /\/calendario\/\?cal=/.test(editarUrl),
+        `${w}px · cada uno con su parámetro y apuntando al calendario → ${verUrl}`);
+      // La comprobación que sostiene toda la función
+      ok(!verUrl.includes(new URL(editarUrl).searchParams.get("cal")),
+        `${w}px · el enlace de mirar NO lleva dentro el código de editar`);
+
+      // El enlace es largo y la pantalla estrecha: es justo donde algo se sale
+      ok(!await seMueveDeLado(p), `${w}px · con los enlaces a la vista la página no se mueve de lado`);
+      ok(await p.evaluate(() => {
+        let fuera = 0;
+        document.querySelectorAll(".cal-compartir-fila").forEach(fila => {
+          const r = fila.getBoundingClientRect();
+          fila.querySelectorAll("input, button").forEach(e => {
+            const x = e.getBoundingClientRect();
+            if (x.width && (x.right > r.right + 0.5 || x.left < r.left - 0.5)) fuera++;
+          });
+        });
+        return fuera === 0;
+      }), `${w}px · ni el campo del enlace ni el botón se salen de su fila`);
+      // 16px o iOS hace zoom al tocar el enlace, y 44px de alto o no se acierta con el dedo
+      ok(await p.evaluate(() => {
+        const i = document.querySelector(".cal-compartir-url");
+        const b = document.querySelector(".cal-compartir-copiar");
+        return parseFloat(getComputedStyle(i).fontSize) >= 16
+          && i.getBoundingClientRect().height >= 43
+          && b.getBoundingClientRect().height >= 43;
+      }), `${w}px · el enlace va a 16px y tanto él como Copiar se tocan con el dedo`);
+
+      // Y copiar copia de verdad: es el único botón del panel
+      await p.locator(".cal-compartir-copiar").first().click();
+      await p.waitForTimeout(200);
+      ok(/Copiado/.test(await p.locator(".cal-compartir-copiar").first().innerText()),
+        `${w}px · al copiar lo dice, que si no no se sabe si ha hecho algo`);
+      const enPortapapeles = await p.evaluate(() => navigator.clipboard.readText().catch(() => ""));
+      ok(enPortapapeles === verUrl,
+        `${w}px · y lo que queda en el portapapeles es el enlace de mirar`);
+      await c.close();
+    }
+
+    // ── COMO LO VE QUIEN ENTRA POR EL ENLACE DE MIRAR ──
+    // No basta con que Firestore le deniegue la escritura: si la pantalla le ofrece
+    // botones que no funcionan, el enlace parece roto en vez de ser de solo lectura.
+    console.log("\n══ El calendario en solo lectura ══");
+    for (const w of [320, 768]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`solo ver ${w}px: ${e}`));
+      await p.goto(BANCO + "?solover=1", { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+
+      ok(await p.locator(".cal-aviso-lectura").isVisible(),
+        `${w}px · se dice desde arriba que es solo lectura, para que no parezca roto`);
+      ok(await p.locator(".cal-nuevo").count() === 0
+         && await p.locator(".cal-equipo").count() === 0
+         && await p.locator(".cal-compartir").count() === 0,
+        `${w}px · ni añadir apuntes, ni tocar el equipo, ni repartir más enlaces`);
+      ok(!await seMueveDeLado(p), `${w}px · en solo lectura tampoco se mueve de lado`);
+
+      // Mirar un día SÍ: en el móvil es la única forma de leer el nombre entero de una
+      // boda. Lo que no puede es ofrecer editarla ni añadir.
+      await p.locator(".cal-celda.tiene-cosas").first().click();
+      await p.waitForSelector(".cal-dia-panel");
+      ok(await p.locator(".cal-dia-item").count() > 0,
+        `${w}px · abrir un día enseña lo que hay, que mirar no es editar`);
+      ok(await p.locator(".cal-dia-anadir").count() === 0
+         && await p.locator(".cal-dia-btn", { hasText: "Editar" }).count() === 0,
+        `${w}px · pero sin botón de añadir ni de editar`);
+      await c.close();
+    }
+
     // ── "FALTA EL ENLACE": EL CAMPO DE PEGAR, SOLO DONDE HACE FALTA ──
     // Es una salida de emergencia, no una instrucción. Sale abierto en iPhone —donde la
     // app instalada estrena un almacén vacío y no ve el código guardado— y en el resto

@@ -11,11 +11,14 @@ import { X } from "lucide-react";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
+import Compartir from "./Compartir.jsx";
 import Traer from "./Traer.jsx";
 import useCalendarioNube from "./useCalendarioNube.js";
 
+// Aquí dentro siempre se entra con cuenta —es la checklist del equipo—, así que no hay
+// modo enlace que valorar: se pide el calendario del equipo y punto.
 export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento }) {
-  const { apuntes, equipo, cargando, traer, guardar, borrar, cambiarEquipo } = useCalendarioNube();
+  const { apuntes, equipo, cargando, codigos, traer, guardar, borrar, cambiarEquipo } = useCalendarioNube();
 
   // Con Escape se sale, como en el resto de pantallas grandes de la app
   useEffect(() => {
@@ -41,6 +44,11 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento }) {
                   quien abría el calendario desde la checklist se encontraba un mes vacío
                   y ninguna forma de rellenarlo. */}
               <Traer apuntes={apuntes} onTraer={traer} />
+              {/* Los enlaces para compartir, también desde aquí: el calendario se abre
+                  más veces desde dentro de la checklist que en su app suelta, y tener
+                  que cambiar de app para copiar un enlace es la clase de rodeo que hace
+                  que no se use. */}
+              <Compartir codigos={codigos} href={window.location.href} />
               <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
               {/* onAbrirEvento aquí NO cambia de página: abre el evento guardado en esta
                   misma app, que es justo lo que se venía a hacer. */}

@@ -16,9 +16,69 @@ function getDb() { return Promise.resolve({ db: fakeDb, fs: fakeFs }); }
 export const nubeActiva = () => true;
 
 // Id corto y legible para el link (~8 caracteres sin ambiguos: 31^8 combinaciones)
-export function nuevoIdEvento() {
+export function nuevoIdEvento(largo = 8) {
   const abc = "abcdefghjkmnpqrstuvwxyz23456789";
-  return Array.from({ length: 8 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+  return Array.from({ length: largo }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+}
+
+// ─── EL CALENDARIO ────────────────────────────────────────────────────────────
+// Copia de la sección de nube.js, con la conexión simulada. Lo que se prueba aquí es la
+// mudanza a la carpeta propia: que copia sin borrar, que no se hace dos veces, y que el
+// documento de mirar no toca el de verdad.
+const COL_CALENDARIO = "calendario";
+const DOC_PUNTERO = "indice/calendario";
+
+export async function resolverCalendario() {
+  const { db, fs } = await getDb();
+  const ref = fs.doc(db, DOC_PUNTERO);
+  const r = await fs.runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.exists() ? snap.data() : {};
+    if (d.codigo && d.ver) return { codigo: d.codigo, ver: d.ver, estrenar: false };
+    const codigo = nuevoIdEvento(12);
+    const ver = nuevoIdEvento(12);
+    tx.set(ref, { codigo, ver }, { merge: true });
+    return { codigo, ver, estrenar: true, apuntes: d.apuntes || "[]", equipo: d.equipo || "[]" };
+  });
+  if (r.estrenar) {
+    const actualizado = Date.now();
+    await Promise.all([
+      fs.setDoc(fs.doc(db, COL_CALENDARIO, r.codigo), { apuntes: r.apuntes, equipo: r.equipo, ver: r.ver, actualizado }),
+      fs.setDoc(fs.doc(db, COL_CALENDARIO, r.ver), { apuntes: r.apuntes, equipo: r.equipo, actualizado }),
+    ]);
+  }
+  return { codigo: r.codigo, ver: r.ver };
+}
+
+function leerCalendario(d) {
+  try {
+    return {
+      apuntes: JSON.parse(d.apuntes),
+      equipo: d.equipo ? JSON.parse(d.equipo) : [],
+      ver: d.ver || "",
+      actualizado: d.actualizado ?? 0,
+    };
+  }
+  catch (e) { return null; }
+}
+
+export async function cargarCalendarioNube(codigo) {
+  const { db, fs } = await getDb();
+  if (!codigo) return null;
+  const snap = await fs.getDoc(fs.doc(db, COL_CALENDARIO, codigo));
+  return snap.exists() ? leerCalendario(snap.data()) : null;
+}
+
+export async function guardarCalendarioNube(codigo, apuntes, equipo = [], ver = "") {
+  const { db, fs } = await getDb();
+  if (!codigo) return 0;
+  const actualizado = Date.now();
+  const contenido = { apuntes: JSON.stringify(apuntes), equipo: JSON.stringify(equipo), actualizado };
+  await Promise.all([
+    fs.setDoc(fs.doc(db, COL_CALENDARIO, codigo), { ...contenido, ver }),
+    ver ? fs.setDoc(fs.doc(db, COL_CALENDARIO, ver), contenido) : Promise.resolve(),
+  ]);
+  return actualizado;
 }
 
 export async function guardarEventoNube(id, estado) {

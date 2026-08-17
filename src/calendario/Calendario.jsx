@@ -483,7 +483,6 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
 // reparte por jornada. El 19 de septiembre no son "tres bodas de 180, 100 y 50": son
 // 400 comensales y 44 personas que hay que tener ese sábado.
 function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar, onGuardar }) {
-  const hoy = hoyISO();
   const porDia = useMemo(() => {
     const dias = new Map();
     for (const a of apuntes) {

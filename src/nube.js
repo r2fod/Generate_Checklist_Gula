@@ -35,10 +35,13 @@ export async function guardarConfigFormulario({ codigo, avisos = [] }) {
   await fs.setDoc(fs.doc(db, COL_ARCHIVO, DOC_FORMULARIO), { codigo, avisos, actualizado: Date.now() });
 }
 
-// Id corto y legible para el link (~8 caracteres sin ambiguos: 31^8 combinaciones)
-export function nuevoIdEvento() {
+// Id corto y legible para el link (~8 caracteres sin ambiguos: 31^8 combinaciones).
+// El largo se puede pedir mayor: el calendario usa 12 porque su enlace no caduca con el
+// evento —vive todo el año y da paso a la agenda entera—, así que conviene que adivinarlo
+// sea mucho más caro que adivinar el de una boda concreta.
+export function nuevoIdEvento(largo = 8) {
   const abc = "abcdefghjkmnpqrstuvwxyz23456789";
-  return Array.from({ length: 8 }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
+  return Array.from({ length: largo }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
 }
 
 // Devuelve la marca de tiempo con la que se ha guardado. Quien llama la apunta para
@@ -267,9 +270,64 @@ export function suscribirArchivoNube(cb) {
 // archivo de eventos sí tuvo que partirse en un documento por evento, pero eso es
 // porque cada uno lleva su checklist entera dentro.
 //
-// Cuelga de "indice/", así que las reglas que ya hay lo cubren tal cual: solo el equipo
-// con sesión iniciada. No hace falta tocar firestore.rules.
-const DOC_CALENDARIO = "indice/calendario";
+// VIVÍA en "indice/calendario", que las reglas solo abren con sesión iniciada. Eso
+// estaba bien mientras el calendario era solo del equipo, pero deja fuera al que entra
+// por un enlace compartido, que no tiene cuenta. Y abrir "indice/" a los de fuera no es
+// una opción: ahí dentro están TAMBIÉN todas las checklists guardadas.
+//
+// Así que el calendario tiene ahora su propia colección, con dos documentos:
+//
+//   calendario/<codigo>  el de verdad. Quien conoce el código lee y escribe.
+//   calendario/<ver>     una copia para mirar. Quien conoce este código NO puede llegar
+//                        al de arriba: son documentos distintos y este no se lee nunca
+//                        de vuelta.
+//
+// El de verdad lleva dentro el código de su copia (campo "ver"), para que quien edita
+// por enlace pueda refrescarla sin tener que conocer nada más. Al revés no: la copia no
+// sabe de quién es copia.
+const COL_CALENDARIO = "calendario";
+
+// Dónde apuntamos los dos códigos: el documento de siempre, que sigue en "indice/" y
+// solo lee el equipo con sesión iniciada. Es lo que impide que el enlace de solo ver
+// lleve a nadie al de editar.
+const DOC_PUNTERO = "indice/calendario";
+
+// Los códigos del calendario del equipo, creándolos la primera vez.
+//
+// La mudanza COPIA lo que hubiera en indice/calendario y no borra nada: ese documento
+// se queda exactamente como estaba, con sus apuntes y su equipo, y solo se le añaden los
+// dos códigos. Si algo saliera mal, los datos siguen donde han estado siempre.
+//
+// Va en una transacción porque dos móviles abriendo el calendario a la vez la primera
+// vez generarían cada uno su pareja de códigos, y el equipo acabaría partido en dos
+// calendarios distintos sin enterarse.
+export async function resolverCalendario() {
+  const conexion = await getDb();
+  if (!conexion) return null;
+  const { db, fs } = conexion;
+  const ref = fs.doc(db, DOC_PUNTERO);
+
+  const r = await fs.runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const d = snap.exists() ? snap.data() : {};
+    if (d.codigo && d.ver) return { codigo: d.codigo, ver: d.ver, estrenar: false };
+    const codigo = nuevoIdEvento(12);
+    const ver = nuevoIdEvento(12);
+    tx.set(ref, { codigo, ver }, { merge: true });
+    // Se llevan tal cual, ya en texto: no se parsean ni se vuelven a serializar, así lo
+    // que llegue a la carpeta nueva es exactamente lo que había.
+    return { codigo, ver, estrenar: true, apuntes: d.apuntes || "[]", equipo: d.equipo || "[]" };
+  });
+
+  if (r.estrenar) {
+    const actualizado = Date.now();
+    await Promise.all([
+      fs.setDoc(fs.doc(db, COL_CALENDARIO, r.codigo), { apuntes: r.apuntes, equipo: r.equipo, ver: r.ver, actualizado }),
+      fs.setDoc(fs.doc(db, COL_CALENDARIO, r.ver), { apuntes: r.apuntes, equipo: r.equipo, actualizado }),
+    ]);
+  }
+  return { codigo: r.codigo, ver: r.ver };
+}
 
 // El equipo va en el MISMO documento que los apuntes, no en otro: son dos listas
 // pequeñas que se leen siempre juntas (para saber quién falta un día hacen falta las
@@ -277,55 +335,55 @@ const DOC_CALENDARIO = "indice/calendario";
 //
 // Y va en Firestore y no en el código porque son nombres de personas de verdad, y el
 // repositorio es público.
-export async function guardarCalendarioNube(apuntes, equipo = []) {
-  const conexion = await getDb();
-  if (!conexion) return 0;
-  const { db, fs } = conexion;
-  const actualizado = Date.now();
-  await fs.setDoc(fs.doc(db, DOC_CALENDARIO), {
-    apuntes: JSON.stringify(apuntes),
-    equipo: JSON.stringify(equipo),
-    actualizado,
-  });
-  return actualizado;
-}
-
-export async function cargarCalendarioNube() {
-  const conexion = await getDb();
-  if (!conexion) return null;
-  const { db, fs } = conexion;
-  const snap = await fs.getDoc(fs.doc(db, DOC_CALENDARIO));
-  if (!snap.exists()) return null;
-  const d = snap.data();
+function leerCalendario(d) {
   try {
     return {
       apuntes: JSON.parse(d.apuntes),
       // Los documentos guardados antes de que existiera el equipo no traen el campo:
       // se devuelve lista vacía en vez de reventar la carga entera.
       equipo: d.equipo ? JSON.parse(d.equipo) : [],
+      ver: d.ver || "",
       actualizado: d.actualizado ?? 0,
     };
   }
   catch (e) { return null; } // documento corrupto: mejor sin calendario que reventando
 }
 
+export async function cargarCalendarioNube(codigo) {
+  const conexion = await getDb();
+  if (!conexion || !codigo) return null;
+  const { db, fs } = conexion;
+  const snap = await fs.getDoc(fs.doc(db, COL_CALENDARIO, codigo));
+  return snap.exists() ? leerCalendario(snap.data()) : null;
+}
+
+// Guarda el calendario y, de paso, refresca la copia de mirar. Las dos escrituras van
+// juntas a propósito: si la copia solo se rehiciera cuando abre el calendario alguien
+// del equipo, el que edita por enlace dejaría a todos los que miran viendo turnos
+// viejos, que es peor que no tener enlace.
+export async function guardarCalendarioNube(codigo, apuntes, equipo = [], ver = "") {
+  const conexion = await getDb();
+  if (!conexion || !codigo) return 0;
+  const { db, fs } = conexion;
+  const actualizado = Date.now();
+  const contenido = { apuntes: JSON.stringify(apuntes), equipo: JSON.stringify(equipo), actualizado };
+  await Promise.all([
+    fs.setDoc(fs.doc(db, COL_CALENDARIO, codigo), { ...contenido, ver }),
+    ver ? fs.setDoc(fs.doc(db, COL_CALENDARIO, ver), contenido) : Promise.resolve(),
+  ]);
+  return actualizado;
+}
+
 // Igual que el resto de suscripciones: se avisa con el timestamp para poder distinguir
 // el eco de lo que uno mismo acaba de escribir de un cambio de otro dispositivo.
-export function suscribirCalendarioNube(cb) {
+export function suscribirCalendarioNube(codigo, cb) {
+  if (!codigo) return () => {};
   return suscribir(({ db, fs }) => fs.onSnapshot(
-      fs.doc(db, DOC_CALENDARIO),
+      fs.doc(db, COL_CALENDARIO, codigo),
       (snap) => {
         if (!snap.exists()) return;
-        const d = snap.data();
-        try {
-          cb({
-            apuntes: JSON.parse(d.apuntes),
-            equipo: d.equipo ? JSON.parse(d.equipo) : [],
-            actualizado: d.actualizado ?? 0,
-            pendiente: snap.metadata.hasPendingWrites,
-          });
-        }
-        catch (e) { /* documento corrupto: se ignora */ }
+        const leido = leerCalendario(snap.data());
+        if (leido) cb({ ...leido, pendiente: snap.metadata.hasPendingWrites });
       },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
     ));

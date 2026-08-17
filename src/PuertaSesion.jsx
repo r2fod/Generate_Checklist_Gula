@@ -111,10 +111,14 @@ function PantallaLogin() {
   );
 }
 
-export default function PuertaSesion({ Contenido }) {
+// sinLogin lo usa el calendario para sus dos enlaces compartidos (?cal= y ?ver=): esos
+// no llevan a un evento suelto sino a la agenda, y quien los recibe no tiene cuenta. Va
+// como prop y no metido en esLinkDeEvento a propósito — así la checklist no se abre sin
+// login por parámetros que ella no entiende.
+export default function PuertaSesion({ Contenido, sinLogin = false }) {
   // omitirLogin se fija una sola vez al arrancar: si es un link de evento o no hay
   // acceso configurado, nunca se pide login.
-  const [omitirLogin] = useState(() => !accesoActivo() || esLinkDeEvento());
+  const [omitirLogin] = useState(() => !accesoActivo() || sinLogin || esLinkDeEvento());
   const [sesion, setSesion] = useState({ cargando: !omitirLogin, usuario: null });
 
   useEffect(() => {
