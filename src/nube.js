@@ -1,26 +1,12 @@
 // ─── SINCRONIZACIÓN EN LA NUBE (Firestore) ─────────────────────────────────────
 // El SDK de Firebase se carga con import() dinámico SOLO si hay configuración:
 // con firebaseConfig = null la app no descarga nada extra y funciona como siempre.
-import { firebaseConfig } from "./firebaseConfig.js";
-import { getFirebaseApp } from "./firebase.js";
+// La conexión y el armazón de las suscripciones viven en firestore.js: estaban
+// escritos aquí y otra vez en formulario/envios.js, con una variable de promesa en
+// cada uno. Se reexporta nubeActiva porque medio proyecto la importa de aquí.
+import { getDb, nubeActiva, suscribir } from "./firestore.js";
 
-let dbPromise = null;
-
-function getDb() {
-  if (!firebaseConfig) return null;
-  if (!dbPromise) {
-    dbPromise = (async () => {
-      const app = await getFirebaseApp();
-      const fs = await import("firebase/firestore");
-      const db = fs.getFirestore(app);
-      return { db, fs };
-    })();
-  }
-  return dbPromise;
-}
-
-// ¿Está activada la edición compartida? (síncrono, para decidir qué link generar)
-export const nubeActiva = () => !!firebaseConfig;
+export { nubeActiva };
 
 // ─── CÓDIGO DEL FORMULARIO DE OFICINA ─────────────────────────────────────────
 // El código del link que se le pasa a la oficina vive en el archivo (colección
@@ -103,13 +89,7 @@ export async function cargarEventoNube(id) {
 // llegaba cuando ya ibas por el 6 y lo pisaba. Se veía como que las horas de barra
 // se cambiaban solas, sin que nadie tocara nada desde ningún otro sitio.
 export function suscribirEventoNube(id, cb) {
-  let unsub = () => {};
-  let cancelado = false;
-  (async () => {
-    const conexion = await getDb();
-    if (!conexion || cancelado) return;
-    const { db, fs } = conexion;
-    unsub = fs.onSnapshot(
+  return suscribir(({ db, fs }) => fs.onSnapshot(
       fs.doc(db, "eventos", id),
       (snap) => {
         if (!snap.exists()) return;
@@ -123,9 +103,7 @@ export function suscribirEventoNube(id, cb) {
         });
       },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
-    );
-  })();
-  return () => { cancelado = true; unsub(); };
+    ));
 }
 
 // ─── ÍNDICE COMPARTIDO DE "EVENTOS GUARDADOS" ──────────────────────────────────
@@ -155,13 +133,7 @@ export async function cargarIndiceEventosNube() {
 // cb recibe { mapa, actualizado } para poder decidir por timestamp qué versión manda
 // (un borrado no se puede "fusionar", solo sustituir por la más reciente).
 export function suscribirIndiceEventosNube(cb) {
-  let unsub = () => {};
-  let cancelado = false;
-  (async () => {
-    const conexion = await getDb();
-    if (!conexion || cancelado) return;
-    const { db, fs } = conexion;
-    unsub = fs.onSnapshot(
+  return suscribir(({ db, fs }) => fs.onSnapshot(
       fs.doc(db, DOC_INDICE),
       (snap) => {
         if (!snap.exists()) return;
@@ -169,9 +141,7 @@ export function suscribirIndiceEventosNube(cb) {
         cb({ mapa: JSON.parse(d.mapa), actualizado: d.actualizado ?? 0 });
       },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
-    );
-  })();
-  return () => { cancelado = true; unsub(); };
+    ));
 }
 
 // ─── ARCHIVO DE EVENTOS: UN DOCUMENTO POR EVENTO ──────────────────────────────
@@ -267,13 +237,7 @@ function leerSnapshotArchivo(snap) {
 // verdad ha pasado: los que llegan se añaden o actualizan, y solo desaparecen los que
 // Firestore marca explícitamente como borrados.
 export function suscribirArchivoNube(cb) {
-  let unsub = () => {};
-  let cancelado = false;
-  (async () => {
-    const conexion = await getDb();
-    if (!conexion || cancelado) return;
-    const { db, fs } = conexion;
-    unsub = fs.onSnapshot(
+  return suscribir(({ db, fs }) => fs.onSnapshot(
       fs.collection(db, COL_ARCHIVO),
       (snap) => {
         const cambios = [];
@@ -293,9 +257,7 @@ export function suscribirArchivoNube(cb) {
         if (cambios.length) cb({ cambios, actualizado });
       },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
-    );
-  })();
-  return () => { cancelado = true; unsub(); };
+    ));
 }
 
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
@@ -350,13 +312,7 @@ export async function cargarCalendarioNube() {
 // Igual que el resto de suscripciones: se avisa con el timestamp para poder distinguir
 // el eco de lo que uno mismo acaba de escribir de un cambio de otro dispositivo.
 export function suscribirCalendarioNube(cb) {
-  let unsub = () => {};
-  let cancelado = false;
-  (async () => {
-    const conexion = await getDb();
-    if (!conexion || cancelado) return;
-    const { db, fs } = conexion;
-    unsub = fs.onSnapshot(
+  return suscribir(({ db, fs }) => fs.onSnapshot(
       fs.doc(db, DOC_CALENDARIO),
       (snap) => {
         if (!snap.exists()) return;
@@ -372,7 +328,5 @@ export function suscribirCalendarioNube(cb) {
         catch (e) { /* documento corrupto: se ignora */ }
       },
       () => { /* sin conexión: se ignora, la app sigue en local */ },
-    );
-  })();
-  return () => { cancelado = true; unsub(); };
+    ));
 }

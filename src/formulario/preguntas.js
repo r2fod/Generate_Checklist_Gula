@@ -756,7 +756,7 @@ export function aRespuestasDeLaApp(r = {}) {
 
 // Qué campos ha decidido la app por su cuenta (no los ha contestado nadie). Sirve
 // para enseñarlos en otro color en la bandeja: de un vistazo se ve qué revisar.
-export function camposSinContestar(r = {}, tipo = "boda") {
+function camposSinContestar(r = {}, tipo = "boda") {
   return preguntasDe(tipo, r)
     .filter(p => r[p.id] === undefined || r[p.id] === null)
     .map(p => p.id);

@@ -138,6 +138,32 @@ export function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts
 }
 
 // Boda y comunión — fiel a "Checklist de Carga – BODA"
+// La categoría de alcoholes. Estaba escrita DOS veces, palabra por palabra, en el
+// generador de bodas y en el de cumpleaños... salvo por una línea: la boda lleva
+// Martini y Crema de arroz y el cumpleaños no. Es decir, ya habían empezado a
+// separarse, que es exactamente lo que pasa cuando la misma lista vive en dos sitios:
+// se cambia una marca y nadie se acuerda de la otra.
+//
+// Los extras van como parámetro para no cambiar nada de lo que sale hoy: quien quiera
+// que el cumpleaños lleve Martini tendrá que decirlo, no heredarlo por descuido.
+function categoriaAlcoholes(destilados, extras = []) {
+  return { nombre: "Alcoholes y licores", items: [
+    ["Ginebra (Seagrams/Tanqueray)", String(destilados.ginebraPremium)],
+    ["Ginebra de sabor (Puerto de Indias)", String(destilados.ginebraSabor)],
+    ["Ron (Bacardí)", String(destilados.ron)], ["Ron saborizado (Negrita)", String(destilados.ronBlanco)],
+    ["Tequila", String(destilados.tequila)], ["Tequila Rosa", String(destilados.tequilaSabor)],
+    ["Vodka", String(destilados.vodka)],
+    ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
+    ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
+    ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
+    ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
+    ["Orujo de hierbas", String(destilados.orujoHierbas)],
+    ["Ballantines", String(destilados.ballantines)], ["Barceló", String(destilados.barcelo)],
+    ...extras,
+    ["Otros licores marca blanca (Smirnoff)", String(destilados.marcaBlanca)],
+  ] };
+}
+
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
@@ -405,23 +431,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
-  if (destilados) {
-    cats.push({ nombre: "Alcoholes y licores", items: [
-      ["Ginebra (Seagrams/Tanqueray)", String(destilados.ginebraPremium)],
-      ["Ginebra de sabor (Puerto de Indias)", String(destilados.ginebraSabor)],
-      ["Ron (Bacardí)", String(destilados.ron)], ["Ron saborizado (Negrita)", String(destilados.ronBlanco)],
-      ["Tequila", String(destilados.tequila)], ["Tequila Rosa", String(destilados.tequilaSabor)],
-      ["Vodka", String(destilados.vodka)],
-      ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
-      ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
-      ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
-      ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
-      ["Orujo de hierbas", String(destilados.orujoHierbas)],
-      ["Ballantines", String(destilados.ballantines)], ["Barceló", String(destilados.barcelo)],
-      ["Martini", "1"], ["Crema de arroz", "1"],
-      ["Otros licores marca blanca (Smirnoff)", String(destilados.marcaBlanca)],
-    ]});
-  }
+  // El carrito de licores de la boda lleva además Martini y Crema de arroz
+  if (destilados) cats.push(categoriaAlcoholes(destilados, [["Martini", "1"], ["Crema de arroz", "1"]]));
 
   cats.push({ nombre: "Logística y retorno", items: [
     ["Cajas extra platos sucios", "1"], ["Cajas extra cubiertos sucios", "1"],
@@ -604,22 +615,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(!hayCongelador, ["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]),
   ]});
 
-  if (destilados) {
-    cats.push({ nombre: "Alcoholes y licores", items: [
-      ["Ginebra (Seagrams/Tanqueray)", String(destilados.ginebraPremium)],
-      ["Ginebra de sabor (Puerto de Indias)", String(destilados.ginebraSabor)],
-      ["Ron (Bacardí)", String(destilados.ron)], ["Ron saborizado (Negrita)", String(destilados.ronBlanco)],
-      ["Tequila", String(destilados.tequila)], ["Tequila Rosa", String(destilados.tequilaSabor)],
-      ["Vodka", String(destilados.vodka)],
-      ["Mistela", String(destilados.mistela)], ["Baileys", String(destilados.baileys)],
-      ["Tía María", String(destilados.tiaMaria)], ["Limoncello", String(destilados.limoncello)],
-      ["Jagger (Jägermeister)", String(destilados.jagger)], ["Peche (licor de melocotón)", String(destilados.peach)],
-      ["Crema de orujo", String(destilados.cremaOrujo)], ["Cazalla", String(destilados.cazalla)],
-      ["Orujo de hierbas", String(destilados.orujoHierbas)],
-      ["Ballantines", String(destilados.ballantines)], ["Barceló", String(destilados.barcelo)],
-      ["Otros licores marca blanca (Smirnoff)", String(destilados.marcaBlanca)],
-    ]});
-  }
+  if (destilados) cats.push(categoriaAlcoholes(destilados));
 
   cats.push({ nombre: "Limpieza", items: [
     ["Fairy", conSufijo(1, "bote")], ["Estropajo", conSufijo(1, "paquete")], ["Papel plata", conSufijo(1, "rollo")], ["Film", conSufijo(1, "rollo")], ["Papel Chemine", conSufijo(2, "rollo")],

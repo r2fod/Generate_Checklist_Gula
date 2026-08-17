@@ -29,7 +29,7 @@ const APPS_CONOCIDAS = /(FBAN|FBAV|FB_IAB|Instagram|Line\/|WhatsApp|Twitter|Link
 // "Version/" de Safari y el truco de abajo los confundiría con una vista incrustada.
 const NAVEGADORES_DE_VERDAD = /(CriOS|FxiOS|EdgiOS|OPiOS|OPT\/)/i;
 
-export function esNavegadorDeApp(ua = "") {
+function esNavegadorDeApp(ua = "") {
   if (!ua) return false;
   if (APPS_CONOCIDAS.test(ua)) return true;
   if (NAVEGADORES_DE_VERDAD.test(ua)) return false;

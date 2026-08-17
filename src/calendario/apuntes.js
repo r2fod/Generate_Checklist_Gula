@@ -130,7 +130,7 @@ export function saneaLista(lista) {
 
 // Todos los días que ocupa un apunte. Uno normal ocupa uno; unas vacaciones de tres
 // semanas ocupan veintiuno, y tienen que pintarse en los veintiuno o no sirven de nada.
-export function diasDelApunte(apunte) {
+function diasDelApunte(apunte) {
   const desde = aFecha(apunte.fecha);
   if (!desde) return [];
   const hasta = apunte.hasta ? aFecha(apunte.hasta) : desde;
@@ -305,8 +305,8 @@ export function saneaEquipo(lista) {
 //
 // Se devuelve null cuando no hay hora: es mejor no enseñar turno que enseñar uno
 // inventado, porque de esto cuelga a qué hora se levanta la gente.
-export const HORAS_ANTES_SALA = 6;
-export const HORAS_ANTES_LOGISTICA = 7;
+const HORAS_ANTES_SALA = 6;
+const HORAS_ANTES_LOGISTICA = 7;
 
 export function turnosDe(apunte, antesSala = HORAS_ANTES_SALA, antesLogistica = HORAS_ANTES_LOGISTICA) {
   const minutos = enMinutos(apunte && apunte.hora);

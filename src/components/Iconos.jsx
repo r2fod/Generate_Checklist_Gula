@@ -76,7 +76,7 @@ const ITEM_ICON_DEFAULT = { I: Package, c: "#64748b" };
 // de texto POR ITEM, y con ~140 items eso son decenas de miles en cada render. Como
 // el icono de un nombre no cambia nunca, se calcula una vez y se guarda.
 const _cacheIconoItem = new Map();
-export function iconoItem(label) {
+function iconoItem(label) {
   let icono = _cacheIconoItem.get(label);
   if (icono) return icono;
   const n = String(label).toLowerCase();

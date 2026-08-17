@@ -13,6 +13,7 @@ import RedDeSeguridad from '../RedDeSeguridad.jsx'
 import '../index.css'
 import Formulario from './Formulario.jsx'
 import { leerGuardado, guardar, codigoDeTexto, direccionConCodigo } from './codigo.js'
+import { esIOS } from './instalar.js'
 import { leerPreferenciaTema, temaSegunPreferencia } from '../tema.js'
 
 // El código del enlace (?enviar=<código>) se recuerda en ESTE navegador porque si no,
@@ -48,13 +49,23 @@ function codigo() {
 function pedirElEnlace() {
   const raiz = document.getElementById('root')
   raiz.innerHTML = ''
+  // El campo para pegar el enlace es una SALIDA de emergencia, no una instrucción: a
+  // quien llega aquí hay que decirle que busque el enlace en el WhatsApp, no ponerle
+  // deberes. Así que sale abierto solo donde de verdad hace falta —el iPhone, donde la
+  // app instalada estrena un almacén vacío y no ve el código que guardó el navegador— y
+  // en el resto queda detrás de un enlace que hay que tocar.
+  //
+  // Escondido, NO quitado: quien abra la dirección pelada en Android se quedaría sin
+  // salida, y eso ya pasó una vez. Un callejón sin salida en el peor sitio posible.
+  const enApple = esIOS(navigator.userAgent, navigator.maxTouchPoints || 0)
   const caja = document.createElement('div')
   caja.className = 'link-roto'
   caja.innerHTML = `
     <h1>Falta el enlace</h1>
     <p>Este formulario se abre con el enlace que da logística. Búscalo en el WhatsApp y ábrelo desde ahí.</p>
-    <label class="link-roto-etiqueta" for="pegar-enlace">O pega aquí el enlace y lo abro yo:</label>
-    <div class="link-roto-pegar">
+    <button type="button" class="link-roto-abrir-pegar"${enApple ? ' hidden' : ''}>Pegar el enlace a mano</button>
+    <label class="link-roto-etiqueta" for="pegar-enlace"${enApple ? '' : ' hidden'}>O pega aquí el enlace y lo abro yo:</label>
+    <div class="link-roto-pegar"${enApple ? '' : ' hidden'}>
       <input id="pegar-enlace" class="form-input" type="text" inputmode="url" autocomplete="off"
              placeholder="https://..." aria-label="Enlace del formulario" />
       <button type="button" class="form-btn-principal">Abrir</button>
@@ -65,6 +76,15 @@ function pedirElEnlace() {
 
   const campo = caja.querySelector('#pegar-enlace')
   const error = caja.querySelector('.link-roto-error')
+  const etiqueta = caja.querySelector('.link-roto-etiqueta')
+  const grupo = caja.querySelector('.link-roto-pegar')
+  const abrirPegar = caja.querySelector('.link-roto-abrir-pegar')
+  abrirPegar.addEventListener('click', () => {
+    abrirPegar.hidden = true
+    etiqueta.hidden = false
+    grupo.hidden = false
+    campo.focus()
+  })
   const abrir = () => {
     const suCodigo = codigoDeTexto(campo.value)
     if (!suCodigo) { error.hidden = false; campo.focus(); return }

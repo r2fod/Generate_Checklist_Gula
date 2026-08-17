@@ -9,7 +9,7 @@ export const CARPAS_EN_ALMACEN = 8;
 // Una 3x3 cubre ~12 personas de pie (0,75 m²/pax), que es el estándar de las
 // alquiladoras. Más una para el buffet y otra para el camión, que si van en la misma
 // cuenta se comen el sitio de comer.
-export const CARPA_BUFFET = 1, CARPA_CAMION = 1;
+const CARPA_BUFFET = 1, CARPA_CAMION = 1;
 
 export function carpasRecomendadas(pax = 0) {
   const paraComer = Math.max(1, Math.ceil((pax || 0) / 12));

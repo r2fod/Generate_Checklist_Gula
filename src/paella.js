@@ -5,7 +5,7 @@
 // qué saber la cuenta. Teniéndolo en un solo sitio, cambiar la ración cambia las dos.
 
 // Una paellera da de comer a unas 30 personas. De ahí sale el número.
-export const PERSONAS_POR_PAELLA = 30;
+const PERSONAS_POR_PAELLA = 30;
 
 export function paellasPorPax(pax = 0) {
   return Math.max(1, Math.ceil((pax || 0) / PERSONAS_POR_PAELLA));

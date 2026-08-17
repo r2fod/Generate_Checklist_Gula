@@ -9,24 +9,11 @@
 //     crear; leerlos, cambiarlos o borrarlos es cosa del equipo con sesión.
 //
 // Lo de este fichero no toca en ningún momento los eventos ni la checklist.
-import { firebaseConfig } from "../firebaseConfig.js";
-import { getFirebaseApp } from "../firebase.js";
+// La conexión y el armazón de las suscripciones, compartidos con nube.js (ver
+// src/firestore.js). Antes estaban aquí duplicados, con su propia promesa.
+import { getDb, nubeActiva, suscribir } from "../firestore.js";
 
-let dbPromise = null;
-
-function getDb() {
-  if (!firebaseConfig) return null;
-  if (!dbPromise) {
-    dbPromise = (async () => {
-      const app = await getFirebaseApp();
-      const fs = await import("firebase/firestore");
-      return { db: fs.getFirestore(app), fs };
-    })();
-  }
-  return dbPromise;
-}
-
-export const nubeActiva = () => !!firebaseConfig;
+export { nubeActiva };
 
 // Código de acceso del formulario: 10 caracteres sin ambiguos (nada de l/1, o/0).
 // Nadie lo teclea —el enlace se copia y se pega—, así que alargarlo no molesta a nadie
@@ -38,7 +25,7 @@ export function nuevoCodigo() {
 }
 
 // Cuántos eventos ve la oficina y de qué ventana de fechas salen
-export const MAX_PROXIMOS = 8;
+const MAX_PROXIMOS = 8;
 
 // Deja los avisos en su forma mínima: nombre y teléfono solo con dígitos (WhatsApp
 // no traga espacios ni guiones). Los que se queden sin número no viajan.
@@ -115,23 +102,17 @@ export async function leerProximos(codigo) {
 // pueden vaciarle la lista a quien está a media pregunta: en ese caso se sigue con lo
 // último que había, que es más útil que una pantalla en blanco.
 export function suscribirProximos(codigo, cb) {
-  let unsub = () => {};
-  let cancelado = false;
-  (async () => {
-    const conexion = await getDb();
-    if (!conexion || !codigo || cancelado) return;
-    const { db, fs } = conexion;
-    unsub = fs.onSnapshot(
-      fs.doc(db, "publico", codigo),
-      (snap) => {
-        if (!snap.exists()) return;
-        const d = snap.data();
-        cb({ eventos: d.eventos || [], avisos: Array.isArray(d.avisos) ? d.avisos : [] });
-      },
-      () => { /* sin conexión o sin permiso: se sigue con lo que ya había */ },
-    );
-  })();
-  return () => { cancelado = true; unsub(); };
+  // Sin código no hay a qué buzón escuchar: se devuelve un cancelador que no hace nada
+  if (!codigo) return () => {};
+  return suscribir(({ db, fs }) => fs.onSnapshot(
+    fs.doc(db, "publico", codigo),
+    (snap) => {
+      if (!snap.exists()) return;
+      const d = snap.data();
+      cb({ eventos: d.eventos || [], avisos: Array.isArray(d.avisos) ? d.avisos : [] });
+    },
+    () => { /* sin conexión o sin permiso: se sigue con lo que ya había */ },
+  ));
 }
 
 // Manda las respuestas. `eventoDestino` es el nombre del evento que han elegido de la
@@ -183,13 +164,7 @@ export async function corregirEnvio(id, respuestas, eventoDestino = "") {
 // momento sin tener que abrir nada ni recargar. Devuelve la función para dejar de
 // escuchar.
 export function suscribirEnvios(cb) {
-  let unsub = () => {};
-  let cancelado = false;
-  (async () => {
-    const conexion = await getDb();
-    if (!conexion || cancelado) return;
-    const { db, fs } = conexion;
-    unsub = fs.onSnapshot(
+  return suscribir(({ db, fs }) => fs.onSnapshot(
       fs.collection(db, "envios"),
       (snap) => {
         const lista = [];
@@ -197,9 +172,7 @@ export function suscribirEnvios(cb) {
         cb(lista.sort((a, b) => (b.enviado?.seconds || 0) - (a.enviado?.seconds || 0)));
       },
       () => { /* sin conexión o sin permiso: la app sigue igual */ },
-    );
-  })();
-  return () => { cancelado = true; unsub(); };
+    ));
 }
 
 // Un envío revisado (aplicado o descartado) NO se borra: sale de la bandeja pero se

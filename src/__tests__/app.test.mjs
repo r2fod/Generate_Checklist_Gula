@@ -3701,6 +3701,43 @@ async function main() {
       await c.close();
     }
 
+    // ── "FALTA EL ENLACE": EL CAMPO DE PEGAR, SOLO DONDE HACE FALTA ──
+    // Es una salida de emergencia, no una instrucción. Sale abierto en iPhone —donde la
+    // app instalada estrena un almacén vacío y no ve el código guardado— y en el resto
+    // queda detrás de un enlace, para no invitar a pegar direcciones a quien solo tiene
+    // que abrir la suya del WhatsApp.
+    {
+      const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+      for (const [quien, ua] of [["en Android", null], ["en iPhone", IPHONE]]) {
+        for (const ancho of [320, 390, 768]) {
+          const c = await navegador.newContext({ viewport: { width: ancho, height: 760 }, ...(ua ? { userAgent: ua } : {}) });
+          const p = await c.newPage();
+          p.on("pageerror", e => errores.push(`falta enlace ${quien} ${ancho}px: ${e}`));
+          // Sin ?enviar= y sin nada guardado: el callejón que hay que resolver
+          await p.goto(`http://localhost:${PUERTO}/formulario/`, { waitUntil: "networkidle" });
+          await p.waitForSelector(".link-roto");
+
+          const abierto = await p.locator(".link-roto-pegar").isVisible();
+          const conBoton = await p.locator(".link-roto-abrir-pegar").isVisible();
+          if (ua) {
+            ok(abierto && !conBoton, `${quien} ${ancho}px: el campo de pegar sale abierto, que es donde hace falta`);
+          } else {
+            ok(!abierto && conBoton, `${quien} ${ancho}px: el campo está escondido tras "Pegar el enlace a mano"`);
+          }
+          // Escondido no es quitado: sigue habiendo salida, que este callejón ya existió
+          if (!ua) {
+            await p.locator(".link-roto-abrir-pegar").click();
+            await p.waitForTimeout(150);
+            ok(await p.locator(".link-roto-pegar").isVisible(),
+              `${quien} ${ancho}px: y al tocarlo aparece, que sin salida se vuelve un callejón`);
+          }
+          ok(!await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1),
+            `${quien} ${ancho}px: la pantalla no se mueve de lado`);
+          await c.close();
+        }
+      }
+    }
+
     // ── LAS TRES APPS SE INSTALAN Y ABREN SIN COBERTURA ──
     // Cada una en su carpeta con su manifiesto: eso es lo que hace que el móvil las
     // instale por separado. Y el service worker es lo que hace que Chrome OFREZCA

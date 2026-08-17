@@ -28,7 +28,7 @@ export function sumaDias(iso, dias) {
 // ("Recoger sillas"): el aviso ya pone "Recogida:" o "Devolución:" según toque.
 // Qué alquileres pide un estado de evento. Es la MISMA decisión que toman los
 // interruptores de la pantalla, pero mirando el estado en vez de reaccionar al clic.
-export function alquileresDe(estado = {}) {
+function alquileresDe(estado = {}) {
   const esProduccion = estado.evento === "produccion";
   const sillas = estado.origenSillas;
   return {

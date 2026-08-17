@@ -123,7 +123,7 @@ export function hoyISO() {
 // ya han pasado se quedan clavados en lo que tuvieran: su lista es historia y no tiene
 // sentido que las cifras cambien al abrirla. Los que están por venir pasan a automático,
 // para que se corrijan solos según su fecha.
-export function temporadaInicial(estado = {}, hoy = hoyISO()) {
+function temporadaInicial(estado = {}, hoy = hoyISO()) {
   if (estado.estacion) return estado.estacion;
   const yaPasado = estado.fechaEvento && estado.fechaEvento < hoy;
   if (!yaPasado) return "auto";

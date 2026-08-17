@@ -5751,17 +5751,44 @@ hr {
   color: var(--text-muted);
   margin-top: 6px;
 }
+.link-roto-etiqueta[hidden] { display: none; }
+
+/* El botón que descubre el campo. Va en plan enlace y no en plan botón grande: es una
+   salida de emergencia, y ponerla con el mismo peso que "búscalo en el WhatsApp" invita
+   a pegar enlaces a quien solo tiene que abrir el suyo. En iPhone no sale, porque allí
+   el campo ya viene abierto: es donde de verdad hace falta. */
+.link-roto-abrir-pegar {
+  align-self: center;
+  min-height: 44px;      /* alto de dedo aunque parezca un enlace */
+  padding: 0 8px;
+  border: 0 !important;
+  background: none !important;
+  color: var(--text-muted) !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-roto-abrir-pegar[hidden] { display: none; }
 .link-roto-pegar {
   display: flex;
+  flex-wrap: wrap;   /* en 320px el "Abrir" baja debajo en vez de estrujar el campo */
   gap: 8px;
   align-items: stretch;
 }
+.link-roto-pegar[hidden] { display: none; }
 .link-roto-pegar .form-input {
   flex: 1;
   min-width: 0;   /* sin esto el input no baja de su ancho por defecto y desborda en 320px */
   text-align: left;
 }
-.link-roto-pegar button { flex: 0 0 auto; padding: 0 16px; }
+/* El campo nunca por debajo de lo legible; si con el botón al lado no cabe, el botón
+   baja a su propia línea y ocupa el ancho entero, que es más fácil de acertar. */
+.link-roto-pegar .form-input { flex: 1 1 190px; }
+.link-roto-pegar button { flex: 1 1 auto; min-width: 96px; padding: 0 16px; }
+@media (min-width: 400px) {
+  .link-roto-pegar button { flex: 0 0 auto; }
+}
 .link-roto-error {
   font-size: 0.82rem;
   color: var(--peligro, #dc2626);

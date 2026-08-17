@@ -11,14 +11,14 @@
 
 // Techo por archivo ya convertido a texto (base64 abulta ~4/3 del binario). Se deja
 // margen para las respuestas y para el segundo archivo del mismo envío.
-export const MAX_BYTES = 420 * 1024;
+const MAX_BYTES = 420 * 1024;
 const LADO_MAX = 1400;
 const CALIDAD = 0.72;
 
-export const esImagen = (f) => !!f && /^image\//.test(f.type);
+const esImagen = (f) => !!f && /^image\//.test(f.type);
 
 // Tamaño en bytes de un data URL, sin montar el binario entero en memoria
-export function pesoDeDataUrl(dataUrl = "") {
+function pesoDeDataUrl(dataUrl = "") {
   const coma = dataUrl.indexOf(",");
   if (coma === -1) return 0;
   const b64 = dataUrl.slice(coma + 1);
