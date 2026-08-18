@@ -977,6 +977,16 @@ body {
   animation: slideUpFade 0.25s ease both;
 }
 
+/* El aviso de lo que el calendario ha adelantado solo. En verde de "hecho" y no en el
+   azul de "atención": no ha pasado nada que haya que atender, se ha ahorrado trabajo.
+   Solo cambia el color — la colocación, el centrado y la animación son las mismas, que
+   ya costaron lo suyo de dejar bien. */
+.cambios-remotos-banner.es-creadas {
+  background: var(--ok-bg);
+  border-color: var(--ok-borde);
+  color: var(--ok-texto);
+}
+
 .aviso-nombre-ocupado {
   display: block;
   margin-top: 6px;

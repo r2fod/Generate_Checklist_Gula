@@ -201,6 +201,12 @@ export function checklistsPorCrear(apuntes, archivo = {}, opciones = {}) {
   apuntesPorPromover(apuntes, opciones).forEach(a => {
     const estado = estadoDesdeApunte(a);
     if (!estado) return;
+    // Sin id no se puede enlazar, y un enlace sin id es peor que ninguno: quien lo
+    // aplique buscará el apunte por un id vacío, eso coincide con TODOS los que
+    // tampoco lo tengan, y acaba marcando media lista con el nombre equivocado. Pasó
+    // en la prueba de arranque: se marcó una boda de dentro de dos meses. Lo normal es
+    // que venga puesto (saneaLista lo pone), pero de esto no se avisa: se rompe callado.
+    if (!a.id) return;
     const nombre = estado.nombreEvento;
     // Si ya hay un evento guardado con ese nombre NO se toca. Puede llevar media
     // checklist montada y sus checks hechos, y sobrescribirla con una recién nacida es

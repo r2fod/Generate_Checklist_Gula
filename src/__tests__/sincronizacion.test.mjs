@@ -167,6 +167,87 @@ console.log('\n══ El calendario se muda a su carpeta propia ══');
   setSesion(true);
 }
 
+console.log('\n══ Al abrir la app: las checklists de lo que ya viene ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const { checklistsPorCrear, saneaLista } = await import('../calendario/apuntes.js');
+
+  // El calendario del equipo, con una boda a la vuelta de la esquina y otra lejos
+  const hoy = new Date();
+  const enDias = (n) => {
+    const f = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + n);
+    return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
+  };
+  const APUNTES = [
+    { fecha: enDias(4), titulo: 'Boda que viene', tipo: 'boda', pax: 120, sitio: 'Finca inventada' },
+    { fecha: enDias(6), titulo: 'Boda ya montada', tipo: 'boda', pax: 90 },
+    { fecha: enDias(60), titulo: 'Boda lejana', tipo: 'boda', pax: 200 },
+  ];
+  almacen.set('indice/calendario', { apuntes: JSON.stringify(APUNTES), equipo: '[]', actualizado: 1 });
+  const cs = await N.resolverCalendario();
+
+  // Y en el archivo, una checklist con TRABAJO HECHO dentro
+  const conTrabajo = { evento: 'boda', pax: 95, checkeados: { 'Bebida::Cerveza': true }, itemsManuales: [{ nombre: 'Hielo' }] };
+
+  // ── Réplica de lo que hace App al arrancar ──
+  const arrancar = async (archivoInicial, archivoListo) => {
+    // La guardia: mientras el archivo no ha cargado no se toca nada. Es lo único que
+    // impide crear una checklist encima de otra que aún no consta.
+    if (!archivoListo) return { archivo: archivoInicial, creadas: [], escribio: false };
+    const cal = await N.cargarCalendarioNube(cs.codigo);
+    // saneaLista igual que hace App: es lo que pone el id de cada apunte, y sin id no
+    // hay forma de enlazarlo con su evento.
+    const apuntes = saneaLista(cal.apuntes);
+    const { nuevas, enlaces } = checklistsPorCrear(apuntes, archivoInicial);
+    const archivo = Object.keys(nuevas).length ? { ...archivoInicial, ...nuevas } : archivoInicial;
+    if (enlaces.length) {
+      const porId = new Map(enlaces.map(e => [e.id, e.nombre]));
+      await N.guardarCalendarioNube(
+        cs.codigo,
+        apuntes.map(a => (porId.has(a.id) ? { ...a, evento: porId.get(a.id) } : a)),
+        cal.equipo, cal.ver,
+      );
+    }
+    return { archivo, creadas: enlaces.filter(e => e.nueva).map(e => e.nombre), escribio: enlaces.length > 0 };
+  };
+
+  // EL CASO PELIGROSO: arrancar con el archivo todavía cargando. Sin la guardia, "Boda
+  // ya montada" no consta, se crearía una vacía encima, y al sincronizar sustituiría la
+  // de verdad con sus checks dentro. No tiene vuelta atrás.
+  const pronto = await arrancar({}, false);
+  ok(!pronto.escribio && pronto.creadas.length === 0,
+    'con el archivo aún cargando NO se crea nada: es lo que impide pisar una checklist con trabajo hecho');
+
+  // Ahora con el archivo cargado de verdad
+  const r1 = await arrancar({ 'Boda ya montada': conTrabajo }, true);
+  ok(r1.creadas.length === 1 && r1.creadas[0] === 'Boda que viene',
+    `solo se crea la que falta y está cerca → ${JSON.stringify(r1.creadas)}`);
+  ok(!r1.creadas.includes('Boda lejana'), 'la de dentro de dos meses no: todavía puede moverse');
+  ok(r1.archivo['Boda ya montada'].checkeados['Bebida::Cerveza'] === true
+     && r1.archivo['Boda ya montada'].itemsManuales.length === 1,
+    'y la que ya estaba montada conserva sus checks y sus items a mano, intactos');
+  ok(r1.archivo['Boda que viene'].pax === 120 && r1.archivo['Boda que viene'].ubicacion === 'Finca inventada',
+    'la creada llega con el pax y el sitio que sabía el calendario');
+
+  // Los apuntes quedan marcados EN LA NUBE, no solo en pantalla: si no, al siguiente
+  // arranque se volverían a crear.
+  const despues = await N.cargarCalendarioNube(cs.codigo);
+  const marcados = despues.apuntes.filter(a => a.evento).map(a => a.titulo).sort();
+  ok(marcados.length === 2 && marcados[0] === 'Boda que viene' && marcados[1] === 'Boda ya montada',
+    `los dos apuntes cercanos quedan enlazados con su evento → ${JSON.stringify(marcados)}`);
+
+  // Segundo arranque: no hay nada que hacer y NO se escribe. Sin esto, cada apertura de
+  // la app escribiría el calendario entero en la nube sin motivo.
+  const r2 = await arrancar(r1.archivo, true);
+  ok(!r2.escribio && r2.creadas.length === 0,
+    'al volver a abrir la app no se crea ni se escribe nada: ya está todo hecho');
+
+  // Y la copia de solo lectura se ha ido refrescando con los apuntes marcados
+  const copia = await N.cargarCalendarioNube(cs.ver);
+  ok(copia.apuntes.filter(a => a.evento).length === 2,
+    'y el enlace de solo mirar enseña el calendario al día, no una foto de antes');
+}
+
 console.log('\n══ Escenarios duros ══');
 // 1. Borrar un evento en un dispositivo llega al otro
 almacen.clear(); limpiarPrevios();

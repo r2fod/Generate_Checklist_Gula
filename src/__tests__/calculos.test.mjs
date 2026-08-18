@@ -839,6 +839,15 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
   const nada = checklistsPorCrear(lista, { ...archivo, "Boda nueva": {} }, { hoy });
   ok(Object.keys(nada.nuevas).length === 0,
     "con todo ya creado no se escribe nada en el archivo");
+
+  // Un apunte SIN id no genera enlace. Parece un detalle y no lo es: quien aplica los
+  // enlaces busca el apunte por su id, un id vacío coincide con todos los que tampoco
+  // lo tengan, y acaba marcando media lista con el nombre equivocado. Salió así en la
+  // prueba de arranque —se marcó una boda de dentro de dos meses— y se rompe callado.
+  const sinId = checklistsPorCrear(
+    [{ fecha: "2026-09-04", titulo: "Boda sin id", tipo: "boda", pax: 100 }], {}, { hoy });
+  ok(sinId.enlaces.length === 0 && Object.keys(sinId.nuevas).length === 0,
+    "un apunte sin id no genera enlace: sin él no se puede marcar y marcaría a los demás");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

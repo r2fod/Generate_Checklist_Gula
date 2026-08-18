@@ -23,6 +23,7 @@ import {
   cargarIndiceEventosNube,
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
   leerConfigFormulario, guardarConfigFormulario,
+  resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
@@ -60,7 +61,7 @@ const CalendarioEnChecklist = React.lazy(() => import("./calendario/EnChecklist.
 // aquí) porque es lo que sabe el CALENDARIO: qué apuntes se acercan, cuáles ya tienen
 // checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
 // EnChecklist— para que no arrastre el calendario entero al bundle de la checklist.
-import { checklistsPorCrear } from "./calendario/apuntes.js";
+import { checklistsPorCrear, saneaLista, saneaEquipo } from "./calendario/apuntes.js";
 
 // Qué evento pide abrir la dirección, si es que pide alguno. Es como el calendario (que
 // es otra app, en otra carpeta) manda a la checklist a un evento concreto: sin esto, su
@@ -634,6 +635,9 @@ export default function App({ onCerrarSesion } = {}) {
   const [enlaceCopiado, setEnlaceCopiado] = useState(false);
   // Aviso flotante cuando la oficina manda o cambia algo con la app abierta
   const [avisoEnvios, setAvisoEnvios] = useState(null);
+  // Las checklists que se han creado solas al abrir. Automático no puede querer decir
+  // invisible: en el archivo aparecen eventos y hay que poder enterarse de cuáles.
+  const [checklistsCreadas, setChecklistsCreadas] = useState([]);
   // A quién avisa la oficina por WhatsApp al mandar o cambiar algo. Se guarda en la
   // nube con el código, así que se pone una vez y vale para todos los dispositivos.
   // El número NO va escrito en el código: este repositorio es público.
@@ -1162,8 +1166,7 @@ export default function App({ onCerrarSesion } = {}) {
   const crearChecklistsDeApuntes = (apuntes) => {
     const archivo = eventosGuardadosRef.current || {};
     const { nuevas, enlaces } = checklistsPorCrear(apuntes, archivo);
-    const cuantas = Object.keys(nuevas).length;
-    if (cuantas > 0) guardarEventos({ ...archivo, ...nuevas });
+    if (Object.keys(nuevas).length > 0) guardarEventos({ ...archivo, ...nuevas });
     return enlaces;
   };
 
@@ -1789,6 +1792,49 @@ export default function App({ onCerrarSesion } = {}) {
   // existe". Se dispara UNA vez —handleCargarEvento recarga la página sin el
   // parámetro— y si el nombre no aparece se dice, en vez de dejar la pantalla como si
   // no se hubiera pulsado nada.
+  // Y esto mismo AL ABRIR LA APP, sin tener que entrar en el calendario.
+  //
+  // Antes solo pasaba al abrir la pantalla del calendario. Si nadie la abría en una
+  // semana, la boda no entraba en el archivo, y por tanto no le salía a la oficina en
+  // el desplegable del formulario: la escribía a mano y llegaba duplicada. Que la
+  // cadena dependa de que alguien entre en una pantalla concreta es justo lo que no
+  // puede ser.
+  //
+  // LA GUARDIA IMPORTANTE es esperar a archivoListo. Mientras el archivo está bajando
+  // de la nube, "Boda X" todavía no consta como guardada; sin esperar, se crearía una
+  // encima y al sincronizar SUSTITUIRÍA la de verdad, con sus checks y sus items a mano
+  // dentro. Es el único fallo de todo esto que no tendría vuelta atrás.
+  const promocionHechaRef = React.useRef(false);
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo || !archivoListo || promocionHechaRef.current) return;
+    promocionHechaRef.current = true;
+    let vivo = true;
+    (async () => {
+      try {
+        const cs = await resolverCalendario();
+        if (!cs || !vivo) return;
+        const cal = await cargarCalendarioNube(cs.codigo);
+        if (!cal || !vivo) return;
+        const apuntes = saneaLista(cal.apuntes);
+        const enlaces = crearChecklistsDeApuntes(apuntes);
+        if (!enlaces.length || !vivo) return;
+        const creadas = enlaces.filter(e => e.nueva).map(e => e.nombre);
+        if (creadas.length) setChecklistsCreadas(creadas);
+        // Los apuntes se marcan de una vez, no uno a uno: si no, las escrituras parten
+        // todas de la misma foto y solo la última sobrevive.
+        const porId = new Map(enlaces.map(e => [e.id, e.nombre]));
+        await guardarCalendarioNube(
+          cs.codigo,
+          apuntes.map(a => (porId.has(a.id) ? { ...a, evento: porId.get(a.id) } : a)),
+          saneaEquipo(cal.equipo),
+          cal.ver || cs.ver,
+        );
+      } catch (e) { /* sin conexión o sin permisos: se reintenta al siguiente arranque */ }
+    })();
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [haySesionEquipo, archivoListo]);
+
   const pidioAbrir = React.useRef(false);
   // El tope de espera. Se arma solo si la dirección pide abrir algo, para no dejar un
   // temporizador suelto en cada arranque normal de la app.
@@ -2786,6 +2832,23 @@ export default function App({ onCerrarSesion } = {}) {
               </span>
             </div>
             <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Lo que se ha adelantado solo al abrir. Se dice, y se ofrece ir a verlo:
+            son eventos que han aparecido en tu archivo sin que los pidieras. */}
+        {checklistsCreadas.length > 0 && (
+          <div className="cambios-remotos-banner es-creadas">
+            <div className="cambios-remotos-detalle">
+              <strong>📅 Del calendario:</strong>
+              <span>
+                {checklistsCreadas.length === 1
+                  ? `He creado la checklist de "${checklistsCreadas[0]}", que ya está cerca.`
+                  : `He creado ${checklistsCreadas.length} checklists de eventos que ya están cerca: ${checklistsCreadas.slice(0, 3).join(", ")}${checklistsCreadas.length > 3 ? ` y ${checklistsCreadas.length - 3} más` : ""}.`}
+              </span>
+            </div>
+            <button className="btn btn-outline" onClick={() => { setChecklistsCreadas([]); setModalCalendario(true); }}>Ver el calendario</button>
+            <button className="cambios-remotos-cerrar" onClick={() => setChecklistsCreadas([])} aria-label="Cerrar aviso"><X size={14} /></button>
           </div>
         )}
 
