@@ -14,7 +14,7 @@ import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, Cli
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
-  turnosDe, DIAS_ANTICIPACION,
+  turnosDe, DIAS_ANTICIPACION, apuntesPorPromover,
 } from "./apuntes.js";
 import { personalNecesario, resumenAsignados, loQueFalta, horasEntre, ROLES } from "../personal.js";
 
@@ -136,7 +136,9 @@ export default function Calendario({
                      onGuardar={puedeEditar ? onGuardar : null} />
       )}
 
-      {vista !== "equipo" && <LoQueViene proximos={proximos} apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} />}
+      {vista !== "equipo" && (
+        <LoQueViene proximos={proximos} apuntes={apuntes} equipo={equipo} onAbrirEvento={onAbrirEvento} />
+      )}
 
       {diaAbierto && (
         <PanelDia
@@ -323,12 +325,23 @@ function Anio({ anio, mapa, hoy, onMes }) {
 // que convierte el calendario en control: no es "qué hay en octubre", es "de qué me
 // tengo que ocupar esta semana".
 function LoQueViene({ proximos, apuntes, equipo, onAbrirEvento }) {
+  const sinChecklist = apuntesPorPromover(apuntes).length;
   if (proximos.length === 0) {
     return <div className="cal-viene cal-viene-vacio">No hay eventos en los próximos 14 días.</div>;
   }
   return (
     <div className="cal-viene">
-      <div className="cal-viene-titulo">Lo que viene</div>
+      <div className="cal-viene-titulo">
+        Lo que viene
+        {/* Cuántos de los que vienen no tienen checklist todavía. El dato ya estaba por
+            filas, pero repartido no se lee: lo que hace falta saber de un vistazo es
+            cuánto queda por preparar, no si esta boda concreta está montada. */}
+        {sinChecklist > 0 && (
+          <span className="cal-viene-pendientes">
+            {sinChecklist} sin checklist
+          </span>
+        )}
+      </div>
       {proximos.map((a, i) => {
         const fuera = ausentesEn(apuntes, a.fecha);
         // Cuánta gente queda ese día. Sin equipo configurado no se puede decir, así que

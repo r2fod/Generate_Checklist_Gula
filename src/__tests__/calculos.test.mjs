@@ -20,7 +20,7 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques } from "../calendario/apuntes.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
 import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario } from "../calendario/enlace.js";
 
@@ -712,6 +712,133 @@ console.log("\n══ Los dos enlaces del calendario ══");
   ok(enlacesDeCalendario("https://x.github.io/Repo/calendario/", null) === null
      && enlacesDeCalendario("https://x.github.io/Repo/calendario/", { codigo: "aaa", ver: "" }) === null,
     "sin los dos códigos no se ofrece ningún enlace");
+}
+
+console.log("\n══ De un apunte del calendario a una checklist empezada ══");
+{
+  const hoy = new Date("2026-09-01T09:00:00");
+  const dia = (n) => {
+    const f = new Date(2026, 8, 1 + n);
+    return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+  };
+
+  const e = estadoDesdeApunte({
+    fecha: dia(5), titulo: "Boda de prueba", tipo: "boda", pax: 120, sitio: "Finca inventada", hora: "14:00",
+  });
+  ok(e.evento === "boda" && e.nombreEvento === "Boda de prueba" && e.fechaEvento === dia(5),
+    "el tipo, el nombre y el día pasan tal cual a la checklist");
+  ok(e.pax === 120 && e.ubicacion === "Finca inventada" && e.horaInicio === "14:00",
+    "y también los pax, el sitio y la hora, que es lo que no hay que volver a teclear");
+
+  // LO IMPORTANTE: el objeto va INCOMPLETO. La checklist lee cada campo con "?? por
+  // defecto", así que todo lo que no esté aquí arranca limpio. Si se colara un campo de
+  // más, se estaría fijando en la checklist nueva un valor que nadie ha elegido.
+  ok(Object.keys(e).sort().join(",") === "evento,fechaEvento,horaInicio,nombreEvento,pax,ubicacion",
+    `solo van los seis campos que el apunte sabe → ${Object.keys(e).join(", ")}`);
+
+  // Un apunte a medias (lo normal cuando te acaban de dar la fecha) no inventa nada
+  const flaco = estadoDesdeApunte({ fecha: dia(3), titulo: "Boda sin datos", tipo: "boda" });
+  ok(Object.keys(flaco).sort().join(",") === "evento,fechaEvento,nombreEvento",
+    `sin pax ni sitio ni hora no se manda ninguno de los tres → ${Object.keys(flaco).join(", ")}`);
+  ok(!("pax" in flaco),
+    "y sobre todo NO se manda pax: un 0 pisaría el 80 por defecto y saldría una checklist de cero personas");
+
+  // Lo que no es un evento no tiene checklist que empezar
+  ["vacaciones", "recogida", "cerrado", "tarea"].forEach(tipo => {
+    ok(estadoDesdeApunte({ fecha: dia(2), titulo: "X", tipo }) === null,
+      `un apunte de tipo "${tipo}" no genera checklist`);
+  });
+  ok(estadoDesdeApunte({ fecha: "", titulo: "", tipo: "boda" }) === null,
+    "y un apunte sin día ni nombre tampoco");
+
+  // La gente asignada NO se hereda: en el calendario es previsión de turnos y coste, y
+  // en la checklist "numCamareros" mueve cantidades de material. Colarlo cambiaría
+  // cuánta comida se carga por lo que alguien apuntó como horario.
+  const conGente = estadoDesdeApunte({
+    fecha: dia(5), titulo: "Boda con gente", tipo: "boda", pax: 100,
+    personal: [{ nombre: "Fulanita", rol: "sala", inicio: "08:00", fin: "02:00", importe: 110 }],
+  });
+  ok(!("numCamareros" in conGente) && !("personal" in conGente) && !("logisticaEquipo" in conGente),
+    "la gente asignada del calendario no se cuela en la checklist");
+
+  // Y los que hay que ofrecer: los que vienen y todavía no tienen checklist
+  const lista = saneaLista([
+    { fecha: dia(3), titulo: "Boda con checklist", tipo: "boda", evento: "Boda con checklist" },
+    { fecha: dia(4), titulo: "Boda sin checklist", tipo: "boda" },
+    { fecha: dia(40), titulo: "Boda muy lejos", tipo: "boda" },
+    { fecha: dia(2), titulo: "Vacaciones de alguien", tipo: "vacaciones" },
+  ]);
+  const faltan = apuntesPorPromover(lista, { hoy }).map(a => a.titulo);
+  ok(faltan.length === 1 && faltan[0] === "Boda sin checklist",
+    `solo se ofrece la que viene y no la tiene → ${JSON.stringify(faltan)}`);
+  // Lo pasado no se promueve: crear la checklist de una boda de hace un mes solo
+  // ensucia el archivo, y encima aparecería en el desplegable de la oficina.
+  const conPasada = saneaLista([...lista, { fecha: "2026-08-20", titulo: "Boda de agosto", tipo: "boda" }]);
+  ok(!apuntesPorPromover(conPasada, { hoy }).some(a => a.titulo === "Boda de agosto"),
+    "un evento que ya pasó no se promueve");
+}
+
+console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
+{
+  const hoy = new Date("2026-09-01T09:00:00");
+  const lista = saneaLista([
+    { fecha: "2026-09-04", titulo: "Boda nueva", tipo: "boda", pax: 120, sitio: "Finca inventada" },
+    { fecha: "2026-09-06", titulo: "Boda ya montada", tipo: "boda", pax: 90 },
+    { fecha: "2026-09-08", titulo: "Boda ya enlazada", tipo: "boda", evento: "Boda ya enlazada" },
+    { fecha: "2026-11-20", titulo: "Boda de noviembre", tipo: "boda", pax: 200 },
+    { fecha: "2026-09-05", titulo: "Vacaciones de alguien", tipo: "vacaciones" },
+    { fecha: "2026-09-07", titulo: "Prueba de menú", tipo: "tarea" },
+  ]);
+  // El archivo YA tiene una de ellas, con trabajo hecho dentro
+  const archivo = {
+    "Boda ya montada": { evento: "boda", pax: 95, checkeados: { "Bebida::Cerveza": true }, itemsManuales: [{ nombre: "Hielo" }] },
+  };
+
+  const { nuevas, enlaces } = checklistsPorCrear(lista, archivo, { hoy });
+
+  ok(Object.keys(nuevas).length === 1 && nuevas["Boda nueva"],
+    `solo se crea la que falta de verdad → ${JSON.stringify(Object.keys(nuevas))}`);
+
+  // LA REGLA QUE PROTEGE EL TRABAJO: una checklist que ya existe NO se toca. Pisarla con
+  // una recién nacida borraría sus checks y sus items a mano — justo lo que no se puede
+  // permitir que pase solo, sin que nadie lo haya pedido.
+  ok(!nuevas["Boda ya montada"],
+    "una checklist que ya existe NO se sobrescribe, aunque el apunte no esté enlazado");
+  ok(archivo["Boda ya montada"].checkeados["Bebida::Cerveza"] === true
+     && archivo["Boda ya montada"].itemsManuales.length === 1,
+    "y el archivo que se le pasa no se toca: los checks y los items a mano siguen ahí");
+
+  // Pero sí se ENLAZA: el apunte se queda pegado a la que ya había, para que no vuelva
+  // a intentarlo en cada apertura.
+  const porNombre = Object.fromEntries(enlaces.map(e => [e.nombre, e]));
+  ok(porNombre["Boda ya montada"] && porNombre["Boda ya montada"].nueva === false,
+    "la que ya existía se enlaza, pero no cuenta como creada");
+  ok(porNombre["Boda nueva"].nueva === true, "y la que se crea sí cuenta como nueva");
+
+  ok(!porNombre["Boda ya enlazada"], "la que ya tenía checklist no se vuelve a mirar");
+  ok(!porNombre["Boda de noviembre"], "la de dentro de dos meses todavía no: aún puede moverse");
+  ok(!porNombre["Vacaciones de alguien"] && !porNombre["Prueba de menú"],
+    "y ni las vacaciones ni una prueba de menú generan checklist");
+
+  // Lo creado lleva lo que sabe el calendario, que es de lo que se trata
+  ok(nuevas["Boda nueva"].evento === "boda" && nuevas["Boda nueva"].pax === 120
+     && nuevas["Boda nueva"].ubicacion === "Finca inventada" && nuevas["Boda nueva"].fechaEvento === "2026-09-04",
+    "lo creado llega con el tipo, el pax, el sitio y el día del apunte");
+
+  // Dos apuntes que se llamen igual dentro de la misma tanda son UN evento, no dos
+  const dobles = saneaLista([
+    { fecha: "2026-09-04", titulo: "Boda repetida", tipo: "boda" },
+    { fecha: "2026-09-05", titulo: "Boda repetida", tipo: "boda" },
+  ]);
+  const r = checklistsPorCrear(dobles, {}, { hoy });
+  ok(Object.keys(r.nuevas).length === 1 && r.enlaces.filter(e => e.nueva).length === 1,
+    "dos apuntes con el mismo nombre crean UNA checklist, no dos");
+
+  // Sin nada que hacer no se devuelve nada que hacer: es lo que evita escribir en el
+  // archivo (y en la nube) cada vez que alguien abre el calendario.
+  const nada = checklistsPorCrear(lista, { ...archivo, "Boda nueva": {} }, { hoy });
+  ok(Object.keys(nada.nuevas).length === 0,
+    "con todo ya creado no se escribe nada en el archivo");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

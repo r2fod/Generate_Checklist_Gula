@@ -395,12 +395,27 @@
 .cal-viene-vacio { color: var(--text-muted); font-size: 0.85rem; }
 
 .cal-viene-titulo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--text-muted);
   margin-bottom: 6px;
+}
+
+/* Cuántos de los que vienen no tienen checklist. En ámbar, no en rojo: no es un error,
+   es trabajo pendiente — y la mayor parte del año habrá alguno. */
+.cal-viene-pendientes {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.68rem;
+  letter-spacing: 0.2px;
 }
 
 /* Cada evento con su carril de color a la izquierda: el mismo tono que en el mes, para
@@ -782,6 +797,45 @@
 .cal-aviso-lectura svg { flex: 0 0 auto; }
 .cal-aviso-lectura b { color: var(--text-main); }
 
+/* ─── LO QUE SE HA CREADO SOLO ────────────────────────────────────────────────
+   En verde de "hecho", no en amarillo de aviso: no ha pasado nada malo, se ha adelantado
+   trabajo. Pero se enseña, porque en tu archivo han aparecido eventos y automático no
+   puede querer decir invisible. */
+.cal-creadas {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--ok-borde);
+  border-radius: var(--radius-md);
+  background: var(--ok-bg);
+  color: var(--ok-texto);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.cal-creadas svg { flex: 0 0 auto; margin-top: 2px; }
+.cal-creadas > span { flex: 1 1 auto; min-width: 0; }
+
+.cal-creadas-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.cal-creadas-cerrar:hover { opacity: 1; }
+
 /* ─── COMPARTIR ───────────────────────────────────────────────────────────────
    Plegado como el equipo, por lo mismo: se usa el día que se reparten los enlaces y
    luego estorba. Los dos enlaces son largos y el móvil es estrecho, así que cada fila
@@ -877,12 +931,34 @@
   text-overflow: ellipsis;
 }
 
-.cal-compartir-copiar {
+/* Copiar y Abrir, juntos. En el móvil se reparten el ancho a medias en su propia
+   línea; en cuanto hay sitio se van a la derecha del enlace, en su tamaño natural. */
+.cal-compartir-acciones {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cal-compartir-copiar,
+.cal-compartir-abrir {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
+  /* "Copiado" es más largo que "Copiar": sin esto el botón crece al pulsarlo y empuja
+     al de al lado. */
+  white-space: nowrap;
+}
+
+/* Es un <a>, no un <button>: hereda .btn pero no su alineado ni su subrayado */
+.cal-compartir-abrir { text-decoration: none; }
+
+@media (min-width: 560px) {
+  .cal-compartir-copiar,
+  .cal-compartir-abrir { flex: 0 0 auto; }
 }
 
 .cal-compartir-aviso {

@@ -173,6 +173,58 @@ export function apuntesPorPromover(apuntes, { dias = DIAS_ANTICIPACION, hoy = ne
   return aVistaProxima(apuntes, { dias, hoy }).filter(a => !a.evento);
 }
 
+// De un apunte a una checklist recién empezada. Es el puente entre las dos apps: aquí
+// se decide qué sabe ya el calendario y no hay que volver a teclear.
+//
+// Devuelve un objeto INCOMPLETO a propósito, y eso es lo importante: la checklist lee
+// cada campo con "?? valor por defecto", así que todo lo que no venga aquí arranca como
+// en una checklist nueva de cero. Devolver un estado completo obligaría a copiar aquí
+// cincuenta valores que ya viven allí, y a mantenerlos sincronizados para siempre.
+//
+// Lo que NO se hereda, aunque se sepa: la gente asignada. En el calendario es la
+// previsión de turnos y coste; en la checklist, "numCamareros" es un número que mueve
+// cantidades de material. Colarlo sería cambiar cuánta comida se carga por lo que
+// alguien apuntó como horario.
+// Qué checklists hay que crear de los eventos que ya se acercan, y cuáles NO.
+//
+// Pura, sin React ni Firestore, a propósito: aquí vive la única decisión de todo esto
+// que puede destrozar trabajo —crear encima de una checklist que ya existe— y esa hay
+// que poder probarla en milisegundos y en todos sus casos, no a ojo por el navegador.
+//
+// Devuelve:
+//   nuevas   { nombre: estado }        lo que hay que añadir al archivo
+//   enlaces  [{ id, nombre, nueva }]   qué apunte queda pegado a qué evento
+export function checklistsPorCrear(apuntes, archivo = {}, opciones = {}) {
+  const nuevas = {};
+  const enlaces = [];
+  const hay = (obj, k) => Object.prototype.hasOwnProperty.call(obj, k);
+  apuntesPorPromover(apuntes, opciones).forEach(a => {
+    const estado = estadoDesdeApunte(a);
+    if (!estado) return;
+    const nombre = estado.nombreEvento;
+    // Si ya hay un evento guardado con ese nombre NO se toca. Puede llevar media
+    // checklist montada y sus checks hechos, y sobrescribirla con una recién nacida es
+    // justo el fallo que no se puede permitir. Se enlaza el apunte con ella y ya.
+    // También se mira en "nuevas": dos apuntes que se llamen igual dentro de la misma
+    // tanda son un evento, no dos.
+    const yaEsta = hay(archivo, nombre) || hay(nuevas, nombre);
+    if (!yaEsta) nuevas[nombre] = estado;
+    enlaces.push({ id: a.id, nombre, nueva: !yaEsta });
+  });
+  return { nuevas, enlaces };
+}
+
+export function estadoDesdeApunte(apunte) {
+  const a = saneaApunte(apunte);
+  // Unas vacaciones o una recogida no son un evento: no hay checklist que empezar
+  if (!a || !esTipoEvento(a.tipo)) return null;
+  const estado = { evento: a.tipo, nombreEvento: a.titulo, fechaEvento: a.fecha };
+  if (a.hora) estado.horaInicio = a.hora;
+  if (a.sitio) estado.ubicacion = a.sitio;
+  if (a.pax) estado.pax = a.pax;
+  return estado;
+}
+
 // Dos eventos el mismo día. No es un error —pasa, y se hacen— pero es justo lo que hay
 // que ver con tiempo, porque duplica la gente y el material que hace falta ese día.
 export function choques(apuntes) {

@@ -3701,6 +3701,61 @@ async function main() {
       await c.close();
     }
 
+    // ── LAS CHECKLISTS QUE SE CREAN SOLAS ──
+    // Al abrir el calendario desde la checklist, los eventos que ya están a menos de 14
+    // días entran solos en el archivo. Lo que se comprueba aquí es el AVISO: automático
+    // no puede querer decir invisible, porque en tu archivo aparecen eventos.
+    console.log("\n══ Las checklists que se crean solas ══");
+    for (const w of [320, 390, 768, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 1000 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`creadas solas ${w}px: ${e}`));
+      await p.goto(BANCO + "?promover=1", { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-creadas");
+
+      const aviso = (await p.locator(".cal-creadas").innerText()).replace(/\s+/g, " ");
+      ok(/He creado/.test(aviso) && /archivo/.test(aviso),
+        `${w}px · avisa de lo que ha creado y de dónde está → "${aviso.slice(0, 90)}…"`);
+      // Con nombres: "he creado 2 checklists" sin decir cuáles obliga a ir a buscarlas
+      ok(/Boda de prueba tres/.test(aviso),
+        `${w}px · y dice CUÁLES, con su nombre`);
+      // El banco le pasa un archivo que ya tiene "Boda de prueba uno": esa no se toca,
+      // así que no puede salir en la lista de creadas.
+      ok(!/Boda de prueba uno/.test(aviso),
+        `${w}px · la que ya existía en el archivo NO sale como creada: no se ha pisado`);
+      // Ni las vacaciones ni las tareas generan checklist
+      ok(!/Fulanita|Prueba de menú|Recoger camión|Cerrado/.test(aviso),
+        `${w}px · ni vacaciones, ni recogidas, ni pruebas de menú`);
+
+      ok(!await seMueveDeLado(p), `${w}px · el aviso no mueve la página de lado`);
+      ok(await p.evaluate(() => {
+        const a2 = document.querySelector(".cal-creadas");
+        const r = a2.getBoundingClientRect();
+        return [...a2.querySelectorAll("svg, span, button")].every(e => {
+          const x = e.getBoundingClientRect();
+          return !x.width || (x.right <= r.right + 0.5 && x.left >= r.left - 0.5);
+        });
+      }), `${w}px · y nada de dentro del aviso se sale de él`);
+
+      // Se puede quitar de en medio: es información de una vez, no un cartel permanente
+      await p.locator(".cal-creadas-cerrar").click();
+      await p.waitForTimeout(150);
+      ok(await p.locator(".cal-creadas").count() === 0, `${w}px · el aviso se puede cerrar`);
+      await c.close();
+    }
+
+    // Sin nada que crear no hay cartel: un aviso que sale siempre deja de leerse
+    {
+      const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`sin creadas: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+      ok(await p.locator(".cal-creadas").count() === 0,
+        "abriendo el calendario sin nada que crear no sale ningún aviso");
+      await c.close();
+    }
+
     // ── LOS DOS ENLACES PARA COMPARTIR ──
     // Uno de mirar y otro de tocar, y la diferencia entre ellos tiene que aguantar: si
     // el de mirar llevara dentro el código de editar, cualquiera que lo reciba se
@@ -3734,7 +3789,7 @@ async function main() {
         let fuera = 0;
         document.querySelectorAll(".cal-compartir-fila").forEach(fila => {
           const r = fila.getBoundingClientRect();
-          fila.querySelectorAll("input, button").forEach(e => {
+          fila.querySelectorAll("input, button, a").forEach(e => {
             const x = e.getBoundingClientRect();
             if (x.width && (x.right > r.right + 0.5 || x.left < r.left - 0.5)) fuera++;
           });
@@ -3758,6 +3813,21 @@ async function main() {
       const enPortapapeles = await p.evaluate(() => navigator.clipboard.readText().catch(() => ""));
       ok(enPortapapeles === verUrl,
         `${w}px · y lo que queda en el portapapeles es el enlace de mirar`);
+
+      // ── El botón de ir directo, sin pasar por copiar y pegar ──
+      const abrir = await p.locator(".cal-compartir-abrir").evaluateAll(es => es.map(e => ({
+        etiqueta: e.tagName, href: e.getAttribute("href"),
+        destino: e.getAttribute("target"), rel: e.getAttribute("rel"),
+        alto: e.getBoundingClientRect().height,
+      })));
+      ok(abrir.length === 2, `${w}px · cada enlace tiene su botón de abrir, no solo el de copiar`);
+      ok(abrir[0].href === verUrl && abrir[1].href === editarUrl,
+        `${w}px · y cada uno lleva al suyo, no los dos al mismo`);
+      // Que sea un <a> de verdad es la diferencia entre poder abrirlo en otra pestaña
+      // con la pulsación larga y no poder.
+      ok(abrir.every(a2 => a2.etiqueta === "A" && a2.destino === "_blank" && /noopener/.test(a2.rel || "")),
+        `${w}px · son enlaces de verdad, en pestaña aparte y sin dejar acceso a la de origen`);
+      ok(abrir.every(a2 => a2.alto >= 43), `${w}px · y se tocan con el dedo, como el de copiar`);
       await c.close();
     }
 

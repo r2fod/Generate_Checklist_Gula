@@ -8,14 +8,14 @@
 // repositorio no entra el nombre de ningún cliente.
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Eye } from "lucide-react";
+import { Eye, Check, X } from "lucide-react";
 import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
 import Traer from "./Traer.jsx";
-import { saneaLista, saneaEquipo, aISO } from "./apuntes.js";
+import { saneaLista, saneaEquipo, aISO, checklistsPorCrear } from "./apuntes.js";
 
 const HOY = new Date();
 // aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no
@@ -65,6 +65,18 @@ function Banco() {
   const soloVer = Boolean(new URLSearchParams(window.location.search).get("solover"));
   const [apuntes, setApuntes] = useState(() => (arrancaVacio ? [] : saneaLista(DEMO)));
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
+  // Con "?promover=1" se monta lo que hace la checklist al abrir el calendario: crea las
+  // de los eventos que ya están cerca y avisa de cuáles. Aquella va detrás del login del
+  // equipo, así que la batería no puede llegar; esto deja probado el aviso y su
+  // responsive con los MISMOS datos y la MISMA función que usa App.
+  const promover = Boolean(new URLSearchParams(window.location.search).get("promover"));
+  const [creadas, setCreadas] = useState(() => {
+    if (!promover) return [];
+    // Una ya existe en el archivo: comprueba que NO se cuenta como creada, que es la
+    // regla que impide pisar una checklist con trabajo hecho.
+    const archivo = { "Boda de prueba uno": { fechaEvento: "x" } };
+    return checklistsPorCrear(saneaLista(DEMO), archivo).enlaces.filter(e => e.nueva).map(e => e.nombre);
+  });
   const guardar = (a) => setApuntes(p => saneaLista([...p.filter(x => x.id !== a.id), a]));
   const borrar = (id) => setApuntes(p => p.filter(x => x.id !== id));
 
@@ -80,6 +92,20 @@ function Banco() {
     )
     : (
       <>
+        {creadas.length > 0 && (
+          <div className="cal-creadas">
+            <Check size={15} aria-hidden="true" />
+            <span>
+              {creadas.length === 1
+                ? <>He creado la checklist de <b>{creadas[0]}</b>, que ya está cerca.</>
+                : <>He creado <b>{creadas.length} checklists</b> de eventos que ya están cerca: {creadas.join(", ")}.</>}
+              {" "}Están en tu archivo, listas para que la oficina les cuelgue los datos del formulario.
+            </span>
+            <button type="button" className="cal-creadas-cerrar" onClick={() => setCreadas([])} aria-label="Cerrar el aviso">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />

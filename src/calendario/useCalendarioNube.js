@@ -76,12 +76,16 @@ export default function useCalendarioNube(enlace = null) {
   // listas. Se pasan explícitas —y no se leen del estado aquí dentro— para que guardar
   // el equipo no suba una foto vieja de los apuntes, ni al revés.
   const escribir = (siguienteApuntes, siguienteEquipo) => {
-    if (soloVer || !donde.current.codigo) return;
+    if (soloVer || !donde.current.codigo) return Promise.resolve();
     const apuntesLimpios = saneaLista(siguienteApuntes);
     const equipoLimpio = saneaEquipo(siguienteEquipo);
     setApuntes(apuntesLimpios);      // se pinta ya, sin esperar a la nube
     setEquipo(equipoLimpio);
-    guardarCalendarioNube(donde.current.codigo, apuntesLimpios, equipoLimpio, donde.current.ver)
+    // Se DEVUELVE la promesa. Casi nadie la mira —guardar es "y sigue"— pero marcar un
+    // apunte como "ya tiene checklist" recarga la página justo después, y sin poder
+    // esperar a que la escritura llegue se queda en el aire: al volver, el calendario
+    // ofrecería crear otra vez la misma checklist.
+    return guardarCalendarioNube(donde.current.codigo, apuntesLimpios, equipoLimpio, donde.current.ver)
       .catch(() => { /* se reintenta al siguiente cambio */ });
   };
 

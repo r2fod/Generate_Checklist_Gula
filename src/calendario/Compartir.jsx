@@ -3,7 +3,7 @@
 // sesión iniciada: quien entra por un enlace no puede llegar a este panel ni a los
 // códigos del otro (viven en indice/, que las reglas cierran sin cuenta).
 import { useState } from "react";
-import { Share2, ChevronDown, Eye, Pencil, Check, Copy } from "lucide-react";
+import { Share2, ChevronDown, Eye, Pencil, Check, Copy, ExternalLink } from "lucide-react";
 import { enlacesDeCalendario } from "./enlace.js";
 
 function Fila({ icono: Icono, titulo, nota, url, clase }) {
@@ -34,11 +34,25 @@ function Fila({ icono: Icono, titulo, nota, url, clase }) {
         onFocus={e => e.target.select()}
         onClick={e => e.target.select()}
       />
-      <button type="button" className="btn btn-outline cal-compartir-copiar" onClick={copiar}>
-        {copiado
-          ? <><Check size={14} aria-hidden="true" /> Copiado</>
-          : <><Copy size={14} aria-hidden="true" /> Copiar</>}
-      </button>
+      <div className="cal-compartir-acciones">
+        <button type="button" className="btn btn-outline cal-compartir-copiar" onClick={copiar}>
+          {copiado
+            ? <><Check size={14} aria-hidden="true" /> Copiado</>
+            : <><Copy size={14} aria-hidden="true" /> Copiar</>}
+        </button>
+        {/* Un enlace de verdad y no un botón con JavaScript: así funcionan el clic
+            central, el "abrir en pestaña nueva" de la pulsación larga en el móvil y el
+            copiar-dirección del menú del navegador. Un onClick con location.href se
+            come todo eso a cambio de nada.
+
+            En pestaña aparte para no perder el calendario que se está mirando — y
+            porque comprobar el enlace de mirar desde el propio calendario del equipo es
+            justo para lo que sirve este botón. */}
+        <a className="btn btn-outline cal-compartir-abrir"
+           href={url} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={14} aria-hidden="true" /> Abrir
+        </a>
+      </div>
     </div>
   );
 }

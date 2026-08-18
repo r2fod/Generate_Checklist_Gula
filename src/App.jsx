@@ -56,6 +56,11 @@ import { calcularCalibracion } from "./calibracion.js";
 // él, y la checklist no engorda para todos por una pantalla que se usa a ratos. El CSS
 // del calendario se importa dentro de ese archivo, así que viaja con él.
 const CalendarioEnChecklist = React.lazy(() => import("./calendario/EnChecklist.jsx"));
+// Qué checklists tocan crear de los eventos que ya se acercan. Va en apuntes.js (y no
+// aquí) porque es lo que sabe el CALENDARIO: qué apuntes se acercan, cuáles ya tienen
+// checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
+// EnChecklist— para que no arrastre el calendario entero al bundle de la checklist.
+import { checklistsPorCrear } from "./calendario/apuntes.js";
 
 // Qué evento pide abrir la dirección, si es que pide alguno. Es como el calendario (que
 // es otra app, en otra carpeta) manda a la checklist a un evento concreto: sin esto, su
@@ -1134,6 +1139,32 @@ export default function App({ onCerrarSesion } = {}) {
       copiarLink(`${window.location.origin}${window.location.pathname}?c=${encodeURIComponent(estadoActualJSON)}${marca}`, nombreEvento, queEs);
     }
     setMenuCompartir(false);
+  };
+
+  // ─── LAS CHECKLISTS DE LO QUE YA SE ACERCA ────────────────────────────────
+  // El calendario sabe que el 19 hay una boda, cómo se llama, de qué tipo es, a qué hora
+  // y para cuánta gente. Con eso ya se puede abrir su checklist, y el resto —menú, barra,
+  // equipamiento— lo termina de rellenar el formulario de la oficina.
+  //
+  // Y ahí está la razón de fondo para crearlas solas: la lista de eventos que ve la
+  // oficina en el formulario sale del ARCHIVO DE CHECKLISTS, no del calendario (ver
+  // resumirParaOficina). Mientras la checklist no existe, esa boda no le aparece en el
+  // desplegable, así que la escribe a mano y llega como un evento duplicado.
+  //
+  // Lo que esto NO hace, y es lo importante:
+  //   · No abre nada. Lo que haya en pantalla se queda como está.
+  //   · No marca ningún evento como activo ni toca el auto-guardado.
+  //   · No sobrescribe una checklist que ya exista con ese nombre (checklistsPorCrear).
+  // Solo mete eventos nuevos en el archivo, que es una operación que no quita nada.
+  //
+  // Devuelve los enlaces (qué apunte va con qué evento) para que el calendario pueda
+  // marcarlos y contar lo que ha pasado.
+  const crearChecklistsDeApuntes = (apuntes) => {
+    const archivo = eventosGuardadosRef.current || {};
+    const { nuevas, enlaces } = checklistsPorCrear(apuntes, archivo);
+    const cuantas = Object.keys(nuevas).length;
+    if (cuantas > 0) guardarEventos({ ...archivo, ...nuevas });
+    return enlaces;
   };
 
   const handleNuevoEvento = () => setDialogo({
@@ -2484,6 +2515,7 @@ export default function App({ onCerrarSesion } = {}) {
           <CalendarioEnChecklist
             onCerrar={() => setModalCalendario(false)}
             onAbrirEvento={(nombre) => { setModalCalendario(false); handleCargarEvento(nombre); }}
+            onCrearChecklists={crearChecklistsDeApuntes}
           />
         </React.Suspense>
       )}
