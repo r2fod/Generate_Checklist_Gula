@@ -236,7 +236,11 @@ export function estadoDesdeApunte(apunte) {
   const a = saneaApunte(apunte);
   // Unas vacaciones o una recogida no son un evento: no hay checklist que empezar
   if (!a || !esTipoEvento(a.tipo)) return null;
-  const estado = { evento: a.tipo, nombreEvento: a.titulo, fechaEvento: a.fecha };
+  // La marca de "esto lo ha creado el calendario y le falta lo suyo". Sin ella, una
+  // checklist recién nacida se ve EXACTAMENTE igual que una que alguien ha terminado:
+  // mismo aspecto, mismos valores por defecto, y ninguna pista de que el pax que se lee
+  // es el de fábrica. Cargar un camión con eso es el fallo caro de todo esto.
+  const estado = { evento: a.tipo, nombreEvento: a.titulo, fechaEvento: a.fecha, sinConfigurar: true };
   if (a.hora) estado.horaInicio = a.hora;
   if (a.sitio) estado.ubicacion = a.sitio;
   if (a.pax) estado.pax = a.pax;

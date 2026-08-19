@@ -987,6 +987,52 @@ body {
   color: var(--ok-texto);
 }
 
+/* ─── FALTA CONFIGURAR ESTE EVENTO ────────────────────────────────────────────
+   No es un aviso flotante: es el estado en el que está lo que tienes delante, así que
+   va en el flujo, arriba, y se queda hasta que deja de ser verdad. En ámbar y no en
+   rojo — no hay ningún error, hay trabajo por hacer. */
+.aviso-sin-configurar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--aviso-borde);
+  border-left: 4px solid var(--aviso-texto-suave);
+  border-radius: var(--radius-md);
+  background: var(--aviso-bg);
+  color: var(--aviso-texto);
+}
+
+.aviso-sin-configurar > svg { flex: 0 0 auto; margin-top: 2px; }
+
+.aviso-sin-configurar-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.aviso-sin-configurar-texto strong { font-size: 0.88rem; }
+.aviso-sin-configurar .btn { flex: 0 0 auto; min-height: 40px; }
+
+/* Y en la lista del archivo, para verlo sin abrir uno por uno */
+.plantilla-sin-configurar {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.66rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .aviso-nombre-ocupado {
   display: block;
   margin-top: 6px;

@@ -735,12 +735,17 @@ console.log("\n══ De un apunte del calendario a una checklist empezada ═�
   // LO IMPORTANTE: el objeto va INCOMPLETO. La checklist lee cada campo con "?? por
   // defecto", así que todo lo que no esté aquí arranca limpio. Si se colara un campo de
   // más, se estaría fijando en la checklist nueva un valor que nadie ha elegido.
-  ok(Object.keys(e).sort().join(",") === "evento,fechaEvento,horaInicio,nombreEvento,pax,ubicacion",
-    `solo van los seis campos que el apunte sabe → ${Object.keys(e).join(", ")}`);
+  ok(Object.keys(e).sort().join(",") === "evento,fechaEvento,horaInicio,nombreEvento,pax,sinConfigurar,ubicacion",
+    `solo van los seis campos que el apunte sabe, más la marca → ${Object.keys(e).join(", ")}`);
+  // LA MARCA: sin ella, una checklist recién nacida se ve EXACTAMENTE igual que una
+  // terminada —mismo aspecto, mismos valores por defecto— y nadie sabría que el pax que
+  // lee es el de fábrica. Cargar un camión con eso es el fallo caro de todo esto.
+  ok(e.sinConfigurar === true,
+    "lo creado se marca como pendiente de configurar, para que no se confunda con una terminada");
 
   // Un apunte a medias (lo normal cuando te acaban de dar la fecha) no inventa nada
   const flaco = estadoDesdeApunte({ fecha: dia(3), titulo: "Boda sin datos", tipo: "boda" });
-  ok(Object.keys(flaco).sort().join(",") === "evento,fechaEvento,nombreEvento",
+  ok(Object.keys(flaco).sort().join(",") === "evento,fechaEvento,nombreEvento,sinConfigurar",
     `sin pax ni sitio ni hora no se manda ninguno de los tres → ${Object.keys(flaco).join(", ")}`);
   ok(!("pax" in flaco),
     "y sobre todo NO se manda pax: un 0 pisaría el 80 por defecto y saldría una checklist de cero personas");
@@ -878,6 +883,19 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
     [{ fecha: "2026-09-04", titulo: "Boda sin id", tipo: "boda", pax: 100 }], {}, { hoy });
   ok(sinId.enlaces.length === 0 && Object.keys(sinId.nuevas).length === 0,
     "un apunte sin id no genera enlace: sin él no se puede marcar y marcaría a los demás");
+}
+
+{
+  // La marca viaja dentro del estado del evento, así que pasa por sanearEstado cada vez
+  // que se abre, se comparte o llega de la nube. Si ahí se perdiera, el aviso saldría
+  // una vez y no volvería: sanearEstado conserva lo que no conoce, y esto lo fija.
+  const conMarca = sanearEstado({ nombreEvento: "Boda X", sinConfigurar: true, recogidas: [] });
+  ok(conMarca.sinConfigurar === true,
+    "la marca de 'sin configurar' sobrevive al saneado del estado");
+  // Y sigue sobreviviendo aunque el estado traiga basura que sí hay que tirar
+  const conBasura = sanearEstado({ sinConfigurar: true, recogidas: "esto no es una lista" });
+  ok(conBasura.sinConfigurar === true && !("recogidas" in conBasura),
+    "y se conserva aunque se tire un campo con el tipo equivocado");
 }
 
 console.log("\n══ Los ratios de personal se pueden ajustar ══");

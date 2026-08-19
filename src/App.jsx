@@ -748,6 +748,11 @@ export default function App({ onCerrarSesion } = {}) {
   // Se guarda un snapshot al EMPEZAR a editar cada item (no por cada tecla).
   // El nombre que has escrito ya es de otro evento guardado: no se auto-guarda para no
   // pisarlo, y se dice claramente en vez de dejarlo en silencio.
+  // ¿Esta checklist la creó el calendario y todavía le falta lo suyo? Viene puesta en
+  // las que se crean solas y se apaga cuando llegan los datos del formulario o cuando
+  // alguien dice que ya está. Se guarda con el evento, así que se ve desde cualquier
+  // dispositivo y no solo en el que la creó.
+  const [sinConfigurar, setSinConfigurar] = useState(estadoInicial.sinConfigurar ?? false);
   const [nombreOcupado, setNombreOcupado] = useState(false);
   const [historial, setHistorial] = useState([]);
   const ultimaClaveEditadaRef = React.useRef(null);
@@ -755,6 +760,7 @@ export default function App({ onCerrarSesion } = {}) {
   // Snapshot de todo el estado configurable — lo usan tanto el link para el móvil
   // como el guardado automático en localStorage
   const getEstadoActual = () => ({
+    sinConfigurar,
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
@@ -850,6 +856,7 @@ export default function App({ onCerrarSesion } = {}) {
 
   // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página
   const SETTERS_SYNC = {
+    sinConfigurar: setSinConfigurar,
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas, diasProduccion: setDiasProduccion,
@@ -1723,7 +1730,10 @@ export default function App({ onCerrarSesion } = {}) {
       textoConfirmar: existe ? "Aplicar y abrir" : "Crear y abrir",
       onConfirm: async () => {
         const base = existe ? guardados[destino] : {};
-        const estado = { ...base, ...cambios, nombreEvento: nombre };
+        // Y aquí deja de estar "sin configurar": esto es exactamente lo que le faltaba.
+        // El aviso existe para que nadie cargue un camión con los valores de fábrica;
+        // una vez llegan los datos de la oficina, seguir avisando sería ruido.
+        const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false };
         // Las notas se SUMAN, no se sustituyen: las del evento suelen ser tuyas (a quién
         // llamar, qué recoger) y las del formulario vienen del cliente. Perder unas por
         // las otras es justo lo que no puede pasar.
@@ -1967,6 +1977,12 @@ export default function App({ onCerrarSesion } = {}) {
         <CalendarDays size={15} /> {n}
         {avisosRecogidas.some(a => a.evento === n) && (
           <span className="plantilla-aviso-badge" title="Tiene recogidas/devoluciones pendientes"><Clock size={12} /> {avisosRecogidas.filter(a => a.evento === n).length}</span>
+        )}
+        {/* Cuáles vienen del calendario y siguen sin datos, sin tener que abrirlos uno a
+            uno. En una semana con cuatro bodas es la diferencia entre saber qué falta y
+            enterarte la víspera. */}
+        {eventosGuardados[n]?.sinConfigurar && (
+          <span className="plantilla-sin-configurar" title="Creado desde el calendario: falta configurarlo">sin configurar</span>
         )}
       </button>
       <button className="plantilla-link" onClick={() => handleDuplicarEvento(n)} title="Duplicar evento" aria-label={`Duplicar evento ${n}`}><Copy size={15} /></button>
@@ -2869,6 +2885,28 @@ export default function App({ onCerrarSesion } = {}) {
               </span>
             </div>
             <button className="cambios-remotos-cerrar" onClick={() => setHayCambiosRemotos(null)} aria-label="Cerrar aviso"><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Esta checklist la creó el calendario y todavía le falta lo suyo. Va arriba
+            del todo y no como un aviso flotante: no es una notificación que pasa, es el
+            estado en el que está lo que tienes delante. Una checklist recién nacida se
+            ve igual que una terminada, y el pax que se lee puede ser el de fábrica. */}
+        {sinConfigurar && !soloMarcar && (
+          <div className="aviso-sin-configurar">
+            <AlertTriangle size={16} aria-hidden="true" />
+            <div className="aviso-sin-configurar-texto">
+              <strong>Falta configurar este evento</strong>
+              <span>
+                Lo ha creado el calendario con lo que sabía: tipo, día
+                {ubicacion ? ", sitio" : ""} y pax. Falta lo demás —barra, menú,
+                equipamiento—, que llega con el formulario de la oficina o lo pones tú.
+                Repasa el pax antes de cargar nada.
+              </span>
+            </div>
+            <button className="btn btn-outline" onClick={() => setSinConfigurar(false)}>
+              Ya está configurado
+            </button>
           </div>
         )}
 

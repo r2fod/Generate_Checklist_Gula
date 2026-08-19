@@ -3701,6 +3701,58 @@ async function main() {
       await c.close();
     }
 
+    // ── "FALTA CONFIGURAR ESTE EVENTO" ──
+    // Una checklist creada por el calendario se ve EXACTAMENTE igual que una terminada:
+    // mismo aspecto, mismos valores por defecto. Quien la abra puede leer el pax de
+    // fábrica y cargar un camión con él. El aviso es lo único que lo evita.
+    console.log("\n══ El aviso de 'falta configurar' ══");
+    for (const w of [320, 390, 768, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`sin configurar ${w}px: ${e}`));
+      await p.goto(url({ nombreEvento: "Boda de prueba", evento: "boda", pax: 120, sinConfigurar: true }),
+        { waitUntil: "domcontentloaded" });
+      await p.waitForSelector(".aviso-sin-configurar", { timeout: 15000 });
+
+      const texto = (await p.locator(".aviso-sin-configurar").innerText()).replace(/\s+/g, " ");
+      ok(/Falta configurar/.test(texto), `${w}px · se dice que falta configurarlo → "${texto.slice(0, 70)}…"`);
+      // Lo que de verdad evita el accidente: que te diga que mires el pax
+      ok(/pax/i.test(texto), `${w}px · y avisa expresamente de repasar el pax antes de cargar`);
+
+      ok(!await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1),
+        `${w}px · el aviso no mueve la página de lado`);
+      ok(await p.evaluate(() => {
+        const a2 = document.querySelector(".aviso-sin-configurar");
+        const r = a2.getBoundingClientRect();
+        return [...a2.querySelectorAll("svg, div, button")].every(e => {
+          const x = e.getBoundingClientRect();
+          return !x.width || (x.right <= r.right + 0.5 && x.left >= r.left - 0.5);
+        });
+      }), `${w}px · nada de dentro del aviso se sale de él`);
+
+      // Y se puede dar por configurado: si no se pudiera quitar, sería un cartel para
+      // siempre y en dos semanas nadie lo leería.
+      await p.locator(".aviso-sin-configurar .btn").click();
+      await p.waitForTimeout(250);
+      ok(await p.locator(".aviso-sin-configurar").count() === 0,
+        `${w}px · "Ya está configurado" lo quita`);
+      await c.close();
+    }
+
+    // Y una checklist normal NO lo lleva: un aviso que sale siempre deja de leerse
+    {
+      const c = await navegador.newContext({ viewport: { width: 390, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`sin configurar (normal): ${e}`));
+      await p.goto(url({ nombreEvento: "Boda montada", evento: "boda", pax: 120 }), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1500);
+      ok(await p.locator(".aviso-sin-configurar").count() === 0,
+        "una checklist montada a mano no lleva el aviso");
+      await c.close();
+    }
+
     // ── AJUSTAR LA GENTE POR COMENSAL ──
     // El número del que sale la cifra de sala, y con ella los delantales, las bandejas y
     // los menús de personal. Se comprueba que ajustarlo se nota de verdad en la vista de
