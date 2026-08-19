@@ -198,7 +198,19 @@ export function checklistsPorCrear(apuntes, archivo = {}, opciones = {}) {
   const nuevas = {};
   const enlaces = [];
   const hay = (obj, k) => Object.prototype.hasOwnProperty.call(obj, k);
-  apuntesPorPromover(apuntes, opciones).forEach(a => {
+  aVistaProxima(apuntes, opciones)
+    // Los que no tienen checklist... y también los que la tienen ROTA. Un apunte
+    // enlazado con un evento que ya no está en el archivo (lo borraron) es peor que uno
+    // sin enlazar: el calendario cree que esa boda está montada, así que no la vuelve a
+    // crear nunca; la oficina no la ve en su desplegable del formulario; y el botón
+    // "Abrir" lleva a un evento que no existe. Se vuelve a contar como pendiente y con
+    // eso se cura sola.
+    //
+    // Lo que ya pasó no se resucita: aVistaProxima solo deja lo que está por venir, así
+    // que borrar la checklist de una boda de hace un mes para hacer limpieza no la trae
+    // de vuelta.
+    .filter(a => !a.evento || !hay(archivo, a.evento))
+    .forEach(a => {
     const estado = estadoDesdeApunte(a);
     if (!estado) return;
     // Sin id no se puede enlazar, y un enlace sin id es peor que ninguno: quien lo

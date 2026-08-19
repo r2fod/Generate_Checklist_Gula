@@ -246,6 +246,18 @@ console.log('\n══ Al abrir la app: las checklists de lo que ya viene ══'
   const copia = await N.cargarCalendarioNube(cs.ver);
   ok(copia.apuntes.filter(a => a.evento).length === 2,
     'y el enlace de solo mirar enseña el calendario al día, no una foto de antes');
+
+  // ── Y AHORA SE BORRA UNA CHECKLIST ──
+  // El apunte sigue apuntando a ella. Sin curar el enlace, el calendario creería que esa
+  // boda está montada y no la volvería a crear NUNCA: no le saldría a la oficina en el
+  // desplegable del formulario, y el botón "Abrir" llevaría a un evento que no existe.
+  const sinElla = { ...r1.archivo };
+  delete sinElla['Boda que viene'];
+  const r3 = await arrancar(sinElla, true);
+  ok(r3.creadas.length === 1 && r3.creadas[0] === 'Boda que viene',
+    `al borrar una checklist, su apunte vuelve a contar como pendiente y se rehace → ${JSON.stringify(r3.creadas)}`);
+  ok(r3.archivo['Boda ya montada'].checkeados['Bebida::Cerveza'] === true,
+    'y la otra, que sigue estando, no se toca al pasar por ahí');
 }
 
 console.log('\n══ Escenarios duros ══');

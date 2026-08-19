@@ -789,9 +789,12 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
     { fecha: "2026-09-05", titulo: "Vacaciones de alguien", tipo: "vacaciones" },
     { fecha: "2026-09-07", titulo: "Prueba de menú", tipo: "tarea" },
   ]);
-  // El archivo YA tiene una de ellas, con trabajo hecho dentro
+  // El archivo YA tiene dos de ellas: una con trabajo hecho dentro y otra que además
+  // está enlazada desde su apunte. El enlace solo vale si el evento sigue existiendo —
+  // uno que apunte a algo borrado se vuelve a crear (se comprueba más abajo).
   const archivo = {
     "Boda ya montada": { evento: "boda", pax: 95, checkeados: { "Bebida::Cerveza": true }, itemsManuales: [{ nombre: "Hielo" }] },
+    "Boda ya enlazada": { evento: "boda", pax: 70 },
   };
 
   const { nuevas, enlaces } = checklistsPorCrear(lista, archivo, { hoy });
@@ -839,6 +842,31 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
   const nada = checklistsPorCrear(lista, { ...archivo, "Boda nueva": {} }, { hoy });
   ok(Object.keys(nada.nuevas).length === 0,
     "con todo ya creado no se escribe nada en el archivo");
+
+  // ── EL ENLACE ROTO: borraste la checklist y el apunte sigue apuntando a ella ──
+  // Es el agujero de verdad de enlazar por nombre. Sin esto, el calendario cree que esa
+  // boda está montada y NO la vuelve a crear nunca: la oficina no la ve en su
+  // desplegable, y el botón "Abrir" lleva a un evento que no existe.
+  {
+    const conEnlace = saneaLista([
+      { fecha: "2026-09-04", titulo: "Boda borrada", tipo: "boda", pax: 100, evento: "Boda borrada" },
+      { fecha: "2026-09-05", titulo: "Boda viva", tipo: "boda", pax: 80, evento: "Boda viva" },
+    ]);
+    // En el archivo solo queda una: la otra se borró
+    const r = checklistsPorCrear(conEnlace, { "Boda viva": { evento: "boda" } }, { hoy });
+    ok(Object.keys(r.nuevas).length === 1 && r.nuevas["Boda borrada"],
+      `la que apunta a un evento borrado se vuelve a crear → ${JSON.stringify(Object.keys(r.nuevas))}`);
+    ok(!r.enlaces.some(e => e.nombre === "Boda viva"),
+      "y la que apunta a un evento que sí existe no se toca");
+
+    // Pero lo que ya pasó no se resucita: borrar la checklist de una boda de hace un mes
+    // para hacer limpieza no puede traerla de vuelta en cada arranque.
+    const pasada = saneaLista([
+      { fecha: "2026-08-01", titulo: "Boda de agosto", tipo: "boda", pax: 100, evento: "Boda de agosto" },
+    ]);
+    ok(Object.keys(checklistsPorCrear(pasada, {}, { hoy }).nuevas).length === 0,
+      "una boda pasada con la checklist borrada NO se resucita");
+  }
 
   // Un apunte SIN id no genera enlace. Parece un detalle y no lo es: quien aplica los
   // enlaces busca el apunte por su id, un id vacío coincide con todos los que tampoco
