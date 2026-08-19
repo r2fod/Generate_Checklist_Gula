@@ -12,13 +12,14 @@ import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
+import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
 import useCalendarioNube from "./useCalendarioNube.js";
 
 // Aquí dentro siempre se entra con cuenta —es la checklist del equipo—, así que no hay
 // modo enlace que valorar: se pide el calendario del equipo y punto.
 export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrearChecklists }) {
-  const { apuntes, equipo, cargando, codigos, traer, guardar, borrar, cambiarEquipo } = useCalendarioNube();
+  const { apuntes, equipo, cargando, codigos, traer, guardar, borrar, cambiarEquipo, ratios, cambiarRatios } = useCalendarioNube();
   // Qué se ha creado al abrir. Se enseña: automático no puede querer decir invisible —
   // en tu archivo aparecen eventos y tienes que poder enterarte de cuáles.
   const [creadas, setCreadas] = useState([]);
@@ -87,6 +88,7 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrear
                   que no se use. */}
               <Compartir codigos={codigos} href={window.location.href} />
               <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
+              <Ratios ratios={ratios} onCambiar={cambiarRatios} />
               {/* onAbrirEvento aquí NO cambia de página: abre el evento guardado en esta
                   misma app, que es justo lo que se venía a hacer. */}
               <Calendario

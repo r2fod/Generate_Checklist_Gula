@@ -15,7 +15,7 @@
 //   corporativo    11,5 · 7,2 · 5,0 · 10,7       → 1 cada 10
 // Cumpleaños y producción grande NO tienen medición propia: se quedan donde estaban y
 // se marcan aquí para no dar por bueno un número que nadie ha comprobado.
-const PAX_POR_CAMARERO = {
+export const PAX_POR_CAMARERO = {
   boda: 9,
   comunion: 9,
   corporativo: 10,
@@ -23,7 +23,52 @@ const PAX_POR_CAMARERO = {
   produccion: 20,   // sin medir por encima de 30 pax
 };
 
+// Los que salieron de la hoja de costes de verdad. Los otros dos se avisan en pantalla
+// como "ratio sin comprobar" — hasta que alguien ponga el suyo, que entonces ya está
+// comprobado por quien lo ha vivido y el aviso sobra.
 const SIN_MEDIR = ["cumpleanos", "produccion"];
+
+// ─── LOS RATIOS SE PUEDEN AJUSTAR ─────────────────────────────────────────────
+// Los de arriba son el punto de partida, no una ley: cada catering trabaja distinto y
+// los de cumpleaños y producción nadie los ha medido. Lo que se ajuste vale para toda la
+// app —la checklist provisiona delantales, bandejas, litos y menús de personal a partir
+// de la cifra de sala— y se guarda en Firestore, para que el equipo entero cuente igual.
+//
+// Vive en una variable de módulo y no se pasa por parámetro porque personalNecesario se
+// llama desde media docena de sitios: enhebrarlo por todos sería tocar código que
+// funciona a cambio de nada. Se pone UNA vez al arrancar (ver ponRatios).
+let ratios = { ...PAX_POR_CAMARERO };
+
+// Solo números que tengan sentido como "pax por camarero". Un 0 dividiría por cero y un
+// 500 diría que una boda de 300 se saca con dos personas: los dos vienen de un dedo
+// resbalando en el móvil, no de una decisión.
+export function saneaRatios(brutos) {
+  const limpio = {};
+  if (!brutos || typeof brutos !== "object") return limpio;
+  Object.keys(PAX_POR_CAMARERO).forEach(tipo => {
+    const n = Number(brutos[tipo]);
+    if (Number.isFinite(n) && n >= 1 && n <= 60) limpio[tipo] = n;
+  });
+  return limpio;
+}
+
+// Lo que no venga se queda en su valor de partida: así una corrección de los medidos en
+// una versión nueva llega igual a todo lo que nadie ha tocado.
+export function ponRatios(nuevos) {
+  ratios = { ...PAX_POR_CAMARERO, ...saneaRatios(nuevos) };
+  return { ...ratios };
+}
+
+export function leerRatios() { return { ...ratios }; }
+
+// Solo lo que alguien ha cambiado de verdad, para no congelar los de partida
+export function ratiosCambiados(valores = {}) {
+  const cambios = {};
+  Object.entries(saneaRatios(valores)).forEach(([tipo, n]) => {
+    if (n !== PAX_POR_CAMARERO[tipo]) cambios[tipo] = n;
+  });
+  return cambios;
+}
 
 // Cocina, por tramos. Medido: 2 hasta 40 pax, 3 hasta 60, 4-5 de 100 en adelante.
 // Por tramos y no con una división porque los saltos reales no son proporcionales: de
@@ -47,7 +92,7 @@ function logisticaNecesaria(pax) {
 // Sala. Un banquete nunca sale con menos de dos personas.
 function salaNecesaria(tipo, pax, paxPorCamarero = 0) {
   if (pax <= 0) return 0;
-  const divisor = paxPorCamarero > 0 ? paxPorCamarero : (PAX_POR_CAMARERO[tipo] || 9);
+  const divisor = paxPorCamarero > 0 ? paxPorCamarero : (ratios[tipo] || 9);
   return Math.max(2, Math.ceil(pax / divisor));
 }
 
@@ -56,7 +101,11 @@ export function personalNecesario(tipo, pax, paxPorCamarero = 0) {
   const sala = salaNecesaria(tipo, pax, paxPorCamarero);
   const cocina = cocinaNecesaria(pax);
   const logistica = logisticaNecesaria(pax);
-  return { sala, cocina, logistica, total: sala + cocina + logistica, sinMedir: SIN_MEDIR.includes(tipo) };
+  // "Sin medir" deja de serlo en cuanto alguien pone el suyo: ese número ya no sale de
+  // una suposición, sale de quien ha hecho el evento. Seguir avisando sería no hacerle
+  // caso a la única persona que lo sabe.
+  const sinMedir = SIN_MEDIR.includes(tipo) && ratios[tipo] === PAX_POR_CAMARERO[tipo];
+  return { sala, cocina, logistica, total: sala + cocina + logistica, sinMedir };
 }
 
 // ─── QUIÉN VA A CADA EVENTO ───────────────────────────────────────────────────

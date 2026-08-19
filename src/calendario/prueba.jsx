@@ -14,8 +14,10 @@ import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
+import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
 import { saneaLista, saneaEquipo, aISO, checklistsPorCrear } from "./apuntes.js";
+import { leerRatios, ponRatios } from "../personal.js";
 
 const HOY = new Date();
 // aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no
@@ -65,6 +67,7 @@ function Banco() {
   const soloVer = Boolean(new URLSearchParams(window.location.search).get("solover"));
   const [apuntes, setApuntes] = useState(() => (arrancaVacio ? [] : saneaLista(DEMO)));
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
+  const [ratios, setRatios] = useState(() => leerRatios());
   // Con "?promover=1" se monta lo que hace la checklist al abrir el calendario: crea las
   // de los eventos que ya están cerca y avisa de cuáles. Aquella va detrás del login del
   // equipo, así que la batería no puede llegar; esto deja probado el aviso y su
@@ -109,6 +112,7 @@ function Banco() {
         <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
+        <Ratios ratios={ratios} onCambiar={(r) => setRatios(ponRatios(r))} />
         <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
       </>
     );

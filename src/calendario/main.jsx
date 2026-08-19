@@ -17,6 +17,7 @@ import "./calendario.css";
 import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
+import Ratios from "./Ratios.jsx";
 import useCalendarioNube from "./useCalendarioNube.js";
 import Traer from "./Traer.jsx";
 import { enlaceDeLaUrl } from "./enlace.js";
@@ -27,7 +28,7 @@ import { enlaceDeLaUrl } from "./enlace.js";
 const ENLACE = enlaceDeLaUrl(window.location.search);
 
 function AppCalendario() {
-  const { apuntes, equipo, cargando, soloVer, codigos, traer, guardar, borrar, cambiarEquipo } = useCalendarioNube(ENLACE);
+  const { apuntes, equipo, cargando, soloVer, codigos, traer, guardar, borrar, cambiarEquipo, ratios, cambiarRatios } = useCalendarioNube(ENLACE);
 
   // Abrir el evento de la checklist desde el calendario. Es otra app, así que se va por
   // dirección; el nombre del evento viaja en el parámetro que ya entiende la checklist.
@@ -58,6 +59,7 @@ function AppCalendario() {
       {!ENLACE && <Compartir codigos={codigos} href={window.location.href} />}
 
       {!soloVer && <Equipo equipo={equipo} onCambiar={cambiarEquipo} />}
+      {!soloVer && <Ratios ratios={ratios} onCambiar={cambiarRatios} />}
 
       {/* Desde un enlace no se ofrece abrir la checklist: es otra app y pide cuenta,
           así que el botón solo llevaría a una pantalla de login. */}

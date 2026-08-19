@@ -310,6 +310,48 @@ export function suscribirPreciosNube(cb) {
     ));
 }
 
+// ─── LOS RATIOS DE PERSONAL ───────────────────────────────────────────────────
+// Cuántos comensales lleva un camarero, por tipo de evento. Los de partida salen de
+// contar el personal real de 19 eventos, pero cada catering trabaja distinto y los de
+// cumpleaños y producción nadie los ha medido: se ajustan desde la app.
+//
+// Van al lado de los precios y por lo mismo: es un ajuste del EQUIPO, no de un móvil. Si
+// cada uno tuviera los suyos, dos personas mirando el mismo sábado verían que hacen
+// falta 22 personas o 28 según quién mire. Cuelga de "indice/", ya cubierto por las
+// reglas, y se sube solo lo cambiado.
+const DOC_RATIOS = "indice/ratios";
+
+export async function guardarRatiosNube(cambios) {
+  const conexion = await getDb();
+  if (!conexion) return 0;
+  const { db, fs } = conexion;
+  const actualizado = Date.now();
+  await fs.setDoc(fs.doc(db, DOC_RATIOS), { ratios: JSON.stringify(cambios), actualizado });
+  return actualizado;
+}
+
+export async function cargarRatiosNube() {
+  const conexion = await getDb();
+  if (!conexion) return null;
+  const { db, fs } = conexion;
+  const snap = await fs.getDoc(fs.doc(db, DOC_RATIOS));
+  if (!snap.exists()) return null;
+  try { return JSON.parse(snap.data().ratios); }
+  catch (e) { return null; }
+}
+
+export function suscribirRatiosNube(cb) {
+  return suscribir(({ db, fs }) => fs.onSnapshot(
+      fs.doc(db, DOC_RATIOS),
+      (snap) => {
+        if (!snap.exists()) return;
+        try { cb(JSON.parse(snap.data().ratios)); }
+        catch (e) { /* documento corrupto: se ignora */ }
+      },
+      () => { /* sin conexión: se usan los de partida */ },
+    ));
+}
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

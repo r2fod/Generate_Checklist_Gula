@@ -15,6 +15,8 @@ import { useEffect, useRef, useState } from "react";
 import { saneaLista, saneaEquipo } from "./apuntes.js";
 import { MODOS } from "./enlace.js";
 import { nubeActiva, resolverCalendario, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube } from "../nube.js";
+import { ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
+import { cargarRatiosNube, guardarRatiosNube, suscribirRatiosNube } from "../nube.js";
 
 export default function useCalendarioNube(enlace = null) {
   const [apuntes, setApuntes] = useState([]);
@@ -24,6 +26,9 @@ export default function useCalendarioNube(enlace = null) {
   // entra por un enlace nunca ve el otro.
   const [codigos, setCodigos] = useState(null);
   const soloVer = Boolean(enlace && enlace.modo === MODOS.LECTURA);
+  // Los ratios de personal. Van aparte del calendario —son un ajuste del equipo, no un
+  // apunte— pero se traen aquí porque es la única pantalla donde se ven y se tocan.
+  const [ratios, setRatios] = useState(() => leerRatios());
 
   // A dónde escribir. En una referencia y no en el estado porque lo usa el guardado, y
   // una foto vieja aquí significa escribir en el documento equivocado.
@@ -66,7 +71,14 @@ export default function useCalendarioNube(enlace = null) {
       corta = suscribirCalendarioNube(cs.codigo, aplicar);
     })();
 
-    return () => { vivo = false; corta(); };
+    // Los ratios, en paralelo: no dependen del código del calendario porque no son
+    // suyos. ponRatios los deja puestos para TODA la app —la checklist provisiona
+    // material a partir de la cifra de sala—, no solo para esta pantalla.
+    const aplicarRatios = (r) => { if (vivo && r) setRatios(ponRatios(r)); };
+    cargarRatiosNube().then(aplicarRatios).catch(() => { /* sin conexión: los de partida */ });
+    const cortaRatios = suscribirRatiosNube(aplicarRatios);
+
+    return () => { vivo = false; corta(); cortaRatios(); };
   }, [clave]);   // eslint-disable-line react-hooks/exhaustive-deps -- enlace es un objeto nuevo cada render; lo que importa es su contenido, que es "clave"
 
   // Se guarda la lista entera, no el apunte suelto: son sesenta apuntes de cuatro
@@ -99,5 +111,14 @@ export default function useCalendarioNube(enlace = null) {
     guardar: (apunte) => escribir([...apuntes.filter(a => a.id !== apunte.id), apunte], equipo),
     borrar: (id) => escribir(apuntes.filter(a => a.id !== id), equipo),
     cambiarEquipo: (siguiente) => escribir(apuntes, siguiente),
+    ratios,
+    // Se sube solo lo cambiado, para que una corrección de los medidos en una versión
+    // nueva llegue igual a todo lo que nadie haya tocado.
+    cambiarRatios: (siguiente) => {
+      if (soloVer) return;
+      setRatios(ponRatios(siguiente));
+      guardarRatiosNube(ratiosCambiados(siguiente))
+        .catch(() => { /* se reintenta al siguiente cambio */ });
+    },
   };
 }

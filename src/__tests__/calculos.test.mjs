@@ -21,7 +21,8 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
-import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados } from "../personal.js";
+import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados,
+  PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario } from "../calendario/enlace.js";
 import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
 
@@ -877,6 +878,64 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
     [{ fecha: "2026-09-04", titulo: "Boda sin id", tipo: "boda", pax: 100 }], {}, { hoy });
   ok(sinId.enlaces.length === 0 && Object.keys(sinId.nuevas).length === 0,
     "un apunte sin id no genera enlace: sin él no se puede marcar y marcaría a los demás");
+}
+
+console.log("\n══ Los ratios de personal se pueden ajustar ══");
+{
+  const base = { ...PAX_POR_CAMARERO };
+  ok(base.boda === 9 && base.corporativo === 10,
+    `los de partida salen de los 19 eventos medidos (boda 1 cada ${base.boda}, corporativo 1 cada ${base.corporativo})`);
+
+  // Antes de tocar nada, cumpleaños avisa de que su ratio no lo ha comprobado nadie
+  ok(personalNecesario("cumpleanos", 100).sinMedir === true,
+    "cumpleaños avisa de que su ratio no está comprobado");
+  ok(personalNecesario("boda", 100).sinMedir === false,
+    "y una boda no, porque el suyo está medido");
+
+  // Ajustarlo cambia la gente de sala, que es de donde salen delantales, bandejas,
+  // litos y menús de personal: no es un número decorativo.
+  const antes = personalNecesario("boda", 180).sala;
+  ponRatios({ boda: 12 });
+  const despues = personalNecesario("boda", 180).sala;
+  ok(antes === 20 && despues === 15,
+    `una boda de 180: 1 cada 9 son ${antes} de sala, 1 cada 12 son ${despues}`);
+
+  // Lo que no se toca se queda en su valor de partida. Importa: así una corrección de
+  // los medidos en una versión nueva llega igual a todo lo que nadie haya cambiado.
+  ok(leerRatios().corporativo === base.corporativo,
+    "lo que nadie ha ajustado sigue en su valor de partida");
+
+  // Y en cuanto alguien pone el suyo, el aviso de "sin comprobar" sobra: ese número ya
+  // no es una suposición, sale de quien ha hecho el evento.
+  ponRatios({ cumpleanos: 15 });
+  ok(personalNecesario("cumpleanos", 100).sinMedir === false,
+    "poner el ratio de cumpleaños quita el aviso de 'sin comprobar'");
+  ok(personalNecesario("produccion", 100).sinMedir === true,
+    "pero producción, que sigue sin ajustar, lo mantiene");
+
+  // Nada de valores que revientan la cuenta: un 0 dividiría por cero y un 500 diría que
+  // una boda de 300 se saca con dos personas. Los dos vienen de un dedo resbalando.
+  const malos = saneaRatios({ boda: 0, comunion: -3, corporativo: 500, cumpleanos: "doce", produccion: 11 });
+  ok(Object.keys(malos).length === 1 && malos.produccion === 11,
+    `solo pasan los números con sentido → ${JSON.stringify(malos)}`);
+  ponRatios({ boda: 0 });
+  ok(leerRatios().boda === base.boda && personalNecesario("boda", 90).sala === 10,
+    "un 0 no se aplica: se vuelve al de partida en vez de dividir por cero");
+
+  // Se sube solo lo cambiado, para no congelar los de partida en la nube
+  const cambios = ratiosCambiados({ ...base, boda: 11 });
+  ok(Object.keys(cambios).length === 1 && cambios.boda === 11,
+    `solo se sube lo que alguien ha cambiado → ${JSON.stringify(cambios)}`);
+
+  // Y el parámetro explícito de la checklist (numCamareros de ese evento concreto)
+  // sigue mandando sobre el ratio general: es el dato de ESA boda.
+  ponRatios({ boda: 12 });
+  ok(personalNecesario("boda", 180, 9).sala === 20,
+    "el pax por camarero de un evento concreto manda sobre el ratio general");
+
+  ponRatios({});   // se dejan como estaban para el resto de la batería
+  ok(leerRatios().boda === base.boda && personalNecesario("cumpleanos", 100).sinMedir === true,
+    "y restablecerlos los devuelve a los de partida, avisos incluidos");
 }
 
 console.log("\n══ Los precios, los mismos para todo el equipo ══");

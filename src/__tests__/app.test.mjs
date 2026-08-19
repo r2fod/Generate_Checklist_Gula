@@ -3701,6 +3701,67 @@ async function main() {
       await c.close();
     }
 
+    // ── AJUSTAR LA GENTE POR COMENSAL ──
+    // El número del que sale la cifra de sala, y con ella los delantales, las bandejas y
+    // los menús de personal. Se comprueba que ajustarlo se nota de verdad en la vista de
+    // equipo, no solo en la casilla.
+    console.log("\n══ Ajustar la gente por comensal ══");
+    for (const w of [320, 390, 768]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 1100 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`ratios ${w}px: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-ratios-cab");
+
+      ok(await p.locator(".cal-ratios-cuerpo").count() === 0,
+        `${w}px · el panel de ratios arranca plegado, como el del equipo`);
+      await p.locator(".cal-ratios-cab").click();
+      await p.waitForSelector(".cal-ratios-cuerpo");
+
+      ok(await p.locator(".cal-ratio").count() === 5,
+        `${w}px · hay un ratio por tipo de evento`);
+      // Los dos que nadie ha medido se marcan; los otros tres no
+      ok(await p.locator(".cal-ratio-avisa").count() === 2,
+        `${w}px · cumpleaños y producción salen marcados como "sin comprobar"`);
+      ok(!await seMueveDeLado(p), `${w}px · el panel no mueve la página de lado`);
+      ok(await p.evaluate(() => {
+        const i = document.querySelector(".cal-ratio-campo input");
+        return parseFloat(getComputedStyle(i).fontSize) >= 16 && i.getBoundingClientRect().height >= 43;
+      }), `${w}px · el número va a 16px y se toca con el dedo`);
+      ok(await p.evaluate(() => {
+        let fuera = 0;
+        document.querySelectorAll(".cal-ratio").forEach(fila => {
+          const r = fila.getBoundingClientRect();
+          fila.querySelectorAll("input, button, span").forEach(e => {
+            const x = e.getBoundingClientRect();
+            if (x.width && (x.right > r.right + 0.5 || x.left < r.left - 0.5)) fuera++;
+          });
+        });
+        return fuera === 0;
+      }), `${w}px · nada de la fila se sale de ella`);
+
+      // Y lo que importa: cambiarlo mueve la cifra de gente que hace falta.
+      await p.locator(".segment-btn", { hasText: "Equipo" }).click();
+      await p.waitForSelector(".cal-jornada");
+      const salaAntes = await p.locator(".cal-necesita b").first().innerText();
+      await p.locator(".segment-btn", { hasText: "Mes" }).click();
+      await p.locator(".cal-ratio-campo input").first().fill("18");
+      await p.waitForTimeout(250);
+      await p.locator(".segment-btn", { hasText: "Equipo" }).click();
+      await p.waitForSelector(".cal-jornada");
+      const salaDespues = await p.locator(".cal-necesita b").first().innerText();
+      ok(Number(salaDespues) < Number(salaAntes),
+        `${w}px · subir los comensales por camarero baja la gente de sala (${salaAntes} → ${salaDespues})`);
+
+      // Volver al de partida sin tener que acordarse de cuál era
+      await p.locator(".segment-btn", { hasText: "Mes" }).click();
+      await p.locator(".cal-ratio-volver").first().click();
+      await p.waitForTimeout(200);
+      ok(await p.locator(".cal-ratio-campo input").first().inputValue() === "9",
+        `${w}px · el botón de volver devuelve el valor de partida`);
+      await c.close();
+    }
+
     // ── LAS CHECKLISTS QUE SE CREAN SOLAS ──
     // Al abrir el calendario desde la checklist, los eventos que ya están a menos de 14
     // días entran solos en el archivo. Lo que se comprueba aquí es el AVISO: automático
