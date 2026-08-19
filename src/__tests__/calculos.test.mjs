@@ -23,6 +23,7 @@ import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../for
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
 import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario } from "../calendario/enlace.js";
+import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
 
 let pasan = 0;
 const fallos = [];
@@ -876,6 +877,60 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
     [{ fecha: "2026-09-04", titulo: "Boda sin id", tipo: "boda", pax: 100 }], {}, { hoy });
   ok(sinId.enlaces.length === 0 && Object.keys(sinId.nuevas).length === 0,
     "un apunte sin id no genera enlace: sin él no se puede marcar y marcaría a los demás");
+}
+
+console.log("\n══ Los precios, los mismos para todo el equipo ══");
+{
+  // localStorage de mentira: precios.js lo usa directamente y aquí no hay navegador
+  const almacen = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (almacen.has(k) ? almacen.get(k) : null),
+    setItem: (k, v) => almacen.set(k, String(v)),
+    removeItem: (k) => almacen.delete(k),
+  };
+
+  const base = leerPrecios();
+  const unItem = "Copas de vino";
+  ok(base[unItem] === 1.63, `de partida, ${unItem} cuesta ${base[unItem]} €`);
+
+  // LO IMPORTANTE: se guarda solo lo CAMBIADO, no el catálogo entero. Guardando la
+  // mezcla completa, el día que se corrija un precio de partida en una versión nueva la
+  // copia guardada lo taparía y nadie del equipo vería la corrección.
+  guardarPrecios({ ...base, [unItem]: 2.50 });
+  const guardado = JSON.parse(almacen.get("gula_precios_items"));
+  ok(Object.keys(guardado).length === 1 && guardado[unItem] === 2.50,
+    `solo se guarda lo que alguien ha cambiado → ${JSON.stringify(guardado)}`);
+  ok(leerPrecios()[unItem] === 2.50, "y al leer, lo cambiado pisa al de partida");
+  ok(leerPrecios()["Cava"] === base["Cava"], "lo que nadie ha tocado sigue en su precio de partida");
+
+  // Volver a poner el de partida deja de ser un cambio: no se arrastra para siempre
+  guardarPrecios({ ...leerPrecios(), [unItem]: 1.63 });
+  ok(Object.keys(JSON.parse(almacen.get("gula_precios_items"))).length === 0,
+    "devolver un precio a su valor de partida lo saca de lo guardado");
+
+  // soloLosCambiados no se cuela nada raro: un texto o un NaN pegado a mano no es precio
+  const sucio = soloLosCambiados({ ...base, "Cava": "carísimo", "Vodka": NaN, "Tónica": 9.9 });
+  ok(Object.keys(sucio).length === 1 && sucio["Tónica"] === 9.9,
+    `un valor que no es un número no se sube → ${JSON.stringify(sucio)}`);
+
+  // Lo que llega de la nube gana sobre lo de este navegador —es lo que ha decidido el
+  // equipo— pero no borra lo de aquí que aún no haya subido.
+  guardarPrecios({ ...base, "Vodka": 12.0 });
+  const fusionado = fusionarPreciosNube({ "Cava": 4.5 });
+  ok(fusionado["Cava"] === 4.5 && fusionado["Vodka"] === 12.0,
+    `llega el precio del equipo y se conserva el de aquí (${fusionado["Cava"]} / ${fusionado["Vodka"]})`);
+  const trasFusion = JSON.parse(almacen.get("gula_precios_items"));
+  ok(trasFusion["Cava"] === 4.5 && trasFusion["Vodka"] === 12.0,
+    "y queda guardado en este navegador, para poder dibujar sin esperar a la nube");
+  ok(fusionarPreciosNube(null)["Cava"] === 4.5,
+    "un documento vacío o corrupto no borra los precios que ya había");
+
+  // El pegado sigue funcionando igual: es como se corrigen
+  const pegado = parsePreciosPegados("Cava: 5,20\nVodka  11.40\nlínea que no es un precio");
+  ok(pegado["Cava"] === 5.2 && pegado["Vodka"] === 11.4 && Object.keys(pegado).length === 2,
+    `pegar precios entiende coma y punto, y se salta lo que no lo es → ${JSON.stringify(pegado)}`);
+
+  delete globalThis.localStorage;
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

@@ -263,6 +263,53 @@ export function suscribirArchivoNube(cb) {
     ));
 }
 
+// ─── LOS PRECIOS DEL EQUIPO ───────────────────────────────────────────────────
+// El coste estimado del Modo carga sale de un catálogo de precios por unidad. Los de
+// partida van en el código (src/precios.js): son precios de proveedor, públicos, no
+// negociados. Lo que se corrige a mano vivía SOLO en el navegador de quien lo corregía,
+// así que dos personas mirando el mismo evento veían costes distintos y ninguna sabía
+// cuál era el bueno.
+//
+// Cuelga de "indice/", que las reglas ya abren solo al equipo con sesión. No hace falta
+// tocar firestore.rules — y es lo correcto: esto son costes internos, no algo que deba
+// leer quien entra por un enlace compartido.
+//
+// Se sube SOLO lo cambiado, no el catálogo entero: ver soloLosCambiados en precios.js.
+const DOC_PRECIOS = "indice/precios";
+
+export async function guardarPreciosNube(cambios) {
+  const conexion = await getDb();
+  if (!conexion) return 0;
+  const { db, fs } = conexion;
+  const actualizado = Date.now();
+  await fs.setDoc(fs.doc(db, DOC_PRECIOS), { precios: JSON.stringify(cambios), actualizado });
+  return actualizado;
+}
+
+export async function cargarPreciosNube() {
+  const conexion = await getDb();
+  if (!conexion) return null;
+  const { db, fs } = conexion;
+  const snap = await fs.getDoc(fs.doc(db, DOC_PRECIOS));
+  if (!snap.exists()) return null;
+  try { return JSON.parse(snap.data().precios); }
+  catch (e) { return null; }   // documento corrupto: mejor los de partida que reventar
+}
+
+// Si alguien corrige un precio desde otro dispositivo, llega solo. Un catálogo de costes
+// que hay que recargar para ver al día es otra vez una hoja suelta.
+export function suscribirPreciosNube(cb) {
+  return suscribir(({ db, fs }) => fs.onSnapshot(
+      fs.doc(db, DOC_PRECIOS),
+      (snap) => {
+        if (!snap.exists()) return;
+        try { cb(JSON.parse(snap.data().precios)); }
+        catch (e) { /* documento corrupto: se ignora */ }
+      },
+      () => { /* sin conexión: se ignora, se usan los de este navegador */ },
+    ));
+}
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

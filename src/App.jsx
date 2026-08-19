@@ -24,6 +24,7 @@ import {
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
   leerConfigFormulario, guardarConfigFormulario,
   resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
+  cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
@@ -47,7 +48,7 @@ import {
 } from "./checklist-format.js";
 import { infoCategoria } from "./components/Iconos.jsx";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
-import { leerPrecios } from "./precios.js";
+import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube } from "./precios.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
 import { calcularCalibracion } from "./calibracion.js";
@@ -1804,6 +1805,40 @@ export default function App({ onCerrarSesion } = {}) {
   // de la nube, "Boda X" todavía no consta como guardada; sin esperar, se crearía una
   // encima y al sincronizar SUSTITUIRÍA la de verdad, con sus checks y sus items a mano
   // dentro. Es el único fallo de todo esto que no tendría vuelta atrás.
+  // ─── LOS PRECIOS, LOS MISMOS PARA TODOS ───────────────────────────────────
+  // El coste estimado del Modo carga sale de un catálogo de precios por unidad. Lo que
+  // se corrige a mano vivía SOLO en el navegador de quien lo corregía: dos personas
+  // mirando el mismo evento veían costes distintos y ninguna sabía cuál era el bueno.
+  //
+  // leerPrecios() es SÍNCRONA porque se dibuja con ella, así que la nube no puede
+  // sustituirla: el navegador hace de copia local y esto la refresca por detrás.
+  //
+  // "preciosAlDia" es solo una marca de tiempo para que el panel de precios, si está
+  // abierto, se entere de que han cambiado y vuelva a leerlos. No lleva los precios
+  // dentro a propósito: quien los quiera, que llame a leerPrecios().
+  const [preciosAlDia, setPreciosAlDia] = useState(0);
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    const aplicar = (remotos) => {
+      if (!remotos) return;
+      fusionarPreciosNube(remotos);
+      setPreciosAlDia(Date.now());
+    };
+    cargarPreciosNube().then(aplicar).catch(() => { /* sin conexión: se usan los de aquí */ });
+    return suscribirPreciosNube(aplicar);
+  }, [haySesionEquipo]);
+
+  // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
+  // no el catálogo entero: si no, el día que se corrija un precio de partida en una
+  // versión nueva, la copia subida lo taparía para todo el equipo.
+  const handleGuardarPrecios = (precios) => {
+    guardarPrecios(precios);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarPreciosNube(soloLosCambiados(precios))
+        .catch(() => { /* sin conexión: queda en este navegador y sube al siguiente cambio */ });
+    }
+  };
+
   const promocionHechaRef = React.useRef(false);
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo || !archivoListo || promocionHechaRef.current) return;
@@ -2567,6 +2602,8 @@ export default function App({ onCerrarSesion } = {}) {
       )}
       {modoCarga && (
         <ModalModoCarga
+          onGuardarPrecios={handleGuardarPrecios}
+          preciosAlDia={preciosAlDia}
           checklist={checklist}
           preparados={preparados}
           marcasRevisar={marcasRevisar}

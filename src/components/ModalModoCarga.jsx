@@ -15,7 +15,7 @@ import { leerPrecios, guardarPrecios, parsePreciosPegados } from "../precios.js"
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {} }) {
+export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0 }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
@@ -239,9 +239,16 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   const handleGuardarPrecios = (texto) => {
     const nuevos = { ...precios, ...parsePreciosPegados(texto) };
     setPrecios(nuevos);
-    guardarPrecios(nuevos);
+    // onGuardarPrecios lo pone App: guarda aquí Y sube, para que el equipo entero vea
+    // los mismos costes. Sin él (banco de pruebas, o sin nube) se guarda solo aquí.
+    (onGuardarPrecios || guardarPrecios)(nuevos);
     setEditandoPrecios(false);
   };
+
+  // Si otra persona corrige un precio desde otro dispositivo, se refleja aquí sin tener
+  // que cerrar el panel. preciosAlDia es solo una marca de tiempo que cambia cuando han
+  // llegado precios nuevos: los de verdad se leen de donde están siempre.
+  useEffect(() => { if (preciosAlDia) setPrecios(leerPrecios()); }, [preciosAlDia]);
   // Exporta el resumen a CSV (se abre en Excel/Sheets/Numbers). Separador ";" y BOM
   // UTF-8 para que Excel en español lo lea bien con tildes.
   const exportarResumenCSV = () => {

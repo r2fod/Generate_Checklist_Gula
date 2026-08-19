@@ -1,7 +1,12 @@
 // ─── CATÁLOGO DE PRECIOS (para el coste estimado en Modo carga → Resumen) ──────
-// Precio por unidad de cada item, guardado en este navegador y compartido entre
-// TODOS los eventos (el precio de "Copas de vino" es el mismo en cualquier boda,
-// no depende del evento) — se busca por el nombre exacto del item.
+// Precio por unidad de cada item, compartido entre TODOS los eventos (el precio de
+// "Copas de vino" es el mismo en cualquier boda, no depende del evento) — se busca por
+// el nombre exacto del item.
+//
+// Lo que se corrija a mano se guarda en este navegador Y en Firestore, para que lo vea
+// todo el equipo: si cada uno tuviera los suyos, dos personas mirando el mismo evento
+// verían costes distintos. La lectura sigue siendo SÍNCRONA (se dibuja con ella), así
+// que el navegador hace de copia local y la nube la refresca por detrás.
 // Precios de partida sacados de "Resumen Eventos.xlsx" (coste unitario estimado,
 // consistente en las ~24 hojas de eventos reales). Cualquier precio pegado en
 // "💶 Precios" pisa al de aquí y queda guardado en el navegador.
@@ -87,12 +92,41 @@ const PRECIOS_BASE = {
   "Copas de cava": 1.63,
   "Vasos chupito cristal (entrante)": 1.07,
 };
+// Solo lo que alguien ha cambiado de verdad, sin el catálogo entero detrás.
+//
+// Importa más de lo que parece: lo que se guarda es la mezcla completa (base + cambios),
+// así que el día que se corrija un precio de partida en una versión nueva de la app, la
+// copia guardada lo taparía y nadie vería la corrección. Guardando solo la diferencia,
+// los precios de partida siguen mandando en todo lo que nadie ha tocado.
+export function soloLosCambiados(precios = {}) {
+  const cambios = {};
+  Object.entries(precios).forEach(([nombre, valor]) => {
+    if (typeof valor !== "number" || !isFinite(valor)) return;
+    if (PRECIOS_BASE[nombre] === valor) return;   // igual que el de partida: no es un cambio
+    cambios[nombre] = valor;
+  });
+  return cambios;
+}
+
+// Mete los precios que vienen de la nube en este navegador, sin perder lo de aquí que
+// todavía no haya subido. Gana lo de la nube: es lo que ha decidido el equipo.
+export function fusionarPreciosNube(remotos = {}) {
+  if (!remotos || typeof remotos !== "object") return leerPrecios();
+  const aqui = (() => {
+    try { return JSON.parse(localStorage.getItem("gula_precios_items") || "{}"); }
+    catch (e) { return {}; }
+  })();
+  guardarPrecios({ ...aqui, ...remotos });
+  return leerPrecios();
+}
+
 export function leerPrecios() {
   try { return { ...PRECIOS_BASE, ...JSON.parse(localStorage.getItem("gula_precios_items") || "{}") }; }
   catch (e) { return { ...PRECIOS_BASE }; }
 }
 export function guardarPrecios(precios) {
-  try { localStorage.setItem("gula_precios_items", JSON.stringify(precios)); }
+  // Solo lo cambiado, no la mezcla entera: ver soloLosCambiados
+  try { localStorage.setItem("gula_precios_items", JSON.stringify(soloLosCambiados(precios))); }
   catch (e) { /* localStorage no disponible */ }
 }
 // Pega líneas "Item: 1,50" o "Item 1.50" (mismo formato que "Añadir varios items") y
