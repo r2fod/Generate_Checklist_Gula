@@ -2296,17 +2296,14 @@ export default function App({ onCerrarSesion } = {}) {
         setItemsManuales(prev => prev.map((it, i) => i === manualIdx ? { ...it, label: nuevoLabel } : it));
         // La cantidad editada a mano de un item manual va ligada a su nombre: se migra la clave
         const newKey = `${categoria}::${nuevoLabel}`;
-        setOverridesManuales(prev => {
-          if (prev[key] === undefined) return prev;
-          const next = { ...prev };
-          next[newKey] = next[key];
-          delete next[key];
-          return next;
-        });
-        // Lo marcado en Modo carga va ligado al nombre igual que la cantidad, y al
-        // renombrar se quedaba huérfano: el item seguía en la lista pero sin su check,
-        // así que lo preparado, lo cargado, lo vuelto y las roturas desaparecían sin
-        // avisar. Se migran a la clave nueva.
+        // Todo lo que va ligado al NOMBRE de un item hay que moverlo al nombre nuevo: la
+        // cantidad editada a mano y lo marcado en Modo carga. Al renombrar se quedaba
+        // huérfano —el item seguía en la lista pero sin su check—, así que lo preparado,
+        // lo cargado, lo vuelto y las roturas desaparecían sin avisar.
+        //
+        // Una sola función para los seis: estaba escrita dos veces seguidas, la primera
+        // a mano para overridesManuales y la segunda ya extraída para los demás. Dos
+        // sitios donde acordarse del mismo arreglo.
         const migrar = (setter) => setter(prev => {
           if (prev[key] === undefined) return prev;
           const next = { ...prev };
@@ -2314,7 +2311,7 @@ export default function App({ onCerrarSesion } = {}) {
           delete next[key];
           return next;
         });
-        [setPreparados, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
+        [setOverridesManuales, setPreparados, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
         keyFinal = newKey;
       } else {
         setNombresManuales(prev => ({ ...prev, [key]: nuevoLabel }));

@@ -14,9 +14,29 @@ import { getFirebaseApp } from "./firebase.js";
 
 let dbPromise = null;
 
+// ─── LA CONEXIÓN DE LAS PRUEBAS ───────────────────────────────────────────────
+// Sustituye la conexión por otra. Lo usan las pruebas de sincronización para correr el
+// nube.js DE VERDAD contra un Firestore en memoria.
+//
+// Existe porque antes había una COPIA A MANO de nube.js entero —288 líneas— con la
+// conexión cambiada. Eso no era solo duplicación: significaba que las pruebas no
+// probaban el código que se publica, probaban la copia. Y las dos se separan solas —
+// pasó al añadir el calendario y otra vez con los ratios—, así que el día que se
+// separasen de verdad la batería habría salido verde contra código que no existe.
+//
+// En producción no la llama nadie: sin llamarla, esto es una variable a null y getDb se
+// comporta exactamente igual que antes.
+let conexionDePruebas = null;
+
+export function ponConexionDePruebas(conexion) {
+  conexionDePruebas = conexion;
+  dbPromise = null;
+}
+
 // Devuelve { db, fs } o null si no hay nube. El módulo de Firestore se trae con
 // import() dinámico: son 542 kB y no tienen por qué caer en el arranque de nadie.
 export function getDb() {
+  if (conexionDePruebas) return Promise.resolve(conexionDePruebas);
   if (!firebaseConfig) return null;
   if (!dbPromise) {
     dbPromise = (async () => {

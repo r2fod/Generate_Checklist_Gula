@@ -5413,19 +5413,6 @@ hr {
 }
 .form-instalar-pasos li { padding-left: 2px; }
 
-.form-salir {
-  align-self: center;
-  margin-top: 4px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  text-decoration: underline;
-  cursor: pointer;
-  padding: 10px 8px;
-  min-height: 40px;
-}
-
 /* Los envíos ya revisados: se ven, pero apagados, para que no compitan con lo que
    sí hay que mirar */
 .envio-card.es-revisado { opacity: 0.72; }
@@ -5502,11 +5489,6 @@ hr {
 }
 
 /* Lo que ya se ha mandado desde este móvil, para volver a ello y cambiarlo */
-.form-mios { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
-.form-mios-titulo {
-  font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
-  letter-spacing: 0.4px; color: var(--text-muted);
-}
 .form-mio { border-style: dashed; }
 
 /* Un envío que la oficina ha corregido después de mandarlo */

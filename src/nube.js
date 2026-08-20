@@ -109,18 +109,18 @@ export function suscribirEventoNube(id, cb) {
     ));
 }
 
-// ─── ÍNDICE COMPARTIDO DE "EVENTOS GUARDADOS" ──────────────────────────────────
-// Un único documento fijo con la lista completa { nombre: estado }, para que el
-// archivo de eventos guardados se vea igual desde cualquier dispositivo/navegador
-// en vez de vivir solo en el localStorage de quien los guardó.
+// ─── EL ÍNDICE VIEJO: SOLO SE LEE, YA NO SE ESCRIBE ───────────────────────────
+// Un único documento con TODOS los eventos juntos. Fue el archivo compartido hasta que
+// se partió en un documento por evento (ver más abajo), porque no cabía: Firestore no
+// admite más de 1 MiB por documento y se llenaba sobre los 88 eventos.
+//
+// Desde entonces NADIE LO ESCRIBE. Se conserva y se lee UNA vez al arrancar, y solo si
+// no hay ningún "evt_": es la red que trae los eventos de quien todavía no se ha migrado.
+// Sus funciones de guardar y de suscribirse se han quitado, que llevaban sin llamarse
+// desde la migración.
+//
+// Ojo con lo que es: una foto congelada del día que se migró, no datos vivos.
 const DOC_INDICE = "indice/eventosGuardados";
-
-export async function guardarIndiceEventosNube(mapa) {
-  const conexion = await getDb();
-  if (!conexion) return;
-  const { db, fs } = conexion;
-  await fs.setDoc(fs.doc(db, DOC_INDICE), { mapa: JSON.stringify(mapa), actualizado: Date.now() });
-}
 
 export async function cargarIndiceEventosNube() {
   const conexion = await getDb();
@@ -130,21 +130,6 @@ export async function cargarIndiceEventosNube() {
   if (!snap.exists()) return null;
   const d = snap.data();
   return { mapa: JSON.parse(d.mapa), actualizado: d.actualizado ?? 0 };
-}
-
-// Avisa (cb) cada vez que alguien (en cualquier dispositivo) guarda/borra un evento.
-// cb recibe { mapa, actualizado } para poder decidir por timestamp qué versión manda
-// (un borrado no se puede "fusionar", solo sustituir por la más reciente).
-export function suscribirIndiceEventosNube(cb) {
-  return suscribir(({ db, fs }) => fs.onSnapshot(
-      fs.doc(db, DOC_INDICE),
-      (snap) => {
-        if (!snap.exists()) return;
-        const d = snap.data();
-        cb({ mapa: JSON.parse(d.mapa), actualizado: d.actualizado ?? 0 });
-      },
-      () => { /* sin conexión: se ignora, la app sigue en local */ },
-    ));
 }
 
 // ─── ARCHIVO DE EVENTOS: UN DOCUMENTO POR EVENTO ──────────────────────────────

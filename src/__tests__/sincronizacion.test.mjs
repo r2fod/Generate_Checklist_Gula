@@ -4,8 +4,18 @@
 // dispositivos, que es donde estaban los fallos que no se veían de otra forma.
 //
 //   node src/__tests__/sincronizacion.test.mjs
-import { almacen, setSesion, limpiarPrevios } from './firestore-simulado.mjs';
-import * as N from './nube-simulada.mjs';
+import { almacen, setSesion, limpiarPrevios, fakeDb, fakeFs } from './firestore-simulado.mjs';
+import { ponConexionDePruebas } from '../firestore.js';
+// El nube.js DE VERDAD, el que se publica. Antes esto importaba una copia a mano de 288
+// líneas con la conexión cambiada, así que estas pruebas —que son la red que ha impedido
+// dos veces esta semana subir algo roto— no cubrían el código que se envía, sino una
+// copia suya que ya se había separado dos veces.
+//
+// Los imports se evalúan antes que esta línea, pero da igual: nube.js no pide la
+// conexión al cargarse, solo dentro de sus funciones. Para cuando corre la primera
+// prueba, la de mentira ya está puesta.
+import * as N from '../nube.js';
+ponConexionDePruebas({ db: fakeDb, fs: fakeFs });
 const ok=(c,m)=>{console.log(`  ${c?'✅':'❌'} ${m}`); if(!c) process.exitCode=1;};
 
 // Réplica EXACTA del arranque de App.jsx (sincronizar + suscripción)
