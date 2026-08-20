@@ -14,7 +14,7 @@
 //   · Resto de casos → hay que iniciar sesión con el correo/contraseña del equipo.
 import { useState, useEffect } from "react";
 import { accesoActivo, iniciarSesion, cerrarSesion, observarSesion } from "./auth.js";
-import logoGula from "./assets/gula-logo.png";
+import logoGula from "./assets/gula-logo.webp";
 
 function esLinkDeEvento() {
   const p = new URLSearchParams(window.location.search);

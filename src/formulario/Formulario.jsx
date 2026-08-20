@@ -8,7 +8,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, loQueFalta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
-import logoGula from "../assets/gula-logo.png";
+import logoGula from "../assets/gula-logo.webp";
 import FondoIconos from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
 import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";

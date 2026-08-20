@@ -38,7 +38,7 @@ import ModalVistaPrevia from "./components/ModalVistaPrevia.jsx";
 import ModalAgregarItems from "./components/ModalAgregarItems.jsx";
 import ModalModoCarga from "./components/ModalModoCarga.jsx";
 import FilaItem from "./components/FilaItem.jsx";
-import logoGula from "./assets/gula-logo.png";
+import logoGula from "./assets/gula-logo.webp";
 import { sanearEstado, cambiosDeCantidad } from "./estado.js";
 import {
   EVENTOS, fmtCantidadCompleta,
