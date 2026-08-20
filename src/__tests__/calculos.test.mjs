@@ -23,7 +23,7 @@ import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../for
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
 import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
-import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario } from "../calendario/enlace.js";
+import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
 import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
 
 let pasan = 0;
@@ -709,6 +709,23 @@ console.log("\n══ Los dos enlaces del calendario ══");
   ok(enlaceDeLaUrl(new URL(es.ver).search).modo === MODOS.LECTURA
      && enlaceDeLaUrl(new URL(es.editar).search).modo === MODOS.EDICION,
     "los enlaces generados se leen de vuelta en el modo que les toca");
+
+  // Lo que se ENSEÑA no es lo que se copia. El entero mide unos 70 caracteres: en un
+  // móvil solo se veía "https://r2fod.github.io/Generate_Ch…", justo la parte IDÉNTICA
+  // en los dos. Mandar el editable creyendo que mandabas el de mirar no tiene arreglo:
+  // ese enlace no se le quita a una persona sin invalidárselo a todas.
+  ok(enlaceCorto(es.ver) === "…/calendario/?ver=bbb",
+    `el enlace se enseña corto y por el final → "${enlaceCorto(es.ver)}"`);
+  ok(enlaceCorto(es.editar) === "…/calendario/?cal=aaa",
+    `y así se distingue de un vistazo del otro → "${enlaceCorto(es.editar)}"`);
+  ok(enlaceCorto(es.ver).length < 30,
+    `y cabe en un móvil estrecho (${enlaceCorto(es.ver).length} caracteres)`);
+  // Pero lo que se copia y lo que abre el botón sigue siendo el ENTERO: un enlace
+  // recortado que alguien pegue no lleva a ninguna parte.
+  ok(es.ver.startsWith("https://") && es.ver.length > enlaceCorto(es.ver).length,
+    "lo que se copia sigue siendo el enlace entero, no el recortado");
+  ok(enlaceCorto("esto no es una dirección") === "esto no es una dirección",
+    "y algo que no es una dirección se enseña tal cual, sin reventar");
 
   // Sin códigos todavía (recién estrenado, o sin nube) no se ofrece un enlace roto
   ok(enlacesDeCalendario("https://x.github.io/Repo/calendario/", null) === null

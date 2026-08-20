@@ -4,7 +4,7 @@
 // códigos del otro (viven en indice/, que las reglas cierran sin cuenta).
 import { useState } from "react";
 import { Share2, ChevronDown, Eye, Pencil, Check, Copy, ExternalLink } from "lucide-react";
-import { enlacesDeCalendario } from "./enlace.js";
+import { enlacesDeCalendario, enlaceCorto } from "./enlace.js";
 
 function Fila({ icono: Icono, titulo, nota, url, clase }) {
   const [copiado, setCopiado] = useState(false);
@@ -23,17 +23,14 @@ function Fila({ icono: Icono, titulo, nota, url, clase }) {
         <strong>{titulo}</strong>
         <small>{nota}</small>
       </div>
-      {/* De solo lectura y con todo el texto seleccionado al tocarlo: si el portapapeles
-          no está disponible (iOS fuera de HTTPS, navegadores viejos) sigue habiendo una
-          forma de llevárselo. */}
-      <input
-        className="cal-compartir-url"
-        readOnly
-        value={url}
-        aria-label={`Enlace para ${titulo.toLowerCase()}`}
-        onFocus={e => e.target.select()}
-        onClick={e => e.target.select()}
-      />
+      {/* Se enseña el enlace RECORTADO, no el entero. El entero mide unos 70 caracteres
+          y en un móvil solo se veía "https://r2fod.github.io/Generate_Ch…": justo la
+          parte idéntica en los dos, o sea ninguna pista de cuál ibas a pegar en el grupo.
+
+          Se copia y se abre SIEMPRE el entero (va en el title). Y con user-select:all un
+          toque lo selecciona, que es la salida cuando el portapapeles no está disponible
+          (iOS fuera de HTTPS, navegadores viejos). */}
+      <code className="cal-compartir-url" title={url}>{enlaceCorto(url)}</code>
       <div className="cal-compartir-acciones">
         <button type="button" className="btn btn-outline cal-compartir-copiar" onClick={copiar}>
           {copiado

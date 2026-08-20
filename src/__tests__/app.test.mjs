@@ -102,6 +102,41 @@ async function nuevaPagina(ctx) {
 const desbordamiento = (page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
+// ─── ¿ESTÁ BIEN ESTA CAJA A ESTE ANCHO? ───────────────────────────────────────
+// Todo lo que puede ir mal en un bloque, medido de una vez y en un solo sitio. Estaba
+// escrito como cinco p.evaluate() casi iguales repartidos por la prueba —uno por panel
+// nuevo—, y cada uno miraba una cosa distinta según el día que se escribió: uno los
+// desbordes, otro las alturas, otro nada. Así se mira LO MISMO en todos.
+//
+// Devuelve los problemas EN CRISTIANO, no un booleano: cuando esto falla lo que hace
+// falta es saber qué elemento y por cuántos píxeles, no que "algo desborda".
+const revisaCaja = (page, selector) => page.evaluate((sel) => {
+  const caja = document.querySelector(sel);
+  if (!caja) return null;               // no está en esta pantalla: no es un fallo
+  const r = caja.getBoundingClientRect();
+  const problemas = [];
+  caja.querySelectorAll("*").forEach(e => {
+    const x = e.getBoundingClientRect();
+    if (!x.width && !x.height) return;   // escondido: ni ocupa ni molesta
+    const cl = (e.className || "").toString().split(" ")[0] || e.tagName;
+    if (x.right > r.right + 0.5) problemas.push(`${cl} se sale por la derecha ${Math.round(x.right - r.right)}px`);
+    if (x.left < r.left - 0.5) problemas.push(`${cl} se sale por la izquierda ${Math.round(r.left - x.left)}px`);
+    if (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== "visible") {
+      problemas.push(`${cl} texto cortado (${e.scrollWidth} en ${e.clientWidth})`);
+    }
+    if (/^(BUTTON|A|INPUT|SELECT)$/.test(e.tagName)) {
+      // 40px es el mínimo con el que se acierta con el pulgar. En el panel del equipo,
+      // fallar el toque significa quitar a quien no era.
+      if (x.height > 0 && x.height < 40) problemas.push(`${cl} solo ${Math.round(x.height)}px de alto`);
+      // Por debajo de 16px iOS hace zoom al enfocar y descoloca la pantalla entera
+      if (e.tagName === "INPUT" && parseFloat(getComputedStyle(e).fontSize) < 16) {
+        problemas.push(`${cl} input por debajo de 16px: iOS hará zoom`);
+      }
+    }
+  });
+  return [...new Set(problemas)];
+}, selector);
+
 // La checklist entera como texto, "nombre=cantidad|sufijo" por item. Vive aquí arriba
 // porque lo usan bloques repartidos por toda la prueba, y definido a media función se
 // quedaba fuera del alcance de los de más arriba.
@@ -3722,14 +3757,10 @@ async function main() {
 
       ok(!await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1),
         `${w}px · el aviso no mueve la página de lado`);
-      ok(await p.evaluate(() => {
-        const a2 = document.querySelector(".aviso-sin-configurar");
-        const r = a2.getBoundingClientRect();
-        return [...a2.querySelectorAll("svg, div, button")].every(e => {
-          const x = e.getBoundingClientRect();
-          return !x.width || (x.right <= r.right + 0.5 && x.left >= r.left - 0.5);
-        });
-      }), `${w}px · nada de dentro del aviso se sale de él`);
+      {
+        const mal = await revisaCaja(p, ".aviso-sin-configurar");
+        ok(mal.length === 0, `${w}px · el aviso de falta configurar, bien${mal.length ? ` → ${mal.join(" · ")}` : ""}`);
+      }
 
       // Y se puede dar por configurado: si no se pudiera quitar, sería un cartel para
       // siempre y en dos semanas nadie lo leería.
@@ -3751,6 +3782,46 @@ async function main() {
       ok(await p.locator(".aviso-sin-configurar").count() === 0,
         "una checklist montada a mano no lleva el aviso");
       await c.close();
+    }
+
+    // ── BARRIDO: TODO LO NUEVO, LOS 9 ANCHOS, LOS DOS TEMAS ──
+    // Los bloques de abajo prueban qué HACE cada panel; esto prueba que CABE, en todas
+    // las pantallas y con el tema oscuro puesto. Van juntos y con el mismo rasero
+    // (revisaCaja) para que no pase lo de siempre: que cada panel se mire a un ancho
+    // distinto según el día que se escribió.
+    console.log("\n══ Responsive de todo lo nuevo: 9 anchos × 2 temas ══");
+    {
+      const PANTALLAS = [
+        ["calendario del equipo", BANCO, [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+        ["aviso de creadas", BANCO + "?promover=1", []],
+        ["solo lectura", BANCO + "?solover=1", []],
+        ["a pantalla completa", BANCO + "?pantalla=1", [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+      ];
+      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura"];
+
+      for (const tema of ["claro", "oscuro"]) {
+        const malos = [];
+        for (const [nombre, dir, abrir] of PANTALLAS) {
+          for (const w of ANCHOS) {
+            const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: w < 768, hasTouch: w < 768 });
+            await c.addInitScript(x => localStorage.setItem("gula_tema", x), tema);
+            const p = await c.newPage();
+            p.on("pageerror", e => errores.push(`responsive ${nombre} ${w}px: ${e}`));
+            await p.goto(dir, { waitUntil: "networkidle" });
+            for (const s of abrir) { const l = p.locator(s); if (await l.count()) await l.first().click().catch(() => {}); }
+            await p.waitForTimeout(300);
+            const fuera = await desbordamiento(p);
+            if (fuera > 0) malos.push(`${nombre} ${w}px: la página se mueve de lado +${fuera}px`);
+            for (const caja of CAJAS) {
+              const mal = await revisaCaja(p, caja);
+              if (mal && mal.length) malos.push(`${nombre} ${w}px ${caja}: ${mal.join(" · ")}`);
+            }
+            await c.close();
+          }
+        }
+        ok(malos.length === 0,
+          `${tema}: todo lo nuevo cabe en los ${ANCHOS.length} anchos${malos.length ? ` → ${malos.slice(0, 4).join(" | ")}${malos.length > 4 ? ` (y ${malos.length - 4} más)` : ""}` : ""}`);
+      }
     }
 
     // ── AJUSTAR LA GENTE POR COMENSAL ──
@@ -3776,21 +3847,10 @@ async function main() {
       ok(await p.locator(".cal-ratio-avisa").count() === 2,
         `${w}px · cumpleaños y producción salen marcados como "sin comprobar"`);
       ok(!await seMueveDeLado(p), `${w}px · el panel no mueve la página de lado`);
-      ok(await p.evaluate(() => {
-        const i = document.querySelector(".cal-ratio-campo input");
-        return parseFloat(getComputedStyle(i).fontSize) >= 16 && i.getBoundingClientRect().height >= 43;
-      }), `${w}px · el número va a 16px y se toca con el dedo`);
-      ok(await p.evaluate(() => {
-        let fuera = 0;
-        document.querySelectorAll(".cal-ratio").forEach(fila => {
-          const r = fila.getBoundingClientRect();
-          fila.querySelectorAll("input, button, span").forEach(e => {
-            const x = e.getBoundingClientRect();
-            if (x.width && (x.right > r.right + 0.5 || x.left < r.left - 0.5)) fuera++;
-          });
-        });
-        return fuera === 0;
-      }), `${w}px · nada de la fila se sale de ella`);
+      {
+        const mal = await revisaCaja(p, ".cal-ratios");
+        ok(mal.length === 0, `${w}px · el panel de ratios, bien${mal.length ? ` → ${mal.join(" · ")}` : ""}`);
+      }
 
       // Y lo que importa: cambiarlo mueve la cifra de gente que hace falta.
       await p.locator(".segment-btn", { hasText: "Equipo" }).click();
@@ -3841,14 +3901,10 @@ async function main() {
         `${w}px · ni vacaciones, ni recogidas, ni pruebas de menú`);
 
       ok(!await seMueveDeLado(p), `${w}px · el aviso no mueve la página de lado`);
-      ok(await p.evaluate(() => {
-        const a2 = document.querySelector(".cal-creadas");
-        const r = a2.getBoundingClientRect();
-        return [...a2.querySelectorAll("svg, span, button")].every(e => {
-          const x = e.getBoundingClientRect();
-          return !x.width || (x.right <= r.right + 0.5 && x.left >= r.left - 0.5);
-        });
-      }), `${w}px · y nada de dentro del aviso se sale de él`);
+      {
+        const mal = await revisaCaja(p, ".cal-creadas");
+        ok(mal.length === 0, `${w}px · el aviso de creadas, bien${mal.length ? ` → ${mal.join(" · ")}` : ""}`);
+      }
 
       // Se puede quitar de en medio: es información de una vez, no un cartel permanente
       await p.locator(".cal-creadas-cerrar").click();
@@ -3887,7 +3943,10 @@ async function main() {
       await p.locator(".cal-compartir-cab").click();
       await p.waitForSelector(".cal-compartir-cuerpo");
 
-      const urls = await p.locator(".cal-compartir-url").evaluateAll(es => es.map(e => e.value));
+      const urls = await p.locator(".cal-compartir-url").evaluateAll(es => es.map(e => e.getAttribute("title")));
+      const visibles = await p.locator(".cal-compartir-url").allInnerTexts();
+      ok(visibles.every(v => v.startsWith("…/") && v.length < 40),
+        `${w}px · se enseña recortado, que es lo que cabe y lo que distingue → "${visibles[0]}"`);
       ok(urls.length === 2, `${w}px · salen los dos enlaces, no uno`);
       const [verUrl, editarUrl] = urls;
       ok(/\/calendario\/\?ver=/.test(verUrl) && /\/calendario\/\?cal=/.test(editarUrl),
@@ -3898,25 +3957,10 @@ async function main() {
 
       // El enlace es largo y la pantalla estrecha: es justo donde algo se sale
       ok(!await seMueveDeLado(p), `${w}px · con los enlaces a la vista la página no se mueve de lado`);
-      ok(await p.evaluate(() => {
-        let fuera = 0;
-        document.querySelectorAll(".cal-compartir-fila").forEach(fila => {
-          const r = fila.getBoundingClientRect();
-          fila.querySelectorAll("input, button, a").forEach(e => {
-            const x = e.getBoundingClientRect();
-            if (x.width && (x.right > r.right + 0.5 || x.left < r.left - 0.5)) fuera++;
-          });
-        });
-        return fuera === 0;
-      }), `${w}px · ni el campo del enlace ni el botón se salen de su fila`);
-      // 16px o iOS hace zoom al tocar el enlace, y 44px de alto o no se acierta con el dedo
-      ok(await p.evaluate(() => {
-        const i = document.querySelector(".cal-compartir-url");
-        const b = document.querySelector(".cal-compartir-copiar");
-        return parseFloat(getComputedStyle(i).fontSize) >= 16
-          && i.getBoundingClientRect().height >= 43
-          && b.getBoundingClientRect().height >= 43;
-      }), `${w}px · el enlace va a 16px y tanto él como Copiar se tocan con el dedo`);
+      {
+        const mal = await revisaCaja(p, ".cal-compartir");
+        ok(mal.length === 0, `${w}px · el panel de compartir, bien${mal.length ? ` → ${mal.join(" · ")}` : ""}`);
+      }
 
       // Y copiar copia de verdad: es el único botón del panel
       await p.locator(".cal-compartir-copiar").first().click();

@@ -823,8 +823,10 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  /* 44px, como el resto: cerrar un aviso con el pulgar y fallar es peor que el aviso */
+  width: 44px;
+  height: 44px;
+  margin: -8px -6px -8px 0;   /* la zona de toque crece sin engordar el aviso */
   padding: 0;
   border: 0;
   border-radius: 999px;
@@ -916,19 +918,28 @@
   line-height: 1.35;
 }
 
+/* Ya no es un <input>: era una línea de 70 caracteres en una caja de 248px, así que en
+   un móvil solo se veía el principio —idéntico en los dos enlaces—. Ahora se enseña
+   recortado por el final (ver enlaceCorto), que es lo que los distingue. */
 .cal-compartir-url {
+  display: block;
   width: 100%;
   min-width: 0;
-  min-height: 44px;
   padding: 9px 11px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--card-bg);
   color: var(--text-muted);
-  /* 16px para que iOS no haga zoom al enfocar. El enlace es largo: se corta con puntos
-     suspensivos en vez de estirar la caja y sacar la página de la pantalla. */
-  font-size: 16px;
-  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  /* Un toque lo selecciona entero: la salida cuando el portapapeles no está disponible */
+  user-select: all;
+  -webkit-user-select: all;
+  /* Un enlace no tiene espacios donde partir: sin esto estira la caja y saca la página
+     de la pantalla, que es el fallo clásico de meter una URL en una tarjeta. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Copiar y Abrir, juntos. En el móvil se reparten el ancho a medias en su propia
@@ -1092,13 +1103,14 @@
   text-align: center;
 }
 
+/* 44px: es un botón que se pulsa con el pulgar en una fila estrecha */
 .cal-ratio-volver {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 999px;
@@ -1184,8 +1196,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 38px;
-  padding: 4px 4px 4px 12px;
+  /* 44px, y sin relleno arriba/abajo para que los BOTONES de dentro midan los 44 —que
+     son lo que se toca—. Venía con el chip a 38 y sus dos botones a 30: en un móvil eso
+     es fallar el toque y quitar del equipo a quien no querías. */
+  min-height: 44px;
+  padding: 0 4px 0 12px;
   border: 1px solid var(--border-color);
   border-radius: 999px;
   background: var(--card-bg);
@@ -1198,7 +1213,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  min-height: 30px;
+  min-height: 44px;
   padding: 0;
   border: 0;
   background: none;
@@ -1230,8 +1245,8 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 0;
   border-radius: 999px;

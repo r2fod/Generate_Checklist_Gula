@@ -53,6 +53,24 @@ export function direccionDelCalendario(href) {
   return `${u.origin}${ruta}`;
 }
 
+// Lo que se ENSEÑA del enlace, que no es lo mismo que lo que se copia.
+//
+// El enlace entero mide unos 70 caracteres y no cabe en un móvil: a 320px se veía
+// "https://r2fod.github.io/Generate_Ch…" y nada más — o sea justo la parte que es
+// IDÉNTICA en los dos. Ninguna pista de cuál estabas a punto de pegar en el grupo, y
+// mandar el editable creyendo que mandabas el de mirar no tiene vuelta atrás: ese enlace
+// no se le puede quitar a una persona sin invalidárselo a todas.
+//
+// Recortado por el final cabe en una línea y se lee lo único que los distingue: ?ver= o
+// ?cal=. Se copia y se abre SIEMPRE el entero; esto es solo la etiqueta.
+export function enlaceCorto(url) {
+  let u;
+  try { u = new URL(url); } catch (e) { return String(url || ""); }
+  const partes = u.pathname.split("/").filter(Boolean);
+  const ultima = partes.length ? partes[partes.length - 1] : "";
+  return `…/${ultima}/${u.search}`;
+}
+
 // Los dos enlaces listos para copiar. Sin códigos no hay enlaces: mejor no enseñar nada
 // que dar uno que no abre.
 export function enlacesDeCalendario(href, codigos) {
