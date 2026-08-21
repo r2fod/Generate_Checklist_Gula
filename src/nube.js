@@ -329,6 +329,13 @@ export const guardarMemoriaNube = MEMORIA.guardar;
 export const cargarMemoriaNube = MEMORIA.cargar;
 export const suscribirMemoriaNube = MEMORIA.suscribir;
 
+// Lo que le importa al equipo ahora (ver asistente/objetivos.js). Un objetivo que solo
+// ve quien lo escribió no es un objetivo del equipo, así que va aquí como los demás.
+const OBJETIVOS = ajusteCompartido("indice/objetivos", "objetivos");
+export const guardarObjetivosNube = OBJETIVOS.guardar;
+export const cargarObjetivosNube = OBJETIVOS.cargar;
+export const suscribirObjetivosNube = OBJETIVOS.suscribir;
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

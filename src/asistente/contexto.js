@@ -27,6 +27,7 @@ export function contextoDelAsistente({
   apuntes = [],
   eventoActual = null,
   memoria = [],
+  objetivos = [],
   conectores = {},
   equipo = [],
   respuestasFormulario = null,
@@ -34,6 +35,9 @@ export function contextoDelAsistente({
   onOlvidar,
   onUsoMemoria,
   onEscribir,
+  onPonerObjetivo,
+  onCambiarEstadoObjetivo,
+  onQuitarObjetivo,
   nivel,
 } = {}) {
   return {
@@ -41,6 +45,7 @@ export function contextoDelAsistente({
     apuntes: (Array.isArray(apuntes) ? apuntes : []).filter(Boolean).map(recortaApunte),
     eventoActual,
     memoria,
+    objetivos,
     conectores,
     equipo,
     respuestasFormulario,
@@ -51,6 +56,10 @@ export function contextoDelAsistente({
     // guardar eventos, el calendario sabe guardar apuntes. El asistente no sabe de
     // ninguna de las dos, solo llama a esto.
     onEscribir,
+    // Los objetivos los edita la pantalla del cerebro; el asistente solo los lee.
+    onPonerObjetivo,
+    onCambiarEstadoObjetivo,
+    onQuitarObjetivo,
     nivel,
   };
 }

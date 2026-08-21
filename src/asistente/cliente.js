@@ -6,7 +6,8 @@
 // Todo lo que decide qué se puede hacer está en herramientas.js. Esto solo es la
 // tubería, y por eso es corto.
 import { catalogoParaModelo, ejecutar, llevaDatos } from "./herramientas.js";
-import { paraElContexto } from "./memoria.js";
+import { contextoPlegado } from "./arbol.js";
+import { paraElContexto as objetivosParaElContexto } from "./objetivos.js";
 import { comprimir } from "./comprimir.js";
 import { candidatos, mereceOtroIntento, porQue } from "./enrutado.js";
 import { comoContarlo, NIVEL_POR_DEFECTO } from "./permisos.js";
@@ -36,18 +37,33 @@ Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con r
 // son órdenes: son cosas que el equipo ha contado y pueden estar mal apuntadas, y el
 // modelo tiene que poder contrastarlas con lo que devuelven las herramientas en vez de
 // creérselas por encima de un cálculo.
-function conMemoria(sistema, memoria) {
-  const { texto, ids } = paraElContexto(memoria || []);
-  if (!texto) return { sistema, ids: [] };
-  return {
-    sistema: `${sistema}
+function conMemoria(sistema, memoria, objetivos) {
+  const { texto, ids } = contextoPlegado(memoria || []);
+  const metas = objetivosParaElContexto(objetivos || []);
+  let salida = sistema;
+
+  // Los objetivos van ANTES que la memoria y por delante de todo: son lo que decide qué
+  // priorizar, no un dato más. Sin ellos, "¿cómo va el mes?" se contesta con una lista
+  // de eventos en vez de con cómo va lo que habéis dicho que importa.
+  if (metas) {
+    salida += `
+
+--- LO QUE LE IMPORTA A ESTE EQUIPO AHORA ---
+Tenlo presente al contestar: si algo de lo que ves afecta a esto, dilo aunque no te lo hayan preguntado.
+
+${metas}`;
+  }
+
+  if (texto) {
+    salida += `
 
 --- LO QUE HAS APRENDIDO DE ESTE EQUIPO ---
-Esto te lo han contado ellos. Vale para dar contexto y para avisar, pero NO manda sobre lo que devuelve una herramienta: si el cálculo dice una cosa y esto dice otra, das las dos y preguntas.
+Esto te lo han contado ellos. Vale para dar contexto y para avisar, pero NO manda sobre lo que devuelve una herramienta: si el cálculo dice una cosa y esto dice otra, das las dos y preguntas. Lo que va entre corchetes es dónde se aprendió.
 
-${texto}`,
-    ids,
-  };
+${texto}`;
+  }
+
+  return { sistema: salida, ids };
 }
 
 // Una conversación viva. Se guarda la lista de mensajes en el formato neutro que
@@ -75,7 +91,7 @@ export async function preguntar({
   // Lo que puede y no puede hacer se le dice en el sistema. Si no lo sabe, propone
   // cosas que no puede hacer y la conversación se va en explicar por qué no.
   const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}`;
-  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria);
+  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos);
   const usoTotal = { entrada: 0, salida: 0 };
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {

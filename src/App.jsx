@@ -27,6 +27,7 @@ import {
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
+  cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
@@ -57,6 +58,7 @@ import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } fr
 import { calcularCalibracion, calibracionBebida } from "./calibracion.js";
 import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
+import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1866,6 +1868,11 @@ export default function App({ onCerrarSesion } = {}) {
   const [memoria, setMemoria] = useState([]);
   const memoriaRef = React.useRef([]);
   React.useEffect(() => { memoriaRef.current = memoria; }, [memoria]);
+  // Lo que le importa al equipo. Va a la nube por lo mismo que la memoria: un objetivo
+  // que solo ve quien lo escribió no es un objetivo del equipo.
+  const [objetivos, setObjetivos] = useState([]);
+  const objetivosRef = React.useRef([]);
+  React.useEffect(() => { objetivosRef.current = objetivos; }, [objetivos]);
   // Los apuntes del calendario, guardados de la carga que YA se hace al arrancar para
   // crear las checklists que se acercan. No cuesta una petición más: es la misma.
   const [apuntesCalendario, setApuntesCalendario] = useState([]);
@@ -1920,6 +1927,24 @@ export default function App({ onCerrarSesion } = {}) {
     setMemoria(reforzada);
     memoriaRef.current = reforzada;
   }, []);
+
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (r) => { if (vivo && r) setObjetivos(saneaObjetivos(r)); };
+    cargarObjetivosNube().then(aplicar).catch(() => { /* sin conexión: sin objetivos */ });
+    const corta = suscribirObjetivosNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const guardarObjetivos = React.useCallback((siguiente) => {
+    const limpios = saneaObjetivos(siguiente);
+    setObjetivos(limpios);
+    objetivosRef.current = limpios;
+    if (nubeActiva() && haySesionEquipo) {
+      guardarObjetivosNube(limpios).catch(() => { /* sin conexión: sube al siguiente cambio */ });
+    }
+  }, [haySesionEquipo]);
 
   const handleCambiarBebida = (siguiente) => {
     setFactoresBebida(ponFactores(siguiente));
@@ -2894,6 +2919,10 @@ export default function App({ onCerrarSesion } = {}) {
                     notasEvento, barraCoctel, horasCoctel, barraCopas, horasCopas, logisticaEquipo,
                   }),
                   memoria,
+                  objetivos,
+                  onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
+                  onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),
+                  onQuitarObjetivo: (id) => guardarObjetivos(quitarObjetivo(objetivosRef.current, id)),
                   onRecordar: handleRecordar,
                   onOlvidar: handleOlvidar,
                   onUsoMemoria: handleUsoMemoria,

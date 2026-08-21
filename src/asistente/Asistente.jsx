@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
-import { porTemas, TEMAS } from "./memoria.js";
+import Cerebro from "./Cerebro.jsx";
 import Companero, { COMPANEROS, CLAVES_COMPANERO } from "./Companero.jsx";
 import Humano from "./Humano.jsx";
 import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
@@ -367,38 +367,15 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             )}
           </div>
         ) : pestana === "cerebro" ? (
-          <div className="asis-hilo asis-cerebro">
-            <p className="asis-explica">
-              Lo que ha aprendido de vosotros y que no sale de ningún cálculo. Está en
-              texto a propósito: se lee y se corrige. Un cerebro que no puedes abrir es un
-              cerebro en el que no puedes confiar — y si aprende mal que en las bodas van
-              dos de cocina, se carga mal el camión y nadie sabe por qué.
-            </p>
-            {!(contexto.memoria || []).length && (
-              <p className="asis-vacio">
-                Todavía no sabe nada. Cuéntale cosas en la charla —"en la finca X no hay
-                enchufe en la carpa", "en comuniones ponemos 3 de cocina"— y las guarda.
-              </p>
-            )}
-            {porTemas(contexto.memoria || []).map(g => (
-              <div className="asis-tema" key={g.tema}>
-                <div className="asis-tema-titulo">{g.titulo}</div>
-                {g.recuerdos.map(r => (
-                  <div className="asis-recuerdo" key={r.id}>
-                    <span className="asis-recuerdo-texto">{r.texto}</span>
-                    {/* Las veces que le ha hecho falta de verdad: lo que sube se queda,
-                        lo que nunca sube se cae cuando hay que hacer sitio. */}
-                    <span className="asis-recuerdo-puntos" title={`Le ha hecho falta ${r.puntos} ${r.puntos === 1 ? "vez" : "veces"}`}>{r.puntos}</span>
-                    <button type="button" className="asis-recuerdo-borrar"
-                      onClick={() => onOlvidar && onOlvidar(r.id)}
-                      title="Que lo olvide" aria-label={`Que olvide: ${r.texto}`}>
-                      <Trash2 size={13} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
+          <Cerebro
+            memoria={contexto.memoria || []}
+            objetivos={contexto.objetivos || []}
+            eventosGuardados={contexto.eventosGuardados || {}}
+            onOlvidar={onOlvidar}
+            onPonerObjetivo={contexto.onPonerObjetivo}
+            onCambiarEstadoObjetivo={contexto.onCambiarEstadoObjetivo}
+            onQuitarObjetivo={contexto.onQuitarObjetivo}
+          />
         ) : (
         <div className="asis-hilo">
           {!hilo.length && (

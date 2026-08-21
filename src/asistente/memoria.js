@@ -84,7 +84,23 @@ export function parecido(a, b) {
 const UMBRAL_FUNDIR = 0.7;
 
 // ─── LA LISTA ─────────────────────────────────────────────────────────────────
-// Un recuerdo: { id, texto, tema, puntos, creado, usado, quien }
+// ─── DE DÓNDE SALIÓ CADA COSA ─────────────────────────────────────────────────
+// Un recuerdo sin fuente es un rumor. "En las comuniones ponemos 3 de cocina" puede ser
+// una decisión del jefe de cocina o algo que alguien dijo de pasada en una conversación
+// de hace ocho meses, y desde el panel no había forma de distinguirlas — así que
+// tampoco había forma de saber cuál corregir.
+//
+// La fuente dice DÓNDE se aprendió: en qué evento se estaba, o si vino de una revisión.
+// No es un adorno del panel: es lo que permite tirar del hilo cuando algo suena raro.
+export const FUENTES = {
+  charla:   "En una conversación",
+  evento:   "Trabajando un evento",
+  revision: "De una revisión",
+  mano:     "Escrito a mano",
+};
+const fuenteValida = (f) => (Object.keys(FUENTES).includes(f) ? f : "charla");
+
+// Un recuerdo: { id, texto, tema, puntos, creado, usado, quien, fuente, donde }
 export function saneaMemoria(bruta) {
   if (!Array.isArray(bruta)) return [];
   const vistos = new Set();
@@ -105,6 +121,10 @@ export function saneaMemoria(bruta) {
         creado: n(r.creado, 0),
         usado: n(r.usado, 0),
         quien: String(r.quien || "").slice(0, 60),
+        fuente: fuenteValida(r.fuente),
+        // En qué evento se estaba al aprenderlo. Es lo que convierte "lo dijo alguien"
+        // en "salió de la boda del 12", que es lo que se puede comprobar.
+        donde: String(r.donde || "").slice(0, 80),
       };
     })
     .filter(Boolean);
@@ -112,7 +132,7 @@ export function saneaMemoria(bruta) {
 
 // Aprender algo. Si ya se sabía —aunque esté dicho de otra forma— se refuerza y se queda
 // la redacción NUEVA: la última vez que alguien lo dijo es la que está al día.
-export function recordar(memoria, texto, { tema = "general", quien = "", ahora = Date.now() } = {}) {
+export function recordar(memoria, texto, { tema = "general", quien = "", fuente = "charla", donde = "", ahora = Date.now() } = {}) {
   const limpio = limpia(texto);
   if (!limpio) return { memoria: saneaMemoria(memoria), recuerdo: null, fundido: false };
   const lista = saneaMemoria(memoria);
@@ -120,7 +140,13 @@ export function recordar(memoria, texto, { tema = "general", quien = "", ahora =
 
   const yaEsta = lista.find(r => r.tema === t && parecido(r.texto, limpio) >= UMBRAL_FUNDIR);
   if (yaEsta) {
-    const actualizado = { ...yaEsta, texto: limpio, puntos: Math.min(999, yaEsta.puntos + 1), usado: ahora, quien: quien || yaEsta.quien };
+    // Al fundir se queda la fuente NUEVA si la hay: la última vez que se dijo es la
+    // que está al día, igual que con la redacción.
+    const actualizado = {
+      ...yaEsta, texto: limpio, puntos: Math.min(999, yaEsta.puntos + 1), usado: ahora,
+      quien: quien || yaEsta.quien,
+      fuente: fuenteValida(fuente), donde: donde || yaEsta.donde,
+    };
     return {
       memoria: lista.map(r => (r.id === yaEsta.id ? actualizado : r)),
       recuerdo: actualizado,
@@ -128,7 +154,10 @@ export function recordar(memoria, texto, { tema = "general", quien = "", ahora =
     };
   }
 
-  const nuevo = { id: clave(limpio), texto: limpio, tema: t, puntos: 1, creado: ahora, usado: ahora, quien: String(quien || "").slice(0, 60) };
+  const nuevo = {
+    id: clave(limpio), texto: limpio, tema: t, puntos: 1, creado: ahora, usado: ahora,
+    quien: String(quien || "").slice(0, 60), fuente: fuenteValida(fuente), donde: String(donde || "").slice(0, 80),
+  };
   return { memoria: poda([...lista, nuevo]), recuerdo: nuevo, fundido: false };
 }
 
