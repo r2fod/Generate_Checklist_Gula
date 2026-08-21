@@ -37,6 +37,10 @@ Firestore.
    | `PROVEEDOR_POR_DEFECTO` | Text | `gemini` (por defecto), `claude`, `openai` o `compatible` |
    | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | Text | Para fijar otro modelo |
 
+   > **Si sale un 404 diciendo que el modelo "is no longer available"**, Google lo ha
+   > retirado. No hay que tocar el código: se añade `GEMINI_MODEL` con el nombre que
+   > diga el propio error y se despliega. Pasa cada pocos meses.
+
 ## Usar cualquier otro modelo
 
 El proveedor `compatible` es un hueco abierto: casi todo el mundo habla hoy el mismo

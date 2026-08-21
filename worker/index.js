@@ -96,7 +96,11 @@ async function quienEs(idToken, env) {
 
 // Gemini. Es el que va por defecto: tiene capa gratuita de verdad.
 async function gemini(cuerpo, env) {
-  const modelo = env.GEMINI_MODEL || "gemini-2.5-flash";
+  // El nombre del modelo caduca. Google retiró gemini-2.5-flash "para cuentas nuevas"
+  // sin avisar, y el Worker contestaba un 404 que no decía nada de por qué. Por eso el
+  // valor de aquí es solo el punto de partida: GEMINI_MODEL lo pisa sin tocar el código,
+  // que es lo que hace falta el día que este también caduque.
+  const modelo = env.GEMINI_MODEL || "gemini-3.6-flash";
   const contenidos = cuerpo.mensajes.map(m => {
     if (m.rol === "herramienta") {
       return { role: "user", parts: [{ functionResponse: { name: m.nombre, response: { resultado: m.contenido } } }] };
