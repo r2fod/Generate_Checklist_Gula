@@ -106,7 +106,17 @@ async function gemini(cuerpo, env) {
       return { role: "user", parts: [{ functionResponse: { name: m.nombre, response: { resultado: m.contenido } } }] };
     }
     if (m.rol === "asistente" && m.llamadas && m.llamadas.length) {
-      return { role: "model", parts: m.llamadas.map(l => ({ functionCall: { name: l.nombre, args: l.argumentos } })) };
+      // La "firma" vuelve pegada a la llamada. Gemini 3.6 la manda con cada functionCall
+      // y EXIGE que se le devuelva tal cual al continuar la conversación: sin ella
+      // contesta un 400 y no ejecuta nada. Es suyo y opaco, así que ni se mira ni se
+      // toca, solo se guarda y se devuelve.
+      return {
+        role: "model",
+        parts: m.llamadas.map(l => ({
+          functionCall: { name: l.nombre, args: l.argumentos },
+          ...(l.firma ? { thoughtSignature: l.firma } : {}),
+        })),
+      };
     }
     return { role: m.rol === "asistente" ? "model" : "user", parts: [{ text: String(m.contenido || "") }] };
   });
@@ -128,7 +138,13 @@ async function gemini(cuerpo, env) {
   return {
     texto: partes.filter(p => p.text).map(p => p.text).join("").trim(),
     llamadas: partes.filter(p => p.functionCall).map((p, i) => ({
-      id: `g${i}`, nombre: p.functionCall.name, argumentos: p.functionCall.args || {},
+      id: `g${i}`,
+      // Gemini a veces devuelve el nombre con un prefijo suyo ("default_api:que_falta").
+      // La app busca la herramienta por su nombre exacto, así que se limpia aquí: si no,
+      // contesta "no existe ninguna herramienta que se llame así" y no es verdad.
+      nombre: String(p.functionCall.name || "").split(":").pop(),
+      argumentos: p.functionCall.args || {},
+      firma: p.thoughtSignature || "",
     })),
   };
 }
