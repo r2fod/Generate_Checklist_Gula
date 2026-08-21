@@ -266,9 +266,15 @@ async function estado(env) {
   const puestas = {};
   claves.forEach(k => {
     const v = String(env[k] || "");
-    // Ni la clave ni un trozo: solo si está y cuánto mide. Con el largo ya se ve si se
-    // ha pegado la que no era o si se ha quedado a medias.
-    puestas[k] = v ? `puesta, ${v.length} caracteres${v !== v.trim() ? " ⚠️ CON ESPACIOS O SALTOS DE LÍNEA" : ""}` : "NO puesta";
+    // De los secretos de verdad, ni un trozo: solo si están y cuánto miden.
+    //
+    // La de Firebase es la excepción y se enseña a medias A PROPÓSITO: esa clave ya es
+    // pública —va dentro del bundle de la app, en un repositorio abierto— así que no hay
+    // nada que descubrir. Y hacía falta: la de Gemini mide exactamente lo mismo, 39
+    // caracteres, así que con el largo no había forma de ver si estaban cambiadas de
+    // sitio, que es el error más fácil de cometer aquí.
+    const trozo = k === "FIREBASE_API_KEY" && v.length > 15 ? ` → ${v.slice(0, 10)}…${v.slice(-5)}` : "";
+    puestas[k] = v ? `puesta, ${v.length} caracteres${v !== v.trim() ? " ⚠️ CON ESPACIOS O SALTOS DE LÍNEA" : ""}${trozo}` : "NO puesta";
   });
 
   let firebase = "no se ha podido comprobar";
@@ -294,6 +300,8 @@ async function estado(env) {
     proveedorPorDefecto: env.PROVEEDOR_POR_DEFECTO || "gemini",
     claves: puestas,
     firebase,
+    // Para comparar de un vistazo con lo de arriba, sin tener que buscarlo en el repo.
+    laQueDeberiaSer: "AIzaSyB12R…MrXpQ",
   };
 }
 
