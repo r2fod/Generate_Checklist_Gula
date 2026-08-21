@@ -27,6 +27,7 @@ import { personalNecesario } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
 import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
 import { conHerramientasDeConectores } from "./conectores.js";
+import { esTipoEvento } from "../calendario/apuntes.js";
 // Los conectores se registran al importarse. Van aquí y no en cada sitio que los use:
 // así basta con añadir una línea para que una integración nueva exista en toda la app.
 import "./conectores/whatsapp.js";
@@ -378,8 +379,14 @@ export const HERRAMIENTAS = {
 
       // Apuntes del calendario que se acercan y todavía no tienen checklist: es el hueco
       // por el que un evento desaparece del desplegable de la oficina.
+      //
+      // Solo los que SON un evento. Las vacaciones, los días cerrados, las tareas y los
+      // "recoger el camión" no llevan checklist ni la van a llevar nunca, y salían todos
+      // en la lista de pendientes: el repaso enseñaba diez líneas de las que ocho no
+      // había que hacer nada, que es la forma de que nadie vuelva a mirarlo. Se vio a la
+      // primera pregunta de verdad, con el calendario real delante.
       const sinChecklist = (ctx.apuntes || [])
-        .filter(a => a && !a.evento && (a.fecha || "") >= hoy && (a.fecha || "") <= limite)
+        .filter(a => a && !a.evento && esTipoEvento(a.tipo) && (a.fecha || "") >= hoy && (a.fecha || "") <= limite)
         .map(a => ({ fecha: a.fecha, titulo: a.titulo, tipo: a.tipo }));
 
       return {

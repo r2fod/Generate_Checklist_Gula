@@ -272,7 +272,14 @@ console.log("\n── El repaso ──");
       "Boda lista": { evento: "boda", fechaEvento: enUnMes, pax: 100, horaInicio: "13:00", ubicacion: "Sitio", logisticaEquipo: [{ nombre: "Alguien" }] },
       "Una vieja": { evento: "boda", fechaEvento: "2020-01-01", pax: 50 },
     },
-    apuntes: [{ fecha: enUnMes, titulo: "Sin checklist todavía", tipo: "corporativo" }],
+    apuntes: [
+      { fecha: enUnMes, titulo: "Sin checklist todavía", tipo: "corporativo" },
+      // Nada de esto lleva checklist ni la va a llevar nunca, y salía todo en la lista
+      // de pendientes. Se vio en la primera pregunta de verdad, con el calendario real.
+      { fecha: enUnMes, titulo: "Vacaciones de alguien", tipo: "vacaciones" },
+      { fecha: enUnMes, titulo: "Recoger camión", tipo: "recogida" },
+      { fecha: enUnMes, titulo: "Día cerrado", tipo: "cerrado" },
+    ],
   };
   const r = ejecutar("que_falta", {}, ctx);
   ok(r.eventos === 2, `solo mira los que se acercan, no el archivo entero (${r.eventos})`);
@@ -281,7 +288,10 @@ console.log("\n── El repaso ──");
   ok(r.conCosasQueFaltan[0].falta.length >= 4, `y dice QUÉ le falta → ${r.conCosasQueFaltan[0].falta.join(" · ")}`);
   ok(r.enOrden.length === 1 && /Boda lista/.test(r.enOrden[0]), "y el que está completo va aparte");
   // El hueco por el que un evento desaparece del desplegable de la oficina
-  ok(r.apuntesSinChecklist.length === 1, "avisa de los apuntes del calendario que aún no tienen checklist");
+  ok(r.apuntesSinChecklist.length === 1 && r.apuntesSinChecklist[0].tipo === "corporativo",
+    `avisa solo de los apuntes que SON un evento y aún no tienen checklist (${r.apuntesSinChecklist.map(a => a.tipo).join(", ")})`);
+  ok(!JSON.stringify(r).includes("Vacaciones") && !JSON.stringify(r).includes("Recoger camión"),
+    "las vacaciones, las recogidas y los días cerrados no salen como pendientes: no llevan checklist");
   ok(ejecutar("que_falta", { dias: 1 }, ctx).eventos === 0, "y se puede acotar a los próximos días");
 }
 
