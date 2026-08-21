@@ -13,6 +13,7 @@ import { recordar, olvidar, refuerza, poda, parecido, paraElContexto, porTemas, 
 import { conectores, conectoresActivos, conHerramientasDeConectores, registrarConector } from "../asistente/conectores.js";
 import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
+import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
 import { buildChecklist as construye } from "../checklist-generadores.js";
 
 let pasan = 0;
@@ -409,6 +410,50 @@ console.log("\n── Etiquetas sin datos a medias ──");
     .flatMap(c => c.items.filter(Boolean).map(i => i[0]));
   ok(con.includes("Nevera roja (grande)") && con.includes("Barbacoa grande"),
     "con los valores puestos, las etiquetas son las de siempre");
+}
+
+console.log("\n── Quién contesta cada pregunta ──");
+{
+  // Con uno configurado no hay nada que decidir, y no puede fallar por intentarlo
+  ok(elige("lo que sea", ["gemini"]) === "gemini", "con un solo proveedor, ese");
+  ok(elige("lo que sea", []) === "" || elige("lo que sea", []) === "gemini",
+    "sin ninguno no se inventa uno");
+
+  // Lo gratis por delante para el día a día: preguntar "¿qué tengo pendiente?" al
+  // modelo caro es tirar dinero.
+  const tres = ["gemini", "claude", "openai"];
+  ok(elige("que tengo pendiente", tres) === "gemini", "el día a día va a lo gratis");
+  ok(elige("cuanto hielo para 100 personas", tres) === "gemini", "y una cuenta sencilla también");
+
+  // Y el bueno solo cuando la pregunta lo pide
+  ok(elige("que me recomiendas para esta boda", tres) === "claude", "recomendar va al de pago");
+  ok(elige("compara el coste de las dos bodas", tres) === "claude", "comparar también");
+  ok(elige("por que sale tan caro", tres) === "claude", "y preguntar un porqué");
+  ok(!preguntaPideCabeza("cuantas sillas llevo") && preguntaPideCabeza("que me recomiendas"),
+    "se distingue buscar un número de pedir criterio");
+
+  // LA REGLA QUE NO SE SALTA: si la pregunta va sobre clientes, OpenAI queda fuera
+  // aunque sea el único. Sus tokens gratis se pagan con los datos.
+  ok(preguntaLlevaDatos("que eventos tengo en septiembre"), "una pregunta sobre eventos lleva datos");
+  ok(!preguntaLlevaDatos("cuanto hielo para 100 personas"), "y una cuenta pelada no");
+  ok(!candidatos("que eventos tengo en septiembre", ["gemini", "openai"]).includes("openai"),
+    "con datos de clientes, OpenAI no entra ni de respaldo");
+  ok(candidatos("cuanto hielo para 100 personas", ["gemini", "openai"]).includes("openai"),
+    "pero para calcular sí puede");
+  ok(candidatos("que eventos tengo", ["openai"]).length === 0,
+    "y si es el único, se prefiere no contestar antes que mandarle los clientes");
+
+  // Solo se proponen los que están configurados de verdad
+  ok(candidatos("que me recomiendas", ["gemini"]).join() === "gemini",
+    "no se propone Claude si no tiene clave");
+  ok(candidatos("lo que sea", tres).every(p => tres.includes(p)), "nunca sale uno de fuera de la lista");
+  ok(ORDEN[0] === "gemini", "el orden de partida empieza por lo gratis");
+
+  // El respaldo: qué merece reintentar con otro y qué no
+  ["429 Too Many Requests", "quota exceeded", "RESOURCE_HAS_BEEN_EXHAUSTED", "503 unavailable", "overloaded"]
+    .forEach(m => ok(mereceOtroIntento(m), `"${m.slice(0, 28)}" merece probar con otro`));
+  ["400 Bad Request", "Cuerpo ilegible", "Hace falta tener sesión del equipo"]
+    .forEach(m => ok(!mereceOtroIntento(m), `"${m.slice(0, 28)}" NO se reintenta: estaría igual de mal en todos`));
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

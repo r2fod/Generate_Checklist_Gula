@@ -324,6 +324,7 @@ async function estado(env) {
   return {
     origenes: env.ORIGENES ? env.ORIGENES.split(",").map(x => x.trim()) : "NO puesto (se aceptará cualquier origen)",
     proveedorPorDefecto: env.PROVEEDOR_POR_DEFECTO || "gemini",
+    disponibles: disponiblesEn(env),
     claves: puestas,
     firebase,
     huellaDeLaClaveDeFirebase: huella,
@@ -332,6 +333,14 @@ async function estado(env) {
     coincide: huella === "353f1b0dd087" ? "✅ SÍ, es la clave correcta" : "❌ NO, la guardada es OTRA clave (¿la de Gemini?)",
   };
 }
+
+// Qué proveedores están de verdad utilizables con lo que hay configurado. La app lo
+// necesita para poder elegir sola: sin esto tendría que adivinar, y adivinar mal
+// significa mandar la pregunta a un proveedor sin clave y comerse el error.
+const disponiblesEn = (env) =>
+  Object.entries(PROVEEDORES)
+    .filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every(k => env[k]))
+    .map(([nombre]) => nombre);
 
 export default {
   async fetch(req, env) {
@@ -362,7 +371,12 @@ export default {
     // Se dice QUÉ falta, no "no configurado": si no, hay que abrir los logs de Cloudflare
     // para enterarse de que lo que faltaba era la dirección y no la clave.
     const faltan = [p.clave, p.ademas].filter(k => k && !env[k]);
-    if (faltan.length) return json({ error: `Este Worker no tiene ${nombre} configurado: falta ${faltan.join(" y ")}.` }, 501, origen);
+    if (faltan.length) {
+      return json({
+        error: `Este Worker no tiene ${nombre} configurado: falta ${faltan.join(" y ")}.`,
+        disponibles: disponiblesEn(env),
+      }, 501, origen);
+    }
 
     if (!Array.isArray(cuerpo.mensajes) || !cuerpo.mensajes.length) {
       return json({ error: "No hay conversación que mandar." }, 400, origen);
@@ -374,11 +388,11 @@ export default {
         mensajes: cuerpo.mensajes,
         herramientas: Array.isArray(cuerpo.herramientas) ? cuerpo.herramientas : [],
       });
-      return json({ ...salida, proveedor: nombre }, 200, origen);
+      return json({ ...salida, proveedor: nombre, disponibles: disponiblesEn(env) }, 200, origen);
     } catch (e) {
       // El mensaje del proveedor se devuelve tal cual: sin él, "algo ha fallado" obliga
       // a mirar los logs de Cloudflare para saber que era una clave caducada.
-      return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
+      return json({ error: String(e && e.message ? e.message : e), disponibles: disponiblesEn(env) }, 502, origen);
     }
   },
 };

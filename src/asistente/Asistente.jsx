@@ -9,7 +9,7 @@
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
 import { Send, X, Sparkles, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle } from "lucide-react";
-import { preguntar } from "./cliente.js";
+import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { porTemas, TEMAS } from "./memoria.js";
 
@@ -19,19 +19,24 @@ const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const leer = (k, x = "") => { try { return localStorage.getItem(k) || x; } catch (e) { return x; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* modo privado */ } };
 
+// El Worker admite además un proveedor "compatible" (OpenRouter, Groq, DeepSeek…). No
+// sale aquí a propósito: con uno configurado no hay nada que elegir, y cuatro botones
+// para tres opciones reales es una pantalla más llena sin ser más útil. El día que se
+// use, se añade una línea.
 const PROVEEDORES = [
+  { id: "auto", nombre: "Automático", nota: "elige según la pregunta" },
   { id: "gemini", nombre: "Gemini", nota: "gratis" },
   { id: "claude", nombre: "Claude", nota: "de pago" },
   { id: "openai", nombre: "OpenAI", nota: "sin datos de clientes" },
-  // El hueco abierto del Worker: con una dirección y una clave vale OpenRouter, Groq,
-  // DeepSeek, Mistral u Ollama. Sale aquí para poder cambiar sin tocar el código.
-  { id: "compatible", nombre: "Otro", nota: "el que pongas en el proxy" },
 ];
 
 export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [pestana, setPestana] = useState("charla");
   const [url, setUrl] = useState(() => leer(CLAVE_URL));
-  const [proveedor, setProveedor] = useState(() => leer(CLAVE_PROVEEDOR, "gemini") || "gemini");
+  const [proveedor, setProveedor] = useState(() => leer(CLAVE_PROVEEDOR, "auto") || "auto");
+  // Lo que el Worker dice que tiene configurado. Hasta la primera respuesta no se sabe,
+  // y se supone Gemini —que es el que se monta por defecto— en vez de no dejar preguntar.
+  const [disponibles, setDisponibles] = useState([]);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -52,13 +57,19 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     setEnCurso("");
     try {
       const token = await tokenDeSesion().catch(() => "");
-      const r = await preguntar({
-        texto: pregunta, mensajes, contexto, proveedor, url, token,
+      const comun = {
+        mensajes, contexto, url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
-      });
+      };
+      const r = proveedor === "auto"
+        ? await preguntarAuto({ ...comun, texto: pregunta, disponibles, onProveedor: (p) => setEnCurso(`preguntando a ${p}`) })
+        : await preguntar({ ...comun, texto: pregunta, proveedor });
       setMensajes(r.mensajes);
-      setHilo(h => [...h, { de: "el", texto: r.respuesta, pasos: r.pasos }]);
+      // La lista de configurados llega con cada respuesta: así el enrutado de la
+      // siguiente pregunta ya sabe con qué cuenta, sin una petición aparte.
+      if (r.disponibles) setDisponibles(r.disponibles);
+      setHilo(h => [...h, { de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo }]);
     } catch (err) {
       setHilo(h => [...h, { de: "error", texto: String(err && err.message ? err.message : err) }]);
     } finally {
@@ -123,6 +134,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               Las claves no viven aquí: viven en el proxy. Sin él no hay asistente, y con
               una clave metida en la app la leería cualquiera — el repositorio es público.
               Los pasos para montarlo están en <code>worker/README.md</code>.
+              {proveedor === "auto" && (
+                <> <strong>En automático</strong> se elige según lo que preguntes: lo gratis
+                para el día a día, el de pago solo cuando haya que comparar o recomendar, y
+                nunca OpenAI para nada que lleve nombres de clientes.</>
+              )}
               {proveedor === "openai" && (
                 <> <strong>Con OpenAI solo funcionan las cuentas y los cálculos:</strong> no
                 se le manda ningún nombre de cliente ni ninguna fecha.</>
@@ -181,12 +197,20 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             <div className={`asis-msg es-${m.de}`} key={i}>
               <div className="asis-burbuja">{m.texto}</div>
               {/* De dónde sale lo que acaba de decir */}
-              {m.pasos && m.pasos.length > 0 && (
+              {(m.pasos && m.pasos.length > 0) || (m.quien && disponibles.length > 1) ? (
                 <div className="asis-pasos">
-                  <Wrench size={11} aria-hidden="true" />
-                  {m.pasos.map((p, j) => <span className="asis-paso" key={j}>{p.nombre}</span>)}
+                  {m.pasos && m.pasos.length > 0 && <Wrench size={11} aria-hidden="true" />}
+                  {(m.pasos || []).map((p, j) => <span className="asis-paso" key={j}>{p.nombre}</span>)}
+                  {/* Quién ha contestado, y por qué le tocó a él. Un asistente que cambia
+                      de modelo sin decirlo hace que nadie entienda por qué a veces tarda
+                      más o contesta distinto. Solo se enseña si hay más de uno. */}
+                  {m.quien && disponibles.length > 1 && (
+                    <span className="asis-paso es-quien">
+                      {m.quien}{m.motivo ? ` · ${m.motivo}` : ""}
+                    </span>
+                  )}
                 </div>
-              )}
+              ) : null}
             </div>
           ))}
           {pensando && (

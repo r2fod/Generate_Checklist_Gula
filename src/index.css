@@ -6200,12 +6200,46 @@ hr {
   background: var(--bg-subtle);
 }
 
-.asis-campo { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.asis-campo { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
 .asis-campo > span { font-size: 0.8rem; font-weight: 600; color: var(--text-label); }
 .asis-campo input { min-height: 44px; font-size: 16px; }
 
-.asis-proveedores { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.asis-nota { font-style: normal; font-weight: 500; opacity: 0.7; font-size: 0.78em; }
+/* En rejilla de dos columnas y no en fila que se parte: con cuatro botones de anchos
+   distintos quedaban dos arriba, dos abajo y descolocados, que es lo que hacía que la
+   pantalla de ajustes pareciera desordenada. En rejilla, todos iguales y alineados. */
+.asis-proveedores {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.asis-proveedores .bebida-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+/* La nota debajo del nombre y no al lado: al lado obliga a que el botón sea el doble de
+   ancho, y era justo lo que descuadraba la rejilla. */
+.asis-nota {
+  font-style: normal;
+  font-weight: 500;
+  opacity: 0.75;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+/* Quién ha contestado. Se distingue de las herramientas porque son cosas distintas:
+   una es qué miró, la otra con quién habló. */
+.asis-paso.es-quien {
+  border-style: dashed;
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 .asis-explica {
   margin: 0;

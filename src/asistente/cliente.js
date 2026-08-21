@@ -8,6 +8,7 @@
 import { catalogoParaModelo, ejecutar, llevaDatos } from "./herramientas.js";
 import { paraElContexto } from "./memoria.js";
 import { comprimir } from "./comprimir.js";
+import { candidatos, mereceOtroIntento, porQue } from "./enrutado.js";
 
 // Un tope duro de vueltas. Sin él, un modelo que se empeñe en pedir la misma
 // herramienta una y otra vez deja el navegador dando vueltas y la factura corriendo.
@@ -55,6 +56,8 @@ export function nuevaConversacion() { return []; }
 // Manda un mensaje y devuelve { mensajes, respuesta, pasos }. "pasos" son las
 // herramientas que se han usado, para poder enseñarlas: un asistente que da un número
 // sin decir de dónde sale es un asistente en el que no se puede confiar.
+// Una vuelta completa con UN proveedor. La de fuera se encarga de elegirlo y de
+// reintentar con otro; esta solo habla.
 export async function preguntar({
   texto, mensajes = [], contexto = {}, proveedor = "gemini",
   url, token, onPaso, onUsoMemoria,
@@ -76,13 +79,23 @@ export async function preguntar({
       body: JSON.stringify({ sistema, mensajes: conversacion, herramientas, proveedor }),
     });
     const d = await r.json().catch(() => ({ error: `El asistente ha contestado algo ilegible (${r.status}).` }));
-    if (!r.ok || d.error) throw new Error(d.error || `El asistente ha fallado (${r.status}).`);
+    if (!r.ok || d.error) {
+      // El Worker dice, hasta cuando falla, qué proveedores tienen clave. Se cuelga del
+      // error para que quien reintenta sepa con cuál probar.
+      const fallo = new Error(d.error || `El asistente ha fallado (${r.status}).`);
+      fallo.disponibles = d.disponibles || null;
+      throw fallo;
+    }
 
     conversacion.push({ rol: "asistente", contenido: d.texto || "", llamadas: d.llamadas || [] });
 
     if (!d.llamadas || !d.llamadas.length) {
       if (onUsoMemoria && recordados.length) onUsoMemoria(recordados);
-      return { mensajes: conversacion, respuesta: d.texto || "", pasos, proveedor: d.proveedor || proveedor, recordados };
+      return {
+        mensajes: conversacion, respuesta: d.texto || "", pasos,
+        proveedor: d.proveedor || proveedor, recordados,
+        disponibles: d.disponibles || null,
+      };
     }
 
     // Se ejecutan aquí, en el navegador, con los datos de la app. El modelo no ve la
@@ -113,4 +126,33 @@ export async function preguntar({
     pasos,
     proveedor,
   };
+}
+
+
+// ─── CON ENRUTADO AUTOMÁTICO ──────────────────────────────────────────────────
+// Elige el proveedor según lo que se pregunte y lo que haya configurado, y si el
+// elegido se cae —sin cuota, saturado— prueba con el siguiente en vez de dejar a la
+// persona mirando un error. Es lo que de verdad se usa desde la pantalla; preguntar()
+// se queda para cuando alguien elige uno a mano.
+export async function preguntarAuto({ texto, disponibles, onProveedor, ...resto }) {
+  const lista = candidatos(texto, disponibles && disponibles.length ? disponibles : ["gemini"]);
+  if (!lista.length) {
+    throw new Error("Esa pregunta lleva datos de clientes y el único proveedor configurado entrena con lo que recibe. Configura Gemini o Claude en el proxy.");
+  }
+
+  let ultimo = null;
+  for (let i = 0; i < lista.length; i++) {
+    const proveedor = lista[i];
+    if (onProveedor) onProveedor(proveedor, porQue(texto, proveedor, disponibles || []));
+    try {
+      const r = await preguntar({ ...resto, texto, proveedor });
+      return { ...r, motivo: porQue(texto, proveedor, r.disponibles || disponibles || []) };
+    } catch (e) {
+      ultimo = e;
+      // Un 400 no se reintenta: la petición está mal y va a estar igual de mal en todos.
+      // Reintentarlo cuatro veces solo tarda cuatro veces más en dar el mismo error.
+      if (i === lista.length - 1 || !mereceOtroIntento(e.message)) throw e;
+    }
+  }
+  throw ultimo;
 }
