@@ -8,10 +8,12 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import Cerebro from "./Cerebro.jsx";
+import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
+import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
 import Companero, { COMPANEROS, CLAVES_COMPANERO } from "./Companero.jsx";
 import Humano from "./Humano.jsx";
 import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
@@ -56,6 +58,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // permiso sería un cartel, no un permiso.
   const [pendientes, setPendientes] = useState([]);
   const [vozActiva, setVozActiva] = useState(() => leer(CLAVE_VOZ, "1") === "1");
+  // El historial vive en este navegador: una conversación es de quien la tuvo. Lo que
+  // sirve al equipo ya se guarda en el cerebro y en las tareas.
+  const [charlas, setCharlas] = useState(() => leerCharlas());
+  const [charlaId, setCharlaId] = useState("");
+  const [verHistorial, setVerHistorial] = useState(false);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -144,12 +151,19 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       // La lista de configurados llega con cada respuesta: así el enrutado de la
       // siguiente pregunta ya sabe con qué cuenta, sin una petición aparte.
       if (r.disponibles) setDisponibles(r.disponibles);
-      setHilo(h => [...h, {
-        de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo,
-        // Lo que costó ESTA pregunta. Verlo en un panel aparte no cambia cómo se
-        // pregunta; verlo pegado a la respuesta sí.
-        coste: costeDeUna(r.proveedor, r.uso),
-      }]);
+      setHilo(h => {
+        const siguiente = [...h, {
+          de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo,
+          coste: costeDeUna(r.proveedor, r.uso),
+        }];
+        // Se guarda al cerrar cada vuelta, no al cerrar el panel: cerrar el panel es
+        // justo lo que antes lo perdía todo.
+        const id = charlaId || `c${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+        if (!charlaId) setCharlaId(id);
+        setCharlas(guardarCharla(charlas, { id, hilo: siguiente, mensajes: r.mensajes }));
+        return siguiente;
+      });
+
     } catch (err) {
       setHuboError(true);
       setHilo(h => [...h, { de: "error", texto: String(err && err.message ? err.message : err) }]);
@@ -166,6 +180,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           <Companero cual={companero} size={30}
             estado={pensando ? "pensando" : huboError ? "error" : "quieto"} />
           <span className="asis-titulo">Asistente</span>
+          <button type="button" className="asis-icono" onClick={() => setVerHistorial(v => !v)}
+            aria-expanded={verHistorial} aria-label="Conversaciones guardadas" title="Conversaciones guardadas">
+            <History size={16} aria-hidden="true" />
+          </button>
           <button type="button" className="asis-icono" onClick={() => setAjustes(v => !v)}
             aria-expanded={ajustes} aria-label="Ajustes del asistente" title="Ajustes">
             <Settings size={16} aria-hidden="true" />
@@ -191,6 +209,30 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             {(contexto.memoria || []).length > 0 && <em>{(contexto.memoria || []).length}</em>}
           </button>
         </div>
+
+        {verHistorial && (
+          <div className="asis-ajustes asis-historial">
+            <button type="button" className="btn btn-outline cer-anadir"
+              onClick={() => { setHilo([]); setMensajes([]); setCharlaId(""); setVerHistorial(false); }}>
+              <Plus size={14} aria-hidden="true" /> Conversación nueva
+            </button>
+            {!charlas.length && <p className="asis-explica">Todavía no hay ninguna guardada.</p>}
+            {charlas.map(c => (
+              <div className={`asis-charla${c.id === charlaId ? " es-abierta" : ""}`} key={c.id}>
+                <button type="button" className="asis-charla-abrir"
+                  onClick={() => { setHilo(c.hilo); setMensajes(c.mensajes); setCharlaId(c.id); setVerHistorial(false); setPestana("charla"); }}>
+                  <span>{c.titulo}</span>
+                  <em>{cuandoFue(c.cuando)}</em>
+                </button>
+                <button type="button" className="asis-recuerdo-borrar"
+                  onClick={() => { setCharlas(borrarCharla(charlas, c.id)); if (c.id === charlaId) { setHilo([]); setMensajes([]); setCharlaId(""); } }}
+                  title="Borrarla" aria-label={`Borrar: ${c.titulo}`}>
+                  <Trash2 size={13} aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         {ajustes && (
           <div className="asis-ajustes">
@@ -276,7 +318,36 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {pestana === "humano" ? (
+        {pestana === "tareas" ? (
+          <div className="asis-hilo asis-cerebro">
+            <p className="asis-explica">
+              Lo que hay que hacer y no sale de ninguna checklist: pedir material, llamar a
+              alguien, confirmar algo. El asistente puede apuntarlas cuando las detecte, si
+              le has dado permiso.
+            </p>
+            {!(contexto.tareas || []).length && <p className="asis-vacio">No hay nada apuntado.</p>}
+            {tareasPorEvento(contexto.tareas || []).map(g => (
+              <div className="asis-tema" key={g.evento || "sueltas"}>
+                <div className="asis-tema-titulo">{g.titulo}</div>
+                {g.tareas.map(t => (
+                  <div className={`asis-recuerdo${t.hecho ? " es-hecha" : ""}`} key={t.id}>
+                    <button type="button" className="asis-tarea-check"
+                      onClick={() => contexto.onMarcarTarea && contexto.onMarcarTarea(t.id, !t.hecho)}
+                      aria-pressed={t.hecho} aria-label={`${t.hecho ? "Desmarcar" : "Dar por hecha"}: ${t.texto}`}>
+                      {t.hecho ? <Check size={13} aria-hidden="true" /> : <span className="asis-tarea-vacia" />}
+                    </button>
+                    <span className="asis-recuerdo-texto">{t.texto}</span>
+                    <button type="button" className="asis-recuerdo-borrar"
+                      onClick={() => contexto.onQuitarTarea && contexto.onQuitarTarea(t.id)}
+                      title="Quitarla" aria-label={`Quitar: ${t.texto}`}>
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : pestana === "humano" ? (
           <div className="asis-hilo">
             <Humano
               cual={companero === "ninguno" ? "chef" : companero}

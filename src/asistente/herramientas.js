@@ -30,6 +30,7 @@ import { conHerramientasDeConectores } from "./conectores.js";
 import { puede as permiteNivel, NIVEL_POR_DEFECTO } from "./permisos.js";
 import { esTipoEvento } from "../calendario/apuntes.js";
 import { revisarEvento, revisarProximos } from "./revision.js";
+import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
 // Los conectores se registran al importarse. Van aquí y no en cada sitio que los use:
 // así basta con añadir una línea para que una integración nueva exista en toda la app.
 import "./conectores/whatsapp.js";
@@ -441,6 +442,68 @@ export const HERRAMIENTAS = {
           acuerdate: r.avisos.filter(a => a.tono === "acuerdate").map(a => a.texto),
         })),
       };
+    },
+  },
+
+  // ─── LO QUE HAY QUE HACER ───────────────────────────────────────────────────
+  // Apuntar escribe, así que va con permiso como todo lo demás. Ver no.
+  ver_tareas: {
+    datos: true,
+    esquema: {
+      description: "Lo que queda por hacer, agrupado por evento. Úsalo cuando pregunten qué hay pendiente de gestionar (pedir material, llamar a alguien), que no es lo mismo que qué falta por configurar.",
+      parameters: { type: "object", properties: { evento: { type: "string", description: "Para ver solo las de un evento." } } },
+    },
+    corre: (ctx, { evento = "" } = {}) => {
+      const grupos = tareasPorEvento(ctx.tareas || [])
+        .filter(g => !evento || normaliza(g.evento).includes(normaliza(evento)))
+        .map(g => ({ evento: g.titulo, pendientes: g.tareas.filter(t => !t.hecho).map(t => t.texto), hechas: g.tareas.filter(t => t.hecho).length }))
+        .filter(g => g.pendientes.length || g.hechas);
+      const quedan = sinHacer(ctx.tareas || []).length;
+      return grupos.length ? { quedan, grupos } : { quedan: 0, mensaje: "No hay nada apuntado por hacer." };
+    },
+  },
+
+  apuntar_tarea: {
+    datos: true,
+    escribe: true,
+    esquema: {
+      description: "Apunta algo que hay que hacer para que no se pierda: pedir material, llamar a un proveedor, confirmar algo. Si es de un evento concreto, dilo — así se puede mirar antes de ese evento y se cae sola cuando pasa.",
+      parameters: {
+        type: "object",
+        properties: {
+          texto: { type: "string", description: "Qué hay que hacer, en una frase." },
+          evento: { type: "string", description: "De qué evento es, si lo es." },
+        },
+        required: ["texto"],
+      },
+    },
+    corre: (ctx, { texto = "", evento = "" } = {}) => {
+      if (!String(texto).trim()) return { error: "No me has dicho qué apuntar." };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja apuntar tareas." };
+      return ctx.onEscribir({
+        que: "apuntar_tarea",
+        resumen: `Apuntar: "${String(texto).trim()}"${evento ? ` (${evento})` : ""}`,
+        datos: { texto: String(texto).trim(), evento: String(evento || "") },
+      });
+    },
+  },
+
+  marcar_tarea: {
+    datos: true,
+    escribe: true,
+    esquema: {
+      description: "Da una tarea por hecha.",
+      parameters: { type: "object", properties: { texto: { type: "string", description: "La tarea, o parte de ella." } }, required: ["texto"] },
+    },
+    corre: (ctx, { texto = "" } = {}) => {
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja tocar las tareas." };
+      const hallada = sinHacer(ctx.tareas || []).find(t => normaliza(t.texto).includes(normaliza(texto)));
+      if (!hallada) return { error: `No hay ninguna tarea pendiente que se parezca a "${texto}".` };
+      return ctx.onEscribir({
+        que: "marcar_tarea",
+        resumen: `Dar por hecha: "${hallada.texto}"`,
+        datos: { id: hallada.id },
+      });
     },
   },
 

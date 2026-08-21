@@ -66,22 +66,29 @@ const palabras = (t) => new Set(limpia(t).toLowerCase()
   .normalize("NFD").replace(/[̀-ͯ]/g, "")
   .split(/[^a-z0-9ñ]+/).filter(p => p.length > 2 && !VACIAS.has(p)).map(raiz));
 
-// Dice, y no "comunes entre el más largo". La diferencia importa en el caso normal: uno
-// dice "en la finca X no hay enchufe en la carpa" y otro lo repite AÑADIENDO "hay que
-// llevar generador". Con el más largo de divisor, cuanto más detalle añade el segundo
-// menos se parecen, que es justo al revés de lo que pasa de verdad.
+// Comunes entre el total de distintas (Jaccard). Se probó antes con Dice y fundía cosas
+// que NO eran lo mismo: dos frases que comparten el armazón —"el X conviene revisarlo
+// antes que el Y"— salían a 0,71 aunque X e Y fueran distintos, porque las palabras del
+// armazón pesaban tanto como las que dicen algo. Y el caso que de verdad importa,
+// "en bodas 4 de cocina" contra "en comuniones 3 de cocina", se quedaba en 0,67: a un
+// pelo del umbral, o sea a un pelo de perder un dato.
+//
+// Jaccard castiga que uno tenga palabras que el otro no, que es exactamente lo que pasa
+// cuando dos frases parecidas hablan de cosas distintas.
 export function parecido(a, b) {
   const x = palabras(a), y = palabras(b);
   if (!x.size || !y.size) return 0;
   let comunes = 0;
   x.forEach(p => { if (y.has(p)) comunes++; });
-  return (2 * comunes) / (x.size + y.size);
+  return comunes / (x.size + y.size - comunes);
 }
 
 // Por encima de esto se considera lo mismo dicho de otra forma y se funde. Se eligió
-// alto: fundir dos recuerdos que NO eran lo mismo pierde información, y eso es peor que
+// para que quepa el caso de siempre —la misma frase con un detalle más, 0,67— y NO
+// quepan dos frases con el mismo armazón y distinto contenido, que se quedan por debajo
+// de 0,57. Fundir dos recuerdos que no eran lo mismo pierde un dato, y eso es peor que
 // tener dos parecidos.
-const UMBRAL_FUNDIR = 0.7;
+const UMBRAL_FUNDIR = 0.6;
 
 // ─── LA LISTA ─────────────────────────────────────────────────────────────────
 // ─── DE DÓNDE SALIÓ CADA COSA ─────────────────────────────────────────────────

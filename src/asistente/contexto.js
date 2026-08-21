@@ -28,6 +28,7 @@ export function contextoDelAsistente({
   eventoActual = null,
   memoria = [],
   objetivos = [],
+  tareas = [],
   conectores = {},
   equipo = [],
   respuestasFormulario = null,
@@ -38,6 +39,8 @@ export function contextoDelAsistente({
   onPonerObjetivo,
   onCambiarEstadoObjetivo,
   onQuitarObjetivo,
+  onMarcarTarea,
+  onQuitarTarea,
   nivel,
 } = {}) {
   return {
@@ -46,6 +49,7 @@ export function contextoDelAsistente({
     eventoActual,
     memoria,
     objetivos,
+    tareas,
     conectores,
     equipo,
     respuestasFormulario,
@@ -60,6 +64,9 @@ export function contextoDelAsistente({
     onPonerObjetivo,
     onCambiarEstadoObjetivo,
     onQuitarObjetivo,
+    // Las tareas las toca la pantalla directamente; el asistente pasa por onEscribir.
+    onMarcarTarea,
+    onQuitarTarea,
     nivel,
   };
 }

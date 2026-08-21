@@ -21,6 +21,7 @@ import Ratios from "./Ratios.jsx";
 import BotonAsistente from "../asistente/BotonAsistente.jsx";
 import { contextoDelAsistente } from "../asistente/contexto.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
+import { encadenar } from "../asistente/escrituraTareas.js";
 import useCalendarioNube from "./useCalendarioNube.js";
 import Traer from "./Traer.jsx";
 import { enlaceDeLaUrl } from "./enlace.js";
@@ -75,7 +76,7 @@ function AppCalendario() {
               apuntes,
               equipo,
               conectores: { calendario: { puedeEscribir: true } },
-              onEscribir: aplicarEnCalendario({ apuntes, guardar, borrar }),
+              onEscribir: encadenar(aplicarEnCalendario({ apuntes, guardar, borrar })),
             })}
           />
         </div>

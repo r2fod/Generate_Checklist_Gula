@@ -336,6 +336,13 @@ export const guardarObjetivosNube = OBJETIVOS.guardar;
 export const cargarObjetivosNube = OBJETIVOS.cargar;
 export const suscribirObjetivosNube = OBJETIVOS.suscribir;
 
+// Lo que hay que hacer (ver asistente/tareas.js). Del equipo: una tarea que solo ve
+// quien la apuntó no está apuntada.
+const TAREAS = ajusteCompartido("indice/tareas", "tareas");
+export const guardarTareasNube = TAREAS.guardar;
+export const cargarTareasNube = TAREAS.cargar;
+export const suscribirTareasNube = TAREAS.suscribir;
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

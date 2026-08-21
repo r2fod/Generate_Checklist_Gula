@@ -44,6 +44,8 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       return { borrado: antes.titulo };
     }
 
-    return { error: `No sé hacer "${que}" en el calendario.` };
+    // null y no un error: el que llama puede tener otro aplicador que sí lo sepa hacer
+    // (ver encadenar en escrituraTareas.js).
+    return null;
   };
 }

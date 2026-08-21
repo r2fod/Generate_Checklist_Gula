@@ -21,6 +21,12 @@ import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte } from "../calendario/apuntes.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
+import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
+import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
+import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../asistente/arbol.js";
+import { parte, foto, queHaCambiado, comoVanLosObjetivos } from "../asistente/subconsciente.js";
+import { tituloDe, saneaCharlas, guardarCharla, borrarCharla, cuandoFue } from "../asistente/conversaciones.js";
+import { aplicarEnTareas, encadenar } from "../asistente/escrituraTareas.js";
 import { paraLeerEnVozAlta, hayEscucha, hayVoz } from "../asistente/voz.js";
 import { NOMBRES_HERRAMIENTAS as TODAS_LAS_HERRAMIENTAS } from "../asistente/herramientas.js";
 import { buildChecklist as construye } from "../checklist-generadores.js";
@@ -86,8 +92,12 @@ console.log("\n── Los datos de clientes y quién puede verlos ──");
     "y no lleva ninguna que devuelva nombres, fechas o sitios");
   // El catálogo entero lleva las de casa Y las de los conectores encendidos: si esto
   // fuera solo las de casa, una integración nueva no llegaría nunca al modelo.
-  ok(catalogoParaModelo(false).length >= NOMBRES_HERRAMIENTAS.length,
-    `el catálogo entero lleva las de casa y las de los conectores (${catalogoParaModelo(false).length} de ${NOMBRES_HERRAMIENTAS.length} propias)`);
+  // Con el nivel por defecto (solo consultar) las de escribir NO salen, así que se
+  // pide con confianza: aquí se comprueba el catálogo, no los permisos.
+  ok(catalogoParaModelo(false, {}, "confianza").length >= NOMBRES_HERRAMIENTAS.length,
+    `el catálogo entero lleva las de casa y las de los conectores (${catalogoParaModelo(false, {}, "confianza").length} de ${NOMBRES_HERRAMIENTAS.length} propias)`);
+  ok(catalogoParaModelo(false).length < catalogoParaModelo(false, {}, "confianza").length,
+    "y en solo consultar salen menos, que es de lo que va el nivel");
 
   // Las marcadas sin datos no pueden devolver datos aunque se les pase un evento
   SIN_DATOS.forEach(n => {
@@ -620,7 +630,9 @@ console.log("\n── Escribir en el calendario ──");
     "una fecha inválida no se guarda");
   ok(aplicar({ que: "editar_apunte", datos: { id: "no-existe", cambios: { pax: 1 } } }).error,
     "editar uno que ya no está lo dice en vez de crear otro");
-  ok(aplicar({ que: "inventado", datos: {} }).error, "una operación que no existe no revienta");
+  // null y no error: así se puede encadenar con otros aplicadores. El error lo da la
+  // cadena cuando no la sabe hacer ninguno.
+  ok(aplicar({ que: "inventado", datos: {} }) === null, "una operación que no es suya la pasa al siguiente");
 }
 
 console.log("\n── El contexto es lo único que existe ──");
@@ -702,6 +714,178 @@ console.log("\n── Hablarle y que conteste ──");
   // Fuera del navegador no existe ninguna de las dos, y comprobarlo no puede reventar:
   // este módulo lo importa el panel entero.
   ok(hayEscucha() === false && hayVoz() === false, "fuera del navegador se dice que no hay, sin reventar");
+}
+
+console.log("\n── El árbol de la memoria ──");
+{
+  let mem = [];
+  const guarda = (t, tema, fuente, donde) => { ({ memoria: mem } = recordar(mem, t, { tema, fuente, donde })); };
+  guarda("En la Finca de prueba no hay enchufe en la carpa", "sitios", "evento", "Boda del 12");
+  guarda("En comuniones ponemos 3 de cocina", "equipo", "charla");
+  guarda("El proveedor de hielo no sirve los domingos", "general", "revision", "Boda del 19");
+
+  // Los tres ejes devuelven la MISMA forma. Es lo que permite pintarlos con un solo
+  // componente y añadir un cuarto mañana sin tocar la pantalla.
+  const a = arbol(mem);
+  [a.temas, a.fuentes, a.dias].forEach((eje, i) => {
+    ok(eje.every(g => g.eje && g.clave && g.titulo && Array.isArray(g.recuerdos)),
+      `el eje ${["temas", "fuentes", "días"][i]} devuelve la forma común`);
+  });
+  ok(a.temas.length === 3 && a.fuentes.length === 3, "tres temas y tres fuentes distintas");
+  ok(porDia(mem).length === 1, "y todo lo de hoy va en un día");
+
+  // La fuente viaja pegada al recuerdo: es lo que permite contrastarlo
+  const ctx = contextoPlegado(mem);
+  ok(/\[Boda del 12\]/.test(ctx.texto), "en el contexto se dice dónde se aprendió cada cosa");
+  ok(ctx.ids.length === 3 && ctx.plegados === 0, "con pocos recuerdos no se pliega nada");
+
+  // Con muchos, se pliega y SE DICE. Tirarlos en silencio sería mentir sobre lo que sabe.
+  // Textos DISTINTOS de verdad: sesenta frases casi iguales se funden en una, que es
+  // justo lo que hace bien la memoria, pero entonces no hay nada que plegar.
+  const SUJETOS = ["mantel", "camion", "nevera", "carpa", "generador", "silla", "copa", "plato", "bandeja", "termo"];
+  const HECHOS = ["se guarda arriba", "pesa demasiado", "hay que pedirlo antes", "llega tarde siempre",
+    "cuesta el doble", "no cabe atras", "se rompe facil"];
+  let muchos = [];
+  SUJETOS.forEach(su => HECHOS.forEach(h => {
+    ({ memoria: muchos } = recordar(muchos, `${su} ${h}`, { tema: "general" }));
+  }));
+  ok(muchos.length > 40, `los setenta recuerdos distintos se guardan (${muchos.length})`);
+  const plegado = contextoPlegado(muchos);
+  ok(plegado.plegados > 0, `con setenta recuerdos se pliega (${plegado.plegados} plegados)`);
+  ok(/no caben/.test(plegado.texto) && /ver_cerebro/.test(plegado.texto),
+    "y se dice cuántos faltan y cómo pedirlos");
+  ok(plegado.texto.length < 3200, "el árbol que viaja tiene tope");
+
+  // El grafo engancha los recuerdos con los sitios y eventos que nombran
+  const g = grafo(mem, { "Boda de prueba": { evento: "boda", ubicacion: "Finca de prueba" } });
+  ok(g.nodos.some(n => n.tipo === "sitio" && n.nombre === "Finca de prueba"), "el grafo saca los sitios de los eventos");
+  ok(g.enlaces.some(e => e.por === "habla de"), "y engancha los recuerdos con lo que nombran");
+  ok(g.enlaces.some(e => e.por === "se aprendió en"), "y con el evento donde se aprendieron");
+  ok(grafo([], {}).nodos.length === 0, "sin nada, grafo vacío y sin reventar");
+}
+
+console.log("\n── Lo que le importa al equipo ──");
+{
+  let o = [];
+  ({ objetivos: o } = ponerObjetivo(o, "Bajar la merma de cristalería", { porQue: "el año pasado costó 900€" }));
+  ({ objetivos: o } = ponerObjetivo(o, "No olvidar las sillas de alquiler"));
+  ok(cuantosActivos(o) === 2, "se apuntan los objetivos");
+  ok(/900€/.test(metasContexto(o)), "y el porqué viaja con ellos: cambia la respuesta");
+
+  // Repetir uno lo REACTIVA, que es lo que se quiere decir al insistir en algo aparcado
+  o = cambiarEstado(o, o.find(x => /sillas/.test(x.texto)).id, "aparcado");
+  ok(cuantosActivos(o) === 1, "aparcar lo saca de los activos");
+  ({ objetivos: o } = ponerObjetivo(o, "No olvidar las sillas de alquiler"));
+  ok(cuantosActivos(o) === 2, "y volver a decirlo lo reactiva en vez de duplicarlo");
+
+  // Solo los activos viajan: los conseguidos ocupan sitio y no cambian nada
+  o = cambiarEstado(o, o[0].id, "logrado");
+  ok(!metasContexto(o).includes(o.find(x => x.estado === "logrado").texto),
+    "un objetivo conseguido no viaja en la conversación");
+
+  ok(ponerObjetivo([], "").objetivo === null, "un objetivo vacío no se crea");
+  ok(metasContexto([]) === "", "sin objetivos no se mete nada en la conversación");
+  let lleno = [];
+  for (let i = 0; i < MAX_OBJETIVOS + 3; i++) ({ objetivos: lleno } = ponerObjetivo(lleno, `Objetivo numero ${i}`));
+  ok(cuantosActivos(lleno) <= MAX_OBJETIVOS, `hay tope de objetivos (${cuantosActivos(lleno)})`);
+}
+
+console.log("\n── Lo que hay que hacer ──");
+{
+  let t = [];
+  ({ tareas: t } = apuntarTarea(t, "Pedir las sillas a Dealde", { evento: "Boda del 12" }));
+  ({ tareas: t } = apuntarTarea(t, "Llamar al proveedor de hielo"));
+  ({ tareas: t } = apuntarTarea(t, "Pedir las sillas a Dealde", { evento: "Boda del 12" }));
+  ok(t.length === 2, `apuntar dos veces lo mismo no duplica (${t.length})`);
+  ok(sinHacer(t).length === 2, "las dos siguen pendientes");
+
+  const sillas = t.find(x => /sillas/.test(x.texto));
+  t = marcarTarea(t, sillas.id, true);
+  ok(sinHacer(t).length === 1, "marcar una la saca de las pendientes");
+  ({ tareas: t } = apuntarTarea(t, "Pedir las sillas a Dealde", { evento: "Boda del 12" }));
+  ok(sinHacer(t).length === 2, "y volver a apuntarla la revive: es lo que se quiere decir al repetirla");
+
+  ok(porEvento(t).some(g => g.evento === "Boda del 12"), "se agrupan por evento");
+  ok(porEvento(t).some(g => g.evento === ""), "y las sueltas van aparte");
+
+  // La limpieza: lo hecho de un evento pasado se va; lo PENDIENTE se queda aunque el
+  // evento haya pasado, porque si no se hizo alguien tiene que enterarse.
+  t = marcarTarea(t, sillas.id, true);
+  const viejos = { "Boda del 12": { fechaEvento: "2020-01-01" } };
+  const limpia = limpiarViejas(t, viejos);
+  ok(!limpia.some(x => /sillas/.test(x.texto)), "lo hecho de un evento pasado se cae solo");
+  ({ tareas: t } = apuntarTarea(t, "Algo que no se hizo", { evento: "Boda del 12" }));
+  ok(limpiarViejas(t, viejos).some(x => /no se hizo/.test(x.texto)),
+    "pero lo PENDIENTE de un evento pasado se queda: alguien tiene que enterarse");
+
+  ok(tareasContexto(t).includes("Llamar al proveedor"), "las pendientes viajan en la conversación");
+  ok(!tareasContexto([]).length, "y sin tareas no se mete nada");
+  ok(apuntarTarea([], "  ").error, "una tarea vacía se rechaza");
+  ok(saneaTareas([{ texto: "x", id: "a" }, { texto: "y", id: "a" }]).length === 1, "no hay dos con el mismo id");
+}
+
+console.log("\n── El subconsciente ──");
+{
+  const hoy = new Date().toISOString().slice(0, 10);
+  const ev = {
+    "Boda A": { evento: "boda", fechaEvento: hoy, pax: 100, ubicacion: "Finca", origenSillas: "Dealde", horaInicio: "13:00", logisticaEquipo: [{ nombre: "A" }] },
+    "Boda B": { evento: "boda", fechaEvento: hoy },
+  };
+
+  // La primera vez NO hay con qué comparar, y decir que ha cambiado algo sería mentir
+  ok(queHaCambiado(null, foto(ev)) === null, "la primera vez no se inventa un cambio");
+
+  const antes = foto({ "Boda A": ev["Boda A"] });
+  const p = parte({ eventosGuardados: ev, objetivos: [{ texto: "Bajar la merma de cristalería", estado: "activo" }], fotoAnterior: antes });
+  ok(p.cambios && p.cambios.eventosNuevos.includes("Boda B"), "detecta lo que ha aparecido desde la última vez");
+  ok(p.estaSemana.length === 2, "y lo que toca esta semana");
+  ok(p.urgentes.some(u => u.evento === "Boda B"), "y señala el que está a medias");
+
+  // Un objetivo que no se puede medir con los datos lo DICE. Es una respuesta honesta:
+  // dice que hay que seguirlo por otro sitio, no que vaya bien.
+  const conRaro = comoVanLosObjetivos([{ texto: "Tratar mejor al cliente", estado: "activo" }], { eventosGuardados: ev });
+  ok(conRaro[0].medible === false && /vosotros/.test(conRaro[0].senal),
+    "un objetivo que no sale de los datos se dice, no se finge");
+  const medible = comoVanLosObjetivos([{ texto: "Bajar la merma", estado: "activo" }], { eventosGuardados: ev });
+  ok(medible[0].medible === true, "y uno que sí se puede medir, se mide");
+
+  ok(comoVanLosObjetivos([{ texto: "X", estado: "aparcado" }], {}).length === 0, "los aparcados no se miran");
+  ok(parte({}).hayAlgoQueContar === false, "sin nada que contar, se dice que no hay nada");
+}
+
+console.log("\n── Las conversaciones guardadas ──");
+{
+  const hilo = [{ de: "yo", texto: "cuanto hielo para la boda del doce de septiembre en la finca esa" }, { de: "el", texto: "122 kg" }];
+  ok(tituloDe(hilo).startsWith("cuanto hielo"), "el título sale de la primera pregunta");
+  ok(tituloDe(hilo).length <= 46, "y se corta para que quepa en la lista");
+  ok(tituloDe([]) === "Sin título", "sin hilo, un título que no miente");
+  ok(tituloDe([{ de: "el", texto: "hola" }]) === "Sin título", "y el título sale de lo que PREGUNTASTE, no de lo que contestó");
+
+  // saneaCharlas es lo que protege de un localStorage manipulado o de otra versión
+  ok(saneaCharlas([{ id: "a", hilo: [] }]).length === 0, "una charla sin hilo no se guarda");
+  ok(saneaCharlas([{ id: "a", hilo }, { id: "a", hilo }]).length === 1, "no hay dos con el mismo id");
+  ok(saneaCharlas("no es una lista").length === 0, "y un guardado corrupto no revienta");
+
+  const dosDias = Date.now() - 2 * 86400000;
+  ok(cuandoFue(Date.now() - 90000) === "hace 2 min", "el cuándo se lee de un vistazo");
+  ok(cuandoFue(dosDias) === "hace 2 días", "y en días cuando toca");
+  ok(cuandoFue(0) === "", "sin fecha no se inventa una");
+}
+
+console.log("\n── Encadenar dónde se escribe ──");
+{
+  let tareas = [];
+  const soloTareas = aplicarEnTareas({ tareas, guardar: (x) => { tareas = x; } });
+  ok(soloTareas({ que: "crear_apunte", datos: {} }) === null,
+    "un aplicador devuelve null si la operación no es suya");
+
+  const cadena = encadenar(soloTareas);
+  ok(cadena({ que: "apuntar_tarea", datos: { texto: "Pedir sillas" } }).apuntado === "Pedir sillas",
+    "encadenado, la coge quien sabe hacerla");
+  ok(cadena({ que: "borrar_apunte", datos: {} }).error,
+    "y si no la sabe hacer nadie, se dice en vez de fallar en silencio");
+  ok(encadenar(null, soloTareas)({ que: "apuntar_tarea", datos: { texto: "Otra cosa" } }).apuntado,
+    "un aplicador vacío en la cadena no la rompe");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

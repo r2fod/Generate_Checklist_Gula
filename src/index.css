@@ -7090,3 +7090,76 @@ hr {
   font-weight: 700;
   opacity: 0.7;
 }
+
+/* ─── HISTORIAL Y TAREAS ──────────────────────────────────────────────────────
+   Antes, al cerrar el panel se perdía la conversación entera: había que volver a
+   preguntar, y se pagaba otra vez. */
+.asis-historial { display: flex; flex-direction: column; gap: 6px; }
+
+.asis-charla {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.asis-charla.es-abierta { border-color: var(--accent); }
+
+.asis-charla-abrir {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.asis-charla-abrir span {
+  font-size: 0.84rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.asis-charla-abrir em { font-style: normal; font-size: 0.72rem; color: var(--text-muted); }
+.asis-charla-abrir:hover { background: var(--bg-subtle); }
+
+/* La casilla de una tarea: grande y a la izquierda, que es donde se busca. */
+.asis-tarea-check {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: -4px 0 -4px -4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ok-texto);
+  cursor: pointer;
+}
+
+.asis-tarea-check:hover { background: var(--bg-subtle); }
+
+.asis-tarea-vacia {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border-color-strong);
+  border-radius: 4px;
+}
+
+/* Una tarea hecha se apaga pero no desaparece: sigue estando para poder desmarcarla si
+   alguien se adelantó. Se va sola cuando su evento pasa. */
+.asis-recuerdo.es-hecha { opacity: 0.5; }
+.asis-recuerdo.es-hecha .asis-recuerdo-texto { text-decoration: line-through; }

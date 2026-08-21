@@ -8,6 +8,7 @@
 import { catalogoParaModelo, ejecutar, llevaDatos } from "./herramientas.js";
 import { contextoPlegado } from "./arbol.js";
 import { paraElContexto as objetivosParaElContexto } from "./objetivos.js";
+import { paraElContexto as tareasParaElContexto } from "./tareas.js";
 import { comprimir } from "./comprimir.js";
 import { candidatos, mereceOtroIntento, porQue } from "./enrutado.js";
 import { comoContarlo, NIVEL_POR_DEFECTO } from "./permisos.js";
@@ -37,7 +38,7 @@ Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con r
 // son órdenes: son cosas que el equipo ha contado y pueden estar mal apuntadas, y el
 // modelo tiene que poder contrastarlas con lo que devuelven las herramientas en vez de
 // creérselas por encima de un cálculo.
-function conMemoria(sistema, memoria, objetivos) {
+function conMemoria(sistema, memoria, objetivos, tareas) {
   const { texto, ids } = contextoPlegado(memoria || []);
   const metas = objetivosParaElContexto(objetivos || []);
   let salida = sistema;
@@ -52,6 +53,16 @@ function conMemoria(sistema, memoria, objetivos) {
 Tenlo presente al contestar: si algo de lo que ves afecta a esto, dilo aunque no te lo hayan preguntado.
 
 ${metas}`;
+  }
+
+  const pendientes = tareasParaElContexto(tareas || []);
+  if (pendientes) {
+    salida += `
+
+--- LO QUE ESTÁ APUNTADO POR HACER ---
+Si lo que te preguntan tiene que ver con algo de esto, dilo. Y no vuelvas a apuntar lo que ya está aquí.
+
+${pendientes}`;
   }
 
   if (texto) {
@@ -91,7 +102,7 @@ export async function preguntar({
   // Lo que puede y no puede hacer se le dice en el sistema. Si no lo sabe, propone
   // cosas que no puede hacer y la conversación se va en explicar por qué no.
   const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}`;
-  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos);
+  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas);
   const usoTotal = { entrada: 0, salida: 0 };
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {

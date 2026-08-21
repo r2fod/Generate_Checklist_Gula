@@ -28,6 +28,7 @@ import {
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
+  cargarTareasNube, guardarTareasNube, suscribirTareasNube,
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
@@ -59,6 +60,8 @@ import { calcularCalibracion, calibracionBebida } from "./calibracion.js";
 import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
+import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
+import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1873,6 +1876,11 @@ export default function App({ onCerrarSesion } = {}) {
   const [objetivos, setObjetivos] = useState([]);
   const objetivosRef = React.useRef([]);
   React.useEffect(() => { objetivosRef.current = objetivos; }, [objetivos]);
+  // Lo que hay que hacer. También del equipo: una tarea que solo ve quien la apuntó no
+  // está apuntada.
+  const [tareas, setTareas] = useState([]);
+  const tareasRef = React.useRef([]);
+  React.useEffect(() => { tareasRef.current = tareas; }, [tareas]);
   // Los apuntes del calendario, guardados de la carga que YA se hace al arrancar para
   // crear las checklists que se acercan. No cuesta una petición más: es la misma.
   const [apuntesCalendario, setApuntesCalendario] = useState([]);
@@ -1943,6 +1951,26 @@ export default function App({ onCerrarSesion } = {}) {
     objetivosRef.current = limpios;
     if (nubeActiva() && haySesionEquipo) {
       guardarObjetivosNube(limpios).catch(() => { /* sin conexión: sube al siguiente cambio */ });
+    }
+  }, [haySesionEquipo]);
+
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (r) => { if (vivo && r) setTareas(saneaTareas(r)); };
+    cargarTareasNube().then(aplicar).catch(() => { /* sin conexión: sin tareas */ });
+    const corta = suscribirTareasNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const guardarTareas = React.useCallback((siguiente) => {
+    // Se limpian las hechas de eventos que ya pasaron al guardar, no en una tarea
+    // aparte: una lista que solo crece deja de mirarse, y entonces da igual qué tenga.
+    const limpias = limpiarViejas(siguiente, eventosGuardadosRef.current || {});
+    setTareas(limpias);
+    tareasRef.current = limpias;
+    if (nubeActiva() && haySesionEquipo) {
+      guardarTareasNube(limpias).catch(() => { /* sin conexión: sube al siguiente cambio */ });
     }
   }, [haySesionEquipo]);
 
@@ -2920,6 +2948,12 @@ export default function App({ onCerrarSesion } = {}) {
                   }),
                   memoria,
                   objetivos,
+                  tareas,
+                  onMarcarTarea: (id, hecho) => guardarTareas(marcarTarea(tareasRef.current, id, hecho)),
+                  onQuitarTarea: (id) => guardarTareas(quitarTarea(tareasRef.current, id)),
+                  // Aquí solo se escriben tareas: los apuntes del calendario se tocan
+                  // desde el calendario, que es quien sabe guardarlos.
+                  onEscribir: encadenar(aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas })),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),
                   onQuitarObjetivo: (id) => guardarObjetivos(quitarObjetivo(objetivosRef.current, id)),
