@@ -5832,3 +5832,206 @@ hr {
   color: var(--peligro, #dc2626);
 }
 .link-roto-error[hidden] { display: none; }
+
+/* ─── PANELES DE AJUSTE ───────────────────────────────────────────────────────
+   Los números que el equipo corrige a mano: la gente por comensal (calendario) y
+   cuánto se bebe en cada tipo de evento (Resumen del Modo carga). Son la misma
+   pantalla dos veces —una cabecera plegable y una fila por tipo con su casilla— así
+   que comparten estilo. Está aquí y no en calendario.css porque la checklist no
+   carga ese fichero, y estaba duplicado un rato hasta que se notó.
+   Plegado a propósito: se tocan una vez al año. En el móvil cada fila va a lo suyo,
+   con el número lo bastante grande para acertar con el dedo. */
+.cal-ratios {
+  margin-bottom: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.cal-ratios-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-ratios-titulo { flex: 1 1 auto; min-width: 0; }
+.cal-ratios-titulo em { font-style: normal; font-weight: 500; color: var(--text-muted); }
+
+.cal-ratios-flecha { flex: 0 0 auto; transition: transform 0.18s ease; }
+.cal-ratios-flecha.es-abierta { transform: rotate(180deg); }
+
+.cal-ratios-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.cal-ratios-nota {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.cal-ratio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+/* Lo que alguien ha ajustado se distingue de lo que viene de fábrica */
+.cal-ratio.es-cambiado { border-left-color: var(--ok-texto); }
+
+.cal-ratio-nombre {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.cal-ratio-avisa {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+}
+
+.cal-ratio-campo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.cal-ratio-uno { white-space: nowrap; }
+
+.cal-ratio-campo input {
+  width: 4.5rem;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  /* 16px para que iOS no haga zoom al enfocar */
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* 44px: es un botón que se pulsa con el pulgar en una fila estrecha */
+.cal-ratio-volver {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cal-ratio-volver:disabled { opacity: 0.25; cursor: default; }
+.cal-ratio-volver:not(:disabled):hover { background: var(--card-bg); color: var(--text-main); }
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-ratios-flecha { transition: none; }
+}
+
+
+/* Qué bebida se está ajustando. Son 4 x 5 casillas: enseñarlas todas llenaría la
+   pantalla de un móvil de números que nadie está mirando, así que se elige una. */
+.bebida-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.bebida-chip {
+  flex: 0 1 auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.bebida-chip:hover { color: var(--text-main); border-color: var(--text-muted); }
+
+.bebida-chip.es-activa {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* El número que sale del histórico. Es un botón porque lo único que se hace con él es
+   usarlo; cuando ya está puesto se queda como etiqueta, sin invitar a pulsarlo otra vez. */
+.cal-ratio-medido {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px dashed var(--ok-texto);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ok-texto);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.cal-ratio-medido em { font-style: normal; font-weight: 500; opacity: 0.75; }
+.cal-ratio-medido:hover { background: var(--accent-soft); }
+
+.cal-ratio-medido.es-puesto {
+  border-style: solid;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bebida-chip { transition: none; }
+}

@@ -25,6 +25,7 @@ import {
   leerConfigFormulario, guardarConfigFormulario,
   resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
+  cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
@@ -52,7 +53,8 @@ import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube } fr
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion } from "./calibracion.js";
+import { calcularCalibracion, calibracionBebida } from "./calibracion.js";
+import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1843,6 +1845,37 @@ export default function App({ onCerrarSesion } = {}) {
     return suscribirPreciosNube(aplicar);
   }, [haySesionEquipo]);
 
+  // ─── CUÁNTO SE BEBE EN CADA TIPO DE EVENTO ──────────────────────────────────
+  // Mismo trato que los precios y por lo mismo: si cada móvil tuviera el suyo, dos
+  // personas mirando la misma comunión cargarían camiones distintos. ponFactores los
+  // deja puestos para TODA la app —el generador de la checklist los lee de ahí— y el
+  // estado de aquí solo existe para que el panel se vuelva a dibujar.
+  const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresBebida(ponFactores(remotos)); };
+    cargarBebidaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirBebidaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarBebida = (siguiente) => {
+    setFactoresBebida(ponFactores(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarBebidaNube(factoresCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+  // Lo que dice el histórico: de cada evento con la vuelta apuntada sale cuánto se bebió
+  // de verdad. Se recalcula solo cuando cambia el archivo o los factores, que es caro
+  // —reconstruye la checklist de cada evento guardado— y no cambia por escribir un pax.
+  const bebidaMedida = useMemo(
+    () => calibracionBebida(eventosGuardados, factoresBebida),
+    [eventosGuardados, factoresBebida],
+  );
+
   // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
   // no el catálogo entero: si no, el día que se corrija un precio de partida en una
   // versión nueva, la copia subida lo taparía para todo el equipo.
@@ -2622,6 +2655,9 @@ export default function App({ onCerrarSesion } = {}) {
         <ModalModoCarga
           onGuardarPrecios={handleGuardarPrecios}
           preciosAlDia={preciosAlDia}
+          factoresBebida={factoresBebida}
+          calibracionBebida={bebidaMedida}
+          onCambiarBebida={handleCambiarBebida}
           checklist={checklist}
           preparados={preparados}
           marcasRevisar={marcasRevisar}

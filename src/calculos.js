@@ -7,6 +7,11 @@
 // una prueba unitaria que tarda nada. Ver src/__tests__/calculos.test.mjs.
 //
 // Nada de aquí toca estado ni pantalla: entra un número, sale un número.
+//
+// Los ratios de bebida y su factor por tipo de evento viven en bebida.js: aquí se
+// calcula con ellos, allí se decide cuáles son. Ese fichero no importa nada, así que
+// esta flecha no tiene vuelta.
+import { RATIOS_BEBIDA, factoresDeTipo } from "./bebida.js";
 
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas: es el
 // buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan pedir un
@@ -94,7 +99,10 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
 // diferencia importa en comuniones: los niños no beben vino ni cerveza, pero sí agua y
 // refresco — y son justo los que más refresco beben. Antes todo se calculaba sobre los
 // adultos, así que en una comunión de 60+25 faltaba agua y refresco para 25 personas.
-export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax } = {}) {
+// "tipo" es el tipo de evento (boda, comunion...) y solo sirve para coger su factor de
+// bebida. Sin él todos valen 1, que es exactamente lo que salía antes de que existieran.
+export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax, tipo = "" } = {}) {
+  const factor = factoresDeTipo(tipo);
   // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
   // la de la comida— y eso antes se resolvía llamando aquí con un 2 fijo cuando no
   // había barra. El efecto era absurdo: media hora de cóctel pedía MENOS que no tener
@@ -108,14 +116,14 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // media, y quedarse corto en agosto no tiene arreglo a media boda. La cerveza que
   // sobra vuelve sin abrir y se reutiliza, así que pasarse cuesta poco; quedarse
   // corto, mucho.
-  const cervezaFactor = mesVerano ? 3.0 : 2.0;
+  const cervezaFactor = (mesVerano ? RATIOS_BEBIDA.cerveza.verano : RATIOS_BEBIDA.cerveza.invierno) * factor.cerveza;
   // El consumo de cerveza por pax no crece sin límite cuanto más dura la barra: a partir
   // de las 4h de referencia el consumo por persona se estabiliza (nadie bebe el doble de
   // cerveza solo porque la barra esté abierta el doble de horas). Por eso el factor de
   // horas se limita a 1: el ratio de arriba ya es el techo, no un punto de partida.
   const cerveza = Math.round((alcoholPax * cervezaFactor * Math.min(1, barFactor)) / 24) * 24;
   // Vino: calibrado con datos reales (65 pax → 30 blanco, 16-17 tinto)
-  const vinoTotal = Math.round(alcoholPax * 0.72);
+  const vinoTotal = Math.round(alcoholPax * RATIOS_BEBIDA.vino * factor.vino);
   const ratioBlanco = mesVerano ? 0.65 : 0.45;
   const vinoBlanco = Math.round(vinoTotal * ratioBlanco);
   const vinoTinto = vinoTotal - vinoBlanco;
@@ -128,7 +136,7 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // cabeza), porque en el brindis todo el mundo coge copa a la vez — que es cosa
   // distinta de cuánto se bebe.
   const BOTELLAS_EXTRA_BRINDIS = 4;
-  const cava = Math.round(alcoholPax * 0.2) + (tieneBrindisCava ? BOTELLAS_EXTRA_BRINDIS : 0);
+  const cava = Math.round(alcoholPax * RATIOS_BEBIDA.cava * factor.cava) + (tieneBrindisCava ? BOTELLAS_EXTRA_BRINDIS : 0);
   // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
   // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
   // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
@@ -140,7 +148,7 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // —las dos Fantas, Aquarius y Sprite— se añadieron después sin ningún dato detrás y
   // sumaban 2,6 uds/pax ellos solos: el total sobrepasaba en un 84% su propia fuente de
   // calibración. Se bajan a la mitad hasta que haya un evento medido que diga otra cosa.
-  const refrescoTotal = Math.round(pax * 7.4);
+  const refrescoTotal = Math.round(pax * RATIOS_BEBIDA.refresco * factor.refresco);
   // El factor de horas se acota (máx. 1,75) para que una barra muy larga no dispare
   // la tónica/refrescos de mezcla por encima de lo real, igual que en la cristalería.
   const barFactorTope = Math.min(1.75, barFactor);

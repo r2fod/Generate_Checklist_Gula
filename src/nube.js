@@ -248,94 +248,77 @@ export function suscribirArchivoNube(cb) {
     ));
 }
 
-// ─── LOS PRECIOS DEL EQUIPO ───────────────────────────────────────────────────
-// El coste estimado del Modo carga sale de un catálogo de precios por unidad. Los de
-// partida van en el código (src/precios.js): son precios de proveedor, públicos, no
-// negociados. Lo que se corrige a mano vivía SOLO en el navegador de quien lo corregía,
-// así que dos personas mirando el mismo evento veían costes distintos y ninguna sabía
-// cuál era el bueno.
+// ─── LOS AJUSTES QUE SON DEL EQUIPO, NO DE UN MÓVIL ───────────────────────────
+// Precios, ratios de personal y factores de bebida son la misma cosa tres veces: un
+// puñado de números que tienen que valer lo mismo para todo el mundo. Si cada uno
+// tuviera los suyos, dos personas mirando el mismo sábado verían que hacen falta 22
+// personas o 28 según quién mire, y el mismo evento costaría 340€ o 410€.
 //
-// Cuelga de "indice/", que las reglas ya abren solo al equipo con sesión. No hace falta
-// tocar firestore.rules — y es lo correcto: esto son costes internos, no algo que deba
-// leer quien entra por un enlace compartido.
+// Los tres cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
+// hace falta tocar firestore.rules, y es lo correcto —esto son ajustes internos, no algo
+// que deba leer quien entra por un enlace compartido. Guardan SOLO lo que
+// alguien ha cambiado, para que una corrección de los valores de partida en una versión
+// nueva siga llegando a todo lo que nadie ha tocado. Y los tres llegan solos desde otro
+// dispositivo: un catálogo que hay que recargar para ver al día es otra vez una hoja
+// suelta.
 //
-// Se sube SOLO lo cambiado, no el catálogo entero: ver soloLosCambiados en precios.js.
-const DOC_PRECIOS = "indice/precios";
-
-export async function guardarPreciosNube(cambios) {
-  const conexion = await getDb();
-  if (!conexion) return 0;
-  const { db, fs } = conexion;
-  const actualizado = Date.now();
-  await fs.setDoc(fs.doc(db, DOC_PRECIOS), { precios: JSON.stringify(cambios), actualizado });
-  return actualizado;
+// Estaban escritos tres veces, palabra por palabra salvo el nombre del documento y el
+// del campo. Aquí se escriben una.
+function ajusteCompartido(ruta, campo) {
+  return {
+    async guardar(cambios) {
+      const conexion = await getDb();
+      if (!conexion) return 0;
+      const { db, fs } = conexion;
+      const actualizado = Date.now();
+      await fs.setDoc(fs.doc(db, ruta), { [campo]: JSON.stringify(cambios), actualizado });
+      return actualizado;
+    },
+    async cargar() {
+      const conexion = await getDb();
+      if (!conexion) return null;
+      const { db, fs } = conexion;
+      const snap = await fs.getDoc(fs.doc(db, ruta));
+      if (!snap.exists()) return null;
+      // Documento corrupto: mejor los de partida que reventar la app entera.
+      try { return JSON.parse(snap.data()[campo]); } catch (e) { return null; }
+    },
+    suscribir(cb) {
+      return suscribir(({ db, fs }) => fs.onSnapshot(
+        fs.doc(db, ruta),
+        (snap) => {
+          if (!snap.exists()) return;
+          try { cb(JSON.parse(snap.data()[campo])); }
+          catch (e) { /* documento corrupto: se ignora */ }
+        },
+        () => { /* sin conexión: se usan los de este navegador */ },
+      ));
+    },
+  };
 }
 
-export async function cargarPreciosNube() {
-  const conexion = await getDb();
-  if (!conexion) return null;
-  const { db, fs } = conexion;
-  const snap = await fs.getDoc(fs.doc(db, DOC_PRECIOS));
-  if (!snap.exists()) return null;
-  try { return JSON.parse(snap.data().precios); }
-  catch (e) { return null; }   // documento corrupto: mejor los de partida que reventar
-}
+// El coste unitario de cada item, para el Resumen del Modo carga. Los de partida van en
+// el código (src/precios.js): son precios de proveedor, públicos, no negociados.
+const PRECIOS = ajusteCompartido("indice/precios", "precios");
+export const guardarPreciosNube = PRECIOS.guardar;
+export const cargarPreciosNube = PRECIOS.cargar;
+export const suscribirPreciosNube = PRECIOS.suscribir;
 
-// Si alguien corrige un precio desde otro dispositivo, llega solo. Un catálogo de costes
-// que hay que recargar para ver al día es otra vez una hoja suelta.
-export function suscribirPreciosNube(cb) {
-  return suscribir(({ db, fs }) => fs.onSnapshot(
-      fs.doc(db, DOC_PRECIOS),
-      (snap) => {
-        if (!snap.exists()) return;
-        try { cb(JSON.parse(snap.data().precios)); }
-        catch (e) { /* documento corrupto: se ignora */ }
-      },
-      () => { /* sin conexión: se ignora, se usan los de este navegador */ },
-    ));
-}
-
-// ─── LOS RATIOS DE PERSONAL ───────────────────────────────────────────────────
 // Cuántos comensales lleva un camarero, por tipo de evento. Los de partida salen de
 // contar el personal real de 19 eventos, pero cada catering trabaja distinto y los de
 // cumpleaños y producción nadie los ha medido: se ajustan desde la app.
-//
-// Van al lado de los precios y por lo mismo: es un ajuste del EQUIPO, no de un móvil. Si
-// cada uno tuviera los suyos, dos personas mirando el mismo sábado verían que hacen
-// falta 22 personas o 28 según quién mire. Cuelga de "indice/", ya cubierto por las
-// reglas, y se sube solo lo cambiado.
-const DOC_RATIOS = "indice/ratios";
+const RATIOS = ajusteCompartido("indice/ratios", "ratios");
+export const guardarRatiosNube = RATIOS.guardar;
+export const cargarRatiosNube = RATIOS.cargar;
+export const suscribirRatiosNube = RATIOS.suscribir;
 
-export async function guardarRatiosNube(cambios) {
-  const conexion = await getDb();
-  if (!conexion) return 0;
-  const { db, fs } = conexion;
-  const actualizado = Date.now();
-  await fs.setDoc(fs.doc(db, DOC_RATIOS), { ratios: JSON.stringify(cambios), actualizado });
-  return actualizado;
-}
-
-export async function cargarRatiosNube() {
-  const conexion = await getDb();
-  if (!conexion) return null;
-  const { db, fs } = conexion;
-  const snap = await fs.getDoc(fs.doc(db, DOC_RATIOS));
-  if (!snap.exists()) return null;
-  try { return JSON.parse(snap.data().ratios); }
-  catch (e) { return null; }
-}
-
-export function suscribirRatiosNube(cb) {
-  return suscribir(({ db, fs }) => fs.onSnapshot(
-      fs.doc(db, DOC_RATIOS),
-      (snap) => {
-        if (!snap.exists()) return;
-        try { cb(JSON.parse(snap.data().ratios)); }
-        catch (e) { /* documento corrupto: se ignora */ }
-      },
-      () => { /* sin conexión: se usan los de partida */ },
-    ));
-}
+// Cuánto se bebe en cada tipo de evento respecto a lo de siempre (ver bebida.js). Es el
+// ajuste que más se mueve solo: sale del histórico de lo que volvió sin abrir, así que
+// tiene que verlo el equipo entero o cada móvil cargaría un camión distinto.
+const BEBIDA = ajusteCompartido("indice/bebida", "bebida");
+export const guardarBebidaNube = BEBIDA.guardar;
+export const cargarBebidaNube = BEBIDA.cargar;
+export const suscribirBebidaNube = BEBIDA.suscribir;
 
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se

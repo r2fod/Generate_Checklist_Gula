@@ -6,6 +6,7 @@ import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
   terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen,
 } from "./calculos.js";
+import { factoresDeTipo } from "./bebida.js";
 import { conSufijo } from "./checklist-format.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
@@ -219,7 +220,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // El agua, los refrescos y el hielo van sobre TODOS (los niños beben); el alcohol solo
   // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
   // faltaba agua y refresco para veinticinco personas.
-  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax });
+  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
@@ -463,7 +464,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
 
-  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax });
+  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos" });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
@@ -662,6 +663,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // puso de verdad salen 2 de sala en los dos casos medidos —un rodaje de 20 pax y una
   // producción de 30—, y en la de 30 exactamente 2 de sala y 1 de cocina. Se ajusta a
   // eso: los dos únicos datos que hay dicen lo mismo.
+  const factorRefresco = factoresDeTipo("produccion").refresco;
   const produPequena = pax <= 30;
   const nSala = numCamareros > 0 ? numCamareros : (produPequena ? 2 : personalSala(pax, numCamareros, divisorCam));
   const nCocina = produPequena ? 1 : Math.max(2, Math.ceil(pax * 2 / 50));
@@ -873,10 +875,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
     ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
-    // en cada bebida por separado en vez de en dos líneas combinadas
-    ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56))],
-    ["Fanta naranja", String(Math.round(paxConsumo * 0.24))], ["Fanta limón", String(Math.round(paxConsumo * 0.2))],
-    ["Aquarius", String(Math.round(paxConsumo * 0.24))],
+    // en cada bebida por separado en vez de en dos líneas combinadas.
+    // El rodaje no pasa por calcBebidas (no hay barra ni alcohol), así que su factor de
+    // refresco se aplica aquí a mano: si no, el panel enseñaría una casilla de producción
+    // que no movería nada.
+    ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94 * factorRefresco))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56 * factorRefresco))],
+    ["Fanta naranja", String(Math.round(paxConsumo * 0.24 * factorRefresco))], ["Fanta limón", String(Math.round(paxConsumo * 0.2 * factorRefresco))],
+    ["Aquarius", String(Math.round(paxConsumo * 0.24 * factorRefresco))],
     // En producción el agua de beber son las CAJAS de 33cl (35 uds). El ratio va por
     // temporada: en un rodaje de doce horas al sol se bebe el doble que en enero, y
     // con 3,5 fijas se salía con poco más de un litro por cabeza y día. La de 1,5L es

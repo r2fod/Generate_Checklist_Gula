@@ -1,6 +1,7 @@
 import { estimarTiemposCarga, FASES_TIEMPO } from "./tiempos-carga.js";
 import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
 import { buildChecklist } from "./checklist-generadores.js";
+import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "./bebida.js";
 
 // ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
 // Las estimaciones de tiempos-carga.js son de sector. En cuanto hay eventos con el
@@ -68,17 +69,9 @@ function contarItemsCarga(ev) {
 // sin necesidad de abrirlo. Aplica las categorías renombradas y añade los items
 // puestos a mano (la clave usa la etiqueta base del item).
 export function checklistDeEventoGuardado(ev) {
-  if (!ev || !ev.evento) return [];
-  const opts = {
-    ...ev,
-    tipoBBQ: (ev.tipoBBQ || "").toLowerCase(),
-    tipoHorno: (ev.tipoHorno || "").toLowerCase(),
-    numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
-  };
   let cats;
-  try {
-    cats = buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
-  } catch (e) { return []; }
+  try { cats = catsDeEventoGuardado(ev); } catch (e) { return []; }
+  if (!cats.length) return [];
   const renom = ev.categoriasRenombradas || {};
   const salida = cats.map(c => ({ nombre: renom[c.nombre] ?? c.nombre, items: c.items.map(it => it[0]) }));
   (ev.itemsManuales || []).forEach(it => {
@@ -88,4 +81,116 @@ export function checklistDeEventoGuardado(ev) {
     destino.items.push(it.label);
   });
   return salida;
+}
+
+// ─── CUÁNTO SE BEBIÓ DE VERDAD ────────────────────────────────────────────────
+// El único dato honesto sobre cuánta bebida hace falta en una comunión no está en
+// ningún manual: está en los eventos ya hechos, en la diferencia entre lo que salió en
+// el camión y lo que volvió sin abrir. Eso ya se apunta en Modo carga → "Vuelve".
+//
+// Aquí se convierte en un factor por tipo de evento (ver bebida.js): se compara lo
+// consumido con lo que la app habría cargado HOY para ese evento, y esa proporción,
+// multiplicada por el factor que ya estuviera puesto, es el factor de verdad. Hacerlo
+// contra la carga reconstruida y no contra el ratio pelado es lo que deja fuera todo lo
+// que ya sabe la app —temporada, horas de barra, brindis, niños— sin repetir su cuenta.
+// Y al multiplicar por el factor vigente el ajuste converge: aplicar la sugerencia y
+// volver a medir da 1, no otra corrección encima.
+const MIN_EVENTOS_BEBIDA = 3;
+
+// Lo cargado y lo vuelto de un item, buscando la clave con el nombre de categoría tal
+// cual y también renombrado: la marca se guardó con el nombre que la categoría tenía en
+// ese momento, y desde entonces se puede haber cambiado.
+function marcaDe(mapa, catBase, catMostrada, label) {
+  const v = mapa[`${catBase}::${label}`];
+  return v !== undefined ? v : mapa[`${catMostrada}::${label}`];
+}
+
+function aNumero(x) {
+  const n = parseFloat(String(x && x.u ? x.u : x).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+}
+
+// Lo que se consumió de una bebida en un evento guardado, y lo que se habría cargado.
+// Devuelve null si falta algún dato: una sola línea del grupo sin apuntar la vuelta ya
+// falsea el total (si no apuntas el tinto, el vino sale como si se hubiera bebido entero).
+function consumoDeBebida(ev, cats, labels) {
+  const renom = ev.categoriasRenombradas || {};
+  const vueltos = ev.vueltos || {};
+  const overrides = ev.overridesManuales || {};
+  let carga = 0, consumo = 0, encontrados = 0;
+  for (const cat of cats) {
+    const mostrada = renom[cat.nombre] ?? cat.nombre;
+    for (const it of cat.items) {
+      const label = it[0];
+      if (!labels.includes(label)) continue;
+      encontrados++;
+      const override = marcaDe(overrides, cat.nombre, mostrada, label);
+      const qty = aNumero(override !== undefined ? override : it[1]);
+      if (qty === null || qty <= 0) return null;
+      const raw = marcaDe(vueltos, cat.nombre, mostrada, label);
+      if (raw === undefined || raw === "") return null;       // no se apuntó la vuelta
+      const vuelta = raw === true ? qty : aNumero(raw);
+      if (vuelta === null || vuelta > qty) return null;        // "vuelven más de las que salieron"
+      carga += qty;
+      consumo += qty - vuelta;
+    }
+  }
+  if (!encontrados || carga <= 0) return null;
+  return { carga, consumo };
+}
+
+// La mediana, no la media: un evento con un barril reventado no puede mover el factor
+// de todos los demás.
+function mediana(valores) {
+  const orden = [...valores].sort((a, b) => a - b);
+  return orden.length % 2
+    ? orden[(orden.length - 1) / 2]
+    : (orden[orden.length / 2 - 1] + orden[orden.length / 2]) / 2;
+}
+
+// { boda: { vino: { factor: 0.83, nEventos: 4 } }, ... } — solo lo que tiene datos
+// suficientes. Lo que no aparece es que nadie ha medido eso todavía, y se queda en 1.
+export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) {
+  const proporciones = {};
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.evento || !ev.vueltos) return;
+    if (!TIPOS_BEBIDA.includes(ev.evento)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(ev); } catch (e) { return; }
+    if (!cats.length) return;
+    CLAVES_BEBIDA.forEach(bebida => {
+      const r = consumoDeBebida(ev, cats, BEBIDAS[bebida].items);
+      if (!r) return;
+      if (!proporciones[ev.evento]) proporciones[ev.evento] = {};
+      (proporciones[ev.evento][bebida] ||= []).push(r.consumo / r.carga);
+    });
+  });
+  const salida = {};
+  Object.entries(proporciones).forEach(([tipo, porBebida]) => {
+    Object.entries(porBebida).forEach(([bebida, lista]) => {
+      if (lista.length < MIN_EVENTOS_BEBIDA) return;
+      const factor = redondeaFactor(mediana(lista) * factorDe(factoresActuales, tipo, bebida));
+      if (!esFactorValido(factor)) return;
+      if (!salida[tipo]) salida[tipo] = {};
+      salida[tipo][bebida] = { factor, nEventos: lista.length };
+    });
+  });
+  return salida;
+}
+
+// Dos decimales: la precisión de "se bebió un 83%" es la que hay, y un 0,8271 en una
+// casilla del panel solo da sensación de exactitud donde no la hay.
+const redondeaFactor = (n) => Math.round(n * 100) / 100;
+
+// Las categorías con sus cantidades, tal y como saldrían hoy. checklistDeEventoGuardado
+// se queda solo con las etiquetas; la calibración necesita también los números.
+export function catsDeEventoGuardado(ev) {
+  if (!ev || !ev.evento) return [];
+  const opts = {
+    ...ev,
+    tipoBBQ: (ev.tipoBBQ || "").toLowerCase(),
+    tipoHorno: (ev.tipoHorno || "").toLowerCase(),
+    numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
+  };
+  return buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
 }

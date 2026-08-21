@@ -27,6 +27,11 @@ import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsign
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
 import { mesasComensales, lineasDeMesas, mesasParaVestir, tipoMesaValido, TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "../mesas.js";
 import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
+import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
+  saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
+  esFactorValido, cuantosAjustados } from "../bebida.js";
+import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
+import { buildChecklist } from "../checklist-generadores.js";
 
 let pasan = 0;
 const fallos = [];
@@ -1190,6 +1195,137 @@ console.log("\n══ Las mesas de los comensales ══");
   // siempre en vez de reventar la checklist entera
   ok(tipoMesaValido("Inventada") === TIPO_MESA_POR_DEFECTO && mesasComensales(60, "Inventada") === 10,
     "un tipo desconocido cae en la rectangular de siempre");
+}
+
+// ─── CUÁNTO SE BEBE EN CADA TIPO DE EVENTO ────────────────────────────────────
+{
+  console.log("\n── Factores de bebida ──");
+  ponFactores({});   // se arranca limpio: otras pruebas de arriba no dejan nada puesto
+
+  // Lo importante del módulo entero: sin tocar nada, TODO sale exactamente como antes
+  // de que existiera. Si esta falla, la nueva pieza ha cambiado la carga de camiones
+  // que llevan años saliendo bien.
+  ok(TIPOS_BEBIDA.every(t => CLAVES_BEBIDA.every(b => factorDe({}, t, b) === FACTOR_NEUTRO)),
+    "sin nada puesto, los veinte factores valen 1");
+  const bodaBase = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100, tipo: "boda" });
+  const sinTipo  = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100 });
+  ok(JSON.stringify(bodaBase) === JSON.stringify(sinTipo),
+    "y pasar el tipo sin factores da lo mismo que no pasarlo");
+
+  // Un factor de 0,5 en el vino de comunión baja el vino de la comunión Y NADA MÁS.
+  // Es el fallo que se cuela solo: tocar un ratio y llevarse por delante otro.
+  ponFactores({ comunion: { vino: 0.5 } });
+  const com = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100, tipo: "comunion" });
+  ok(com.vinoBlanco + com.vinoTinto === Math.round((bodaBase.vinoBlanco + bodaBase.vinoTinto) / 2),
+    `el vino de comunión baja a la mitad → ${com.vinoBlanco + com.vinoTinto} de ${bodaBase.vinoBlanco + bodaBase.vinoTinto}`);
+  ok(com.cerveza === bodaBase.cerveza && com.cava === bodaBase.cava && com.cocaNormal === bodaBase.cocaNormal,
+    "y la cerveza, el cava y el refresco no se mueven");
+  const bodaOtraVez = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100, tipo: "boda" });
+  ok(JSON.stringify(bodaOtraVez) === JSON.stringify(bodaBase),
+    "y la boda sigue igual que antes de tocar la comunión");
+
+  // Los cuatro factores llegan a su bebida, cada uno a la suya
+  ponFactores({ boda: { cerveza: 0.5, cava: 0.5, refresco: 0.5 } });
+  const mitad = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100, tipo: "boda" });
+  ok(mitad.cerveza < bodaBase.cerveza && mitad.cava < bodaBase.cava && mitad.cocaNormal < bodaBase.cocaNormal,
+    "cerveza, cava y refresco bajan cada uno con el suyo");
+  ok(mitad.vinoBlanco === bodaBase.vinoBlanco && mitad.vinoTinto === bodaBase.vinoTinto,
+    "y el vino, que no se tocó, se queda donde estaba");
+
+  // Un dedo resbalando en el móvil no puede dejar la boda sin vino ni pedir cinco veces
+  // la bebida de un evento entero.
+  ok(!esFactorValido(0) && !esFactorValido(0.1) && !esFactorValido(5) && !esFactorValido(NaN),
+    "un 0, un 0,1 o un 5 no son factores");
+  ok(esFactorValido(0.3) && esFactorValido(1) && esFactorValido(2), "0,3, 1 y 2 sí lo son");
+  ok(Object.keys(saneaFactores({ boda: { vino: 9 }, inventado: { vino: 1.2 } })).length === 0,
+    "lo que no cuela se tira, y un tipo que no existe también");
+
+  // Poner el neutro es QUITAR el factor, no guardar un 1: guardarlo congelaría el ratio
+  // de partida el día que se corrija en una versión nueva.
+  const puesto = conFactor({}, "boda", "vino", 0.8);
+  ok(puesto.boda.vino === 0.8, "conFactor pone el factor");
+  ok(Object.keys(conFactor(puesto, "boda", "vino", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  const dos = conFactor(conFactor({}, "boda", "vino", 0.8), "boda", "cava", 1.2);
+  ok(dos.boda.vino === 0.8 && dos.boda.cava === 1.2 && cuantosAjustados(dos) === 2,
+    "dos factores del mismo tipo conviven");
+
+  ponFactores({});
+  ok(cuantosAjustados(leerFactores()) === 0, "y se puede volver a dejar todo limpio");
+}
+
+// ─── LO QUE DICE EL HISTÓRICO ─────────────────────────────────────────────────
+{
+  console.log("\n── Calibración de bebida con lo que volvió ──");
+  ponFactores({});
+
+  // Las etiquetas de BEBIDAS tienen que existir DE VERDAD en una checklist. Si alguien
+  // renombra "Vino blanco" en el generador, la calibración deja de encontrarlo y se
+  // queda callada para siempre — un fallo que no da error, solo silencio.
+  const cats = buildChecklist("boda", 100, 2, 4, 0, {});
+  const enLaChecklist = new Set(cats.flatMap(c => c.items.filter(Boolean).map(it => it[0])));
+  CLAVES_BEBIDA.forEach(b => {
+    const faltan = BEBIDAS[b].items.filter(l => !enLaChecklist.has(l));
+    ok(faltan.length === 0, `las líneas de ${BEBIDAS[b].nombre} existen en la checklist${faltan.length ? ` → faltan ${faltan.join(", ")}` : ""}`);
+  });
+
+  // Un evento con la vuelta apuntada: sale X, vuelve la mitad → se bebió la mitad.
+  const eventoBase = { evento: "comunion", pax: 100, ninos: 0, fechaEvento: "2026-05-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4, mesVerano: true };
+  const catsCom = catsDeEventoGuardado(eventoBase);
+  // Se apunta que vuelve la mitad de cada línea de vino, con la clave real de la app
+  const conVueltaVino = (frac) => {
+    const vueltos = {};
+    catsCom.forEach(c => c.items.filter(Boolean).forEach(it => {
+      if (!BEBIDAS.vino.items.includes(it[0])) return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${it[0]}`] = String(Math.round(qty * frac));
+    }));
+    return { ...eventoBase, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada: dos eventos son una anécdota, y cambiar la
+  // carga de todas las comuniones por dos casos es peor que no tocar nada.
+  const dos = { a: conVueltaVino(0.5), b: conVueltaVino(0.5) };
+  ok(Object.keys(calibracionBebida(dos, {})).length === 0, "con dos eventos no se pronuncia");
+
+  const tres = { a: conVueltaVino(0.5), b: conVueltaVino(0.5), c: conVueltaVino(0.5) };
+  const cal = calibracionBebida(tres, {});
+  ok(cal.comunion && cal.comunion.vino && Math.abs(cal.comunion.vino.factor - 0.5) < 0.03,
+    `con tres, vuelve la mitad → factor ~0,5 (${cal.comunion && cal.comunion.vino && cal.comunion.vino.factor})`);
+  ok(cal.comunion.vino.nEventos === 3, "y dice en cuántos eventos se ha medido");
+  ok(!cal.comunion.cerveza && !cal.comunion.cava,
+    "y de lo que no se apuntó la vuelta no dice nada");
+
+  // La mediana, no la media: un evento raro (un barril reventado, un cronómetro mal)
+  // no puede llevarse por delante el factor de todos los demás.
+  const conRaro = { a: conVueltaVino(0.5), b: conVueltaVino(0.5), c: conVueltaVino(0.5), d: conVueltaVino(0) };
+  ok(Math.abs(calibracionBebida(conRaro, {}).comunion.vino.factor - 0.5) < 0.03,
+    "un evento en el que no volvió nada no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir tiene que dar 1, no otra corrección
+  // encima. Si no, cada visita al panel bajaría el vino otro tanto hasta dejarlo en nada.
+  ponFactores({ comunion: { vino: 0.5 } });
+  // Consumo clavado = no vuelve nada, no "vuelve todo": si volviera todo el consumo
+  // sería cero y el factor también, que es otra cosa distinta.
+  const yaAjustado = { a: conVueltaVino(0), b: conVueltaVino(0), c: conVueltaVino(0) };
+  const seg = calibracionBebida(yaAjustado, { comunion: { vino: 0.5 } });
+  ok(seg.comunion && Math.abs(seg.comunion.vino.factor - 0.5) < 0.03,
+    `con el factor ya puesto y consumo clavado, se queda en 0,5 (${seg.comunion && seg.comunion.vino.factor})`);
+  ponFactores({});
+
+  // "Vuelven más de las que salieron" es imposible y no puede contarse como consumo 0
+  const imposible = {};
+  catsCom.forEach(c => c.items.filter(Boolean).forEach(it => {
+    if (BEBIDAS.vino.items.includes(it[0])) imposible[`${c.nombre}::${it[0]}`] = "9999";
+  }));
+  const conImposible = { a: { ...eventoBase, vueltos: imposible }, b: conVueltaVino(0.5), c: conVueltaVino(0.5) };
+  ok(!calibracionBebida(conImposible, {}).comunion,
+    "una línea con más vuelta que carga tira ese evento entero, y quedan dos");
+
+  // Un evento sin vueltos, uno con el tipo cambiado a mano y uno vacío no revientan nada
+  ok(Object.keys(calibracionBebida({ x: { evento: "boda", pax: 50 }, y: {}, z: { evento: "inventado", vueltos: {} } }, {})).length === 0,
+    "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
