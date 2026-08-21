@@ -63,9 +63,12 @@ import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.j
 // él, y la checklist no engorda para todos por una pantalla que se usa a ratos. El CSS
 // del calendario se importa dentro de ese archivo, así que viaja con él.
 const CalendarioEnChecklist = React.lazy(() => import("./calendario/EnChecklist.jsx"));
-// El asistente, igual: quien no lo abra no se descarga ni una línea de él. Y solo se
-// ofrece con sesión del equipo, porque solo con ella hay token que darle al proxy.
-const Asistente = React.lazy(() => import("./asistente/Asistente.jsx"));
+// El asistente vive en su propia carpeta y se monta con una línea. El botón, la carga
+// perezosa y el panel van juntos ahí dentro: aquí estaban escritos a mano —botón,
+// estado y quince líneas armando el contexto— y montarlo también en el calendario
+// habría sido copiar todo eso. Lo copiado se separa; ya nos pasó con el espejo de la nube.
+import BotonAsistente from "./asistente/BotonAsistente.jsx";
+import { contextoDelAsistente, eventoAbierto } from "./asistente/contexto.js";
 // Qué checklists tocan crear de los eventos que ya se acercan. Va en apuntes.js (y no
 // aquí) porque es lo que sabe el CALENDARIO: qué apuntes se acercan, cuáles ya tienen
 // checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
@@ -1855,7 +1858,6 @@ export default function App({ onCerrarSesion } = {}) {
   // personas mirando la misma comunión cargarían camiones distintos. ponFactores los
   // deja puestos para TODA la app —el generador de la checklist los lee de ahí— y el
   // estado de aquí solo existe para que el panel se vuelva a dibujar.
-  const [asistenteAbierto, setAsistenteAbierto] = useState(false);
   // ─── EL CEREBRO DEL ASISTENTE ───────────────────────────────────────────────
   // Lo que ha aprendido del equipo. Va a la nube y no a este navegador por lo mismo que
   // los precios: lo que se aprende en una boda tiene que servir en la siguiente, la mire
@@ -2715,26 +2717,6 @@ export default function App({ onCerrarSesion } = {}) {
           />
         </React.Suspense>
       )}
-      {asistenteAbierto && (
-        <React.Suspense fallback={null}>
-          {/* El asistente NO recibe la app: recibe una foto de los datos que puede
-              consultar. Lo que no esté aquí, no existe para él — que es exactamente la
-              diferencia entre un asistente que consulta y uno que anda suelto. */}
-          <Asistente
-            onCerrar={() => setAsistenteAbierto(false)}
-            onOlvidar={handleOlvidar}
-            contexto={{
-              eventosGuardados,
-              apuntes: apuntesCalendario,
-              memoria,
-              onRecordar: handleRecordar,
-              onOlvidar: handleOlvidar,
-              onUsoMemoria: handleUsoMemoria,
-              eventoActual: { nombreEvento, evento, pax, ninos, fechaEvento, horaInicio, ubicacion, notasEvento, barraCoctel, horasCoctel, barraCopas, horasCopas, logisticaEquipo },
-            }}
-          />
-        </React.Suspense>
-      )}
       {modoCarga && (
         <ModalModoCarga
           onGuardarPrecios={handleGuardarPrecios}
@@ -2899,8 +2881,24 @@ export default function App({ onCerrarSesion } = {}) {
             {!soloMarcar && (
               <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
             )}
+            {/* Solo con sesión del equipo: sin ella no hay token que darle al proxy. */}
             {onCerrarSesion && (
-              <button className="btn btn-ghost" onClick={() => setAsistenteAbierto(true)} title="Preguntar al asistente sobre tus eventos">Asistente</button>
+              <BotonAsistente
+                onOlvidar={handleOlvidar}
+                titulo="Preguntar al asistente sobre tus eventos"
+                contexto={contextoDelAsistente({
+                  eventosGuardados,
+                  apuntes: apuntesCalendario,
+                  eventoActual: eventoAbierto({
+                    nombreEvento, evento, pax, ninos, fechaEvento, horaInicio, ubicacion,
+                    notasEvento, barraCoctel, horasCoctel, barraCopas, horasCopas, logisticaEquipo,
+                  }),
+                  memoria,
+                  onRecordar: handleRecordar,
+                  onOlvidar: handleOlvidar,
+                  onUsoMemoria: handleUsoMemoria,
+                })}
+              />
             )}
             {onCerrarSesion && (
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>

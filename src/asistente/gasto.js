@@ -24,6 +24,7 @@ export const PRECIOS = {
 
 const CLAVE = "gula_asistente_gasto";
 export const mesActual = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+export const diaActual = (d = new Date()) => d.toISOString().slice(0, 10);
 
 const numero = (x) => (Number.isFinite(Number(x)) ? Math.max(0, Number(x)) : 0);
 
@@ -39,7 +40,11 @@ export function saneaGasto(bruto, mes = mesActual()) {
     if (!PRECIOS[p] || !v || typeof v !== "object") return;
     proveedores[p] = { entrada: numero(v.entrada), salida: numero(v.salida), preguntas: numero(v.preguntas) };
   });
-  return { mes, proveedores };
+  // El contador del día va aparte del mes, y no es un capricho: las capas gratuitas
+  // limitan POR DÍA (y por minuto). El número mensual no avisa de que estás a punto de
+  // tocar techo esta tarde, que es justo cuando te deja tirado.
+  const dia = bruto.dia === diaActual() ? { dia: bruto.dia, entrada: numero(bruto.hoy && bruto.hoy.entrada), salida: numero(bruto.hoy && bruto.hoy.salida), preguntas: numero(bruto.hoy && bruto.hoy.preguntas) } : null;
+  return { mes, proveedores, dia: diaActual(), hoy: dia && dia.dia === diaActual() ? { entrada: dia.entrada, salida: dia.salida, preguntas: dia.preguntas } : { entrada: 0, salida: 0, preguntas: 0 } };
 }
 
 export function leerGasto() {
@@ -52,8 +57,15 @@ export function apuntar(proveedor, uso, gasto = leerGasto()) {
   const mes = mesActual();
   const base = gasto.mes === mes ? gasto : { mes, proveedores: {} };
   const antes = base.proveedores[proveedor] || { entrada: 0, salida: 0, preguntas: 0 };
+  const hoyPrevio = base.dia === diaActual() ? (base.hoy || { entrada: 0, salida: 0, preguntas: 0 }) : { entrada: 0, salida: 0, preguntas: 0 };
   const siguiente = {
     mes,
+    dia: diaActual(),
+    hoy: {
+      entrada: hoyPrevio.entrada + numero(uso.entrada),
+      salida: hoyPrevio.salida + numero(uso.salida),
+      preguntas: hoyPrevio.preguntas + 1,
+    },
     proveedores: {
       ...base.proveedores,
       [proveedor]: {
@@ -70,6 +82,17 @@ export function apuntar(proveedor, uso, gasto = leerGasto()) {
 export function borrarGasto() {
   try { localStorage.removeItem(CLAVE); } catch (e) { /* modo privado */ }
   return saneaGasto(null);
+}
+
+// Lo que costó UNA pregunta, para poder enseñarlo debajo de su respuesta. Ver el gasto
+// solo en un panel aparte no cambia cómo se pregunta; verlo pegado a la respuesta sí.
+export function costeDeUna(proveedor, uso) {
+  if (!uso) return null;
+  const tokens = numero(uso.entrada) + numero(uso.salida);
+  if (!tokens) return null;
+  const p = PRECIOS[proveedor];
+  const eur = p ? (numero(uso.entrada) / 1e6) * p.entrada + (numero(uso.salida) / 1e6) * p.salida : 0;
+  return { tokens, euros: eur, gratis: !eur };
 }
 
 // Lo que cuesta un proveedor este mes, en euros.
@@ -114,6 +137,23 @@ export function puedePreguntar(proveedor, gasto = leerGasto(), tope = leerTope()
   return {
     puede: false,
     motivo: `Este mes llevas ${gastado.toFixed(2)}€ y el tope está en ${tope.toFixed(2)}€. Sube el tope en los ajustes o usa Gemini, que es gratis.`,
+  };
+}
+
+// Los totales del mes, y la media por pregunta. La media es el número que de verdad
+// sirve para afinar: si una pregunta normal sale por veinte mil tokens es que se está
+// mandando de más, y ahí es donde hay que apretar la compresión.
+export function totales(gasto = leerGasto()) {
+  const v = Object.values(gasto.proveedores);
+  const preguntas = v.reduce((a, x) => a + x.preguntas, 0);
+  const tokens = v.reduce((a, x) => a + x.entrada + x.salida, 0);
+  const hoy = gasto.hoy || { entrada: 0, salida: 0, preguntas: 0 };
+  return {
+    preguntas, tokens,
+    media: preguntas ? Math.round(tokens / preguntas) : 0,
+    euros: eurosTotales(gasto),
+    hoyPreguntas: hoy.preguntas,
+    hoyTokens: hoy.entrada + hoy.salida,
   };
 }
 

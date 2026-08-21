@@ -1553,3 +1553,13 @@ button.cal-turnos.es-vacia {
 @media (prefers-reduced-motion: reduce) {
   .cal-asignados-flecha { transition: none; }
 }
+
+/* El botón del asistente, en su fila. Va suelto y no dentro de otro panel a propósito:
+   se abre desde cualquier punto del calendario y no cuelga de ninguno de ellos. */
+.cal-asistente {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.cal-asistente .btn { min-height: 44px; }

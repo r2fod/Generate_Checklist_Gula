@@ -14,7 +14,12 @@ import { conectores, conectoresActivos, conHerramientasDeConectores, registrarCo
 import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
 import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
-import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS } from "../asistente/gasto.js";
+import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
+import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
+import { revisarEvento, revisarProximos } from "../asistente/revision.js";
+import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
+import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
+import { idDeApunte } from "../calendario/apuntes.js";
 import { buildChecklist as construye } from "../checklist-generadores.js";
 
 let pasan = 0;
@@ -498,6 +503,155 @@ console.log("\n── El gasto ──");
     "pero Gemini sigue: pararlo por dinero cuando es gratis dejaría la app sin asistente por un número que no aplica");
 
   ok(Object.keys(PRECIOS).every(p => PRECIOS[p].nombre), "todos los proveedores tienen nombre para la pantalla");
+}
+
+console.log("\n── Qué se le deja hacer ──");
+{
+  const escribe = { escribe: true }, lee = { escribe: false };
+
+  // El de partida es el de siempre: nadie se encuentra un asistente con permisos que
+  // no ha dado.
+  ok(CLAVES_NIVEL[0] === "consultar" && !NIVELES.consultar.escribe, "el nivel de partida no escribe");
+  ok(NIVELES.permiso.escribe && NIVELES.permiso.confirma, "\"Con permiso\" escribe pero pregunta");
+  ok(NIVELES.confianza.escribe && !NIVELES.confianza.confirma, "\"Confianza\" escribe sin preguntar");
+
+  // Consultar SIEMPRE se puede: el nivel decide qué puede CAMBIAR, no qué puede saber
+  CLAVES_NIVEL.forEach(n => ok(permite("ver_evento", n, lee).puede, `en ${n} se puede consultar`));
+  ok(!permite("crear_apunte", "consultar", escribe).puede, "en consultar no se puede escribir");
+  ok(permite("crear_apunte", "permiso", escribe).puede, "en permiso sí");
+  ok(pideConfirmacion("permiso", escribe) && !pideConfirmacion("confianza", escribe),
+    "y solo en permiso hay que aprobarlo");
+  ok(!pideConfirmacion("permiso", lee), "consultar nunca pide aprobación");
+
+  // LA LISTA QUE NO DEPENDE DEL NIVEL. La identidad de un item es categoría::etiqueta:
+  // marcarlo o renombrarlo por su cuenta destruye lo que otra persona lleva marcado en
+  // el camión, sin forma de recuperarlo. Eso no es un permiso que quepa en un desplegable.
+  NUNCA.forEach(n => {
+    CLAVES_NIVEL.forEach(nivel => {
+      ok(!permite(n, nivel, escribe).puede, `"${n}" sigue prohibida en ${nivel}`);
+    });
+  });
+  ok(permite("marcar_cargado", "confianza", escribe).motivo.includes("una persona"),
+    "y se explica por qué, no solo que no");
+
+  // Un nivel inventado cae en el más prudente, no en el más permisivo
+  ok(!permite("crear_apunte", "inventado", escribe).puede, "un nivel que no existe no abre la puerta");
+  ok(comoContarlo("consultar").includes("No puedes cambiar nada"), "al modelo se le dice lo que puede");
+  ok(comoContarlo("permiso").includes("aprueba"), "y que en permiso hay que aprobarlo");
+}
+
+console.log("\n── ¿Esto tiene sentido? ──");
+{
+  const dentroDeUnMes = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+  const tono = (r, t) => r.avisos.filter(a => a.tono === t);
+
+  // Un evento completo no debe inventarse problemas: un revisor que siempre encuentra
+  // algo es un revisor que nadie mira.
+  const bueno = revisarEvento("Boda buena", {
+    evento: "boda", pax: 100, ninos: 10, fechaEvento: dentroDeUnMes, horaInicio: "13:00",
+    ubicacion: "Finca de prueba", barraCoctel: true, horasCoctel: 1, barraCopas: true, horasCopas: 4,
+    logisticaEquipo: [{ nombre: "Alguien" }, { nombre: "Otro" }], tipoCongelador: "Mediana",
+    origenSillas: "Nuestras",
+  });
+  ok(tono(bueno, "falta").length === 0 && tono(bueno, "raro").length === 0,
+    `un evento completo no saca ni faltas ni rarezas → ${bueno.avisos.map(a => a.tono).join(", ") || "nada"}`);
+
+  // El fallo silencioso por excelencia: la barra marcada con cero horas. No da error, no
+  // se ve en pantalla, y la checklist sale sin una gota.
+  const sinHoras = revisarEvento("X", { evento: "boda", pax: 100, fechaEvento: dentroDeUnMes, horaInicio: "13:00", ubicacion: "F", barraCopas: true, horasCopas: 0, logisticaEquipo: [{ nombre: "A" }] });
+  ok(tono(sinHoras, "raro").some(a => /cero horas/.test(a.texto)), "caza la barra marcada con cero horas");
+
+  // Y el contrario: horas puestas con la barra desmarcada, que tampoco cuentan
+  const sinMarcar = revisarEvento("X", { evento: "boda", pax: 100, fechaEvento: dentroDeUnMes, horaInicio: "13:00", ubicacion: "F", horasCopas: 4, logisticaEquipo: [{ nombre: "A" }] });
+  ok(tono(sinMarcar, "raro").some(a => /desmarcada/.test(a.texto)), "y las horas puestas con la barra desmarcada");
+
+  // Lo que impide calcular sale como falta y va primero
+  const vacio = revisarEvento("Y", { evento: "boda" });
+  ok(tono(vacio, "falta").length >= 3, `un evento vacío saca varias faltas (${tono(vacio, "falta").length})`);
+  ok(vacio.avisos[0].tono === "falta", "y las faltas salen las primeras");
+  ok(vacio.avisos.every(a => a.comoSeArregla !== undefined), "cada aviso dice cómo se arregla");
+
+  // Alergias escritas que el contador no supo leer: están puestas y aun así cocina no
+  // sabe cuántos menús sacar. Es el peor caso posible y tiene que salir.
+  const raroAlergias = revisarEvento("Z", { evento: "boda", pax: 50, fechaEvento: dentroDeUnMes, horaInicio: "13:00", ubicacion: "F", logisticaEquipo: [{ nombre: "A" }], notasEvento: "ALERGIAS: uno que no puede con el sésamo" });
+  ok(tono(raroAlergias, "raro").some(a => /clasificar|no he sabido/.test(a.texto)),
+    "avisa de las alergias que no ha sabido contar");
+
+  // Los recordatorios son de cosas que hay que hacer FUERA de la app
+  const alquiler = revisarEvento("W", { evento: "boda", pax: 80, fechaEvento: dentroDeUnMes, horaInicio: "13:00", ubicacion: "F", logisticaEquipo: [{ nombre: "A" }], origenSillas: "Dealde", llevaGenerador: true });
+  ok(tono(alquiler, "acuerdate").some(a => /sillas/i.test(a.texto)), "recuerda las sillas de alquiler");
+  ok(tono(alquiler, "acuerdate").some(a => /generador/i.test(a.texto)), "y el generador con su gasolina");
+
+  // El repaso de todos solo saca los que tienen algo
+  const todos = revisarProximos({
+    "Con problema": { evento: "boda", fechaEvento: dentroDeUnMes },
+    "Vieja": { evento: "boda", fechaEvento: "2020-01-01" },
+  });
+  ok(todos.length === 1 && todos[0].evento === "Con problema", "el repaso general solo saca los que se acercan y tienen algo");
+}
+
+console.log("\n── Escribir en el calendario ──");
+{
+  const id = idDeApunte("2026-09-12", "Boda X");
+  const apuntes = [{ id, fecha: "2026-09-12", titulo: "Boda X", tipo: "boda" }];
+  let ops = [];
+  const aplicar = aplicarEnCalendario({
+    apuntes, guardar: (a) => ops.push(["guardar", a.id]), borrar: (x) => ops.push(["borrar", x]),
+  });
+
+  ops = []; const creado = aplicar({ que: "crear_apunte", datos: { titulo: "Boda Y", fecha: "2026-10-01", tipo: "boda", pax: 90 } });
+  ok(creado.creado === "Boda Y" && ops[0][1] === idDeApunte("2026-10-01", "Boda Y"),
+    "al crear, el id sale de la fecha y el título — no es aleatorio");
+
+  // Cambiar la fecha cambia la IDENTIDAD. Si no se borra el viejo quedan los dos y el
+  // calendario enseña el mismo evento dos veces.
+  ops = []; aplicar({ que: "editar_apunte", datos: { id, cambios: { fecha: "2026-09-13" } } });
+  ok(ops.some(o => o[0] === "borrar" && o[1] === id), "al cambiar la fecha se borra el id viejo");
+  ok(ops.some(o => o[0] === "guardar" && o[1] === idDeApunte("2026-09-13", "Boda X")), "y se guarda con el nuevo");
+
+  ops = []; aplicar({ que: "editar_apunte", datos: { id, cambios: { pax: 120 } } });
+  ok(!ops.some(o => o[0] === "borrar"), "pero cambiar solo el pax no borra nada: la identidad no cambia");
+
+  // Todo pasa por saneaLista, la misma puerta que lo escrito a mano
+  ok(aplicar({ que: "crear_apunte", datos: { titulo: "X", fecha: "no es fecha", tipo: "boda" } }).error,
+    "una fecha inválida no se guarda");
+  ok(aplicar({ que: "editar_apunte", datos: { id: "no-existe", cambios: { pax: 1 } } }).error,
+    "editar uno que ya no está lo dice en vez de crear otro");
+  ok(aplicar({ que: "inventado", datos: {} }).error, "una operación que no existe no revienta");
+}
+
+console.log("\n── El contexto es lo único que existe ──");
+{
+  // Lo que no se pase, el asistente no lo ve. Es la parte importante: decir el contexto
+  // app por app es decir qué puede mirar en cada sitio.
+  const ctx = contextoDelAsistente({
+    apuntes: [{ id: "a1", fecha: "2026-09-12", titulo: "X", tipo: "boda", marcaInterna: "no debe salir" }],
+  });
+  ok(!JSON.stringify(ctx.apuntes).includes("marcaInterna"), "los apuntes se recortan a lo que hace falta");
+  ok(ctx.eventosGuardados && ctx.memoria && Array.isArray(ctx.apuntes), "y lo que no se pasa queda vacío, no undefined");
+
+  // El evento abierto no lleva marcas de carga: no pintan nada en una respuesta y son
+  // justo lo que no debe ver.
+  const abierto = eventoAbierto({ evento: "boda", pax: 100, checkeados: { a: true }, vueltos: { b: "2" }, roturas: { c: "1" } });
+  ok(!JSON.stringify(abierto).includes("checkeados") && !JSON.stringify(abierto).includes("roturas"),
+    "el evento abierto no lleva las marcas de carga");
+  ok(eventoAbierto({}) === null, "y sin evento no se inventa uno");
+}
+
+console.log("\n── Tokens por pregunta ──");
+{
+  ok(costeDeUna("gemini", { entrada: 3000, salida: 400 }).gratis === true, "una de Gemini sale como gratis");
+  ok(costeDeUna("claude", { entrada: 3000, salida: 400 }).euros > 0, "y una de Claude con su coste");
+  ok(costeDeUna("gemini", { entrada: 0, salida: 0 }) === null, "una sin tokens no enseña nada");
+  ok(costeDeUna("gemini", null) === null, "y sin datos tampoco");
+
+  let g = saneaGasto(null);
+  g = apuntar("gemini", { entrada: 2000, salida: 500 }, g);
+  g = apuntar("gemini", { entrada: 4000, salida: 500 }, g);
+  const t = totales(g);
+  ok(t.media === 3500, `la media por pregunta sale bien (${t.media})`);
+  ok(t.hoyPreguntas === 2 && t.hoyTokens === 7000, "y hoy se cuenta aparte del mes");
+  ok(totales(saneaGasto(null)).media === 0, "sin preguntas la media es cero, no NaN");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

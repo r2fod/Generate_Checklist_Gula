@@ -9,6 +9,7 @@ import { catalogoParaModelo, ejecutar, llevaDatos } from "./herramientas.js";
 import { paraElContexto } from "./memoria.js";
 import { comprimir } from "./comprimir.js";
 import { candidatos, mereceOtroIntento, porQue } from "./enrutado.js";
+import { comoContarlo, NIVEL_POR_DEFECTO } from "./permisos.js";
 
 // Un tope duro de vueltas. Sin él, un modelo que se empeñe en pedir la misma
 // herramienta una y otra vez deja el navegador dando vueltas y la factura corriendo.
@@ -64,13 +65,17 @@ export async function preguntar({
 }) {
   if (!url) throw new Error("El asistente no está configurado: falta la dirección del Worker.");
   const soloSinDatos = ENTRENAN_CON_LO_QUE_LES_LLEGA.includes(proveedor);
-  const herramientas = catalogoParaModelo(soloSinDatos, contexto.conectores || {});
+  const nivel = contexto.nivel || NIVEL_POR_DEFECTO;
+  const herramientas = catalogoParaModelo(soloSinDatos, contexto.conectores || {}, nivel);
   const conversacion = [...mensajes, { rol: "usuario", contenido: texto }];
   const pasos = [];
   // Lo aprendido viaja en cada pregunta; los ids vuelven para poder reforzar lo que de
   // verdad se ha usado, que es lo que separa un recuerdo útil de uno que alguien apuntó
   // una vez y no volvió a hacer falta.
-  const { sistema, ids: recordados } = conMemoria(SISTEMA, contexto.memoria);
+  // Lo que puede y no puede hacer se le dice en el sistema. Si no lo sabe, propone
+  // cosas que no puede hacer y la conversación se va en explicar por qué no.
+  const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}`;
+  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria);
   const usoTotal = { entrada: 0, salida: 0 };
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {

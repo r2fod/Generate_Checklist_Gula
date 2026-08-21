@@ -18,6 +18,9 @@ import Calendario from "./Calendario.jsx";
 import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
 import Ratios from "./Ratios.jsx";
+import BotonAsistente from "../asistente/BotonAsistente.jsx";
+import { contextoDelAsistente } from "../asistente/contexto.js";
+import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import useCalendarioNube from "./useCalendarioNube.js";
 import Traer from "./Traer.jsx";
 import { enlaceDeLaUrl } from "./enlace.js";
@@ -57,6 +60,26 @@ function AppCalendario() {
           enlace no tiene por qué poder fabricar otros, y del de mirar no se puede
           llegar al de editar. */}
       {!ENLACE && <Compartir codigos={codigos} href={window.location.href} />}
+
+      {/* El asistente, solo con cuenta y solo si se puede escribir: desde un enlace de
+          solo lectura no tiene sentido ofrecer algo que va a negarse en cada intento.
+          Aquí SÍ se le pasa por dónde escribir —el calendario sabe guardar apuntes—, así
+          que el conector de calendario se enciende y puede crear, corregir y borrar. Lo
+          que haga depende del nivel que esté puesto en sus ajustes. */}
+      {!soloVer && !ENLACE && (
+        <div className="cal-asistente">
+          <BotonAsistente
+            className="btn btn-outline"
+            titulo="Preguntar al asistente sobre el calendario"
+            contexto={contextoDelAsistente({
+              apuntes,
+              equipo,
+              conectores: { calendario: { puedeEscribir: true } },
+              onEscribir: aplicarEnCalendario({ apuntes, guardar, borrar }),
+            })}
+          />
+        </div>
+      )}
 
       {!soloVer && <Equipo equipo={equipo} onCambiar={cambiarEquipo} />}
       {!soloVer && <Ratios ratios={ratios} onCambiar={cambiarRatios} />}

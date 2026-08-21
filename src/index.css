@@ -6505,3 +6505,130 @@ hr {
 }
 
 .asis-gasto-total strong { font-size: 1.15rem; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.asis-niveles { display: flex; flex-wrap: wrap; gap: 6px; }
+.asis-niveles .bebida-chip { flex: 1 1 auto; text-align: center; justify-content: center; }
+
+/* Lo que costó cada pregunta, pegado a su respuesta. Verlo solo en un panel aparte no
+   cambia cómo se pregunta; verlo aquí sí. */
+.asis-paso.es-coste { font-variant-numeric: tabular-nums; }
+.asis-paso.es-coste.es-gratis { border-style: dotted; }
+
+/* Hoy, el mes y la media. Tres cifras en una fila: en el móvil se aprietan pero caben,
+   y partirlas en tres filas hace que haya que hacer scroll para ver la media, que es
+   justo la que dice si algo va mal. */
+.asis-gasto-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.asis-gasto-cifras > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  min-width: 0;
+}
+
+.asis-gasto-cifras span { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.asis-gasto-cifras strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.asis-gasto-cifras em { font-style: normal; font-size: 0.68rem; color: var(--text-muted); text-align: center; overflow-wrap: anywhere; }
+
+/* ─── LOS CAMBIOS QUE ESPERAN UN SÍ ───────────────────────────────────────────
+   En "Con permiso" nada se aplica hasta que alguien lo aprueba aquí. Van encima del
+   campo de escribir porque es lo último que se mira antes de seguir preguntando: en
+   cualquier otro sitio se queda un cambio esperando sin que nadie lo vea. */
+.asis-pendientes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg);
+}
+
+.asis-pendiente { display: flex; flex-direction: column; gap: 8px; }
+
+.asis-pendiente-texto {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--aviso-texto);
+  overflow-wrap: anywhere;
+}
+
+/* Los dos botones a mitad y mitad: "Hacerlo" y "No" tienen que ser igual de fáciles de
+   pulsar. Un "No" pequeño al lado de un "Sí" grande no es una pregunta, es un empujón. */
+.asis-pendiente-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.asis-pendiente-botones .btn { min-height: 42px; justify-content: center; }
+.asis-si { background: var(--ok-texto); border-color: var(--ok-texto); color: #fff; }
+
+/* ─── LAS ANIMACIONES DEL ASISTENTE ───────────────────────────────────────────
+   Todas cortas y con un porqué. Una animación que solo adorna se convierte en espera:
+   se ve bonita la primera vez y estorba las cincuenta siguientes.
+
+   Y todas se apagan con prefers-reduced-motion al final del bloque: hay gente a la que
+   el movimiento le sienta mal de verdad, y esto se abre veinte veces al día. */
+
+/* El panel entra desde abajo en el móvil (de donde viene el pulgar) y desde la derecha
+   en pantalla grande (de donde viene el ratón). */
+.asis-fondo { animation: asis-fondo-entra 0.18s ease-out; }
+.asis-panel { animation: asis-panel-abajo 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+
+@keyframes asis-fondo-entra { from { opacity: 0; } to { opacity: 1; } }
+@keyframes asis-panel-abajo { from { transform: translateY(18px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (min-width: 768px) {
+  .asis-panel { animation-name: asis-panel-lado; }
+  @keyframes asis-panel-lado { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+}
+
+/* Cada mensaje aparece en su sitio. Sin esto la respuesta salta de golpe y cuesta ver
+   dónde empieza lo nuevo cuando el hilo ya es largo. */
+.asis-msg { animation: asis-msg-entra 0.2s ease-out; }
+@keyframes asis-msg-entra { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Un cambio esperando aprobación SÍ tiene que llamar la atención: es lo único de todo
+   el panel que hace algo si le dices que sí. Un latido y se queda quieto. */
+.asis-pendiente { animation: asis-pendiente-entra 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes asis-pendiente-entra {
+  0%   { transform: translateY(10px) scale(0.98); opacity: 0; }
+  70%  { transform: translateY(0) scale(1.01); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
+.asis-pendientes { animation: asis-aviso-late 1.4s ease-in-out 0.3s 2; }
+@keyframes asis-aviso-late {
+  0%, 100% { background: var(--aviso-bg); }
+  50%      { background: var(--aviso-bg-fuerte); }
+}
+
+/* Las etiquetas de debajo (herramientas, quién contestó, tokens) entran escalonadas:
+   así se lee "ha mirado esto, ha costado esto" en vez de aparecer todo de golpe. */
+.asis-pasos .asis-paso { animation: asis-paso-entra 0.22s ease-out backwards; }
+.asis-pasos .asis-paso:nth-child(2) { animation-delay: 0.04s; }
+.asis-pasos .asis-paso:nth-child(3) { animation-delay: 0.08s; }
+.asis-pasos .asis-paso:nth-child(4) { animation-delay: 0.12s; }
+@keyframes asis-paso-entra { from { transform: scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* El cuerpo de la pestaña, al cambiar de una a otra */
+.asis-hilo { animation: asis-msg-entra 0.18s ease-out; }
+
+/* Los ajustes se despliegan, no aparecen: así se ve que salen de la rueda dentada. */
+.asis-ajustes { animation: asis-despliega 0.22s ease-out; overflow: hidden; }
+@keyframes asis-despliega {
+  from { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
+  to   { max-height: 620px; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asis-fondo, .asis-panel, .asis-msg, .asis-pendiente, .asis-pendientes,
+  .asis-pasos .asis-paso, .asis-hilo, .asis-ajustes, .companero, .companero.es-pensando {
+    animation: none;
+    transition: none;
+  }
+}

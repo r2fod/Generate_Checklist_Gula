@@ -27,11 +27,14 @@ import { personalNecesario } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
 import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
 import { conHerramientasDeConectores } from "./conectores.js";
+import { puede as permiteNivel, NIVEL_POR_DEFECTO } from "./permisos.js";
 import { esTipoEvento } from "../calendario/apuntes.js";
+import { revisarEvento, revisarProximos } from "./revision.js";
 // Los conectores se registran al importarse. Van aquí y no en cada sitio que los use:
 // así basta con añadir una línea para que una integración nueva exista en toda la app.
 import "./conectores/whatsapp.js";
 import "./conectores/correo.js";
+import "./conectores/calendario.js";
 
 // Los nombres se comparan sin tildes, sin mayúsculas y sin sobrar espacios: quien
 // pregunta escribe "la boda de fulanita", no "Boda Fulanita y Mengano".
@@ -399,6 +402,48 @@ export const HERRAMIENTAS = {
     },
   },
 
+  // ─── ¿ESTO TIENE SENTIDO? ───────────────────────────────────────────────────
+  // El fallo caro de este oficio no es calcular mal: es que alguien deje un campo sin
+  // poner y nadie lo mire hasta que el camión está cargado. Las reglas viven en
+  // revision.js y son concretas y probadas — el asistente las cuenta, no las inventa.
+  revisar_evento: {
+    datos: true,
+    esquema: {
+      description: "Repasa la configuración de un evento y dice qué falta, qué no cuadra y de qué hay que acordarse. Úsalo cuando pregunten si un evento está listo, si algo falla o antes de dar por cerrado un evento.",
+      parameters: { type: "object", properties: { nombre: { type: "string", description: "Nombre del evento. Vacío para el que está abierto." } } },
+    },
+    corre: (ctx, { nombre = "" } = {}) => {
+      const ev = buscaEvento(ctx, nombre);
+      if (!ev) return noEncontrado(nombre);
+      const r = revisarEvento(ev.nombre, ev.datos);
+      return r.todoEnOrden
+        ? { evento: ev.nombre, todoEnOrden: true, mensaje: "No he encontrado nada raro: los datos están completos y cuadran." }
+        : r;
+    },
+  },
+
+  revisar_todo: {
+    datos: true,
+    esquema: {
+      description: "Repasa TODOS los eventos que se acercan y dice cuáles tienen algo mal o a medias. Úsalo para '¿está todo listo?' o '¿cómo va el mes?'.",
+      parameters: { type: "object", properties: { dias: { type: "number", description: "Cuántos días mirar. Por defecto 30." } } },
+    },
+    corre: (ctx, { dias = 30 } = {}) => {
+      const lista = revisarProximos(ctx.eventosGuardados || {}, Math.max(1, Math.round(dias) || 30));
+      if (!lista.length) return { todoEnOrden: true, mensaje: "Todos los eventos que se acercan están completos y sin nada raro." };
+      return {
+        conAlgo: lista.length,
+        // Lo que FALTA primero y por evento: es lo que decide qué hacer esta tarde.
+        eventos: lista.map(r => ({
+          evento: r.evento, fecha: r.fecha,
+          falta: r.avisos.filter(a => a.tono === "falta").map(a => a.texto),
+          raro: r.avisos.filter(a => a.tono === "raro").map(a => a.texto),
+          acuerdate: r.avisos.filter(a => a.tono === "acuerdate").map(a => a.texto),
+        })),
+      };
+    },
+  },
+
   simular_checklist: {
     datos: false,
     esquema: {
@@ -451,6 +496,12 @@ export function ejecutar(nombre, argumentos, contexto = {}) {
   const catalogo = todas(contexto.conectores || {});
   const h = catalogo[nombre];
   if (!h) return { error: `No existe ninguna herramienta que se llame "${nombre}".` };
+  // El permiso se comprueba AQUÍ y no solo al armar el catálogo. Son dos cerrojos a
+  // propósito: el catálogo evita que el modelo pida lo que no puede, y esto evita que
+  // se ejecute si lo pide igual —por una conversación vieja, o por un catálogo que se
+  // armó con otro nivel.
+  const permiso = permiteNivel(nombre, contexto.nivel || NIVEL_POR_DEFECTO, h);
+  if (!permiso.puede) return { error: permiso.motivo };
   try {
     return h.corre(contexto, argumentos || {});
   } catch (e) {
@@ -468,9 +519,12 @@ export function llevaDatos(nombre, conectoresConfig = {}) {
 }
 
 // El catálogo en el formato que esperan los proveedores. Se manda en cada petición.
-export function catalogoParaModelo(soloSinDatos = false, conectoresConfig = {}) {
+export function catalogoParaModelo(soloSinDatos = false, conectoresConfig = {}, nivel = NIVEL_POR_DEFECTO) {
   const catalogo = todas(conectoresConfig);
   return Object.keys(catalogo)
     .filter(n => !soloSinDatos || !catalogo[n].datos)
+    // Lo que el nivel no permite ni se ofrece. Enseñárselo y luego negárselo hace que la
+    // conversación se vaya en explicar por qué no puede hacer lo que acaba de proponer.
+    .filter(n => permiteNivel(n, nivel, catalogo[n]).puede)
     .map(n => ({ name: n, ...catalogo[n].esquema }));
 }

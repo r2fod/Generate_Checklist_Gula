@@ -8,16 +8,18 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { porTemas, TEMAS } from "./memoria.js";
 import Companero, { COMPANEROS, CLAVES_COMPANERO } from "./Companero.jsx";
-import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis } from "./gasto.js";
+import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
+import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permisos.js";
 
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
+const CLAVE_NIVEL = "gula_asistente_nivel";
 
 const leer = (k, x = "") => { try { return localStorage.getItem(k) || x; } catch (e) { return x; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* modo privado */ } };
@@ -44,6 +46,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [gasto, setGasto] = useState(() => leerGasto());
   const [tope, setTope] = useState(() => leerTope());
   const [huboError, setHuboError] = useState(false);
+  const [nivel, setNivel] = useState(() => nivelValido(leer(CLAVE_NIVEL, NIVEL_POR_DEFECTO)));
+  // Los cambios que el asistente ha propuesto y esperan un sí. En "Con permiso" nada se
+  // aplica hasta que alguien lo aprueba aquí — si se aplicara y luego se enseñara, el
+  // permiso sería un cartel, no un permiso.
+  const [pendientes, setPendientes] = useState([]);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -53,6 +60,46 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const finRef = useRef(null);
 
   useEffect(() => { if (finRef.current) finRef.current.scrollIntoView({ block: "end" }); }, [hilo, pensando]);
+
+  // Por dónde escribe el asistente. En "Confianza" se aplica y se cuenta; en "Con
+  // permiso" se guarda para que lo apruebe una persona. La herramienta no sabe en cuál
+  // de los dos está: le contesta lo que ha pasado y ya.
+  const escribir = (propuesta) => {
+    if (!contexto.onEscribir) {
+      return { error: "Esta pantalla no deja cambiar nada. Explica dónde se hace a mano." };
+    }
+    if (NIVELES[nivel].confirma) {
+      const id = `p${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+      setPendientes(p => [...p, { ...propuesta, id }]);
+      return {
+        pendiente: true,
+        resumen: propuesta.resumen,
+        mensaje: "Propuesto, pero NO aplicado: le sale a la persona en pantalla para que lo apruebe. Díselo y no des el cambio por hecho.",
+      };
+    }
+    try {
+      const r = contexto.onEscribir(propuesta);
+      return { hecho: true, resumen: propuesta.resumen, ...(r || {}) };
+    } catch (err) {
+      return { error: `No se ha podido aplicar: ${err && err.message ? err.message : err}` };
+    }
+  };
+
+  const resolver = (id, aplicar) => {
+    const p = pendientes.find(x => x.id === id);
+    setPendientes(xs => xs.filter(x => x.id !== id));
+    if (!p) return;
+    if (!aplicar) {
+      setHilo(h => [...h, { de: "el", texto: `Descartado: ${p.resumen}` }]);
+      return;
+    }
+    try {
+      contexto.onEscribir(p);
+      setHilo(h => [...h, { de: "el", texto: `Hecho: ${p.resumen}` }]);
+    } catch (err) {
+      setHilo(h => [...h, { de: "error", texto: `No se ha podido aplicar: ${err && err.message ? err.message : err}` }]);
+    }
+  };
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -76,7 +123,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     try {
       const token = await tokenDeSesion().catch(() => "");
       const comun = {
-        mensajes, contexto, url, token,
+        mensajes, contexto: { ...contexto, nivel, onEscribir: escribir }, url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
       };
@@ -92,7 +139,12 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       // La lista de configurados llega con cada respuesta: así el enrutado de la
       // siguiente pregunta ya sabe con qué cuenta, sin una petición aparte.
       if (r.disponibles) setDisponibles(r.disponibles);
-      setHilo(h => [...h, { de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo }]);
+      setHilo(h => [...h, {
+        de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo,
+        // Lo que costó ESTA pregunta. Verlo en un panel aparte no cambia cómo se
+        // pregunta; verlo pegado a la respuesta sí.
+        coste: costeDeUna(r.proveedor, r.uso),
+      }]);
     } catch (err) {
       setHuboError(true);
       setHilo(h => [...h, { de: "error", texto: String(err && err.message ? err.message : err) }]);
@@ -157,6 +209,23 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               ))}
             </div>
             <label className="asis-campo">
+              <span>Qué se le deja hacer</span>
+              <div className="asis-niveles">
+                {CLAVES_NIVEL.map(k => (
+                  <button
+                    key={k} type="button"
+                    className={`bebida-chip${nivel === k ? " es-activa" : ""}`}
+                    onClick={() => { setNivel(k); guardar(CLAVE_NIVEL, k); }}
+                    aria-pressed={nivel === k}
+                  >
+                    {NIVELES[k].nombre}
+                  </button>
+                ))}
+              </div>
+              <span className="asis-nota">{NIVELES[nivel].resumen}</span>
+            </label>
+
+            <label className="asis-campo">
               <span>Compañero</span>
               <div className="asis-munecos">
                 {CLAVES_COMPANERO.map(k => (
@@ -218,10 +287,32 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             ))}
 
             {resumen(gasto).length > 0 && (
-              <div className="asis-gasto-total">
-                <span>Total del mes</span>
-                <strong>{eurosTotales(gasto).toFixed(2)}€</strong>
-              </div>
+              <>
+                <div className="asis-gasto-total">
+                  <span>Total del mes</span>
+                  <strong>{eurosTotales(gasto).toFixed(2)}€</strong>
+                </div>
+                {/* Hoy va aparte del mes porque las capas gratuitas limitan POR DÍA: el
+                    número mensual no avisa de que vas a tocar techo esta tarde. Y la
+                    media es lo que dice si se está mandando de más. */}
+                <div className="asis-gasto-cifras">
+                  <div>
+                    <span>Hoy</span>
+                    <strong>{totales(gasto).hoyPreguntas}</strong>
+                    <em>{totales(gasto).hoyTokens.toLocaleString("es-ES")} tk</em>
+                  </div>
+                  <div>
+                    <span>Este mes</span>
+                    <strong>{totales(gasto).preguntas}</strong>
+                    <em>{totales(gasto).tokens.toLocaleString("es-ES")} tk</em>
+                  </div>
+                  <div>
+                    <span>Media</span>
+                    <strong>{totales(gasto).media.toLocaleString("es-ES")}</strong>
+                    <em>tk por pregunta</em>
+                  </div>
+                </div>
+              </>
             )}
 
             <label className="asis-campo">
@@ -296,7 +387,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             <div className={`asis-msg es-${m.de}`} key={i}>
               <div className="asis-burbuja">{m.texto}</div>
               {/* De dónde sale lo que acaba de decir */}
-              {(m.pasos && m.pasos.length > 0) || (m.quien && disponibles.length > 1) ? (
+              {(m.pasos && m.pasos.length > 0) || m.coste || (m.quien && disponibles.length > 1) ? (
                 <div className="asis-pasos">
                   {m.pasos && m.pasos.length > 0 && <Wrench size={11} aria-hidden="true" />}
                   {(m.pasos || []).map((p, j) => <span className="asis-paso" key={j}>{p.nombre}</span>)}
@@ -306,6 +397,12 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                   {m.quien && disponibles.length > 1 && (
                     <span className="asis-paso es-quien">
                       {m.quien}{m.motivo ? ` · ${m.motivo}` : ""}
+                    </span>
+                  )}
+                  {m.coste && (
+                    <span className={`asis-paso es-coste${m.coste.gratis ? " es-gratis" : ""}`}>
+                      {m.coste.tokens.toLocaleString("es-ES")} tk
+                      {!m.coste.gratis && ` · ${m.coste.euros.toFixed(3)}€`}
                     </span>
                   )}
                 </div>
@@ -322,6 +419,28 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           )}
           <div ref={finRef} />
         </div>
+        )}
+
+        {/* Encima del campo de escribir a propósito: es lo último que se mira antes de
+            seguir preguntando, y así no se queda un cambio esperando sin que nadie lo vea. */}
+        {pestana === "charla" && pendientes.length > 0 && (
+          <div className="asis-pendientes">
+            {pendientes.map(p => (
+              <div className="asis-pendiente" key={p.id}>
+                <span className="asis-pendiente-texto">
+                  {p.ojo && <strong>⚠️ </strong>}{p.resumen}
+                </span>
+                <div className="asis-pendiente-botones">
+                  <button type="button" className="btn asis-si" onClick={() => resolver(p.id, true)}>
+                    <Check size={14} aria-hidden="true" /> Hacerlo
+                  </button>
+                  <button type="button" className="btn btn-outline asis-no" onClick={() => resolver(p.id, false)}>
+                    <Ban size={14} aria-hidden="true" /> No
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {pestana === "charla" && (
