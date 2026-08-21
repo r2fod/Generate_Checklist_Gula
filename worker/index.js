@@ -266,16 +266,22 @@ async function estado(env) {
   const puestas = {};
   claves.forEach(k => {
     const v = String(env[k] || "");
-    // De los secretos de verdad, ni un trozo: solo si están y cuánto miden.
-    //
-    // La de Firebase es la excepción y se enseña a medias A PROPÓSITO: esa clave ya es
-    // pública —va dentro del bundle de la app, en un repositorio abierto— así que no hay
-    // nada que descubrir. Y hacía falta: la de Gemini mide exactamente lo mismo, 39
-    // caracteres, así que con el largo no había forma de ver si estaban cambiadas de
-    // sitio, que es el error más fácil de cometer aquí.
-    const trozo = k === "FIREBASE_API_KEY" && v.length > 15 ? ` → ${v.slice(0, 10)}…${v.slice(-5)}` : "";
-    puestas[k] = v ? `puesta, ${v.length} caracteres${v !== v.trim() ? " ⚠️ CON ESPACIOS O SALTOS DE LÍNEA" : ""}${trozo}` : "NO puesta";
+    // Solo si está y cuánto mide. Ni un carácter de ninguna, y no por prudencia
+    // exagerada: enseñar un trozo NO FUNCIONÓ. Salía enmascarado con puntos —una
+    // extensión del navegador, o el propio Cloudflare— y no había forma de compararlo.
+    // La huella de abajo hace ese trabajo sin nada que enmascarar.
+    puestas[k] = v ? `puesta, ${v.length} caracteres${v !== v.trim() ? " ⚠️ CON ESPACIOS O SALTOS DE LÍNEA" : ""}` : "NO puesta";
   });
+
+  // La huella: los doce primeros caracteres del SHA-256. Dos claves distintas dan
+  // huellas distintas y de la huella no se puede volver a la clave, así que se puede
+  // pegar en cualquier sitio. Es lo único que sobrevive a que algo enmascare el texto.
+  let huella = "sin clave";
+  const bruta = String(env.FIREBASE_API_KEY || "");
+  if (bruta) {
+    const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bruta.trim()));
+    huella = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
+  }
 
   let firebase = "no se ha podido comprobar";
   const fk = String(env.FIREBASE_API_KEY || "").trim();
@@ -300,8 +306,10 @@ async function estado(env) {
     proveedorPorDefecto: env.PROVEEDOR_POR_DEFECTO || "gemini",
     claves: puestas,
     firebase,
-    // Para comparar de un vistazo con lo de arriba, sin tener que buscarlo en el repo.
-    laQueDeberiaSer: "AIzaSyB12R…MrXpQ",
+    huellaDeLaClaveDeFirebase: huella,
+    huellaQueDeberiaSalir: "353f1b0dd087",
+    // El veredicto ya masticado: si no coinciden, la guardada no es la que toca.
+    coincide: huella === "353f1b0dd087" ? "✅ SÍ, es la clave correcta" : "❌ NO, la guardada es OTRA clave (¿la de Gemini?)",
   };
 }
 
