@@ -154,7 +154,13 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // 0,8 BOTELLAS por pax (~1,2 L/pax, en el rango alto del sector: 0,5-1 L/pax);
   // se sirve en packs de 6. Antes la cifra de botellas se etiquetaba como "packs"
   // (64 packs = 384 botellas para 80 pax, 7 L/pax — un disparate multiplicado ×6).
-  const agua15 = Math.round(pax * 0.8);
+  // Un niño bebe agua, pero no la de un adulto: cuenta como 0,6. Contarlo entero
+  // hinchaba el agua de una comunión sin motivo. Las de 33cl NO llevan esta corrección
+  // —van tal cual— porque donde más se usan es en producción, y allí no suele haber
+  // niños (de hecho el generador de rodaje fuerza ninos = 0).
+  const FACTOR_AGUA_NINO = 0.6;
+  const paxAgua = alcoholPax + Math.max(0, pax - alcoholPax) * FACTOR_AGUA_NINO;
+  const agua15 = Math.round(paxAgua * 0.8);
   const agua15Packs = Math.max(2, Math.ceil(agua15 / 6));
   // El Red Bull sí es cosa de la barra: sin barra no va ninguno. Por eso mira las horas
   // DE VERDAD (h), no el suelo — si mirara el suelo, saldría en eventos sin barra.

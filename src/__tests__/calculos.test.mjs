@@ -1042,6 +1042,14 @@ console.log("\n══ Los niños beben agua y refresco, no vino ══");
 
   ok(con.agua15 > sin.agua15 && con.cocaNormal > sin.cocaNormal,
     `el agua y el refresco cuentan a los niños (${sin.agua15}→${con.agua15} agua · ${sin.cocaNormal}→${con.cocaNormal} coca)`);
+  // Pero un niño no bebe el agua de un adulto: cuenta como 0,6. Contarlo entero
+  // hinchaba el agua de una comunión sin motivo.
+  ok(con.agua15 === 60,
+    `25 niños suman como 15 adultos en el agua, no como 25 (${sin.agua15}→${con.agua15}, entero serían 68)`);
+  // Las de 33cl NO llevan la corrección: donde más se usan es en producción, y allí no
+  // suele haber niños.
+  ok(con.aguasPequenasUds === Math.round(85 * 3),
+    `las de 33cl van sobre todos, sin corregir (${con.aguasPequenasUds} uds)`);
   ok(con.vinoBlanco + con.vinoTinto === sin.vinoBlanco + sin.vinoTinto,
     "pero el vino no: se calcula solo sobre los adultos");
   ok(con.cerveza === sin.cerveza && con.cava === sin.cava && con.tonica === sin.tonica,
