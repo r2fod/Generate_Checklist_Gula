@@ -75,8 +75,12 @@ async function quienEs(idToken, env) {
     // piden cosas opuestas, y sin verlo se prueban las dos a ciegas.
     const detalle = await r.text().catch(() => "");
     const motivo = (detalle.match(/"message"\s*:\s*"([^"]+)"/) || [])[1] || `HTTP ${r.status}`;
-    if (/API_KEY|KEY_INVALID/i.test(motivo)) {
-      return { fallo: `Firebase rechaza la clave del Worker (${motivo}). Revisa FIREBASE_API_KEY en Settings → Variables, sin espacios ni saltos de línea.` };
+    // Google escribe lo mismo de varias formas según el caso: "API_KEY_INVALID" en unos
+    // sitios y "API key not valid" en otros. Buscando solo la primera, el aviso de clave
+    // mala salía por la rama de "cierra sesión y vuelve a entrar", que manda a arreglar
+    // justo lo que no estaba roto.
+    if (/api[ _-]?key|referer|referrer|permission/i.test(motivo)) {
+      return { fallo: `Firebase rechaza la clave del Worker (${motivo}). Revisa FIREBASE_API_KEY en Settings → Variables: tiene que ser la apiKey de Firebase, no la de Gemini — las dos empiezan por AIza y se confunden con una facilidad pasmosa.` };
     }
     return { fallo: `Firebase no acepta la sesión (${motivo}). Suele arreglarse cerrando sesión en la app y volviendo a entrar.` };
   }
