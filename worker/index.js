@@ -1,0 +1,219 @@
+// ─── EL PROXY DEL ASISTENTE ───────────────────────────────────────────────────
+// Un Cloudflare Worker de una sola pieza. Existe por una razón concreta: la app es un
+// sitio estático en GitHub Pages y el repositorio es público, así que una clave de API
+// metida en el bundle la lee cualquiera y la gasta cualquiera. Aquí las claves viven
+// como secretos del Worker y nunca salen.
+//
+// Lo que hace, en orden:
+//   1. Comprueba que quien pregunta tiene sesión del equipo (el mismo Firebase Auth de
+//      la app). Sin esto, quien descubra la URL del Worker se come la cuota.
+//   2. Traduce la conversación al formato del proveedor elegido y se la manda.
+//   3. Devuelve SIEMPRE la misma forma: { texto, llamadas }. La app no sabe con quién
+//      está hablando, y por eso se puede cambiar de proveedor sin tocar la app.
+//
+// Las herramientas NO se ejecutan aquí. El Worker devuelve "quiero llamar a esto con
+// estos argumentos" y es la app la que lo ejecuta con sus datos, en el navegador. El
+// modelo no ve Firestore ni tiene por dónde entrar.
+//
+// Va sin dependencias y en un fichero a propósito: así se pega tal cual en el panel de
+// Cloudflare sin instalar nada. Ver worker/README.md.
+
+const CORS = (origen) => ({
+  "Access-Control-Allow-Origin": origen,
+  "Access-Control-Allow-Headers": "content-type, authorization",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+});
+
+const json = (datos, estado, origen) =>
+  new Response(JSON.stringify(datos), {
+    status: estado,
+    headers: { "content-type": "application/json", ...CORS(origen) },
+  });
+
+// Solo los sitios de la app. Un Worker que contesta a cualquier origen es un Worker que
+// acaba en la extensión de otro.
+function origenPermitido(req, env) {
+  const permitidos = (env.ORIGENES || "").split(",").map(s => s.trim()).filter(Boolean);
+  const origen = req.headers.get("Origin") || "";
+  if (!permitidos.length) return origen || "*";      // sin configurar: no se bloquea, pero conviene ponerlo
+  return permitidos.includes(origen) ? origen : "";
+}
+
+// ─── QUIÉN PREGUNTA ───────────────────────────────────────────────────────────
+// Se verifica el token de Firebase contra el propio Firebase en vez de comprobar la
+// firma a mano: es una petición y no hay que meter criptografía ni claves públicas en
+// el Worker. La FIREBASE_API_KEY es la del cliente web, que ya es pública (va en el
+// bundle de la app): aquí no se está guardando ningún secreto nuevo.
+async function quienEs(idToken, env) {
+  if (!idToken) return null;
+  const r = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idToken }) },
+  );
+  if (!r.ok) return null;
+  const d = await r.json().catch(() => null);
+  const u = d && d.users && d.users[0];
+  return u ? { uid: u.localId, email: u.email || "" } : null;
+}
+
+// ─── LOS TRES PROVEEDORES ─────────────────────────────────────────────────────
+// Cada uno pide la conversación y las herramientas en su propio formato y contesta en
+// el suyo. Aquí se traduce a la ida y a la vuelta, y la app ve siempre lo mismo.
+
+// Gemini. Es el que va por defecto: tiene capa gratuita de verdad.
+async function gemini(cuerpo, env) {
+  const modelo = env.GEMINI_MODEL || "gemini-2.5-flash";
+  const contenidos = cuerpo.mensajes.map(m => {
+    if (m.rol === "herramienta") {
+      return { role: "user", parts: [{ functionResponse: { name: m.nombre, response: { resultado: m.contenido } } }] };
+    }
+    if (m.rol === "asistente" && m.llamadas && m.llamadas.length) {
+      return { role: "model", parts: m.llamadas.map(l => ({ functionCall: { name: l.nombre, args: l.argumentos } })) };
+    }
+    return { role: m.rol === "asistente" ? "model" : "user", parts: [{ text: String(m.contenido || "") }] };
+  });
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: contenidos,
+        systemInstruction: { parts: [{ text: cuerpo.sistema }] },
+        tools: [{ functionDeclarations: cuerpo.herramientas }],
+      }),
+    },
+  );
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  const d = await r.json();
+  const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+  return {
+    texto: partes.filter(p => p.text).map(p => p.text).join("").trim(),
+    llamadas: partes.filter(p => p.functionCall).map((p, i) => ({
+      id: `g${i}`, nombre: p.functionCall.name, argumentos: p.functionCall.args || {},
+    })),
+  };
+}
+
+// Claude. El de más calidad, y el que se paga por token.
+async function claude(cuerpo, env) {
+  const mensajes = [];
+  cuerpo.mensajes.forEach(m => {
+    if (m.rol === "herramienta") {
+      mensajes.push({ role: "user", content: [{ type: "tool_result", tool_use_id: m.id, content: JSON.stringify(m.contenido) }] });
+    } else if (m.rol === "asistente" && m.llamadas && m.llamadas.length) {
+      mensajes.push({ role: "assistant", content: [
+        ...(m.contenido ? [{ type: "text", text: m.contenido }] : []),
+        ...m.llamadas.map(l => ({ type: "tool_use", id: l.id, name: l.nombre, input: l.argumentos })),
+      ] });
+    } else {
+      mensajes.push({ role: m.rol === "asistente" ? "assistant" : "user", content: String(m.contenido || "") });
+    }
+  });
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: env.ANTHROPIC_MODEL || "claude-opus-5",
+      max_tokens: 2048,
+      system: cuerpo.sistema,
+      messages: mensajes,
+      tools: cuerpo.herramientas.map(h => ({
+        name: h.name, description: h.description, input_schema: h.parameters || { type: "object", properties: {} },
+      })),
+    }),
+  });
+  if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  const d = await r.json();
+  const bloques = d.content || [];
+  return {
+    texto: bloques.filter(b => b.type === "text").map(b => b.text).join("").trim(),
+    llamadas: bloques.filter(b => b.type === "tool_use").map(b => ({ id: b.id, nombre: b.name, argumentos: b.input || {} })),
+  };
+}
+
+// OpenAI. Va el último y con una condición: solo se le mandan herramientas que NO
+// llevan datos de clientes (la app se encarga de filtrarlas antes de preguntar). Sus
+// tokens gratuitos se pagan compartiendo lo que le llega para entrenar, y por ahí no
+// pueden pasar nombres ni fechas de nadie.
+async function openai(cuerpo, env) {
+  const mensajes = [{ role: "system", content: cuerpo.sistema }];
+  cuerpo.mensajes.forEach(m => {
+    if (m.rol === "herramienta") {
+      mensajes.push({ role: "tool", tool_call_id: m.id, content: JSON.stringify(m.contenido) });
+    } else if (m.rol === "asistente" && m.llamadas && m.llamadas.length) {
+      mensajes.push({
+        role: "assistant", content: m.contenido || null,
+        tool_calls: m.llamadas.map(l => ({ id: l.id, type: "function", function: { name: l.nombre, arguments: JSON.stringify(l.argumentos) } })),
+      });
+    } else {
+      mensajes.push({ role: m.rol === "asistente" ? "assistant" : "user", content: String(m.contenido || "") });
+    }
+  });
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: env.OPENAI_MODEL || "gpt-4o-mini",
+      messages: mensajes,
+      tools: cuerpo.herramientas.map(h => ({ type: "function", function: { name: h.name, description: h.description, parameters: h.parameters || { type: "object", properties: {} } } })),
+    }),
+  });
+  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  const d = await r.json();
+  const m = ((d.choices || [])[0] || {}).message || {};
+  return {
+    texto: (m.content || "").trim(),
+    llamadas: (m.tool_calls || []).map(t => ({
+      id: t.id, nombre: t.function.name,
+      argumentos: (() => { try { return JSON.parse(t.function.arguments || "{}"); } catch (e) { return {}; } })(),
+    })),
+  };
+}
+
+const PROVEEDORES = { gemini, claude, openai };
+
+export default {
+  async fetch(req, env) {
+    const origen = origenPermitido(req, env);
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origen || "null") });
+    if (!origen) return new Response("Origen no permitido", { status: 403 });
+    if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+
+    // Un cuerpo enorme es un error o un abuso; en los dos casos no se atiende.
+    const crudo = await req.text();
+    if (crudo.length > 200000) return json({ error: "La conversación es demasiado larga." }, 413, origen);
+
+    let cuerpo;
+    try { cuerpo = JSON.parse(crudo); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+
+    const usuario = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+    if (!usuario) return json({ error: "Hace falta tener sesión del equipo." }, 401, origen);
+
+    const nombre = PROVEEDORES[cuerpo.proveedor] ? cuerpo.proveedor : (env.PROVEEDOR_POR_DEFECTO || "gemini");
+    const clave = { gemini: "GEMINI_API_KEY", claude: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY" }[nombre];
+    if (!env[clave]) return json({ error: `Este Worker no tiene configurado ${nombre}.` }, 501, origen);
+
+    if (!Array.isArray(cuerpo.mensajes) || !cuerpo.mensajes.length) {
+      return json({ error: "No hay conversación que mandar." }, 400, origen);
+    }
+
+    try {
+      const salida = await PROVEEDORES[nombre]({
+        sistema: String(cuerpo.sistema || ""),
+        mensajes: cuerpo.mensajes,
+        herramientas: Array.isArray(cuerpo.herramientas) ? cuerpo.herramientas : [],
+      }, env);
+      return json({ ...salida, proveedor: nombre }, 200, origen);
+    } catch (e) {
+      // El mensaje del proveedor se devuelve tal cual: sin él, "algo ha fallado" obliga
+      // a mirar los logs de Cloudflare para saber que era una clave caducada.
+      return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
+    }
+  },
+};
