@@ -252,8 +252,60 @@ const PROVEEDORES = {
 };
 
 
+// ─── DIAGNÓSTICO ──────────────────────────────────────────────────────────────
+// "API key not valid" con una clave que SÍ funciona probada a mano solo puede querer
+// decir una cosa: que el Worker está usando otro valor. Y como los secretos no se pueden
+// volver a leer desde el panel, no había forma de comprobarlo — solo borrar y repegar a
+// ciegas, que es justo lo que ya no había funcionado.
+//
+// Esto lo comprueba desde dentro: prueba la clave de Firebase contra Google y cuenta qué
+// contesta. No enseña ninguna clave —solo cuántos caracteres tiene y qué dice Google—,
+// así que se puede abrir desde el navegador sin miedo.
+async function estado(env) {
+  const claves = ["GEMINI_API_KEY", "FIREBASE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY"];
+  const puestas = {};
+  claves.forEach(k => {
+    const v = String(env[k] || "");
+    // Ni la clave ni un trozo: solo si está y cuánto mide. Con el largo ya se ve si se
+    // ha pegado la que no era o si se ha quedado a medias.
+    puestas[k] = v ? `puesta, ${v.length} caracteres${v !== v.trim() ? " ⚠️ CON ESPACIOS O SALTOS DE LÍNEA" : ""}` : "NO puesta";
+  });
+
+  let firebase = "no se ha podido comprobar";
+  const fk = String(env.FIREBASE_API_KEY || "").trim();
+  if (fk) {
+    try {
+      // Un token de mentira a propósito: si la clave vale, Google se queja del TOKEN
+      // (INVALID_ID_TOKEN). Si se queja de la CLAVE, la clave es la que está mal.
+      const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(fk)}`,
+        { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idToken: "prueba" }) });
+      const t = await r.text();
+      const motivo = (t.match(/"message"\s*:\s*"([^"]+)"/) || [])[1] || `HTTP ${r.status}`;
+      firebase = /INVALID_ID_TOKEN/i.test(motivo)
+        ? "✅ LA CLAVE DE FIREBASE ES CORRECTA (Google solo rechaza el token de prueba, que es lo esperado)"
+        : `❌ LA CLAVE DE FIREBASE NO VALE → Google dice: ${motivo}`;
+    } catch (e) {
+      firebase = `no se ha podido preguntar a Google: ${e && e.message ? e.message : e}`;
+    }
+  }
+
+  return {
+    origenes: env.ORIGENES ? env.ORIGENES.split(",").map(x => x.trim()) : "NO puesto (se aceptará cualquier origen)",
+    proveedorPorDefecto: env.PROVEEDOR_POR_DEFECTO || "gemini",
+    claves: puestas,
+    firebase,
+  };
+}
+
 export default {
   async fetch(req, env) {
+    // Antes que nada y sin comprobar origen: es una página de diagnóstico que no enseña
+    // ninguna clave, y tiene que poder abrirse desde el navegador para servir de algo.
+    if (new URL(req.url).pathname === "/__estado") {
+      return new Response(JSON.stringify(await estado(env), null, 2),
+        { headers: { "content-type": "application/json; charset=utf-8" } });
+    }
+
     const origen = origenPermitido(req, env);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origen || "null") });
     if (!origen) return new Response("Origen no permitido", { status: 403 });
