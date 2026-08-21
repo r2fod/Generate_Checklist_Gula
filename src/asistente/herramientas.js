@@ -25,6 +25,12 @@ import { escaletaDelEvento, resumenEscaleta } from "../escaleta.js";
 import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
 import { personalNecesario } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
+import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
+import { conHerramientasDeConectores } from "./conectores.js";
+// Los conectores se registran al importarse. Van aquí y no en cada sitio que los use:
+// así basta con añadir una línea para que una integración nueva exista en toda la app.
+import "./conectores/whatsapp.js";
+import "./conectores/correo.js";
 
 // Los nombres se comparan sin tildes, sin mayúsculas y sin sobrar espacios: quien
 // pregunta escribe "la boda de fulanita", no "Boda Fulanita y Mengano".
@@ -284,6 +290,108 @@ export const HERRAMIENTAS = {
     },
   },
 
+
+  // ─── EL CEREBRO ─────────────────────────────────────────────────────────────
+  // Las dos únicas herramientas que ESCRIBEN, y escriben en un sitio que no le hace
+  // daño a nadie: su propia memoria. No tocan eventos, ni checklists, ni marcas de
+  // carga. Lo peor que puede pasar con ellas es que recuerde una tontería, y para eso
+  // está el panel del cerebro, donde se lee y se borra a mano.
+  recordar: {
+    datos: true,
+    esquema: {
+      description: "Guarda algo que has aprendido del equipo y que no está en ningún cálculo: cómo trabajan, qué pasa en una finca, qué prefiere un cliente. Úsalo cuando te corrijan o te cuenten algo que servirá en el próximo evento. Una frase corta y concreta, en tercera persona.",
+      parameters: {
+        type: "object",
+        properties: {
+          texto: { type: "string", description: "Lo aprendido, en una frase. Ej: 'En la finca X no hay enchufe en la carpa, hay que llevar generador'." },
+          tema: { type: "string", description: `Uno de: ${CLAVES_TEMA.join(", ")}.` },
+        },
+        required: ["texto"],
+      },
+    },
+    corre: (ctx, { texto = "", tema = "general" } = {}) => {
+      if (!String(texto).trim()) return { error: "No me has dicho qué recordar." };
+      if (!ctx.onRecordar) return { error: "El cerebro no está disponible ahora mismo." };
+      const r = ctx.onRecordar(String(texto), String(tema));
+      return r && r.recuerdo
+        ? { guardado: r.recuerdo.texto, tema: TEMAS[r.recuerdo.tema], yaLoSabia: !!r.fundido }
+        : { error: "No he podido guardarlo." };
+    },
+  },
+
+  olvidar: {
+    datos: true,
+    esquema: {
+      description: "Borra algo que habías aprendido, cuando resulta que era falso o ha dejado de valer. Hace falta el texto exacto o casi.",
+      parameters: { type: "object", properties: { texto: { type: "string", description: "El recuerdo a borrar." } }, required: ["texto"] },
+    },
+    corre: (ctx, { texto = "" } = {}) => {
+      if (!ctx.onOlvidar) return { error: "El cerebro no está disponible ahora mismo." };
+      const encontrado = (ctx.memoria || []).find(r => normaliza(r.texto).includes(normaliza(texto)) || normaliza(texto).includes(normaliza(r.texto)));
+      if (!encontrado) return { error: `No recuerdo nada parecido a "${texto}".` };
+      ctx.onOlvidar(encontrado.id);
+      return { olvidado: encontrado.texto };
+    },
+  },
+
+  ver_cerebro: {
+    datos: true,
+    esquema: {
+      description: "Todo lo que has aprendido del equipo hasta ahora, por temas. Úsalo si te preguntan qué sabes o qué recuerdas.",
+      parameters: { type: "object", properties: { tema: { type: "string", description: `Uno de: ${CLAVES_TEMA.join(", ")}. Vacío para todos.` } } },
+    },
+    corre: (ctx, { tema = "" } = {}) => {
+      const grupos = porTemas(ctx.memoria || [])
+        .filter(g => !tema || g.tema === tema)
+        .map(g => ({ tema: g.titulo, recuerdos: g.recuerdos.map(r => r.texto) }));
+      return grupos.length ? { grupos } : { vacio: "Todavía no he aprendido nada. Cuéntame cosas y las guardo." };
+    },
+  },
+
+  // ─── EL REPASO ──────────────────────────────────────────────────────────────
+  // El equivalente del "subconscious loop" de OpenHuman, pero sin bucle: en vez de un
+  // proceso dando vueltas por detrás, se contesta cuando alguien pregunta. Lo que hace
+  // falta es el DATO —qué está a medias y qué se acerca—, no que lo calcule solo a las
+  // seis de la mañana.
+  que_falta: {
+    datos: true,
+    esquema: {
+      description: "El repaso: qué eventos se acercan, cuáles están sin configurar, a cuáles les falta la hora o el sitio. Úsalo cuando pregunten '¿qué tengo pendiente?' o '¿cómo va la semana?'.",
+      parameters: { type: "object", properties: { dias: { type: "number", description: "Cuántos días mirar hacia delante. Por defecto 30." } } },
+    },
+    corre: (ctx, { dias = 30 } = {}) => {
+      const hoy = new Date().toISOString().slice(0, 10);
+      const limite = new Date(Date.now() + Math.max(1, Math.round(dias) || 30) * 86400000).toISOString().slice(0, 10);
+      const proximos = Object.entries(ctx.eventosGuardados || {})
+        .filter(([, e]) => (e.fechaEvento || "") >= hoy && (e.fechaEvento || "") <= limite)
+        .sort((a, b) => (a[1].fechaEvento || "").localeCompare(b[1].fechaEvento || ""));
+
+      const pendientes = proximos.map(([nombre, e]) => {
+        const falta = [];
+        if (e.sinConfigurar) falta.push("está recién creado del calendario, sin configurar");
+        if (!e.horaInicio) falta.push("sin hora de inicio (no hay escaleta)");
+        if (!e.ubicacion) falta.push("sin sitio");
+        if (!e.pax) falta.push("sin comensales");
+        if (!(e.logisticaEquipo || []).some(p => p && p.nombre && p.nombre.trim())) falta.push("sin equipo de logística asignado");
+        return { evento: nombre, fecha: e.fechaEvento || "", falta };
+      });
+
+      // Apuntes del calendario que se acercan y todavía no tienen checklist: es el hueco
+      // por el que un evento desaparece del desplegable de la oficina.
+      const sinChecklist = (ctx.apuntes || [])
+        .filter(a => a && !a.evento && (a.fecha || "") >= hoy && (a.fecha || "") <= limite)
+        .map(a => ({ fecha: a.fecha, titulo: a.titulo, tipo: a.tipo }));
+
+      return {
+        desde: hoy, hasta: limite,
+        eventos: pendientes.length,
+        conCosasQueFaltan: pendientes.filter(p => p.falta.length),
+        enOrden: pendientes.filter(p => !p.falta.length).map(p => `${p.fecha} · ${p.evento}`),
+        apuntesSinChecklist: sinChecklist,
+      };
+    },
+  },
+
   simular_checklist: {
     datos: false,
     esquema: {
@@ -319,14 +427,22 @@ export const HERRAMIENTAS = {
 
 export const NOMBRES_HERRAMIENTAS = Object.keys(HERRAMIENTAS);
 
-// Las que NO llevan datos de clientes. Es la lista que decide qué se le puede preguntar
-// a un proveedor que entrena con lo que recibe.
+// Las de casa que NO llevan datos de clientes. Es la lista que decide qué se le puede
+// preguntar a un proveedor que entrena con lo que recibe.
 export const SIN_DATOS = NOMBRES_HERRAMIENTAS.filter(n => !HERRAMIENTAS[n].datos);
+
+// El catálogo REAL de una conversación: las de casa más las de los conectores que estén
+// configurados. Todo lo de abajo pasa por aquí, así que una integración nueva aparece
+// sola en el catálogo, en la ejecución y en la barrera de datos, sin tocar nada más.
+export function todas(conectoresConfig = {}) {
+  return conHerramientasDeConectores(HERRAMIENTAS, conectoresConfig);
+}
 
 // Ejecutar una herramienta por su nombre. Nunca lanza: un fallo aquí tiene que llegarle
 // al modelo como un texto que pueda leer y corregir, no reventar la conversación.
 export function ejecutar(nombre, argumentos, contexto = {}) {
-  const h = HERRAMIENTAS[nombre];
+  const catalogo = todas(contexto.conectores || {});
+  const h = catalogo[nombre];
   if (!h) return { error: `No existe ninguna herramienta que se llame "${nombre}".` };
   try {
     return h.corre(contexto, argumentos || {});
@@ -335,9 +451,19 @@ export function ejecutar(nombre, argumentos, contexto = {}) {
   }
 }
 
+// ¿Esta herramienta devuelve datos con dueño? Se pregunta al catálogo completo y no a
+// la lista de casa: si no, una herramienta de un conector no estaría en ninguna lista y
+// pasaría por "sin datos" por descuido, que es la forma en que estas cosas fallan.
+export function llevaDatos(nombre, conectoresConfig = {}) {
+  const h = todas(conectoresConfig)[nombre];
+  // Lo que no se conoce se trata como si llevara datos. Ante la duda, no se comparte.
+  return h ? !!h.datos : true;
+}
+
 // El catálogo en el formato que esperan los proveedores. Se manda en cada petición.
-export function catalogoParaModelo(soloSinDatos = false) {
-  return NOMBRES_HERRAMIENTAS
-    .filter(n => !soloSinDatos || !HERRAMIENTAS[n].datos)
-    .map(n => ({ name: n, ...HERRAMIENTAS[n].esquema }));
+export function catalogoParaModelo(soloSinDatos = false, conectoresConfig = {}) {
+  const catalogo = todas(conectoresConfig);
+  return Object.keys(catalogo)
+    .filter(n => !soloSinDatos || !catalogo[n].datos)
+    .map(n => ({ name: n, ...catalogo[n].esquema }));
 }

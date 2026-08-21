@@ -26,6 +26,7 @@ import {
   resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
+  cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
@@ -55,12 +56,16 @@ import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
 import { calcularCalibracion, calibracionBebida } from "./calibracion.js";
 import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
+import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
 // él, y la checklist no engorda para todos por una pantalla que se usa a ratos. El CSS
 // del calendario se importa dentro de ese archivo, así que viaja con él.
 const CalendarioEnChecklist = React.lazy(() => import("./calendario/EnChecklist.jsx"));
+// El asistente, igual: quien no lo abra no se descarga ni una línea de él. Y solo se
+// ofrece con sesión del equipo, porque solo con ella hay token que darle al proxy.
+const Asistente = React.lazy(() => import("./asistente/Asistente.jsx"));
 // Qué checklists tocan crear de los eventos que ya se acercan. Va en apuntes.js (y no
 // aquí) porque es lo que sabe el CALENDARIO: qué apuntes se acercan, cuáles ya tienen
 // checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
@@ -1850,6 +1855,18 @@ export default function App({ onCerrarSesion } = {}) {
   // personas mirando la misma comunión cargarían camiones distintos. ponFactores los
   // deja puestos para TODA la app —el generador de la checklist los lee de ahí— y el
   // estado de aquí solo existe para que el panel se vuelva a dibujar.
+  const [asistenteAbierto, setAsistenteAbierto] = useState(false);
+  // ─── EL CEREBRO DEL ASISTENTE ───────────────────────────────────────────────
+  // Lo que ha aprendido del equipo. Va a la nube y no a este navegador por lo mismo que
+  // los precios: lo que se aprende en una boda tiene que servir en la siguiente, la mire
+  // quien la mire. Si cada móvil recordara sus cosas, el asistente sabría algo distinto
+  // según quién preguntara, que es peor que no recordar nada.
+  const [memoria, setMemoria] = useState([]);
+  const memoriaRef = React.useRef([]);
+  React.useEffect(() => { memoriaRef.current = memoria; }, [memoria]);
+  // Los apuntes del calendario, guardados de la carga que YA se hace al arrancar para
+  // crear las checklists que se acercan. No cuesta una petición más: es la misma.
+  const [apuntesCalendario, setApuntesCalendario] = useState([]);
   const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo) return;
@@ -1859,6 +1876,48 @@ export default function App({ onCerrarSesion } = {}) {
     const corta = suscribirBebidaNube(aplicar);
     return () => { vivo = false; corta(); };
   }, [haySesionEquipo]);
+
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remota) => { if (vivo && remota) setMemoria(saneaMemoria(remota)); };
+    cargarMemoriaNube().then(aplicar).catch(() => { /* sin conexión: sin memoria, no pasa nada */ });
+    const corta = suscribirMemoriaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  // Una sola puerta para guardar: así el estado y la nube nunca se separan, y el
+  // asistente puede llamar a esto sin saber que existe Firestore.
+  const guardarMemoria = React.useCallback((siguiente) => {
+    const limpia = saneaMemoria(siguiente);
+    setMemoria(limpia);
+    memoriaRef.current = limpia;
+    if (nubeActiva() && haySesionEquipo) {
+      guardarMemoriaNube(limpia).catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  }, [haySesionEquipo]);
+
+  const handleRecordar = React.useCallback((texto, tema) => {
+    // Se parte de la referencia y no del estado: dentro de una misma respuesta el
+    // asistente puede aprender dos cosas seguidas, y con el estado la segunda pisaría
+    // a la primera.
+    const r = recordar(memoriaRef.current, texto, { tema });
+    guardarMemoria(r.memoria);
+    return r;
+  }, [guardarMemoria]);
+
+  const handleOlvidar = React.useCallback((id) => {
+    guardarMemoria(olvidar(memoriaRef.current, id).memoria);
+  }, [guardarMemoria]);
+
+  // Los recuerdos que de verdad han viajado en una respuesta suben. No se sube a la nube
+  // en cada pregunta —serían escrituras constantes por un contador— sino solo aquí, en
+  // el estado, y viaja con el siguiente cambio de verdad.
+  const handleUsoMemoria = React.useCallback((ids) => {
+    const reforzada = refuerza(memoriaRef.current, ids);
+    setMemoria(reforzada);
+    memoriaRef.current = reforzada;
+  }, []);
 
   const handleCambiarBebida = (siguiente) => {
     setFactoresBebida(ponFactores(siguiente));
@@ -1899,6 +1958,7 @@ export default function App({ onCerrarSesion } = {}) {
         const cal = await cargarCalendarioNube(cs.codigo);
         if (!cal || !vivo) return;
         const apuntes = saneaLista(cal.apuntes);
+        setApuntesCalendario(apuntes);
         const enlaces = crearChecklistsDeApuntes(apuntes);
         if (!enlaces.length || !vivo) return;
         const creadas = enlaces.filter(e => e.nueva).map(e => e.nombre);
@@ -2655,6 +2715,26 @@ export default function App({ onCerrarSesion } = {}) {
           />
         </React.Suspense>
       )}
+      {asistenteAbierto && (
+        <React.Suspense fallback={null}>
+          {/* El asistente NO recibe la app: recibe una foto de los datos que puede
+              consultar. Lo que no esté aquí, no existe para él — que es exactamente la
+              diferencia entre un asistente que consulta y uno que anda suelto. */}
+          <Asistente
+            onCerrar={() => setAsistenteAbierto(false)}
+            onOlvidar={handleOlvidar}
+            contexto={{
+              eventosGuardados,
+              apuntes: apuntesCalendario,
+              memoria,
+              onRecordar: handleRecordar,
+              onOlvidar: handleOlvidar,
+              onUsoMemoria: handleUsoMemoria,
+              eventoActual: { nombreEvento, evento, pax, ninos, fechaEvento, horaInicio, ubicacion, notasEvento, barraCoctel, horasCoctel, barraCopas, horasCopas, logisticaEquipo },
+            }}
+          />
+        </React.Suspense>
+      )}
       {modoCarga && (
         <ModalModoCarga
           onGuardarPrecios={handleGuardarPrecios}
@@ -2818,6 +2898,9 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="header-actions">
             {!soloMarcar && (
               <button className="btn btn-ghost" onClick={handleNuevoEvento} title="Borra la configuración guardada y empieza de cero">Nuevo evento</button>
+            )}
+            {onCerrarSesion && (
+              <button className="btn btn-ghost" onClick={() => setAsistenteAbierto(true)} title="Preguntar al asistente sobre tus eventos">Asistente</button>
             )}
             {onCerrarSesion && (
               <button className="btn btn-ghost" onClick={onCerrarSesion} title="Cerrar la sesión del equipo">Cerrar sesión</button>

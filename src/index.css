@@ -6122,3 +6122,282 @@ hr {
 
 .escaleta-alerta svg { flex: 0 0 auto; margin-top: 2px; }
 .escaleta-alerta-icono { flex: 0 0 auto; color: var(--aviso-texto); }
+
+/* ─── EL ASISTENTE ────────────────────────────────────────────────────────────
+   Una conversación en un panel. En el móvil ocupa la pantalla entera —escribir en
+   una cajita de 200px con el teclado abierto no lo hace nadie— y de tablet para
+   arriba se queda anclado abajo a la derecha, sin tapar la checklist. */
+.asis-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  background: rgba(15, 23, 42, 0.35);
+  padding: 0;
+}
+
+.asis-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  background: var(--card-bg);
+  color: var(--text-main);
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .asis-fondo { padding: 20px; background: rgba(15, 23, 42, 0.2); }
+  .asis-panel {
+    width: min(440px, 100%);
+    height: min(660px, 100%);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+.asis-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+
+.asis-titulo {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.asis-icono {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.asis-icono:hover { background: var(--card-bg); color: var(--text-main); border-color: var(--border-color); }
+
+.asis-ajustes {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+
+.asis-campo { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.asis-campo > span { font-size: 0.8rem; font-weight: 600; color: var(--text-label); }
+.asis-campo input { min-height: 44px; font-size: 16px; }
+
+.asis-proveedores { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.asis-nota { font-style: normal; font-weight: 500; opacity: 0.7; font-size: 0.78em; }
+
+.asis-explica {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.asis-explica code {
+  font-size: 0.95em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+}
+
+.asis-hilo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.asis-vacio { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+.asis-vacio ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+
+.asis-msg { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
+.asis-msg.es-yo { align-items: flex-end; }
+
+.asis-burbuja {
+  max-width: 88%;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+}
+
+.asis-msg.es-yo .asis-burbuja { background: var(--accent); border-color: var(--accent); color: #fff; }
+.asis-msg.es-error .asis-burbuja { background: var(--error-bg); border-color: var(--error-borde); color: var(--error-texto); }
+
+.asis-pensando { display: inline-flex; align-items: center; gap: 7px; color: var(--text-muted); }
+.asis-gira { animation: asis-girar 1s linear infinite; }
+@keyframes asis-girar { to { transform: rotate(360deg); } }
+
+/* De dónde sale lo que acaba de decir. Un número que decide lo que va en el camión
+   tiene que poder rastrearse hasta la herramienta que lo calculó. */
+.asis-pasos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.asis-paso {
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+
+.asis-escribir {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+
+.asis-escribir input { flex: 1 1 auto; min-width: 0; min-height: 44px; font-size: 16px; }
+.asis-escribir .btn { flex: 0 0 auto; min-height: 44px; min-width: 48px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .asis-gira { animation: none; }
+}
+
+/* ─── EL CEREBRO DEL ASISTENTE ────────────────────────────────────────────────
+   La charla y el cerebro son dos vistas del mismo panel. Separarlas en dos sitios
+   distintos haría que nadie abriera nunca el cerebro, y entonces lo que aprende mal
+   no lo corrige nadie. */
+/* En su propia fila: con el título y los dos iconos al lado no cabían en 320px. */
+.asis-pestanas {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+
+.asis-pestana {
+  flex: 1 1 0;
+  justify-content: center;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 7px 11px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.asis-pestana:hover { color: var(--text-main); }
+
+.asis-pestana.es-activa {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.asis-pestana em {
+  font-style: normal;
+  font-size: 0.75em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.asis-cerebro { gap: 16px; }
+
+.asis-tema { display: flex; flex-direction: column; gap: 6px; }
+
+.asis-tema-titulo {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.asis-recuerdo {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+}
+
+.asis-recuerdo-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* Las veces que le ha hecho falta de verdad. Lo que sube se queda; lo que nunca sube
+   se cae solo cuando hay que hacer sitio. */
+.asis-recuerdo-puntos {
+  flex: 0 0 auto;
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.asis-recuerdo-borrar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: -8px -8px -8px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.asis-recuerdo-borrar:hover { color: var(--error-texto); background: var(--error-bg); }

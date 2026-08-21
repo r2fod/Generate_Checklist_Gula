@@ -18,6 +18,10 @@ import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
 import { saneaLista, saneaEquipo, aISO, checklistsPorCrear } from "./apuntes.js";
 import { leerRatios, ponRatios } from "../personal.js";
+// El asistente pide sesión de equipo para salir en la app, así que la batería tampoco
+// llega a él. Se monta aquí con "?asistente=1", igual que la maquetación de pantalla
+// completa: al menos su colocación queda probada a todos los anchos.
+import Asistente from "../asistente/Asistente.jsx";
 
 const HOY = new Date();
 // aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no
@@ -116,6 +120,18 @@ function Banco() {
         <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
       </>
     );
+
+  if (new URLSearchParams(window.location.search).get("asistente")) {
+    return (
+      <Asistente
+        onCerrar={() => {}}
+        contexto={{
+          eventosGuardados: { "Boda de prueba uno": { evento: "boda", pax: 120, fechaEvento: dia(2), horaInicio: "14:00", ubicacion: "Finca de ejemplo" } },
+          apuntes: saneaLista(DEMO),
+        }}
+      />
+    );
+  }
 
   // Con "?pantalla=1" se monta la MISMA maquetación que usa la checklist por dentro
   // (EnChecklist.jsx): pantalla completa, barra fija arriba y el scroll dentro del

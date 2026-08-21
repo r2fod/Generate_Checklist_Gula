@@ -320,6 +320,15 @@ export const guardarBebidaNube = BEBIDA.guardar;
 export const cargarBebidaNube = BEBIDA.cargar;
 export const suscribirBebidaNube = BEBIDA.suscribir;
 
+// Lo que el asistente ha aprendido del equipo (ver asistente/memoria.js). Es el ajuste
+// compartido más claro de todos: si cada móvil recordara sus cosas, el asistente sabría
+// una cosa distinta según quién preguntara. Y va aquí y no en el navegador porque lo
+// que se aprende en una boda tiene que servir en la siguiente, la mire quien la mire.
+const MEMORIA = ajusteCompartido("indice/memoria", "memoria");
+export const guardarMemoriaNube = MEMORIA.guardar;
+export const cargarMemoriaNube = MEMORIA.cargar;
+export const suscribirMemoriaNube = MEMORIA.suscribir;
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

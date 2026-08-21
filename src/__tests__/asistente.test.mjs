@@ -9,6 +9,11 @@
 // mal borra el trabajo de quien está cargando el camión.
 import { HERRAMIENTAS, NOMBRES_HERRAMIENTAS, SIN_DATOS, ejecutar, catalogoParaModelo } from "../asistente/herramientas.js";
 import { preguntar } from "../asistente/cliente.js";
+import { recordar, olvidar, refuerza, poda, parecido, paraElContexto, porTemas, saneaMemoria, MAX_RECUERDOS } from "../asistente/memoria.js";
+import { conectores, conectoresActivos, conHerramientasDeConectores, registrarConector } from "../asistente/conectores.js";
+import { todas, llevaDatos } from "../asistente/herramientas.js";
+import { comprimir, ahorro } from "../asistente/comprimir.js";
+import { buildChecklist as construye } from "../checklist-generadores.js";
 
 let pasan = 0;
 const fallos = [];
@@ -69,8 +74,10 @@ console.log("\n── Los datos de clientes y quién puede verlos ──");
     `el catálogo recortado son solo las de calcular → ${recortado.join(", ")}`);
   ok(!recortado.includes("buscar_eventos") && !recortado.includes("ver_evento") && !recortado.includes("ver_calendario"),
     "y no lleva ninguna que devuelva nombres, fechas o sitios");
-  ok(catalogoParaModelo(false).length === NOMBRES_HERRAMIENTAS.length,
-    "el catálogo entero sí las lleva todas");
+  // El catálogo entero lleva las de casa Y las de los conectores encendidos: si esto
+  // fuera solo las de casa, una integración nueva no llegaría nunca al modelo.
+  ok(catalogoParaModelo(false).length >= NOMBRES_HERRAMIENTAS.length,
+    `el catálogo entero lleva las de casa y las de los conectores (${catalogoParaModelo(false).length} de ${NOMBRES_HERRAMIENTAS.length} propias)`);
 
   // Las marcadas sin datos no pueden devolver datos aunque se les pase un evento
   SIN_DATOS.forEach(n => {
@@ -165,6 +172,233 @@ console.log("\n── El bucle de herramientas ──");
   let sinUrl = "";
   try { await preguntar({ texto: "hola", contexto: CTX }); } catch (e) { sinUrl = e.message; }
   ok(/no está configurado/.test(sinUrl), "sin dirección del Worker avisa en vez de fallar por la red");
+}
+
+console.log("\n── El cerebro ──");
+{
+  const guarda = (mem, texto, tema) => recordar(mem, texto, { tema }).memoria;
+
+  // Lo importante: aprender lo mismo dicho de otra forma NO son dos recuerdos. Sin esto,
+  // a los seis meses hay nueve versiones de "en esa finca no hay enchufe" y cada
+  // pregunta arrastra las nueve.
+  let m = guarda([], "En la finca de ejemplo no hay enchufe en la carpa", "sitios");
+  m = guarda(m, "En la finca de ejemplo no hay enchufes en la carpa, hay que llevar generador", "sitios");
+  ok(m.length === 1, `lo mismo con más detalle se funde (${m.length})`);
+  ok(/generador/.test(m[0].texto), "y se queda la redacción NUEVA, que es la que está al día");
+  ok(m[0].puntos === 2, "con más peso, porque se ha dicho dos veces");
+
+  // Y el fundido peligroso NO ocurre: dos frases con la misma forma pero distinto
+  // contenido son dos cosas distintas, y fundirlas perdería una.
+  let n = guarda([], "En bodas ponemos 4 de cocina", "equipo");
+  n = guarda(n, "En comuniones ponemos 3 de cocina", "equipo");
+  ok(n.length === 2, `bodas y comuniones NO se funden (${n.length})`);
+  ok(parecido("En bodas ponemos 4 de cocina", "En comuniones ponemos 3 de cocina") < 0.7,
+    "porque no se parecen lo bastante");
+
+  // El mismo recuerdo guardado desde dos móviles es UNO: el id sale del texto
+  ok(saneaMemoria([{ texto: "Hola qué tal" }, { texto: "Hola qué tal" }]).length === 1,
+    "el mismo recuerdo dos veces se queda en uno");
+
+  // Un tema inventado cae en general en vez de crear un cajón nuevo
+  ok(guarda([], "algo", "inventado")[0].tema === "general", "un tema que no existe cae en general");
+  ok(recordar([], "   ").recuerdo === null, "y el texto vacío no crea recuerdo");
+
+  // El tope: la memoria no puede crecer sin límite, porque cada pregunta la arrastra
+  const muchos = Array.from({ length: MAX_RECUERDOS + 50 }, (_, i) => ({ texto: `Cosa numero ${i} de prueba`, tema: "general", puntos: i % 7 + 1, usado: i }));
+  const podada = poda(muchos);
+  ok(podada.length === MAX_RECUERDOS, `la memoria tiene tope (${podada.length})`);
+  ok(Math.min(...podada.map(r => r.puntos)) >= Math.min(...muchos.map(r => r.puntos)),
+    "y al podar se van los de menos peso, no los últimos que entraron");
+
+  // Reforzar: lo que se usa sube. Es lo que separa un recuerdo útil de uno que alguien
+  // apuntó una vez y no volvió a hacer falta.
+  const antes = m[0].puntos;
+  ok(refuerza(m, [m[0].id])[0].puntos === antes + 1, "usar un recuerdo lo refuerza");
+  ok(refuerza(m, ["no-existe"])[0].puntos === antes, "y reforzar uno que no está no toca nada");
+
+  // Olvidar de verdad
+  ok(olvidar(m, m[0].id).memoria.length === 0 && olvidar(m, m[0].id).habia, "olvidar borra y lo dice");
+  ok(!olvidar(m, "fantasma").habia, "y olvidar algo que no está lo dice también");
+
+  // Lo que viaja en cada pregunta: agrupado por tema y con tope de tamaño
+  let g = guarda([], "En la finca A no hay agua corriente", "sitios");
+  g = guarda(g, "En comuniones ponemos 3 de cocina", "equipo");
+  const ctxMem = paraElContexto(g);
+  ok(/Fincas y sitios:/.test(ctxMem.texto) && /Cómo trabaja el equipo:/.test(ctxMem.texto),
+    "el contexto va agrupado por temas");
+  ok(ctxMem.ids.length === 2, "y devuelve qué recuerdos han viajado, para poder reforzarlos");
+  ok(paraElContexto(g, { max: 20 }).texto.length < 200, "con poco sitio se lleva solo lo mejor");
+  ok(paraElContexto([]).texto === "", "y sin memoria no mete nada en la conversación");
+
+  ok(porTemas(g).length === 2 && porTemas([]).length === 0, "porTemas agrupa para la pantalla");
+}
+
+console.log("\n── El cerebro, desde el asistente ──");
+{
+  // El cerebro escribe. Es lo ÚNICO que escribe, y hay que comprobar que sigue sin
+  // poder tocar nada más: un asistente que aprende está bien, uno que marca items no.
+  let mem = [];
+  const ctx = {
+    ...CTX,
+    memoria: mem,
+    onRecordar: (t, tema) => { const r = recordar(mem, t, { tema }); mem = r.memoria; return r; },
+    onOlvidar: (id) => { mem = olvidar(mem, id).memoria; },
+  };
+  const antes = JSON.stringify(CTX.eventosGuardados);
+
+  const r1 = ejecutar("recordar", { texto: "En la finca de prueba no hay enchufe en la carpa", tema: "sitios" }, ctx);
+  ok(r1.guardado && !r1.yaLoSabia && mem.length === 1, "el asistente puede aprender algo");
+  const r2 = ejecutar("recordar", { texto: "En la finca de prueba no hay enchufes en la carpa", tema: "sitios" }, ctx);
+  ok(r2.yaLoSabia && mem.length === 1, "y si ya lo sabía lo dice en vez de duplicarlo");
+  ok(JSON.stringify(CTX.eventosGuardados) === antes, "aprender no toca ni un evento");
+
+  ctx.memoria = mem;
+  ok(ejecutar("ver_cerebro", {}, ctx).grupos.length === 1, "puede enseñar lo que sabe");
+  ok(ejecutar("olvidar", { texto: "enchufe" }, ctx).olvidado && mem.length === 0,
+    "y puede olvidarlo cuando resulta que era falso");
+  ok(ejecutar("olvidar", { texto: "algo que nunca dijo nadie" }, { ...ctx, memoria: mem }).error,
+    "olvidar algo que no recuerda contesta un error, no borra al azar");
+  ok(ejecutar("recordar", { texto: "algo" }, { ...CTX }).error,
+    "y sin cerebro conectado lo dice en vez de fallar");
+}
+
+console.log("\n── El repaso ──");
+{
+  const hoy = new Date().toISOString().slice(0, 10);
+  const enUnMes = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+  const ctx = {
+    eventosGuardados: {
+      "Boda a medias": { evento: "boda", fechaEvento: enUnMes, sinConfigurar: true },
+      "Boda lista": { evento: "boda", fechaEvento: enUnMes, pax: 100, horaInicio: "13:00", ubicacion: "Sitio", logisticaEquipo: [{ nombre: "Alguien" }] },
+      "Una vieja": { evento: "boda", fechaEvento: "2020-01-01", pax: 50 },
+    },
+    apuntes: [{ fecha: enUnMes, titulo: "Sin checklist todavía", tipo: "corporativo" }],
+  };
+  const r = ejecutar("que_falta", {}, ctx);
+  ok(r.eventos === 2, `solo mira los que se acercan, no el archivo entero (${r.eventos})`);
+  ok(r.conCosasQueFaltan.length === 1 && r.conCosasQueFaltan[0].evento === "Boda a medias",
+    "señala el que está a medias");
+  ok(r.conCosasQueFaltan[0].falta.length >= 4, `y dice QUÉ le falta → ${r.conCosasQueFaltan[0].falta.join(" · ")}`);
+  ok(r.enOrden.length === 1 && /Boda lista/.test(r.enOrden[0]), "y el que está completo va aparte");
+  // El hueco por el que un evento desaparece del desplegable de la oficina
+  ok(r.apuntesSinChecklist.length === 1, "avisa de los apuntes del calendario que aún no tienen checklist");
+  ok(ejecutar("que_falta", { dias: 1 }, ctx).eventos === 0, "y se puede acotar a los próximos días");
+}
+
+console.log("\n── Conectores ──");
+{
+  // WhatsApp no necesita configurar nada (es un enlace), así que está encendido de
+  // salida. El correo necesita cuenta y etiqueta, así que NO existe para el modelo.
+  const ids = conectores().map(c => c.id);
+  ok(ids.includes("whatsapp") && ids.includes("correo"), `los conectores se registran solos → ${ids.join(", ")}`);
+  const activos = conectoresActivos({}).map(c => c.id);
+  ok(activos.includes("whatsapp"), "whatsapp está listo sin configurar nada");
+  ok(!activos.includes("correo"), "y el correo NO, porque le falta la cuenta");
+
+  // Esto es lo que importa: un conector a medias no puede aparecer en el catálogo. Si
+  // apareciera, el modelo lo llamaría y fallaría en cada pregunta.
+  const catalogo = catalogoParaModelo(false).map(h => h.name);
+  ok(catalogo.includes("mensaje_para_el_equipo"), "la herramienta de whatsapp entra en el catálogo");
+  ok(!catalogo.includes("buscar_correos"), "y la del correo no, mientras esté a medias");
+
+  // En cuanto se configura, aparece sola. Sin tocar una línea del asistente.
+  const conCorreo = { correo: { cuenta: "eventos@ejemplo.com", etiqueta: "Eventos" } };
+  ok(conectoresActivos(conCorreo).map(c => c.id).includes("correo"), "configurado, el correo se enciende");
+  ok(catalogoParaModelo(false, conCorreo).map(h => h.name).includes("buscar_correos"),
+    "y su herramienta entra en el catálogo sin tocar nada más");
+  ok(ejecutar("buscar_correos", {}, { ...CTX, conectores: conCorreo }).error,
+    "aunque todavía conteste que no está implementado, que es la verdad");
+
+  // La barrera de datos alcanza a los conectores. Este es el fallo que se cuela solo:
+  // una herramienta nueva que no está en ninguna lista y pasa por "sin datos".
+  ok(llevaDatos("mensaje_para_el_equipo") === true, "una herramienta de conector con datos se marca como tal");
+  ok(llevaDatos("inventada") === true, "y una desconocida se trata como si los llevara: ante la duda, no se comparte");
+  ok(!catalogoParaModelo(true).map(h => h.name).includes("mensaje_para_el_equipo"),
+    "así que no se le ofrece a un proveedor que entrena con lo que recibe");
+
+  // De casa gana sobre conector: la de casa es la que tiene pruebas
+  const chocan = conHerramientasDeConectores({ mensaje_para_el_equipo: { deCasa: true } }, {});
+  ok(chocan.mensaje_para_el_equipo.deCasa === true, "si dos coinciden en nombre, gana la de casa");
+
+  // El mensaje del grupo sale con lo que hay que saber, y deja claro que no se ha enviado
+  const wa = ejecutar("mensaje_para_el_equipo", { nombre: "fulanita" }, CTX);
+  ok(/Boda Fulanita/.test(wa.texto) && /Salida \d{2}:\d{2}/.test(wa.texto), "el mensaje lleva el evento y la hora de salida");
+  ok(/ALERGIAS/.test(wa.texto) && /sin gluten/.test(wa.texto), "y las alergias, al final y separadas");
+  ok(/^https:\/\/wa\.me\//.test(wa.enlace) && /NO se ha enviado/.test(wa.aviso),
+    "devuelve el enlace y avisa de que no lo ha mandado");
+
+  // Un conector nuevo entra con una línea, que es la prueba de que el hueco sirve
+  registrarConector({
+    id: "prueba", nombre: "De prueba", necesita: ["clave"],
+    herramientas: { saluda: { datos: false, esquema: { description: "x", parameters: { type: "object", properties: {} } }, corre: () => ({ hola: true }) } },
+  });
+  const cfg = { prueba: { clave: "sí" } };
+  ok(!Object.keys(todas({})).includes("saluda"), "un conector nuevo sin configurar sigue apagado");
+  ok(ejecutar("saluda", {}, { conectores: cfg }).hola === true, "y configurado funciona, sin tocar el asistente");
+  ok(catalogoParaModelo(true, cfg).map(h => h.name).includes("saluda"),
+    "y si declara que no lleva datos, se le puede ofrecer a cualquiera");
+}
+
+console.log("\n── Comprimir lo que se le manda al modelo ──");
+{
+  const valido = (x) => { try { JSON.parse(JSON.stringify(x)); return true; } catch (e) { return false; } };
+
+  // Lo que más pesa de toda la app: una checklist entera. Y viaja otra vez en cada
+  // pregunta siguiente, así que lo que se ahorre aquí se ahorra muchas veces.
+  const entera = ejecutar("ver_checklist", { nombre: "fulanita" }, CTX);
+  const c = comprimir(entera);
+  ok(c.despues < c.antes * 0.5, `una checklist entera baja a menos de la mitad (${c.antes} → ${c.despues})`);
+  ok(valido(c.resultado), "y lo que sale sigue siendo JSON válido");
+  // El primer intento truncaba el JSON por la mitad y lo volvía a pegar. Producía texto
+  // que ya no era JSON, así que el modelo recibía basura en vez de datos. Nunca más.
+  ok(JSON.stringify(c.resultado).length <= 3100, "y cabe en el tope");
+
+  // Lo que se recorta SE DICE. Un resultado a medias sin avisar hace que el modelo
+  // conteste con seguridad sobre datos que no ha visto, y eso es peor que uno largo.
+  const larga = comprimir({ cosas: Array.from({ length: 100 }, (_, i) => `elemento ${i}`) });
+  ok(JSON.stringify(larga.resultado).includes("y 70 más"), "una lista larga avisa de cuántos faltan");
+
+  // Lo pequeño no se toca: comprimir lo que ya cabía solo quitaría información
+  const chico = ejecutar("calcular_hielo", { comensales: 100, verano: true, horasBarra: 4 }, CTX);
+  ok(comprimir(chico).resultado.kg === chico.kg, "un resultado pequeño llega entero");
+
+  // Un error es lo único que el modelo necesita leer palabra por palabra
+  ok(comprimir({ error: "no encuentro eso" }).resultado.error === "no encuentro eso",
+    "los errores no se tocan nunca");
+
+  // Los ceros y los vacíos se van: "0 tónicas" y "no llevar tónica" son lo mismo
+  const conCeros = comprimir({ a: 1, b: 0, c: "", d: null, e: [], f: false, g: 0.7200000000000001 });
+  ok(!("b" in conCeros.resultado) && !("d" in conCeros.resultado) && !("e" in conCeros.resultado),
+    "los ceros, nulos y vacíos no viajan");
+  ok(conCeros.resultado.g === 0.72, "y los decimales largos se redondean");
+  ok(conCeros.resultado.a === 1, "pero lo que dice algo se queda");
+
+  // Nada revienta con entradas raras
+  [null, undefined, 0, "", [], "texto suelto"].forEach(x => {
+    ok(valido(comprimir(x).resultado) || comprimir(x).resultado === undefined, `comprimir ${JSON.stringify(x)} no revienta`);
+  });
+
+  ok(ahorro([{ antes: 1000, despues: 400 }, { antes: 500, despues: 250 }]).porcentaje === 57,
+    "el ahorro de toda la conversación se puede enseñar");
+  ok(ahorro([]).porcentaje === 0, "y sin pasos no inventa un porcentaje");
+}
+
+console.log("\n── Etiquetas sin datos a medias ──");
+{
+  // Un evento creado solo por el calendario no lleva tipo de nevera ni de barbacoa: solo
+  // nombre, fecha y tipo. La checklist imprimía "Nevera (undefined)" y "Barbacoa
+  // undefined", y salía en el camión así. Lo destapó el asistente, al pedir una checklist
+  // reconstruida desde un evento guardado en vez de desde la pantalla.
+  ["boda", "comunion", "corporativo", "cumpleanos", "produccion"].forEach(t => {
+    const etiquetas = construye(t, 100, 2, 4, 0, {}).flatMap(c => c.items.filter(Boolean).map(i => i[0]));
+    const rotas = etiquetas.filter(l => /undefined|null|NaN/.test(l));
+    ok(rotas.length === 0, `${t} sin opciones no imprime etiquetas a medias${rotas.length ? ` → ${rotas.join(", ")}` : ""}`);
+  });
+  // Y con los valores puestos sigue saliendo exactamente lo de siempre
+  const con = construye("boda", 100, 2, 4, 0, { tipoNevera: "Grande", tipoBBQ: "grande" })
+    .flatMap(c => c.items.filter(Boolean).map(i => i[0]));
+  ok(con.includes("Nevera roja (grande)") && con.includes("Barbacoa grande"),
+    "con los valores puestos, las etiquetas son las de siempre");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

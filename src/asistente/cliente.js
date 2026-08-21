@@ -5,7 +5,9 @@
 //
 // Todo lo que decide qué se puede hacer está en herramientas.js. Esto solo es la
 // tubería, y por eso es corto.
-import { catalogoParaModelo, ejecutar, HERRAMIENTAS } from "./herramientas.js";
+import { catalogoParaModelo, ejecutar, llevaDatos } from "./herramientas.js";
+import { paraElContexto } from "./memoria.js";
+import { comprimir } from "./comprimir.js";
 
 // Un tope duro de vueltas. Sin él, un modelo que se empeñe en pedir la misma
 // herramienta una y otra vez deja el navegador dando vueltas y la factura corriendo.
@@ -24,7 +26,27 @@ Cómo trabajas:
 - Si no sabes el nombre exacto de un evento, buscas antes de rendirte.
 - Si una herramienta devuelve un error, lo dices tal cual y propones qué hacer. No te lo inventas ni disimulas.
 - No puedes cambiar nada todavía: solo consultar. Si te piden modificar algo, dilo claro y explica dónde se hace en la app.
-- Las alergias son lo más serio que manejas. Si aparecen, se dicen enteras y las primeras.`;
+- Las alergias son lo más serio que manejas. Si aparecen, se dicen enteras y las primeras.
+
+Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con recordar: una frase corta, concreta y en tercera persona. No guardes lo que ya sale de un cálculo (cuánta cerveza, cuánto hielo) ni datos de un evento suelto que ya están en la app; guarda lo que NO está escrito en ninguna parte y servirá el mes que viene. Si algo que recordabas resulta ser falso, lo borras con olvidar.`;
+
+// Lo aprendido va al final del mensaje de sistema, aparte y marcado. Aparte porque no
+// son órdenes: son cosas que el equipo ha contado y pueden estar mal apuntadas, y el
+// modelo tiene que poder contrastarlas con lo que devuelven las herramientas en vez de
+// creérselas por encima de un cálculo.
+function conMemoria(sistema, memoria) {
+  const { texto, ids } = paraElContexto(memoria || []);
+  if (!texto) return { sistema, ids: [] };
+  return {
+    sistema: `${sistema}
+
+--- LO QUE HAS APRENDIDO DE ESTE EQUIPO ---
+Esto te lo han contado ellos. Vale para dar contexto y para avisar, pero NO manda sobre lo que devuelve una herramienta: si el cálculo dice una cosa y esto dice otra, das las dos y preguntas.
+
+${texto}`,
+    ids,
+  };
+}
 
 // Una conversación viva. Se guarda la lista de mensajes en el formato neutro que
 // entiende el Worker; la traducción a cada proveedor es cosa suya.
@@ -35,19 +57,23 @@ export function nuevaConversacion() { return []; }
 // sin decir de dónde sale es un asistente en el que no se puede confiar.
 export async function preguntar({
   texto, mensajes = [], contexto = {}, proveedor = "gemini",
-  url, token, onPaso,
+  url, token, onPaso, onUsoMemoria,
 }) {
   if (!url) throw new Error("El asistente no está configurado: falta la dirección del Worker.");
   const soloSinDatos = ENTRENAN_CON_LO_QUE_LES_LLEGA.includes(proveedor);
-  const herramientas = catalogoParaModelo(soloSinDatos);
+  const herramientas = catalogoParaModelo(soloSinDatos, contexto.conectores || {});
   const conversacion = [...mensajes, { rol: "usuario", contenido: texto }];
   const pasos = [];
+  // Lo aprendido viaja en cada pregunta; los ids vuelven para poder reforzar lo que de
+  // verdad se ha usado, que es lo que separa un recuerdo útil de uno que alguien apuntó
+  // una vez y no volvió a hacer falta.
+  const { sistema, ids: recordados } = conMemoria(SISTEMA, contexto.memoria);
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
     const r = await fetch(url, {
       method: "POST",
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ sistema: SISTEMA, mensajes: conversacion, herramientas, proveedor }),
+      body: JSON.stringify({ sistema, mensajes: conversacion, herramientas, proveedor }),
     });
     const d = await r.json().catch(() => ({ error: `El asistente ha contestado algo ilegible (${r.status}).` }));
     if (!r.ok || d.error) throw new Error(d.error || `El asistente ha fallado (${r.status}).`);
@@ -55,7 +81,8 @@ export async function preguntar({
     conversacion.push({ rol: "asistente", contenido: d.texto || "", llamadas: d.llamadas || [] });
 
     if (!d.llamadas || !d.llamadas.length) {
-      return { mensajes: conversacion, respuesta: d.texto || "", pasos, proveedor: d.proveedor || proveedor };
+      if (onUsoMemoria && recordados.length) onUsoMemoria(recordados);
+      return { mensajes: conversacion, respuesta: d.texto || "", pasos, proveedor: d.proveedor || proveedor, recordados };
     }
 
     // Se ejecutan aquí, en el navegador, con los datos de la app. El modelo no ve la
@@ -63,13 +90,17 @@ export async function preguntar({
     for (const llamada of d.llamadas) {
       // Un proveedor que pide una herramienta con datos cuando no se le ofreció ninguna
       // no se atiende: da igual por qué lo haya hecho.
-      if (soloSinDatos && HERRAMIENTAS[llamada.nombre] && HERRAMIENTAS[llamada.nombre].datos) {
+      if (soloSinDatos && llevaDatos(llamada.nombre, contexto.conectores || {})) {
         conversacion.push({ rol: "herramienta", id: llamada.id, nombre: llamada.nombre,
           contenido: { error: "Esa herramienta no está disponible con este proveedor porque devuelve datos de clientes." } });
         continue;
       }
-      const resultado = ejecutar(llamada.nombre, llamada.argumentos, contexto);
-      pasos.push({ nombre: llamada.nombre, argumentos: llamada.argumentos, resultado });
+      const crudo = ejecutar(llamada.nombre, llamada.argumentos, contexto);
+      // Se comprime ANTES de meterlo en la conversación, no al mandarlo: el resultado se
+      // queda ahí y viaja otra vez en cada pregunta siguiente. Comprimir a la salida
+      // ahorraría una vez; comprimir aquí ahorra todas.
+      const { resultado, antes, despues } = comprimir(crudo);
+      pasos.push({ nombre: llamada.nombre, argumentos: llamada.argumentos, resultado, antes, despues });
       if (onPaso) onPaso({ nombre: llamada.nombre, argumentos: llamada.argumentos });
       conversacion.push({ rol: "herramienta", id: llamada.id, nombre: llamada.nombre, contenido: resultado });
     }

@@ -34,8 +34,31 @@ Firestore.
    |---|---|---|
    | `ANTHROPIC_API_KEY` | Secret | Claude. **Ojo: la suscripción de Claude no vale, la API se paga aparte por token.** |
    | `OPENAI_API_KEY` | Secret | OpenAI |
-   | `PROVEEDOR_POR_DEFECTO` | Text | `gemini` (por defecto), `claude` u `openai` |
+   | `PROVEEDOR_POR_DEFECTO` | Text | `gemini` (por defecto), `claude`, `openai` o `compatible` |
    | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | Text | Para fijar otro modelo |
+
+## Usar cualquier otro modelo
+
+El proveedor `compatible` es un hueco abierto: casi todo el mundo habla hoy el mismo
+dialecto que OpenAI, así que con una dirección y una clave se puede apuntar a lo que sea.
+
+| Nombre | Tipo | Qué es |
+|---|---|---|
+| `COMPATIBLE_URL` | Text | La dirección base de la API |
+| `COMPATIBLE_API_KEY` | Secret | La clave de ese servicio |
+| `COMPATIBLE_MODEL` | Text | El modelo exacto |
+
+Ejemplos que funcionan tal cual:
+
+| Servicio | `COMPATIBLE_URL` | Para qué |
+|---|---|---|
+| **OpenRouter** | `https://openrouter.ai/api/v1` | Cientos de modelos con una sola cuenta y una sola clave. Es la opción si quieres probar varios. |
+| **Groq** | `https://api.groq.com/openai/v1` | Muy rápido y con capa gratuita |
+| **DeepSeek** | `https://api.deepseek.com/v1` | Barato |
+| **Mistral** | `https://api.mistral.ai/v1` | Europeo |
+| **Ollama** | `http://TU-IP:11434/v1` | Un modelo en un ordenador tuyo. Necesita que ese ordenador esté encendido y sea accesible desde fuera — no vale `localhost`, porque el Worker no corre en tu máquina. |
+
+Cambiar de modelo es cambiar estas tres variables. No hay que tocar la app.
 
 5. **Decirle a la app dónde está** — copia la URL del Worker
    (`https://asistente-gula.TUCUENTA.workers.dev`) y pégala en el ajuste del asistente

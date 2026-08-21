@@ -171,7 +171,7 @@ function categoriaAlcoholes(destilados, extras = []) {
 
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ, tipoHorno,
+    dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ = "", tipoHorno = "",
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
     tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     soloBandeja,
@@ -181,7 +181,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoNevera, tipoCongelador, tipoPaella, numPaellas = 0, origenSillas = "Dealde",
+    tipoNevera = "Mediana", tipoCongelador = "Mediana", tipoPaella, numPaellas = 0, origenSillas = "Dealde",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
@@ -315,7 +315,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // pantalla con una sola línea a 0, que no dice nada a quien carga.
   if (bombonas > 0) paellaItems.push(["Bombonas llenas", String(bombonas)]);
   if (tipoBBQ !== "no lleva") {
-    paellaItems.push([`Barbacoa ${tipoBBQ}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
+    paellaItems.push([`Barbacoa${tipoBBQ ? ` ${tipoBBQ}` : ""}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
   }
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
@@ -461,7 +461,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    tipoPaella, numPaellas = 0, tipoNevera, tipoCongelador, llevaTarta = true, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "Dealde",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
   } = opts;

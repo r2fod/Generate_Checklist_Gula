@@ -2221,14 +2221,35 @@ async function main() {
       .match(/src="[^"]*assets\/([^"]+\.js)"/) || [])[1];
     const jsViejo = entrada;
     ok(!!jsViejo && await p.locator(".item-row").count() > 20, `la app queda instalada (bundle ${jsViejo})`);
-    // Se "despliega" una versión nueva con un cambio visible
+    // Se "despliega" una versión nueva con un cambio visible.
+    //
+    // El texto que se cambia NO tiene por qué estar en el bundle de entrada: en cuanto
+    // algo perezoso (el asistente, el calendario) importa lo mismo que la app, Rollup
+    // saca los generadores a un chunk compartido y el texto se va con ellos. Esta prueba
+    // daba por hecho que vivían en la entrada y se quedó ciega el día que dejó de ser
+    // verdad — sin fallar, que es lo peor. Ahora se busca en qué fichero está.
+    const assets = `${dir}/../assets`;
+    const MARCA = "Cubo basura reciclaje";
+    const conElTexto = fs3.readdirSync(assets)
+      .filter(f => f.endsWith(".js") && fs3.readFileSync(`${assets}/${f}`, "utf8").includes(MARCA));
+    ok(conElTexto.length === 1, `el texto de la prueba está en un solo fichero (${conElTexto.join(", ") || "ninguno"})`);
     const nuevo = "checklist-VERSIONNUEVA.js";
-    fs3.writeFileSync(`${dir}/../assets/${nuevo}`,
-      fs3.readFileSync(`${dir}/../assets/${jsViejo}`, "utf8").replaceAll("Cubo basura reciclaje", "CAMBIO VERSION NUEVA"));
-    fs3.rmSync(`${dir}/../assets/${jsViejo}`);
-    fs3.writeFileSync(`${dir}/index.html`, fs3.readFileSync(`${dir}/index.html`, "utf8").replace(jsViejo, nuevo));
+    // Se renombran los dos: la entrada, porque la prueba comprueba que el service worker
+    // se trae la nueva; y el chunk donde vive el texto, para que no se sirva el cacheado.
+    const renombrados = { [jsViejo]: nuevo };
+    conElTexto.forEach(f => { if (f !== jsViejo) renombrados[f] = f.replace(/^([^-]+)-.*\.js$/, "$1-VERSIONNUEVA.js"); });
+    Object.entries(renombrados).forEach(([viejo, nue]) => {
+      fs3.writeFileSync(`${assets}/${nue}`,
+        fs3.readFileSync(`${assets}/${viejo}`, "utf8").replaceAll(MARCA, "CAMBIO VERSION NUEVA"));
+      fs3.rmSync(`${assets}/${viejo}`);
+    });
+    // Y las referencias entre chunks, que van por nombre de fichero dentro del propio JS
+    const cambiaNombres = (txt) => Object.entries(renombrados).reduce((t, [v, n]) => t.replaceAll(v, n), txt);
+    fs3.readdirSync(assets).filter(f => f.endsWith(".js")).forEach(f =>
+      fs3.writeFileSync(`${assets}/${f}`, cambiaNombres(fs3.readFileSync(`${assets}/${f}`, "utf8"))));
+    fs3.writeFileSync(`${dir}/index.html`, cambiaNombres(fs3.readFileSync(`${dir}/index.html`, "utf8")));
     const pre = JSON.parse(fs3.readFileSync(`${dir}/../precache.json`, "utf8"));
-    fs3.writeFileSync(`${dir}/../precache.json`, JSON.stringify({ id: "NUEVA", ficheros: pre.ficheros.map(f => f.replace(jsViejo, nuevo)) }));
+    fs3.writeFileSync(`${dir}/../precache.json`, JSON.stringify({ id: "NUEVA", ficheros: pre.ficheros.map(cambiaNombres) }));
     fs3.writeFileSync(`${dir}/../version.json`, JSON.stringify({ id: "NUEVA" }));
     // Se vuelve a abrir la app instalada, con cobertura
     await p.goto(`${BASE2}?c=${estado}`, { waitUntil: "load" });
@@ -3907,8 +3928,11 @@ async function main() {
         ["aviso de creadas", BANCO + "?promover=1", []],
         ["solo lectura", BANCO + "?solover=1", []],
         ["a pantalla completa", BANCO + "?pantalla=1", [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+        // El asistente pide sesión de equipo en la app, así que solo se le llega por
+        // aquí. Se abre con los ajustes desplegados, que es lo que más ocupa.
+        ["asistente", BANCO + "?asistente=1", []],
       ];
-      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura"];
+      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura", ".asis-panel"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];

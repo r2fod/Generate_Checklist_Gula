@@ -49,3 +49,13 @@ export function observarSesion(cb) {
   })();
   return () => { cancelado = true; unsub(); };
 }
+
+// El token de la sesión, para que el proxy del asistente pueda comprobar que quien
+// pregunta es del equipo. Se pide al SDK cada vez y no se guarda: el propio SDK lo
+// refresca solo cuando caduca, y una copia nuestra sería una copia caducada.
+export async function tokenDeSesion() {
+  const conexion = await getAuth();
+  if (!conexion) return "";
+  const usuario = conexion.auth.currentUser;
+  return usuario ? usuario.getIdToken() : "";
+}

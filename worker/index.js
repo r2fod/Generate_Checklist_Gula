@@ -137,46 +137,87 @@ async function claude(cuerpo, env) {
   };
 }
 
-// OpenAI. Va el último y con una condición: solo se le mandan herramientas que NO
-// llevan datos de clientes (la app se encarga de filtrarlas antes de preguntar). Sus
-// tokens gratuitos se pagan compartiendo lo que le llega para entrenar, y por ahí no
-// pueden pasar nombres ni fechas de nadie.
-async function openai(cuerpo, env) {
-  const mensajes = [{ role: "system", content: cuerpo.sistema }];
-  cuerpo.mensajes.forEach(m => {
-    if (m.rol === "herramienta") {
-      mensajes.push({ role: "tool", tool_call_id: m.id, content: JSON.stringify(m.contenido) });
-    } else if (m.rol === "asistente" && m.llamadas && m.llamadas.length) {
-      mensajes.push({
-        role: "assistant", content: m.contenido || null,
-        tool_calls: m.llamadas.map(l => ({ id: l.id, type: "function", function: { name: l.nombre, arguments: JSON.stringify(l.argumentos) } })),
-      });
-    } else {
-      mensajes.push({ role: m.rol === "asistente" ? "assistant" : "user", content: String(m.contenido || "") });
-    }
-  });
-  const r = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${env.OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: env.OPENAI_MODEL || "gpt-4o-mini",
-      messages: mensajes,
-      tools: cuerpo.herramientas.map(h => ({ type: "function", function: { name: h.name, description: h.description, parameters: h.parameters || { type: "object", properties: {} } } })),
-    }),
-  });
-  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  const d = await r.json();
-  const m = ((d.choices || [])[0] || {}).message || {};
-  return {
-    texto: (m.content || "").trim(),
-    llamadas: (m.tool_calls || []).map(t => ({
-      id: t.id, nombre: t.function.name,
-      argumentos: (() => { try { return JSON.parse(t.function.arguments || "{}"); } catch (e) { return {}; } })(),
-    })),
+// Cualquier cosa que hable el dialecto de OpenAI, que a estas alturas es casi todo:
+// OpenAI, OpenRouter (cientos de modelos con una sola clave), Groq, DeepSeek, Together,
+// Mistral, LM Studio y hasta Ollama. Por eso está escrito UNA vez y parametrizado: el
+// proveedor "compatible" y el de OpenAI son este mismo código con otra dirección.
+//
+// El de OpenAI lleva además una condición: sus tokens gratuitos se pagan compartiendo
+// lo que le llega para entrenar, así que la app solo le ofrece herramientas que no
+// devuelven datos de clientes (ver cliente.js). Aquí no se puede comprobar —el Worker no
+// sabe qué hace cada herramienta— y por eso la barrera vive allí, donde sí se sabe.
+function dialectoOpenAI({ base, clave, modelo }) {
+  return async (cuerpo) => {
+    const mensajes = [{ role: "system", content: cuerpo.sistema }];
+    cuerpo.mensajes.forEach(m => {
+      if (m.rol === "herramienta") {
+        mensajes.push({ role: "tool", tool_call_id: m.id, content: JSON.stringify(m.contenido) });
+      } else if (m.rol === "asistente" && m.llamadas && m.llamadas.length) {
+        mensajes.push({
+          role: "assistant", content: m.contenido || null,
+          tool_calls: m.llamadas.map(l => ({ id: l.id, type: "function", function: { name: l.nombre, arguments: JSON.stringify(l.argumentos) } })),
+        });
+      } else {
+        mensajes.push({ role: m.rol === "asistente" ? "assistant" : "user", content: String(m.contenido || "") });
+      }
+    });
+    const r = await fetch(`${String(base).replace(/\/+$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${clave}` },
+      body: JSON.stringify({
+        model: modelo,
+        messages: mensajes,
+        tools: cuerpo.herramientas.map(h => ({ type: "function", function: { name: h.name, description: h.description, parameters: h.parameters || { type: "object", properties: {} } } })),
+      }),
+    });
+    if (!r.ok) throw new Error(`${modelo} ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    const d = await r.json();
+    const m = ((d.choices || [])[0] || {}).message || {};
+    return {
+      texto: (m.content || "").trim(),
+      llamadas: (m.tool_calls || []).map(t => ({
+        id: t.id, nombre: t.function.name,
+        argumentos: (() => { try { return JSON.parse(t.function.arguments || "{}"); } catch (e) { return {}; } })(),
+      })),
+    };
   };
 }
 
-const PROVEEDORES = { gemini, claude, openai };
+// ─── EL REGISTRO ──────────────────────────────────────────────────────────────
+// Añadir un proveedor es añadir una fila. "clave" es el secreto sin el que no se puede
+// usar, y "habla" recibe el entorno y devuelve la función que habla con él.
+const PROVEEDORES = {
+  gemini: {
+    clave: "GEMINI_API_KEY",
+    habla: (env) => (cuerpo) => gemini(cuerpo, env),
+  },
+  claude: {
+    clave: "ANTHROPIC_API_KEY",
+    habla: (env) => (cuerpo) => claude(cuerpo, env),
+  },
+  openai: {
+    clave: "OPENAI_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.openai.com/v1",
+      clave: env.OPENAI_API_KEY,
+      modelo: env.OPENAI_MODEL || "gpt-4o-mini",
+    }),
+  },
+  // El hueco abierto: pones una dirección y una clave y ya está. Con OpenRouter son
+  // cientos de modelos con una sola cuenta; con Groq o DeepSeek, los suyos; y si algún
+  // día tienes Ollama en un ordenador al que se llegue desde fuera, también.
+  compatible: {
+    clave: "COMPATIBLE_API_KEY",
+    // Sin dirección no hay a dónde llamar, así que este pide dos cosas y no una.
+    ademas: "COMPATIBLE_URL",
+    habla: (env) => dialectoOpenAI({
+      base: env.COMPATIBLE_URL,
+      clave: env.COMPATIBLE_API_KEY,
+      modelo: env.COMPATIBLE_MODEL || "",
+    }),
+  },
+};
+
 
 export default {
   async fetch(req, env) {
@@ -196,19 +237,22 @@ export default {
     if (!usuario) return json({ error: "Hace falta tener sesión del equipo." }, 401, origen);
 
     const nombre = PROVEEDORES[cuerpo.proveedor] ? cuerpo.proveedor : (env.PROVEEDOR_POR_DEFECTO || "gemini");
-    const clave = { gemini: "GEMINI_API_KEY", claude: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY" }[nombre];
-    if (!env[clave]) return json({ error: `Este Worker no tiene configurado ${nombre}.` }, 501, origen);
+    const p = PROVEEDORES[nombre];
+    // Se dice QUÉ falta, no "no configurado": si no, hay que abrir los logs de Cloudflare
+    // para enterarse de que lo que faltaba era la dirección y no la clave.
+    const faltan = [p.clave, p.ademas].filter(k => k && !env[k]);
+    if (faltan.length) return json({ error: `Este Worker no tiene ${nombre} configurado: falta ${faltan.join(" y ")}.` }, 501, origen);
 
     if (!Array.isArray(cuerpo.mensajes) || !cuerpo.mensajes.length) {
       return json({ error: "No hay conversación que mandar." }, 400, origen);
     }
 
     try {
-      const salida = await PROVEEDORES[nombre]({
+      const salida = await p.habla(env)({
         sistema: String(cuerpo.sistema || ""),
         mensajes: cuerpo.mensajes,
         herramientas: Array.isArray(cuerpo.herramientas) ? cuerpo.herramientas : [],
-      }, env);
+      });
       return json({ ...salida, proveedor: nombre }, 200, origen);
     } catch (e) {
       // El mensaje del proveedor se devuelve tal cual: sin él, "algo ha fallado" obliga
