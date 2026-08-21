@@ -20,6 +20,9 @@ import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte } from "../calendario/apuntes.js";
+import { gestoDeHerramienta } from "../asistente/gestos.js";
+import { paraLeerEnVozAlta, hayEscucha, hayVoz } from "../asistente/voz.js";
+import { NOMBRES_HERRAMIENTAS as TODAS_LAS_HERRAMIENTAS } from "../asistente/herramientas.js";
 import { buildChecklist as construye } from "../checklist-generadores.js";
 
 let pasan = 0;
@@ -652,6 +655,53 @@ console.log("\n── Tokens por pregunta ──");
   ok(t.media === 3500, `la media por pregunta sale bien (${t.media})`);
   ok(t.hoyPreguntas === 2 && t.hoyTokens === 7000, "y hoy se cuenta aparte del mes");
   ok(totales(saneaGasto(null)).media === 0, "sin preguntas la media es cero, no NaN");
+}
+
+console.log("\n── La cara de lo que está haciendo ──");
+{
+  // Lo importante: borrar NO puede parecerse a buscar. Con un solo "pensando" para todo,
+  // te enteras de que iba a borrar algo cuando ya está borrado.
+  ok(gestoDeHerramienta("borrar_apunte").gesto === "borrando", "borrar tiene su propia cara");
+  ok(gestoDeHerramienta("olvidar").gesto === "borrando", "y olvidar también, que también quita");
+  ok(gestoDeHerramienta("crear_apunte").gesto === "creando", "crear tiene otra");
+  ok(gestoDeHerramienta("buscar_eventos").gesto === "buscando", "buscar otra");
+  ok(gestoDeHerramienta("calcular_hielo").gesto === "calculando", "calcular otra");
+  ok(gestoDeHerramienta("revisar_todo").gesto === "revisando", "revisar otra");
+  ok(gestoDeHerramienta("recordar").gesto === "aprendiendo", "y aprender otra");
+
+  // Lo específico gana a lo general: "borrar_apunte" lleva "apunte" dentro y no puede
+  // caer en la regla de crear.
+  ok(gestoDeHerramienta("borrar_apunte").gesto !== gestoDeHerramienta("crear_apunte").gesto,
+    "borrar un apunte no se confunde con crearlo");
+
+  // TODAS las herramientas tienen frase en cristiano. Si falta una, sale
+  // "buscando ver_checklist", que es peor que no decir nada.
+  TODAS_LAS_HERRAMIENTAS.forEach(n => {
+    const f = gestoDeHerramienta(n).frase;
+    ok(!f.includes("_"), `"${n}" se dice en cristiano → ${f}`);
+  });
+
+  ok(gestoDeHerramienta("").frase === "Pensando…", "sin herramienta, pensando");
+  ok(gestoDeHerramienta("preguntando a gemini").frase.startsWith("Preguntando"),
+    "y un aviso que ya viene escrito se deja tal cual");
+  ok(gestoDeHerramienta("inventada_nueva").frase.includes("inventada nueva"),
+    "una herramienta nueva sin frase no rompe: se lee su nombre sin guiones");
+}
+
+console.log("\n── Hablarle y que conteste ──");
+{
+  // El texto de una respuesta lleva markdown y símbolos que leídos en voz alta suenan
+  // absurdos. Y las horas son el caso peor: "13:00" se lee "trece dos puntos cero cero".
+  const leido = paraLeerEnVozAlta("**Boda X** a las 13:00\n- ⚠️ 2 celíacos\n- `sin gluten`");
+  ok(!leido.includes("*") && !leido.includes("`"), "no lee los asteriscos ni las comillas");
+  ok(!leido.includes("⚠️"), "ni los símbolos");
+  ok(/13 y 00/.test(leido), `las horas se leen como horas → "${leido}"`);
+  ok(!/\n/.test(leido), "y va en una sola línea");
+  ok(paraLeerEnVozAlta("") === "" && paraLeerEnVozAlta(null) === "", "sin texto no dice nada");
+
+  // Fuera del navegador no existe ninguna de las dos, y comprobarlo no puede reventar:
+  // este módulo lo importa el panel entero.
+  ok(hayEscucha() === false && hayVoz() === false, "fuera del navegador se dice que no hay, sin reventar");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

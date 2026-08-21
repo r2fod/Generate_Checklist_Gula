@@ -3934,8 +3934,13 @@ async function main() {
         // Con los ajustes desplegados, que es lo que más ocupa: la rejilla de
         // proveedores, los muñecos y los campos.
         ["asistente ajustes", BANCO + "?asistente=1", [".asis-icono"]],
+        // Las tres pestañas: son las que se van a descolocar en un móvil y nadie se
+        // enteraría hasta abrirlas.
+        ["asistente humano", BANCO + "?asistente=1", ['.asis-pestana:nth-of-type(2)']],
+        ["asistente cerebro", BANCO + "?asistente=1", ['.asis-pestana:nth-of-type(3)']],
+        ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:nth-of-type(4)']],
       ];
-      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura", ".asis-panel"];
+      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura", ".asis-panel", ".hum", ".asis-proveedores"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];

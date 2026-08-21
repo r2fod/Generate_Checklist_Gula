@@ -6207,9 +6207,37 @@ hr {
 /* En rejilla de dos columnas y no en fila que se parte: con cuatro botones de anchos
    distintos quedaban dos arriba, dos abajo y descolocados, que es lo que hacía que la
    pantalla de ajustes pareciera desordenada. En rejilla, todos iguales y alineados. */
+/* Automático a lo ancho y arriba: es un modo, no un proveedor. Metido en la misma
+   rejilla que los tres, su nota larga ensanchaba su columna y todo salía descuadrado. */
+.asis-auto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-height: 48px;
+  padding: 9px 14px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.asis-auto strong { font-size: 0.88rem; font-weight: 700; }
+.asis-auto em { font-style: normal; font-size: 0.72rem; opacity: 0.8; }
+.asis-auto:hover { color: var(--text-main); border-color: var(--text-muted); }
+.asis-auto.es-activa { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Los tres proveedores, en tres columnas iguales. Con las notas cortas caben en un
+   móvil de 320px sin partirse. */
 .asis-proveedores {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 10px;
 }
@@ -6217,10 +6245,13 @@ hr {
 .asis-proveedores .bebida-chip {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 1px;
-  padding: 8px 12px;
-  text-align: left;
+  padding: 8px 4px;
+  min-width: 0;
+  text-align: center;
+  border-radius: var(--radius-sm);
 }
 
 /* La nota debajo del nombre y no al lado: al lado obliga a que el botón sea el doble de
@@ -6630,5 +6661,300 @@ hr {
   .asis-pasos .asis-paso, .asis-hilo, .asis-ajustes, .companero, .companero.es-pensando {
     animation: none;
     transition: none;
+  }
+}
+
+/* ─── EL COMPAÑERO A TAMAÑO GRANDE ────────────────────────────────────────────
+   La pantalla donde se le habla. Grande a propósito: se usa con el móvil en una mano
+   y una caja en la otra, y el botón del micro tiene que acertarse sin mirar. */
+.hum {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 100%;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+.hum-escena {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(58vw, 190px);
+  aspect-ratio: 1;
+}
+
+.hum-svg { width: 100%; height: 100%; overflow: visible; }
+
+/* Los colores salen de los tokens del tema: el compañero se adapta a claro y oscuro
+   sin una sola regla duplicada. */
+.hum-cuerpo { fill: var(--accent); opacity: 0.22; }
+.hum-relleno { fill: var(--accent); opacity: 0.3; }
+.hum-borde { fill: var(--accent); opacity: 0.45; stroke: var(--accent); }
+.hum-vapor { fill: var(--accent); stroke: var(--accent); opacity: 0.4; }
+.hum-cara, .hum-boca { stroke: var(--accent); }
+.hum-cara-relleno .hum-ojo { fill: var(--accent); }
+
+/* Respira siempre: quieto del todo parece una imagen pegada, no un compañero. */
+.hum-escena { animation: hum-respira 3.4s ease-in-out infinite; }
+@keyframes hum-respira {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-4px) scale(1.015); }
+}
+
+/* Parpadea. Sin esto la cara se queda mirando fija y resulta desagradable enseguida. */
+.hum-ojo { animation: hum-parpadeo 5.2s infinite; transform-origin: center; }
+.hum-escena .hum-ojo:nth-of-type(2) { animation-delay: 0.04s; }
+@keyframes hum-parpadeo {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(0.1); }
+}
+
+/* Pensando: los ojos se entrecierran y respira más rápido */
+.hum-escena.es-pensando { animation-duration: 1.5s; }
+.hum-escena.es-pensando .hum-ojo { animation: none; transform: scaleY(0.45); transform-origin: center; }
+
+/* Hablando: la boca se abre y se cierra. Es lo que hace que parezca que habla él. */
+.hum-escena.es-hablando .hum-boca { animation: hum-habla 0.34s ease-in-out infinite; }
+@keyframes hum-habla {
+  0%, 100% { d: path("M84 146 q16 12 32 0"); }
+  50%      { d: path("M84 144 q16 22 32 0"); }
+}
+/* Los navegadores que no saben animar 'd' se quedan con la boca quieta pero el cuerpo
+   sigue moviéndose, así que no parece roto. */
+.hum-escena.es-hablando { animation-duration: 1.1s; }
+
+/* Escuchando: aros saliendo. Sin ellos no se sabe si el micro está abierto. */
+.hum-aro {
+  position: absolute;
+  inset: 6%;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: hum-aro 1.9s ease-out infinite;
+  pointer-events: none;
+}
+.hum-aro.es-tarde { animation-delay: 0.95s; }
+@keyframes hum-aro {
+  0%   { transform: scale(0.85); opacity: 0.55; }
+  100% { transform: scale(1.32); opacity: 0; }
+}
+
+.hum-estado {
+  margin: 0;
+  min-height: 2.6em;
+  max-width: 30ch;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.hum-aviso {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--aviso-texto);
+}
+
+.hum-botones { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* Grande y redondo: se acierta con el pulgar sin mirar, que es el caso de uso entero. */
+.hum-micro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.hum-micro:hover:not(:disabled) { transform: scale(1.05); }
+.hum-micro:disabled { opacity: 0.4; cursor: default; }
+.hum-micro.es-oyendo { background: var(--error-texto); animation: hum-micro-late 1.2s ease-in-out infinite; }
+@keyframes hum-micro-late {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+  70%      { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); }
+}
+
+.hum-voz {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.hum-voz.es-activa { border-color: var(--accent); color: var(--accent); }
+.hum-voz:disabled { opacity: 0.4; cursor: default; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hum-escena, .hum-ojo, .hum-boca, .hum-aro, .hum-micro { animation: none; }
+}
+
+/* ─── LOS GESTOS QUE HACE SOLO ────────────────────────────────────────────────
+   Un personaje que solo se mueve cuando le hablas parece un botón con cara. Lo que da
+   sensación de vida es lo que hace sin que le pidas nada, y que no se sepa cuándo.
+   Los tiempos salen al azar desde el componente; aquí solo están las formas. */
+
+/* Mira a un lado: se van las pupilas y el cuerpo acompaña un poco, como al distraerse */
+.hum-escena.gesto-mira-izq .hum-ojo { animation: hum-mira-izq 1.5s ease-in-out; }
+.hum-escena.gesto-mira-der .hum-ojo { animation: hum-mira-der 1.5s ease-in-out; }
+@keyframes hum-mira-izq {
+  0%, 100% { transform: translateX(0); }
+  25%, 70% { transform: translateX(-4px); }
+}
+@keyframes hum-mira-der {
+  0%, 100% { transform: translateX(0); }
+  25%, 70% { transform: translateX(4px); }
+}
+
+.hum-escena.gesto-mira-izq { animation: hum-gira-izq 1.5s ease-in-out; }
+.hum-escena.gesto-mira-der { animation: hum-gira-der 1.5s ease-in-out; }
+@keyframes hum-gira-izq {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  30%, 65% { transform: rotate(-3deg) translateY(-2px); }
+}
+@keyframes hum-gira-der {
+  0%, 100% { transform: rotate(0) translateY(0); }
+  30%, 65% { transform: rotate(3deg) translateY(-2px); }
+}
+
+/* Ladea la cabeza, como cuando algo te llama la atención */
+.hum-escena.gesto-ladea { animation: hum-ladea 1.5s cubic-bezier(0.34, 1.4, 0.64, 1); }
+@keyframes hum-ladea {
+  0%, 100% { transform: rotate(0); }
+  35%, 70% { transform: rotate(-7deg); }
+}
+
+/* Se estira: coge aire y vuelve. Es el que más vida da porque no es simétrico. */
+.hum-escena.gesto-estira { animation: hum-estira 1.5s cubic-bezier(0.34, 1.3, 0.64, 1); }
+@keyframes hum-estira {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  30%      { transform: translateY(-9px) scale(0.97, 1.06); }
+  60%      { transform: translateY(2px) scale(1.03, 0.96); }
+}
+
+/* Asiente, como diciendo "aquí sigo" */
+.hum-escena.gesto-asiente { animation: hum-asiente 1.5s ease-in-out; }
+@keyframes hum-asiente {
+  0%, 100% { transform: translateY(0); }
+  25%      { transform: translateY(6px); }
+  50%      { transform: translateY(-3px); }
+  75%      { transform: translateY(3px); }
+}
+
+/* Y la boca acompaña: una sonrisa un poco más ancha mientras hace el gesto. */
+.hum-escena.gesto-estira .hum-boca,
+.hum-escena.gesto-asiente .hum-boca { animation: hum-sonrie 1.5s ease-in-out; }
+@keyframes hum-sonrie {
+  0%, 100% { transform: scaleX(1); }
+  40%      { transform: scaleX(1.12) translateY(1px); }
+}
+.hum-boca { transform-origin: 100px 146px; }
+.hum-ojo { transition: transform 0.2s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hum-escena.gesto-mira-izq, .hum-escena.gesto-mira-der, .hum-escena.gesto-ladea,
+  .hum-escena.gesto-estira, .hum-escena.gesto-asiente,
+  .hum-escena.gesto-mira-izq .hum-ojo, .hum-escena.gesto-mira-der .hum-ojo,
+  .hum-escena.gesto-estira .hum-boca, .hum-escena.gesto-asiente .hum-boca {
+    animation: none;
+  }
+}
+
+/* ─── LA CARA DE LO QUE ESTÁ HACIENDO ─────────────────────────────────────────
+   Buscar y borrar no son lo mismo. Con un solo "pensando" para todo, te enteras de que
+   iba a borrar algo cuando ya está borrado. */
+
+/* Buscando: los ojos van de un lado a otro, como quien repasa una lista */
+.hum-escena.es-buscando { animation: hum-respira 2.2s ease-in-out infinite; }
+.hum-escena.es-buscando .hum-ojo { animation: hum-rastrea 1.1s ease-in-out infinite; }
+@keyframes hum-rastrea {
+  0%, 100% { transform: translateX(-4px); }
+  50%      { transform: translateX(4px); }
+}
+
+/* Calculando: los ojos miran arriba, que es lo que hace todo el mundo al echar cuentas */
+.hum-escena.es-calculando .hum-ojo {
+  animation: hum-arriba 1.6s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes hum-arriba {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  40%, 70% { transform: translateY(-4px) scaleY(0.8); }
+}
+.hum-escena.es-calculando { animation: hum-ladea-lento 2.4s ease-in-out infinite; }
+@keyframes hum-ladea-lento {
+  0%, 100% { transform: rotate(-2deg); }
+  50%      { transform: rotate(2deg); }
+}
+
+/* Revisando: se acerca, como quien mira algo de cerca para comprobarlo */
+.hum-escena.es-revisando { animation: hum-acerca 1.8s ease-in-out infinite; }
+@keyframes hum-acerca {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+.hum-escena.es-revisando .hum-ojo { transform: scaleY(0.7); transform-origin: center; }
+
+/* Creando: da saltitos. Es lo único alegre de la lista, y lo es a propósito. */
+.hum-escena.es-creando { animation: hum-salta 0.55s cubic-bezier(0.3, 1.4, 0.6, 1) infinite; }
+@keyframes hum-salta {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  35%      { transform: translateY(-10px) scale(0.96, 1.05); }
+  70%      { transform: translateY(0) scale(1.04, 0.96); }
+}
+
+/* Borrando: se echa atrás y se pone rojo. Tiene que dar un poco de respeto: es lo único
+   que quita algo, y quien mira debe poder pararlo antes de que acabe. */
+.hum-escena.es-borrando { animation: hum-retrocede 1.1s ease-in-out infinite; }
+@keyframes hum-retrocede {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  30%      { transform: translateX(-6px) rotate(-4deg); }
+  60%      { transform: translateX(3px) rotate(2deg); }
+}
+.hum-escena.es-borrando .hum-cuerpo,
+.hum-escena.es-borrando .hum-relleno,
+.hum-escena.es-borrando .hum-borde { fill: var(--error-texto); stroke: var(--error-texto); }
+.hum-escena.es-borrando .hum-cara, .hum-escena.es-borrando .hum-boca { stroke: var(--error-texto); }
+.hum-escena.es-borrando .hum-ojo { fill: var(--error-texto); }
+/* Boca hacia abajo: no le gusta lo que va a hacer */
+.hum-escena.es-borrando .hum-boca { d: path("M84 152 q16 -10 32 0"); }
+
+/* Aprendiendo: asiente despacio, como quien toma nota */
+.hum-escena.es-aprendiendo { animation: hum-toma-nota 1.4s ease-in-out infinite; }
+@keyframes hum-toma-nota {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  40%      { transform: translateY(5px) rotate(-2deg); }
+  70%      { transform: translateY(-2px) rotate(1deg); }
+}
+.hum-escena.es-aprendiendo .hum-ojo { animation: hum-parpadeo 1.8s infinite; }
+
+/* Pensando (lo que queda): los ojos entrecerrados y respirando más rápido */
+.hum-escena.es-pensando .hum-boca { d: path("M86 148 h28"); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hum-escena.es-buscando, .hum-escena.es-calculando, .hum-escena.es-revisando,
+  .hum-escena.es-creando, .hum-escena.es-borrando, .hum-escena.es-aprendiendo,
+  .hum-escena.es-buscando .hum-ojo, .hum-escena.es-calculando .hum-ojo,
+  .hum-escena.es-aprendiendo .hum-ojo {
+    animation: none;
   }
 }

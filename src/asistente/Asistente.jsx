@@ -8,11 +8,12 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { porTemas, TEMAS } from "./memoria.js";
 import Companero, { COMPANEROS, CLAVES_COMPANERO } from "./Companero.jsx";
+import Humano from "./Humano.jsx";
 import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
 import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permisos.js";
 
@@ -20,6 +21,7 @@ const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
 const CLAVE_NIVEL = "gula_asistente_nivel";
+const CLAVE_VOZ = "gula_asistente_voz";
 
 const leer = (k, x = "") => { try { return localStorage.getItem(k) || x; } catch (e) { return x; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* modo privado */ } };
@@ -28,11 +30,13 @@ const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* m
 // sale aquí a propósito: con uno configurado no hay nada que elegir, y cuatro botones
 // para tres opciones reales es una pantalla más llena sin ser más útil. El día que se
 // use, se añade una línea.
+// Automático NO es un proveedor: es un modo. Estaba en la misma rejilla que los tres y
+// se veía: su nota es larga, ensanchaba su columna y la rejilla salía descuadrada. Va
+// arriba y a lo ancho, que además es lo que es —o elige él, o eliges tú uno de estos.
 const PROVEEDORES = [
-  { id: "auto", nombre: "Automático", nota: "elige según la pregunta" },
   { id: "gemini", nombre: "Gemini", nota: "gratis" },
   { id: "claude", nombre: "Claude", nota: "de pago" },
-  { id: "openai", nombre: "OpenAI", nota: "sin datos de clientes" },
+  { id: "openai", nombre: "OpenAI", nota: "sin clientes" },
 ];
 
 export default function Asistente({ contexto, onCerrar, onOlvidar }) {
@@ -51,6 +55,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // aplica hasta que alguien lo aprueba aquí — si se aplicara y luego se enseñara, el
   // permiso sería un cartel, no un permiso.
   const [pendientes, setPendientes] = useState([]);
+  const [vozActiva, setVozActiva] = useState(() => leer(CLAVE_VOZ, "1") === "1");
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -101,9 +106,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     }
   };
 
-  const enviar = async (e) => {
-    e.preventDefault();
-    const pregunta = texto.trim();
+  const enviar = async (e, dictado = "") => {
+    if (e) e.preventDefault();
+    const pregunta = (dictado || texto).trim();
     if (!pregunta || pensando) return;
     // El tope se comprueba ANTES de mandar nada: preguntar y luego decir que no había
     // presupuesto sería haberlo gastado igual.
@@ -197,12 +202,22 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                 onChange={e => { setUrl(e.target.value); guardar(CLAVE_URL, e.target.value.trim()); }}
               />
             </label>
+            <button
+              type="button"
+              className={`asis-auto${proveedor === "auto" ? " es-activa" : ""}`}
+              onClick={() => { setProveedor("auto"); guardar(CLAVE_PROVEEDOR, "auto"); }}
+              aria-pressed={proveedor === "auto"}
+            >
+              <strong>Automático</strong>
+              <em>elige según la pregunta</em>
+            </button>
             <div className="asis-proveedores">
               {PROVEEDORES.map(p => (
                 <button
                   key={p.id} type="button"
                   className={`bebida-chip${proveedor === p.id ? " es-activa" : ""}`}
                   onClick={() => { setProveedor(p.id); guardar(CLAVE_PROVEEDOR, p.id); }}
+                  aria-pressed={proveedor === p.id}
                 >
                   {p.nombre} <em className="asis-nota">{p.nota}</em>
                 </button>
@@ -261,7 +276,21 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {pestana === "gasto" ? (
+        {pestana === "humano" ? (
+          <div className="asis-hilo">
+            <Humano
+              cual={companero === "ninguno" ? "chef" : companero}
+              estado={pensando ? "pensando" : huboError ? "error" : "quieto"}
+              haciendo={enCurso}
+              ultimaRespuesta={[...hilo].reverse().find(m => m.de === "el")?.texto || ""}
+              vozActiva={vozActiva}
+              onCambiarVoz={(v) => { setVozActiva(v); guardar(CLAVE_VOZ, v ? "1" : "0"); }}
+              // Lo dictado entra por la MISMA puerta que lo escrito: mismas herramientas,
+              // mismos permisos, mismo enrutado. Hablarle no es un camino aparte.
+              onPregunta={(t) => enviar(null, t)}
+            />
+          </div>
+        ) : pestana === "gasto" ? (
           <div className="asis-hilo asis-cerebro">
             <p className="asis-explica">
               Lo que llevas consumido este mes, contado en este navegador. Los precios son
