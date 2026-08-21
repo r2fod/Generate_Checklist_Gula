@@ -7,6 +7,7 @@ import {
   terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen,
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
+import { categoriaMenusEspeciales } from "./menus-especiales.js";
 import { conSufijo } from "./checklist-format.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
@@ -126,9 +127,19 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
 
 // ─── BUILD CHECKLIST ──────────────────────────────────────────────────────────
 export function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
-  if (evtKey === "cumpleanos") return buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts);
-  if (evtKey === "produccion") return buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts);
-  return buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts); // boda, comunión y evento corporativo
+  const cats = generadorDe(evtKey)(evtKey, pax, horasCoctel, horasCopas, ninos, opts);
+  // Los menús especiales se cuentan de las alergias de las notas y salen los PRIMEROS,
+  // en su propia categoría. Van aquí y no dentro de cada generador porque son los mismos
+  // en los cinco tipos de evento: una alergia no depende de si es boda o rodaje. Si no
+  // hay ninguna, la categoría no existe y la checklist sale exactamente igual que antes.
+  const especiales = categoriaMenusEspeciales((opts && opts.notasEvento) || "");
+  return especiales ? [especiales, ...cats] : cats;
+}
+
+function generadorDe(evtKey) {
+  if (evtKey === "cumpleanos") return (k, ...a) => buildChecklistCumpleanos(...a);
+  if (evtKey === "produccion") return (k, ...a) => buildChecklistProduccion(...a);
+  return buildChecklistBoda;   // boda, comunión y evento corporativo
 }
 
 // Boda y comunión — fiel a "Checklist de Carga – BODA"

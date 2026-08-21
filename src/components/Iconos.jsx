@@ -7,6 +7,10 @@ import {
 // Icono decorativo + color pastel por categoría, buscado por fragmento del nombre
 // (varía según el tipo de evento: "Cocina y fuego", "Cocina y Electro"...)
 const ICONOS_CATEGORIA = [
+  // La primera de la lista y la primera de la checklist: los menús que hay que sacar
+  // aparte por una alergia. En rojo a propósito — es lo único de toda la carga que, si
+  // se pasa por alto, acaba en algo más que un viaje de vuelta.
+  { fragmento: "menús especiales", Comp: ChefHat, color: "#fee2e2", texto: "#991b1b" },
   { fragmento: "electric", Comp: Plug, color: "#fef3c7", texto: "#92400e" },
   { fragmento: "personal", Comp: Users, color: "#e0e7ff", texto: "#3730a3" },
   { fragmento: "mobiliario", Comp: Armchair, color: "#fce7f3", texto: "#9d174d" },
@@ -46,6 +50,7 @@ export function IconoCategoria({ nombre, size = 16 }) {
 // Icono por MATERIAL: se elige según palabras clave del nombre del item (el primero
 // que coincide gana, por eso el orden importa). Es decorativo — una pista visual.
 const ICONOS_ITEM = [
+  { f: ["menú sin", "menu sin", "menú vegano", "menu vegano", "menú vegetariano", "menu vegetariano", "menú especial", "menu especial"], I: ChefHat, c: "#991b1b" },
   { f: ["vino", "tinto de verano", "vermut", "mistela", "cava", "champ", "sangr"], I: Wine, c: "#9d174d" },
   { f: ["cerveza", "barril", "tercio", "alhambra"], I: Beer, c: "#b45309" },
   { f: ["ginebra", "ron ", "vodka", "tequila", "whisk", "licor", "baileys", "orujo", "cazalla", "jagger", "jägg", "martini", "ballantines", "barceló", "barcelo", "seagram", "smirnoff", "destilado", "tanqueray", "puerto de indias", "negrita", "tía maría", "tia maria", "limoncello", "peche"], I: Martini, c: "#7c3aed" },

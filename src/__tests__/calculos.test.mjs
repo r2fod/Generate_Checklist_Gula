@@ -31,6 +31,8 @@ import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
 import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
+import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
+import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
 
 let pasan = 0;
@@ -1326,6 +1328,151 @@ console.log("\n══ Las mesas de los comensales ══");
   // Un evento sin vueltos, uno con el tipo cambiado a mano y uno vacío no revientan nada
   ok(Object.keys(calibracionBebida({ x: { evento: "boda", pax: 50 }, y: {}, z: { evento: "inventado", vueltos: {} } }, {})).length === 0,
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
+}
+
+// ─── LOS MENÚS QUE HAY QUE HACER APARTE ───────────────────────────────────────
+{
+  console.log("\n── Menús especiales a partir de las alergias ──");
+  const de = (t) => menusEspeciales(alergiasDeLasNotas(t));
+  const cuantos = (t, clave) => (de(t).find(m => m.clave === clave) || {}).n;
+
+  // El ejemplo que sale escrito en el propio formulario. Si esto falla, falla lo que la
+  // gente va a escribir de verdad.
+  const real = de("⚠️ ALERGIAS: 2 celíacos, 1 alérgico al marisco en la mesa 4, 1 vegano");
+  ok(totalMenusEspeciales(real) === 4, `el ejemplo del formulario da 4 menús → ${totalMenusEspeciales(real)}`);
+  ok(cuantos("⚠️ ALERGIAS: 2 celíacos, 1 alérgico al marisco en la mesa 4, 1 vegano", "gluten") === 2,
+    "dos celíacos son dos menús sin gluten");
+  // El 4 de "en la mesa 4" no son cuatro menús, y ese es el fallo que más caro sale:
+  // cocina prepara cuatro raciones sin marisco y faltan tres platos normales.
+  ok(cuantos("⚠️ ALERGIAS: 1 alérgico al marisco en la mesa 4", "marisco") === 1,
+    "y el número de una mesa no se cuenta como comensales");
+
+  // Escrito con números en palabra, que es como se contesta desde el móvil
+  ok(cuantos("ALERGIAS: dos veganos y un intolerante a la lactosa", "vegano") === 2 &&
+     cuantos("ALERGIAS: dos veganos y un intolerante a la lactosa", "lactosa") === 1,
+    "\"dos veganos y un intolerante a la lactosa\" sale bien");
+
+  // Sin número es UNA persona: quedarse corto en cocina es el fallo caro
+  ok(cuantos("ALERGIAS: celíaco", "gluten") === 1, "sin número se cuenta uno");
+
+  // La misma familia repartida en dos frases se suma
+  ok(cuantos("ALERGIAS: 2 celíacos. 1 celíaco más que avisó ayer", "gluten") === 3,
+    "la misma alergia en dos frases se suma");
+
+  // Contestar que no hay no puede crear una categoría
+  ["", "   ", "ninguna", "No", "no hay", "-", "sin alergias"].forEach(t => {
+    ok(de(`ALERGIAS: ${t}`).length === 0, `"${t || "(vacío)"}" no crea ningún menú`);
+  });
+
+  // MENCIONAR un alérgeno no es PEDIR un menú. Sin esto, "el postre lleva frutos secos"
+  // mandaba a cocina a preparar un menú que nadie ha pedido.
+  ok(de("El postre lleva frutos secos").length === 0,
+    "mencionar un alérgeno sin pedir nada no crea un menú");
+  ok(cuantos("ALERGIAS: 1 sin frutos secos", "secos") === 1,
+    "pero \"1 sin frutos secos\" sí");
+
+  // Lo que la app NO entiende sale igual, contado y con el texto. Una alergia que se
+  // calla porque no se ha sabido clasificar es justo lo que esto viene a evitar.
+  const raro = de("ALERGIAS: 2 alérgicos al sésamo");
+  ok(raro.length === 1 && raro[0].clave === "revisar" && raro[0].n === 2,
+    `una alergia desconocida sale para revisar, no se pierde → ${JSON.stringify(raro)}`);
+
+  // Las notas que no son alergias no ensucian la cuenta
+  ok(de("⚠️ ALERGIAS: 1 vegano\nHablar con Marta al llegar. Aparcar detrás.").length === 1,
+    "el resto de las notas no cuenta como menús");
+
+  // Y sin la marca del formulario, escrito a mano en las notas, también se lee
+  ok(cuantos("Ojo: hay 3 celíacos", "gluten") === 3, "escrito a mano en las notas también vale");
+
+  // La categoría entra en la checklist SOLO si hay alguno, y va la primera
+  ok(categoriaMenusEspeciales("nada que reseñar") === null, "sin alergias no hay categoría");
+  const cat = categoriaMenusEspeciales("⚠️ ALERGIAS: 2 celíacos, 1 vegano");
+  ok(cat.nombre === "Menús especiales" && cat.items.length === 2, "con alergias sale la categoría");
+
+  const conAlergias = buildChecklist("boda", 100, 2, 4, 0, { notasEvento: "⚠️ ALERGIAS: 2 celíacos" });
+  const sinAlergias = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(conAlergias[0].nombre === "Menús especiales", "y va la primera de la checklist");
+  ok(conAlergias.length === sinAlergias.length + 1, "sin tocar ninguna otra categoría");
+  ok(JSON.stringify(conAlergias.slice(1)) === JSON.stringify(sinAlergias),
+    "y el resto de la checklist sale exactamente igual que antes");
+
+  // Los cinco tipos de evento la llevan: una alergia no depende de si es boda o rodaje
+  ["boda", "comunion", "corporativo", "cumpleanos", "produccion"].forEach(t => {
+    const c = buildChecklist(t, 60, 2, 2, 0, { notasEvento: "ALERGIAS: 1 celíaco" });
+    ok(c[0] && c[0].nombre === "Menús especiales", `${t} también saca los menús especiales`);
+  });
+}
+
+// ─── LA ESCALETA DEL DÍA ──────────────────────────────────────────────────────
+{
+  console.log("\n── Escaleta del día ──");
+  const base = { horaInicio: "13:00", horasCoctel: 1, horasCopas: 4, totalItems: 140,
+    pax: 100, numLogistica: 3, horasJornada: 10 };
+  const e = escaletaDelEvento(base);
+  const dame = (fase) => e.find(t => t.fase === fase);
+  const enMin = (h) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3));
+
+  // Sin hora de inicio no hay escaleta. Enseñar una que empieza a las 00:00 sería
+  // enseñar una mentira ordenada, y alguien saldría del obrador a esa hora.
+  ok(escaletaDelEvento({}).length === 0 && escaletaDelEvento({ horaInicio: "nolaes" }).length === 0,
+    "sin hora de inicio no se inventa ninguna escaleta");
+
+  // Va en orden y sin huecos: el fin de cada tramo es el principio del siguiente. Es lo
+  // único que hace que una escaleta sirva para algo.
+  let encadenada = true;
+  for (let i = 1; i < e.length; i++) if (e[i - 1].fin !== e[i].hora) encadenada = false;
+  ok(encadenada, "los tramos van encadenados, sin huecos ni solapes");
+
+  // La hora de inicio es la única que no se negocia: el montaje tiene que estar acabado
+  // antes, con su margen de respiro.
+  ok(dame("margen").fin === "13:00" && dame("margen").minutos === MARGEN_ANTES_MIN,
+    `el repaso acaba justo a la hora de inicio (${dame("margen").fin})`);
+  ok(dame("montaje").fin === dame("margen").hora, "y el montaje acaba cuando empieza el repaso");
+
+  // El cóctel arranca a la hora de inicio y las copas van después del servicio
+  ok(dame("coctel").hora === "13:00", "el cóctel empieza a la hora de inicio");
+  ok(enMin(dame("copas").hora) > enMin(dame("servicio").hora), "y las copas van después del servicio");
+  ok(dame("recogida").hora === dame("copas").fin, "la recogida empieza al cerrar la barra");
+
+  // Sin barra de cóctel no hay tramo de cóctel: no se pinta un tramo de cero minutos
+  const sinCoctel = escaletaDelEvento({ ...base, horasCoctel: 0 });
+  ok(!sinCoctel.find(t => t.fase === "coctel"), "sin cóctel no sale el tramo de cóctel");
+  ok(sinCoctel.find(t => t.fase === "servicio").hora === "13:00",
+    "y el servicio pasa a empezar a la hora de inicio");
+  const sinCopas = escaletaDelEvento({ ...base, horasCopas: 0 });
+  ok(!sinCopas.find(t => t.fase === "copas"), "y sin barra de copas tampoco sale el suyo");
+
+  // El viaje no lo sabe la app y se marca. Una escaleta que se saca un tiempo de viaje
+  // de la manga es peor que no tenerla, porque parece que lo sabe.
+  ok(dame("viaje").estimado === true && dame("viaje").minutos === VIAJE_POR_DEFECTO_MIN,
+    "el viaje sale marcado como estimado");
+  ok(escaletaDelEvento({ ...base, viajeMin: 90 }).find(t => t.fase === "viaje").estimado !== true,
+    "y si se dice cuánto se tarda, deja de estar marcado");
+
+  // Más carga o menos gente empujan la salida hacia atrás, nunca hacia delante
+  const masItems = escaletaDelEvento({ ...base, totalItems: 400 });
+  ok(enMin(masItems[0].hora) < enMin(e[0].hora), "con más carga hay que salir antes");
+  const menosGente = escaletaDelEvento({ ...base, numLogistica: 1 });
+  ok(enMin(menosGente[0].hora) < enMin(e[0].hora), "y con menos gente de logística también");
+
+  // El horario que ya se ha decidido manda, pero el desfase se dice en voz alta: es
+  // tiempo que va a faltar en el montaje, no un detalle.
+  const conEquipo = escaletaDelEvento({ ...base, logisticaEquipo: [{ inicio: "09:00" }, { inicio: "10:00" }] });
+  const prep = conEquipo.find(t => t.fase === "prep");
+  ok(prep.horaDecidida === "09:00", "coge la entrada más temprana del equipo, no la más tarde");
+  ok(prep.desfaseMin > 0, `y avisa de cuánto se entra tarde (${prep.desfaseMin} min)`);
+  const aTiempo = escaletaDelEvento({ ...base, logisticaEquipo: [{ inicio: "05:00" }] });
+  ok(aTiempo.find(t => t.fase === "prep").desfaseMin < 0, "entrando pronto el desfase sale a favor");
+
+  // Un evento de noche que se recoge pasada medianoche no puede reventar la escaleta
+  const nocturno = escaletaDelEvento({ ...base, horaInicio: "21:00", horasCopas: 5 });
+  ok(nocturno.every(t => /^\d{2}:\d{2}$/.test(t.hora) && /^\d{2}:\d{2}$/.test(t.fin)),
+    "un evento que acaba de madrugada sigue dando horas válidas");
+
+  // El resumen de una línea es lo que de verdad se pregunta por el grupo de WhatsApp
+  ok(/^Salida \d{2}:\d{2} · inicio 13:00 · recogida hasta \d{2}:\d{2}$/.test(resumenEscaleta(e)),
+    `el resumen sale en una línea → "${resumenEscaleta(e)}"`);
+  ok(resumenEscaleta([]) === "", "y sin escaleta el resumen es vacío, no un texto a medias");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

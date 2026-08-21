@@ -8,6 +8,7 @@ import { fmtCantidadCompleta, quitarItemsSinCantidad } from "../checklist-format
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
 import { leerPrecios, guardarPrecios, parsePreciosPegados } from "../precios.js";
 import PanelBebida from "./PanelBebida.jsx";
+import Escaleta from "./Escaleta.jsx";
 
 // ─── MODO CARGA (check interactivo, sincronizado por el link del evento) ──────
 // Pantalla simple pensada para el móvil mientras se carga/descarga el camión. Dos
@@ -339,6 +340,16 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 </span>
               </div>
             )}
+            {/* Debajo de los tiempos estimados porque sale de ellos: primero cuánto se
+                tarda en cada cosa, y de ahí a qué hora toca cada una. */}
+            <Escaleta datos={{
+              horaInicio: meta.horaInicio,
+              horasCoctel: meta.horasCoctel,
+              horasCopas: meta.horasCopas,
+              logisticaEquipo: meta.logisticaEquipo,
+              totalItems, pax: meta.totalPax, numLogistica, horasJornada,
+              calibracion: meta.calibracion,
+            }} />
           </div>
           {!sinCerrar && (
             <button className="preview-close-btn" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>

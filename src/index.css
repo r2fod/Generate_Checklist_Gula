@@ -4509,7 +4509,7 @@ hr {
   min-width: 0;
   padding: 9px 12px;
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
 }
 .resumen-ficha.is-aviso { background: var(--aviso-bg); border-color: var(--aviso-borde); }
@@ -5985,7 +5985,7 @@ hr {
   flex: 0 1 auto;
   min-height: 40px;
   padding: 8px 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: 999px;
   background: transparent;
   color: var(--text-muted);
@@ -6035,3 +6035,84 @@ hr {
 @media (prefers-reduced-motion: reduce) {
   .bebida-chip { transition: none; }
 }
+
+/* ─── LA ESCALETA DEL DÍA ─────────────────────────────────────────────────────
+   Una línea de tiempo dentro del Modo carga. Reusa la cabecera plegable de los
+   paneles de ajuste (.cal-ratios) y solo añade lo suyo: la columna de horas y el
+   hilo vertical que las une. En el móvil la hora manda a la izquierda con ancho
+   fijo, para que los títulos empiecen todos en la misma vertical. */
+.escaleta-lista {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.escaleta-tramo {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  position: relative;
+}
+
+/* El hilo que une las horas. Va en el ::before de cada tramo menos el último, así no
+   hay que pintar una línea absoluta que se descuadre al plegar o al cambiar de ancho. */
+.escaleta-tramo:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 21px;
+  top: 26px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--border-color);
+}
+
+.escaleta-hora {
+  flex: 0 0 44px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-main);
+  padding-top: 1px;
+}
+
+.escaleta-cuerpo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.escaleta-titulo { font-weight: 600; font-size: 0.92rem; color: var(--text-main); }
+
+.escaleta-dura {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.escaleta-dura em { font-style: normal; color: var(--aviso-texto); }
+
+/* Los tramos del evento en sí (lo que ve el cliente) se separan de los de montaje y
+   recogida: son lo que hay que cuadrar, no lo que se puede mover. */
+.escaleta-tramo.es-coctel .escaleta-titulo,
+.escaleta-tramo.es-servicio .escaleta-titulo,
+.escaleta-tramo.es-copas .escaleta-titulo { color: var(--accent); }
+
+.escaleta-alerta {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg);
+  color: var(--aviso-texto);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.escaleta-alerta svg { flex: 0 0 auto; margin-top: 2px; }
+.escaleta-alerta-icono { flex: 0 0 auto; color: var(--aviso-texto); }

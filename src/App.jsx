@@ -2057,8 +2057,12 @@ export default function App({ onCerrarSesion } = {}) {
     tipoNevera, tipoCongelador, tipoPaella, numPaellas, origenSillas, tipoMesa,
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
     paxPorCamarero,
+    // Las notas entran en el cálculo por una sola cosa: de ahí salen las alergias, y de
+    // las alergias cuántos menús hay que hacer aparte (ver menus-especiales.js).
+    notasEvento,
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   }), [
+    notasEvento,
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
@@ -2682,6 +2686,13 @@ export default function App({ onCerrarSesion } = {}) {
             calibracion,
             logisticaReal: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
             horasJornada: horasJornadaEquipo,
+            // Para la escaleta: la hora de inicio manda y las horas de barra sitúan el
+            // resto del día. Las de barra van ya "efectivas" (0 si la barra no está
+            // marcada), igual que en el cálculo de la checklist.
+            horaInicio,
+            horasCoctel: barraCoctel ? horasCoctel : 0,
+            horasCopas: barraCopas ? horasCopas : 0,
+            logisticaEquipo,
           }}
           onClose={() => setModoCarga(false)}
           // Con el link de logística, Modo carga es la app entera: no hay ✕ ni fondo
