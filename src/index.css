@@ -6435,3 +6435,73 @@ hr {
 }
 
 .asis-recuerdo-borrar:hover { color: var(--error-texto); background: var(--error-bg); }
+
+/* ─── EL COMPAÑERO ────────────────────────────────────────────────────────────
+   El estado del asistente donde se está mirando. No es adorno: con el móvil en una
+   mano y una caja en la otra, "está pensando" se ve de reojo y no se lee. */
+.companero {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--accent);
+  transition: transform 0.25s ease, color 0.25s ease;
+}
+
+.companero.es-pensando { animation: companero-respira 1.6s ease-in-out infinite; }
+.companero.es-error { color: var(--error-texto); }
+
+@keyframes companero-respira {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-2px) scale(1.05); }
+}
+
+.asis-munecos { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.asis-muneco {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.asis-muneco:hover { border-color: var(--text-muted); }
+.asis-muneco.es-activo { border-color: var(--accent); background: var(--accent-soft); }
+.asis-muneco-no { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
+
+/* ─── EL GASTO ────────────────────────────────────────────────────────────────
+   Un asistente que cobra por palabra y no dice cuánto lleva gastado es un asistente
+   que un día trae una factura. */
+.asis-gasto-detalle {
+  display: block;
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.asis-recuerdo-puntos.es-gratis {
+  border-color: var(--ok-texto);
+  color: var(--ok-texto);
+  min-width: 0;
+}
+
+.asis-gasto-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  font-size: 0.88rem;
+}
+
+.asis-gasto-total strong { font-size: 1.15rem; color: var(--accent); font-variant-numeric: tabular-nums; }

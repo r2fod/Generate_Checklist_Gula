@@ -135,7 +135,9 @@ async function gemini(cuerpo, env) {
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
   const d = await r.json();
   const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+  const u = d.usageMetadata || {};
   return {
+    uso: { entrada: u.promptTokenCount || 0, salida: u.candidatesTokenCount || 0 },
     texto: partes.filter(p => p.text).map(p => p.text).join("").trim(),
     llamadas: partes.filter(p => p.functionCall).map((p, i) => ({
       id: `g${i}`,
@@ -184,7 +186,9 @@ async function claude(cuerpo, env) {
   if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
   const d = await r.json();
   const bloques = d.content || [];
+  const u = d.usage || {};
   return {
+    uso: { entrada: u.input_tokens || 0, salida: u.output_tokens || 0 },
     texto: bloques.filter(b => b.type === "text").map(b => b.text).join("").trim(),
     llamadas: bloques.filter(b => b.type === "tool_use").map(b => ({ id: b.id, nombre: b.name, argumentos: b.input || {} })),
   };
@@ -226,7 +230,9 @@ function dialectoOpenAI({ base, clave, modelo }) {
     if (!r.ok) throw new Error(`${modelo} ${r.status}: ${(await r.text()).slice(0, 300)}`);
     const d = await r.json();
     const m = ((d.choices || [])[0] || {}).message || {};
+    const u = d.usage || {};
     return {
+      uso: { entrada: u.prompt_tokens || 0, salida: u.completion_tokens || 0 },
       texto: (m.content || "").trim(),
       llamadas: (m.tool_calls || []).map(t => ({
         id: t.id, nombre: t.function.name,

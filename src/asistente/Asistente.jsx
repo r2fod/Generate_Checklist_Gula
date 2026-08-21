@@ -8,13 +8,16 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Sparkles, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { porTemas, TEMAS } from "./memoria.js";
+import Companero, { COMPANEROS, CLAVES_COMPANERO } from "./Companero.jsx";
+import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis } from "./gasto.js";
 
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
+const CLAVE_COMPANERO = "gula_asistente_companero";
 
 const leer = (k, x = "") => { try { return localStorage.getItem(k) || x; } catch (e) { return x; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* modo privado */ } };
@@ -37,6 +40,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // Lo que el Worker dice que tiene configurado. Hasta la primera respuesta no se sabe,
   // y se supone Gemini —que es el que se monta por defecto— en vez de no dejar preguntar.
   const [disponibles, setDisponibles] = useState([]);
+  const [companero, setCompanero] = useState(() => leer(CLAVE_COMPANERO, "chef") || "chef");
+  const [gasto, setGasto] = useState(() => leerGasto());
+  const [tope, setTope] = useState(() => leerTope());
+  const [huboError, setHuboError] = useState(false);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
@@ -51,6 +58,17 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     e.preventDefault();
     const pregunta = texto.trim();
     if (!pregunta || pensando) return;
+    // El tope se comprueba ANTES de mandar nada: preguntar y luego decir que no había
+    // presupuesto sería haberlo gastado igual.
+    if (proveedor !== "auto" && !esGratis(proveedor)) {
+      const permiso = puedePreguntar(proveedor, gasto, tope);
+      if (!permiso.puede) {
+        setHilo(h => [...h, { de: "yo", texto: pregunta }, { de: "error", texto: permiso.motivo }]);
+        setTexto("");
+        setHuboError(true);
+        return;
+      }
+    }
     setTexto("");
     setHilo(h => [...h, { de: "yo", texto: pregunta }]);
     setPensando(true);
@@ -66,11 +84,17 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         ? await preguntarAuto({ ...comun, texto: pregunta, disponibles, onProveedor: (p) => setEnCurso(`preguntando a ${p}`) })
         : await preguntar({ ...comun, texto: pregunta, proveedor });
       setMensajes(r.mensajes);
+      setHuboError(false);
+      // Lo que ha costado esta pregunta. Se apunta aquí y no en el proxy porque el
+      // contador es para mirarlo, no para facturar: subirlo a la nube en cada pregunta
+      // serían escrituras constantes por un número que solo sirve de aviso.
+      if (r.uso) setGasto(apuntar(r.proveedor, r.uso));
       // La lista de configurados llega con cada respuesta: así el enrutado de la
       // siguiente pregunta ya sabe con qué cuenta, sin una petición aparte.
       if (r.disponibles) setDisponibles(r.disponibles);
       setHilo(h => [...h, { de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo }]);
     } catch (err) {
+      setHuboError(true);
       setHilo(h => [...h, { de: "error", texto: String(err && err.message ? err.message : err) }]);
     } finally {
       setPensando(false);
@@ -82,7 +106,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
       <div className="asis-panel">
         <div className="asis-cab">
-          <span className="asis-titulo"><Sparkles size={16} aria-hidden="true" /> Asistente</span>
+          <Companero cual={companero} size={30}
+            estado={pensando ? "pensando" : huboError ? "error" : "quieto"} />
+          <span className="asis-titulo">Asistente</span>
           <button type="button" className="asis-icono" onClick={() => setAjustes(v => !v)}
             aria-expanded={ajustes} aria-label="Ajustes del asistente" title="Ajustes">
             <Settings size={16} aria-hidden="true" />
@@ -130,6 +156,25 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                 </button>
               ))}
             </div>
+            <label className="asis-campo">
+              <span>Compañero</span>
+              <div className="asis-munecos">
+                {CLAVES_COMPANERO.map(k => (
+                  <button
+                    key={k} type="button"
+                    className={`asis-muneco${companero === k ? " es-activo" : ""}`}
+                    onClick={() => { setCompanero(k); guardar(CLAVE_COMPANERO, k); }}
+                    title={COMPANEROS[k].nombre} aria-label={COMPANEROS[k].nombre}
+                    aria-pressed={companero === k}
+                  >
+                    {k === "ninguno"
+                      ? <span className="asis-muneco-no">sin</span>
+                      : <Companero cual={k} size={30} estado="quieto" />}
+                  </button>
+                ))}
+              </div>
+            </label>
+
             <p className="asis-explica">
               Las claves no viven aquí: viven en el proxy. Sin él no hay asistente, y con
               una clave metida en la app la leería cualquiera — el repositorio es público.
@@ -147,7 +192,61 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {pestana === "cerebro" ? (
+        {pestana === "gasto" ? (
+          <div className="asis-hilo asis-cerebro">
+            <p className="asis-explica">
+              Lo que llevas consumido este mes, contado en este navegador. Los precios son
+              aproximados y de la web de cada uno: el número exacto importa menos que el
+              orden de magnitud, que es lo que hace falta para saber si una pregunta merece
+              el modelo caro.
+            </p>
+
+            {!resumen(gasto).length && <p className="asis-vacio">Todavía no has preguntado nada este mes.</p>}
+
+            {resumen(gasto).map(r => (
+              <div className="asis-recuerdo" key={r.proveedor}>
+                <span className="asis-recuerdo-texto">
+                  <strong>{r.nombre}</strong>
+                  <em className="asis-gasto-detalle">
+                    {r.preguntas} pregunta{r.preguntas === 1 ? "" : "s"} · {r.tokens.toLocaleString("es-ES")} tokens
+                  </em>
+                </span>
+                <span className={`asis-recuerdo-puntos${r.gratis ? " es-gratis" : ""}`}>
+                  {r.gratis ? "gratis" : `${r.euros.toFixed(2)}€`}
+                </span>
+              </div>
+            ))}
+
+            {resumen(gasto).length > 0 && (
+              <div className="asis-gasto-total">
+                <span>Total del mes</span>
+                <strong>{eurosTotales(gasto).toFixed(2)}€</strong>
+              </div>
+            )}
+
+            <label className="asis-campo">
+              <span>Tope al mes (0 = sin tope)</span>
+              <input
+                className="form-input" type="number" min="0" step="1" inputMode="decimal"
+                value={tope}
+                onChange={e => setTope(ponerTope(e.target.value))}
+              />
+            </label>
+            <p className="asis-explica">
+              {/* Parar Gemini por un tope de dinero cuando no cuesta nada sería absurdo,
+                  y dejaría a la app sin asistente por un número que no aplica. */}
+              El tope solo frena a los de pago. Gemini es gratis y sigue contestando aunque
+              se pase.
+            </p>
+
+            {resumen(gasto).length > 0 && (
+              <button type="button" className="btn btn-outline"
+                onClick={() => { if (confirm("¿Poner el contador a cero?")) setGasto(borrarGasto()); }}>
+                Poner el contador a cero
+              </button>
+            )}
+          </div>
+        ) : pestana === "cerebro" ? (
           <div className="asis-hilo asis-cerebro">
             <p className="asis-explica">
               Lo que ha aprendido de vosotros y que no sale de ningún cálculo. Está en

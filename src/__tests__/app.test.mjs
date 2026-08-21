@@ -3931,6 +3931,9 @@ async function main() {
         // El asistente pide sesión de equipo en la app, así que solo se le llega por
         // aquí. Se abre con los ajustes desplegados, que es lo que más ocupa.
         ["asistente", BANCO + "?asistente=1", []],
+        // Con los ajustes desplegados, que es lo que más ocupa: la rejilla de
+        // proveedores, los muñecos y los campos.
+        ["asistente ajustes", BANCO + "?asistente=1", [".asis-icono"]],
       ];
       const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura", ".asis-panel"];
 

@@ -14,6 +14,7 @@ import { conectores, conectoresActivos, conHerramientasDeConectores, registrarCo
 import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
 import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
+import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS } from "../asistente/gasto.js";
 import { buildChecklist as construye } from "../checklist-generadores.js";
 
 let pasan = 0;
@@ -454,6 +455,49 @@ console.log("\n── Quién contesta cada pregunta ──");
     .forEach(m => ok(mereceOtroIntento(m), `"${m.slice(0, 28)}" merece probar con otro`));
   ["400 Bad Request", "Cuerpo ilegible", "Hace falta tener sesión del equipo"]
     .forEach(m => ok(!mereceOtroIntento(m), `"${m.slice(0, 28)}" NO se reintenta: estaría igual de mal en todos`));
+}
+
+console.log("\n── El gasto ──");
+{
+  // localStorage no existe en node: apuntar() lo intenta y sigue. Que no reviente es
+  // parte de la prueba, porque en modo privado del navegador pasa lo mismo.
+  let g = saneaGasto(null);
+  ok(g.mes === mesActual() && Object.keys(g.proveedores).length === 0, "arranca a cero, del mes en curso");
+
+  g = apuntar("gemini", { entrada: 3000, salida: 400 }, g);
+  g = apuntar("claude", { entrada: 5000, salida: 900 }, g);
+  g = apuntar("claude", { entrada: 4000, salida: 700 }, g);
+  ok(g.proveedores.claude.preguntas === 2 && g.proveedores.claude.entrada === 9000,
+    "suma las preguntas y los tokens de cada proveedor");
+  ok(g.proveedores.gemini.entrada === 3000, "y los lleva separados");
+
+  // Gemini es gratis: cuenta tokens pero no euros. Enseñar un coste donde no lo hay
+  // haría que alguien dejara de usar lo único que no cuesta nada.
+  ok(euros("gemini", g) === 0 && esGratis("gemini"), "Gemini cuenta tokens pero no euros");
+  ok(euros("claude", g) > 0 && !esGratis("claude"), "y Claude sí cuesta");
+  ok(Math.abs(eurosTotales(g) - euros("claude", g)) < 1e-9, "el total es la suma de lo que cuesta");
+
+  // Ordenado por lo que más cuesta: es lo que se mira
+  const r = resumen(g);
+  ok(r[0].proveedor === "claude" && r[0].gratis === false, "el resumen pone primero lo que más cuesta");
+  ok(r.find(x => x.proveedor === "gemini").gratis === true, "y marca cuál es gratis");
+
+  // Un mes nuevo empieza de cero: un contador que arrastra meses no dice nada de lo que
+  // va a llegar en la próxima factura, que es para lo que se mira.
+  ok(Object.keys(saneaGasto({ mes: "2020-01", proveedores: { claude: { entrada: 9e9 } } }).proveedores).length === 0,
+    "el gasto de otro mes no se arrastra");
+  ok(saneaGasto({ mes: mesActual(), proveedores: { inventado: { entrada: 5 } } }).proveedores.inventado === undefined,
+    "y un proveedor que no existe se ignora");
+  ok(apuntar("inventado", { entrada: 100 }, g) === g, "apuntar en uno que no existe no toca nada");
+
+  // El tope: frena a los de pago y NO a los gratis
+  ok(puedePreguntar("claude", g, 0).puede, "sin tope no se frena nada");
+  ok(!puedePreguntar("claude", g, 0.001).puede, "pasado el tope, el de pago se para");
+  ok(puedePreguntar("claude", g, 0.001).motivo.includes("Gemini"), "y dice qué hacer, no solo que no");
+  ok(puedePreguntar("gemini", g, 0.001).puede,
+    "pero Gemini sigue: pararlo por dinero cuando es gratis dejaría la app sin asistente por un número que no aplica");
+
+  ok(Object.keys(PRECIOS).every(p => PRECIOS[p].nombre), "todos los proveedores tienen nombre para la pantalla");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

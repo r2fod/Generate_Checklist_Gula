@@ -71,6 +71,7 @@ export async function preguntar({
   // verdad se ha usado, que es lo que separa un recuerdo útil de uno que alguien apuntó
   // una vez y no volvió a hacer falta.
   const { sistema, ids: recordados } = conMemoria(SISTEMA, contexto.memoria);
+  const usoTotal = { entrada: 0, salida: 0 };
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
     const r = await fetch(url, {
@@ -87,6 +88,7 @@ export async function preguntar({
       throw fallo;
     }
 
+    if (d.uso) { usoTotal.entrada += d.uso.entrada || 0; usoTotal.salida += d.uso.salida || 0; }
     conversacion.push({ rol: "asistente", contenido: d.texto || "", llamadas: d.llamadas || [] });
 
     if (!d.llamadas || !d.llamadas.length) {
@@ -95,6 +97,10 @@ export async function preguntar({
         mensajes: conversacion, respuesta: d.texto || "", pasos,
         proveedor: d.proveedor || proveedor, recordados,
         disponibles: d.disponibles || null,
+        // Lo que ha costado, para poder contarlo. Se suma lo de TODAS las vueltas: una
+        // pregunta que llama a tres herramientas son cuatro idas y venidas al modelo, y
+        // contar solo la última diría que costó la cuarta parte de lo que costó.
+        uso: usoTotal,
       };
     }
 
