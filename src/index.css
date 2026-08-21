@@ -3778,6 +3778,12 @@ hr {
   flex-wrap: wrap;
 }
 
+/* Los botones de esta barra se quedaban en 36px de alto, por debajo de los 40 con los
+   que se acierta con el pulgar. Se veía solo de 1024px para arriba —más abajo el
+   flex-wrap los estiraba—, que es justo donde nadie mira si un botón es tocable.
+   Lo destapó el barrido de anchos, no un ojo. */
+.resumen-precios-bar .btn { min-height: 40px; }
+
 .resumen-coste-total {
   font-size: 0.85rem;
   color: var(--text-muted);

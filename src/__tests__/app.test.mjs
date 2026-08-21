@@ -267,6 +267,114 @@ async function main() {
       `${tipo}: ${items} items · ${iconos} iconos · ${invalidas} inválidas · ${selectores} selectores · ${marcados}/${filas} vueltos · Resumen sin NaN`);
   }
 
+  // ── LO NUEVO DEL MODO CARGA: MENÚS ESPECIALES, ESCALETA Y BEBIDA ────────────
+  // Los tres viven en la checklist, no en el calendario, así que el barrido de allí no
+  // los toca. Aquí se comprueban las dos cosas: que HACEN lo suyo y que CABEN, con el
+  // mismo rasero (revisaCaja) en los nueve anchos y los dos temas.
+  console.log("\n── Menús especiales, escaleta y bebida ──");
+  {
+    // Nombres inventados: en el repositorio no entra ni un cliente de verdad.
+    const CON_ALERGIAS = {
+      evento: "boda", pax: 100, ninos: 10, horaInicio: "13:00",
+      barraCoctel: true, horasCoctel: 1, barraCopas: true, horasCopas: 4,
+      nombreEvento: "Boda Fulanita y Mengano", fechaEvento: "2026-09-12",
+      notasEvento: "⚠️ ALERGIAS: 2 celíacos, 1 alérgico al marisco en la mesa 4, 1 vegano\nAparcar detrás.",
+      logisticaEquipo: [{ nombre: "A", inicio: "09:00", fin: "23:00" }],
+    };
+
+    const c0 = await navegador.newContext({ viewport: { width: 1280, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c0.route(h, r => r.abort());
+    const p0 = await nuevaPagina(c0);
+    await p0.goto(url(CON_ALERGIAS), { waitUntil: "domcontentloaded" });
+    await p0.waitForTimeout(1900);
+
+    // Los menús especiales son la PRIMERA categoría: es lo único de toda la carga que,
+    // si se pasa por alto, acaba en algo más que un viaje de vuelta.
+    const primera = (await p0.locator(".cat-name").first().innerText().catch(() => "")).trim();
+    ok(/men[uú]s especiales/i.test(primera), `los menús especiales abren la checklist → "${primera}"`);
+    const textoMenus = await p0.locator(".item-row").evaluateAll(rs => rs.slice(0, 6)
+      .map(r => `${(r.querySelector(".item-name, .item-label") || {}).textContent || ""}=${(r.querySelector(".item-qty-input") || {}).value || ""}`).join(" | "));
+    ok(/sin gluten=2/.test(textoMenus), `dos celíacos son dos menús sin gluten → ${textoMenus}`);
+    ok(/marisco=1/.test(textoMenus), "y el 4 de \"mesa 4\" no se cuenta como cuatro menús");
+
+    // Sin alergias la categoría no existe: la checklist de siempre no cambia
+    await p0.goto(url({ ...CON_ALERGIAS, notasEvento: "Aparcar detrás." }), { waitUntil: "domcontentloaded" });
+    await p0.waitForTimeout(1700);
+    ok(!/men[uú]s especiales/i.test(await p0.locator("body").innerText()),
+      "sin alergias no aparece la categoría por ninguna parte");
+
+    // La escaleta y el panel de bebida, dentro del Resumen del Modo carga
+    await p0.goto(url(CON_ALERGIAS), { waitUntil: "domcontentloaded" });
+    await p0.waitForTimeout(1900);
+    await p0.locator("button", { hasText: "Modo carga" }).first().click(); await p0.waitForTimeout(1000);
+    ok(await p0.locator(".escaleta-cab, .escaleta .cal-ratios-cab").count() > 0 ||
+       await p0.locator(".escaleta").count() > 0, "la escaleta sale en el Modo carga");
+    const cab = await p0.locator(".escaleta .cal-ratios-titulo").first().innerText();
+    ok(/salida \d{2}:\d{2}.*inicio 13:00.*recogida hasta \d{2}:\d{2}/i.test(cab),
+      `y resume el día sin desplegarla → "${cab.replace(/\s+/g, " ")}"`);
+    await p0.locator(".escaleta .cal-ratios-cab").first().click(); await p0.waitForTimeout(400);
+    const horas = await p0.locator(".escaleta-hora").allInnerTexts();
+    ok(horas.length >= 7 && horas.every(h => /^\d{2}:\d{2}$/.test(h)),
+      `desplegada da ${horas.length} tramos con hora válida → ${horas.join(" ")}`);
+    // El equipo entra a las 09:00 y la cuenta dice bastante antes: eso se dice, no se calla
+    ok(await p0.locator(".escaleta-alerta").count() === 1,
+      "y avisa de que el equipo entra más tarde de lo que sale la cuenta");
+
+    await p0.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click(); await p0.waitForTimeout(700);
+    const panelBebida = p0.locator(".cal-ratios").filter({ hasText: "Cuánto se bebe" }).first();
+    ok(await panelBebida.count() === 1, "el panel de bebida sale en el Resumen");
+    await panelBebida.locator(".cal-ratios-cab").click(); await p0.waitForTimeout(350);
+    const chips = await p0.locator(".bebida-chip").allInnerTexts();
+    ok(chips.length === 4, `con las cuatro bebidas → ${chips.join(", ")}`);
+    // Cambiar un factor tiene que cambiar la checklist de verdad, no solo la casilla
+    const vinoAntes = await p0.evaluate(() => {
+      const f = [...document.querySelectorAll(".carga-row, .item-row")]
+        .find(r => /vino blanco/i.test(r.textContent));
+      return f ? f.textContent.replace(/\s+/g, " ") : "";
+    });
+    await p0.locator(".cal-ratio-campo input").first().fill("0,5"); await p0.waitForTimeout(700);
+    ok(await p0.locator(".cal-ratio.es-cambiado").count() >= 1,
+      "el factor tocado se marca como cambiado");
+    // El factor va a Firestore, no a este navegador (es un ajuste del EQUIPO, igual que
+    // los precios y la gente por comensal). En el banco de pruebas la nube está cortada,
+    // así que aquí solo se comprueba que el panel responde, no que persista.
+    ok(vinoAntes !== "", `y hay una línea de vino sobre la que aplica → ${vinoAntes.slice(0, 40)}`);
+    await c0.close();
+
+    // ── El barrido: los tres, 9 anchos × 2 temas ──
+    const CAJAS = [".escaleta", ".cal-ratios", ".resumen-precios-bar"];
+    for (const tema of ["claro", "oscuro"]) {
+      const malos = [];
+      for (const w of ANCHOS) {
+        const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: w < 768, hasTouch: w < 768 });
+        for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+        await c.addInitScript(x => localStorage.setItem("gula_tema", x), tema);
+        const p = await c.newPage();
+        p.on("pageerror", e => errores.push(`modo carga ${w}px: ${e}`));
+        await p.goto(url(CON_ALERGIAS), { waitUntil: "domcontentloaded" });
+        await p.waitForTimeout(1800);
+        await p.locator("button", { hasText: "Modo carga" }).first().click().catch(() => {});
+        await p.waitForTimeout(900);
+        // Desplegados: plegados no se ve nada y el barrido no comprobaría nada
+        await p.locator(".escaleta .cal-ratios-cab").first().click().catch(() => {});
+        await p.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click().catch(() => {});
+        await p.waitForTimeout(600);
+        const pb = p.locator(".cal-ratios").filter({ hasText: "Cuánto se bebe" }).first();
+        if (await pb.count()) await pb.locator(".cal-ratios-cab").click().catch(() => {});
+        await p.waitForTimeout(400);
+        const fuera = await desbordamiento(p);
+        if (fuera > 0) malos.push(`${w}px: la página se mueve de lado +${fuera}px`);
+        for (const caja of CAJAS) {
+          const mal = await revisaCaja(p, caja);
+          if (mal && mal.length) malos.push(`${w}px ${caja}: ${mal.join(" · ")}`);
+        }
+        await c.close();
+      }
+      ok(malos.length === 0,
+        `${tema}: escaleta y bebida caben en los ${ANCHOS.length} anchos${malos.length ? ` → ${malos.slice(0, 4).join(" | ")}${malos.length > 4 ? ` (y ${malos.length - 4} más)` : ""}` : ""}`);
+    }
+  }
+
   // ── Casos límite de pax ─────────────────────────────────────────────────────
   console.log("\n── Casos límite ──");
   for (const pax of [0, 1, 999]) {
