@@ -764,6 +764,47 @@ console.log("\n── El árbol de la memoria ──");
   ok(grafo([], {}).nodos.length === 0, "sin nada, grafo vacío y sin reventar");
 }
 
+console.log("\n── SuperContext: el barrido por relevancia ──");
+{
+  // Sin overflow no cambia nada: el barrido solo actúa cuando hay que elegir qué se
+  // pliega, y con pocos recuerdos no hay elección que hacer.
+  let peq = [];
+  ({ memoria: peq } = recordar(peq, "En comuniones ponemos 3 de cocina", { tema: "equipo" }));
+  ok(contextoPlegado(peq).texto === contextoPlegado(peq, { pregunta: "algo sin relación" }).texto,
+    "sin overflow, la pregunta no cambia nada");
+
+  // El caso que de verdad importa: un dato relevante pero poco usado, contra treinta
+  // populares que no tienen nada que ver. Sin SuperContext el dato relevante se pliega
+  // porque "vivacidad" solo mira puntos y frescura, no de qué habla la pregunta.
+  const SUJ = ["mantel", "camion", "nevera", "carpa", "generador", "silla", "copa", "plato", "bandeja", "termo"];
+  const HEC = ["se guarda arriba", "pesa demasiado", "hay que pedirlo antes", "llega tarde siempre", "cuesta el doble", "no cabe atras", "se rompe facil"];
+  let mem = [];
+  SUJ.forEach(su => HEC.forEach(h => { ({ memoria: mem } = recordar(mem, `${su} ${h}`, { tema: "general" })); }));
+  mem = mem.map(r => ({ ...r, puntos: 50, usado: Date.now() }));         // muy vivos, cero relación
+  ({ memoria: mem } = recordar(mem, "El hielo se derrite rápido sin congelador en agosto", { tema: "bebida" }));
+  mem = mem.map(r => (r.texto.includes("hielo") ? { ...r, puntos: 1, usado: Date.now() - 90 * 86400000 } : r));
+
+  const sinPregunta = contextoPlegado(mem, { max: 900 });
+  const conPregunta = contextoPlegado(mem, { max: 900, pregunta: "cuánto hielo necesito para la barra en agosto" });
+  ok(!sinPregunta.texto.includes("hielo"), "sin pregunta, el dato poco usado se pliega (es lo correcto en el primer turno)");
+  ok(conPregunta.texto.includes("hielo"), "y CON la pregunta, el barrido lo rescata aunque tenga pocos puntos");
+  ok(sinPregunta.plegados > 0 && conPregunta.plegados > 0, "y en los dos casos se sigue plegando el resto y avisando");
+
+  // Lo relevante no expulsa a lo relevante: entre dos MISMO parecido a la pregunta
+  // (comparten exactamente las mismas palabras que ella), sigue ganando el más vivo, no
+  // un orden al azar.
+  let dos = [];
+  ({ memoria: dos } = recordar(dos, "El hielo de la barra pesa mucho", { tema: "bebida" }));
+  ({ memoria: dos } = recordar(dos, "El hielo de la barra huele mal", { tema: "bebida" }));
+  const pA = parecido(dos[0].texto, "hielo de la barra");
+  const pB = parecido(dos[1].texto, "hielo de la barra");
+  ok(pA === pB, `las dos frases de prueba son igual de relevantes (${pA} vs ${pB})`);
+  dos = dos.map((r, i) => ({ ...r, puntos: i === 0 ? 40 : 5 }));
+  const ambos = contextoPlegado(dos, { pregunta: "hielo de la barra" });
+  ok(ambos.texto.indexOf("pesa mucho") < ambos.texto.indexOf("huele mal"),
+    "entre dos igual de relevantes, sigue mandando el más vivo");
+}
+
 console.log("\n── Lo que le importa al equipo ──");
 {
   let o = [];

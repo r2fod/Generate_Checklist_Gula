@@ -38,8 +38,10 @@ Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con r
 // son órdenes: son cosas que el equipo ha contado y pueden estar mal apuntadas, y el
 // modelo tiene que poder contrastarlas con lo que devuelven las herramientas en vez de
 // creérselas por encima de un cálculo.
-function conMemoria(sistema, memoria, objetivos, tareas) {
-  const { texto, ids } = contextoPlegado(memoria || []);
+function conMemoria(sistema, memoria, objetivos, tareas, pregunta) {
+  // El SuperContext: se rastrea la memoria hacia lo que de verdad tiene que ver con
+  // esta pregunta, en vez de mandar siempre el "top" general. Ver arbol.js.
+  const { texto, ids } = contextoPlegado(memoria || [], { pregunta });
   const metas = objetivosParaElContexto(objetivos || []);
   let salida = sistema;
 
@@ -102,7 +104,7 @@ export async function preguntar({
   // Lo que puede y no puede hacer se le dice en el sistema. Si no lo sabe, propone
   // cosas que no puede hacer y la conversación se va en explicar por qué no.
   const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}`;
-  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas);
+  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
   const usoTotal = { entrada: 0, salida: 0 };
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {

@@ -11,6 +11,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
+import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube } from "../nube.js";
 import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
 import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
@@ -64,6 +65,27 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [charlaId, setCharlaId] = useState("");
   const [verHistorial, setVerHistorial] = useState(false);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
+
+  // Si nadie ha puesto todavía una dirección EN ESTE MÓVIL, se busca la que ya haya
+  // configurado el equipo: es la misma idea que los precios o los ratios —quien la
+  // configura primero la deja puesta para todos, y va en Firestore y no en el código
+  // porque el repositorio es público y una URL publicada ahí es un blanco fácil para
+  // golpearla hasta agotar la cuota diaria del equipo. Si este móvil YA tiene una
+  // puesta a mano (por ejemplo, para probar otro Worker), esa manda: no se pisa con la
+  // del equipo.
+  useEffect(() => {
+    if (leer(CLAVE_URL) || !nubeActiva()) return;
+    let vivo = true;
+    const aplicar = (remoto) => {
+      if (!vivo || !remoto || !remoto.url || leer(CLAVE_URL)) return;
+      setUrl(remoto.url);
+      guardar(CLAVE_URL, remoto.url);
+      setAjustes(false);
+    };
+    cargarProxyNube().then(aplicar).catch(() => { /* sin conexión: se pide a mano */ });
+    const corta = suscribirProxyNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, []);
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const [enCurso, setEnCurso] = useState("");
@@ -241,7 +263,14 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               <input
                 className="form-input" type="url" inputMode="url" placeholder="https://asistente-gula.tucuenta.workers.dev"
                 value={url}
-                onChange={e => { setUrl(e.target.value); guardar(CLAVE_URL, e.target.value.trim()); }}
+                onChange={e => {
+                  const limpia = e.target.value.trim();
+                  setUrl(e.target.value);
+                  guardar(CLAVE_URL, limpia);
+                  // Se sube a la nube al escribirla, igual que un precio o un ratio: es
+                  // lo que hace que la próxima persona del equipo no tenga que buscarla.
+                  if (limpia && nubeActiva()) guardarProxyNube({ url: limpia }).catch(() => { /* sin conexión: sube en el siguiente cambio */ });
+                }}
               />
             </label>
             <button
@@ -304,7 +333,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             <p className="asis-explica">
               Las claves no viven aquí: viven en el proxy. Sin él no hay asistente, y con
               una clave metida en la app la leería cualquiera — el repositorio es público.
-              Los pasos para montarlo están en <code>worker/README.md</code>.
+              Los pasos para montarlo están en <code>worker/README.md</code>. La dirección
+              se comparte con el equipo —quien la ponga primero la deja para los demás—,
+              así que no debería hacer falta tocarla salvo para apuntar a otra.
               {proveedor === "auto" && (
                 <> <strong>En automático</strong> se elige según lo que preguntes: lo gratis
                 para el día a día, el de pago solo cuando haya que comparar o recomendar, y

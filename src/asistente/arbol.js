@@ -15,7 +15,7 @@
 //   · DÍA     — "esto es de esta semana". Es como se sabe qué está al día.
 //
 // Sin React ni nube: entra una lista, sale un árbol.
-import { TEMAS, CLAVES_TEMA, FUENTES, poda } from "./memoria.js";
+import { TEMAS, CLAVES_TEMA, FUENTES, poda, parecido } from "./memoria.js";
 
 // Lo que cabe entero antes de empezar a plegar. Por debajo de esto plegar solo quita
 // información sin ahorrar nada que se note.
@@ -71,11 +71,37 @@ export function arbol(memoria) {
 // ─── LO QUE VIAJA EN CADA PREGUNTA ────────────────────────────────────────────
 // El árbol plegado: por tema (que es como se pregunta), con lo vivo entero y el resto
 // resumido en una línea. Devuelve también qué ids han viajado, para poder reforzarlos.
-export function contextoPlegado(memoria, { max = MAX_ARBOL, ahora = Date.now() } = {}) {
+// ─── SUPERCONTEXT: BARRIDO POR RELEVANCIA ─────────────────────────────────────
+// La idea de OpenHuman de rastrear la memoria antes de leer el primer mensaje. Sin
+// "pregunta", se manda lo más vivo (puntos + frescura) tal cual, que es lo correcto
+// para el primer turno de la conversación —no hay nada a lo que ser relevante todavía.
+// Con "pregunta" se reordena hacia lo que de verdad viene a cuento: preguntar "¿cuánto
+// hielo llevo?" no tiene por qué arrastrar los cinco recuerdos más usados sobre sillas
+// de alquiler si hay uno sobre hielo esperando en la página siguiente.
+//
+// Reutiliza parecido() de memoria.js a propósito: es la misma cuenta de palabras
+// compartidas que decide si dos recuerdos son "lo mismo dicho de otra forma". Aquí mide
+// si un recuerdo es "de lo que se está hablando", que es la misma pregunta con otro fin.
+export function contextoPlegado(memoria, { max = MAX_ARBOL, ahora = Date.now(), pregunta = "" } = {}) {
   const lista = poda(memoria);
   if (!lista.length) return { texto: "", ids: [], plegados: 0 };
 
-  const ordenada = [...lista].sort((a, b) => vivacidad(b, ahora) - vivacidad(a, ahora));
+  // Sin pregunta, se ordena por vivacidad — es lo correcto en el primer turno, cuando
+  // no hay nada a lo que ser relevante todavía.
+  //
+  // Con pregunta, lo relevante manda: primero lo que de verdad habla de esto (ordenado
+  // por cuánto se parece), y solo cuando se agota lo relevante entra lo simplemente
+  // vivo. Sumar el parecido a la vivacidad —lo primero que se probó— no bastaba: un
+  // recuerdo con muchos puntos y CERO relación con la pregunta seguía ganando a uno
+  // relevante pero poco usado, que es justo el caso que SuperContext tiene que arreglar
+  // (el dato que hace falta ahora mismo, aunque nadie lo haya mirado en meses).
+  const ordenada = pregunta
+    ? [...lista].sort((a, b) => {
+        const pa = parecido(a.texto, pregunta), pb = parecido(b.texto, pregunta);
+        if (pa > 0 || pb > 0) return pb - pa || vivacidad(b, ahora) - vivacidad(a, ahora);
+        return vivacidad(b, ahora) - vivacidad(a, ahora);
+      })
+    : [...lista].sort((a, b) => vivacidad(b, ahora) - vivacidad(a, ahora));
   const enteros = [];
   const plegados = [];
   let tamano = 0;

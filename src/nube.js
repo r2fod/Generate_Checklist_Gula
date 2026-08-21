@@ -343,6 +343,18 @@ export const guardarTareasNube = TAREAS.guardar;
 export const cargarTareasNube = TAREAS.cargar;
 export const suscribirTareasNube = TAREAS.suscribir;
 
+// La dirección del Worker del asistente. NO va en el código —el repositorio es
+// público, y una URL publicada ahí es un blanco fácil para que cualquiera la encuentre
+// buscando "*.workers.dev" y se ponga a golpearla hasta agotar la cuota diaria del
+// equipo, aunque no consiga colarse (el Worker exige sesión). Guardarla aquí, detrás de
+// las reglas de Firestore que ya exigen sesión para leer, es la misma protección que
+// hoy tiene cualquier dato del equipo, y evita que cada móvil tenga que ir a buscarla:
+// el primero que la configura la deja puesta para todos.
+const PROXY = ajusteCompartido("indice/proxy", "proxy");
+export const guardarProxyNube = PROXY.guardar;
+export const cargarProxyNube = PROXY.cargar;
+export const suscribirProxyNube = PROXY.suscribir;
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

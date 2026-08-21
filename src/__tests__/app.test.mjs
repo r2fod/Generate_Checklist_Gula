@@ -3948,6 +3948,10 @@ async function main() {
           for (const w of ANCHOS) {
             const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: w < 768, hasTouch: w < 768 });
             await c.addInitScript(x => localStorage.setItem("gula_tema", x), tema);
+            // El asistente, desde que trae la dirección del proxy de Firestore, toca la
+            // nube al montarse. Sin cortar estos hosts, "networkidle" no llega nunca en
+            // un banco sin internet de verdad, y el barrido entero se cuelga.
+            for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
             const p = await c.newPage();
             p.on("pageerror", e => errores.push(`responsive ${nombre} ${w}px: ${e}`));
             await p.goto(dir, { waitUntil: "networkidle" });
