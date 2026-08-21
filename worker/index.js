@@ -45,16 +45,45 @@ function origenPermitido(req, env) {
 // firma a mano: es una petición y no hay que meter criptografía ni claves públicas en
 // el Worker. La FIREBASE_API_KEY es la del cliente web, que ya es pública (va en el
 // bundle de la app): aquí no se está guardando ningún secreto nuevo.
+//
+// Devuelve { usuario } o { fallo }, y el fallo dice CUÁL de las tres cosas ha pasado. La
+// primera versión devolvía null en los tres casos y contestaba "hace falta sesión": con
+// eso, un usuario que SÍ tenía sesión no tenía forma de saber si el problema era su
+// sesión, la clave de Firebase mal pegada o el token caducado. Tres arreglos distintos
+// bajo el mismo mensaje es un mensaje que no sirve.
 async function quienEs(idToken, env) {
-  if (!idToken) return null;
-  const r = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
-    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idToken }) },
-  );
-  if (!r.ok) return null;
+  if (!idToken) {
+    return { fallo: "No ha llegado ninguna sesión. Entra con el usuario del equipo en la app; si ya has entrado, cierra sesión y vuelve a entrar." };
+  }
+  // La clave se recorta: pegada desde el panel se lleva saltos de línea y espacios con
+  // una facilidad pasmosa, y eso rompe la URL sin decir por qué.
+  const clave = String(env.FIREBASE_API_KEY || "").trim();
+  if (!clave) return { fallo: "Este Worker no tiene FIREBASE_API_KEY configurada." };
+
+  let r;
+  try {
+    r = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(clave)}`,
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idToken: String(idToken).trim() }) },
+    );
+  } catch (e) {
+    return { fallo: `No se ha podido comprobar la sesión con Firebase: ${e && e.message ? e.message : e}` };
+  }
+
+  if (!r.ok) {
+    // El motivo de Google se devuelve tal cual. "API_KEY_INVALID" y "INVALID_ID_TOKEN"
+    // piden cosas opuestas, y sin verlo se prueban las dos a ciegas.
+    const detalle = await r.text().catch(() => "");
+    const motivo = (detalle.match(/"message"\s*:\s*"([^"]+)"/) || [])[1] || `HTTP ${r.status}`;
+    if (/API_KEY|KEY_INVALID/i.test(motivo)) {
+      return { fallo: `Firebase rechaza la clave del Worker (${motivo}). Revisa FIREBASE_API_KEY en Settings → Variables, sin espacios ni saltos de línea.` };
+    }
+    return { fallo: `Firebase no acepta la sesión (${motivo}). Suele arreglarse cerrando sesión en la app y volviendo a entrar.` };
+  }
+
   const d = await r.json().catch(() => null);
   const u = d && d.users && d.users[0];
-  return u ? { uid: u.localId, email: u.email || "" } : null;
+  return u ? { usuario: { uid: u.localId, email: u.email || "" } } : { fallo: "Firebase no reconoce a ese usuario." };
 }
 
 // ─── LOS TRES PROVEEDORES ─────────────────────────────────────────────────────
@@ -233,8 +262,8 @@ export default {
     let cuerpo;
     try { cuerpo = JSON.parse(crudo); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
 
-    const usuario = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
-    if (!usuario) return json({ error: "Hace falta tener sesión del equipo." }, 401, origen);
+    const quien = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+    if (quien.fallo) return json({ error: quien.fallo }, 401, origen);
 
     const nombre = PROVEEDORES[cuerpo.proveedor] ? cuerpo.proveedor : (env.PROVEEDOR_POR_DEFECTO || "gemini");
     const p = PROVEEDORES[nombre];

@@ -23,6 +23,9 @@ const PROVEEDORES = [
   { id: "gemini", nombre: "Gemini", nota: "gratis" },
   { id: "claude", nombre: "Claude", nota: "de pago" },
   { id: "openai", nombre: "OpenAI", nota: "sin datos de clientes" },
+  // El hueco abierto del Worker: con una dirección y una clave vale OpenRouter, Groq,
+  // DeepSeek, Mistral u Ollama. Sale aquí para poder cambiar sin tocar el código.
+  { id: "compatible", nombre: "Otro", nota: "el que pongas en el proxy" },
 ];
 
 export default function Asistente({ contexto, onCerrar, onOlvidar }) {
