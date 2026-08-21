@@ -22,6 +22,41 @@
 // copas pedían 111. Multiplicando por un entero primero no queda resto que redondear.
 export const conMargen = (n) => Math.ceil((n * 11) / 10);
 
+// ─── HIELO ────────────────────────────────────────────────────────────────────
+// Un "taxi" es la saca de transporte: 12 bolsas de 2 kg = 24 kg.
+export const KG_POR_TAXI = 24;
+export const KG_POR_BOLSA = 2;
+
+// Kilos por persona. El sector maneja 0,7-1 kg/pax con barra en verano y 0,3-0,5 sin
+// barra o en invierno: eso cubre lo que va en el vaso Y lo de conservar bebida en las
+// bañeras. Aquí se coge el extremo alto, como en toda la bebida.
+const KG_HIELO_POR_PAX = { verano: 0.9, invierno: 0.5 };
+
+// Sin barra se sigue necesitando hielo —los refrescos y el agua de la comida van fríos—
+// pero bastante menos: no hay cubatas.
+const FACTOR_SIN_BARRA = 0.6;
+
+// La merma por derretimiento. Con congelador o arca en el sitio el hielo se guarda y
+// aguanta; sin él vive en neveras portátiles y termos, y en una jornada de verano se
+// pierde un tercio largo antes de llegar al vaso. Este es el número que decide si el
+// hielo se acaba a media barra.
+const MERMA_SIN_CONGELADOR = { verano: 1.35, invierno: 1.2 };
+
+// Devuelve las tres unidades porque las tres se usan: los kilos para pedirlo, las bolsas
+// para contarlo al cargar y los taxis para saber cuánto sitio ocupa en el camión.
+export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongelador = false } = {}) {
+  const n = Math.max(0, Math.round(pax) || 0);
+  if (!n) return { kg: 0, bolsas: 0, taxis: 0 };
+  const temporada = mesVerano ? "verano" : "invierno";
+  const merma = tieneCongelador ? 1 : MERMA_SIN_CONGELADOR[temporada];
+  const kg = Math.ceil(n * KG_HIELO_POR_PAX[temporada] * (horasBarra > 0 ? 1 : FACTOR_SIN_BARRA) * merma);
+  return {
+    kg,
+    bolsas: Math.ceil(kg / KG_POR_BOLSA),
+    taxis: Math.max(1, Math.ceil(kg / KG_POR_TAXI)),
+  };
+}
+
 // Cuántas copas/vasos caben en cada batea, por tipo
 export const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 export function bateas(units, size) { return Math.ceil(units / size); }
@@ -55,7 +90,11 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
 // "horasCopas" se pasa aparte para lo que solo existe en la barra de copas: la tónica,
 // que es mezcla de ginebra y en el aperitivo no se sirve. Por defecto vale lo mismo que
 // h, para que quien llame sin ese dato siga viendo lo de siempre.
-export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h) {
+// "pax" es TODO el mundo (adultos + niños) y "alcoholPax" solo los adultos. La
+// diferencia importa en comuniones: los niños no beben vino ni cerveza, pero sí agua y
+// refresco — y son justo los que más refresco beben. Antes todo se calculaba sobre los
+// adultos, así que en una comunión de 60+25 faltaba agua y refresco para 25 personas.
+export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax } = {}) {
   // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
   // la de la comida— y eso antes se resolvía llamando aquí con un 2 fijo cuando no
   // había barra. El efecto era absurdo: media hora de cóctel pedía MENOS que no tener
@@ -74,9 +113,9 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // de las 4h de referencia el consumo por persona se estabiliza (nadie bebe el doble de
   // cerveza solo porque la barra esté abierta el doble de horas). Por eso el factor de
   // horas se limita a 1: el ratio de arriba ya es el techo, no un punto de partida.
-  const cerveza = Math.round((pax * cervezaFactor * Math.min(1, barFactor)) / 24) * 24;
+  const cerveza = Math.round((alcoholPax * cervezaFactor * Math.min(1, barFactor)) / 24) * 24;
   // Vino: calibrado con datos reales (65 pax → 30 blanco, 16-17 tinto)
-  const vinoTotal = Math.round(pax * 0.72);
+  const vinoTotal = Math.round(alcoholPax * 0.72);
   const ratioBlanco = mesVerano ? 0.65 : 0.45;
   const vinoBlanco = Math.round(vinoTotal * ratioBlanco);
   const vinoTinto = vinoTotal - vinoBlanco;
@@ -89,10 +128,18 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // cabeza), porque en el brindis todo el mundo coge copa a la vez — que es cosa
   // distinta de cuánto se bebe.
   const BOTELLAS_EXTRA_BRINDIS = 4;
-  const cava = Math.round(pax * 0.2) + (tieneBrindisCava ? BOTELLAS_EXTRA_BRINDIS : 0);
+  const cava = Math.round(alcoholPax * 0.2) + (tieneBrindisCava ? BOTELLAS_EXTRA_BRINDIS : 0);
   // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
   // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
   // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
+  // OJO con este número: las fracciones de abajo suman 0,775, así que lo que sale de
+  // verdad son ~4,4 unidades por persona, no 7,4.
+  //
+  // Coca normal (0,25), Zero (0,15) y Nestea (0,025) SÍ están calibrados: cuadran
+  // exactos con el evento de 65 pax del que salieron (120 / 72 / 12). Los otros cuatro
+  // —las dos Fantas, Aquarius y Sprite— se añadieron después sin ningún dato detrás y
+  // sumaban 2,6 uds/pax ellos solos: el total sobrepasaba en un 84% su propia fuente de
+  // calibración. Se bajan a la mitad hasta que haya un evento medido que diga otra cosa.
   const refrescoTotal = Math.round(pax * 7.4);
   // El factor de horas se acota (máx. 1,75) para que una barra muy larga no dispare
   // la tónica/refrescos de mezcla por encima de lo real, igual que en la cristalería.
@@ -101,7 +148,7 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // igual con solo cóctel —donde no hay destilados— y hasta sin barra ninguna, porque
   // el mínimo de 6 botellas se aplicaba siempre. En el aperitivo se sirve vermut,
   // cerveza y refresco; la ginebra no aparece hasta las copas.
-  const tonica = horasCopas > 0 ? Math.max(6, Math.round(pax * 0.15 * barFactorTope)) : 0;
+  const tonica = horasCopas > 0 ? Math.max(6, Math.round(alcoholPax * 0.15 * barFactorTope)) : 0;
   // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
   // Agua Vidaqua de personal, que se calcula aparte en calcPersonal(). El ratio es
   // 0,8 BOTELLAS por pax (~1,2 L/pax, en el rango alto del sector: 0,5-1 L/pax);
@@ -111,19 +158,23 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   const agua15Packs = Math.max(2, Math.ceil(agua15 / 6));
   // El Red Bull sí es cosa de la barra: sin barra no va ninguno. Por eso mira las horas
   // DE VERDAD (h), no el suelo — si mirara el suelo, saldría en eventos sin barra.
-  const redbull = h > 0 ? Math.max(6, Math.round(pax * 0.06 * barFactorTope)) : 0;
+  const redbull = h > 0 ? Math.max(6, Math.round(alcoholPax * 0.06 * barFactorTope)) : 0;
   // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
   const aguasPequenasUds = Math.round(pax * 3);
   const aguasPequenasCajas = Math.max(1, Math.ceil(aguasPequenasUds / 35));
-  // Con congelador en la finca se hace/almacena el hielo in situ: no hace falta traerlo en taxis
-  const taxisHielo = tieneCongelador ? 0 : Math.max(2, Math.ceil(pax / 30));
+  // El hielo sale de calcHielo: kilos, bolsas y taxis, y depende de la temporada, de si
+  // hay barra y de si en el sitio hay congelador donde guardarlo (ver arriba). Antes era
+  // "taxis = pax/30" y con congelador CERO, dando por hecho que se hacía in situ: una
+  // finca con arca te deja guardarlo, no fabricarlo.
+  const hielo = calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador });
+  const taxisHielo = hielo.taxis;
   // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
   // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas).
   // Calibrado con datos reales (65 pax → 6 rojo, 5 blanco).
-  const vermutRojo = Math.max(2, Math.round(pax / 11));
-  const vermutBlanco = Math.max(2, Math.round(pax / 13));
+  const vermutRojo = Math.max(2, Math.round(alcoholPax / 11));
+  const vermutBlanco = Math.max(2, Math.round(alcoholPax / 13));
   // Tinto de verano: bebida de verano habitual, más presente en meses cálidos
-  const tintoVerano = Math.max(2, Math.round(pax * (mesVerano ? 0.25 : 0.12)));
+  const tintoVerano = Math.max(2, Math.round(alcoholPax * (mesVerano ? 0.25 : 0.12)));
   return {
     // Sin margen extra: los ratios ya van por encima de los rangos del sector (vino
     // 0,72 bot/pax vs 0,33-0,5 estándar; cerveza 3/pax en verano vs 1,5-2; cava 0,2
@@ -136,16 +187,16 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
     cocaZero:   Math.round(refrescoTotal * 0.15),
     // Cada refresco por separado, sin unificar (datos reales: Fanta naranja y limón
     // se piden como productos distintos, no combinados en una sola línea)
-    fantaNaranja: Math.round(refrescoTotal * 0.08),
-    fantaLimon:   Math.round(refrescoTotal * 0.07),
-    aquarius:     Math.round(refrescoTotal * 0.1),
-    sprite:     Math.round(refrescoTotal * 0.1),
+    fantaNaranja: Math.round(refrescoTotal * 0.04),
+    fantaLimon:   Math.round(refrescoTotal * 0.035),
+    aquarius:     Math.round(refrescoTotal * 0.05),
+    sprite:     Math.round(refrescoTotal * 0.05),
     nestea:     Math.round(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
     aguaConGas: Math.round(pax * 0.37),
-    cerveza00:  Math.round(pax * 0.37),
-    sinGluten:  Math.round(pax * 0.3),
-    taxisHielo,
+    cerveza00:  Math.round(alcoholPax * 0.37),
+    sinGluten:  Math.round(alcoholPax * 0.3),
+    taxisHielo, hieloKg: hielo.kg, hieloBolsas: hielo.bolsas,
   };
 }
 

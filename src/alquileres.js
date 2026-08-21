@@ -4,6 +4,7 @@
 
 export const ALQUILERES = {
   sillas:          { etiqueta: "Sillas" }, // el proveedor lo elige el selector: Dealde o Carvillo
+  mesas:           { etiqueta: "Mesas redondas" }, // solo si se eligen redondas: las rectangulares son nuestras
   armarioCaliente: { etiqueta: "Armario caliente", proveedor: "Dealde" },
   mobiliario:      { etiqueta: "Mobiliario", proveedor: "Event Style" },
   // Solo en producciones

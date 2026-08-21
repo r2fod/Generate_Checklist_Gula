@@ -78,7 +78,14 @@ function cocinaNecesaria(pax) {
   if (pax <= 40) return 2;
   if (pax <= 60) return 3;
   if (pax <= 120) return 4;
-  return 5;
+  // Por encima de 120 se quedaba clavado en 5: una boda de 300 pedía la misma cocina
+  // que una de 130. No es que falte gente, es que la comida no sale a tiempo.
+  //
+  // OJO: los tramos de arriba SÍ están medidos; esto de aquí NO. Los 19 eventos de la
+  // hoja no llegan a 200 pax, así que 1 cada 55 es la referencia del sector (1 cada
+  // 40-50 en emplatado) puesta con prudencia. En cuanto haya un evento grande de
+  // verdad, se ajusta con ese número.
+  return Math.max(5, Math.ceil(pax / 55));
 }
 
 // Logística es el número más estable de toda la hoja: 2 personas en casi todo, sea de
@@ -86,7 +93,11 @@ function cocinaNecesaria(pax) {
 // ellos, sino del camión: cargarlo y descargarlo cuesta lo mismo con 60 que con 140.
 function logisticaNecesaria(pax) {
   if (pax <= 0) return 0;
-  return pax <= 30 ? 1 : 2;
+  if (pax <= 30) return 1;
+  // Se quedaba en 2 para siempre: lo mismo para 40 que para 400. Sube despacio porque
+  // de verdad no escala con los comensales —depende del camión— pero una boda de 300
+  // son dos viajes y el doble de material. Tope en 4: por encima no se ha visto nunca.
+  return Math.min(4, 1 + Math.ceil(pax / 100));
 }
 
 // Sala. Un banquete nunca sale con menos de dos personas.

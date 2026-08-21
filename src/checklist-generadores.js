@@ -9,6 +9,7 @@ import {
 import { conSufijo } from "./checklist-format.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
+import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { calcPaella } from "./paella.js";
 
 // Item "opcional": SIEMPRE ocupa su sitio en el array (nunca se quita del todo con un
@@ -69,19 +70,11 @@ function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20, minimoSala 
   };
 }
 
-// Las mesas donde se SIENTA la gente. Rectangulares de 1,80: siete por mesa, que es
-// el punto medio de lo que admiten (6 cómodo, 8 apretando, ~60cm por comensal) y lo
-// razonable en un banquete, donde cada uno lleva varios platos y copas delante.
+// Las mesas donde se SIENTA la gente viven en mesas.js: la cuenta depende del tipo
+// elegido (rectangular nuestra o redonda de alquiler) y la usan los tres generadores.
 //
-// Antes solo se contaban en boda y comunión. En un cumpleaños y en un rodaje la gente
-// también se sienta a comer, así que llevan las suyas igual.
-function calcMesasComensales(evtKey, pax) {
-  return Math.ceil(pax / 7);
-}
-
-function calcMesasTotal(evtKey, pax) {
-  return calcMesasCocina(pax) + calcMesasComensales(evtKey, pax);
-}
+// Las de COCINA no se eligen: son siempre rectangulares de 1,80, que es sobre lo que se
+// prepara el servicio.
 
 // Categoría de Café, compartida por los 3 tipos de evento
 // Las 3 cafeteras son propiedad de la empresa (no alquiler):
@@ -177,6 +170,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoNevera, tipoCongelador, tipoPaella, numPaellas = 0, origenSillas = "Dealde",
+    tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
   } = opts;
@@ -222,12 +216,15 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // a mano del formulario, que sigue mandando sobre esto.
   const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 10 : 9);
 
-  const bebidas    = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
+  // El agua, los refrescos y el hielo van sobre TODOS (los niños beben); el alcohol solo
+  // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
+  // faltaba agua y refresco para veinticinco personas.
+  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
   // se bebe el mismo vino con la misma comida haya barra detrás o no.
-  const cristal    = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal    = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -256,7 +253,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
-    ["Mesas de 1,8m", String(calcMesasTotal(evtKey, pax))],
+    ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
@@ -344,7 +341,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ...repartoManteles(calcMesasTotal(evtKey, pax) + 2 + mesasAltas, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
+    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 2 + mesasAltas, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
     ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
@@ -427,7 +424,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
-    opt(!hayCongelador, ["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]),
+    ["Hielo", conSufijo(bebidas.hieloKg, `kg · ${bebidas.taxisHielo} taxis`)],
     opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
@@ -453,6 +450,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     tipoPaella, numPaellas = 0, tipoNevera, tipoCongelador, llevaTarta = true, origenSillas = "Dealde",
+    tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
   } = opts;
   const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
@@ -465,10 +463,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
 
-  const bebidas = calcBebidas(pax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas);
+  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
-  const cristal = calcCristaleria(pax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
   // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
   // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
@@ -494,7 +492,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   cats.push({ nombre: "Mobiliario", items: [
     // Igual que un banquete: las de cocina más las de la gente que se sienta
-    ["Mesas de 1,8m", String(calcMesasTotal("cumpleanos", pax))],
+    ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
@@ -547,7 +545,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ...repartoManteles(calcMesasTotal("cumpleanos", pax) + 1, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
+    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 1, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ...(usaTela
@@ -612,7 +610,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
-    opt(!hayCongelador, ["Hielo", conSufijo(bebidas.taxisHielo, "taxis")]),
+    ["Hielo", conSufijo(bebidas.hieloKg, `kg · ${bebidas.taxisHielo} taxis`)],
   ]});
 
   if (destilados) cats.push(categoriaAlcoholes(destilados));
@@ -640,6 +638,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
+    tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
     llevaCarpas = true, llevaGenerador = true, mesVerano = true,
   } = opts;
@@ -724,13 +723,13 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // ninguna fuera para sentarse. Ahora es al revés y cuadra con lo que se monta.
   const MESAS_BUFFET = pax <= 100 ? 4 : 5;
   const MESA_CAMION = 1;
-  const mesasComer = calcMesasComensales("produccion", pax);
+
   // En rodajes siempre aparece gente que no estaba en la lista (técnicos, productora,
   // visitas), así que las sillas se piden con 5 de más sobre el pax del día.
   // (con 0 pax no se suman: un evento aún sin rellenar no debe pedir 5 sillas)
   const SILLAS_EXTRA = totalPax > 0 ? 5 : 0;
   cats.push({ nombre: "Mobiliario", items: [
-    ["Mesas de 1,8m", String(MESAS_BUFFET + MESA_CAMION + mesasComer)],
+    ...lineasDeMesas(MESAS_BUFFET + MESA_CAMION, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     ["Mesa 1x1 cuadrada (zona cajas sucias)", "1"],
     // Mesa larga fuera: las largas del rodaje son las de 1,8m de arriba, así que era
     // una línea repetida que solo hacía dudar de si había que cargar algo más.
@@ -810,7 +809,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mantelería y Textiles", items: [
     // Un mantel por mesa de servicio y de buffet (la del camión y la de cajas
     // sucias van sin vestir) + 1 de repuesto
-    ...repartoManteles(MESAS_BUFFET + MESA_CAMION + mesasComer + 1, opts.colorManteles || colorPorDefecto("produccion"), opts.porcentajeBeige),
+    ...repartoManteles(mesasParaVestir(MESAS_BUFFET + MESA_CAMION, totalPax, tipoMesa) + 1, opts.colorManteles || colorPorDefecto("produccion"), opts.porcentajeBeige),
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(nSala + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ["Bandeja camareros", String(nSala)],

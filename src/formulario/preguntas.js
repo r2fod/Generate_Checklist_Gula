@@ -337,6 +337,24 @@ export const PREGUNTAS = [
     soloEn: [...CON_BARRA, "produccion"],
   },
 
+  {
+    id: "tipoMesa", tipo: "opciones", texto: "¿De qué son las mesas donde come la gente?",
+    // Cuántas no se pregunta: salen del pax. De qué tipo sí, porque las redondas no son
+    // nuestras y cada alquiler es una recogida — y porque entran más comensales por
+    // mesa, así que el número cambia.
+    //
+    // Las de cocina y las de las barras van aparte y son siempre nuestras rectangulares
+    // de 1,80: eso no se pregunta porque no cambia nunca.
+    nota: "Las redondas son de alquiler: se crea sola su recogida y su devolución. Las de cocina y barras van aparte, siempre de 1,8m.",
+    opciones: [
+      { valor: "Rectangular 1,8m", texto: "Las nuestras, rectangulares de 1,8m" },
+      { valor: "Redonda 1,5m", texto: "Redondas de 1,5m (alquiler)" },
+      { valor: "Redonda 1,8m", texto: "Redondas de 1,8m (alquiler)" },
+      { valor: "Redonda 2m", texto: "Redondas de 2m (alquiler)" },
+    ],
+    soloEn: [...CON_BARRA, "produccion"],
+  },
+
   // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
   // En un rodaje el menú se imprime y se ponen etiquetas: si el archivo no viaja con
   // los datos, acaba en un WhatsApp perdido y el día del rodaje no lo encuentra nadie.
@@ -645,6 +663,7 @@ export function aRespuestasDeLaApp(r = {}) {
     // alquiler puesto, aplicar el envío te lo borraba junto con su recogida. Sin
     // contestar no se toca nada, como todo lo demás del formulario.
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
+    if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
   } else {
     pon("pax", r.adultos);
     pon("ninos", r.ninos);
@@ -674,6 +693,7 @@ export function aRespuestasDeLaApp(r = {}) {
     // app (Dealde / Carvillo / Nuestras), y solo los dos primeros crean recogida
     if (puesto(r.armarioCaliente)) estado.llevaArmarioCaliente = r.armarioCaliente === "si";
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
+    if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
     if (Array.isArray(r.extras)) {
       estado.tieneBrindisCava = marcado("extras", "brindis");
       estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";

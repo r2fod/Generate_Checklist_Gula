@@ -49,6 +49,7 @@ import {
 import { infoCategoria } from "./components/Iconos.jsx";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
 import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube } from "./precios.js";
+import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
 import { calcularCalibracion } from "./calibracion.js";
@@ -187,7 +188,7 @@ const ETIQUETAS_CAMPO = {
   llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
   llevaAguasPequenas: "Aguas pequeñas", tipoAguaPequena: "Envase de las aguas pequeñas", hayDesayuno: "Desayuno",
-  tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas",
+  tipoNevera: "Nevera", tipoCongelador: "Congelador", origenSillas: "Sillas", tipoMesa: "Tipo de mesa",
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   recogidas: "Recogidas", compras: "Compras",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
@@ -511,6 +512,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
   const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras | No llevan
+  // De qué tipo son las mesas donde SE SIENTA la gente. Las de cocina no se eligen: son
+  // siempre rectangulares de 1,80, que es sobre lo que se prepara el servicio.
+  // Las redondas no son nuestras, van de alquiler.
+  const [tipoMesa, setTipoMesa] = useState(estadoInicial.tipoMesa ?? TIPO_MESA_POR_DEFECTO);
   // Equipo de logística (montaje/desmontaje): cada persona con su propio horario.
   // Si hay un estado guardado con el formato antiguo (horario general) se migra a una fila.
   const [logisticaEquipo, setLogisticaEquipo] = useState(estadoInicial.logisticaEquipo ?? (
@@ -773,7 +778,7 @@ export default function App({ onCerrarSesion } = {}) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
-    tipoNevera, tipoCongelador, origenSillas, itemsManuales, overridesManuales,
+    tipoNevera, tipoCongelador, origenSillas, tipoMesa, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
   });
@@ -874,7 +879,7 @@ export default function App({ onCerrarSesion } = {}) {
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
     entranteCompartido: setEntranteCompartido, numEntrantesCompartir: setNumEntrantesCompartir,
-    tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas,
+    tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas, tipoMesa: setTipoMesa,
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
     itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
@@ -2016,7 +2021,7 @@ export default function App({ onCerrarSesion } = {}) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
-    tipoNevera, tipoCongelador, tipoPaella, numPaellas, origenSillas,
+    tipoNevera, tipoCongelador, tipoPaella, numPaellas, origenSillas, tipoMesa,
     estiloPlatoPrincipal, estiloPlatoPostre, diasProduccion,
     paxPorCamarero,
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
@@ -2028,7 +2033,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
     tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
-    tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre,
+    tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre, tipoMesa,
     diasProduccion, paxPorCamarero, logisticaEquipo,
   ]);
 
@@ -3400,6 +3405,20 @@ export default function App({ onCerrarSesion } = {}) {
                   sincronizaAlquiler("sillas", v === "Dealde" || v === "Carvillo", conceptoAlquiler("sillas", v));
                 }}
                 options={["Dealde", "Carvillo", "Nuestras", "No llevan"]}
+              />
+              {/* Las mesas de los comensales. Las rectangulares son nuestras y van a
+                  SEIS por mesa —no siete— porque aquí se juntan varias para hacer mesas
+                  largas, y al juntarlas se pierden las cabeceras. Las redondas no las
+                  tenemos: si se eligen, salen como línea de alquiler aparte, y las de
+                  cocina se quedan en su línea de 1,8m. */}
+              <SegmentedControl
+                label="Mesas de los comensales"
+                value={tipoMesa}
+                onChange={v => {
+                  setTipoMesa(v);
+                  sincronizaAlquiler("mesas", Boolean(TIPOS_MESA[v] && TIPOS_MESA[v].alquiler), conceptoAlquiler("mesas"), /mesa/i);
+                }}
+                options={Object.keys(TIPOS_MESA)}
               />
               {/* El generador de las producciones siempre es alquilado (SOS), así que su
                   interruptor vive aquí y no en Equipamiento: al marcarlo hay que ir a

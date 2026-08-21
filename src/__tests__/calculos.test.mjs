@@ -16,6 +16,7 @@ import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras,
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
+  calcHielo, KG_POR_TAXI, KG_POR_BOLSA,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
@@ -24,6 +25,7 @@ import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estado
 import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
+import { mesasComensales, lineasDeMesas, mesasParaVestir, tipoMesaValido, TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "../mesas.js";
 import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
 
 let pasan = 0;
@@ -574,8 +576,11 @@ console.log("\n══ Cuánta gente hace falta: contra lo que se puso de verdad 
   // Cocina y logística, que antes no se calculaban en ningún sitio
   ok(personalNecesario("boda", 40).cocina === 2 && personalNecesario("boda", 150).cocina === 5,
     "la cocina va por tramos: 2 hasta 40 pax y 5 de 120 en adelante");
-  ok(personalNecesario("boda", 60).logistica === 2 && personalNecesario("boda", 150).logistica === 2,
-    "y logística son 2 tanto en 60 como en 150: no depende de los comensales, depende del camión");
+  // La logística no escala con los comensales —depende del camión— pero tampoco se
+  // queda clavada en 2 para siempre: una boda de 300 son dos viajes y el doble de
+  // material. Sube despacio y con tope.
+  ok(personalNecesario("boda", 60).logistica === 2 && personalNecesario("boda", 150).logistica === 3,
+    "la logística sube despacio: 2 en 60 pax, 3 en 150");
   ok(personalNecesario("boda", 0).total === 0,
     "sin comensales no hace falta nadie");
 
@@ -623,8 +628,8 @@ console.log("\n══ Quién va a cada evento: horas e importe ══");
 
   // Lo que falta por cubrir, contra lo que hace falta de verdad
   const falta = loQueFalta(personalNecesario("boda", 135), gente);
-  ok(falta.sala === 14 && falta.cocina === 4 && falta.logistica === 1,
-    `de una boda de 135 pax, con tres asignados faltan ${falta.sala} de sala`);
+  ok(falta.sala === 14 && falta.cocina === 4 && falta.logistica === 2,
+    `de una boda de 135 pax, con tres asignados faltan ${falta.sala} de sala y ${falta.logistica} de logística`);
   ok(loQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
     "y si sobra gente de un rol, no sale un número negativo");
 }
@@ -1025,6 +1030,158 @@ console.log("\n══ Los precios, los mismos para todo el equipo ══");
     `pegar precios entiende coma y punto, y se salta lo que no lo es → ${JSON.stringify(pegado)}`);
 
   delete globalThis.localStorage;
+}
+
+console.log("\n══ Los niños beben agua y refresco, no vino ══");
+{
+  // Comunión de 60 adultos + 25 niños. Antes TODO se calculaba sobre los adultos, así
+  // que faltaba agua y refresco para veinticinco personas — y son justo quienes más
+  // refresco beben.
+  const con = calcBebidas(85, 6, true, false, true, 4, { alcoholPax: 60 });
+  const sin = calcBebidas(60, 6, true, false, true, 4);
+
+  ok(con.agua15 > sin.agua15 && con.cocaNormal > sin.cocaNormal,
+    `el agua y el refresco cuentan a los niños (${sin.agua15}→${con.agua15} agua · ${sin.cocaNormal}→${con.cocaNormal} coca)`);
+  ok(con.vinoBlanco + con.vinoTinto === sin.vinoBlanco + sin.vinoTinto,
+    "pero el vino no: se calcula solo sobre los adultos");
+  ok(con.cerveza === sin.cerveza && con.cava === sin.cava && con.tonica === sin.tonica,
+    "ni la cerveza, ni el cava, ni la tónica");
+  ok(con.hieloKg > sin.hieloKg,
+    `y el hielo sí, que los refrescos de los niños también van fríos (${sin.hieloKg}→${con.hieloKg} kg)`);
+
+  // Sin niños se comporta exactamente igual que antes: alcoholPax cae en pax
+  const solo = calcBebidas(100, 6, true, false, true, 4);
+  ok(solo.vinoBlanco + solo.vinoTinto === 72 && solo.agua15 === 80,
+    "sin niños no cambia nada de lo de siempre");
+}
+
+console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
+{
+  // Coca normal, Zero y Nestea cuadran EXACTOS con el evento de 65 pax del que salieron
+  // (120 / 72 / 12). Esos no se tocan.
+  const b = calcBebidas(65, 4, true, false);
+  ok(b.cocaNormal === 120 && b.cocaZero === 72 && b.nestea === 12,
+    `los tres calibrados siguen clavados en su fuente → ${b.cocaNormal}/${b.cocaZero}/${b.nestea}`);
+
+  // Los otros cuatro se añadieron después sin ningún dato: sumaban 2,6 uds/pax ellos
+  // solos y hacían que el total sobrepasara en un 84% su propia calibración.
+  const total = b.cocaNormal + b.cocaZero + b.nestea + b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite;
+  const porPax = total / 65;
+  ok(porPax > 4 && porPax < 5,
+    `el total baja a ${porPax.toFixed(1)} uds/pax (antes 5,7, calibración 3,1)`);
+  const sinCalibrar = (b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite) / 65;
+  ok(sinCalibrar < 1.5,
+    `y los cuatro sin calibrar pesan ahora ${sinCalibrar.toFixed(1)} uds/pax, no 2,6`);
+}
+
+console.log("\n══ Cocina y logística dejan de aplanarse ══");
+{
+  const n = (pax) => personalNecesario("boda", pax);
+  // Se quedaban clavadas: 5 de cocina y 2 de logística lo mismo para 130 que para 400.
+  ok(n(300).cocina > n(150).cocina && n(400).cocina > n(300).cocina,
+    `la cocina sube con el evento (150→${n(150).cocina} · 300→${n(300).cocina} · 400→${n(400).cocina})`);
+  ok(n(300).logistica > n(100).logistica,
+    `y la logística también (100→${n(100).logistica} · 300→${n(300).logistica})`);
+  // Los tramos MEDIDOS no se tocan: esos sí salen de los 19 eventos de la hoja
+  ok(n(40).cocina === 2 && n(60).cocina === 3 && n(120).cocina === 4,
+    "los tramos medidos (≤40, ≤60, ≤120) se quedan exactamente como estaban");
+  ok(n(30).logistica === 1 && n(100).logistica === 2,
+    "y la logística pequeña también");
+  // Ni se dispara: por encima de 4 de logística no se ha visto nunca
+  ok(n(1000).logistica === 4, "la logística tiene tope en 4, no crece sin freno");
+}
+
+console.log("\n══ El hielo: kilos, bolsas y taxis ══");
+{
+  ok(KG_POR_TAXI === 24 && KG_POR_BOLSA === 2,
+    "un taxi son 12 bolsas de 2 kg = 24 kg");
+
+  const v = (pax, o) => calcHielo(pax, o);
+
+  // Boda de verano con barra y SIN arca en la finca: es el caso que se queda sin hielo
+  const veranoSinArca = v(150, { mesVerano: true, horasBarra: 5, tieneCongelador: false });
+  ok(veranoSinArca.kg === 183 && veranoSinArca.taxis === 8 && veranoSinArca.bolsas === 92,
+    `150 pax, verano, con barra, sin arca → ${veranoSinArca.kg} kg · ${veranoSinArca.taxis} taxis · ${veranoSinArca.bolsas} bolsas`);
+  // Las tres unidades tienen que cuadrar entre sí
+  ok(veranoSinArca.bolsas === Math.ceil(veranoSinArca.kg / 2)
+     && veranoSinArca.taxis === Math.ceil(veranoSinArca.kg / 24),
+    "las bolsas y los taxis salen de los kilos, no son cuentas aparte");
+
+  // LA MERMA: con arca el hielo se guarda; sin ella vive en neveras portátiles y en
+  // verano se pierde un tercio antes de llegar al vaso.
+  const conArca = v(150, { mesVerano: true, horasBarra: 5, tieneCongelador: true });
+  ok(conArca.kg === 135 && veranoSinArca.kg > conArca.kg,
+    `sin arca hacen falta ${veranoSinArca.kg} kg contra ${conArca.kg} con ella: es la merma por derretimiento`);
+  ok(Math.round((veranoSinArca.kg / conArca.kg) * 100) === 136,
+    "la merma de verano sin arca es del ~35%");
+
+  // Y con arca YA NO SALE CERO. Antes con congelador no se cargaba hielo, dando por
+  // hecho que se fabricaba in situ: un arca te deja guardarlo, no fabricarlo.
+  ok(conArca.kg > 0 && conArca.taxis > 0,
+    "con arca se sigue cargando hielo: sirve para guardarlo, no para fabricarlo");
+
+  // Temporada y barra
+  ok(v(150, { mesVerano: false, horasBarra: 5 }).kg < veranoSinArca.kg,
+    "en invierno hace falta menos que en verano");
+  const sinBarra = v(150, { mesVerano: true, horasBarra: 0 });
+  ok(sinBarra.kg < v(150, { mesVerano: true, horasBarra: 4 }).kg && sinBarra.kg > 0,
+    `sin barra hace falta menos, pero no cero: los refrescos y el agua van fríos igual (${sinBarra.kg} kg)`);
+
+  // Nunca medio taxi ni cero taxis con hielo dentro
+  ok(v(10, { mesVerano: true, horasBarra: 4 }).taxis === 1,
+    "un evento pequeño pide un taxi, no cero");
+  ok(v(0, {}).kg === 0 && v(0, {}).taxis === 0,
+    "sin gente no se carga hielo");
+
+  // Está en el rango del sector (0,7-1 kg/pax con barra en verano)
+  const porPax = veranoSinArca.kg / 150;
+  ok(porPax >= 0.7 && porPax <= 1.4,
+    `sale a ${porPax.toFixed(2)} kg/pax, dentro del rango alto del sector`);
+}
+
+console.log("\n══ Las mesas de los comensales ══");
+{
+  // SEIS por mesa rectangular, no siete ni ocho: aquí se juntan varias para hacer mesas
+  // largas, y al juntarlas se pierden las cabeceras, que es de donde salen los
+  // comensales de más que dan las tablas del sector.
+  ok(TIPOS_MESA[TIPO_MESA_POR_DEFECTO].porMesa === 6,
+    "la rectangular de 1,8m va a 6, porque se juntan y se pierden las cabeceras");
+  ok(mesasComensales(100) === 17 && mesasComensales(60) === 10,
+    `100 pax → ${mesasComensales(100)} mesas rectangulares · 60 pax → ${mesasComensales(60)}`);
+  ok(mesasComensales(0) === 0 && mesasComensales(1) === 1,
+    "sin gente no hay mesas, y una persona ya pide una");
+
+  // Las redondas son de alquiler y entran más por mesa
+  ok(mesasComensales(120, "Redonda 2m") === 10 && TIPOS_MESA["Redonda 2m"].alquiler === true,
+    `120 pax en redonda de 2m → ${mesasComensales(120, "Redonda 2m")} mesas, y son de alquiler`);
+  ok(mesasComensales(100, "Redonda 1,5m") === 13 && mesasComensales(100, "Redonda 1,8m") === 10,
+    `100 pax en redonda de 1,5 → 13 mesas · de 1,8 → 10`);
+  ok(TIPOS_MESA["Redonda 1,5m"].alquiler === true && TIPOS_MESA[TIPO_MESA_POR_DEFECTO].alquiler === false,
+    "las redondas son de alquiler; las rectangulares son nuestras");
+
+  // Todo rectangular: UNA sola línea, con las de cocina sumadas, como ha sido siempre.
+  // El nombre "Mesas de 1,8m" es la identidad del ítem: si cambiara, los eventos ya
+  // guardados perderían sus marcas de carga y sus cantidades corregidas a mano.
+  const rect = lineasDeMesas(4, 100);
+  ok(rect.length === 1 && rect[0][0] === "Mesas de 1,8m" && rect[0][1] === "21",
+    `en rectangular sale una línea con cocina incluida → ${JSON.stringify(rect)}`);
+
+  // Con redondas se parten en dos: las de cocina SIGUEN siendo rectangulares, que es
+  // sobre lo que se prepara el servicio, y no se mezclan con las de comer.
+  const red = lineasDeMesas(4, 100, "Redonda 1,5m");
+  ok(red.length === 2 && red[0][0] === "Mesas de 1,8m" && red[0][1] === "4",
+    `las de cocina se quedan rectangulares y aparte → ${JSON.stringify(red[0])}`);
+  ok(red[1][0] === "Mesas redondas 1,5m (alquiler)" && red[1][1] === "13" && red[1][2] === true,
+    `y las de comer salen marcadas como alquiler → ${JSON.stringify(red[1])}`);
+
+  // Los manteles visten TODAS las mesas, sean del tipo que sean
+  ok(mesasParaVestir(4, 100) === 21 && mesasParaVestir(4, 100, "Redonda 1,8m") === 14,
+    `se visten todas: 21 en rectangular, 14 en redonda de 1,8`);
+
+  // Un tipo que no existe (de un evento viejo, o de un estado manipulado) cae en el de
+  // siempre en vez de reventar la checklist entera
+  ok(tipoMesaValido("Inventada") === TIPO_MESA_POR_DEFECTO && mesasComensales(60, "Inventada") === 10,
+    "un tipo desconocido cae en la rectangular de siempre");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

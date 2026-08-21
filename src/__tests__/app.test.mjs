@@ -2421,11 +2421,14 @@ async function main() {
       const f = (await listaItems(p)).find(i => i.startsWith("Mesas de 1,8m")) || "";
       return Number((f.match(/=(\d+)/) || [])[1] || 0);
     };
-    // Comensales (pax/7, rectangular de 1,80) + cocina (4/5/6)
+    // Comensales (pax/6, rectangular de 1,80) + las de cocina y barras (4/5/6).
+    // Seis por mesa y no siete: aquí se juntan varias para hacer mesas largas y al
+    // juntarlas se pierden las cabeceras, que es de donde salen los comensales de más
+    // que dan las tablas del sector.
     const cien = await mesas(100), dosc = await mesas(200), tresc = await mesas(300);
-    ok(cien === 19, `100 pax: 15 de comensales + 4 de cocina = ${cien}`);
-    ok(dosc === 34, `200 pax: 29 + 5 = ${dosc}`);
-    ok(tresc === 49, `300 pax: 43 + 6 = ${tresc}`);
+    ok(cien === 21, `100 pax: 17 de comensales + 4 de cocina = ${cien}`);
+    ok(dosc === 39, `200 pax: 34 + 5 = ${dosc}`);
+    ok(tresc === 56, `300 pax: 50 + 6 = ${tresc}`);
     // Lo que fallaba antes: dejar de crecer a partir de 100 pax
     ok(tresc > dosc && dosc > cien,
       "y una boda más grande lleva más mesas, que antes se plantaban a partir de 100 pax");
@@ -3673,12 +3676,12 @@ async function main() {
       // El día con tres eventos: lo que hace falta es la SUMA de los tres
       const jornada = p.locator(".cal-jornada").filter({ hasText: "3 eventos" }).first();
       const suma = (await jornada.locator(".cal-jornada-suma").innerText()).replace(/\s+/g, " ");
-      ok(/3 eventos/.test(suma) && /245 pax/.test(suma) && /41 personas/.test(suma),
+      ok(/3 eventos/.test(suma) && /245 pax/.test(suma) && /42 personas/.test(suma),
         `el día con tres eventos suma pax y personas de los tres → "${suma}"`);
 
       // Y lo que de verdad se viene a ver: que no llegáis
       const gente = (await jornada.locator(".cal-jornada-gente").innerText()).replace(/\s+/g, " ");
-      ok(/te faltan 39 personas/.test(gente),
+      ok(/te faltan 40 personas/.test(gente),
         `dice cuánta gente falta por buscar fuera → "${gente}"`);
 
       // Los turnos salen de la hora del banquete: sala 6h antes, logística 7h
@@ -3718,7 +3721,7 @@ async function main() {
       const sumaGente = (await p.locator(".cal-asignados-suma").first().innerText()).replace(/\s+/g, " ");
       ok(/18 h en total/.test(sumaGente) && /110 €/.test(sumaGente),
         `y se suman horas e importe del evento → "${sumaGente}"`);
-      ok(/Asignados 1 de 20/.test((await p.locator(".cal-asignados-cab").first().innerText()).replace(/\s+/g, " ")),
+      ok(/Asignados 1 de 21/.test((await p.locator(".cal-asignados-cab").first().innerText()).replace(/\s+/g, " ")),
         "la cabecera dice cuántos hay de los que hacen falta, sin abrirla");
 
       // Nada de la fila se sale de su sitio a ningún ancho
