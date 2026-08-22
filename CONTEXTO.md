@@ -422,6 +422,9 @@ camión, sin forma de recuperarlo y sin que nadie sepa por qué.
   accessible by integration`, es cosa de un administrador. Son 30 segundos.
 - **Mover `ci/test.yml` a `.github/workflows/test.yml`** (ver "Integración continua"):
   desde aquí el push se rechaza por falta del permiso `workflows`.
+- **Volver a pegar `worker/pegar.js` en Cloudflare.** La desduplicación tocó
+  `menus-especiales.js`, que va empaquetado dentro del Worker, así que el bundle cambió
+  (mismo comportamiento, pero el que corre en Cloudflare es el viejo hasta que se pegue).
 - **Decidir si se quiere `deploy.yml`** (publicar en GitHub Pages desde CI). No se ha
   escrito a propósito, está esperando el OK.
 
