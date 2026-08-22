@@ -9,13 +9,14 @@
 // pasó, deja DESCARGAR lo que hubiera guardado (que es el trabajo hecho) y ofrece
 // empezar de cero solo después de haber podido guardarlo.
 import { Component } from "react";
+import { leerTexto, borrar } from "./almacen.js";
 
 const CLAVES = ["gula_checklist_estado", "gula_eventos_guardados", "gula_plantillas"];
 
 function descargarTodo() {
   const datos = {};
   for (const k of CLAVES) {
-    try { datos[k] = localStorage.getItem(k); } catch (e) { /* no accesible: se omite */ }
+    datos[k] = leerTexto(k, null);
   }
   const url = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" }));
   const a = document.createElement("a");
@@ -57,7 +58,7 @@ export default class RedDeSeguridad extends Component {
             // Solo el evento abierto: los eventos guardados y las plantillas NO se
             // tocan, que es donde está el trabajo de verdad. Casi siempre lo que está
             // corrupto es el estado suelto, y con esto se arranca limpio sin perder nada.
-            try { localStorage.removeItem("gula_checklist_estado"); } catch (e) { /* da igual */ }
+            borrar("gula_checklist_estado");
             window.location.href = window.location.origin + window.location.pathname;
           }}
         >Empezar de cero (sin borrar los eventos guardados)</button>

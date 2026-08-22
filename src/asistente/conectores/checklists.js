@@ -10,8 +10,8 @@
 // pisa.
 import { registrarConector } from "../conectores.js";
 import { aVistaProxima, esTipoEvento } from "../../calendario/apuntes.js";
+import { sinTildes } from "../../texto.js";
 
-const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 export default registrarConector({
   id: "checklists",

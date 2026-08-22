@@ -25,6 +25,10 @@ src/calendario/             la app del calendario
 src/formulario/             la app de la oficina (sin login)
 src/asistente/              el asistente: cerebro, herramientas, permisos, muñeco
 src/nube.js                 TODO lo que habla con Firestore, en un solo sitio
+src/fecha.js                hoy en ISO (local y UTC, y por qué son dos)
+src/texto.js                sinTildes / limpiaTexto / claveDeTexto (identidad por texto)
+src/almacen.js              localStorage con su try/catch, en un solo sitio
+src/tema.js                 claro/oscuro + aplicarTemaInicial (la usan los dos arranques)
 src/precios.js              los 53 precios (pendientes de mudarse a Firestore)
 src/checklist-generadores.js  qué material lleva cada tipo de evento
 src/revision.js → asistente/revision.js  las reglas de "esto no cuadra"
@@ -83,7 +87,9 @@ desentona enseguida.
   son la única forma de que no se repita.
 - Cada fichero abre con una cabecera `// ─── TÍTULO ───` que explica por qué existe.
 - **Nada de duplicar.** Si algo se escribe dos veces, se extrae (así salieron
-  `promoverApuntes`, `ajusteCompartido`, `companeros.js` y `texto.js`).
+  `promoverApuntes`, `ajusteCompartido`, `companeros.js`, `asistente/texto.js` y, en la
+  última pasada, `fecha.js`, `texto.js`, `almacen.js` y `aplicarTemaInicial`). Hay
+  pruebas que vigilan que no vuelvan a copiarse.
 - **Los avisos dicen qué hacer**, no solo qué pasó. El motivo del proveedor se devuelve
   tal cual en vez de "algo ha fallado": eso ahorra abrir los logs de Cloudflare.
 - **Una prueba por cada fallo arreglado**, y con el porqué en el texto de la prueba.
@@ -201,6 +207,28 @@ hora, sitio, pax       marcada "sinConfigurar" equipamiento…
 **La lista de eventos que ve la oficina sale del ARCHIVO DE CHECKLISTS, no del
 calendario.** Por eso la checklist se crea pronto: si no existe, la oficina la escribe a
 mano y llega duplicada.
+
+## Lo desduplicado (y lo que NO se unificó)
+
+- **`src/fecha.js`** — "hoy" estaba escrito cuatro veces. Se extrajo tal cual: siguen
+  siendo DOS funciones, `hoyLocalISO()` (checklist y calendario) y `hoyUTCISO()`
+  (subconsciente y tareas). Unificarlas mueve la frontera de "esto ya ha pasado" entre
+  las 00:00 y las 02:00 de verano, que es justo cuando se recoge un evento. Para código
+  nuevo: `hoyLocalISO()`.
+- **`src/texto.js`** — `sinTildes` (estaba en los tres conectores y en `enrutado.js`, y
+  además con otro nombre en herramientas, menús especiales, apuntes y checklist-format)
+  y `limpiaTexto`/`claveDeTexto` (memoria, objetivos, tareas, conversaciones). NO se
+  tocaron los dos generadores de identidad —`idDeApunte` y `idDeNombreEvento`—: ahí un
+  carácter distinto es un id distinto y deja huérfano lo guardado. Y la ñ se sigue
+  perdiendo en las claves, a propósito, por lo mismo.
+- **`src/almacen.js`** — los trece `try/catch` de `localStorage`. `guardarJSON` devuelve
+  si pudo, que es lo que necesitan las conversaciones para tirar la mitad vieja cuando
+  no cabe. Excepciones: `formulario/codigo.js` e `instalar.js` reciben el almacén COMO
+  PARÁMETRO (así se prueban con uno de mentira).
+- **`aplicarTemaInicial` → `src/tema.js`** — estaba copiada en los dos arranques.
+
+Tres pruebas de las de "no vuelvas a copiarlo" recorren `src/` y fallan si aparece otra
+copia de `sinTildes`, otro `localStorage.getItem` suelto u otro `aplicarTemaInicial`.
 
 ## Lo hecho
 

@@ -12,8 +12,8 @@
 import { registrarConector } from "../conectores.js";
 import { escaletaDelEvento, resumenEscaleta } from "../../escaleta.js";
 import { menusEspeciales, alergiasDeLasNotas } from "../../menus-especiales.js";
+import { sinTildes } from "../../texto.js";
 
-const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 const buscaEvento = (ctx, nombre) => {
   const archivo = ctx.eventosGuardados || {};

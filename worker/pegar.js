@@ -1,3 +1,6 @@
+//#region src/texto.js
+const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+//#endregion
 //#region src/menus-especiales.js
 const FAMILIAS = [
 	{
@@ -126,7 +129,7 @@ const NUMEROS = {
 	once: 11,
 	doce: 12
 };
-const normaliza = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const normaliza = sinTildes;
 function alergiasDeLasNotas(notas) {
 	const t = String(notas || "");
 	const i = t.search(/alergias?\s*:/i);

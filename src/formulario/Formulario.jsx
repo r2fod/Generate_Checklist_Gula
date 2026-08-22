@@ -13,6 +13,7 @@ import FondoIconos from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
 import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, silenciar } from "./instalar.js";
+import { leerJSON, guardarJSON, borrar } from "../almacen.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -95,7 +96,7 @@ function fmtCuando(ms) {
 export default function Formulario({ codigo }) {
   const clave = `gula_formulario_${codigo}`;
   const [guardado] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(clave) || "{}"); } catch (e) { return {}; }
+    return leerJSON(clave, {}) || {};
   });
   const [proximos, setProximos] = useState(null); // null = cargando
   // A quién avisar por WhatsApp al terminar de mandar (lo configura logística)
@@ -251,8 +252,8 @@ export default function Formulario({ codigo }) {
   // Se guarda según escriben: si cierran el navegador a media pregunta, vuelven donde
   // lo dejaron. Es un formulario que se rellena de pie y con prisa.
   useEffect(() => {
-    try { localStorage.setItem(clave, JSON.stringify({ respuestas, paso, eventoDestino, envioId })); }
-    catch (e) { /* sin sitio o en privado: se sigue igual, solo se pierde el borrador */ }
+    // Sin sitio o en privado no se guarda y se sigue igual: solo se pierde el borrador.
+    guardarJSON(clave, { respuestas, paso, eventoDestino, envioId });
   }, [clave, respuestas, paso, eventoDestino, envioId]);
 
   const tipo = respuestas.tipo || "boda";
@@ -377,7 +378,7 @@ export default function Formulario({ codigo }) {
           Cambiar algo de lo que he mandado
         </button>
         <button className="form-btn-atras" onClick={() => {
-          try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
+          borrar(clave);
           setRespuestas({}); setPaso(-1); setEventoDestino(null); setEnviado(false); setEnvioId("");
         }}>Mandar otro evento</button>
       </div>
@@ -522,7 +523,7 @@ export default function Formulario({ codigo }) {
         // "Lo que has mandado", y desde ahí se abre para cambiarlo.
         setAvisosParaBoton(limpiarAvisos(avisos));
         setEnvioId("");
-        try { localStorage.removeItem(clave); } catch (e) { /* da igual */ }
+        borrar(clave);
       } catch (e) {
         setError("No se ha podido enviar. Mira la conexión y vuelve a darle.");
       } finally { setEnviando(false); }

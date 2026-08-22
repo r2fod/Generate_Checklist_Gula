@@ -20,6 +20,8 @@
 //
 // Sin React, sin Firestore: entra una lista, sale una lista.
 
+import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
+
 // Los temas son cerrados a propósito. Con temas libres, "bebida", "bebidas" y "Bebida"
 // acaban siendo tres cajones distintos con lo mismo dentro, y el asistente se lleva uno.
 export const TEMAS = {
@@ -42,13 +44,12 @@ export const MAX_RECUERDOS = 200;
 // Y lo que de verdad viaja en cada conversación: los mejores, hasta este tamaño.
 const MAX_CONTEXTO = 2600;
 
-const limpia = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXTO);
+const limpia = (t) => limpiaTexto(t, MAX_TEXTO);
 
 // El id sale del propio texto para que el mismo recuerdo guardado dos veces desde dos
-// móviles sea UNO, no dos. Es la misma idea que la identidad de un item de la checklist.
-const clave = (texto) => limpia(texto).toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "")
-  .replace(/[^a-z0-9ñ ]/g, "").replace(/\s+/g, "-").slice(0, 60);
+// móviles sea UNO, no dos. Es la misma idea que la identidad de un item de la checklist,
+// y por eso la cuenta vive en src/texto.js y no copiada aquí.
+const clave = (texto) => claveDeTexto(texto, 60);
 
 // ─── PARECIDO ─────────────────────────────────────────────────────────────────
 // Sin esto, "en la finca X no hay enchufe fuera" y "en la finca X no hay enchufes en la
@@ -62,8 +63,7 @@ const VACIAS = new Set(["de", "la", "el", "los", "las", "un", "una", "en", "y", 
 // se recorte igual en los dos textos que se están comparando.
 const raiz = (p) => (p.length > 3 && p.endsWith("s") ? p.slice(0, -1) : p);
 
-const palabras = (t) => new Set(limpia(t).toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "")
+const palabras = (t) => new Set(sinTildes(limpia(t))
   .split(/[^a-z0-9ñ]+/).filter(p => p.length > 2 && !VACIAS.has(p)).map(raiz));
 
 // Comunes entre el total de distintas (Jaccard). Se probó antes con Dice y fundía cosas

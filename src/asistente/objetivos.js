@@ -14,6 +14,8 @@
 //
 // Sin React ni Firestore: entra una lista, sale una lista.
 
+import { limpiaTexto, claveDeTexto } from "../texto.js";
+
 // Cuántos caben. Con más de esto no son objetivos, es una lista de deseos: entran todos
 // en cada pregunta, ocupan sitio y el asistente no puede priorizar entre quince cosas.
 export const MAX_OBJETIVOS = 8;
@@ -26,11 +28,11 @@ export const ESTADOS = {
 };
 const estadoValido = (e) => (Object.keys(ESTADOS).includes(e) ? e : "activo");
 
-const limpia = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXTO);
+const limpia = (t) => limpiaTexto(t, MAX_TEXTO);
 
-const clave = (texto) => limpia(texto).toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "")
-  .replace(/[^a-z0-9ñ ]/g, "").replace(/\s+/g, "-").slice(0, 50);
+// Misma identidad-a-partir-del-texto que en memoria y tareas: vive en src/texto.js.
+// Aquí el tope es 50 y no 60 porque los ids ya guardados se cortaron así.
+const clave = (texto) => claveDeTexto(texto, 50);
 
 // { id, texto, estado, creado, porQue }
 export function saneaObjetivos(bruto) {

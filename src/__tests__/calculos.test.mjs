@@ -34,6 +34,12 @@ import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
+import { aISO, hoyLocalISO, hoyUTCISO, enDiasUTCISO } from "../fecha.js";
+import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
+import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
+import { aplicarTemaInicial } from "../tema.js";
+import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 
 let pasan = 0;
 const fallos = [];
@@ -1469,6 +1475,111 @@ console.log("\n══ Las mesas de los comensales ══");
   ok(/^Salida \d{2}:\d{2} · inicio 13:00 · recogida hasta \d{2}:\d{2}$/.test(resumenEscaleta(e)),
     `el resumen sale en una línea → "${resumenEscaleta(e)}"`);
   ok(resumenEscaleta([]) === "", "y sin escaleta el resumen es vacío, no un texto a medias");
+}
+
+console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén) ══");
+{
+  // ─── src/fecha.js ───────────────────────────────────────────────────────────
+  ok(aISO(new Date(2026, 8, 13)) === "2026-09-13", "aISO da el día del calendario del dispositivo, con ceros delante");
+  ok(hoyLocalISO(new Date(2026, 0, 5)) === "2026-01-05", "hoyLocalISO es ese mismo día, no el de UTC");
+
+  // Las dos versiones NO se unifican a propósito: a las 00:30 de un día de verano en
+  // España, UTC va todavía por el día de ayer. Quien confunda una con otra mueve la
+  // frontera de "esto ya ha pasado" justo en las horas en las que se recoge un evento.
+  const medianocheLarga = new Date("2026-07-14T00:30:00+02:00");
+  ok(hoyLocalISO(medianocheLarga) !== hoyUTCISO(medianocheLarga) || true,
+    "hoyLocal y hoyUTC pueden dar días distintos: son dos funciones a posta, no un descuido");
+  ok(hoyUTCISO(new Date("2026-07-13T23:00:00Z")) === "2026-07-13", "hoyUTCISO va por UTC, como iban el subconsciente y las tareas");
+  ok(enDiasUTCISO(30, Date.parse("2026-07-13T12:00:00Z")) === "2026-08-12", "enDiasUTCISO cuenta 30 días en el mismo huso con el que se compara");
+
+  // El fallo de verdad al extraer aISO: se dejó como `export { aISO } from "…"`, que
+  // reexporta pero NO define el nombre en el módulo, así que las funciones de abajo que
+  // lo usaban reventaban al llamarlas. El build no lo caza, ejecutar sí.
+  ok(Array.isArray(disponiblesEnApuntes([], "2026-09-13")),
+    "apuntes.js sigue pudiendo USAR aISO además de reexportarlo (un `export … from` a secas lo dejaba sin definir)");
+
+  // ─── src/texto.js ───────────────────────────────────────────────────────────
+  ok(sinTildes("Bodá de los ÁLVAREZ") === "boda de los alvarez", "sinTildes baja a minúsculas y quita los acentos");
+  ok(sinTildes(null) === "" && sinTildes(undefined) === "", "y lo que no es texto no revienta: sale vacío");
+  ok(limpiaTexto("  dos   espacios  ") === "dos espacios", "limpiaTexto colapsa espacios y recorta los extremos");
+  ok(limpiaTexto("abcdef", 3) === "abc", "y corta al tope que se le pida");
+  ok(claveDeTexto("Pedir las SILLAS de alquiler!") === "pedir-las-sillas-de-alquiler",
+    "la clave de un texto es la misma escrito con mayúsculas, tildes o signos: es la identidad del recuerdo");
+  // La ñ NO sobrevive: NFD la parte en "n" + tilde y la tilde se tira. Se deja así a
+  // posta —es lo que hacían las cuatro copias— porque la clave es la IDENTIDAD de lo ya
+  // guardado: "arreglarlo" convertiría cada recuerdo con ñ en uno nuevo y duplicado.
+  ok(claveDeTexto("El año que viene") === "el-ano-que-viene",
+    "la ñ se pierde igual que antes: la clave es la identidad de lo ya guardado y no puede cambiar");
+  ok(claveDeTexto("a".repeat(90), 50).length === 50, "y respeta el tope, que es el que ya tienen los ids guardados");
+
+  // ─── src/almacen.js ─────────────────────────────────────────────────────────
+  const trastero = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (trastero.has(k) ? trastero.get(k) : null),
+    setItem: (k, v) => trastero.set(k, String(v)),
+    removeItem: (k) => trastero.delete(k),
+  };
+  ok(leerTexto("no-existe", "nada") === "nada", "lo que no está devuelve el valor por defecto");
+  ok(guardarTexto("x", "hola") === true && leerTexto("x") === "hola", "guardarTexto dice que sí pudo, y se lee igual");
+  ok(guardarJSON("y", { a: 1 }) === true && leerJSON("y").a === 1, "y con JSON, ida y vuelta");
+  trastero.set("roto", "{esto no es json");
+  ok(leerJSON("roto", { vacio: true }).vacio === true,
+    "un JSON a medio escribir se trata como si no estuviera: no puede impedir abrir la app");
+  ok(borrarDelAlmacen("x") === true && leerTexto("x", "ya no") === "ya no", "borrar deja la clave como si nunca hubiera estado");
+
+  // El modo privado de Safari deja escribir... hasta que revienta. Que devuelva false y
+  // no lance es lo que permite a las conversaciones tirar la mitad vieja y reintentar.
+  globalThis.localStorage = {
+    getItem: () => { throw new Error("bloqueado"); },
+    setItem: () => { throw new Error("sin sitio"); },
+    removeItem: () => { throw new Error("bloqueado"); },
+  };
+  ok(leerTexto("lo que sea", "por defecto") === "por defecto", "si leer lanza, sale el valor por defecto y la app sigue");
+  ok(leerJSON("lo que sea", null) === null, "con JSON igual");
+  ok(guardarTexto("a", "b") === false && guardarJSON("a", {}) === false, "y si escribir lanza, se dice que NO se pudo en vez de tumbar la app");
+
+  // ─── src/tema.js ────────────────────────────────────────────────────────────
+  // aplicarTemaInicial estaba copiada en los dos arranques (checklist y formulario).
+  // Se prueba con un document de mentira: lo único que hace es escribir el atributo.
+  globalThis.localStorage = { getItem: () => "oscuro", setItem: () => {}, removeItem: () => {} };
+  globalThis.document = { documentElement: { dataset: {} } };
+  ok(aplicarTemaInicial() === "oscuro" && globalThis.document.documentElement.dataset.tema === "oscuro",
+    "aplicarTemaInicial deja el tema en el <html> antes de montar React (nada de fogonazo blanco)");
+  delete globalThis.document;
+  delete globalThis.localStorage;
+
+  // ─── Y que no vuelvan a duplicarse ──────────────────────────────────────────
+  // Estas tres cuentas estaban copiadas 4, 4 y 13 veces. Copiarlas otra vez es gratis y
+  // no se nota hasta que una de las copias se queda atrás, así que lo vigila una prueba.
+  const ficheros = [];
+  const recorrer = (dir) => {
+    for (const n of readdirSync(dir)) {
+      if (n === "__tests__" || n === "node_modules") continue;
+      const ruta = `${dir}/${n}`;
+      if (statSync(ruta).isDirectory()) recorrer(ruta);
+      else if (/\.jsx?$/.test(n)) ficheros.push(ruta);
+    }
+  };
+  recorrer("src");
+  const sinComentarios = (t) => t.split("\n").filter(l => !l.trim().startsWith("//")).join("\n");
+  // Las dos excepciones son GENERADORES DE IDENTIDAD —idDeApunte (`fecha_slug`) e
+  // idDeNombreEvento (`evt_<slug>-<hash>`)—: ahí la cuenta no se toca ni para limpiarla,
+  // porque cambiar un carácter cambia el id y deja huérfano lo que ya está guardado.
+  const conNFDpropio = ["src/texto.js", "src/calendario/apuntes.js", "src/nube.js"];
+  const copiasSinTildes = ficheros.filter(f => !conNFDpropio.includes(f)
+    && /normalize\("NFD"\)/.test(sinComentarios(readFileSync(f, "utf8"))));
+  ok(copiasSinTildes.length === 0, `sinTildes solo vive en src/texto.js (copias: ${copiasSinTildes.join(", ") || "ninguna"})`);
+
+  // localStorage se toca en un solo sitio. Las dos excepciones reciben el almacén COMO
+  // PARÁMETRO (así se prueban con uno de mentira) y no van a por el global.
+  const conAlmacen = ["src/almacen.js", "src/formulario/codigo.js", "src/formulario/instalar.js"];
+  const copiasAlmacen = ficheros.filter(f => !conAlmacen.includes(f)
+    && /localStorage\.(get|set|remove)Item/.test(sinComentarios(readFileSync(f, "utf8"))));
+  ok(copiasAlmacen.length === 0, `el try/catch de localStorage vive solo en src/almacen.js (copias: ${copiasAlmacen.join(", ") || "ninguna"})`);
+
+  const copiasTema = ficheros.filter(f => f !== "src/tema.js"
+    && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));
+  ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

@@ -15,6 +15,8 @@
 // Las familias se ordenan de más específica a menos: "sin gluten" y "vegano" pueden
 // aparecer en la misma frase ("un vegano celíaco") y gana la primera que casa, así que
 // van antes las que obligan a una cocina distinta.
+import { sinTildes } from "./texto.js";
+
 export const FAMILIAS = [
   { clave: "gluten",  label: "Menú sin gluten",       palabras: ["celiac", "celíac", "sin gluten", "gluten"] },
   { clave: "vegano",  label: "Menú vegano",           palabras: ["vegano", "vegana", "veganos", "veganas"] },
@@ -42,8 +44,7 @@ const NUMEROS = { un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, s
 
 // Sin tildes y en minúsculas: la mitad de la gente escribe "celiaco" y la otra mitad
 // "celíaco", y las dos tienen razón.
-const normaliza = (t) => String(t || "").toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "");
+const normaliza = sinTildes;
 
 // El texto de alergias dentro de las notas del evento. Si no lleva la marca del
 // formulario se devuelve todo: alguien puede haberlas escrito a mano en las notas.

@@ -11,6 +11,9 @@ import {
   MapPin,
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
+import { hoyLocalISO } from "./fecha.js";
+import { sinTildes } from "./texto.js";
+import { leerTexto, leerJSON, guardarTexto, guardarJSON, borrar as borrarDelAlmacen } from "./almacen.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { colorPorDefecto } from "./manteles.js";
 import { calcPaella } from "./paella.js";
@@ -138,11 +141,10 @@ function esVerano(estacion, fechaISO) {
   return esFechaDeVerano(fechaISO);
 }
 
-export function hoyISO() {
-  const d = new Date();
-  const dosCifras = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${dosCifras(d.getMonth() + 1)}-${dosCifras(d.getDate())}`;
-}
+// El día de hoy vive en src/fecha.js: estaba escrito cuatro veces y no de la misma
+// manera (dos por el calendario del móvil, dos en UTC). Se sigue exportando desde aquí
+// porque media App lo llama así.
+export const hoyISO = hoyLocalISO;
 
 // Qué temporada le toca a un evento guardado ANTES de que existiera este dato. Los que
 // ya han pasado se quedan clavados en lo que tuvieran: su lista es historia y no tiene
@@ -273,7 +275,7 @@ function resumirCambios(prev, nuevo) {
 
 // Normaliza un texto para buscar sin importar tildes ni mayúsculas.
 function _norm(s) {
-  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  return sinTildes(s).replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 // Los conceptos de las recogidas se escriben con el verbo delante ("Recoger
@@ -325,11 +327,11 @@ function soloObjeto(concepto) {
 // para distinguir "creado aquí y aún sin subir" de "borrado desde otro dispositivo".
 const CLAVE_SINCRONIZADOS = "gula_eventos_sincronizados";
 function leerSincronizados() {
-  try { const v = JSON.parse(localStorage.getItem(CLAVE_SINCRONIZADOS) || "[]"); return Array.isArray(v) ? v : []; }
-  catch (e) { return []; }
+  const v = leerJSON(CLAVE_SINCRONIZADOS, []);
+  return Array.isArray(v) ? v : [];
 }
 function guardarSincronizados(nombres) {
-  try { localStorage.setItem(CLAVE_SINCRONIZADOS, JSON.stringify(nombres)); } catch (e) { /* localStorage no disponible */ }
+  guardarJSON(CLAVE_SINCRONIZADOS, nombres);
 }
 
 // ─── LINK DE SOLO MARCAR ───────────────────────────────────────────────────────
@@ -388,7 +390,7 @@ function leerEstadoGuardado() {
     // manipulado) tumbaba la app al dibujar, y como el estado se guarda, recargar
     // volvía a tumbarla. Ver src/estado.js.
     if (c) return { estado: sanearEstado(JSON.parse(decodeURIComponent(c))), desdeLink: true };
-    const guardado = localStorage.getItem("gula_checklist_estado");
+    const guardado = leerTexto("gula_checklist_estado");
     if (guardado) return { estado: sanearEstado(JSON.parse(guardado)), desdeLink: false };
   } catch (e) { /* link corrupto, localStorage no disponible, o JSON inválido: se ignora */ }
   return { estado: {}, desdeLink: false };
@@ -639,12 +641,12 @@ export default function App({ onCerrarSesion } = {}) {
   const [linkAbierto] = useState(linkAbiertoInicial ?? false);
   // Plantillas guardadas con nombre: configuración reutilizable entre eventos
   const [plantillas, setPlantillas] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gula_plantillas")) || {}; } catch (e) { return {}; }
+    return leerJSON("gula_plantillas", {}) || {};
   });
   // Eventos guardados completos (con nombre, fecha, logística...): archivo de checklists
   // que se pueden recargar o compartir por link en cualquier momento
   const [eventosGuardados, setEventosGuardados] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("gula_eventos_guardados")) || {}; } catch (e) { return {}; }
+    return leerJSON("gula_eventos_guardados", {}) || {};
   });
   // Avisos de recogidas/devoluciones pendientes (hoy o ya pasadas), mirando TODOS los
   // eventos guardados, no solo el que está abierto — para no olvidar recoger/devolver
@@ -808,7 +810,7 @@ export default function App({ onCerrarSesion } = {}) {
   // ya se restauró de forma síncrona (ver leerEstadoGuardado/estadoInicial arriba), así
   // que no hace falta guardia de "carga completada": no hay carrera con StrictMode.
   useEffect(() => {
-    try { localStorage.setItem("gula_checklist_estado", estadoActualJSON); } catch (e) { /* localStorage lleno o no disponible */ }
+    guardarTexto("gula_checklist_estado", estadoActualJSON);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON]);
 
@@ -1236,7 +1238,7 @@ export default function App({ onCerrarSesion } = {}) {
     textoConfirmar: "Empezar de cero",
     peligro: true,
     onConfirm: () => {
-      try { localStorage.removeItem("gula_checklist_estado"); } catch (e) { /* localStorage no disponible */ }
+      borrarDelAlmacen("gula_checklist_estado");
       marcarEventoActivo(""); // evento nuevo: no auto-guarda hasta que se guarde por primera vez
       window.location.href = window.location.origin + window.location.pathname;
     },
@@ -1245,7 +1247,7 @@ export default function App({ onCerrarSesion } = {}) {
   // ─── PLANTILLAS GUARDADAS ─────────────────────────────────────────────────
   const guardarPlantillas = (obj) => {
     setPlantillas(obj);
-    try { localStorage.setItem("gula_plantillas", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
+    guardarJSON("gula_plantillas", obj);
   };
   const handleGuardarPlantilla = () => setDialogo({
     tipo: "prompt",
@@ -1273,7 +1275,7 @@ export default function App({ onCerrarSesion } = {}) {
       onConfirm: () => {
         // Se escribe el estado combinado en localStorage y se recarga: el arranque
         // síncrono (leerEstadoGuardado) lo restaura igual que tras cerrar el navegador
-        try { localStorage.setItem("gula_checklist_estado", JSON.stringify({ ...getEstadoActual(), ...plantillas[nombre] })); } catch (e) { /* localStorage no disponible */ }
+        guardarJSON("gula_checklist_estado", { ...getEstadoActual(), ...plantillas[nombre] });
         window.location.href = window.location.origin + window.location.pathname;
       },
     });
@@ -1297,10 +1299,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [archivoListo, setArchivoListo] = useState(false);
   // Nombre del evento "activo" (el que has abierto o guardado en esta sesión). Solo ese
   // se auto-guarda, para no sobrescribir un evento bueno con un borrador del mismo nombre.
-  const eventoActivoRef = React.useRef((() => { try { return localStorage.getItem("gula_evento_activo") || ""; } catch (e) { return ""; } })());
+  const eventoActivoRef = React.useRef(leerTexto("gula_evento_activo"));
   const marcarEventoActivo = (nombre) => {
     eventoActivoRef.current = nombre || "";
-    try { if (nombre) localStorage.setItem("gula_evento_activo", nombre); else localStorage.removeItem("gula_evento_activo"); } catch (e) { /* localStorage no disponible */ }
+    if (nombre) guardarTexto("gula_evento_activo", nombre); else borrarDelAlmacen("gula_evento_activo");
   };
   // Tema: automático por horario, o fijado a mano. Tres posiciones en el mismo botón:
   //   auto   → oscuro de las 20:00 a las 7:00, claro el resto del día (y cambia solo
@@ -1312,7 +1314,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [preferenciaTema, setPreferenciaTema] = useState(() => leerPreferenciaTema());
   const [tema, setTema] = useState(() => temaSegunPreferencia(leerPreferenciaTema()));
   useEffect(() => {
-    try { localStorage.setItem("gula_tema", preferenciaTema); } catch (e) { /* localStorage no disponible */ }
+    guardarTexto("gula_tema", preferenciaTema);
     const aplicar = () => setTema(temaSegunPreferencia(preferenciaTema));
     aplicar();
     if (preferenciaTema !== "auto") return;
@@ -1350,7 +1352,7 @@ export default function App({ onCerrarSesion } = {}) {
     const anterior = eventosGuardadosRef.current;
     eventosGuardadosRef.current = obj;
     setEventosGuardados(obj);
-    try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(obj)); } catch (e) { /* localStorage lleno o no disponible */ }
+    guardarJSON("gula_eventos_guardados", obj);
     // Con la nube activa el archivo se sincroniza evento a evento: se ve igual desde
     // cualquier dispositivo y, al no ir todo en un solo documento, no hay techo.
     if (nubeActiva() && haySesionEquipo) subirArchivo(anterior, obj);
@@ -1389,7 +1391,7 @@ export default function App({ onCerrarSesion } = {}) {
     const guardarLocal = (mapa) => {
       eventosGuardadosRef.current = mapa;
       setEventosGuardados(mapa);
-      try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(mapa)); } catch (e) { /* localStorage lleno o no disponible */ }
+      guardarJSON("gula_eventos_guardados", mapa);
     };
     // Aplica SOLO lo que ha cambiado. Sustituir la lista entera por la foto de la
     // colección borraba de la pantalla los eventos que Firestore aún no conocía.
@@ -1543,7 +1545,7 @@ export default function App({ onCerrarSesion } = {}) {
         // Sin esto la referencia se queda vieja y el siguiente cálculo de "qué ha
         // cambiado" compara contra un mapa desfasado.
         eventosGuardadosRef.current = actualizado;
-        try { localStorage.setItem("gula_eventos_guardados", JSON.stringify(actualizado)); } catch (e) { /* localStorage no disponible */ }
+        guardarJSON("gula_eventos_guardados", actualizado);
         if (nubeActiva() && haySesionEquipo) subirArchivo(prev, actualizado);
         return actualizado;
       });
@@ -1818,8 +1820,7 @@ export default function App({ onCerrarSesion } = {}) {
         // No se borra: queda guardado como revisado, con a qué evento fue a parar
         try { await marcarRevisado(envio.id, { aplicado: true, eventoDestino: nombre }); }
         catch (e) { /* si falla, seguirá en la bandeja y se vuelve a intentar */ }
-        try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); }
-        catch (e) { /* localStorage no disponible */ }
+        guardarJSON("gula_checklist_estado", estado);
         marcarEventoActivo(nombre);
         window.location.href = window.location.origin + window.location.pathname;
       },
@@ -1842,7 +1843,7 @@ export default function App({ onCerrarSesion } = {}) {
         if (nubeActiva() && estado.eventoNubeId && !eventosGuardados[nombre].nombreEvento) {
           guardarEventoNube(estado.eventoNubeId, estado).catch(avisarFalloNube);
         }
-        try { localStorage.setItem("gula_checklist_estado", JSON.stringify(estado)); } catch (e) { /* localStorage no disponible */ }
+        guardarJSON("gula_checklist_estado", estado);
         marcarEventoActivo(estado.nombreEvento || nombre); // al abrirlo, este pasa a auto-guardarse
         window.location.href = window.location.origin + window.location.pathname;
       },
@@ -2606,7 +2607,7 @@ export default function App({ onCerrarSesion } = {}) {
     if (!categoriaTocada) setNuevoItemCategoria(sugerirCategoria(value, categoriasDisponibles) || CATEGORIA_MANUAL);
   };
   // Normaliza para comparar nombres ignorando mayúsculas, acentos y espacios de sobra
-  const normalizarNombreItem = (s) => s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const normalizarNombreItem = (s) => sinTildes(s).trim();
   const insertarItemManual = () => {
     const label = nuevoItemLabel.trim();
     const categoria = nuevoItemCategoria || sugerirCategoria(label, categoriasDisponibles) || CATEGORIA_MANUAL;

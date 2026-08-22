@@ -16,11 +16,11 @@
 // línea de calendario; una checklist lleva dentro el trabajo de quien carga el camión.
 import { registrarConector } from "../conectores.js";
 import { TIPOS, esTipoEvento } from "../../calendario/apuntes.js";
+import { sinTildes } from "../../texto.js";
 
 const TIPOS_VALIDOS = Object.keys(TIPOS);
 const esFecha = (f) => /^\d{4}-\d{2}-\d{2}$/.test(String(f || ""));
 
-const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // El apunte que se está pidiendo, buscado por título. Se exige que sea uno solo: con
 // dos "Boda García" en el calendario, adivinar cuál sería jugársela con los datos de

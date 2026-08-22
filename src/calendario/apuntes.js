@@ -17,6 +17,8 @@
 // node en milisegundos.
 
 import { saneaAsignados, esHora, enMinutos, enReloj } from "../personal.js";
+import { aISO } from "../fecha.js";
+import { sinTildes } from "../texto.js";
 
 // Los cinco tipos de evento son los mismos que genera la app. Los otros tres no son
 // eventos: son las capas que hacen falta para poder anticipar de verdad, y salen de lo
@@ -62,8 +64,11 @@ export function aFecha(iso) {
   return f.getFullYear() === a && f.getMonth() === m - 1 && f.getDate() === d ? f : null;
 }
 
-export const aISO = (f) =>
-  `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+// Vive en src/fecha.js con el resto de las cuentas de días; se reexporta porque medio
+// calendario la importa desde aquí. Con `export … from` a secas el nombre NO queda
+// definido en este módulo y las funciones de abajo que lo usan revientan al llamarlas
+// (lo cazó la prueba de disponiblesEn): hay que importarlo y reexportarlo.
+export { aISO };
 
 // Días entre dos fechas, contando por días de calendario y no por horas: de las 23:00
 // del lunes a la 01:00 del martes hay dos horas, pero es "mañana", no "hoy".
@@ -302,7 +307,7 @@ export const INICIAL_DIA = ["L", "M", "X", "J", "V", "S", "D"];
 // en vez de crear dos fantasmas distintos.
 export const EQUIPO = [];
 
-const sinAcentos = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const sinAcentos = (s) => sinTildes(String(s));
 
 // Saca la persona de un texto suelto. Se busca por palabras completas y no por trozos:
 // con "contiene" a secas, un apodo de dos letras como "fu" cazaba dentro de "Fulgencio"
@@ -361,7 +366,7 @@ export function saneaEquipo(lista) {
       ? [...new Set(p.apodos.map(a => String(a).trim().toLowerCase()).filter(Boolean))]
       : [];
     // El nombre siempre vale como apodo: si no, "Fulanita" no se reconocería a sí misma
-    const suyo = nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const suyo = sinTildes(nombre);
     limpio.push({ nombre, apodos: [...new Set([suyo, ...apodos])] });
   }
   return limpio;

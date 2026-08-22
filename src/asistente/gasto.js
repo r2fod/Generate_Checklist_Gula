@@ -9,6 +9,7 @@
 // uno verá lo suyo y da igual; el tope de verdad lo pone el proveedor.
 //
 // Sin React: entran tokens, sale un número.
+import { leerTexto, leerJSON, guardarTexto, guardarJSON, borrar } from "../almacen.js";
 
 // Precio por millón de tokens, en euros aproximados. Son de la web de cada uno y
 // cambian: el número exacto importa menos que el orden de magnitud, que es lo que hace
@@ -48,8 +49,7 @@ export function saneaGasto(bruto, mes = mesActual()) {
 }
 
 export function leerGasto() {
-  try { return saneaGasto(JSON.parse(localStorage.getItem(CLAVE) || "null")); }
-  catch (e) { return saneaGasto(null); }
+  return saneaGasto(leerJSON(CLAVE, null));
 }
 
 export function apuntar(proveedor, uso, gasto = leerGasto()) {
@@ -75,12 +75,12 @@ export function apuntar(proveedor, uso, gasto = leerGasto()) {
       },
     },
   };
-  try { localStorage.setItem(CLAVE, JSON.stringify(siguiente)); } catch (e) { /* modo privado */ }
+  guardarJSON(CLAVE, siguiente);
   return siguiente;
 }
 
 export function borrarGasto() {
-  try { localStorage.removeItem(CLAVE); } catch (e) { /* modo privado */ }
+  borrar(CLAVE);
   return saneaGasto(null);
 }
 
@@ -113,13 +113,13 @@ export function eurosTotales(gasto = leerGasto()) {
 const CLAVE_TOPE = "gula_asistente_tope";
 
 export function leerTope() {
-  try { const n = Number(localStorage.getItem(CLAVE_TOPE)); return Number.isFinite(n) && n >= 0 ? n : 0; }
-  catch (e) { return 0; }
+  const n = Number(leerTexto(CLAVE_TOPE, "0"));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 export function ponerTope(euros) {
   const n = Number(euros);
-  try { localStorage.setItem(CLAVE_TOPE, String(Number.isFinite(n) && n >= 0 ? n : 0)); } catch (e) { /* modo privado */ }
+  guardarTexto(CLAVE_TOPE, Number.isFinite(n) && n >= 0 ? n : 0);
   return leerTope();
 }
 

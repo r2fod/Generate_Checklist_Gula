@@ -14,7 +14,7 @@ import '../index.css'
 import Formulario from './Formulario.jsx'
 import { leerGuardado, guardar, codigoDeTexto, direccionConCodigo } from './codigo.js'
 import { esIOS } from './instalar.js'
-import { leerPreferenciaTema, temaSegunPreferencia } from '../tema.js'
+import { aplicarTemaInicial } from '../tema.js'
 
 // El código del enlace (?enviar=<código>) se recuerda en ESTE navegador porque si no,
 // instalar la app no serviría de nada: el icono abre la dirección de siempre y quien
@@ -99,10 +99,8 @@ function pedirElEnlace() {
 }
 
 // El tema se pone en el <html> ANTES de montar React, igual que en la checklist: si no,
-// hay un fogonazo de blanco al arrancar de noche.
-function aplicarTemaInicial() {
-  document.documentElement.dataset.tema = temaSegunPreferencia(leerPreferenciaTema());
-}
+// hay un fogonazo de blanco al arrancar de noche. La función es la MISMA (tema.js);
+// estuvo copiada aquí y allí hasta que se extrajo.
 aplicarTemaInicial()
 
 const elCodigo = codigo()

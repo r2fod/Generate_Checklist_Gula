@@ -1,19 +1,19 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { leerJSON, guardarJSON } from "../almacen.js";
 
 // Opciones "de siempre" (nombre, tipo de sitio...) que el usuario va añadiendo a mano
 // con "+ Otro...". Se guardan en este navegador (no en la nube: son de comodidad) y a la
 // próxima vez ya aparezcan como una opción más de la lista, en cualquier evento.
+const claveExtras = (clave) => `gula_opciones_extra::${clave}`;
 function leerExtrasGuardados(clave) {
-  try { return JSON.parse(localStorage.getItem(`gula_opciones_extra::${clave}`) || "[]"); }
-  catch (e) { return []; }
+  const l = leerJSON(claveExtras(clave), []);
+  return Array.isArray(l) ? l : [];
 }
 function guardarExtra(clave, valor) {
   if (!valor || !valor.trim()) return;
-  try {
-    const actuales = leerExtrasGuardados(clave);
-    if (!actuales.includes(valor)) localStorage.setItem(`gula_opciones_extra::${clave}`, JSON.stringify([...actuales, valor]));
-  } catch (e) { /* localStorage no disponible */ }
+  const actuales = leerExtrasGuardados(clave);
+  if (!actuales.includes(valor)) guardarJSON(claveExtras(clave), [...actuales, valor]);
 }
 export default function SelectConOtro({ label, value, onChange, options, opcionNinguna }) {
   const [extras, setExtras] = useState(() => leerExtrasGuardados(label));

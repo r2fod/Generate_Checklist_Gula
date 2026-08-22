@@ -27,12 +27,16 @@ import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personal
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
+import { leerTexto, guardarTexto } from "../almacen.js";
+
 const CLAVE_NIVEL = "gula_asistente_nivel";
 const CLAVE_PERSONALIDAD = "gula_asistente_personalidad";
 const CLAVE_VOZ = "gula_asistente_voz";
 
-const leer = (k, x = "") => { try { return localStorage.getItem(k) || x; } catch (e) { return x; } };
-const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* modo privado */ } };
+// El almacén del navegador, con su try/catch, vive en src/almacen.js. Aquí "" y null se
+// tratan igual: un ajuste guardado en blanco es un ajuste sin poner.
+const leer = (k, x = "") => leerTexto(k, x) || x;
+const guardar = guardarTexto;
 
 // El Worker admite además un proveedor "compatible" (OpenRouter, Groq, DeepSeek…). No
 // sale aquí a propósito: con uno configurado no hay nada que elegir, y cuatro botones

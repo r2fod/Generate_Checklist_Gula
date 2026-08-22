@@ -21,9 +21,13 @@
 // Sin React ni nube: entran datos, sale un parte.
 import { revisarProximos } from "./revision.js";
 import { esTipoEvento } from "../calendario/apuntes.js";
+import { hoyUTCISO, enDiasUTCISO } from "../fecha.js";
+import { leerJSON, guardarJSON } from "../almacen.js";
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
-const enDias = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+// En UTC, como estaban escritas aquí desde el principio: ver el porqué de que no se
+// unifiquen con las locales en src/fecha.js.
+const hoyISO = hoyUTCISO;
+const enDias = enDiasUTCISO;
 
 // ─── LA FOTO ──────────────────────────────────────────────────────────────────
 // Para saber qué ha cambiado hay que recordar cómo estaba. Se guarda lo mínimo: nombres
@@ -44,12 +48,12 @@ export function foto(eventosGuardados = {}, apuntes = [], memoria = [], objetivo
 const CLAVE_FOTO = "gula_asistente_foto";
 
 export function leerFoto() {
-  try { const f = JSON.parse(localStorage.getItem(CLAVE_FOTO) || "null"); return f && f.cuando ? f : null; }
-  catch (e) { return null; }
+  const f = leerJSON(CLAVE_FOTO, null);
+  return f && f.cuando ? f : null;
 }
 
 export function guardarFoto(f) {
-  try { localStorage.setItem(CLAVE_FOTO, JSON.stringify(f)); } catch (e) { /* modo privado */ }
+  guardarJSON(CLAVE_FOTO, f);
   return f;
 }
 

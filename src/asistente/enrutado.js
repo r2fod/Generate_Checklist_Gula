@@ -23,6 +23,8 @@
 //
 // Sin React y sin red: entra una pregunta, sale un nombre.
 
+import { sinTildes } from "../texto.js";
+
 // El orden por defecto: primero lo gratis, luego lo bueno, luego lo limitado.
 export const ORDEN = ["gemini", "claude", "openai", "compatible"];
 
@@ -51,9 +53,6 @@ const PIDE_CABEZA = [
   "deberia", "debería", "opinas", "opinion", "opinión", "analiza", "explica",
   "diferencia", "merece la pena", "que hago", "qué hago", "ayudame a decidir",
 ];
-
-const sinTildes = (t) => String(t || "").toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 const tieneAlguna = (texto, lista) => {
   const t = ` ${sinTildes(texto)} `;

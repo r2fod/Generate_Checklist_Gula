@@ -11,19 +11,19 @@
 // La lista NO se guarda por código: si logística cambia el enlace, lo que ya
 // mandaron sigue existiendo en la nube y tiene que poder corregirse igual. Atarla al
 // código dejaba la lista vacía por un cambio que no tiene nada que ver con ellas.
+import { leerJSON, guardarJSON } from "../almacen.js";
+
 const CLAVE = "gula_formulario_mios";
 const clave = () => CLAVE;
 
 export function leerMios() {
-  try {
-    const l = JSON.parse(localStorage.getItem(clave()) || "[]");
-    return Array.isArray(l) ? l : [];
-  } catch (e) { return []; }
+  const l = leerJSON(clave(), []);
+  return Array.isArray(l) ? l : [];
 }
 
+// Sin sitio se pierde la lista, no lo mandado: lo enviado ya está en la nube.
 function guardar(lista) {
-  try { localStorage.setItem(clave(), JSON.stringify(lista.slice(0, 20))); }
-  catch (e) { /* sin sitio: se pierde la lista, no lo mandado */ }
+  guardarJSON(clave(), lista.slice(0, 20));
 }
 
 // Apunta (o actualiza) un envío. Se guardan también las respuestas para poder

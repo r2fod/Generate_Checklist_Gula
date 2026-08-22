@@ -19,6 +19,8 @@
 //     100 personas no tiene dueño; "la boda de Fulanita el 12 de septiembre" sí.
 //
 // No importa React ni la nube: entran datos, sale un resultado. Se prueba con node.
+import { sinTildes } from "../texto.js";
+
 import { calcBebidas, calcHielo } from "../calculos.js";
 import { buildChecklist } from "../checklist-generadores.js";
 import { escaletaDelEvento, resumenEscaleta } from "../escaleta.js";
@@ -40,8 +42,7 @@ import "./conectores/checklists.js";
 
 // Los nombres se comparan sin tildes, sin mayúsculas y sin sobrar espacios: quien
 // pregunta escribe "la boda de fulanita", no "Boda Fulanita y Mengano".
-const normaliza = (t) => String(t || "").toLowerCase().trim()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "");
+const normaliza = (t) => sinTildes(t).trim();
 
 // Cuánto se parece un nombre a lo que se ha preguntado. No es una búsqueda difusa de
 // verdad: basta con que todas las palabras de la pregunta estén en el nombre, que es

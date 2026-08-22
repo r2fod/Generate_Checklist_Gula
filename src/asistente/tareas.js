@@ -14,16 +14,21 @@
 //
 // Sin React ni nube: entra una lista, sale una lista.
 
+import { sinTildes, limpiaTexto } from "../texto.js";
+import { hoyUTCISO } from "../fecha.js";
+
 export const MAX_TAREAS = 60;
 const MAX_TEXTO = 180;
 
-const limpia = (t) => String(t || "").replace(/\s+/g, " ").trim().slice(0, MAX_TEXTO);
+const limpia = (t) => limpiaTexto(t, MAX_TEXTO);
 
-const clave = (texto, evento) => `${limpia(texto)}|${evento || ""}`.toLowerCase()
-  .normalize("NFD").replace(/[̀-ͯ]/g, "")
+// No usa claveDeTexto: aquí la identidad lleva DENTRO el evento ("pedir las sillas" de
+// la boda del 12 no es la misma tarea que la del sábado siguiente), y por eso conserva
+// la barra y colapsa los guiones. Lo que sí comparte es el sinTildes.
+const clave = (texto, evento) => sinTildes(`${limpia(texto)}|${evento || ""}`)
   .replace(/[^a-z0-9ñ|]/g, "-").replace(/-+/g, "-").slice(0, 70);
 
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+const hoyISO = hoyUTCISO;
 
 // { id, texto, evento, hecho, creado, quien }
 export function saneaTareas(bruto) {

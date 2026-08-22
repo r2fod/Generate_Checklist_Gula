@@ -13,9 +13,10 @@ import React, { useMemo, useState } from "react";
 import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList, ChevronDown, X } from "lucide-react";
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
-  aISO, aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
+  aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
   turnosDe, DIAS_ANTICIPACION, apuntesPorPromover,
 } from "./apuntes.js";
+import { hoyLocalISO } from "../fecha.js";
 import { personalNecesario, resumenAsignados, loQueFalta, horasEntre, ROLES } from "../personal.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
@@ -27,7 +28,8 @@ function IconoTipo({ tipo, size = 13, className = "" }) {
   return <Icono size={size} className={`cal-icono tipo-${tipo} ${className}`} aria-hidden="true" />;
 }
 
-const hoyISO = () => aISO(new Date());
+// "Hoy" vive en src/fecha.js: la misma cuenta estaba escrita en cuatro sitios.
+const hoyISO = hoyLocalISO;
 
 // Cuánto falta, en cristiano. A nivel de módulo porque lo usan los dos sitios que
 // enseñan cuentas atrás: "Lo que viene" y la vista de equipo.

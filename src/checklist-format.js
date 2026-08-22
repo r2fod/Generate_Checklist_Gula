@@ -1,3 +1,5 @@
+import { sinTildes } from "./texto.js";
+
 import { BATEA } from "./calculos.js";
 
 // ─── EVENTOS ────────────────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ export function detectarDelimitador(text) {
 
 // Quita acentos, pasa a minúsculas y limpia puntuación para comparar cabeceras de forma robusta
 export function normalizar(s) {
-  return s.toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+  return sinTildes(s.toString())
     .replace(/[^a-z0-9ñ\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 

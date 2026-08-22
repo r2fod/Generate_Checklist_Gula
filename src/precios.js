@@ -13,6 +13,8 @@
 // una copia local en localStorage y la nube la refresca por detrás. Lo que esto cuesta,
 // y hay que saberlo: un navegador que nunca se ha conectado se queda sin precios (el
 // Resumen calcula a 0) hasta la primera vez que lo haga con sesión iniciada.
+import { leerJSON, guardarJSON } from "./almacen.js";
+
 const CLAVE = "gula_precios_items";
 
 // Un texto o un NaN pegado a mano no es un precio: no se guarda ni se sube.
@@ -33,12 +35,10 @@ export function fusionarPreciosNube(remotos = {}) {
 }
 
 export function leerPrecios() {
-  try { return JSON.parse(localStorage.getItem(CLAVE) || "{}"); }
-  catch (e) { return {}; }
+  return leerJSON(CLAVE, {}) || {};
 }
 export function guardarPrecios(precios) {
-  try { localStorage.setItem(CLAVE, JSON.stringify(saneaPrecios(precios))); }
-  catch (e) { /* localStorage no disponible */ }
+  guardarJSON(CLAVE, saneaPrecios(precios));
 }
 // Pega líneas "Item: 1,50" o "Item 1.50" (mismo formato que "Añadir varios items") y
 // las fusiona con el catálogo existente sin perder precios que no se han vuelto a pegar

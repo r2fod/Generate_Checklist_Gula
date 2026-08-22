@@ -4,17 +4,16 @@ import RedDeSeguridad from './RedDeSeguridad.jsx'
 import './index.css'
 import { cargarEventoNube } from './nube.js'
 import Acceso from './Acceso.jsx'
-import { leerPreferenciaTema, temaSegunPreferencia } from './tema.js'
+import { aplicarTemaInicial } from './tema.js'
+import { leerTexto, leerJSON, guardarJSON } from './almacen.js'
 
 // Si el link es de la nube (?evento=id) se descarga la checklist ANTES de montar
 // la app y se deja en localStorage: así el arranque síncrono de App la restaura
 // igual que cualquier estado guardado. Se mantiene el parámetro en la URL para
 // que recargar la página vuelva a traer la última versión.
-// El tema se pone en el <html> ANTES de montar React: así no hay un fogonazo de
-// blanco al arrancar y la pantalla de acceso también sale en oscuro.
-function aplicarTemaInicial() {
-  document.documentElement.dataset.tema = temaSegunPreferencia(leerPreferenciaTema());
-}
+// El tema se pone en el <html> ANTES de montar React (vive en tema.js, que lo comparte
+// con el arranque del formulario): así no hay un fogonazo de blanco al arrancar y la
+// pantalla de acceso también sale en oscuro.
 aplicarTemaInicial()
 
 // Este arranque es SOLO el de la checklist, que vive en su propia carpeta. El
@@ -27,7 +26,7 @@ aplicarTemaInicial()
 // de aquí es solo la red de seguridad para un ?enviar= que llegue a la carpeta de la
 // checklist: sin ella se quedaría mirando la checklist, que no es lo que pedía.
 function codigoGuardado() {
-  try { return localStorage.getItem("gula_formulario_codigo") || "" } catch (e) { return "" }
+  return leerTexto("gula_formulario_codigo")
 }
 
 function desviarAlFormulario() {
@@ -99,15 +98,14 @@ function preguntarAntesDePisar(id, estadoNube, estadoLocal, seguir) {
     window.location.href = window.location.origin + window.location.pathname
   })
   caja.querySelector('[data-pisar]').addEventListener('click', () => {
-    localStorage.setItem("gula_checklist_estado", JSON.stringify(estadoNube))
+    guardarJSON("gula_checklist_estado", estadoNube)
     seguir()
   })
   raiz.appendChild(caja)
 }
 
 function estadoGuardado() {
-  try { return JSON.parse(localStorage.getItem("gula_checklist_estado") || "null") }
-  catch (e) { return null }
+  return leerJSON("gula_checklist_estado", null)
 }
 
 async function arrancar() {
@@ -126,7 +124,7 @@ async function arrancar() {
           preguntarAntesDePisar(id, estado, local, montar)
           return
         }
-        localStorage.setItem("gula_checklist_estado", JSON.stringify(estado))
+        guardarJSON("gula_checklist_estado", estado)
       } else {
         // El link es válido pero ahí no hay nada: no se puede seguir como si nada
         avisarEventoNoEncontrado(id, false)

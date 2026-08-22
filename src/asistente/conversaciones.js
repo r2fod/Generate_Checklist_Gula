@@ -10,12 +10,16 @@
 //
 // Sin React: entra una lista, sale una lista.
 
+import { limpiaTexto } from "../texto.js";
+import { leerJSON, guardarJSON, borrar } from "../almacen.js";
+
 const CLAVE = "gula_asistente_charlas";
 // Cuántas se guardan. Con más, la lista deja de servir para encontrar algo y localStorage
 // empieza a pesar de verdad (una conversación con herramientas son varios kB).
 export const MAX_CHARLAS = 20;
 
-const limpia = (t) => String(t || "").replace(/\s+/g, " ").trim();
+// Sin tope: el título ya se corta aparte, a 44, y con puntos suspensivos.
+const limpia = (t) => limpiaTexto(t);
 
 // El título sale de la primera pregunta. Pedirlo a mano lo dejaría siempre en blanco, y
 // pedírselo al modelo cuesta dinero por algo que se resuelve con un slice.
@@ -51,19 +55,15 @@ export function saneaCharlas(bruto) {
 }
 
 export function leerCharlas() {
-  try { return saneaCharlas(JSON.parse(localStorage.getItem(CLAVE) || "[]")); }
-  catch (e) { return []; }
+  return saneaCharlas(leerJSON(CLAVE, []));
 }
 
 function escribir(lista) {
   const limpias = saneaCharlas(lista);
-  try { localStorage.setItem(CLAVE, JSON.stringify(limpias)); }
-  catch (e) {
-    // Sin sitio: se tira la mitad más vieja y se reintenta. Perder conversaciones viejas
-    // es mucho mejor que dejar de guardar las nuevas sin decir nada.
-    try { localStorage.setItem(CLAVE, JSON.stringify(limpias.slice(0, Math.ceil(MAX_CHARLAS / 2)))); }
-    catch (e2) { /* modo privado: no se guarda y la app sigue */ }
-  }
+  // Sin sitio: se tira la mitad más vieja y se reintenta. Perder conversaciones viejas
+  // es mucho mejor que dejar de guardar las nuevas sin decir nada. Por eso guardarJSON
+  // devuelve si pudo: es el único sitio de la app donde el fallo cambia qué se hace.
+  if (!guardarJSON(CLAVE, limpias)) guardarJSON(CLAVE, limpias.slice(0, Math.ceil(MAX_CHARLAS / 2)));
   return limpias;
 }
 
@@ -86,7 +86,7 @@ export function borrarCharla(lista, id) {
 }
 
 export function borrarTodas() {
-  try { localStorage.removeItem(CLAVE); } catch (e) { /* modo privado */ }
+  borrar(CLAVE);
   return [];
 }
 
