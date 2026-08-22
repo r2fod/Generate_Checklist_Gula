@@ -448,6 +448,30 @@ export const HERRAMIENTAS = {
 
   // ─── LO QUE HAY QUE HACER ───────────────────────────────────────────────────
   // Apuntar escribe, así que va con permiso como todo lo demás. Ver no.
+  ver_repaso: {
+    datos: true,
+    esquema: {
+      description: "El repaso que hizo el asistente por la noche, sin que nadie lo pidiera: qué eventos de los próximos días tienen algo sin poner. Úsalo cuando pregunten qué se ha detectado, qué está mal o de qué hay que ocuparse. No lo confundas con revisar_todo: aquello lo calcula ahora con lo que hay en este dispositivo, y esto es lo que se miró en la nube con TODOS los eventos del equipo.",
+      parameters: { type: "object", properties: {} },
+    },
+    corre: (ctx) => {
+      const r = ctx.repaso;
+      if (!r || !Array.isArray(r.eventos)) {
+        return { nada: "Todavía no hay ningún repaso guardado. Lo escribe el Worker por la noche; si acabas de montarlo, puede que aún no haya corrido." };
+      }
+      const horas = Math.floor((Date.now() - (Number(r.cuando) || 0)) / 3600000);
+      return {
+        // Cuándo corrió importa tanto como lo que dice: un repaso de hace cinco días
+        // habla de un calendario que ya no es el de hoy.
+        haceHoras: horas,
+        mirados: r.mirados,
+        dias: r.dias,
+        eventos: r.eventos,
+        ...(r.eventos.length ? {} : { todoEnOrden: !!r.mirados }),
+      };
+    },
+  },
+
   ver_tareas: {
     datos: true,
     esquema: {

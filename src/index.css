@@ -2105,7 +2105,7 @@ body {
   padding: 8px 12px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--text-main);
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -4533,7 +4533,7 @@ hr {
 .resumen-ficha-valor {
   font-size: 1.02rem;
   font-weight: 800;
-  color: var(--navy);
+  color: var(--primary-navy);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -6573,8 +6573,8 @@ button.asis-paso.es-coste.es-abre {
   color: inherit;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-button.asis-paso.es-coste.es-abre:hover { background: var(--bg-hover, var(--bg-subtle)); }
-button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent-color); }
+button.asis-paso.es-coste.es-abre:hover { background: var(--accent-soft); }
+button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .asis-vueltas { opacity: 0.65; }
 
 .asis-diario {
@@ -7051,6 +7051,54 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent-color)
   border-radius: var(--radius-md);
   background: var(--bg-subtle);
 }
+
+/* ─── EL REPASO DE LA NOCHE ───────────────────────────────────────────────────
+   Lo que dejó escrito el cron mientras no había nadie. Misma caja que los objetivos:
+   son las dos cosas que se leen nada más abrir el cerebro, y darles formas distintas
+   solo haría que una pareciera más importante que la otra sin motivo. */
+.cer-repaso {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+}
+
+.cer-repaso-evento {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.cer-repaso-cab {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.cer-repaso-cab strong { font-size: 0.86rem; }
+.cer-repaso-cab em { font-size: 0.74rem; color: var(--text-muted); font-style: normal; }
+
+.cer-repaso-evento ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+
+.cer-aviso {
+  /* La raya de color a la izquierda y no el texto entero teñido: un párrafo en rojo se
+     lee peor, y aquí lo que hay que leer es lo que falta, no el color. */
+  padding-left: 8px;
+  border-left: 3px solid var(--border-color);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.cer-aviso em { font-style: normal; color: var(--text-muted); }
+/* Los mismos tres tonos que usa revision.js, y la diferencia importa: "falta" impide
+   calcular, "raro" huele mal, "acuérdate" hay que hacerlo fuera de la app. */
+.cer-aviso.es-falta { border-left-color: var(--error-texto); }
+.cer-aviso.es-raro { border-left-color: var(--aviso-texto-suave); }
+.cer-aviso.es-acuerdate { border-left-color: var(--accent); }
 
 .cer-objetivo {
   display: flex;

@@ -18,6 +18,8 @@
 // Va sin dependencias y en un fichero a propósito: así se pega tal cual en el panel de
 // Cloudflare sin instalar nada. Ver worker/README.md.
 
+import { repasar, DIAS_VISTA } from "./repaso.js";
+
 const CORS = (origen) => ({
   "Access-Control-Allow-Origin": origen,
   "Access-Control-Allow-Headers": "content-type, authorization",
@@ -349,12 +351,41 @@ const disponiblesEn = (env) =>
     .map(([nombre]) => nombre);
 
 export default {
+  // ─── EL REPASO DE LA NOCHE ──────────────────────────────────────────────────
+  // Lo dispara el cron de Cloudflare, sin nadie delante. No usa el modelo: son las
+  // reglas de revision.js, así que cuesta cero tokens y no depende de ningún proveedor.
+  // Deja el resultado en Firestore ("indice/avisos") y la app lo enseña al abrirse.
+  //
+  // Si falla, se deja escrito en los logs y no se reintenta: el cron vuelve mañana, y un
+  // reintento en bucle contra una contraseña mal puesta solo gasta cuota.
+  async scheduled(evento, env, ctx) {
+    ctx.waitUntil(
+      repasar(env)
+        .then(r => console.log(`Repaso: ${r.eventos.length} eventos con avisos de ${r.mirados} mirados.`))
+        .catch(e => console.error(`El repaso ha fallado: ${e && e.message ? e.message : e}`)),
+    );
+  },
+
   async fetch(req, env) {
     // Antes que nada y sin comprobar origen: es una página de diagnóstico que no enseña
     // ninguna clave, y tiene que poder abrirse desde el navegador para servir de algo.
     if (new URL(req.url).pathname === "/__estado") {
       return new Response(JSON.stringify(await estado(env), null, 2),
         { headers: { "content-type": "application/json; charset=utf-8" } });
+    }
+
+    // Lanzar el repaso a mano, para no esperar a que sea de noche cuando se acaba de
+    // montar. Pide la misma sesión de equipo que todo lo demás: no es una página
+    // pública, escribe en Firestore.
+    if (new URL(req.url).pathname === "/__repaso") {
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return new Response(JSON.stringify({ error: quienPide.fallo }), { status: 401, headers: { "content-type": "application/json; charset=utf-8" } });
+      try {
+        const r = await repasar(env);
+        return new Response(JSON.stringify({ ...r, dias: DIAS_VISTA }, null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e && e.message ? e.message : e) }, null, 2), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
+      }
     }
 
     const origen = origenPermitido(req, env);

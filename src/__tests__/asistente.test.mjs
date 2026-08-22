@@ -21,6 +21,7 @@ import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte } from "../calendario/apuntes.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
+import { repasar } from "../../worker/repaso.js";
 import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
 import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../asistente/arbol.js";
@@ -708,7 +709,19 @@ console.log("\n── La cara de lo que está haciendo ──");
 
   // TODAS las herramientas tienen frase en cristiano. Si falta una, sale
   // "buscando ver_checklist", que es peor que no decir nada.
-  TODAS_LAS_HERRAMIENTAS.forEach(n => {
+  //
+  // Y "todas" son las de casa MÁS las de los conectores: mirando solo las de casa,
+  // "crear_checklists" se coló sin frase y el muñeco decía "Creando crear checklists…".
+  // Con todos los conectores encendidos, una herramienta nueva no puede escaparse.
+  const CATALOGO_ENTERO = Object.keys(todas({
+    correo: { cuenta: "x", etiqueta: "y" },
+    whatsapp: {},
+    calendario: { puedeEscribir: true },
+    checklists: { puedeCrear: true },
+  }));
+  ok(CATALOGO_ENTERO.length > TODAS_LAS_HERRAMIENTAS.length,
+    `el catálogo entero incluye las de los conectores (${CATALOGO_ENTERO.length} contra ${TODAS_LAS_HERRAMIENTAS.length})`);
+  CATALOGO_ENTERO.forEach(n => {
     const f = gestoDeHerramienta(n).frase;
     ok(!f.includes("_"), `"${n}" se dice en cristiano → ${f}`);
   });
@@ -718,6 +731,91 @@ console.log("\n── La cara de lo que está haciendo ──");
     "y un aviso que ya viene escrito se deja tal cual");
   ok(gestoDeHerramienta("inventada_nueva").frase.includes("inventada nueva"),
     "una herramienta nueva sin frase no rompe: se lee su nombre sin guiones");
+}
+
+console.log("\n── El repaso de la noche ──");
+{
+  // El cron del Worker corriendo aquí, con un Firestore de mentira. Importa porque este
+  // camino no lo ejecuta nadie mirando: si se rompe, se rompe en silencio a las tres de
+  // la mañana y nadie se entera hasta que falta un congelador en agosto.
+  const EVENTOS = {
+    "Boda de prueba": { evento: "boda", pax: 120, fechaEvento: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10) },
+    "Comunión de prueba": { evento: "comunion", pax: 80, ninos: 20, fechaEvento: new Date(Date.now() + 400 * 86400000).toISOString().slice(0, 10), horaInicio: "13:00", ubicacion: "Finca de prueba" },
+  };
+
+  const firestoreFalso = ({ falloEntrada = null } = {}) => {
+    const escrito = [];
+    globalThis.fetch = async (url, opciones = {}) => {
+      const u = String(url);
+      if (u.includes("signInWithPassword")) {
+        if (falloEntrada) return { ok: false, status: 400, json: async () => ({ error: { message: falloEntrada } }) };
+        return { ok: true, status: 200, json: async () => ({ idToken: "token-de-mentira" }) };
+      }
+      if (u.includes("/documents/indice/avisos")) {
+        escrito.push(JSON.parse(opciones.body));
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+      if (u.includes("/documents/indice")) {
+        return {
+          ok: true, status: 200,
+          json: async () => ({
+            documents: [
+              // Un documento que NO es un evento: el índice viejo vive en la misma
+              // colección y colarlo rompería el repaso.
+              { name: "proyectos/x/documents/indice/eventosGuardados", fields: { mapa: { stringValue: "{}" } } },
+              ...Object.entries(EVENTOS).map(([nombre, e], i) => ({
+                name: `proyectos/x/documents/indice/evt_${i}`,
+                fields: { nombre: { stringValue: nombre }, estado: { stringValue: JSON.stringify(e) } },
+              })),
+              // Y uno corrupto: no puede tumbar el repaso entero.
+              { name: "proyectos/x/documents/indice/evt_roto", fields: { nombre: { stringValue: "Roto" }, estado: { stringValue: "{{{" } } },
+            ],
+          }),
+        };
+      }
+      throw new Error(`El repaso ha llamado a un sitio que no tocaba: ${u}`);
+    };
+    return escrito;
+  };
+
+  const ENV = { FIREBASE_API_KEY: "k", FIREBASE_PROJECT_ID: "gula-prueba", ROBOT_EMAIL: "robot@prueba", ROBOT_PASSWORD: "x" };
+
+  const escrito = firestoreFalso();
+  const r = await repasar(ENV);
+  ok(r.mirados === 2, `mira los eventos y salta lo que no lo es (${r.mirados})`);
+  ok(r.eventos.length === 1 && r.eventos[0].evento === "Boda de prueba",
+    "solo avisa de los que están dentro de los 30 días");
+  ok(r.eventos[0].avisos.some(a => a.tono === "falta"),
+    "y con los avisos de siempre, los de revision.js, no otros nuevos");
+  ok(r.eventos[0].avisos.every(a => typeof a.comoSeArregla === "string"),
+    "cada aviso lleva cómo se arregla");
+  ok(escrito.length === 1 && JSON.parse(escrito[0].fields.avisos.stringValue).mirados === 2,
+    "y queda escrito en Firestore para que la app lo enseñe al abrirse");
+
+  // Y se puede preguntar por él: sin herramienta, el repaso solo se ve si te acuerdas de
+  // abrir la pestaña del cerebro.
+  const conRepaso = ejecutar("ver_repaso", {}, { ...CTX, repaso: r });
+  ok(conRepaso.mirados === 2 && conRepaso.eventos.length === 1, "y se puede preguntar por él");
+  ok(typeof conRepaso.haceHoras === "number",
+    "diciendo cuándo corrió: un repaso de hace cinco días habla de otro calendario");
+  ok(ejecutar("ver_repaso", {}, CTX).nada, "y si todavía no hay ninguno, lo dice en vez de callar");
+
+  // Cero avisos con cero eventos mirados es un error mudo; con doce, una buena noticia.
+  ok(typeof r.mirados === "number", "se apunta cuántos se han mirado, no solo cuántos fallan");
+
+  // Los fallos se dicen, no se tragan: un repaso que calla parece que ha ido bien.
+  firestoreFalso({ falloEntrada: "INVALID_PASSWORD" });
+  let fallo = "";
+  try { await repasar(ENV); } catch (e) { fallo = e.message; }
+  ok(/INVALID_PASSWORD/.test(fallo), `el motivo de Google llega tal cual → "${fallo}"`);
+
+  for (const [quita, espera] of [["FIREBASE_PROJECT_ID", /FIREBASE_PROJECT_ID/], ["ROBOT_EMAIL", /ROBOT_EMAIL/]]) {
+    firestoreFalso();
+    const env = { ...ENV, [quita]: "" };
+    let m = "";
+    try { await repasar(env); } catch (e) { m = e.message; }
+    ok(espera.test(m), `sin ${quita} dice exactamente qué falta`);
+  }
 }
 
 console.log("\n── Hablarle y que conteste ──");

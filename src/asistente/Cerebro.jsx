@@ -13,7 +13,7 @@
 // Los tres ejes devuelven la misma forma, así que los pinta UN componente. Añadir un
 // cuarto eje mañana es una función en arbol.js, no una pantalla nueva aquí.
 import { useState } from "react";
-import { Trash2, Target, Plus, Check, Archive, Network } from "lucide-react";
+import { Trash2, Target, Plus, Check, Archive, Network, MoonStar } from "lucide-react";
 import { porTema, porFuente, porDia, grafo } from "./arbol.js";
 import { ESTADOS, MAX_OBJETIVOS, cuantosActivos } from "./objetivos.js";
 
@@ -24,13 +24,24 @@ const VISTAS = [
   { id: "grafo", nombre: "Grafo", eje: null },
 ];
 
+// Cuándo corrió, en cristiano. Una marca de tiempo cruda obliga a hacer la resta
+// mentalmente, y lo que importa es si el repaso está fresco o lleva días parado.
+function cuandoFueElRepaso(cuando) {
+  const horas = Math.floor((Date.now() - (Number(cuando) || 0)) / 3600000);
+  if (!cuando || horas < 0) return "En algún momento";
+  if (horas < 1) return "Hace un rato";
+  if (horas < 24) return `Hace ${horas} hora${horas === 1 ? "" : "s"}`;
+  const dias = Math.floor(horas / 24);
+  return `Hace ${dias} día${dias === 1 ? "" : "s"}`;
+}
+
 const COLOR_NODO = {
   sitio: "#0891b2", evento: "#4f46e5", tipo: "#9333ea",
   tema: "#15803d", recuerdo: "#b45309",
 };
 
 export default function Cerebro({
-  memoria = [], objetivos = [], eventosGuardados = {},
+  memoria = [], objetivos = [], eventosGuardados = {}, repaso = null,
   onOlvidar, onPonerObjetivo, onCambiarEstadoObjetivo, onQuitarObjetivo,
 }) {
   const [vista, setVista] = useState("temas");
@@ -110,6 +121,47 @@ export default function Cerebro({
           </button>
         )}
       </div>
+
+      {/* ── LO QUE MIRÓ MIENTRAS NO HABÍA NADIE ──
+          El repaso lo escribe el cron del Worker, no este navegador: por eso está aunque
+          nadie haya abierto la app en toda la semana, que es justo cuando hace falta. */}
+      {repaso && (
+        <div className="cer-repaso">
+          <div className="cer-titulo">
+            <MoonStar size={14} aria-hidden="true" />
+            <span>El repaso de la noche</span>
+            {repaso.eventos.length > 0 && <em>{repaso.eventos.length}</em>}
+          </div>
+          <p className="asis-explica">
+            {cuandoFueElRepaso(repaso.cuando)} miró {repaso.mirados} evento{repaso.mirados === 1 ? "" : "s"}
+            {" "}de los próximos {repaso.dias} días.
+          </p>
+          {repaso.eventos.length === 0 ? (
+            // "0 avisos" con 0 mirados es un error mudo; con doce, una buena noticia. Por
+            // eso se dice el número de arriba y aquí solo se celebra si de verdad miró.
+            <p className="asis-vacio">
+              {repaso.mirados
+                ? "Todo en orden: no falta nada por poner."
+                : "No encontró ningún evento que mirar. Si eso no cuadra, revisa el repaso en los ajustes."}
+            </p>
+          ) : repaso.eventos.map((e, i) => (
+            <div className="cer-repaso-evento" key={i}>
+              <div className="cer-repaso-cab">
+                <strong>{e.evento}</strong>
+                {e.fecha && <em>{e.fecha}</em>}
+              </div>
+              <ul>
+                {e.avisos.map((a, j) => (
+                  <li className={`cer-aviso es-${a.tono}`} key={j}>
+                    {a.texto}
+                    {a.comoSeArregla && <em> · {a.comoSeArregla}</em>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── LO QUE SABE ── */}
       <div className="cer-titulo">

@@ -301,7 +301,7 @@ ok(p1.local['Boda'].pax===150, `el PC recibe la edición del móvil (pax=${p1.lo
 
 // 4. Nombres con tildes, barras y muy largos
 almacen.clear(); limpiarPrevios();
-const raros = {'Comunión Álvaro/Rocío':ev(40), ['x'.repeat(200)]:ev(10), 'Boda 50% + extra':ev(60)};
+const raros = {'Comunión Zutano/Zutana':ev(40), ['x'.repeat(200)]:ev(10), 'Boda 50% + extra':ev(60)};
 const r1 = crearDispositivo('raros', raros); await r1.arrancar();
 const r2 = crearDispositivo('otro', {}); await r2.arrancar();
 ok(Object.keys(r2.local).length===3, `nombres raros viajan bien: ${JSON.stringify(Object.keys(r2.local).map(s=>s.slice(0,22)))}`);

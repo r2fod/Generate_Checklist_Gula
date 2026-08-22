@@ -11,7 +11,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
-import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube } from "../nube.js";
+import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
 import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
 import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
@@ -84,6 +84,19 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     };
     cargarProxyNube().then(aplicar).catch(() => { /* sin conexión: se pide a mano */ });
     const corta = suscribirProxyNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, []);
+
+  // El repaso que dejó escrito el cron del Worker mientras no había nadie. Se lee, no se
+  // calcula: el subconsciente ya mira lo de este navegador al abrir, y esto es lo otro
+  // —lo que se miró aunque nadie abriera la app en toda la semana—.
+  const [repaso, setRepaso] = useState(null);
+  useEffect(() => {
+    if (!nubeActiva()) return;
+    let vivo = true;
+    const aplicar = (r) => { if (vivo && r && Array.isArray(r.eventos)) setRepaso(r); };
+    cargarAvisosNube().then(aplicar).catch(() => { /* sin conexión: no se enseña */ });
+    const corta = suscribirAvisosNube(aplicar);
     return () => { vivo = false; corta(); };
   }, []);
   const [texto, setTexto] = useState("");
@@ -161,7 +174,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     try {
       const token = await tokenDeSesion().catch(() => "");
       const comun = {
-        mensajes, contexto: { ...contexto, nivel, onEscribir: escribir }, url, token,
+        mensajes,
+        // El repaso entra en el contexto para que "ver_repaso" lo lea: lo carga este
+        // panel de Firestore, no la app, así que no viene en el contexto de fuera.
+        contexto: { ...contexto, nivel, repaso, onEscribir: escribir },
+        url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
       };
@@ -494,6 +511,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             memoria={contexto.memoria || []}
             objetivos={contexto.objetivos || []}
             eventosGuardados={contexto.eventosGuardados || {}}
+            repaso={repaso}
             onOlvidar={onOlvidar}
             onPonerObjetivo={contexto.onPonerObjetivo}
             onCambiarEstadoObjetivo={contexto.onCambiarEstadoObjetivo}

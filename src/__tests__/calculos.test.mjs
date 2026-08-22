@@ -512,10 +512,10 @@ console.log("\n══ El equipo del calendario: quién queda un día ══");
     "y el nombre completo cae en la misma, no crea un segundo fantasma");
   // El fallo que hubo que arreglar: buscar por trozos convertía media hoja en
   // vacaciones de quien tuviera el apodo más corto.
-  const conRo = saneaEquipo([{ nombre: "Rocío", apodos: ["ro"] }, "Rodrigo"]);
-  ok(personaDeTexto("Boda de Rodrigo", conRo) === "Rodrigo",
-    '"Rodrigo" no es "ro": se busca por palabras completas, no por trozos');
-  ok(personaDeTexto("VACAS RO", conRo) === "Rocío",
+  const conFu = saneaEquipo([{ nombre: "Fulgencia", apodos: ["fu"] }, "Fulanito"]);
+  ok(personaDeTexto("Boda de Fulanito", conFu) === "Fulanito",
+    '"Fulanito" no es "fu": se busca por palabras completas, no por trozos');
+  ok(personaDeTexto("VACAS FU", conFu) === "Fulgencia",
     "pero el apodo suelto sí cae donde toca");
   ok(personaDeTexto("Boda de unos clientes", equipo) === null,
     "y un texto sin nadie del equipo no inventa a nadie");

@@ -13,7 +13,11 @@
 // general ("borrar" antes que cualquier cosa con "apunte" dentro).
 const REGLAS = [
   { como: /^(borrar|olvidar|eliminar)/, gesto: "borrando", frase: "Borrando" },
-  { como: /^(crear|apuntar|agregar|anadir|añadir)/, gesto: "creando", frase: "Creando" },
+  { como: /^apuntar/, gesto: "creando", frase: "Apuntando" },
+  // Marcar una tarea escribe, no mira. Sin esta regla caía en el "Mirando" de por
+  // defecto, que es justo lo contrario de lo que está pasando.
+  { como: /^marcar/, gesto: "creando", frase: "Marcando" },
+  { como: /^(crear|agregar|anadir|añadir)/, gesto: "creando", frase: "Creando" },
   { como: /^(editar|cambiar|corregir|modificar)/, gesto: "creando", frase: "Corrigiendo" },
   { como: /^recordar/, gesto: "aprendiendo", frase: "Aprendiendo" },
   { como: /^(revisar|que_falta)/, gesto: "revisando", frase: "Repasando" },
@@ -40,6 +44,11 @@ const EN_CRISTIANO = {
   calcular_hielo: "el hielo",
   calcular_personal: "la gente",
   simular_checklist: "una checklist de prueba",
+  crear_checklists: "las checklists",
+  ver_tareas: "las tareas",
+  ver_repaso: "el repaso de la noche",
+  apuntar_tarea: "la tarea",
+  marcar_tarea: "la tarea",
   crear_apunte: "el apunte",
   editar_apunte: "el apunte",
   borrar_apunte: "el apunte",

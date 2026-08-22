@@ -2905,7 +2905,7 @@ async function main() {
     const estado = {
       evento: "produccion", pax: 25, nombreEvento: "Boda Fulanita y Mengano", fechaEvento: dia(1),
       // Un concepto largo de verdad, de los que parten el texto en tres líneas
-      recogidas: [{ concepto: "Apollo paella y jamonero — recoger en casa de los padres de Rocío", fecha: dia(-2), fechaDevolucion: dia(-1) }],
+      recogidas: [{ concepto: "Apollo paella y jamonero — recoger en casa de los padres de Fulanita", fecha: dia(-2), fechaDevolucion: dia(-1) }],
       compras: [],
     };
     await c.addInitScript(e => {

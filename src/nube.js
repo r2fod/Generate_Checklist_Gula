@@ -355,6 +355,18 @@ export const guardarProxyNube = PROXY.guardar;
 export const cargarProxyNube = PROXY.cargar;
 export const suscribirProxyNube = PROXY.suscribir;
 
+// ─── EL REPASO DE LA NOCHE ────────────────────────────────────────────────────
+// Lo que dejó escrito el cron del Worker mientras no había nadie: qué eventos de los
+// próximos treinta días tienen algo sin poner. Aquí SOLO se lee — lo escribe el Worker,
+// no la app— y por eso no se exporta el "guardar": una app que pudiera sobrescribirlo
+// acabaría pisando el repaso con lo que sabe un solo navegador.
+//
+// Mismo sitio que los demás ajustes compartidos, así que las reglas que ya existen
+// ("indice/{doc} con sesión") lo cubren sin tocar nada.
+const AVISOS = ajusteCompartido("indice/avisos", "avisos");
+export const cargarAvisosNube = AVISOS.cargar;
+export const suscribirAvisosNube = AVISOS.suscribir;
+
 // ─── EL CALENDARIO DEL EQUIPO ─────────────────────────────────────────────────
 // Los apuntes del calendario (ver src/calendario/apuntes.js): qué día, qué es y cómo se
 // llama. Van en UN documento porque son pocos y pequeños — un año entero son unos

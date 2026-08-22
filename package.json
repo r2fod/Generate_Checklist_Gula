@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "worker:build": "rolldown worker/index.js -o worker/pegar.js -f esm --platform neutral",
     "predeploy": "npm run test",
     "deploy": "gh-pages -d dist",
     "test": "node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs && node src/__tests__/app.test.mjs",

@@ -18,7 +18,12 @@ Firestore.
 
 3. **Crear el Worker** — en el panel: *Workers & Pages* → *Create* → *Worker*. Ponle un
    nombre (por ejemplo `asistente-gula`) y dale a *Deploy*. Luego *Edit code*, borra lo
-   que venga de ejemplo, pega entero el contenido de `worker/index.js` y *Deploy*.
+   que venga de ejemplo, pega entero el contenido de **`worker/pegar.js`** y *Deploy*.
+
+   > **Ojo: se pega `pegar.js`, no `index.js`.** `index.js` es la fuente, la que se lee y
+   > se edita; `pegar.js` es esa misma fuente con las reglas de revisión de la app metidas
+   > dentro, que es lo que necesita el repaso de la noche. Se genera con
+   > `npm run worker:build` y se regenera cada vez que se toque el Worker o la revisión.
 
 4. **Los secretos** — en el Worker: *Settings* → *Variables and Secrets*. Añade:
 
@@ -78,9 +83,44 @@ Cambiar de modelo es cambiar estas tres variables. No hay que tocar la app.
   —hielo, bebida, personal—, nunca las que devuelven nombres, fechas o sitios. Y si aun
   así pidiera una, el cliente la rechaza.
 
+## El repaso de la noche (opcional)
+
+Las reglas de "esto no cuadra" ya existen y ya avisan… pero solo cuando alguien abre la
+app. Y el fallo caro de este oficio no es calcular mal: es que un campo se quede sin
+poner y nadie lo mire hasta que el camión está cargado. Si nadie abre la app en toda la
+semana, nadie lo mira.
+
+Con esto, el Worker lo mira solo cada noche y deja escrito el resultado; la app lo enseña
+en *Cerebro* la próxima vez que alguien entre. **No usa el modelo**: son las mismas reglas
+de siempre, así que cuesta cero tokens y da igual que fallen los proveedores.
+
+1. **Una cuenta para el robot** — en Firebase: *Authentication* → *Users* → *Add user*.
+   Un correo cualquiera (por ejemplo `robot@gula.local`) y una contraseña larga. Es una
+   cuenta normal del equipo: las reglas de Firestore ya la aceptan, no hay que tocarlas.
+
+2. **Tres variables más** en el Worker:
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `FIREBASE_PROJECT_ID` | Text | `gula-checklist` |
+   | `ROBOT_EMAIL` | Text | El correo del paso 1 |
+   | `ROBOT_PASSWORD` | Secret | Su contraseña |
+
+3. **El cron** — en el Worker: *Settings* → *Triggers* → *Cron Triggers* → *Add*.
+   Pon `0 5 * * *` (las 5 de la mañana UTC). Está en el plan gratuito.
+
+4. **Probarlo sin esperar a la noche** — abre `https://TU-WORKER.workers.dev/__repaso`
+   desde la app con sesión iniciada. Contesta con lo que ha encontrado, o con el motivo
+   exacto si algo falta.
+
+Si falla, no reintenta: se apunta en los logs de Cloudflare y vuelve mañana. Un reintento
+en bucle contra una contraseña mal puesta solo gasta cuota.
+
 ## Lo que NO puede hacer el asistente
 
-Ninguna herramienta escribe nada: de momento solo consulta. Y cuando se añadan las de
-escribir, cuatro no se expondrán nunca —marcar cargado, marcar preparado, marcar vuelto
-y apuntar roturas— porque la identidad de cada item es `categoría::etiqueta` y tocar eso
+Lo que escribe pasa por un nivel de permiso que se elige en los ajustes: *solo consultar*,
+*con permiso* (pide confirmación) o *confianza*. Y hay ocho herramientas que **no se
+exponen en ningún nivel**, tampoco en confianza: marcar cargado, marcar preparado, marcar
+vuelto, apuntar roturas, renombrar un item, renombrar una categoría, borrar un evento y
+borrar un archivo. La identidad de cada item es `categoría::etiqueta`, así que tocar eso
 por su cuenta borraría el trabajo de quien está cargando el camión.
