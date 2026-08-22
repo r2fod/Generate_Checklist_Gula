@@ -301,6 +301,22 @@ function revisarProximos(eventosGuardados = {}, diasVista = 30) {
 //#region worker/repaso.js
 const FIRESTORE = "https://firestore.googleapis.com/v1";
 const PREFIJO_EVENTO = "evt_";
+const TECHO_DOCUMENTO = 1048576;
+const AVISA_DESDE = .75;
+const URGE_DESDE = .9;
+const kB = (bytes) => `${Math.round(bytes / 1024)} kB`;
+function avisoDePeso(nombre, bytes) {
+	const parte = bytes / TECHO_DOCUMENTO;
+	if (parte < AVISA_DESDE) return null;
+	return {
+		documento: nombre,
+		bytes,
+		porcentaje: Math.round(parte * 100),
+		tono: parte >= URGE_DESDE ? "malo" : "ojo",
+		texto: `El documento ${nombre} va por ${kB(bytes)} de los ${kB(TECHO_DOCUMENTO)} que caben (${Math.round(parte * 100)} %).`,
+		comoSeArregla: nombre.includes("calendario") ? "Saca del calendario los apuntes de años cerrados (Traer/exportar guarda una copia antes)." : "Es el archivo antiguo y solo se lee: se puede vaciar cuando se confirme que todo está en indice/evt_*."
+	};
+}
 async function entrar(env) {
 	const clave = String(env.FIREBASE_API_KEY || "").trim();
 	const correo = String(env.ROBOT_EMAIL || "").trim();
@@ -357,6 +373,13 @@ async function leerEventos(env, token) {
 	}
 	return mapa;
 }
+async function pesoDe(env, token, ruta) {
+	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/${ruta}`;
+	const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+	if (!r.ok) return null;
+	const texto = await r.text();
+	return new TextEncoder().encode(texto).length;
+}
 async function guardarAvisos(env, token, contenido) {
 	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/avisos`;
 	const r = await fetch(url, {
@@ -380,10 +403,18 @@ async function repasar(env) {
 	const token = await entrar(env);
 	const eventos = await leerEventos(env, token);
 	const revisados = revisarProximos(eventos, 30);
+	const pesos = [];
+	for (const ruta of ["indice/calendario", "indice/eventosGuardados"]) {
+		const bytes = await pesoDe(env, token, ruta).catch(() => null);
+		if (bytes === null) continue;
+		const aviso = avisoDePeso(ruta, bytes);
+		if (aviso) pesos.push(aviso);
+	}
 	const contenido = {
 		cuando: Date.now(),
 		dias: 30,
 		mirados: Object.keys(eventos).length,
+		documentos: pesos,
 		eventos: revisados.map((r) => ({
 			evento: r.evento,
 			fecha: r.fecha,

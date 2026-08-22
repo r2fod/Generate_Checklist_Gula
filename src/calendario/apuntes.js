@@ -133,6 +133,34 @@ export function saneaLista(lista) {
   return [...porId.values()].sort((x, y) => x.fecha.localeCompare(y.fecha) || x.titulo.localeCompare(y.titulo));
 }
 
+// ¿Dicen lo mismo dos listas ya saneadas? Se compara campo a campo y no por referencia:
+// cada foto de Firestore trae objetos nuevos aunque no haya cambiado nada, y hay muchas
+// —cada escritura propia dispara la suya, dos veces (local y confirmada)—. Sin esto, el
+// calendario repintaba la rejilla entera cada vez que alguien tocaba un apunte, y con
+// 250 apuntes eso son 35 casillas rehechas para nada.
+//
+// Van saneadas y ordenadas por saneaLista, así que basta con recorrerlas en paralelo:
+// no hace falta ordenar ni indexar otra vez.
+export function mismaLista(a, b) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i], y = b[i];
+    if (x === y) continue;
+    if (!x || !y) return false;
+    const claves = Object.keys(x);
+    if (claves.length !== Object.keys(y).length) return false;
+    for (const k of claves) {
+      // Los asignados son un objeto dentro del apunte: se compara su contenido, que es
+      // corto y de una sola capa. Comparándolo por referencia esto no serviría de nada.
+      if (x[k] && y[k] && typeof x[k] === "object") {
+        if (JSON.stringify(x[k]) !== JSON.stringify(y[k])) return false;
+      } else if (x[k] !== y[k]) return false;
+    }
+  }
+  return true;
+}
+
 // Todos los días que ocupa un apunte. Uno normal ocupa uno; unas vacaciones de tres
 // semanas ocupan veintiuno, y tienen que pintarse en los veintiuno o no sirven de nada.
 function diasDelApunte(apunte) {

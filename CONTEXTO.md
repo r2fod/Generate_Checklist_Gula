@@ -484,6 +484,26 @@ Para medir en el navegador hay dos modos nuevos en el banco de pruebas:
 `?muchos=250` (calendario lleno de apuntes inventados) y `?boton=1` (el botón del
 asistente, para cronometrar del clic al panel).
 
+**Lo que sí se cambió con esa medición delante** (y nada más):
+
+- **El asistente se precarga en el rato muerto.** `src/precarga.js` (`alSobrarTiempo`,
+  con `requestIdleCallback` y respaldo de `setTimeout` para Safari) y una sola llamada,
+  en `BotonAsistente.jsx`, que es el sitio compartido por las dos apps. Quien abre el
+  panel ya no espera a la red con el dedo en el botón; quien no lo abre no descarga nada
+  hasta que el navegador está parado.
+- **La rejilla del calendario ya no se repinta con cada foto de Firestore.** Cada
+  escritura dispara DOS fotos (la local y la confirmada) y las dos traen listas nuevas
+  aunque digan lo mismo. `mismaLista()` (en `apuntes.js`, pura y probada) compara por
+  contenido, y el hook deja el estado intacto cuando no hay novedad.
+- **Las animaciones en bucle** (30) ya usaban `transform`/`opacity` salvo tres de
+  pintado —el degradado del logo, la boca del muñeco y el aro del micro— que no provocan
+  reflow y se dejan como están. Ahora hay una prueba que falla si alguien anima en bucle
+  algo que mueva la maqueta.
+- **El repaso de la noche avisa de los documentos que se acercan al MiB** de Firestore
+  (`indice/calendario` y `indice/eventosGuardados`): al 75 % avisa, al 90 % urge, y en
+  los dos casos dice qué hacer. Sin esto, el techo lo descubre quien intenta apuntar una
+  boda un sábado y no puede guardarla. Sale en *Cerebro*, encima de los avisos de eventos.
+
 ## Rendimiento real (4G, CPU ×4, con gzip como sirve GitHub Pages)
 
 | App | Red | Primer pintado |

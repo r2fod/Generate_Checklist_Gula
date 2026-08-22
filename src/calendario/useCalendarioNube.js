@@ -12,7 +12,7 @@
 //   · ?cal=…      — enlace editable: el calendario de verdad, sin cuenta.
 //   · ?ver=…      — enlace de mirar: una copia. No se escribe nunca desde aquí.
 import { useEffect, useRef, useState } from "react";
-import { saneaLista, saneaEquipo } from "./apuntes.js";
+import { saneaLista, saneaEquipo, mismaLista } from "./apuntes.js";
 import { MODOS } from "./enlace.js";
 import { nubeActiva, resolverCalendario, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube } from "../nube.js";
 import { ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
@@ -51,10 +51,17 @@ export default function useCalendarioNube(enlace = null) {
       donde.current = { codigo: cs.codigo, ver: cs.ver || "" };
       if (!enlace) setCodigos({ codigo: cs.codigo, ver: cs.ver });
 
+      // Cada foto de Firestore trae listas NUEVAS aunque digan exactamente lo mismo, y
+      // llegan de dos en dos por cada escritura (la local y la confirmada). Pasarlas al
+      // estado tal cual repintaba la rejilla entera del mes sin que hubiera cambiado un
+      // solo apunte. Con la comparación por contenido, la foto que no trae novedades no
+      // toca el estado y React no repinta nada.
       const aplicar = (d) => {
         if (!vivo || !d) return;
-        setApuntes(saneaLista(d.apuntes));
-        setEquipo(saneaEquipo(d.equipo));
+        const nuevos = saneaLista(d.apuntes);
+        setApuntes(previos => (mismaLista(previos, nuevos) ? previos : nuevos));
+        const nuevoEquipo = saneaEquipo(d.equipo);
+        setEquipo(previo => (JSON.stringify(previo) === JSON.stringify(nuevoEquipo) ? previo : nuevoEquipo));
         // El documento de verdad lleva dentro el código de su copia. Quien edita por
         // enlace no lo sabía al entrar: lo aprende aquí, y con él puede refrescarla.
         if (d.ver) donde.current.ver = d.ver;

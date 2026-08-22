@@ -19,9 +19,10 @@ import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoC
 import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
-import { idDeApunte } from "../calendario/apuntes.js";
+import { idDeApunte, saneaLista, mismaLista } from "../calendario/apuntes.js";
+import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
-import { repasar } from "../../worker/repaso.js";
+import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
 import { readFileSync } from "node:fs";
@@ -1302,6 +1303,64 @@ console.log("\n── Crear checklists desde el calendario ──");
   ok(aplicar({ que: "apuntar_tarea", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
   ok(aplicar({ que: "crear_checklists", datos: { ids: ["fantasma"] } }).error,
     "un apunte que ya no está lo dice");
+}
+
+console.log("\n── Lo que ya no se repinta ni se descarga tarde ──");
+{
+  // ─── La foto de Firestore que no trae nada nuevo ────────────────────────────
+  // Cada escritura del calendario dispara DOS fotos (la local y la confirmada) y las dos
+  // traen objetos nuevos. Pasándolas al estado tal cual, React repintaba la rejilla
+  // entera del mes sin que hubiera cambiado un apunte.
+  const a = saneaLista([
+    { fecha: "2026-09-13", titulo: "Boda inventada", tipo: "boda", pax: 120 },
+    { fecha: "2026-09-20", titulo: "Comunión inventada", tipo: "comunion" },
+  ]);
+  const b = saneaLista([
+    { fecha: "2026-09-13", titulo: "Boda inventada", tipo: "boda", pax: 120 },
+    { fecha: "2026-09-20", titulo: "Comunión inventada", tipo: "comunion" },
+  ]);
+  ok(a !== b && mismaLista(a, b), "dos fotos distintas con el mismo contenido cuentan como iguales: no se repinta");
+  ok(!mismaLista(a, saneaLista([...a, { fecha: "2026-09-21", titulo: "Otra", tipo: "boda" }])),
+    "pero un apunte nuevo sí cambia la lista");
+  const cambiado = saneaLista([{ ...a[0], pax: 130 }, a[1]]);
+  ok(!mismaLista(a, cambiado), "y un pax corregido también: la comparación es por contenido, no por longitud");
+  const conEquipo = saneaLista([{ ...a[0], personal: [{ nombre: "Fulanita", rol: "sala" }] }, a[1]]);
+  const conOtroEquipo = saneaLista([{ ...a[0], personal: [{ nombre: "Menganito", rol: "sala" }] }, a[1]]);
+  ok(!mismaLista(conEquipo, conOtroEquipo),
+    "el personal asignado va DENTRO del apunte (un array de objetos) y también se compara por contenido: por referencia siempre sería distinto y no se ahorraría nada");
+  ok(mismaLista(conEquipo, saneaLista([{ ...a[0], personal: [{ nombre: "Fulanita", rol: "sala" }] }, a[1]])),
+    "y el mismo personal en dos fotos distintas sigue siendo el mismo");
+  ok(mismaLista([], []) && !mismaLista([], a), "listas vacías incluidas");
+
+  // ─── Precargar en el rato muerto ────────────────────────────────────────────
+  // Sin requestIdleCallback (Safari viejo, y node) tiene que caer en setTimeout y no
+  // reventar; y con la misma clave no puede hacerse dos veces, que StrictMode monta los
+  // efectos dos veces a propósito.
+  olvidarPrecargas();
+  let veces = 0;
+  const cancelar1 = alSobrarTiempo(() => { veces++; }, { clave: "prueba", espera: 1 });
+  const cancelar2 = alSobrarTiempo(() => { veces++; }, { clave: "prueba", espera: 1 });
+  ok(typeof cancelar1 === "function" && typeof cancelar2 === "function", "siempre devuelve con qué cancelar");
+  await new Promise(r => setTimeout(r, 30));
+  ok(veces === 1, `con la misma clave la precarga se hace UNA vez, no una por montaje (fueron ${veces})`);
+  olvidarPrecargas();
+  let reventado = false;
+  try { alSobrarTiempo(null); alSobrarTiempo(() => { throw new Error("la red"); }, { espera: 1 }); }
+  catch (e) { reventado = true; }
+  await new Promise(r => setTimeout(r, 30));
+  ok(!reventado, "precargar es un extra: ni sin función ni fallando puede tumbar la app");
+
+  // ─── El aviso de documento a punto de reventar ──────────────────────────────
+  // Firestore corta en 1 MiB y no avisa: la escritura que lo pasa falla y se pierde lo
+  // que se estaba guardando. Quien se entera es quien apunta una boda un sábado.
+  ok(TECHO_DOCUMENTO === 1048576, "el techo es el de Firestore, 1 MiB, no un número redondo inventado");
+  ok(avisoDePeso("indice/calendario", 120000) === null, "un documento normal no dice nada: el aviso que sale siempre no se lee");
+  const ojo = avisoDePeso("indice/calendario", 800000);
+  ok(ojo && ojo.tono === "ojo" && /781 kB/.test(ojo.texto), `a tres cuartos avisa sin alarmar → ${ojo && ojo.texto}`);
+  ok(ojo && /apuntes de años cerrados/.test(ojo.comoSeArregla), "y dice QUÉ hacer, no solo qué pasa");
+  const malo = avisoDePeso("indice/eventosGuardados", 1000000);
+  ok(malo && malo.tono === "malo", "pasado el 90 % el tono cambia: ahí ya urge");
+  ok(malo && /solo se lee/.test(malo.comoSeArregla), "y el consejo es distinto para el archivo congelado que para el calendario");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

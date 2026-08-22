@@ -12,11 +12,16 @@
 // y lo que no le pase, el asistente no lo verá. Esa es la parte importante: el contexto
 // es lo único que existe para él, así que decirlo app por app es decir qué puede mirar
 // en cada sitio.
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles } from "lucide-react";
+import { alSobrarTiempo } from "../precarga.js";
 
-const Panel = React.lazy(() => import("./Asistente.jsx"));
+// El import se saca a una función para poder llamarlo DOS veces con el mismo resultado:
+// una para la carga perezosa de verdad y otra para adelantarla en el rato muerto. El
+// navegador solo se lo baja una vez; la segunda llamada sale del módulo ya cargado.
+const traerElPanel = () => import("./Asistente.jsx");
+const Panel = React.lazy(traerElPanel);
 
 export default function BotonAsistente({
   contexto = {},
@@ -26,6 +31,13 @@ export default function BotonAsistente({
   titulo = "Preguntar al asistente",
 }) {
   const [abierto, setAbierto] = useState(false);
+
+  // Se adelanta la descarga del panel al primer rato muerto: quien lo abre ya no espera
+  // a la red con el dedo en el botón, que en un montaje es 3G de finca. Va en el sitio
+  // COMPARTIDO por las dos apps a propósito —igual que los conectores— para que no se
+  // haga en una y en la otra no. La clave impide que StrictMode lo lance dos veces.
+  useEffect(() => alSobrarTiempo(traerElPanel, { clave: "asistente" }), []);
+
   return (
     <>
       <button type="button" className={className} onClick={() => setAbierto(true)} title={titulo}>

@@ -1582,6 +1582,63 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
   ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);
 }
 
+console.log("\n══ Las animaciones en bucle no pueden mover la maqueta ══");
+{
+  // Una animación infinita se recalcula 60 veces por segundo mientras esté en pantalla.
+  // Si toca `width`, `top`, `margin` o cualquier cosa de la caja, cada fotograma obliga
+  // al navegador a rehacer la maqueta ENTERA de la página; con `transform` y `opacity`
+  // se queda en la GPU y no toca nada más. En un móvil de montaje, con el asistente
+  // abierto (que tiene al compañero respirando siempre), es la diferencia entre una
+  // lista que se desplaza suave y una que da tirones.
+  const hojas = ["src/index.css", "src/calendario/calendario.css"].map(f => [f, readFileSync(f, "utf8")]);
+
+  const bloques = {};
+  for (const [fichero, texto] of hojas) {
+    const re = /@keyframes\s+([\w-]+)\s*\{/g;
+    let m;
+    while ((m = re.exec(texto))) {
+      // Hay que casar la llave de cierre a mano: dentro hay más bloques ({ from }, { to }).
+      let i = re.lastIndex, nivel = 1;
+      while (nivel > 0 && i < texto.length) {
+        if (texto[i] === "{") nivel++;
+        else if (texto[i] === "}") nivel--;
+        i++;
+      }
+      bloques[m[1]] = { fichero, cuerpo: texto.slice(re.lastIndex, i - 1) };
+    }
+  }
+
+  const enBucle = new Set();
+  for (const [, texto] of hojas) {
+    const re = /animation\s*:\s*([^;]+);/g;
+    let m;
+    while ((m = re.exec(texto))) {
+      if (!/infinite/.test(m[1])) continue;
+      for (const nombre of Object.keys(bloques)) {
+        if (new RegExp(`\\b${nombre}\\b`).test(m[1])) enBucle.add(nombre);
+      }
+    }
+  }
+  ok(enBucle.size > 20, `se han encontrado las animaciones en bucle para revisarlas (${enBucle.size})`);
+
+  // Lo que SÍ puede animarse en bucle. transform y opacity no tocan la maqueta. Las tres
+  // excepciones son de pintado (no de maqueta) y están medidas y aceptadas:
+  //   · form-logo-colores — el degradado del logo del formulario, 11 s por vuelta.
+  //   · hum-habla         — la boca del muñeco, un path de SVG diminuto y solo mientras habla.
+  //   · hum-micro-late    — el aro del micrófono, solo mientras está escuchando.
+  // Ninguna provoca reflow; si alguien añade una que mueva la caja, esta prueba lo dice.
+  const SEGURAS = new Set(["transform", "opacity", "d", "background-position", "box-shadow", "color", "fill", "stroke"]);
+  const DE_MAQUETA = /^(width|height|top|left|right|bottom|margin|padding|font-size|border-width|inset|max-height|min-height|max-width|min-width|flex|gap)/;
+  const culpables = [];
+  for (const nombre of enBucle) {
+    const propiedades = [...new Set([...bloques[nombre].cuerpo.matchAll(/([a-z-]+)\s*:/g)].map(x => x[1]))];
+    const malas = propiedades.filter(p => DE_MAQUETA.test(p) || !SEGURAS.has(p));
+    if (malas.length) culpables.push(`${nombre} (${malas.join(", ")})`);
+  }
+  ok(culpables.length === 0,
+    `ninguna animación en bucle mueve la maqueta${culpables.length ? ` → ${culpables.join(" · ")}` : ""}`);
+}
+
 console.log("\n──────────────────────────────────────────────────────────");
 console.log(`  ${pasan} comprobaciones pasadas, ${fallos.length} fallidas`);
 if (fallos.length) { console.log("\n  Fallos:"); fallos.forEach(f => console.log(`   · ${f}`)); process.exit(1); }

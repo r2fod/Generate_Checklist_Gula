@@ -136,6 +136,15 @@ export default function Cerebro({
             {cuandoFueElRepaso(repaso.cuando)} miró {repaso.mirados} evento{repaso.mirados === 1 ? "" : "s"}
             {" "}de los próximos {repaso.dias} días.
           </p>
+          {/* Los documentos que se acercan al MiB de Firestore. Va antes que los eventos
+              porque no es "a esta boda le falta un dato": es "el sábado que viene alguien
+              va a apuntar una boda y no va a poder guardarla". */}
+          {(repaso.documentos || []).map((d, i) => (
+            <li className={`cer-aviso es-${d.tono}`} key={`doc-${i}`} style={{ listStyle: "none" }}>
+              {d.texto}
+              {d.comoSeArregla && <em> · {d.comoSeArregla}</em>}
+            </li>
+          ))}
           {repaso.eventos.length === 0 ? (
             // "0 avisos" con 0 mirados es un error mudo; con doce, una buena noticia. Por
             // eso se dice el número de arriba y aquí solo se celebra si de verdad miró.
