@@ -360,6 +360,19 @@ El plan acordado:
 2. **Comprobar** que `indice/precios` tiene los 53, abriendo desde otro dispositivo.
 3. **Despliegue B** — quitar `PRECIOS_BASE` del repositorio.
 
+> **La trampa que había aquí, ya desarmada — no la vuelvas a armar.** El guardado normal
+> de precios (`handleGuardarPrecios`) subía `soloLosCambiados(...)`, y `guardarPreciosNube`
+> hace un `setDoc`, que **sobrescribe el documento entero**. Así que bastaba con subir los
+> 53 y que alguien corrigiera un precio esa tarde para que `indice/precios` se quedara con
+> uno, sin que nadie se enterara. Con `PRECIOS_BASE` todavía en el código no se notaba; el
+> día del paso 3 habría dejado al equipo sin catálogo.
+>
+> Ahora sube `leerPrecios()` —todo— y hay pruebas que vigilan que **en ningún sitio** se
+> suba a la nube solo lo cambiado. Lo que se perdió a cambio, para que no se "arregle"
+> de vuelta sin querer: guardando solo las diferencias, una corrección de un precio de
+> partida en una versión nueva llegaba a quien no lo hubiera tocado. Eso ya no pasa, y
+> se iba a perder igual en el paso 3.
+
 **Lo que hay que aceptar y decírselo:** un navegador nuevo **sin conexión** se quedará sin
 precios hasta conectarse una vez. Hoy funciona siempre porque van dentro de la app.
 

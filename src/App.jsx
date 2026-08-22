@@ -52,7 +52,7 @@ import {
 } from "./checklist-format.js";
 import { infoCategoria } from "./components/Iconos.jsx";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
-import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube } from "./precios.js";
+import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
@@ -2059,7 +2059,20 @@ export default function App({ onCerrarSesion } = {}) {
   const handleGuardarPrecios = (precios) => {
     guardarPrecios(precios);
     if (nubeActiva() && haySesionEquipo) {
-      guardarPreciosNube(soloLosCambiados(precios))
+      // Sube el catálogo ENTERO, no solo lo cambiado, y esto era una trampa de las que
+      // esperan meses: guardarPreciosNube hace un setDoc, que SOBRESCRIBE el documento.
+      // Subiendo solo las diferencias, bastaba con que alguien corrigiera un precio
+      // después de la migración para que "indice/precios" pasara de los 53 a uno, sin
+      // que nadie se enterara. Mientras PRECIOS_BASE siga en el código el hueco queda
+      // tapado, pero el día que se quite eso deja al equipo sin catálogo.
+      //
+      // Lo que se pierde a cambio, y hay que saberlo: guardando solo las diferencias, si
+      // se corrige un precio de partida equivocado en una versión nueva, la corrección
+      // llegaba a quien no lo hubiera tocado. Subiendo todo, la nube fija los 53 y esa
+      // corrección ya no llega. Se pierde igualmente en el paso 3 de la migración, que
+      // es donde la nube pasa a ser la única fuente: se adelanta a hoy para no dejar una
+      // trampa armada esperando a que alguien lea un aviso el día justo.
+      guardarPreciosNube(leerPrecios())
         .catch(() => { /* sin conexión: queda en este navegador y sube al siguiente cambio */ });
     }
   };

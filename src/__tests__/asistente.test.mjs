@@ -783,6 +783,17 @@ console.log("\n── La migración de los precios ──");
     "la pantalla de Precios llega hasta ese manejador");
   ok(/Subir todos los precios a la nube/.test(modal),
     "y la acción se llama como lo que hace, para que el dueño la encuentre");
+
+  // Y la trampa que quedaba armada: el guardado NORMAL de precios también sube a la
+  // nube, y guardarPreciosNube hace un setDoc que SOBRESCRIBE el documento. Subiendo
+  // solo las diferencias, bastaba con que alguien corrigiera un precio después de la
+  // migración para que la nube pasara de los 53 a uno, sin que nadie se enterara.
+  const guardado = app.match(/const handleGuardarPrecios[\s\S]*?\n  };/)?.[0] || "";
+  ok(guardado.length > 0, "el guardado normal de precios sigue estando");
+  ok(/guardarPreciosNube\(leerPrecios\(\)\)/.test(guardado),
+    "y sube el catálogo entero: con setDoc, subir solo lo cambiado borra de la nube todo lo demás");
+  ok(!/guardarPreciosNube\(soloLosCambiados/.test(app),
+    "en ningún sitio se sube a la nube solo lo cambiado");
 }
 
 console.log("\n── El Worker y el navegador ──");
