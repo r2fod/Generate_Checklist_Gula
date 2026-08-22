@@ -92,7 +92,7 @@ npm run worker:build  # empaqueta el Worker en worker/pegar.js (ver más abajo)
 npm run deploy        # predeploy = test, no publica en rojo
 ```
 
-Estado: **335 (cálculos) + 386 (asistente) + 201 (sincronización) + 711 (navegador), 0 fallos.**
+Estado: **335 (cálculos) + 396 (asistente) + 201 (sincronización) + 711 (navegador), 0 fallos.**
 
 La batería entera tarda **~45 minutos**, casi todo el barrido responsive
 (9 anchos × 2 temas × 10 pantallas = 180 cargas de página). No es que esté colgada.
@@ -238,7 +238,7 @@ fondo oscuro deslumbra). **Van opacos, mezclados con el fondo, no la misma tinta
 opacidad**: con transparencia, cada pieza solapada sumaba color y dejaba costura —se veía
 el cuello a través de la chaquetilla—.
 
-### Siete cosas que costaron caro y no hay que repetir
+### Nueve cosas que costaron caro y no hay que repetir
 
 1. **La barrera de datos.** Cada herramienta declara `datos: true/false`. A un proveedor
    que entrena con lo que recibe (OpenAI) **solo se le ofrecen las de calcular**, nunca
@@ -274,6 +274,21 @@ el cuello a través de la chaquetilla—.
 7. **Los ajustes SUSTITUYEN a la pestaña, no se apilan encima.** Apilados se comían
    media pantalla de móvil en las cinco pestañas a la vez.
 
+8. **Una ruta del Worker que llama la app va DESPUÉS del OPTIONS y del origen, y
+   contesta con `json()`.** La app la llama con `fetch` y cabecera `authorization`, y
+   eso hace que el navegador mande antes un OPTIONS de permiso. Puesta arriba del todo,
+   la ruta se tragaba ese OPTIONS y contestaba sin cabeceras CORS: el navegador
+   bloqueaba la respuesta y en pantalla salía `Failed to fetch` sin ningún motivo. Se
+   perdió un buen rato buscando una variable mal puesta que estaba bien. Hay pruebas
+   que comprueban el ORDEN en el fichero, porque esto no se puede probar llamando.
+   `/__estado` no lo sufre porque se abre como navegación, no como fetch.
+
+9. **En el móvil el panel es una hoja que crece con su contenido**, no pantalla
+   completa siempre: Gasto eran 844px de panel para 296 de contenido, y 426 en blanco
+   debajo parecen algo que no ha cargado. Charla y Humano sí van enteras a propósito
+   (Charla tiene lista de mensajes y campo de escribir; una hoja que crece con cada
+   respuesta daría saltos). Lo decide la clase `es-<pestaña>` del panel.
+
 ### El proxy (Cloudflare Worker)
 
 Las claves de API **no pueden ir en el bundle**: el repositorio es público. Viven como
@@ -284,7 +299,12 @@ secretos de un Worker que además comprueba que quien pregunta tiene sesión del
   empaquetada dentro (`npm run worker:build`). Hay que regenerarlo y volver a pegarlo
   cada vez que se toque el Worker o la revisión.
 - **La URL del Worker NO está en el repositorio**, a propósito: vive en `indice/proxy`,
-  y el primero que la configura la deja puesta para todo el equipo.
+  y el primero que la configura la deja puesta para todo el equipo. Qué hacer con lo que
+  hay en cada sitio lo decide `src/asistente/proxy.js`, aparte y probado. **Ojo con el
+  caso que faltaba:** la dirección solo subía al TECLEARLA, así que quien la configuró
+  antes de que existiera ese reparto se la quedaba para él y los demás veían el campo
+  vacío sin manera de saber cuál era. Ahora, si la nube no la tiene y este navegador sí,
+  se sube sola al abrir el asistente.
 
 ### El repaso de la noche
 
@@ -354,10 +374,15 @@ precios hasta conectarse una vez. Hoy funciona siempre porque van dentro de la a
 
 - Un apunte a **250 pax**; otro del **9 al 10 de octubre** con el campo *Hasta*.
 - **Ratios de cumpleaños y producción**: el panel existe, falta medir un evento real.
-- **Montar el repaso de la noche**: cuenta de robot en Firebase y tres variables en
-  Cloudflare (ver `worker/README.md`). El cron ya está creado.
+- (El repaso de la noche ya está montado y probado en producción: mira 11 eventos y
+  escribe en `indice/avisos`. El cron corre a las 05:00 UTC.)
 
-### 3. Tinyflows — decidido NO hacer por ahora
+### 3. Cosas pequeñas apuntadas
+
+- El aviso del repaso no distingue singular de plural: dice *"1 tienen algo sin
+  poner"*. Es cosmético y está sin arreglar.
+
+### 4. Tinyflows — decidido NO hacer por ahora
 
 Automatizaciones que el dueño defina desde la app ("cada lunes revisa la semana").
 Necesitan un editor de reglas y un intérprete en el Worker, y eso deja **un segundo motor
