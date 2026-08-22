@@ -3789,6 +3789,19 @@ hr {
   color: var(--text-muted);
 }
 
+/* El resultado de "subir todos los precios a la nube": en rojo si no se han subido,
+   porque la migración que ese botón arranca tiene un segundo paso (quitar los precios
+   del repositorio) que solo se puede dar por hecho si este aviso lo dice. */
+.resumen-subida-precios {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.resumen-subida-aviso { font-size: 0.85rem; color: var(--text-muted); }
+.resumen-subida-aviso.es-mal { color: var(--error-texto); }
+
 .resumen-coste-total strong {
   color: var(--text-main);
   font-variant-numeric: tabular-nums;

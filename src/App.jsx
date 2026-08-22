@@ -2064,6 +2064,22 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  // Subir TODOS los precios, no solo lo cambiado: es la migración para sacarlos del
+  // repositorio, que es público y con los precios de compra dentro revela márgenes.
+  // Va en DOS despliegues: primero se sube el catálogo entero una vez (este botón) y
+  // solo cuando esté entero en Firestore se quita PRECIOS_BASE de aquí. Se sube
+  // leerPrecios() a propósito y NO soloLosCambiados(): la nube hoy solo guarda las
+  // diferencias, así que borrar la base sin subir el catálogo antes no es mudarla, es
+  // borrarla — y el Resumen calcularía con casi nada para todo el equipo.
+  const handleSubirTodosPrecios = async () => {
+    const todos = leerPrecios();
+    const actualizado = await guardarPreciosNube(todos);
+    // Devuelve 0 cuando no hay conexión con la nube: eso no es "subidos". Quien pulsa
+    // esto está verificando una migración, callarse sería dejarle creer que está hecha.
+    if (!actualizado) throw new Error("no hay conexión con la nube en este navegador");
+    return { cuantos: Object.keys(todos).length };
+  };
+
   const promocionHechaRef = React.useRef(false);
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo || !archivoListo || promocionHechaRef.current) return;
@@ -2826,6 +2842,7 @@ export default function App({ onCerrarSesion } = {}) {
       {modoCarga && (
         <ModalModoCarga
           onGuardarPrecios={handleGuardarPrecios}
+          onSubirTodosPrecios={handleSubirTodosPrecios}
           preciosAlDia={preciosAlDia}
           factoresBebida={factoresBebida}
           calibracionBebida={bebidaMedida}

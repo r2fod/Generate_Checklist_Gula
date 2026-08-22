@@ -354,8 +354,9 @@ todo el equipo y no habría de dónde recuperarlo.
 
 El plan acordado:
 
-1. **Despliegue A** — añadir en la pantalla de 💶 Precios una acción "subir todos los
-   precios a la nube" (los 53, no solo lo cambiado). El dueño la pulsa una vez.
+1. **Despliegue A — YA EN CÓDIGO, falta que el dueño la pulse.** La pantalla de 💶
+   Precios tiene la acción "Subir todos los precios a la nube" (los 53, no solo lo
+   cambiado) y dice cuántos ha subido.
 2. **Comprobar** que `indice/precios` tiene los 53, abriendo desde otro dispositivo.
 3. **Despliegue B** — quitar `PRECIOS_BASE` del repositorio.
 
@@ -377,12 +378,7 @@ precios hasta conectarse una vez. Hoy funciona siempre porque van dentro de la a
 - (El repaso de la noche ya está montado y probado en producción: mira 11 eventos y
   escribe en `indice/avisos`. El cron corre a las 05:00 UTC.)
 
-### 3. Cosas pequeñas apuntadas
-
-- El aviso del repaso no distingue singular de plural: dice *"1 tienen algo sin
-  poner"*. Es cosmético y está sin arreglar.
-
-### 4. Tinyflows — decidido NO hacer por ahora
+### 3. Tinyflows — decidido NO hacer por ahora
 
 Automatizaciones que el dueño defina desde la app ("cada lunes revisa la semana").
 Necesitan un editor de reglas y un intérprete en el Worker, y eso deja **un segundo motor
