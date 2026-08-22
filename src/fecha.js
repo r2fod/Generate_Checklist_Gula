@@ -15,16 +15,20 @@
 
 // Un día de calendario tal y como lo ve este dispositivo. Lo que usan la checklist y el
 // calendario, que comparan contra fechas escritas a mano por una persona.
+/** @param {Date} f @returns {string} */
 export const aISO = (f) =>
   `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
 
+/** @param {Date} [ahora] @returns {string} */
 export const hoyLocalISO = (ahora = new Date()) => aISO(ahora);
 
 // El día en UTC. Lo que usan el subconsciente y las tareas desde que se escribieron.
+/** @param {Date} [ahora] @returns {string} */
 export const hoyUTCISO = (ahora = new Date()) => ahora.toISOString().slice(0, 10);
 
 // Dentro de N días, en UTC. Misma cuenta y mismo huso que hoyUTCISO, que es con lo que
 // se compara: mezclar los dos husos en los extremos de una ventana la deja descuadrada
 // un día por un lado.
+/** @param {number} n @param {number} [ahora] milisegundos @returns {string} */
 export const enDiasUTCISO = (n, ahora = Date.now()) =>
   new Date(ahora + n * 86400000).toISOString().slice(0, 10);

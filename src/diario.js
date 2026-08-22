@@ -31,6 +31,7 @@ const MAX_MOTIVO = 200;
 
 // Lo que puede apuntarse. Lista cerrada a propósito: una etiqueta nueva se añade aquí,
 // y en ese momento alguien mira si lo que va a apuntar lleva nombres.
+/** @type {Record<string, string>} */
 export const SUCESOS = {
   "nube-denegada": "La nube ha denegado una escritura",
   "nube-llena": "El documento ya no cabe en la nube",
@@ -40,11 +41,13 @@ export const SUCESOS = {
   "proveedor-fallo": "Un proveedor del asistente ha fallado",
 };
 
+/** @param {string} que @returns {boolean} */
 export const esSuceso = (que) => Object.prototype.hasOwnProperty.call(SUCESOS, que);
 
 // Tacha lo que puede identificar a alguien. No pretende ser un anonimizador de verdad
 // —eso no existe con texto libre—: pretende que lo normal no se cuele. Por eso encima va
 // una lista blanca de datos, y esto es solo la segunda vuelta.
+/** @param {unknown} texto @returns {string} */
 export function sinDatosPersonales(texto) {
   // El ORDEN importa: lo entrecomillado va PRIMERO. Al revés, el «correo» que acababa
   // de ponerse se quedaba entre comillas angulares y la regla del nombre lo volvía a
@@ -65,7 +68,12 @@ export function sinDatosPersonales(texto) {
 
 // Solo números, booleanos y etiquetas cortas sin espacios (códigos de error tipo
 // "permission-denied"). Un texto libre no entra: ahí es donde viajarían los nombres.
+/**
+ * @param {Record<string, unknown>} datos
+ * @returns {Record<string, string|number|boolean>}
+ */
 function datosLimpios(datos) {
+  /** @type {Record<string, string|number|boolean>} */
   const salida = {};
   Object.entries(datos || {}).forEach(([k, v]) => {
     if (typeof v === "number" && Number.isFinite(v)) salida[k] = v;
@@ -75,12 +83,23 @@ function datosLimpios(datos) {
   return salida;
 }
 
+/**
+ * Un apunte: cuándo, qué, y los datos que hayan pasado la lista blanca.
+ * @typedef {{ cuando: number, que: string, motivo?: string } & Record<string, string|number|boolean>} Apunte
+ */
+
+/** @returns {Apunte[]} */
 export function leerDiario() {
   const l = leerJSON(CLAVE, []);
   return Array.isArray(l) ? l.filter(a => a && esSuceso(a.que)) : [];
 }
 
 // Devuelve el diario ya con lo nuevo dentro, para poder pintarlo sin volver a leerlo.
+/**
+ * @param {string} que una de las claves de SUCESOS
+ * @param {{ motivo?: string } & Record<string, unknown>} [datos]
+ * @returns {Apunte[]} el diario ya con lo nuevo dentro
+ */
 export function apunta(que, { motivo = "", ...datos } = {}) {
   if (!esSuceso(que)) return leerDiario();   // una etiqueta que no está en la lista no se apunta
   const apunte = {
@@ -94,6 +113,7 @@ export function apunta(que, { motivo = "", ...datos } = {}) {
   return diario;
 }
 
+/** @returns {Apunte[]} */
 export function borrarDiario() {
   borrar(CLAVE);
   return [];
@@ -101,6 +121,7 @@ export function borrarDiario() {
 
 // Lo que se copia y se pega en el chat del equipo. Texto plano, del más nuevo al más
 // viejo, con la hora local, que es como lo cuenta quien lo sufrió ("sobre las once").
+/** @param {Apunte[]} [diario] @returns {string} */
 export function comoTexto(diario = leerDiario()) {
   if (!diario.length) return "Sin fallos apuntados en este dispositivo.";
   return diario.map(a => {

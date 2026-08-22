@@ -21,6 +21,11 @@ const yaHechas = new Set();
 // `clave` es para que llamar dos veces a lo mismo no lo haga dos veces (StrictMode monta
 // los efectos dos veces a propósito). Devuelve una función para cancelar: si la persona
 // se va de la página antes del rato muerto, no tiene sentido descargar nada.
+/**
+ * @param {() => unknown} tarea
+ * @param {{ clave?: string, espera?: number }} [opciones]
+ * @returns {() => void} para cancelarla
+ */
 export function alSobrarTiempo(tarea, { clave = "", espera = 2000 } = {}) {
   if (typeof tarea !== "function") return () => {};
   if (clave) {

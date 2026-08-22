@@ -4,14 +4,21 @@
 import { leerTexto } from "./almacen.js";
 
 export const HORA_OSCURO = 20, HORA_CLARO = 7;
+/** @param {Date} [ahora] @returns {boolean} */
 export function esHoraDeOscuro(ahora = new Date()) {
   const h = ahora.getHours();
   return h >= HORA_OSCURO || h < HORA_CLARO;
 }
+/** @returns {"claro"|"oscuro"|"auto"} */
 export function leerPreferenciaTema() {
   const g = leerTexto("gula_tema");
   return g === "claro" || g === "oscuro" || g === "auto" ? g : "auto";
 }
+/**
+ * @param {string} pref "claro", "oscuro" o "auto"
+ * @param {Date} [ahora]
+ * @returns {"claro"|"oscuro"}
+ */
 export function temaSegunPreferencia(pref, ahora = new Date()) {
   if (pref === "claro" || pref === "oscuro") return pref;
   return esHoraDeOscuro(ahora) ? "oscuro" : "claro";
@@ -21,6 +28,7 @@ export function temaSegunPreferencia(pref, ahora = new Date()) {
 // al arrancar de noche, y la pantalla de acceso (que va antes de la app) salía siempre
 // en claro. Estaba copiada tal cual en los dos arranques —checklist y formulario—, que
 // es justo la clase de duplicado que se queda a medias: se tocó una y la otra no.
+/** @param {Date} [ahora] @returns {"claro"|"oscuro"} */
 export function aplicarTemaInicial(ahora = new Date()) {
   const tema = temaSegunPreferencia(leerPreferenciaTema(), ahora);
   document.documentElement.dataset.tema = tema;

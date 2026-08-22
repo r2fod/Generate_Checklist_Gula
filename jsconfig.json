@@ -1,0 +1,39 @@
+{
+  // ─── TIPADO GRADUAL, SOLO EN LOS MÓDULOS PUROS ──────────────────────────────
+  // Esto NO convierte el proyecto a TypeScript. Sigue siendo JavaScript: lo único que
+  // hace es que `npm run tipos` lea los comentarios JSDoc y avise si alguien llama a
+  // una función con un texto donde iba un número.
+  //
+  // Por qué solo estos ficheros, y no `src` entero: App.jsx son 4.000 líneas de estado
+  // y JSX, y tiparlo de golpe daría cientos de avisos que nadie va a mirar — una lista
+  // de avisos que no se mira es peor que no tenerla, porque tapa el que sí importa.
+  // Aquí están los módulos que entran datos y salen datos, sin React, sin nube y sin
+  // navegador: son los que se reusan desde varios sitios (y desde el Worker), y por eso
+  // son los que más duele equivocar.
+  //
+  // Para meter uno nuevo: que sea puro, añadirlo a "include" y dejarlo en verde en el
+  // mismo commit. Si no sale limpio a la primera, no se añade "por ahora": se arregla o
+  // se deja fuera.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    // El proyecto no tiene tipos de node instalados y no hace falta: estos módulos no
+    // importan nada de node.
+    "types": [],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/fecha.js",
+    "src/texto.js",
+    "src/almacen.js",
+    "src/precarga.js",
+    "src/diario.js",
+    "src/tema.js"
+  ]
+}

@@ -44,6 +44,8 @@ jobs:
       # oxlint acaba en 0 con warnings (los ~141 de `catch (e)` son de la casa); lo que
       # no se tolera son ERRORES, y de esos sale con código distinto de 0.
       - run: npm run test:rapido
+      # test:rapido empieza por `npm run tipos`: los módulos puros con JSDoc, revisados
+      # por tsc. No es TypeScript, es JavaScript con los comentarios comprobados.
 
   worker:
     name: worker/pegar.js regenerado

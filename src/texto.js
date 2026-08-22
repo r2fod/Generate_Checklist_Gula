@@ -15,17 +15,20 @@
 
 // Minúsculas y sin acentos, para comparar. NFD parte "á" en "a" + tilde suelta, y la
 // tilde suelta es lo que se tira.
+/** @param {unknown} t @returns {string} */
 export const sinTildes = (t) => String(t || "").toLowerCase()
   .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 // Espacios de sobra fuera y un solo espacio dentro. El `max` recorta lo que llega
 // pegado de un modelo o de un formulario: sin tope, un párrafo entero se cuela como
 // título de una tarea.
+/** @param {unknown} t @param {number} [max] @returns {string} */
 export const limpiaTexto = (t, max = Infinity) =>
   String(t || "").replace(/\s+/g, " ").trim().slice(0, max);
 
 // El id sale del propio texto: el mismo recuerdo guardado dos veces desde dos móviles
 // tiene que ser UNO. La ñ se conserva a posta —"año" y "ano" no son lo mismo, y quien
 // lo lea en un panel de depuración lo agradece—.
+/** @param {unknown} texto @param {number} [max] @returns {string} */
 export const claveDeTexto = (texto, max = 60) => sinTildes(limpiaTexto(texto))
   .replace(/[^a-z0-9ñ ]/g, "").replace(/\s+/g, "-").slice(0, max);

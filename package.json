@@ -12,7 +12,8 @@
     "predeploy": "npm run test",
     "deploy": "gh-pages -d dist",
     "test": "node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs && node src/__tests__/app.test.mjs",
-    "test:rapido": "node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs",
+    "test:rapido": "npm run tipos && node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs",
+    "tipos": "tsc -p jsconfig.json",
     "medir": "node pruebas/medir.mjs",
     "reglas:deploy": "firebase deploy --only firestore:rules",
     "test:calc": "node src/__tests__/calculos.test.mjs",
@@ -32,6 +33,7 @@
     "gh-pages": "^6.3.0",
     "oxlint": "^1.71.0",
     "playwright-core": "^1.62.1",
+    "typescript": "^5.9.3",
     "vite": "^8.1.1"
   }
 }

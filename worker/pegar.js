@@ -1,4 +1,5 @@
 //#region src/texto.js
+/** @param {unknown} t @returns {string} */
 const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 //#endregion
 //#region src/menus-especiales.js

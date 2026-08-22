@@ -17,6 +17,11 @@
 // bloques, y una referencia cogida al importar se quedaría con la de antes.
 
 // Devuelve `porDefecto` si no se puede leer o si no hay nada guardado.
+/**
+ * @param {string} clave
+ * @param {string|null} [porDefecto]
+ * @returns {string|null}
+ */
 export function leerTexto(clave, porDefecto = "") {
   try {
     const v = localStorage.getItem(clave);
@@ -26,11 +31,17 @@ export function leerTexto(clave, porDefecto = "") {
 
 // Devuelve si se pudo guardar. Casi nadie mira el resultado, pero las conversaciones sí:
 // cuando no cabe, tiran la mitad más vieja y reintentan.
+/**
+ * @param {string} clave
+ * @param {string|number|boolean} valor
+ * @returns {boolean} si se pudo guardar
+ */
 export function guardarTexto(clave, valor) {
   try { localStorage.setItem(clave, String(valor)); return true; }
   catch (e) { return false; }
 }
 
+/** @param {string} clave @returns {boolean} */
 export function borrar(clave) {
   try { localStorage.removeItem(clave); return true; }
   catch (e) { return false; }
@@ -38,6 +49,11 @@ export function borrar(clave) {
 
 // El JSON roto se trata igual que el que no está: `porDefecto`. Un estado a medio
 // escribir (pestaña cerrada a mitad de un setItem) no puede impedir abrir la app.
+/**
+ * @param {string} clave
+ * @param {any} [porDefecto]
+ * @returns {any}
+ */
 export function leerJSON(clave, porDefecto = null) {
   try {
     const v = localStorage.getItem(clave);
@@ -47,6 +63,11 @@ export function leerJSON(clave, porDefecto = null) {
   } catch (e) { return porDefecto; }
 }
 
+/**
+ * @param {string} clave
+ * @param {any} valor
+ * @returns {boolean} si se pudo guardar
+ */
 export function guardarJSON(clave, valor) {
   try { return guardarTexto(clave, JSON.stringify(valor)); }
   catch (e) { return false; } // referencias circulares: no debería pasar, pero no tumba nada

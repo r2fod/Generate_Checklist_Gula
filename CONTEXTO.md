@@ -100,7 +100,8 @@ desentona enseguida.
 ```
 npm run lint          # oxlint (los ~141 warnings de catch (e) son de la casa; ERRORES tiene que haber 0)
 npm run test          # calculos → asistente → build → sincronizacion → app (navegador)
-npm run test:rapido   # lo mismo SIN el barrido del navegador (~1 min). Es lo que corre en CI
+npm run test:rapido   # tipos + lo mismo SIN el barrido del navegador (~1 min). Es lo de CI
+npm run tipos         # tsc sobre los módulos puros con JSDoc (ver jsconfig.json)
 npm run worker:build  # empaqueta el Worker en worker/pegar.js (ver más abajo)
 npm run deploy        # predeploy = test, no publica en rojo
 ```
@@ -225,6 +226,20 @@ hora, sitio, pax       marcada "sinConfigurar" equipamiento…
 **La lista de eventos que ve la oficina sale del ARCHIVO DE CHECKLISTS, no del
 calendario.** Por eso la checklist se crea pronto: si no existe, la oficina la escribe a
 mano y llega duplicada.
+
+## Tipos, solo donde salen gratis
+
+`jsconfig.json` + `npm run tipos` (tsc con `checkJs`, sin emitir nada). **No es una
+migración a TypeScript**: sigue siendo JavaScript y lo único que se comprueba son los
+comentarios JSDoc de los módulos **puros**: `fecha.js`, `texto.js`, `almacen.js`,
+`precarga.js`, `diario.js` y `tema.js`.
+
+Por qué solo esos: `App.jsx` de golpe daría cientos de avisos, y una lista de avisos que
+nadie mira tapa el que sí importa. Estos seis entran datos y salen datos, los usan varios
+sitios (y uno el Worker), y son los que más duele equivocar.
+
+Para añadir uno: que sea puro, meterlo en `include` y dejarlo **en verde en el mismo
+commit**. Si no sale limpio a la primera, se arregla o se queda fuera; nada de "por ahora".
 
 ## Saber qué ha pasado sin espiar a nadie
 
