@@ -185,8 +185,25 @@ publico/<codigo>          próximos eventos que ve la oficina
 envios/<id>               lo que manda la oficina
 ```
 
-`firestore.rules` **se pega a mano en la consola**: no hay `firebase.json` y no se
-despliega solo. Hoy consola y repo coinciden.
+`firestore.rules` ya **no se pega a mano**: hay `firebase.json` y se sube con
+
+```
+npm run reglas:deploy      # firebase deploy --only firestore:rules
+```
+
+La primera vez hace falta `npm i -g firebase-tools`, `firebase login` y
+`firebase use gula-checklist` (o `--project gula-checklist` en el comando). Solo
+despliega las reglas: ni hosting, ni funciones, ni índices — la app se publica en GitHub
+Pages y eso no cambia. Pegarlas en la consola seguía funcionando, pero el repositorio y
+la consola se separaban en cuanto alguien tocaba una y se olvidaba de la otra, y de eso
+no se entera nadie hasta que una escritura falla.
+
+**Las reglas de `publico/` y `envios/` están probadas** en `sincronizacion.test.mjs`
+contra el Firestore simulado, que ahora las aplica de verdad (crear sí, listar no,
+corregir solo mientras nadie lo haya revisado, la fecha la pone el servidor). Antes el
+simulado las denegaba todas, así que las dos colecciones a las que se llega SIN sesión
+—las únicas que puede tocar cualquiera con el enlace del formulario— eran las únicas sin
+prueba.
 
 ### Conceptos que hay que respetar
 

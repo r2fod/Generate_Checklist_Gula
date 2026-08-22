@@ -4,7 +4,7 @@
 // dispositivos, que es donde estaban los fallos que no se veían de otra forma.
 //
 //   node src/__tests__/sincronizacion.test.mjs
-import { almacen, setSesion, limpiarPrevios, fakeDb, fakeFs } from './firestore-simulado.mjs';
+import { almacen, setSesion, limpiarPrevios, fakeDb, fakeFs, reglasPermiten } from './firestore-simulado.mjs';
 import { ponConexionDePruebas } from '../firestore.js';
 // El nube.js DE VERDAD, el que se publica. Antes esto importaba una copia a mano de 288
 // líneas con la conexión cambiada, así que estas pruebas —que son la red que ha impedido
@@ -1067,4 +1067,82 @@ console.log("\n══ Algo distinto de lo normal ══");
   const opts = PREGUNTAS.find(q => q.id === "distinto").opciones.map(o => o.valor);
   ok(opts.length === 6 && opts.includes("sinPlatos") && opts.includes("bandejasPlata"),
     `y son seis casillas en UNA pantalla, no cuatro preguntas sueltas → ${opts.join(", ")}`);
+}
+
+// ─── LAS DOS COLECCIONES DE LA OFICINA ────────────────────────────────────────
+// Son las únicas a las que se llega SIN sesión de equipo: cualquiera con el enlace del
+// formulario escribe en ellas. Hasta ahora el Firestore simulado las denegaba todas, así
+// que estas reglas —las que de verdad separan "mandar lo mío" de "leer lo de los demás"—
+// solo estaban probadas pegándolas en la consola y mirando. Ahora corren aquí.
+console.log('\n══ El buzón de la oficina: publico/ y envios/ ══');
+{
+  const { publicarProximos, leerProximos, borrarProximos, enviarFormulario, corregirEnvio,
+    leerEnvios, marcarRevisado } = await import('../formulario/envios.js');
+  const { MARCA_SERVIDOR } = await import('./firestore-simulado.mjs');
+
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const CODIGO = 'ABC234DEF5';
+
+  // La app publica la lista corta (tiene sesión). Va SOLO nombre, día, sitio y tipo.
+  await publicarProximos(CODIGO, {
+    'Boda Fulanita y Mengano': { evento: 'boda', pax: 120, fechaEvento: '2099-09-13', ubicacion: 'Finca inventada', notasEvento: 'lo que sea' },
+  }, [{ nombre: 'Logística', tel: '600 11 22 33' }]);
+  const publicado = almacen.get(`publico/${CODIGO}`);
+  ok(publicado.eventos.length === 1 && !('pax' in publicado.eventos[0]),
+    'lo que se publica para la oficina no lleva pax ni nada de dentro del evento');
+
+  // Y la lee quien tiene el enlace, sin cuenta ninguna.
+  setSesion(false);
+  const leido = await leerProximos(CODIGO);
+  ok(leido.ok && leido.eventos.length === 1, 'con el código se lee la lista sin sesión: es como entra la oficina');
+  ok((await leerProximos('OTROCODIGO')).ok === false, 'y con un código que no existe no se inventa nada');
+
+  // Sin sesión NO se puede escribir ahí: si se pudiera, quien tiene el enlace del
+  // formulario podría cambiarle a todo el mundo la lista de eventos.
+  let pudoEscribir = true;
+  try { await publicarProximos(CODIGO, {}, []); } catch (e) { pudoEscribir = false; }
+  ok(!pudoEscribir, 'pero sin sesión no se puede escribir en publico/: el enlace es para leer y mandar, no para tocar');
+  let pudoBorrar = true;
+  try { await borrarProximos(CODIGO); } catch (e) { pudoBorrar = false; }
+  ok(!pudoBorrar, 'ni borrarla, que dejaría a la oficina sin poder elegir evento');
+  ok(reglasPermiten(`publico/${CODIGO}`, 'list', false) === false,
+    'y la colección no se puede listar: sin el código no hay forma de dar con un buzón');
+
+  // ─── Mandar y corregir ──────────────────────────────────────────────────────
+  const id = await enviarFormulario(CODIGO, { tipo: 'boda', pax: 120 }, 'Boda Fulanita y Mengano');
+  const envio = almacen.get(`envios/${id}`);
+  ok(!!envio && envio.codigo === CODIGO, 'quien tiene el código puede CREAR un envío sin cuenta');
+  ok(envio.enviado === MARCA_SERVIDOR,
+    'la fecha la pone el servidor, no el reloj del móvil: un móvil con la hora mal no adelanta ni atrasa un envío');
+
+  // Lo que NO puede hacer quien solo tiene el código: leer el buzón entero.
+  let pudoLeer = true;
+  try { await leerEnvios(); } catch (e) { pudoLeer = false; }
+  ok(!pudoLeer, 'sin sesión no se puede listar el buzón: los envíos de las demás no son suyos');
+
+  // Corregir lo suyo, mientras nadie lo haya revisado, sí.
+  await corregirEnvio(id, { tipo: 'boda', pax: 140 }, 'Boda Fulanita y Mengano');
+  ok(almacen.get(`envios/${id}`).respuestas.pax === 140 && almacen.get(`envios/${id}`).corregido === true,
+    'y puede corregirlo mientras esté sin revisar: cambian los pax y no hace falta mandar otro');
+
+  // Colar un campo que no toca, o cambiar el código, no: el buzón no es un almacén.
+  const conCampoRaro = fakeFs.updateDoc(fakeFs.doc(fakeDb, 'envios', id), { respuestas: { pax: 1 }, enviado: MARCA_SERVIDOR, loQueSea: 'x' })
+    .then(() => true).catch(() => false);
+  ok((await conCampoRaro) === false, 'un campo que no está en la lista tumba la corrección: el buzón no vale de almacén');
+  const cambiandoCodigo = fakeFs.updateDoc(fakeFs.doc(fakeDb, 'envios', id), { codigo: 'OTRO', respuestas: { pax: 1 }, enviado: MARCA_SERVIDOR })
+    .then(() => true).catch(() => false);
+  ok((await cambiandoCodigo) === false, 'ni se puede mover un envío al buzón de otro cambiándole el código');
+
+  // En cuanto logística lo revisa, se acabó corregir: lo aplicado ya está en la
+  // checklist, y una corrección silenciosa después dejaría las dos cosas distintas.
+  setSesion(true);
+  await marcarRevisado(id, { aplicado: true, eventoDestino: 'Boda Fulanita y Mengano' });
+  ok(await leerEnvios().then(l => l.length === 1), 'el equipo con sesión sí lee la bandeja');
+  setSesion(false);
+  let pudoCorregirRevisado = true;
+  try { await corregirEnvio(id, { tipo: 'boda', pax: 200 }, ''); } catch (e) { pudoCorregirRevisado = false; }
+  ok(!pudoCorregirRevisado,
+    'y una vez revisado ya no se corrige: lo aplicado y lo mandado dejarían de decir lo mismo');
+  ok(almacen.get(`envios/${id}`).respuestas.pax === 140, 'lo guardado sigue siendo lo último válido, no lo rechazado');
+  setSesion(true);
 }

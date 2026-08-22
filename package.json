@@ -14,6 +14,7 @@
     "test": "node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs && node src/__tests__/app.test.mjs",
     "test:rapido": "node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs",
     "medir": "node pruebas/medir.mjs",
+    "reglas:deploy": "firebase deploy --only firestore:rules",
     "test:calc": "node src/__tests__/calculos.test.mjs",
     "test:sync": "node src/__tests__/sincronizacion.test.mjs",
     "test:app": "node src/__tests__/app.test.mjs"
