@@ -135,7 +135,10 @@ que hace `predeploy`.
 **No hay `deploy.yml`**: publicar desde CI está a la espera del OK del dueño. Hoy se
 despliega a mano con `npm run deploy`.
 
-Estado: **335 (cálculos) + 396 (asistente) + 201 (sincronización) + 711 (navegador), 0 fallos.**
+Estado: **373 (cálculos) + 418 (asistente) + 216 (sincronización) + 711 (navegador), 0 fallos.**
+El barrido del navegador no se ha vuelto a lanzar en esta tanda (el contenedor donde se
+trabajó no tiene chromium y no puede bajarlo): **lánzalo antes del próximo deploy**, que
+es lo que hace `predeploy` de todas formas.
 
 La batería entera tarda **~45 minutos**, casi todo el barrido responsive
 (9 anchos × 2 temas × 10 pantallas = 180 cargas de página). No es que esté colgada.
