@@ -23,6 +23,7 @@ import { idDeApunte } from "../calendario/apuntes.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar } from "../../worker/repaso.js";
 import { sinMarcas } from "../asistente/texto.js";
+import { queHacerConLaUrl } from "../asistente/proxy.js";
 import { readFileSync } from "node:fs";
 import { COMPANEROS, CLAVES_COMPANERO, CLAVES_DIBUJADAS, companeroValido, COMPANERO_POR_DEFECTO } from "../asistente/companeros.js";
 import { comoHabla, PERSONALIDADES, CLAVES_PERSONALIDAD } from "../asistente/personalidad.js";
@@ -759,6 +760,53 @@ console.log("\n── El asistente es el mismo en las dos apps ──");
   // ofrecerla.
   ok(/aplicarEnCalendario\(\{[^}]*guardar:[^}]*borrar:/s.test(app),
     "y le pasa el guardar y el borrar de verdad, no solo el permiso");
+}
+
+console.log("\n── El Worker y el navegador ──");
+{
+  // Esto no se puede probar llamando al Worker —no corre aquí—, pero sí se puede
+  // comprobar el orden, que es lo que estaba mal y costó un "Failed to fetch" sin
+  // explicación en el móvil.
+  //
+  // La app pide el repaso con un fetch y una cabecera "authorization". Eso hace que el
+  // navegador mande ANTES un OPTIONS de permiso. Si la ruta del repaso está por encima
+  // de donde se atiende ese OPTIONS, se lo traga y contesta 401 sin cabeceras CORS: el
+  // navegador bloquea la respuesta y en pantalla no se lee ningún motivo.
+  const worker = readFileSync(new URL("../../worker/index.js", import.meta.url), "utf8");
+
+  const iOptions = worker.indexOf('req.method === "OPTIONS"');
+  const iRepaso = worker.indexOf('pathname === "/__repaso"');
+  const iOrigen = worker.indexOf("const origen = origenPermitido");
+  ok(iOptions > 0 && iRepaso > 0 && iOrigen > 0, "las tres piezas siguen en el Worker");
+  ok(iRepaso > iOptions,
+    "el repaso se atiende DESPUÉS del OPTIONS, para no tragarse el permiso previo del navegador");
+  ok(iRepaso > iOrigen, "y después de comprobar el origen, para poder contestar con CORS");
+
+  // Y una respuesta sin cabeceras CORS no llega a leerse desde otra dirección, por muy
+  // bien que conteste el Worker.
+  const bloqueRepaso = worker.slice(iRepaso, iRepaso + 700);
+  ok(!/new Response\(/.test(bloqueRepaso),
+    "el repaso contesta con json(), que pone las cabeceras, y no con Response a pelo");
+  ok(/"Access-Control-Allow-Methods": "GET, POST, OPTIONS"/.test(worker),
+    "y el GET está permitido: el repaso a mano se pide con GET");
+}
+
+console.log("\n── La dirección del proxy ──");
+{
+  // No está en el código a propósito (el repositorio es público), así que vive en
+  // Firestore y quien la configura primero la deja para todos. El agujero que tenía:
+  // solo subía al TECLEARLA, así que quien la puso antes de que existiera este reparto
+  // se la quedaba para él y los demás veían el campo vacío sin saber cuál era.
+  const q = queHacerConLaUrl;
+  ok(q({ mia: "", equipo: "" }).accion === "pedir", "si no la tiene nadie, se pide");
+  ok(q({ mia: "", equipo: "https://w" }).accion === "bajar",
+    "si la tiene el equipo y este navegador no, se baja: nadie la configura dos veces");
+  ok(q({ mia: "https://w", equipo: "" }).accion === "subir",
+    "y si la tiene este navegador y el equipo no, SE SUBE — el caso que faltaba");
+  ok(q({ mia: "https://mia", equipo: "https://equipo" }).url === "https://mia",
+    "con las dos manda la de este navegador: quien apunta a otro Worker para probar no quiere que se la pisen");
+  ok(q({ mia: "  https://w  ", equipo: "" }).url === "https://w",
+    "y los espacios de pegarla no cuentan como dirección");
 }
 
 console.log("\n── Cómo escribe ──");

@@ -23,7 +23,9 @@ import { repasar, DIAS_VISTA } from "./repaso.js";
 const CORS = (origen) => ({
   "Access-Control-Allow-Origin": origen,
   "Access-Control-Allow-Headers": "content-type, authorization",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  // GET además de POST: el repaso a mano se pide con GET, y si no está aquí el
+  // navegador bloquea la respuesta aunque el Worker conteste bien.
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Max-Age": "86400",
 });
 
@@ -377,20 +379,27 @@ export default {
     // Lanzar el repaso a mano, para no esperar a que sea de noche cuando se acaba de
     // montar. Pide la misma sesión de equipo que todo lo demás: no es una página
     // pública, escribe en Firestore.
-    if (new URL(req.url).pathname === "/__repaso") {
-      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
-      if (quienPide.fallo) return new Response(JSON.stringify({ error: quienPide.fallo }), { status: 401, headers: { "content-type": "application/json; charset=utf-8" } });
-      try {
-        const r = await repasar(env);
-        return new Response(JSON.stringify({ ...r, dias: DIAS_VISTA }, null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: String(e && e.message ? e.message : e) }, null, 2), { status: 500, headers: { "content-type": "application/json; charset=utf-8" } });
-      }
-    }
-
     const origen = origenPermitido(req, env);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS(origen || "null") });
     if (!origen) return new Response("Origen no permitido", { status: 403 });
+    // ─── LANZAR EL REPASO A MANO ────────────────────────────────────────────
+    // Va DESPUÉS de comprobar el origen y de atender el OPTIONS, y no antes, que es
+    // donde estaba y por eso no funcionaba: la app lo llama con un fetch y una cabecera
+    // "authorization", y eso hace que el navegador mande primero un OPTIONS de permiso.
+    // Puesta arriba, esta ruta se tragaba ese OPTIONS y contestaba 401 sin cabeceras
+    // CORS, así que el navegador bloqueaba la respuesta y en pantalla salía un
+    // "Failed to fetch" que no decía nada. Por eso también se contesta con json(), que
+    // las pone: una respuesta sin ellas no llega a leerse desde otra dirección.
+    if (new URL(req.url).pathname === "/__repaso") {
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      try {
+        return json({ ...(await repasar(env)), dias: DIAS_VISTA }, 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+      }
+    }
+
     if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
 
     // Un cuerpo enorme es un error o un abuso; en los dos casos no se atiende.

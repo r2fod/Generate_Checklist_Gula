@@ -6149,6 +6149,24 @@ hr {
   overflow: hidden;
 }
 
+/* ─── EN EL MÓVIL, UNA HOJA QUE CRECE CON SU CONTENIDO ───────────────────────
+   El panel se estiraba a pantalla completa siempre, así que Gasto —que son cuatro
+   párrafos y un campo— dejaba 426px en blanco debajo y parecía que faltaba algo por
+   cargar. Medido: 844px de panel para 296 de contenido.
+
+   Charla se queda a pantalla completa a propósito: tiene la lista de mensajes y el
+   campo de escribir abajo, y una hoja que crece con cada respuesta daría saltos. */
+@media (max-width: 767px) {
+  .asis-panel:not(.es-charla) {
+    height: auto;
+    max-height: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  /* Sin esto el contenido sigue estirándose y la hoja vuelve a ocupar todo */
+  .asis-panel:not(.es-charla) .asis-hilo,
+  .asis-panel:not(.es-charla) .asis-ajustes { flex: 0 1 auto; }
+}
+
 @media (min-width: 768px) {
   .asis-fondo { padding: 20px; background: rgba(15, 23, 42, 0.2); }
   .asis-panel {
@@ -7254,7 +7272,7 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   margin: 10px 0;
 }
 .asis-repaso-lanzar .btn { justify-content: center; gap: 6px; }
-.asis-explica.es-mal { color: var(--error-texto); }
+.asis-explica.es-mal, .asis-nota.es-mal { color: var(--error-texto); }
 
 .cer-repaso {
   display: flex;

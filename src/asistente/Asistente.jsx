@@ -21,6 +21,7 @@ import Humano from "./Humano.jsx";
 import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
 import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permisos.js";
 import { sinMarcas } from "./texto.js";
+import { queHacerConLaUrl } from "./proxy.js";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
 
 const CLAVE_URL = "gula_asistente_url";
@@ -84,7 +85,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // puesta a mano (por ejemplo, para probar otro Worker), esa manda: no se pisa con la
   // del equipo.
   useEffect(() => {
-    if (leer(CLAVE_URL) || !nubeActiva()) return;
+    if (!nubeActiva()) return;
     let vivo = true;
     const aplicar = (remoto) => {
       if (!vivo || !remoto || !remoto.url || leer(CLAVE_URL)) return;
@@ -92,7 +93,16 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       guardar(CLAVE_URL, remoto.url);
       setAjustes(false);
     };
-    cargarProxyNube().then(aplicar).catch(() => { /* sin conexión: se pide a mano */ });
+    // Qué hacer con lo que hay en cada sitio lo decide proxy.js, que está probado.
+    cargarProxyNube()
+      .then(remoto => {
+        if (!vivo) return;
+        const { accion, url: buena } = queHacerConLaUrl({ mia: leer(CLAVE_URL), equipo: remoto && remoto.url });
+        if (accion === "bajar") aplicar({ url: buena });
+        // Subirla es lo que hace que el siguiente móvil no tenga que configurar nada.
+        if (accion === "subir") guardarProxyNube({ url: buena }).catch(() => { /* sin conexión: sube en el siguiente arranque */ });
+      })
+      .catch(() => { /* sin conexión: se pide a mano */ });
     const corta = suscribirProxyNube(aplicar);
     return () => { vivo = false; corta(); };
   }, []);
@@ -101,6 +111,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // calcula: el subconsciente ya mira lo de este navegador al abrir, y esto es lo otro
   // —lo que se miró aunque nadie abriera la app en toda la semana—.
   const [repaso, setRepaso] = useState(null);
+  const [avisoUrl, setAvisoUrl] = useState(null);
   const [repasando, setRepasando] = useState(false);
   const [avisoRepaso, setAvisoRepaso] = useState(null);
   useEffect(() => {
@@ -259,7 +270,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
   return (
     <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
-      <div className="asis-panel">
+      {/* La pestaña va en la clase para que el CSS pueda tratarlas distinto: en el móvil
+          Charla necesita toda la altura (lista de mensajes + campo de escribir), y las
+          demás no —se quedaban con 400px en blanco debajo—. */}
+      <div className={`asis-panel es-${ajustes ? "ajustes" : pestana}`}>
         <div className="asis-cab">
           <Companero cual={companero} size={30}
             estado={pensando ? "pensando" : huboError ? "error" : "quieto"} />
@@ -347,9 +361,16 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                   guardar(CLAVE_URL, limpia);
                   // Se sube a la nube al escribirla, igual que un precio o un ratio: es
                   // lo que hace que la próxima persona del equipo no tenga que buscarla.
-                  if (limpia && nubeActiva()) guardarProxyNube({ url: limpia }).catch(() => { /* sin conexión: sube en el siguiente cambio */ });
+                  // Si no se puede subir se DICE. Tragárselo dejaba a quien la escribe
+                  // creyendo que ya la tiene el equipo, y al resto con el campo vacío.
+                  if (limpia && nubeActiva()) {
+                    setAvisoUrl(null);
+                    guardarProxyNube({ url: limpia })
+                      .catch(() => setAvisoUrl("Guardada en este navegador, pero no ha subido al equipo. Con conexión y sesión iniciada, vuelve a escribirla."));
+                  }
                 }}
               />
+              {avisoUrl && <span className="asis-nota es-mal">{avisoUrl}</span>}
             </label>
             <button
               type="button"

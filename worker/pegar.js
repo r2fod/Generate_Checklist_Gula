@@ -399,7 +399,7 @@ async function repasar(env) {
 const CORS = (origen) => ({
 	"Access-Control-Allow-Origin": origen,
 	"Access-Control-Allow-Headers": "content-type, authorization",
-	"Access-Control-Allow-Methods": "POST, OPTIONS",
+	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 	"Access-Control-Max-Age": "86400"
 });
 const json = (datos, estado, origen) => new Response(JSON.stringify(datos), {
@@ -712,31 +712,24 @@ var worker_default = {
 	},
 	async fetch(req, env) {
 		if (new URL(req.url).pathname === "/__estado") return new Response(JSON.stringify(await estado(env), null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
-		if (new URL(req.url).pathname === "/__repaso") {
-			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
-			if (quienPide.fallo) return new Response(JSON.stringify({ error: quienPide.fallo }), {
-				status: 401,
-				headers: { "content-type": "application/json; charset=utf-8" }
-			});
-			try {
-				const r = await repasar(env);
-				return new Response(JSON.stringify({
-					...r,
-					dias: 30
-				}, null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
-			} catch (e) {
-				return new Response(JSON.stringify({ error: String(e && e.message ? e.message : e) }, null, 2), {
-					status: 500,
-					headers: { "content-type": "application/json; charset=utf-8" }
-				});
-			}
-		}
 		const origen = origenPermitido(req, env);
 		if (req.method === "OPTIONS") return new Response(null, {
 			status: 204,
 			headers: CORS(origen || "null")
 		});
 		if (!origen) return new Response("Origen no permitido", { status: 403 });
+		if (new URL(req.url).pathname === "/__repaso") {
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			try {
+				return json({
+					...await repasar(env),
+					dias: 30
+				}, 200, origen);
+			} catch (e) {
+				return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+			}
+		}
 		if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
 		const crudo = await req.text();
 		if (crudo.length > 2e5) return json({ error: "La conversación es demasiado larga." }, 413, origen);
