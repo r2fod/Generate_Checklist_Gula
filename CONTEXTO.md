@@ -48,6 +48,25 @@ calendario tiene dos documentos y no uno con un flag.
    nombres inventados.
 6. Respuestas **breves**.
 
+## Cómo se revisa lo visual
+
+Las pruebas comprueban desbordamiento y texto cortado, **no si algo se ve bien**. Dos
+cosas que pasaron las pruebas y estaban rotas: el muñeco invisible fuera de su caja, y
+los ajustes apilados encima de cada pestaña.
+
+Cuando toques la interfaz, **haz capturas y míralas**. Con playwright-core y el chromium
+que ya está instalado:
+
+```js
+await p.locator(".asis-panel").screenshot({ path: "x.png", animations: "disabled" });
+```
+
+`animations: "disabled"` no es opcional: el compañero respira en bucle, así que sin eso
+Playwright espera 30 s a que el elemento "esté quieto" y revienta por timeout.
+
+Y para cazar lo que sí es automatizable —que nada se salga del panel ni se monte encima
+de la cabecera— se recorre `.asis-panel *` comparando cada caja con la del panel.
+
 ## Cómo se escribe aquí
 
 Mira cualquier fichero de `src/asistente/` antes de escribir: el estilo es muy marcado y
@@ -73,7 +92,7 @@ npm run worker:build  # empaqueta el Worker en worker/pegar.js (ver más abajo)
 npm run deploy        # predeploy = test, no publica en rojo
 ```
 
-Estado: **335 (cálculos) + 383 (asistente) + 711 (navegador), 0 fallos.**
+Estado: **335 (cálculos) + 386 (asistente) + 201 (sincronización) + 711 (navegador), 0 fallos.**
 
 La batería entera tarda **~45 minutos**, casi todo el barrido responsive
 (9 anchos × 2 temas × 10 pantallas = 180 cargas de página). No es que esté colgada.
@@ -153,8 +172,11 @@ mano y llega duplicada.
 - Logo 67 → 11 kB (WebP 450px q80).
 - **El asistente entero** (ver su sección): cerebro con memoria y árbol, subconsciente,
   objetivos, tareas, conversaciones guardadas, enrutado entre proveedores, contador de
-  tokens con tope, permisos por nivel, muñeco animado con 7 gestos, voz, conectores,
-  diario de gasto por vuelta y cuatro personalidades.
+  tokens con tope, permisos por nivel, ocho compañeros animados con 7 gestos, voz,
+  conectores, diario de gasto por vuelta y cuatro personalidades.
+- **Sin markdown en las respuestas.** Se le pide en el sistema Y se limpia en
+  `sinMarcas()`: pedirlo no basta, un modelo se olvida cada tantas respuestas y el que
+  se olvida no avisa.
 - **El repaso de la noche**: el Worker mira los eventos aunque nadie abra la app.
 - **Limpieza del repositorio**: se colaron tres nombres reales de personas en las
   pruebas y se cambiaron por inventados. Si añades fixtures, **inventa los nombres**.
@@ -193,10 +215,30 @@ se arma en un solo sitio (`contexto.js`) y no en cada app.
 | `personalidad.js` | Cuatro tonos. Solo cambian CÓMO habla |
 | `texto.js` | `sinMarcas()`: le quita el markdown a las respuestas |
 | `revision.js` | Las reglas de "esto no cuadra". **Puro: lo reusa el Worker** |
-| `Humano.jsx` / `Companero.jsx` | El muñeco, grande y pequeño |
-| `companeros.js` | La LISTA de muñecos, aparte para que node pueda leerla |
+| `Humano.jsx` / `Companero.jsx` | Los ocho oficios, cuerpo entero y busto |
+| `companeros.js` | La LISTA de compañeros y `companeroValido()`, aparte para que node pueda leerla |
 
-### Cuatro cosas que costaron caro y no hay que repetir
+### Los compañeros
+
+Ocho OFICIOS con cuerpo: cocinera, cocinero, camarero, camarera, logística,
+parrillero, sumiller y repostera. **Comparten el mismo cuerpo** y cambian tres cosas —lo
+de la cabeza, lo de las manos y el detalle del pecho—, porque ocho torsos distintos se
+descuadran en cuanto se toca uno.
+
+Empezaron siendo objetos con cara (un gorro, una cazuela, una paella) y no funcionaban:
+un objeto solo puede inclinarse, así que los siete gestos se quedaban en un balanceo.
+
+Se dibujan **dos veces**: cuerpo entero en `Humano.jsx` (pestaña Humano) y busto en
+`Companero.jsx` (cabecera, 30px — a ese tamaño una persona entera es una mancha). La
+lista vive en `companeros.js` y una prueba compara los dos ficheros: añadir uno en un
+solo sitio hacía que al elegirlo desapareciera en la otra pantalla.
+
+Los colores son tokens `--pj-*` con su versión en oscuro (la chaquetilla blanca sobre
+fondo oscuro deslumbra). **Van opacos, mezclados con el fondo, no la misma tinta a media
+opacidad**: con transparencia, cada pieza solapada sumaba color y dejaba costura —se veía
+el cuello a través de la chaquetilla—.
+
+### Siete cosas que costaron caro y no hay que repetir
 
 1. **La barrera de datos.** Cada herramienta declara `datos: true/false`. A un proveedor
    que entrena con lo que recibe (OpenAI) **solo se le ofrecen las de calcular**, nunca
@@ -212,9 +254,25 @@ se arma en un solo sitio (`contexto.js`) y no en cada app.
    la checklist no, así que el MISMO asistente contestaba distinto según por dónde lo
    abrieras. Hay una prueba que compara los dos ficheros.
 
-4. **El muñeco se dibuja en dos ficheros** (pequeño en la cabecera, grande en Humano).
-   Añadir uno solo en uno hace que al elegirlo desaparezca en la otra pantalla. Por eso
-   la lista vive en `companeros.js` y hay una prueba de paridad.
+4. **El muñeco se dibuja en dos ficheros** (busto en la cabecera, cuerpo entero en
+   Humano). Añadir uno solo en uno hace que al elegirlo desaparezca en la otra pantalla.
+   Por eso la lista vive en `companeros.js` y hay una prueba de paridad. Esa prueba lee
+   las CLAVES del objeto `OFICIOS`, no el texto de la línea: mirando el formato exacto
+   avisaba de un fallo inexistente en cuanto uno se escribía más corto.
+
+5. **Un flex en columna centrado cuyo contenido no cabe empuja los primeros hijos por
+   encima del borde de arriba**, y ahí no se llega ni con scroll. `.hum` estaba centrado
+   y, al crecer esa pantalla, el muñeco se fue 218px fuera y quedó detrás de los
+   ajustes: existía, medía 191px y era invisible. Centrar en vertical algo que puede
+   crecer es una bomba de relojería.
+
+6. **Animar `max-height` obliga a `overflow: hidden`.** Los ajustes lo hacían y, siendo
+   hijos flex de un panel que los encogía, lo de abajo quedaba cortado sin forma de
+   llegar: había un botón que no se podía ni pulsar. Se animan con opacidad y
+   desplazamiento, y llevan su propio scroll.
+
+7. **Los ajustes SUSTITUYEN a la pestaña, no se apilan encima.** Apilados se comían
+   media pantalla de móvil en las cinco pestañas a la vez.
 
 ### El proxy (Cloudflare Worker)
 
@@ -237,8 +295,9 @@ proveedor. El cron entra con una cuenta "robot" de Firebase (secretos del Worker
 que las reglas de Firestore siguen pidiendo sesión y no hay que tocarlas.
 
 `/__repaso` lo lanza a mano, **pero pide la sesión en una cabecera**: no se puede abrir
-en una pestaña del navegador. Hay un botón en los ajustes del asistente, que es el único
-sitio que tiene el token.
+en una pestaña del navegador —eso se documentó mal una vez y no funcionaba—. Hay un
+botón "Repasar los eventos ahora" en los ajustes del asistente, que es el único sitio
+con el token.
 
 ### Lo que el asistente NO puede hacer, en ningún nivel
 
