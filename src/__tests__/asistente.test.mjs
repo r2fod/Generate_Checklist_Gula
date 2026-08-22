@@ -24,7 +24,7 @@ import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar } from "../../worker/repaso.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { readFileSync } from "node:fs";
-import { COMPANEROS, CLAVES_COMPANERO } from "../asistente/companeros.js";
+import { COMPANEROS, CLAVES_COMPANERO, CLAVES_DIBUJADAS, companeroValido, COMPANERO_POR_DEFECTO } from "../asistente/companeros.js";
 import { comoHabla, PERSONALIDADES, CLAVES_PERSONALIDAD } from "../asistente/personalidad.js";
 import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
@@ -792,23 +792,37 @@ console.log("\n── Los muñecos ──");
   // no es lo que se lee a 200— pero la lista tiene que ser la misma: si se añade uno solo
   // en un fichero, al elegirlo desaparece en la otra pantalla y parece que se ha roto.
   const lee = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
-  const claves = (t, marca) => (t.match(new RegExp(`^  ([a-z]+): ${marca}`, "gm")) || [])
-    .map(l => l.trim().split(":")[0]);
+  // Se leen las claves del objeto OFICIOS de cada fichero. Mirando el formato exacto de
+  // la línea ("clave: (") la prueba se rompía al escribir uno como "clave: <>…", que es
+  // el mismo dibujo escrito más corto: avisaba de un fallo que no existía.
+  const claves = (t) => {
+    const bloque = t.slice(t.indexOf("const OFICIOS = {"));
+    return (bloque.slice(0, bloque.indexOf("\n};")).match(/^ {2}([a-z]+):/gm) || [])
+      .map(l => l.trim().replace(":", ""));
+  };
 
-  const enPequeno = claves(lee("../asistente/Companero.jsx"), "\\(");
-  const enGrande = claves(lee("../asistente/Humano.jsx"), "\\(");
+  const enPequeno = claves(lee("../asistente/Companero.jsx"));
+  const enGrande = claves(lee("../asistente/Humano.jsx"));
   const faltan = enPequeno.filter(k => !enGrande.includes(k));
   const sobran = enGrande.filter(k => !enPequeno.includes(k));
 
-  ok(enPequeno.length >= 7, `hay al menos siete muñecos (${enPequeno.length})`);
+  ok(enPequeno.length === CLAVES_DIBUJADAS.length,
+    `los dibujados son los mismos que dice la lista (${enPequeno.length} de ${CLAVES_DIBUJADAS.length})`);
   ok(!faltan.length, `todos los del pequeño están en el grande${faltan.length ? ` → falta ${faltan.join(", ")}` : ""}`);
   ok(!sobran.length, `y ninguno sobra en el grande${sobran.length ? ` → sobra ${sobran.join(", ")}` : ""}`);
 
   // Y todos son de catering: el que pidió el muñeco quería algo de la casa, no una bola
   // con ojos. "ninguno" es la opción de apagarlo, no un muñeco.
-  CLAVES_COMPANERO.filter(k => k !== "ninguno").forEach(k => {
+  CLAVES_DIBUJADAS.forEach(k => {
     ok(enPequeno.includes(k), `"${k}" (${COMPANEROS[k].nombre}) está dibujado, no solo listado`);
   });
+
+  // Los compañeros pasaron de objetos con cara a oficios. Quien tuviera guardado un
+  // "chef" o una "cazuela" se quedaba sin muñeco y sin saber por qué.
+  ok(companeroValido("chef") === COMPANERO_POR_DEFECTO && companeroValido("cazuela") === COMPANERO_POR_DEFECTO,
+    "uno de los viejos cae en el de por defecto en vez de dejar el hueco");
+  ok(companeroValido("camarero") === "camarero" && companeroValido("ninguno") === "ninguno",
+    "y los que existen se respetan, incluido apagarlo");
 }
 
 console.log("\n── La personalidad ──");

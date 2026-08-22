@@ -11,7 +11,7 @@
 //
 // Ninguno se parece al de OpenHuman: son formas simples de la casa.
 import { useState, useEffect } from "react";
-import { COMPANEROS } from "./companeros.js";
+import { COMPANEROS, COMPANERO_POR_DEFECTO } from "./companeros.js";
 
 // La lista vive en companeros.js: la comparten las dos pantallas y la leen las pruebas,
 // que corren en node y no entienden JSX. Se reexporta para no romper lo que ya importaba
@@ -24,8 +24,8 @@ function Ojos({ estado }) {
   if (estado === "error") {
     return (
       <g stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <path d="M20 27 l5 5 M25 27 l-5 5" />
-        <path d="M39 27 l5 5 M44 27 l-5 5" />
+        <path d="M25 26 l5 5 M30 26 l-5 5" />
+        <path d="M34 26 l5 5 M39 26 l-5 5" />
       </g>
     );
   }
@@ -33,81 +33,81 @@ function Ojos({ estado }) {
   const dx = estado === "pensando" ? 2.5 : 0;
   return (
     <g fill="currentColor">
-      <circle cx={22 + dx} cy="30" r="3.2" />
-      <circle cx={42 + dx} cy="30" r="3.2" />
+      <circle cx={27 + dx} cy="29" r="2.6" />
+      <circle cx={37 + dx} cy="29" r="2.6" />
     </g>
   );
 }
 
 const Boca = ({ estado }) => (
   estado === "error"
-    ? <path d="M25 43 q7 -5 14 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    : <path d="M25 40 q7 6 14 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    ? <path d="M27 38 q5 -4 10 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    : <path d="M27 36 q5 5 10 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
 );
 
-// Cada uno es el mismo par de ojos y boca dentro de una silueta distinta.
-const SILUETAS = {
-  chef: (
+// A 30px no cabe una persona entera con brazos: se queda en una mancha. Así que aquí
+// va el BUSTO —cabeza, hombros y lo que lleva puesto—, que es lo que de verdad se lee
+// a ese tamaño. Los mismos siete oficios que el grande y en la misma postura, para que
+// al elegir uno no parezca que has cambiado de personaje.
+const BUSTO = (
+  <>
+    <path d="M14 56 a18 18 0 0 1 36 0 z" fill="url(#compVolumen)" />
+    <circle cx="32" cy="30" r="16" fill="url(#compVolumen)" />
+  </>
+);
+
+const GORRO = (
+  <>
+    <path d="M20 15 a8 8 0 0 1 7 -8 a9 9 0 0 1 14 0 a8 8 0 0 1 7 8 v4 h-28 z" className="comp-viste" />
+    <rect x="19" y="17" width="30" height="6" rx="3" className="comp-detalle" />
+  </>
+);
+const PELO_LARGO = <path d="M16 30 q-3 10 1 14 h4 q-4 -7 -2 -14 z M48 30 q3 10 -1 14 h-4 q4 -7 2 -14 z" className="comp-viste" />;
+const PAJARITA = <path d="M28 47 l-5 -3 v6 z M36 47 l5 -3 v6 z" className="comp-detalle" />;
+
+const OFICIOS = {
+  cocinera:  <>{PELO_LARGO}{GORRO}</>,
+  cocinero:  GORRO,
+  camarero:  <><path d="M16 30 a16 16 0 0 1 32 0 q-8 -6 -18 -3 q-8 2 -14 3 z" className="comp-viste" />{PAJARITA}</>,
+  camarera:  <><path d="M16 30 a16 16 0 0 1 32 0 v-3 a16 16 0 0 0 -32 0 z" className="comp-viste" /><circle cx="49" cy="33" r="4.5" className="comp-viste" />{PAJARITA}</>,
+  logistica: (
     <>
-      <path d="M18 22 a9 9 0 0 1 8 -9 a10 10 0 0 1 16 0 a9 9 0 0 1 8 9 v4 h-32 z" fill="currentColor" opacity="0.22" />
-      <rect x="17" y="25" width="30" height="5" rx="2" fill="currentColor" opacity="0.35" />
-      <rect x="16" y="29" width="32" height="26" rx="11" fill="currentColor" opacity="0.12" />
+      <path d="M17 22 a15 15 0 0 1 30 0 v3 h-30 z" className="comp-viste" />
+      <path d="M15 24 h-7 a2.5 2.5 0 0 0 0 5 h8 z" className="comp-detalle" />
+      <path d="M22 48 h20 v3 h-20 z" className="comp-detalle" />
+      <rect x="24" y="52" width="16" height="10" rx="2" className="comp-viste" />
     </>
   ),
-  cazuela: (
+  parrillero: (
     <>
-      <path d="M14 30 h36 v12 a14 14 0 0 1 -36 0 z" fill="currentColor" opacity="0.16" />
-      <rect x="12" y="27" width="40" height="4" rx="2" fill="currentColor" opacity="0.35" />
-      <path d="M26 20 q3 -5 0 -9 M32 19 q3 -6 0 -11 M38 20 q3 -5 0 -9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+      <path d="M16 25 a16 16 0 0 1 32 0 v-1 a16 16 0 0 0 -32 0 z" className="comp-viste" />
+      <path d="M46 22 l6 -3 l-1 5 z" className="comp-detalle" />
+      <ellipse cx="32" cy="54" rx="11" ry="4" className="comp-detalle" />
     </>
   ),
-  copa: (
+  sumiller: (
     <>
-      <path d="M18 20 h28 l-4 18 a10 10 0 0 1 -20 0 z" fill="currentColor" opacity="0.16" />
-      <path d="M32 48 v8 M25 56 h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity="0.4" />
-      <circle cx="24" cy="16" r="1.6" fill="currentColor" opacity="0.5" />
-      <circle cx="40" cy="13" r="1.2" fill="currentColor" opacity="0.4" />
+      <path d="M17 24 a15 15 0 0 1 30 0 q-15 -7 -30 0 z" className="comp-viste" />
+      <path d="M32 45 v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.55" />
+      <circle cx="32" cy="52" r="3" className="comp-detalle" />
     </>
   ),
-  camion: (
+  repostera: (
     <>
-      <rect x="12" y="22" width="26" height="24" rx="3" fill="currentColor" opacity="0.16" />
-      <path d="M38 30 h8 l6 7 v9 h-14 z" fill="currentColor" opacity="0.22" />
-      <circle cx="21" cy="50" r="4.5" fill="currentColor" opacity="0.4" />
-      <circle cx="44" cy="50" r="4.5" fill="currentColor" opacity="0.4" />
-    </>
-  ),
-  // La bandeja de camarero, con la campana encima: es lo que más se ve en un evento.
-  bandeja: (
-    <>
-      <path d="M14 44 a18 12 0 0 1 36 0 z" fill="currentColor" opacity="0.16" />
-      <rect x="10" y="44" width="44" height="4" rx="2" fill="currentColor" opacity="0.35" />
-      <circle cx="32" cy="20" r="2" fill="currentColor" opacity="0.45" />
-      <path d="M22 52 h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.3" />
-    </>
-  ),
-  paella: (
-    <>
-      <ellipse cx="32" cy="40" rx="21" ry="13" fill="currentColor" opacity="0.16" />
-      <ellipse cx="32" cy="37" rx="21" ry="12" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.35" />
-      {/* Las dos asas, que es lo que hace que una paella se reconozca y no sea un plato */}
-      <path d="M10 37 h-5 M54 37 h5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.4" />
-      <circle cx="24" cy="40" r="1.6" fill="currentColor" opacity="0.4" />
-      <circle cx="40" cy="41" r="1.6" fill="currentColor" opacity="0.4" />
-    </>
-  ),
-  tarta: (
-    <>
-      <path d="M14 34 h36 v14 a4 4 0 0 1 -4 4 h-28 a4 4 0 0 1 -4 -4 z" fill="currentColor" opacity="0.16" />
-      <rect x="12" y="30" width="40" height="5" rx="2" fill="currentColor" opacity="0.3" />
-      <path d="M32 30 v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
-      <path d="M32 21 q3 -3 0 -5 q-3 2 0 5" fill="currentColor" opacity="0.5" />
+      {PELO_LARGO}
+      <path d="M16 27 a16 16 0 0 1 32 0 v-3 a16 16 0 0 0 -32 0 z" className="comp-viste" />
+      <path d="M46 23 l6 -4 l-1 6 z" className="comp-detalle" />
+      <path d="M25 50 h14 v9 h-14 z" className="comp-detalle" />
     </>
   ),
 };
 
+const SILUETAS = Object.fromEntries(
+  Object.entries(OFICIOS).map(([k, extras]) => [k, <>{BUSTO}{extras}</>]),
+);
+
 // "estado" es uno de: quieto, pensando, error.
-export default function Companero({ cual = "chef", estado = "quieto", size = 40 }) {
+export default function Companero({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", size = 40 }) {
   // Un parpadeo de vez en cuando. Sin él la cara se queda mirando fijo y resulta
   // desagradable a los diez segundos; con él parece que está ahí y ya está.
   const [parpadea, setParpadea] = useState(false);
@@ -131,10 +131,22 @@ export default function Companero({ cual = "chef", estado = "quieto", size = 40 
   return (
     <span className={`companero es-${estado}`} aria-hidden="true" title={COMPANEROS[cual].nombre}>
       <svg width={size} height={size} viewBox="0 0 64 64" role="presentation">
+        {/* El mismo volumen que el grande, en pequeño: degradado y un brillo. A 30px no
+            se aprecia el detalle, pero sí la diferencia entre una mancha plana y algo
+            con cuerpo. El id lleva prefijo propio porque en la página conviven los dos
+            SVG y un id repetido hace que gane el primero que se pinte. */}
+        <defs>
+          <radialGradient id="compVolumen" cx="34%" cy="26%" r="82%">
+            <stop offset="0%" className="hum-luz" />
+            <stop offset="52%" className="hum-medio" />
+            <stop offset="100%" className="hum-sombra" />
+          </radialGradient>
+        </defs>
         {SILUETAS[cual]}
+        <ellipse className="comp-brillo" cx="26" cy="24" rx="6" ry="4" transform="rotate(-20 26 24)" />
         {parpadea
           ? <g stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <path d="M19 30 h6" /><path d="M39 30 h6" />
+              <path d="M24 29 h6" /><path d="M34 29 h6" />
             </g>
           : <Ojos estado={estado} />}
         <Boca estado={estado} />

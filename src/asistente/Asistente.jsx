@@ -16,7 +16,7 @@ import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
 import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
 import Companero from "./Companero.jsx";
-import { COMPANEROS, CLAVES_COMPANERO } from "./companeros.js";
+import { COMPANERO_POR_DEFECTO, companeroValido } from "./companeros.js";
 import Humano from "./Humano.jsx";
 import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
 import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permisos.js";
@@ -53,7 +53,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // Lo que el Worker dice que tiene configurado. Hasta la primera respuesta no se sabe,
   // y se supone Gemini —que es el que se monta por defecto— en vez de no dejar preguntar.
   const [disponibles, setDisponibles] = useState([]);
-  const [companero, setCompanero] = useState(() => leer(CLAVE_COMPANERO, "chef") || "chef");
+  // Quien tuviera guardado uno de los viejos —eran objetos con cara, ya no existen—
+  // cae en el de por defecto en vez de quedarse sin muñeco.
+  const [companero, setCompanero] = useState(() => companeroValido(leer(CLAVE_COMPANERO, COMPANERO_POR_DEFECTO)));
   const [gasto, setGasto] = useState(() => leerGasto());
   const [tope, setTope] = useState(() => leerTope());
   const [huboError, setHuboError] = useState(false);
@@ -387,24 +389,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               <span className="asis-nota">{NIVELES[nivel].resumen}</span>
             </label>
 
-            <label className="asis-campo">
-              <span>Compañero</span>
-              <div className="asis-munecos">
-                {CLAVES_COMPANERO.map(k => (
-                  <button
-                    key={k} type="button"
-                    className={`asis-muneco${companero === k ? " es-activo" : ""}`}
-                    onClick={() => { setCompanero(k); guardar(CLAVE_COMPANERO, k); }}
-                    title={COMPANEROS[k].nombre} aria-label={COMPANEROS[k].nombre}
-                    aria-pressed={companero === k}
-                  >
-                    {k === "ninguno"
-                      ? <span className="asis-muneco-no">sin</span>
-                      : <Companero cual={k} size={30} estado="quieto" />}
-                  </button>
-                ))}
-              </div>
-            </label>
+            {/* El compañero se elige en la pestaña Humano, mirándolo a tamaño grande, y
+                no aquí: a 30px las siete siluetas se parecen tanto que había que elegir
+                a ciegas. Y tenerlo en dos sitios era mantener dos elegidores del mismo
+                ajuste. */}
 
             {/* ── LANZAR EL REPASO A MANO ──
                 Tiene que estar aquí y no ser una dirección que se abre en el navegador:
@@ -446,7 +434,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {pestana === "tareas" ? (
+        {/* Los ajustes SUSTITUYEN a la pestaña, no se apilan encima. Apilados se comían
+            media pantalla de móvil en las cinco pestañas a la vez: entrabas en Humano y
+            veías la dirección del proxy y los proveedores antes que el muñeco. */}
+        {!ajustes && (pestana === "tareas" ? (
           <div className="asis-hilo asis-cerebro">
             <p className="asis-explica">
               Lo que hay que hacer y no sale de ninguna checklist: pedir material, llamar a
@@ -478,7 +469,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         ) : pestana === "humano" ? (
           <div className="asis-hilo">
             <Humano
-              cual={companero === "ninguno" ? "chef" : companero}
+              cual={companero === "ninguno" ? COMPANERO_POR_DEFECTO : companero}
               estado={pensando ? "pensando" : huboError ? "error" : "quieto"}
               haciendo={enCurso}
               ultimaRespuesta={[...hilo].reverse().find(m => m.de === "el")?.texto || ""}
@@ -672,11 +663,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           )}
           <div ref={finRef} />
         </div>
-        )}
+        ))}
 
         {/* Encima del campo de escribir a propósito: es lo último que se mira antes de
             seguir preguntando, y así no se queda un cambio esperando sin que nadie lo vea. */}
-        {pestana === "charla" && pendientes.length > 0 && (
+        {!ajustes && pestana === "charla" && pendientes.length > 0 && (
           <div className="asis-pendientes">
             {pendientes.map(p => (
               <div className="asis-pendiente" key={p.id}>
@@ -696,7 +687,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {pestana === "charla" && (
+        {!ajustes && pestana === "charla" && (
         <form className="asis-escribir" onSubmit={enviar}>
           <input
             className="form-input" type="text" value={texto} placeholder="Escribe tu pregunta"

@@ -6198,6 +6198,10 @@ hr {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-subtle);
+  /* Con su propio scroll: en un móvil los ajustes son más altos que la pantalla, y sin
+     esto el panel los encogía y el final quedaba inalcanzable. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .asis-campo { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
@@ -6404,6 +6408,21 @@ hr {
 }
 
 .asis-pestana:hover { color: var(--text-main); }
+
+/* En el móvil, sin iconos: con ellos las cinco suman 397px en una fila de 378 y una se
+   cae sola a la segunda —cuatro arriba y "Gasto" solo debajo, que parece un error—. Sin
+   iconos caben las cinco, que es lo que hace falta para verlas todas de un vistazo. */
+@media (max-width: 480px) {
+  .asis-pestana svg { display: none; }
+  .asis-pestana { padding: 7px 9px; }
+}
+
+/* Y en el móvil más estrecho, aún más apretado: a 320px las cinco suman 316px en una
+   fila de 308 y se caía una. Ocho píxeles decidían si las ves todas o no. */
+@media (max-width: 360px) {
+  .asis-pestana { padding: 7px 6px; font-size: 0.8rem; }
+  .asis-pestanas { gap: 4px; padding: 8px 4px; }
+}
 
 .asis-pestana.es-activa {
   background: var(--accent-soft);
@@ -6708,10 +6727,13 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .asis-hilo { animation: asis-msg-entra 0.18s ease-out; }
 
 /* Los ajustes se despliegan, no aparecen: así se ve que salen de la rueda dentada. */
-.asis-ajustes { animation: asis-despliega 0.22s ease-out; overflow: hidden; }
+/* Se desliza, no se estira. Animar "max-height" obligaba a "overflow: hidden", y con
+   el panel encogiéndolo por ser un hijo flex, lo de abajo quedaba cortado sin forma de
+   llegar: el botón de repasar no se podía ni pulsar. */
+.asis-ajustes { animation: asis-despliega 0.22s ease-out; }
 @keyframes asis-despliega {
-  from { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; }
-  to   { max-height: 620px; opacity: 1; }
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6730,7 +6752,12 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Desde arriba y NO centrado. Un flex en columna centrado cuyo contenido no cabe
+     empuja los primeros hijos POR ENCIMA del borde de arriba, y ahí no se llega ni
+     con scroll: el muñeco se iba 218px fuera y quedaba detrás de los ajustes. Se ve
+     en cuanto la pantalla añade algo —los elegidores de abajo—, así que centrar aquí
+     era una bomba de relojería. */
+  justify-content: flex-start;
   gap: 14px;
   min-height: 100%;
   padding: 8px 0 4px;
@@ -6748,13 +6775,107 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .hum-svg { width: 100%; height: 100%; overflow: visible; }
 
 /* Los colores salen de los tokens del tema: el compañero se adapta a claro y oscuro
-   sin una sola regla duplicada. */
-.hum-cuerpo { fill: var(--accent); opacity: 0.22; }
-.hum-relleno { fill: var(--accent); opacity: 0.3; }
-.hum-borde { fill: var(--accent); opacity: 0.45; stroke: var(--accent); }
+   sin una sola regla duplicada.
+   El cuerpo va con un degradado y no con un color plano: es lo que le da volumen. Se
+   define aquí y no en el SVG para que el tema oscuro lo cambie solo, y para que
+   "es-borrando" —que pinta el muñeco de rojo— pueda seguir pisándolo con un fill liso. */
+.hum-cuerpo { fill: url(#humVolumen); opacity: 1; }
+/* La ropa. Blanca de chaquetilla por defecto, y cada oficio la pisa con la suya. */
+.hum-relleno { fill: var(--pj-uniforme); opacity: 1; }
+.hum-borde { fill: var(--pj-uniforme-sombra); stroke: var(--pj-uniforme-sombra); opacity: 1; }
+/* El contorno fino: sin él, la chaquetilla blanca sobre fondo blanco desaparece. */
+.hum-cuerpo, .hum-relleno { stroke: var(--pj-uniforme-sombra); stroke-width: 1.5; }
+
+/* Y las piezas con color propio, que son las que hacen que se distingan de un vistazo */
+.pj-pelo { fill: var(--pj-pelo); }
+.pj-delantal { fill: var(--pj-delantal); }
+.pj-metal { fill: var(--pj-metal); stroke: var(--pj-metal-oscuro); stroke-width: 1.5; }
+.pj-metal-linea { fill: none; stroke: var(--pj-metal-oscuro); stroke-linecap: round; }
+.pj-madera { fill: var(--pj-madera); }
+.pj-fuego { fill: var(--pj-fuego); }
+.pj-vino { fill: var(--pj-vino); }
+.pj-tarta { fill: var(--pj-tarta); }
+.pj-oscuro { fill: var(--pj-pelo); stroke: var(--pj-pelo); }
+.pj-reflectante { fill: var(--pj-fuego); }
+
+/* Las paradas del degradado: la misma tinta del tema a tres opacidades. Variar la
+   opacidad y no el tono es lo que hace que funcione igual en claro y en oscuro sin
+   tener dos paletas. */
+/* ─── LA PALETA DE LOS COMPAÑEROS ────────────────────────────────────────────
+   Todo salía de --accent, así que los ocho eran del mismo morado y parecían siluetas
+   sin acabar. Con color de verdad —chaquetilla blanca, piel, madera, metal— se lee de
+   un vistazo quién es cada uno, y no pesa un byte más que el morado.
+
+   Van como tokens y no a pelo en el SVG para poder corregirlos en el tema oscuro: la
+   chaquetilla blanca sobre fondo oscuro deslumbra, y la piel clara se vuelve un foco. */
+:root {
+  --pj-piel: #f2c9a4;
+  --pj-piel-sombra: #dda87e;
+  --pj-pelo: #4a3b32;
+  --pj-uniforme: #f7f8fb;
+  --pj-uniforme-sombra: #dfe3ee;
+  --pj-delantal: #6b7280;
+  --pj-metal: #c7ccd8;
+  --pj-metal-oscuro: #98a0b0;
+  --pj-madera: #b98450;
+  --pj-fuego: #f59e0b;
+  --pj-vino: #9d2b4e;
+  --pj-tarta: #f6c1d4;
+}
+:root[data-tema="oscuro"] {
+  --pj-piel: #d8a97f;
+  --pj-piel-sombra: #b98a63;
+  --pj-pelo: #2c2420;
+  --pj-uniforme: #dfe3ee;
+  --pj-uniforme-sombra: #b9c0d2;
+  --pj-delantal: #8b93a3;
+  --pj-metal: #aab1c0;
+  --pj-metal-oscuro: #7d8494;
+  --pj-madera: #a5713f;
+  --pj-fuego: #fbbf24;
+  --pj-vino: #c2456c;
+  --pj-tarta: #e79cb8;
+}
+
+/* Tintas OPACAS, no la misma tinta a media opacidad. Con transparencia, cada pieza que
+   se solapa con otra —el cuello con el torso, el brazo con el costado— sumaba color y
+   dejaba una costura visible: se veía el cuello a través de la chaqueta. Mezclando con
+   el fondo se consigue el mismo tono claro sin que nada se transparente. */
+/* El degradado ahora es la PIEL: la cabeza y las manos. Sigue siendo un radial con la
+   luz arriba a la izquierda, que es lo que da el volumen. */
+.hum-luz    { stop-color: var(--pj-piel); stop-opacity: 1; }
+.hum-medio  { stop-color: var(--pj-piel); stop-opacity: 1; }
+.hum-sombra { stop-color: var(--pj-piel-sombra); stop-opacity: 1; }
+
+.hum-brillo-centro { stop-color: #fff; stop-opacity: 0.34; }
+.hum-brillo-borde  { stop-color: #fff; stop-opacity: 0; }
+.hum-brillo { pointer-events: none; }
+
+.hum-suelo { fill: var(--accent); opacity: 0.24; }
+
+/* El pequeño de la cabecera: el mismo degradado y un brillo diminuto. Las siluetas
+   llevan su fill puesto a mano en el SVG, así que aquí solo se pinta el brillo. */
+.comp-brillo { fill: #fff; opacity: 0.3; pointer-events: none; }
+/* Lo que viste el busto pequeño, con las mismas tintas opacas que el grande: si se
+   dejan translúcidas, a 30px las piezas solapadas se emborronan en una mancha. */
+.comp-viste { fill: color-mix(in srgb, var(--accent) 40%, var(--card-bg)); }
+.comp-detalle { fill: color-mix(in srgb, var(--accent) 62%, var(--card-bg)); }
+:root[data-tema="oscuro"] .comp-brillo { opacity: 0.14; }
+
+.hum-ojo-luz   { stop-color: var(--accent); stop-opacity: 1; }
+.hum-ojo-fondo { stop-color: var(--accent); stop-opacity: 0.72; }
+.hum-chispa { fill: #fff; opacity: 0.85; }
+
+/* En oscuro el brillo blanco a media opacidad lava el muñeco entero: se baja, y la
+   sombra del suelo sube, que sobre un fondo oscuro casi no se ve. */
+:root[data-tema="oscuro"] .hum-brillo-centro { stop-opacity: 0.22; }
+:root[data-tema="oscuro"] .hum-suelo { opacity: 0.3; }
+:root[data-tema="oscuro"] .hum-chispa { opacity: 0.7; }
 .hum-vapor { fill: var(--accent); stroke: var(--accent); opacity: 0.4; }
 .hum-cara, .hum-boca { stroke: var(--accent); }
-.hum-cara-relleno .hum-ojo { fill: var(--accent); }
+.hum-cara-relleno /* Los ojos, tinta sólida. Con degradado se quedaban lavados sobre un cuerpo claro y
+   la cara perdía toda la fuerza: es lo primero que se mira. */
+.hum-ojo { fill: var(--accent); }
 
 /* Respira siempre: quieto del todo parece una imagen pegada, no un compañero. */
 .hum-escena { animation: hum-respira 3.4s ease-in-out infinite; }
@@ -7077,16 +7198,19 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 }
 
 .hum-elegir {
-  display: flex;
-  flex-wrap: wrap;
+  /* Rejilla y no fila que se parte: con "flex-wrap" la última fila estiraba sus dos
+     botones a lo ancho y quedaban del doble que los de arriba. Con "auto-fill" las
+     columnas vacías se mantienen, así que el último se queda del tamaño de su columna
+     y todo alinea. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 6px;
 }
 
 .hum-elegir-uno {
-  flex: 1 1 auto;
-  /* Que quepan varios por fila pero ninguno se quede en un sello: por debajo de 88px el
-     nombre parte en dos líneas y la fila se descuadra. */
-  min-width: 88px;
+  /* Que ninguno se quede en un sello: por debajo de 88px el nombre parte en dos líneas
+     y la fila se descuadra. */
+  min-width: 0;
   min-height: 44px;
   display: flex;
   flex-direction: column;
@@ -7103,7 +7227,6 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
-.hum-elegir-uno.es-ancho { min-width: 112px; }
 .hum-elegir-uno span:first-child { font-size: 1rem; line-height: 1.1; }
 .hum-elegir-uno.es-ancho span:first-child { font-size: 0.8rem; font-weight: 700; }
 .hum-elegir-uno em { font-style: normal; font-size: 0.68rem; opacity: 0.75; text-align: center; }
