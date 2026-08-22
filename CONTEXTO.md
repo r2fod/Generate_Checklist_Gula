@@ -91,11 +91,41 @@ desentona enseguida.
 ## Comandos
 
 ```
-npm run lint          # oxlint (los ~137 warnings de catch (e) son de la casa; ERRORES tiene que haber 0)
+npm run lint          # oxlint (los ~141 warnings de catch (e) son de la casa; ERRORES tiene que haber 0)
 npm run test          # calculos → asistente → build → sincronizacion → app (navegador)
+npm run test:rapido   # lo mismo SIN el barrido del navegador (~1 min). Es lo que corre en CI
 npm run worker:build  # empaqueta el Worker en worker/pegar.js (ver más abajo)
 npm run deploy        # predeploy = test, no publica en rojo
 ```
+
+### Integración continua (`ci/test.yml` → `.github/workflows/test.yml`)
+
+**El fichero está en `ci/test.yml`, no en su sitio todavía.** GitHub no deja que una App
+(que es con lo que trabaja la IA aquí) cree ni modifique nada dentro de
+`.github/workflows/` sin el permiso `workflows`: el push se rechaza entero con
+*"refusing to allow a GitHub App to create or update workflow"*. Lo mueve el dueño en
+diez segundos y a partir de ahí ya corre:
+
+```
+git mv ci/test.yml .github/workflows/test.yml
+git commit -m "CI en su sitio" && git push
+```
+
+Una vez movido, en cada push y cada PR corren dos trabajos:
+
+- **rapidas**: `npm ci` + `npm run lint` + `npm run test:rapido` (~1 min).
+- **worker**: regenera `worker/pegar.js` y falla si sale diferente del que hay subido —
+  si la fuente cambió y nadie lo regeneró, el repositorio dice una cosa y Cloudflare
+  corre otra, y eso solo se nota cuando el repaso de la noche hace algo raro.
+
+El **barrido del navegador** (45 min) NO corre en cada empujón: bloquearía las
+revisiones tres cuartos de hora y la gente dejaría de mirarlas. Va en el trabajo
+`navegador`, que salta de noche (04:00 UTC, una hora antes del cron del Worker) o a mano
+desde la pestaña Actions. Antes de un `deploy` sigue corriendo entera en local, que es lo
+que hace `predeploy`.
+
+**No hay `deploy.yml`**: publicar desde CI está a la espera del OK del dueño. Hoy se
+despliega a mano con `npm run deploy`.
 
 Estado: **335 (cálculos) + 396 (asistente) + 201 (sincronización) + 711 (navegador), 0 fallos.**
 
@@ -358,6 +388,14 @@ camión, sin forma de recuperarlo y sin que nadie sepa por qué.
 
 - Un apunte a **250 pax**; otro del **9 al 10 de octubre** con el campo *Hasta*.
 - **Ratios de cumpleaños y producción**: el panel existe, falta medir un evento real.
+- **Proteger `main`** (Settings → Branches → Add rule, patrón `main`): pedir PR, exigir
+  que pasen los checks *Lint y pruebas rápidas* y *worker/pegar.js regenerado*, y no
+  permitir empujar directo. Desde aquí no se puede: la API contesta `403 Resource not
+  accessible by integration`, es cosa de un administrador. Son 30 segundos.
+- **Mover `ci/test.yml` a `.github/workflows/test.yml`** (ver "Integración continua"):
+  desde aquí el push se rechaza por falta del permiso `workflows`.
+- **Decidir si se quiere `deploy.yml`** (publicar en GitHub Pages desde CI). No se ha
+  escrito a propósito, está esperando el OK.
 
 ### 2. Tinyflows — decidido NO hacer por ahora
 

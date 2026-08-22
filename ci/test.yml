@@ -1,0 +1,89 @@
+# ─── LAS PRUEBAS EN CADA EMPUJÓN ──────────────────────────────────────────────
+# Hasta ahora las pruebas solo corrían en el portátil de quien tocaba el código, y eso
+# ya dejó pasar un deploy roto: se publica lo que hay en dist/ AL TERMINAR, así que si
+# nadie lanzó la batería antes, se publica sin probar. Aquí corren solas.
+#
+# Por qué NO se lanza aquí la batería entera: `npm run test` termina con el barrido del
+# navegador (9 anchos × 2 temas × 10 pantallas), que son ~45 minutos. Esperar 45 min por
+# cada empujón hace que la gente deje de mirar el resultado, que es peor que no tenerlo.
+# En cada push/PR corre lo rápido (cálculos, asistente, build, sincronización: ~1 min) y
+# el navegador va aparte, de noche y a mano — el trabajo "navegador" de abajo.
+name: Pruebas
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    # 04:00 UTC, una hora antes del repaso de la noche del Worker (05:00), para que si
+    # el barrido rompe algo se vea antes de que el cron escriba en indice/avisos.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+# Un empujón encima de otro cancela el anterior: nadie mira el resultado de un commit
+# que ya no es la punta de la rama, y los minutos de runner sí se gastan.
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rapidas:
+    name: Lint y pruebas rápidas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      # oxlint acaba en 0 con warnings (los ~141 de `catch (e)` son de la casa); lo que
+      # no se tolera son ERRORES, y de esos sale con código distinto de 0.
+      - run: npm run test:rapido
+
+  worker:
+    name: worker/pegar.js regenerado
+    runs-on: ubuntu-latest
+    # worker/pegar.js es lo que se pega en Cloudflare: la fuente (worker/index.js) con
+    # revision.js empaquetada dentro. Si alguien toca la fuente y no lo regenera, el
+    # repositorio dice una cosa y Cloudflare corre otra, y eso no se nota hasta que el
+    # repaso de la noche hace algo raro. Aquí se regenera y se exige que no cambie.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run worker:build
+      - name: Comprobar que no hay diferencias
+        run: |
+          if ! git diff --exit-code -- worker/pegar.js; then
+            echo "::error file=worker/pegar.js::worker/pegar.js no está regenerado. Lanza 'npm run worker:build', súbelo, y vuelve a pegarlo en Cloudflare."
+            exit 1
+          fi
+
+  navegador:
+    name: Barrido del navegador (~45 min)
+    # Solo de noche o a mano: en cada push bloquearía las revisiones tres cuartos de hora.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      # playwright-core no trae navegador; se baja el chromium que espera la batería y
+      # se le pasa la ruta por CHROMIUM_PATH, que es el primer sitio donde mira.
+      - run: npx --yes playwright@1.62.1 install --with-deps chromium
+      - name: Localizar chromium
+        run: echo "CHROMIUM_PATH=$(ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1)" >> "$GITHUB_ENV"
+      - run: npm run build
+      - run: node src/__tests__/app.test.mjs
