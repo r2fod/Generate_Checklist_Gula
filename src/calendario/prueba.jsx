@@ -22,6 +22,7 @@ import { leerRatios, ponRatios } from "../personal.js";
 // llega a él. Se monta aquí con "?asistente=1", igual que la maquetación de pantalla
 // completa: al menos su colocación queda probada a todos los anchos.
 import Asistente from "../asistente/Asistente.jsx";
+import BotonAsistente from "../asistente/BotonAsistente.jsx";
 
 const HOY = new Date();
 // aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no
@@ -61,6 +62,25 @@ const EQUIPO_DEMO = [
 // formados. No abren nada: aquí no hay nube.
 const CODIGOS_DEMO = { codigo: "kq7mfp2xd4rj", ver: "wz3nbh8tsy6c" };
 
+// Con "?muchos=250" se monta el calendario con esa cantidad de apuntes inventados,
+// repartidos alrededor de hoy. Es para MEDIR (ver pruebas/medir.mjs): con los doce del
+// banco no se nota nada, y lo que se quiere saber es cómo va un año lleno de verdad.
+function muchosApuntes(cuantos) {
+  const TIPOS = ["boda", "comunion", "corporativo", "cumpleanos", "produccion", "vacaciones", "tarea", "recogida"];
+  const lista = [];
+  for (let i = 0; i < cuantos; i++) {
+    lista.push({
+      fecha: dia((i % 400) - 100),
+      titulo: `Evento inventado ${i}`,
+      tipo: TIPOS[i % TIPOS.length],
+      pax: 50 + (i % 200),
+      hora: "13:00",
+      sitio: "Sitio de prueba",
+    });
+  }
+  return lista;
+}
+
 function Banco() {
   // Con "?vacio=1" se arranca sin nada, que es como se ve el cuadro de pegar y como se
   // prueba un enlace de importación que llega a un calendario recién estrenado.
@@ -69,7 +89,11 @@ function Banco() {
   // sin equipo y sin poder tocar un apunte. Es la mitad de la función de compartir, y
   // sin esto la batería no podía llegar a ella (va detrás de un código de Firestore).
   const soloVer = Boolean(new URLSearchParams(window.location.search).get("solover"));
-  const [apuntes, setApuntes] = useState(() => (arrancaVacio ? [] : saneaLista(DEMO)));
+  const cuantos = Number(new URLSearchParams(window.location.search).get("muchos")) || 0;
+  const [apuntes, setApuntes] = useState(() => {
+    if (arrancaVacio) return [];
+    return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : DEMO);
+  });
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
   const [ratios, setRatios] = useState(() => leerRatios());
   // Con "?promover=1" se monta lo que hace la checklist al abrir el calendario: crea las
@@ -121,6 +145,16 @@ function Banco() {
       </>
     );
 
+  // Con "?boton=1" se monta el BOTÓN del asistente, no el panel: es lo que hay que medir
+  // —del clic a tener el panel delante— porque ahí dentro está la carga del chunk.
+  if (new URLSearchParams(window.location.search).get("boton")) {
+    return (
+      <div className="app-wrapper">
+        <BotonAsistente contexto={{ eventosGuardados: {}, apuntes }} />
+      </div>
+    );
+  }
+
   if (new URLSearchParams(window.location.search).get("asistente")) {
     return (
       <Asistente
@@ -152,4 +186,8 @@ function Banco() {
   return <div className="app-wrapper">{dentro}</div>;
 }
 
+// Cuánto se ha tardado desde que arranca el módulo hasta que hay algo pintado. Lo lee
+// pruebas/medir.mjs; en el uso normal del banco no molesta a nadie.
+const arranque = performance.now();
 createRoot(document.getElementById("root")).render(<StrictMode><Banco /></StrictMode>);
+requestAnimationFrame(() => { window.__medida = performance.now() - arranque; });

@@ -459,6 +459,31 @@ en `indice/avisos`; el cron corre a las 05:00 UTC.
   con la checklist (`btn`, `form-input`, `link-roto`, `envio-*`…). Partirlo rompe el diseño.
 - **Firebase**: ya carga con `import()` dinámico en los tres sitios. No hay nada que ganar.
 
+## Rendimiento: medido antes de tocar nada
+
+`npm run medir` (pruebas/medir.mjs). La parte de la cuenta pura corre siempre; la del
+navegador necesita el mismo chromium que `app.test.mjs` y, si no está, se salta y lo dice.
+
+**La cuenta pura del calendario, con el banco lleno** (node 22, este contenedor):
+
+| Apuntes | saneaLista | porDia | próximos | choques | rejilla + disponibles |
+|---|---|---|---|---|---|
+| 12 | 0,7 ms | 0,06 ms | 0,02 ms | 0,03 ms | 0,20 ms |
+| 200 | 0,70 ms | 0,51 ms | 0,28 ms | 0,26 ms | 1,54 ms |
+| 250 | 0,71 ms | 0,46 ms | 0,18 ms | 0,31 ms | 1,75 ms |
+| 500 | 1,69 ms | 0,94 ms | 0,35 ms | 0,67 ms | 3,71 ms |
+
+Conclusión, y por eso no se ha tocado: **la aritmética del calendario no es el problema**.
+Con 250 apuntes, una pintada entera del mes son ~2,7 ms de cuentas. Lo que cuesta es
+React pintando las casillas, y eso solo se mide en el navegador. Por tanto **nada de
+`useMemo` nuevos aquí**: los cuatro que ya hay (`porDia`, `aVistaProxima`, `choques`,
+`diasEnChoque`) valen más por estabilizar las referencias que por ahorrar esos
+milisegundos.
+
+Para medir en el navegador hay dos modos nuevos en el banco de pruebas:
+`?muchos=250` (calendario lleno de apuntes inventados) y `?boton=1` (el botón del
+asistente, para cronometrar del clic al panel).
+
 ## Rendimiento real (4G, CPU ×4, con gzip como sirve GitHub Pages)
 
 | App | Red | Primer pintado |
