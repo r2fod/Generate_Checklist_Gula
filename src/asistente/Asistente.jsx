@@ -8,22 +8,26 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
 import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
 import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
-import Companero, { COMPANEROS, CLAVES_COMPANERO } from "./Companero.jsx";
+import Companero from "./Companero.jsx";
+import { COMPANEROS, CLAVES_COMPANERO } from "./companeros.js";
 import Humano from "./Humano.jsx";
 import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarGasto, puedePreguntar, esGratis, totales, costeDeUna } from "./gasto.js";
 import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permisos.js";
+import { sinMarcas } from "./texto.js";
+import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
 
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
 const CLAVE_NIVEL = "gula_asistente_nivel";
+const CLAVE_PERSONALIDAD = "gula_asistente_personalidad";
 const CLAVE_VOZ = "gula_asistente_voz";
 
 const leer = (k, x = "") => { try { return localStorage.getItem(k) || x; } catch (e) { return x; } };
@@ -54,6 +58,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [tope, setTope] = useState(() => leerTope());
   const [huboError, setHuboError] = useState(false);
   const [nivel, setNivel] = useState(() => nivelValido(leer(CLAVE_NIVEL, NIVEL_POR_DEFECTO)));
+  // El tono con el que habla. Va en este navegador y no en la nube, igual que el muñeco:
+  // es gusto de cada uno, y no tiene sentido que quien prefiere respuestas secas se las
+  // encuentre con guasa porque otro cambió el ajuste.
+  const [personalidad, setPersonalidad] = useState(() => personalidadValida(leer(CLAVE_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO)));
   // Los cambios que el asistente ha propuesto y esperan un sí. En "Con permiso" nada se
   // aplica hasta que alguien lo aprueba aquí — si se aplicara y luego se enseñara, el
   // permiso sería un cartel, no un permiso.
@@ -91,6 +99,8 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // calcula: el subconsciente ya mira lo de este navegador al abrir, y esto es lo otro
   // —lo que se miró aunque nadie abriera la app en toda la semana—.
   const [repaso, setRepaso] = useState(null);
+  const [repasando, setRepasando] = useState(false);
+  const [avisoRepaso, setAvisoRepaso] = useState(null);
   useEffect(() => {
     if (!nubeActiva()) return;
     let vivo = true;
@@ -99,6 +109,34 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     const corta = suscribirAvisosNube(aplicar);
     return () => { vivo = false; corta(); };
   }, []);
+  // Pedirle al Worker que repase ahora. Lo mismo que hace el cron por la noche, pero
+  // con la sesión de quien lo pide: sirve para comprobar que está bien montado sin
+  // esperar a mañana, y para forzarlo cuando se acaba de cambiar medio calendario.
+  const lanzarRepaso = async () => {
+    setRepasando(true);
+    setAvisoRepaso(null);
+    try {
+      const token = await tokenDeSesion().catch(() => "");
+      const r = await fetch(`${url.replace(/\/+$/, "")}/__repaso`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const d = await r.json().catch(() => ({}));
+      // El motivo del Worker tal cual: dice qué variable falta, y eso se arregla solo.
+      if (!r.ok || d.error) { setAvisoRepaso({ mal: true, texto: d.error || `Ha fallado (${r.status}).` }); return; }
+      setRepaso(d);
+      setAvisoRepaso({
+        mal: false,
+        texto: d.eventos && d.eventos.length
+          ? `Ha mirado ${d.mirados} eventos y ${d.eventos.length} tienen algo sin poner. Lo tienes en Cerebro.`
+          : `Ha mirado ${d.mirados} eventos y no falta nada por poner.`,
+      });
+    } catch (e) {
+      setAvisoRepaso({ mal: true, texto: `No se ha podido llegar al proxy: ${e.message}` });
+    } finally {
+      setRepasando(false);
+    }
+  };
+
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const [enCurso, setEnCurso] = useState("");
@@ -177,7 +215,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         mensajes,
         // El repaso entra en el contexto para que "ver_repaso" lo lea: lo carga este
         // panel de Firestore, no la app, así que no viene en el contexto de fuera.
-        contexto: { ...contexto, nivel, repaso, onEscribir: escribir },
+        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir },
         url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
@@ -368,6 +406,27 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               </div>
             </label>
 
+            {/* ── LANZAR EL REPASO A MANO ──
+                Tiene que estar aquí y no ser una dirección que se abre en el navegador:
+                el Worker pide la sesión del equipo en una cabecera, y una pestaña normal
+                no la manda. La app sí tiene el token, así que es el único sitio desde el
+                que se puede pedir. */}
+            {url && (
+              <div className="asis-repaso-lanzar">
+                <button type="button" className="btn btn-outline" disabled={repasando}
+                  onClick={lanzarRepaso}>
+                  {repasando ? <Loader2 size={14} className="asis-gira" aria-hidden="true" /> : <MoonStar size={14} aria-hidden="true" />}
+                  {repasando ? "Repasando…" : "Repasar los eventos ahora"}
+                </button>
+                {avisoRepaso && <p className={`asis-explica${avisoRepaso.mal ? " es-mal" : ""}`}>{avisoRepaso.texto}</p>}
+                <p className="asis-explica">
+                  Lo mismo que hace solo cada noche. Mira los eventos de los próximos 30 días
+                  y deja escrito lo que falta por poner; se ve en Cerebro. No usa el modelo,
+                  así que no gasta tokens.
+                </p>
+              </div>
+            )}
+
             <p className="asis-explica">
               Las claves no viven aquí: viven en el proxy. Sin él no hay asistente, y con
               una clave metida en la app la leería cualquiera — el repositorio es público.
@@ -425,6 +484,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               ultimaRespuesta={[...hilo].reverse().find(m => m.de === "el")?.texto || ""}
               vozActiva={vozActiva}
               onCambiarVoz={(v) => { setVozActiva(v); guardar(CLAVE_VOZ, v ? "1" : "0"); }}
+              personalidad={personalidad}
+              onCambiarCompanero={(k) => { setCompanero(k); guardar(CLAVE_COMPANERO, k); }}
+              onCambiarPersonalidad={(k) => { setPersonalidad(k); guardar(CLAVE_PERSONALIDAD, k); }}
               // Lo dictado entra por la MISMA puerta que lo escrito: mismas herramientas,
               // mismos permisos, mismo enrutado. Hablarle no es un camino aparte.
               onPregunta={(t) => enviar(null, t)}
@@ -532,7 +594,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           )}
           {hilo.map((m, i) => (
             <div className={`asis-msg es-${m.de}`} key={i}>
-              <div className="asis-burbuja">{m.texto}</div>
+              {/* Sin markdown: se le pide al modelo que no lo use, pero pedirlo no basta
+                  —se olvida cada tantas respuestas y el que se olvida no avisa—, así que
+                  se limpia aquí, que es el único sitio donde se puede garantizar. */}
+              <div className="asis-burbuja">{m.de === "el" ? sinMarcas(m.texto) : m.texto}</div>
               {/* De dónde sale lo que acaba de decir */}
               {(m.pasos && m.pasos.length > 0) || m.coste || (m.quien && disponibles.length > 1) ? (
                 <div className="asis-pasos">

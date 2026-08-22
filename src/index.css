@@ -6717,7 +6717,7 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .asis-fondo, .asis-panel, .asis-msg, .asis-pendiente, .asis-pendientes,
   .asis-pasos .asis-paso, .asis-hilo, .asis-ajustes, .companero, .companero.es-pensando,
-  .asis-diario {
+  .asis-diario, .hum-elegir-uno {
     animation: none;
     transition: none;
   }
@@ -7056,6 +7056,83 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
    Lo que dejó escrito el cron mientras no había nadie. Misma caja que los objetivos:
    son las dos cosas que se leen nada más abrir el cerebro, y darles formas distintas
    solo haría que una pareciera más importante que la otra sin motivo. */
+/* ─── ELEGIR MUÑECO Y TONO, EN LA PANTALLA DEL MUÑECO ────────────────────────
+   Aquí y no solo en los ajustes: el muñeco se cambia mirándolo. Escondido detrás de la
+   rueda dentada, la mitad de la gente ni sabía que se podía cambiar. */
+.hum-ajustes {
+  width: 100%;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hum-ajuste-titulo {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.hum-elegir {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hum-elegir-uno {
+  flex: 1 1 auto;
+  /* Que quepan varios por fila pero ninguno se quede en un sello: por debajo de 88px el
+     nombre parte en dos líneas y la fila se descuadra. */
+  min-width: 88px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 7px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.hum-elegir-uno.es-ancho { min-width: 112px; }
+.hum-elegir-uno span:first-child { font-size: 1rem; line-height: 1.1; }
+.hum-elegir-uno.es-ancho span:first-child { font-size: 0.8rem; font-weight: 700; }
+.hum-elegir-uno em { font-style: normal; font-size: 0.68rem; opacity: 0.75; text-align: center; }
+.hum-elegir-uno:hover { background: var(--accent-soft); }
+.hum-elegir-uno.es-activa {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.hum-ajuste-nota {
+  margin: 2px 0 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* El botón de repasar ahora, en los ajustes del asistente. */
+.asis-repaso-lanzar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+.asis-repaso-lanzar .btn { justify-content: center; gap: 6px; }
+.asis-explica.es-mal { color: var(--error-texto); }
+
 .cer-repaso {
   display: flex;
   flex-direction: column;

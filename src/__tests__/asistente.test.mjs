@@ -8,7 +8,7 @@
 // dando vueltas. Un asistente que consulta mal da una respuesta rara; uno que escribe
 // mal borra el trabajo de quien está cargando el camión.
 import { HERRAMIENTAS, NOMBRES_HERRAMIENTAS, SIN_DATOS, ejecutar, catalogoParaModelo } from "../asistente/herramientas.js";
-import { preguntar } from "../asistente/cliente.js";
+import { preguntar, SISTEMA } from "../asistente/cliente.js";
 import { recordar, olvidar, refuerza, poda, parecido, paraElContexto, porTemas, saneaMemoria, MAX_RECUERDOS } from "../asistente/memoria.js";
 import { conectores, conectoresActivos, conHerramientasDeConectores, registrarConector } from "../asistente/conectores.js";
 import { todas, llevaDatos } from "../asistente/herramientas.js";
@@ -22,6 +22,10 @@ import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte } from "../calendario/apuntes.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar } from "../../worker/repaso.js";
+import { sinMarcas } from "../asistente/texto.js";
+import { readFileSync } from "node:fs";
+import { COMPANEROS, CLAVES_COMPANERO } from "../asistente/companeros.js";
+import { comoHabla, PERSONALIDADES, CLAVES_PERSONALIDAD } from "../asistente/personalidad.js";
 import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
 import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../asistente/arbol.js";
@@ -731,6 +735,99 @@ console.log("\n── La cara de lo que está haciendo ──");
     "y un aviso que ya viene escrito se deja tal cual");
   ok(gestoDeHerramienta("inventada_nueva").frase.includes("inventada nueva"),
     "una herramienta nueva sin frase no rompe: se lee su nombre sin guiones");
+}
+
+console.log("\n── El asistente es el mismo en las dos apps ──");
+{
+  // El fallo que hubo que arreglar: en el calendario podía crear, editar y borrar
+  // apuntes, y en la checklist no —solo se le encendía el conector de checklists—. El
+  // asistente es el MISMO en las dos pantallas, así que pedirle lo mismo contestaba
+  // distinto según por dónde lo hubieras abierto, sin forma de que nadie adivinara
+  // por qué.
+  const fuente = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
+  const app = fuente("../App.jsx");
+  const cal = fuente("../calendario/main.jsx");
+
+  const encendidos = (t) => ["calendario", "checklists"].filter(c => new RegExp(`${c}: \\{ puede`).test(t));
+  ok(encendidos(app).includes("calendario"),
+    "la checklist enciende el conector del calendario, no solo el de checklists");
+  ok(encendidos(cal).includes("calendario"),
+    "y el calendario también, como ya hacía");
+
+  // Y que de verdad tenga con qué escribir: encender el conector sin pasar el aplicador
+  // deja al modelo ofreciendo una herramienta que falla al usarla, que es peor que no
+  // ofrecerla.
+  ok(/aplicarEnCalendario\(\{[^}]*guardar:[^}]*borrar:/s.test(app),
+    "y le pasa el guardar y el borrar de verdad, no solo el permiso");
+}
+
+console.log("\n── Cómo escribe ──");
+{
+  // Los modelos escriben markdown por costumbre. En una burbuja que no lo interpreta se
+  // ven los asteriscos tal cual, y parece que ha contestado una máquina rota. Se le pide
+  // que no lo use, pero pedirlo no basta: un modelo se olvida cada tantas respuestas.
+  ok(sinMarcas("El **8 de julio** hay una boda") === "El 8 de julio hay una boda",
+    "las negritas se van");
+  ok(sinMarcas("con `código` dentro") === "con código dentro", "y las comillas invertidas");
+  ok(sinMarcas("## Eventos") === "Eventos", "y las almohadillas de título");
+  ok(sinMarcas("- uno\n- dos") === "· uno\n· dos",
+    "los guiones de lista pasan a puntos, no desaparecen: tres cosas seguidas sin nada delante se leen como una parrafada");
+  ok(sinMarcas("uno\n\n\n\ndos") === "uno\n\ndos", "y un hueco de cuatro saltos se queda en uno normal");
+  ok(sinMarcas("una boda\ny una comunión").includes("\n"),
+    "pero los saltos de línea de verdad se respetan: en pantalla son lo que hace legible una lista");
+
+  // El sistema tiene que pedirlo, no solo limpiarse después: limpiar arregla lo que se ve,
+  // pedirlo arregla lo que se paga (menos tokens gastados en asteriscos).
+  ok(/NADA de markdown/.test(SISTEMA), "y se le pide en el sistema, no solo se limpia después");
+  // La línea que decía "no puedes cambiar nada todavía" contradecía al nivel de permiso:
+  // en Confianza el modelo recibía las dos órdenes a la vez y se creía la equivocada.
+  ok(!/no puedes cambiar nada todav/i.test(SISTEMA),
+    "y el sistema ya no contradice al nivel de permiso");
+}
+
+console.log("\n── Los muñecos ──");
+{
+  // El muñeco se dibuja DOS veces: pequeño en la cabecera (Companero.jsx) y grande en la
+  // pestaña Humano (Humano.jsx). Son dos SVG distintos a propósito —lo que se lee a 30px
+  // no es lo que se lee a 200— pero la lista tiene que ser la misma: si se añade uno solo
+  // en un fichero, al elegirlo desaparece en la otra pantalla y parece que se ha roto.
+  const lee = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
+  const claves = (t, marca) => (t.match(new RegExp(`^  ([a-z]+): ${marca}`, "gm")) || [])
+    .map(l => l.trim().split(":")[0]);
+
+  const enPequeno = claves(lee("../asistente/Companero.jsx"), "\\(");
+  const enGrande = claves(lee("../asistente/Humano.jsx"), "\\(");
+  const faltan = enPequeno.filter(k => !enGrande.includes(k));
+  const sobran = enGrande.filter(k => !enPequeno.includes(k));
+
+  ok(enPequeno.length >= 7, `hay al menos siete muñecos (${enPequeno.length})`);
+  ok(!faltan.length, `todos los del pequeño están en el grande${faltan.length ? ` → falta ${faltan.join(", ")}` : ""}`);
+  ok(!sobran.length, `y ninguno sobra en el grande${sobran.length ? ` → sobra ${sobran.join(", ")}` : ""}`);
+
+  // Y todos son de catering: el que pidió el muñeco quería algo de la casa, no una bola
+  // con ojos. "ninguno" es la opción de apagarlo, no un muñeco.
+  CLAVES_COMPANERO.filter(k => k !== "ninguno").forEach(k => {
+    ok(enPequeno.includes(k), `"${k}" (${COMPANEROS[k].nombre}) está dibujado, no solo listado`);
+  });
+}
+
+console.log("\n── La personalidad ──");
+{
+  ok(comoHabla("directo") === "", "\"Directo\" no añade nada: es el asistente de siempre");
+  ok(comoHabla("cercano").length > 20 && comoHabla("bromista") !== comoHabla("parco"),
+    "y las otras tres cambian de verdad, cada una a lo suyo");
+  ok(comoHabla("inventada") === "", "una personalidad que no existe cae en la de por defecto");
+
+  // Lo que ninguna personalidad puede pisar. Un asistente bromista que se salte una
+  // alergia no es simpático, es peligroso.
+  ok(/alergia/i.test(PERSONALIDADES.bromista.tono) && /serio/i.test(PERSONALIDADES.bromista.tono),
+    "la bromista tiene prohibido bromear con una alergia o un error");
+  ok(/alergias/i.test(PERSONALIDADES.parco.tono),
+    "y la parca tiene prohibido acortar una alergia");
+  CLAVES_PERSONALIDAD.forEach(k => {
+    ok(PERSONALIDADES[k].nombre && PERSONALIDADES[k].resumen,
+      `"${k}" se puede enseñar en pantalla con nombre y resumen`);
+  });
 }
 
 console.log("\n── El repaso de la noche ──");

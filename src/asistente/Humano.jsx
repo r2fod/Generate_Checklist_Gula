@@ -15,6 +15,8 @@ import { useState, useEffect, useRef } from "react";
 import { Mic, MicOff, Volume2, VolumeX, Loader2 } from "lucide-react";
 import { escuchar, hablar, callar, hayEscucha, hayVoz } from "./voz.js";
 import { gestoDeHerramienta } from "./gestos.js";
+import { COMPANEROS, CLAVES_COMPANERO } from "./companeros.js";
+import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO } from "./personalidad.js";
 
 // Los cuatro son la misma cara dentro de un cuerpo distinto, igual que en el pequeño.
 const CUERPOS = {
@@ -47,6 +49,32 @@ const CUERPOS = {
       <path d="M116 92 h26 l20 22 v28 h-46 z" className="hum-relleno" />
       <circle cx="62" cy="152" r="14" className="hum-borde" />
       <circle cx="140" cy="152" r="14" className="hum-borde" />
+    </>
+  ),
+  bandeja: (
+    <>
+      <path d="M40 140 a60 40 0 0 1 120 0 z" className="hum-cuerpo" />
+      <rect x="32" y="140" width="136" height="12" rx="6" className="hum-borde" />
+      <circle cx="100" cy="62" r="6" className="hum-vapor" />
+      <path d="M70 164 h60" strokeWidth="6" strokeLinecap="round" fill="none" className="hum-borde" />
+    </>
+  ),
+  paella: (
+    <>
+      <ellipse cx="100" cy="128" rx="68" ry="42" className="hum-cuerpo" />
+      <ellipse cx="100" cy="118" rx="68" ry="38" fill="none" strokeWidth="6" className="hum-borde" />
+      {/* Las dos asas: sin ellas una paella es un plato hondo cualquiera */}
+      <path d="M32 118 h-18 M168 118 h18" strokeWidth="9" strokeLinecap="round" fill="none" className="hum-borde" />
+      <circle cx="74" cy="134" r="5" className="hum-vapor" />
+      <circle cx="128" cy="138" r="5" className="hum-vapor" />
+    </>
+  ),
+  tarta: (
+    <>
+      <path d="M46 106 h108 v46 a12 12 0 0 1 -12 12 h-84 a12 12 0 0 1 -12 -12 z" className="hum-cuerpo" />
+      <rect x="40" y="94" width="120" height="14" rx="6" className="hum-borde" />
+      <path d="M100 94 v-22" strokeWidth="6" strokeLinecap="round" fill="none" className="hum-borde" />
+      <path d="M100 72 q9 -9 0 -18 q-9 8 0 18" className="hum-vapor" />
     </>
   ),
 };
@@ -87,7 +115,7 @@ function useGestos(activo) {
   return gesto;
 }
 
-export default function Humano({ cual = "chef", estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz }) {
+export default function Humano({ cual = "chef", estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad }) {
   const [oyendo, setOyendo] = useState(false);
   const [dictado, setDictado] = useState("");
   const [aviso, setAviso] = useState("");
@@ -164,8 +192,8 @@ export default function Humano({ cual = "chef", estado = "quieto", haciendo = ""
       <p className="hum-estado">
         {oyendo ? (dictado || "Te escucho…")
           : trabajo ? trabajo.frase
-          : hablando ? "Hablando…"
-          : "Dale al micro y pregúntame."}
+          : hablando ? "…"
+          : "Dale al micro y cuéntame."}
       </p>
 
       {aviso && <p className="hum-aviso">{aviso}</p>}
@@ -196,6 +224,50 @@ export default function Humano({ cual = "chef", estado = "quieto", haciendo = ""
           <span>{vozActiva ? "Contesta en voz alta" : "Contesta en silencio"}</span>
         </button>
       </div>
+
+      {/* ── QUIÉN ES Y CÓMO HABLA ──
+          Aquí y no solo en los ajustes: el muñeco se cambia mirándolo, no acordándote de
+          que hay un ajuste en otra pantalla. Escondido detrás de la rueda dentada, la
+          mitad de la gente no llegó a saber que se podía cambiar. */}
+      {(onCambiarCompanero || onCambiarPersonalidad) && (
+        <div className="hum-ajustes">
+          {onCambiarCompanero && (
+            <>
+              <p className="hum-ajuste-titulo">Quién te acompaña</p>
+              <div className="hum-elegir" role="radiogroup" aria-label="Elegir compañero">
+                {CLAVES_COMPANERO.map(k => (
+                  <button key={k} type="button" role="radio" aria-checked={cual === k}
+                    className={`hum-elegir-uno${cual === k ? " es-activa" : ""}`}
+                    onClick={() => onCambiarCompanero(k)} title={COMPANEROS[k].nombre}>
+                    <span aria-hidden="true">{COMPANEROS[k].emoji}</span>
+                    <span>{COMPANEROS[k].nombre}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {onCambiarPersonalidad && (
+            <>
+              <p className="hum-ajuste-titulo">Cómo te habla</p>
+              <div className="hum-elegir" role="radiogroup" aria-label="Elegir personalidad">
+                {CLAVES_PERSONALIDAD.map(k => (
+                  <button key={k} type="button" role="radio" aria-checked={personalidad === k}
+                    className={`hum-elegir-uno es-ancho${personalidad === k ? " es-activa" : ""}`}
+                    onClick={() => onCambiarPersonalidad(k)}>
+                    <span>{PERSONALIDADES[k].nombre}</span>
+                    <em>{PERSONALIDADES[k].resumen}</em>
+                  </button>
+                ))}
+              </div>
+              {/* Lo que NO cambia nunca, para que nadie piense que "Bromista" se salta algo */}
+              <p className="hum-ajuste-nota">
+                Los números, las alergias y lo que puede tocar no cambian: solo cambia cómo te lo cuenta.
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Si el navegador no sabe escuchar se dice, en vez de esconder el botón sin
           explicar por qué — que es lo que hace pensar que se ha roto. */}

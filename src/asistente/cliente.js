@@ -12,6 +12,7 @@ import { paraElContexto as tareasParaElContexto } from "./tareas.js";
 import { comprimir } from "./comprimir.js";
 import { candidatos, mereceOtroIntento, porQue } from "./enrutado.js";
 import { comoContarlo, NIVEL_POR_DEFECTO } from "./permisos.js";
+import { comoHabla } from "./personalidad.js";
 
 // Un tope duro de vueltas. Sin él, un modelo que se empeñe en pedir la misma
 // herramienta una y otra vez deja el navegador dando vueltas y la factura corriendo.
@@ -26,10 +27,12 @@ export const SISTEMA = `Eres el asistente de una empresa de catering. Ayudas al 
 
 Cómo trabajas:
 - Contestas en español, corto y al grano. Sin preámbulos ni resúmenes finales.
+- Escribes como hablarías: en frases. NADA de markdown — ni asteriscos para negrita, ni almohadillas, ni comillas invertidas. Esto se lee en una burbuja de chat que no lo interpreta, así que los asteriscos salen tal cual y quedan fatal.
+- Para enumerar cosas, una por línea empezando por "· ". Y solo si de verdad son una lista: tres eventos son una lista, dos frases no.
+- Las fechas se dicen como se dicen en voz alta: "el 8 de julio", no "08/07/2026".
 - Los números SIEMPRE salen de las herramientas, nunca de tu cabeza. Si te preguntan cuánta cerveza hace falta, llamas a calcular_bebida; no estimas.
 - Si no sabes el nombre exacto de un evento, buscas antes de rendirte.
 - Si una herramienta devuelve un error, lo dices tal cual y propones qué hacer. No te lo inventas ni disimulas.
-- No puedes cambiar nada todavía: solo consultar. Si te piden modificar algo, dilo claro y explica dónde se hace en la app.
 - Las alergias son lo más serio que manejas. Si aparecen, se dicen enteras y las primeras.
 
 Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con recordar: una frase corta, concreta y en tercera persona. No guardes lo que ya sale de un cálculo (cuánta cerveza, cuánto hielo) ni datos de un evento suelto que ya están en la app; guarda lo que NO está escrito en ninguna parte y servirá el mes que viene. Si algo que recordabas resulta ser falso, lo borras con olvidar.`;
@@ -103,7 +106,10 @@ export async function preguntar({
   // una vez y no volvió a hacer falta.
   // Lo que puede y no puede hacer se le dice en el sistema. Si no lo sabe, propone
   // cosas que no puede hacer y la conversación se va en explicar por qué no.
-  const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}`;
+  // El tono va con las reglas duras, no en lugar de ellas: una personalidad solo añade
+  // cómo se dice, nunca qué se puede tocar ni qué se puede callar.
+  const tono = comoHabla(contexto.personalidad);
+  const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}${tono ? `\n\n${tono}` : ""}`;
   const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
   const usoTotal = { entrada: 0, salida: 0 };
   // El diario: una línea por ida y vuelta al modelo, no una por pregunta. El total ya

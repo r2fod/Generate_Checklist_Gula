@@ -1,3 +1,5 @@
+import { sinMarcas } from "./texto.js";
+
 // ─── HABLARLE Y QUE CONTESTE ──────────────────────────────────────────────────
 // Dictar la pregunta y oír la respuesta, usando lo que ya trae el navegador. No pasa
 // por ningún modelo ni por el proxy: no gasta un solo token y funciona sin conexión al
@@ -67,13 +69,12 @@ export function escuchar({ onParcial, onTexto, onFin, onError, idioma = "es-ES" 
 // El texto de una respuesta lleva markdown, listas y símbolos que leídos en voz alta
 // suenan absurdos ("asterisco asterisco boda"). Se limpia antes.
 export function paraLeerEnVozAlta(texto) {
-  return String(texto || "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\*(.+?)\*/g, "$1")
-    .replace(/`(.+?)`/g, "$1")
-    .replace(/^[\s]*[-*•]\s+/gm, "")
-    .replace(/^#{1,6}\s+/gm, "")
+  // Las marcas las quita sinMarcas, que es el mismo trabajo que hace falta en pantalla.
+  // Aquí se le añade lo que solo estorba al oído: los emojis, los "·" que quedan de las
+  // listas y los saltos de línea, que leídos en alto no suenan a nada.
+  return sinMarcas(texto)
     .replace(/⚠️|✅|❌|📅|📍|👥|🚚|🔧/g, "")
+    .replace(/^·\s+/gm, "")
     // Las horas se leen mal: "13:00" sale como "trece dos puntos cero cero".
     .replace(/\b(\d{1,2}):(\d{2})\b/g, "$1 y $2")
     .replace(/\s+/g, " ")

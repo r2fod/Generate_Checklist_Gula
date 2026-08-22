@@ -63,6 +63,7 @@ import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
 import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
 import { aplicarEnChecklists } from "./asistente/escrituraChecklists.js";
+import { aplicarEnCalendario } from "./asistente/escrituraCalendario.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1912,6 +1913,40 @@ export default function App({ onCerrarSesion } = {}) {
   // Los apuntes del calendario, guardados de la carga que YA se hace al arrancar para
   // crear las checklists que se acercan. No cuesta una petición más: es la misma.
   const [apuntesCalendario, setApuntesCalendario] = useState([]);
+
+  // Va AQUÍ, pegado a la declaración de arriba, y no más arriba con el resto de acciones:
+  // el array de dependencias de un useCallback se evalúa al pintar, así que nombrar
+  // "apuntesCalendario" antes de esta línea revienta la app entera con un ReferenceError
+  // —página en blanco, sin pista de por qué—. El build no lo caza: es de ejecución.
+  // ─── ESCRIBIR EN EL CALENDARIO DESDE LA CHECKLIST ───────────────────────────
+  // El asistente podía crear, editar y borrar apuntes en la app del calendario, pero no
+  // aquí: solo se le encendía el conector de checklists. Y el asistente es el mismo en
+  // las dos pantallas, así que pedirle lo mismo daba respuestas distintas según por
+  // dónde lo hubieras abierto — sin manera de que nadie adivinara por qué.
+  //
+  // Se lee la nube ANTES de escribir, igual que en promoverApuntes: partir de lo que hay
+  // en pantalla escribiría encima de lo que otro acabe de guardar.
+  const escribirEnCalendario = React.useCallback(async (cambia) => {
+    const cs = await resolverCalendario();
+    if (!cs) throw new Error("No hay calendario del equipo todavía.");
+    const cal = await cargarCalendarioNube(cs.codigo);
+    const antes = saneaLista(cal ? cal.apuntes : apuntesCalendario);
+    const despues = saneaLista(cambia(antes));
+    await guardarCalendarioNube(cs.codigo, despues, saneaEquipo(cal ? cal.equipo : []), (cal && cal.ver) || cs.ver);
+    setApuntesCalendario(despues);
+  }, [apuntesCalendario]);
+
+  const guardarApunte = React.useCallback((apunte) => {
+    // Por id: un apunte editado conserva el suyo, y uno nuevo no pisa a nadie.
+    escribirEnCalendario(lista => [...lista.filter(a => a.id !== apunte.id), apunte])
+      .catch(() => { /* sin conexión: se dice arriba, no se traga */ });
+  }, [escribirEnCalendario]);
+
+  const borrarApunte = React.useCallback((id) => {
+    escribirEnCalendario(lista => lista.filter(a => a.id !== id))
+      .catch(() => { /* sin conexión */ });
+  }, [escribirEnCalendario]);
+
   const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo) return;
@@ -2972,10 +3007,16 @@ export default function App({ onCerrarSesion } = {}) {
                   // Los apuntes del calendario se EDITAN desde el calendario, que es
                   // quien sabe guardarlos; aquí se pueden convertir en checklists, que
                   // es lo que sabe hacer esta app.
-                  conectores: { checklists: { puedeCrear: true } },
+                  conectores: {
+                    checklists: { puedeCrear: true },
+                    // También desde aquí: el asistente es el mismo en las dos pantallas y
+                    // no puede contestar cosas distintas según por dónde se abra.
+                    calendario: { puedeEscribir: true },
+                  },
                   onEscribir: encadenar(
                     aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
                     aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
+                    aplicarEnCalendario({ apuntes: apuntesCalendario, guardar: guardarApunte, borrar: borrarApunte }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),

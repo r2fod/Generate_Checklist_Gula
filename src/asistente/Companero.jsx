@@ -11,15 +11,12 @@
 //
 // Ninguno se parece al de OpenHuman: son formas simples de la casa.
 import { useState, useEffect } from "react";
+import { COMPANEROS } from "./companeros.js";
 
-export const COMPANEROS = {
-  chef:    { nombre: "Gorro", emoji: "👨‍🍳" },
-  cazuela: { nombre: "Cazuela", emoji: "🍲" },
-  copa:    { nombre: "Copa", emoji: "🥂" },
-  camion:  { nombre: "Camión", emoji: "🚚" },
-  ninguno: { nombre: "Ninguno", emoji: "—" },
-};
-export const CLAVES_COMPANERO = Object.keys(COMPANEROS);
+// La lista vive en companeros.js: la comparten las dos pantallas y la leen las pruebas,
+// que corren en node y no entienden JSX. Se reexporta para no romper lo que ya importaba
+// de aquí.
+export { COMPANEROS, CLAVES_COMPANERO } from "./companeros.js";
 
 // Los ojos son lo único que cambia entre estados, y es suficiente: mirando a un lado
 // mientras piensa, cerrados en cruz cuando algo ha fallado, abiertos el resto del rato.
@@ -78,6 +75,33 @@ const SILUETAS = {
       <path d="M38 30 h8 l6 7 v9 h-14 z" fill="currentColor" opacity="0.22" />
       <circle cx="21" cy="50" r="4.5" fill="currentColor" opacity="0.4" />
       <circle cx="44" cy="50" r="4.5" fill="currentColor" opacity="0.4" />
+    </>
+  ),
+  // La bandeja de camarero, con la campana encima: es lo que más se ve en un evento.
+  bandeja: (
+    <>
+      <path d="M14 44 a18 12 0 0 1 36 0 z" fill="currentColor" opacity="0.16" />
+      <rect x="10" y="44" width="44" height="4" rx="2" fill="currentColor" opacity="0.35" />
+      <circle cx="32" cy="20" r="2" fill="currentColor" opacity="0.45" />
+      <path d="M22 52 h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.3" />
+    </>
+  ),
+  paella: (
+    <>
+      <ellipse cx="32" cy="40" rx="21" ry="13" fill="currentColor" opacity="0.16" />
+      <ellipse cx="32" cy="37" rx="21" ry="12" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.35" />
+      {/* Las dos asas, que es lo que hace que una paella se reconozca y no sea un plato */}
+      <path d="M10 37 h-5 M54 37 h5" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.4" />
+      <circle cx="24" cy="40" r="1.6" fill="currentColor" opacity="0.4" />
+      <circle cx="40" cy="41" r="1.6" fill="currentColor" opacity="0.4" />
+    </>
+  ),
+  tarta: (
+    <>
+      <path d="M14 34 h36 v14 a4 4 0 0 1 -4 4 h-28 a4 4 0 0 1 -4 -4 z" fill="currentColor" opacity="0.16" />
+      <rect x="12" y="30" width="40" height="5" rx="2" fill="currentColor" opacity="0.3" />
+      <path d="M32 30 v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+      <path d="M32 21 q3 -3 0 -5 q-3 2 0 5" fill="currentColor" opacity="0.5" />
     </>
   ),
 };

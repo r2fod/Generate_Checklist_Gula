@@ -3993,7 +3993,10 @@ async function main() {
         // El panel entero y, dentro, lo que se descuadra por su cuenta: la fila de
         // pestañas (cinco no caben a lo ancho en un móvil), el muñeco grande, la rejilla
         // de proveedores, las tres cifras del gasto y los objetivos del cerebro.
-        ".asis-panel", ".asis-pestanas", ".hum", ".asis-proveedores", ".asis-gasto-cifras", ".cer-objetivos"];
+        // Y los dos elegidores nuevos de la pestaña Humano: siete muñecos y cuatro tonos
+        // son muchas casillas para una columna de 320px.
+        ".asis-panel", ".asis-pestanas", ".hum", ".asis-proveedores", ".asis-gasto-cifras",
+        ".cer-objetivos", ".hum-ajustes", ".hum-elegir"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];

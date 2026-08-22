@@ -12,20 +12,20 @@
 // El orden importa: gana el primero que casa, así que lo específico va antes que lo
 // general ("borrar" antes que cualquier cosa con "apunte" dentro).
 const REGLAS = [
-  { como: /^(borrar|olvidar|eliminar)/, gesto: "borrando", frase: "Borrando" },
+  { como: /^(borrar|olvidar|eliminar)/, gesto: "borrando", frase: "Quitando" },
   { como: /^apuntar/, gesto: "creando", frase: "Apuntando" },
   // Marcar una tarea escribe, no mira. Sin esta regla caía en el "Mirando" de por
   // defecto, que es justo lo contrario de lo que está pasando.
   { como: /^marcar/, gesto: "creando", frase: "Marcando" },
   { como: /^(crear|agregar|anadir|añadir)/, gesto: "creando", frase: "Creando" },
   { como: /^(editar|cambiar|corregir|modificar)/, gesto: "creando", frase: "Corrigiendo" },
-  { como: /^recordar/, gesto: "aprendiendo", frase: "Aprendiendo" },
-  { como: /^(revisar|que_falta)/, gesto: "revisando", frase: "Repasando" },
+  { como: /^recordar/, gesto: "aprendiendo", frase: "Me quedo con" },
+  { como: /^(revisar|que_falta)/, gesto: "revisando", frase: "Echando un ojo a" },
   { como: /^buscar/, gesto: "buscando", frase: "Buscando" },
   // Mirar y buscar no es lo mismo: buscar es no saber dónde está, mirar es abrirlo.
   { como: /^(ver_|simular)/, gesto: "buscando", frase: "Mirando" },
-  { como: /^calcular/, gesto: "calculando", frase: "Calculando" },
-  { como: /^mensaje/, gesto: "creando", frase: "Escribiendo el mensaje" },
+  { como: /^calcular/, gesto: "calculando", frase: "Sacando" },
+  { como: /^mensaje/, gesto: "creando", frase: "Escribiendo" },
 ];
 
 // Cómo se llama cada herramienta en cristiano, para la frase. Sin esto sale
@@ -54,7 +54,7 @@ const EN_CRISTIANO = {
   borrar_apunte: "el apunte",
   recordar: "lo que me has contado",
   olvidar: "lo que me dijiste",
-  mensaje_para_el_equipo: "para el equipo",
+  mensaje_para_el_equipo: "un mensaje para el equipo",
   buscar_correos: "en el correo",
 };
 
