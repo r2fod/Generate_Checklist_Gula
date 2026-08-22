@@ -26,7 +26,7 @@ import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsign
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
 import { mesasComensales, lineasDeMesas, mesasParaVestir, tipoMesaValido, TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "../mesas.js";
-import { leerPrecios, guardarPrecios, soloLosCambiados, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
+import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados } from "../precios.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
@@ -987,7 +987,11 @@ console.log("\n══ Los ratios de personal se pueden ajustar ══");
 
 console.log("\n══ Los precios, los mismos para todo el equipo ══");
 {
-  // localStorage de mentira: precios.js lo usa directamente y aquí no hay navegador
+  // localStorage de mentira: precios.js lo usa directamente y aquí no hay navegador.
+  // Ya no hay catálogo de partida en el código —vive solo en Firestore, migrado desde
+  // aquí—, así que leerPrecios() en un navegador sin nube y sin nada guardado es {}: el
+  // Resumen calcula a 0 hasta que llegue la primera vez con conexión. Es el coste
+  // aceptado a cambio de no tener los precios de compra en un repositorio público.
   const almacen = new Map();
   globalThis.localStorage = {
     getItem: (k) => (almacen.has(k) ? almacen.get(k) : null),
@@ -995,33 +999,25 @@ console.log("\n══ Los precios, los mismos para todo el equipo ══");
     removeItem: (k) => almacen.delete(k),
   };
 
-  const base = leerPrecios();
-  const unItem = "Copas de vino";
-  ok(base[unItem] === 1.63, `de partida, ${unItem} cuesta ${base[unItem]} €`);
+  ok(Object.keys(leerPrecios()).length === 0, "sin nube ni nada guardado, no hay ningún precio");
 
-  // LO IMPORTANTE: se guarda solo lo CAMBIADO, no el catálogo entero. Guardando la
-  // mezcla completa, el día que se corrija un precio de partida en una versión nueva la
-  // copia guardada lo taparía y nadie del equipo vería la corrección.
-  guardarPrecios({ ...base, [unItem]: 2.50 });
+  // Ahora se guarda el catálogo ENTERO, no solo lo cambiado: no hay base con la que
+  // diferenciar, así que "lo cambiado" ya no significa nada.
+  guardarPrecios({ "Copas de vino": 1.63, "Cava": 4.0 });
   const guardado = JSON.parse(almacen.get("gula_precios_items"));
-  ok(Object.keys(guardado).length === 1 && guardado[unItem] === 2.50,
-    `solo se guarda lo que alguien ha cambiado → ${JSON.stringify(guardado)}`);
-  ok(leerPrecios()[unItem] === 2.50, "y al leer, lo cambiado pisa al de partida");
-  ok(leerPrecios()["Cava"] === base["Cava"], "lo que nadie ha tocado sigue en su precio de partida");
+  ok(Object.keys(guardado).length === 2 && guardado["Cava"] === 4.0,
+    `se guarda el catálogo completo tal cual → ${JSON.stringify(guardado)}`);
+  ok(leerPrecios()["Copas de vino"] === 1.63, "y se lee igual");
 
-  // Volver a poner el de partida deja de ser un cambio: no se arrastra para siempre
-  guardarPrecios({ ...leerPrecios(), [unItem]: 1.63 });
-  ok(Object.keys(JSON.parse(almacen.get("gula_precios_items"))).length === 0,
-    "devolver un precio a su valor de partida lo saca de lo guardado");
-
-  // soloLosCambiados no se cuela nada raro: un texto o un NaN pegado a mano no es precio
-  const sucio = soloLosCambiados({ ...base, "Cava": "carísimo", "Vodka": NaN, "Tónica": 9.9 });
-  ok(Object.keys(sucio).length === 1 && sucio["Tónica"] === 9.9,
-    `un valor que no es un número no se sube → ${JSON.stringify(sucio)}`);
+  // Un texto o un NaN pegado a mano no es un precio: no se guarda ni se sube
+  guardarPrecios({ "Copas de vino": 1.63, "Cava": "carísimo", "Vodka": NaN, "Tónica": 9.9 });
+  const sucio = leerPrecios();
+  ok(Object.keys(sucio).length === 2 && sucio["Tónica"] === 9.9 && !("Cava" in sucio) && !("Vodka" in sucio),
+    `los valores que no son un número se descartan al guardar → ${JSON.stringify(sucio)}`);
 
   // Lo que llega de la nube gana sobre lo de este navegador —es lo que ha decidido el
   // equipo— pero no borra lo de aquí que aún no haya subido.
-  guardarPrecios({ ...base, "Vodka": 12.0 });
+  guardarPrecios({ "Copas de vino": 1.63, "Vodka": 12.0 });
   const fusionado = fusionarPreciosNube({ "Cava": 4.5 });
   ok(fusionado["Cava"] === 4.5 && fusionado["Vodka"] === 12.0,
     `llega el precio del equipo y se conserva el de aquí (${fusionado["Cava"]} / ${fusionado["Vodka"]})`);

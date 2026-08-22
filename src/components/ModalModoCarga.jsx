@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
-  Bell, BellOff, CloudUpload, Euro, FileText, Pause, Play, RotateCcw, X,
+  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X,
 } from "lucide-react";
 import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
 import { fmtCantidadCompleta, quitarItemsSinCantidad } from "../checklist-format.js";
@@ -17,7 +17,7 @@ import Escaleta from "./Escaleta.jsx";
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, onSubirTodosPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida }) {
+export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
@@ -27,10 +27,6 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   const [verResumen, setVerResumen] = useState(false);
   const [precios, setPrecios] = useState(() => leerPrecios());
   const [editandoPrecios, setEditandoPrecios] = useState(false);
-  // La migración a Firestore se pulsa una vez y no vuelve a tocar: su aviso tiene que
-  // aguantar abierto mientras se va a comprobar, no borrarse al primer render.
-  const [subiendoPrecios, setSubiendoPrecios] = useState(false);
-  const [avisoPreciosNube, setAvisoPreciosNube] = useState(null);
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
   // Items con cantidad numérica (los que se pueden "marcar todo vuelto"). Sirve para
   // alternar el botón entre marcar y desmarcar todo en la pestaña Vuelta.
@@ -251,24 +247,6 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
     setEditandoPrecios(false);
   };
 
-  // La migración entera (el manejador lo pone App): sube el catálogo COMPLETO a la
-  // nube, no solo lo cambiado. El aviso dice cuántos han subido y dónde comprobarlo,
-  // porque el paso que viene después —quitar los precios del repositorio— solo se
-  // puede dar por hecho si esto se ha verificado, y callarse un fallo aquí dejaría a
-  // alguien borrando el catálogo pensando que ya estaba en la nube.
-  const handleSubirTodosPrecios = async () => {
-    setSubiendoPrecios(true);
-    setAvisoPreciosNube(null);
-    try {
-      const { cuantos } = await onSubirTodosPrecios();
-      setAvisoPreciosNube({ mal: false, texto: `Subidos los ${cuantos} precios a Firestore. Antes de quitarlos de la app, comprueba en indice/precios que están los ${cuantos}.` });
-    } catch (e) {
-      setAvisoPreciosNube({ mal: true, texto: `No se han subido: ${e.message}` });
-    } finally {
-      setSubiendoPrecios(false);
-    }
-  };
-
   // Si otra persona corrige un precio desde otro dispositivo, se refleja aquí sin tener
   // que cerrar el panel. preciosAlDia es solo una marca de tiempo que cambia cuando han
   // llegado precios nuevos: los de verdad se leen de donde están siempre.
@@ -443,21 +421,6 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                   placeholder={"Copas de vino: 0,60\nVino blanco: 6,50\nRegletas y alargadores: 2"}
                   onBlur={e => { if (e.target.value.trim()) { handleGuardarPrecios(e.target.value); e.target.value = ""; } }}
                 />
-                {/* La migración de los precios a la nube, paso 1 de 2: subir el catálogo
-                    ENTERO una vez. Sin esto, quitar PRECIOS_BASE del repositorio (paso 2,
-                    porque es público y con los precios dentro revela márgenes) dejaría al
-                    equipo calculando con casi nada. Solo existe donde hay nube: en el banco
-                    de pruebas no se ofrece. */}
-                {onSubirTodosPrecios && (
-                  <div className="resumen-subida-precios">
-                    <button className="btn btn-outline" onClick={handleSubirTodosPrecios} disabled={subiendoPrecios}>
-                      <CloudUpload size={14} /> {subiendoPrecios ? "Subiendo…" : "Subir todos los precios a la nube"}
-                    </button>
-                    {avisoPreciosNube && (
-                      <span className={`resumen-subida-aviso${avisoPreciosNube.mal ? " es-mal" : ""}`}>{avisoPreciosNube.texto}</span>
-                    )}
-                  </div>
-                )}
               </div>
             )}
             {/* Debajo de los precios y no arriba: primero se mira cómo ha ido el evento,

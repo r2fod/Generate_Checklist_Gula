@@ -263,8 +263,10 @@ function resumirCambios(prev, nuevo) {
 
 // generarHTMLWord está en ./checklist-format.js.
 
-// El catálogo de precios (PRECIOS_BASE, leerPrecios, guardarPrecios, parsePreciosPegados)
-// está en ./precios.js (compartido con ModalModoCarga).
+// El catálogo de precios (leerPrecios, guardarPrecios, fusionarPreciosNube,
+// parsePreciosPegados) está en ./precios.js (compartido con ModalModoCarga). Vive SOLO
+// en Firestore: el repositorio es público y un catálogo de precios de compra revela
+// márgenes.
 
 // HORA_OSCURO, HORA_CLARO, esHoraDeOscuro, leerPreferenciaTema y temaSegunPreferencia
 // están en ./tema.js (compartido con main.jsx y formulario/main.jsx).
@@ -2059,38 +2061,13 @@ export default function App({ onCerrarSesion } = {}) {
   const handleGuardarPrecios = (precios) => {
     guardarPrecios(precios);
     if (nubeActiva() && haySesionEquipo) {
-      // Sube el catálogo ENTERO, no solo lo cambiado, y esto era una trampa de las que
-      // esperan meses: guardarPreciosNube hace un setDoc, que SOBRESCRIBE el documento.
-      // Subiendo solo las diferencias, bastaba con que alguien corrigiera un precio
-      // después de la migración para que "indice/precios" pasara de los 53 a uno, sin
-      // que nadie se enterara. Mientras PRECIOS_BASE siga en el código el hueco queda
-      // tapado, pero el día que se quite eso deja al equipo sin catálogo.
-      //
-      // Lo que se pierde a cambio, y hay que saberlo: guardando solo las diferencias, si
-      // se corrige un precio de partida equivocado en una versión nueva, la corrección
-      // llegaba a quien no lo hubiera tocado. Subiendo todo, la nube fija los 53 y esa
-      // corrección ya no llega. Se pierde igualmente en el paso 3 de la migración, que
-      // es donde la nube pasa a ser la única fuente: se adelanta a hoy para no dejar una
-      // trampa armada esperando a que alguien lea un aviso el día justo.
+      // Sube el catálogo ENTERO, no solo lo cambiado: guardarPreciosNube hace un
+      // setDoc, que SOBRESCRIBE el documento. La nube es la única fuente de precios
+      // —no hay catálogo de partida en el código—, así que subir solo las diferencias
+      // dejaría el documento con un agujero cada vez que alguien corrigiera un precio.
       guardarPreciosNube(leerPrecios())
         .catch(() => { /* sin conexión: queda en este navegador y sube al siguiente cambio */ });
     }
-  };
-
-  // Subir TODOS los precios, no solo lo cambiado: es la migración para sacarlos del
-  // repositorio, que es público y con los precios de compra dentro revela márgenes.
-  // Va en DOS despliegues: primero se sube el catálogo entero una vez (este botón) y
-  // solo cuando esté entero en Firestore se quita PRECIOS_BASE de aquí. Se sube
-  // leerPrecios() a propósito y NO soloLosCambiados(): la nube hoy solo guarda las
-  // diferencias, así que borrar la base sin subir el catálogo antes no es mudarla, es
-  // borrarla — y el Resumen calcularía con casi nada para todo el equipo.
-  const handleSubirTodosPrecios = async () => {
-    const todos = leerPrecios();
-    const actualizado = await guardarPreciosNube(todos);
-    // Devuelve 0 cuando no hay conexión con la nube: eso no es "subidos". Quien pulsa
-    // esto está verificando una migración, callarse sería dejarle creer que está hecha.
-    if (!actualizado) throw new Error("no hay conexión con la nube en este navegador");
-    return { cuantos: Object.keys(todos).length };
   };
 
   const promocionHechaRef = React.useRef(false);
@@ -2855,7 +2832,6 @@ export default function App({ onCerrarSesion } = {}) {
       {modoCarga && (
         <ModalModoCarga
           onGuardarPrecios={handleGuardarPrecios}
-          onSubirTodosPrecios={handleSubirTodosPrecios}
           preciosAlDia={preciosAlDia}
           factoresBebida={factoresBebida}
           calibracionBebida={bebidaMedida}

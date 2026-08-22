@@ -762,38 +762,33 @@ console.log("\n── El asistente es el mismo en las dos apps ──");
     "y le pasa el guardar y el borrar de verdad, no solo el permiso");
 }
 
-console.log("\n── La migración de los precios ──");
+console.log("\n── Los precios, ya migrados a la nube ──");
 {
-  // Sacar los precios del repositorio (público: con los precios de compra dentro se
-  // ven los márgenes) va en DOS despliegues, y el segundo destruye si el primero no
-  // está hecho: la nube hoy solo guarda las diferencias, así que quitar PRECIOS_BASE
-  // sin haber subido el catálogo entero antes no es mudarlo, es borrarlo. La subida
-  // no se puede probar llamando a la nube desde aquí, pero sí vigilar el contrato de
-  // lo que sube: el catálogo ENTERO, nunca soloLosCambiados().
+  // La migración terminó: los 53 precios de "Resumen Eventos.xlsx" se subieron una vez
+  // desde el botón "Subir todos los precios a la nube" y se comprobó en Firestore que
+  // llegaron los 53. Con eso confirmado, PRECIOS_BASE sale del código —es público, y un
+  // catálogo de precios de compra revela márgenes— y el botón de migración, que ya
+  // había hecho su trabajo, se quita para no dejarlo como un "por si acaso" confuso al
+  // lado de un campo que ya sube el catálogo con cada corrección.
   const fuente = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
+  const precios = fuente("../precios.js");
   const app = fuente("../App.jsx");
   const modal = fuente("../components/ModalModoCarga.jsx");
-  const subida = app.match(/const handleSubirTodosPrecios[\s\S]*?\n  };/)?.[0] || "";
 
-  ok(/leerPrecios\(\)/.test(subida) && /guardarPreciosNube\(/.test(subida),
-    "la migración sube el catálogo ENTERO (leerPrecios), no solo lo cambiado");
-  ok(!/soloLosCambiados/.test(subida),
-    "y no pasa por soloLosCambiados, que dejaría la nube con casi nada");
-  ok(/onSubirTodosPrecios=\{handleSubirTodosPrecios\}/.test(app),
-    "la pantalla de Precios llega hasta ese manejador");
-  ok(/Subir todos los precios a la nube/.test(modal),
-    "y la acción se llama como lo que hace, para que el dueño la encuentre");
+  ok(!/PRECIOS_BASE/.test(precios) && !/PRECIOS_BASE/.test(app) && !/PRECIOS_BASE/.test(modal),
+    "no queda ningún precio de compra en el código: la nube es la única fuente");
+  ok(!/soloLosCambiados/.test(precios) && !/soloLosCambiados/.test(app),
+    "y no queda ningún sitio que suba o guarde solo las diferencias");
+  ok(!/handleSubirTodosPrecios|Subir todos los precios a la nube/.test(app) && !/handleSubirTodosPrecios|Subir todos los precios a la nube/.test(modal),
+    "el botón de la migración, ya usado, no queda como código muerto");
 
-  // Y la trampa que quedaba armada: el guardado NORMAL de precios también sube a la
-  // nube, y guardarPreciosNube hace un setDoc que SOBRESCRIBE el documento. Subiendo
-  // solo las diferencias, bastaba con que alguien corrigiera un precio después de la
-  // migración para que la nube pasara de los 53 a uno, sin que nadie se enterara.
+  // Lo que SÍ tiene que seguir: el guardado normal de precios sube a la nube en cada
+  // corrección, y sube el catálogo ENTERO —con setDoc, subir solo lo cambiado borra de
+  // la nube todo lo demás, que es justo la trampa que dejaba armada la migración.
   const guardado = app.match(/const handleGuardarPrecios[\s\S]*?\n  };/)?.[0] || "";
   ok(guardado.length > 0, "el guardado normal de precios sigue estando");
   ok(/guardarPreciosNube\(leerPrecios\(\)\)/.test(guardado),
-    "y sube el catálogo entero: con setDoc, subir solo lo cambiado borra de la nube todo lo demás");
-  ok(!/guardarPreciosNube\(soloLosCambiados/.test(app),
-    "en ningún sitio se sube a la nube solo lo cambiado");
+    "y sube el catálogo entero, no solo lo que se acaba de tocar");
 }
 
 console.log("\n── El Worker y el navegador ──");

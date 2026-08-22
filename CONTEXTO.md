@@ -14,8 +14,8 @@ Si acabas de llegar, en este orden:
    la diferencia entre una mejora y borrarle el trabajo a alguien que está cargando un
    camión.
 3. **"Proceso"** — cómo lanzar las pruebas sin romperte tú solo el deploy.
-4. **"Pendiente"** — lo que hay empezado, sobre todo la migración de precios, que está
-   aprobada y a medias y es destructiva si se hace de golpe.
+4. **"Pendiente"** y **"Hecho (referencia, no acción)"** — qué queda de verdad por hacer
+   y qué ya está cerrado, para no repetir trabajo ni perseguir un plan que ya se cumplió.
 
 Y el mapa rápido de dónde vive cada cosa:
 
@@ -47,6 +47,11 @@ calendario tiene dos documentos y no uno con un flag.
    clientes, ni personal, ni teléfonos, ni €/pax. Eso vive en Firestore. En pruebas,
    nombres inventados.
 6. Respuestas **breves**.
+7. **Este fichero se actualiza SIEMPRE, en el mismo commit que el cambio de código, no
+   después.** No es opcional ni algo que se hace "cuando hay tiempo": es la única forma
+   de que la siguiente sesión —de esta IA o de otra— sepa por dónde seguir sin releer
+   todo el código. Si arreglas algo, mueves algo o descartas un plan, esa frase de aquí
+   arriba que ya no es verdad se corrige en el mismo commit, no se deja para luego.
 
 ## Cómo se revisa lo visual
 
@@ -104,6 +109,16 @@ La batería entera tarda **~45 minutos**, casi todo el barrido responsive
 - **Una sola cosa a la vez**: los dos usan el puerto 4178.
 - **Commit y push de cada pieza en cuanto está verde.** El contenedor se recicla y lo no
   subido se pierde (ya pasó).
+- **Rama que abres, rama que borras al fusionar.** Si trabajas en una rama nueva
+  (`arena/*` u otra), bórrala del remoto en cuanto su contenido esté en `main` — no la
+  dejes "por si acaso". Se acumulan: llegaron a juntarse 10 ramas cerradas por PR
+  (subidas con `push` directo a `main` en vez de con el botón de fusionar de GitHub) sin
+  que nadie las borrase, todas con 0 diferencias contra `main`.
+  **Probado y sin permiso en este entorno**: ni `git push origin --delete <rama>` ni el
+  refspec `git push origin :<rama>` — los dos dan `403`. Tampoco hay ninguna herramienta
+  de GitHub disponible para borrar refs (solo crear ramas y tocar ficheros dentro de
+  ellas). Hay que pedírselo al dueño: Settings → Branches, o la papelera 🗑️ en la lista
+  de ramas del repositorio — 30 segundos, y él sí puede.
 - Matar procesos por PID; `pkill -f` se mata a sí mismo. Y `pgrep -f "npm run test"`
   **casa con su propio comando**: un bucle de espera escrito así no termina nunca. Usar
   `pgrep -f "npm [r]un test"`, que el corchete rompe la auto-coincidencia.
@@ -339,64 +354,31 @@ camión, sin forma de recuperarlo y sin que nadie sepa por qué.
 
 ## Pendiente
 
-### 1. Mover los precios a Firestore — EN DOS DESPLIEGUES, no en uno
-
-Está **aprobado por el dueño** y a medias. `src/precios.js` tiene 53 precios de compra
-sacados de su hoja de cálculo: el coste unitario de cada bebida y cada consumible. Es
-información comercial en un repositorio público —revela sus márgenes y su poder de
-compra—, así que se saca. (No los copies aquí al documentar el cambio: este fichero
-también es público.)
-
-**El detalle que lo convierte en destructivo si se hace de golpe:** Firestore guarda hoy
-**solo las diferencias** (`soloLosCambiados()`), no el catálogo. Borrar `PRECIOS_BASE`
-sin más no es mudarlo, es **borrarlo**: el Resumen pasaría a calcular con casi nada para
-todo el equipo y no habría de dónde recuperarlo.
-
-El plan acordado:
-
-1. **Despliegue A — YA EN CÓDIGO, falta que el dueño la pulse.** La pantalla de 💶
-   Precios tiene la acción "Subir todos los precios a la nube" (los 53, no solo lo
-   cambiado) y dice cuántos ha subido.
-2. **Comprobar** que `indice/precios` tiene los 53, abriendo desde otro dispositivo.
-3. **Despliegue B** — quitar `PRECIOS_BASE` del repositorio.
-
-> **La trampa que había aquí, ya desarmada — no la vuelvas a armar.** El guardado normal
-> de precios (`handleGuardarPrecios`) subía `soloLosCambiados(...)`, y `guardarPreciosNube`
-> hace un `setDoc`, que **sobrescribe el documento entero**. Así que bastaba con subir los
-> 53 y que alguien corrigiera un precio esa tarde para que `indice/precios` se quedara con
-> uno, sin que nadie se enterara. Con `PRECIOS_BASE` todavía en el código no se notaba; el
-> día del paso 3 habría dejado al equipo sin catálogo.
->
-> Ahora sube `leerPrecios()` —todo— y hay pruebas que vigilan que **en ningún sitio** se
-> suba a la nube solo lo cambiado. Lo que se perdió a cambio, para que no se "arregle"
-> de vuelta sin querer: guardando solo las diferencias, una corrección de un precio de
-> partida en una versión nueva llegaba a quien no lo hubiera tocado. Eso ya no pasa, y
-> se iba a perder igual en el paso 3.
-
-**Lo que hay que aceptar y decírselo:** un navegador nuevo **sin conexión** se quedará sin
-precios hasta conectarse una vez. Hoy funciona siempre porque van dentro de la app.
-
-**Lo que NO se mueve, y no es negociable:**
-
-| Qué | ¿A la nube? | Por qué |
-|---|---|---|
-| Ratios de personal y factores de bebida | No | Poco sensibles, y sin ellos la app no calcula nada en el primer arranque |
-| Nombres de items y categorías | **Nunca** | Son la identidad `categoría::etiqueta`: moverlos **borra los checks de todos** |
-| Nombres de proveedores de alquiler | **Nunca** | Van dentro del nombre del item, así que caen en lo anterior |
-
-### 2. Del dueño, en la app (necesita su sesión)
+### 1. Del dueño, en la app (necesita su sesión)
 
 - Un apunte a **250 pax**; otro del **9 al 10 de octubre** con el campo *Hasta*.
 - **Ratios de cumpleaños y producción**: el panel existe, falta medir un evento real.
-- (El repaso de la noche ya está montado y probado en producción: mira 11 eventos y
-  escribe en `indice/avisos`. El cron corre a las 05:00 UTC.)
 
-### 3. Tinyflows — decidido NO hacer por ahora
+### 2. Tinyflows — decidido NO hacer por ahora
 
 Automatizaciones que el dueño defina desde la app ("cada lunes revisa la semana").
 Necesitan un editor de reglas y un intérprete en el Worker, y eso deja **un segundo motor
 de reglas** viviendo al lado de `revision.js` y del subconsciente: en cuanto se separan,
 uno avisa de cosas que el otro no. El repaso de la noche cubre el 80 % del valor sin eso.
+
+## Hecho (referencia, no acción)
+
+**La migración de los precios a Firestore — terminada, los tres pasos.** `src/precios.js`
+tenía 53 precios de compra en el código; el repositorio es público, así que revelaban
+márgenes. Se subieron a Firestore desde 💶 Precios, se comprobó que llegaron los 53, y
+`PRECIOS_BASE` salió del código junto con el botón de migración (ya usado, no se deja
+como código muerto). La nube es hoy la **única** fuente: un navegador que nunca se ha
+conectado se queda sin precios hasta la primera vez que lo haga. `handleGuardarPrecios`
+sube el catálogo entero en cada corrección, no solo lo cambiado — con `setDoc`, subir
+solo la diferencia sobrescribiría el documento y dejaría al equipo con casi nada.
+
+**El repaso de la noche — montado y probado en producción.** Mira 11 eventos y escribe
+en `indice/avisos`; el cron corre a las 05:00 UTC.
 
 ## Decidido NO hacer (y por qué)
 
