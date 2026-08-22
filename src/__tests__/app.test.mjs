@@ -267,6 +267,52 @@ async function main() {
       `${tipo}: ${items} items · ${iconos} iconos · ${invalidas} inválidas · ${selectores} selectores · ${marcados}/${filas} vueltos · Resumen sin NaN`);
   }
 
+  // ── EL PANEL DEL ASISTENTE ESCAPA DEL HEADER ────────────────────────────────
+  // El panel es "position: fixed" para cubrir la pantalla, pero fixed deja de serlo en
+  // cuanto un antepasado tiene un transform — y el <header> de la app lo tiene puesto
+  // para siempre por su animación de entrada (animation ... both). El botón vive dentro
+  // de ese header, así que sin portal el panel se quedaba fijo respecto al HEADER: una
+  // tira recortada de 41px arriba en vez del modal entero. Se vio en la app de verdad,
+  // no aquí: el banco del calendario monta el panel suelto y nunca pasó por el header.
+  console.log("\n── El panel del asistente escapa del header ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1280, height: 900 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 80 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1800);
+
+    // El transform del header es la trampa: si algún día se quita la animación, esta
+    // prueba deja de probar nada y hay que saberlo.
+    const conTransform = await p.evaluate(() => {
+      const h = document.querySelector(".app-header");
+      return !!h && getComputedStyle(h).transform !== "none";
+    });
+    ok(conTransform, "el header sigue teniendo transform (es lo que el panel tiene que esquivar)");
+
+    // Se monta el panel a mano dentro del header y se mide: es el caso exacto que se
+    // rompía, sin depender de tener sesión de equipo para que salga el botón.
+    const medida = await p.evaluate(() => {
+      const header = document.querySelector(".app-header");
+      const hacerPanel = () => {
+        const d = document.createElement("div");
+        d.className = "asis-fondo";
+        d.innerHTML = '<div class="asis-panel"></div>';
+        return d;
+      };
+      const dentro = hacerPanel(); header.appendChild(dentro);
+      const enBody = hacerPanel(); document.body.appendChild(enBody);
+      const a = dentro.getBoundingClientRect(), b = enBody.getBoundingClientRect();
+      dentro.remove(); enBody.remove();
+      return { dentro: Math.round(a.height), body: Math.round(b.height), alto: window.innerHeight };
+    });
+    ok(medida.dentro < medida.alto / 2,
+      `dentro del header el panel se recorta (${medida.dentro}px de ${medida.alto}px) — por eso hace falta el portal`);
+    ok(medida.body === medida.alto,
+      `y colgado de body ocupa la pantalla entera (${medida.body}px de ${medida.alto}px)`);
+    await c.close();
+  }
+
   // ── LO NUEVO DEL MODO CARGA: MENÚS ESPECIALES, ESCALETA Y BEBIDA ────────────
   // Los tres viven en la checklist, no en el calendario, así que el barrido de allí no
   // los toca. Aquí se comprueban las dos cosas: que HACEN lo suyo y que CABEN, con el

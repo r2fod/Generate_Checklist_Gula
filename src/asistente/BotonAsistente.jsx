@@ -13,6 +13,7 @@
 // es lo único que existe para él, así que decirlo app por app es decir qué puede mirar
 // en cada sitio.
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Sparkles } from "lucide-react";
 
 const Panel = React.lazy(() => import("./Asistente.jsx"));
@@ -30,12 +31,20 @@ export default function BotonAsistente({
       <button type="button" className={className} onClick={() => setAbierto(true)} title={titulo}>
         <Sparkles size={14} aria-hidden="true" /> {etiqueta}
       </button>
-      {abierto && (
-        // Sin fallback: mientras carga no se pinta nada durante un parpadeo, que es
-        // mejor que un cartel de "cargando" que aparece y desaparece.
+      {abierto && createPortal(
+        // Con un portal a propósito, y no montado donde vive el botón: el panel es
+        // "position: fixed" para cubrir toda la pantalla, pero fixed deja de ser fixed
+        // de verdad en cuanto un antepasado tiene un transform puesto — y el <header>
+        // de la app lo tiene, de su animación de entrada, que se queda ahí para siempre
+        // aunque termine (animation ... both). Sin el portal, el panel se quedaba
+        // "fijo" respecto al header en vez de respecto a la pantalla: una tira
+        // recortada arriba en vez del modal entero. Iba a pasar en cualquiera de las
+        // tres apps el día que el botón viviera dentro de un header con esa animación,
+        // así que se soluciona aquí, en el sitio compartido, y no parcheando cada header.
         <React.Suspense fallback={null}>
           <Panel contexto={contexto} onOlvidar={onOlvidar} onCerrar={() => setAbierto(false)} />
-        </React.Suspense>
+        </React.Suspense>,
+        document.body,
       )}
     </>
   );
