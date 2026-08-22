@@ -62,6 +62,7 @@ import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.j
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
 import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
+import { aplicarEnChecklists } from "./asistente/escrituraChecklists.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1198,6 +1199,33 @@ export default function App({ onCerrarSesion } = {}) {
     return enlaces;
   };
 
+  // Crear las checklists de unos apuntes Y dejar marcado en el calendario cuál es la
+  // de cada uno. Las dos cosas van juntas siempre: crear sin marcar deja el apunte
+  // suelto y al siguiente arranque la app se ofrece a crearla otra vez.
+  //
+  // Vive aquí y no dentro del efecto de arranque porque ahora hay dos sitios que la
+  // necesitan —el arranque y el asistente— y tener dos copias del mismo baile es
+  // exactamente cómo se separan con el tiempo.
+  const promoverApuntes = React.useCallback(async (apuntes) => {
+    const enlaces = crearChecklistsDeApuntes(apuntes);
+    if (!enlaces.length) return [];
+    const creadas = enlaces.filter(e => e.nueva).map(e => e.nombre);
+    try {
+      const cs = await resolverCalendario();
+      if (cs) {
+        const cal = await cargarCalendarioNube(cs.codigo);
+        // Los apuntes se marcan de una vez, no uno a uno: si no, las escrituras parten
+        // todas de la misma foto y solo la última sobrevive.
+        const porId = new Map(enlaces.map(e => [e.id, e.nombre]));
+        const marcados = saneaLista(cal ? cal.apuntes : apuntes)
+          .map(a => (porId.has(a.id) ? { ...a, evento: porId.get(a.id) } : a));
+        await guardarCalendarioNube(cs.codigo, marcados, saneaEquipo(cal ? cal.equipo : []), (cal && cal.ver) || cs.ver);
+        setApuntesCalendario(marcados);
+      }
+    } catch (e) { /* sin conexión: las checklists ya están creadas, el enlace se pone al siguiente arranque */ }
+    return creadas;
+  }, []);
+
   const handleNuevoEvento = () => setDialogo({
     tipo: "confirm",
     titulo: "¿Empezar un evento nuevo?",
@@ -2014,19 +2042,9 @@ export default function App({ onCerrarSesion } = {}) {
         if (!cal || !vivo) return;
         const apuntes = saneaLista(cal.apuntes);
         setApuntesCalendario(apuntes);
-        const enlaces = crearChecklistsDeApuntes(apuntes);
-        if (!enlaces.length || !vivo) return;
-        const creadas = enlaces.filter(e => e.nueva).map(e => e.nombre);
-        if (creadas.length) setChecklistsCreadas(creadas);
-        // Los apuntes se marcan de una vez, no uno a uno: si no, las escrituras parten
-        // todas de la misma foto y solo la última sobrevive.
-        const porId = new Map(enlaces.map(e => [e.id, e.nombre]));
-        await guardarCalendarioNube(
-          cs.codigo,
-          apuntes.map(a => (porId.has(a.id) ? { ...a, evento: porId.get(a.id) } : a)),
-          saneaEquipo(cal.equipo),
-          cal.ver || cs.ver,
-        );
+        if (!vivo) return;
+        const creadas = await promoverApuntes(apuntes);
+        if (creadas.length && vivo) setChecklistsCreadas(creadas);
       } catch (e) { /* sin conexión o sin permisos: se reintenta al siguiente arranque */ }
     })();
     return () => { vivo = false; };
@@ -2951,9 +2969,14 @@ export default function App({ onCerrarSesion } = {}) {
                   tareas,
                   onMarcarTarea: (id, hecho) => guardarTareas(marcarTarea(tareasRef.current, id, hecho)),
                   onQuitarTarea: (id) => guardarTareas(quitarTarea(tareasRef.current, id)),
-                  // Aquí solo se escriben tareas: los apuntes del calendario se tocan
-                  // desde el calendario, que es quien sabe guardarlos.
-                  onEscribir: encadenar(aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas })),
+                  // Los apuntes del calendario se EDITAN desde el calendario, que es
+                  // quien sabe guardarlos; aquí se pueden convertir en checklists, que
+                  // es lo que sabe hacer esta app.
+                  conectores: { checklists: { puedeCrear: true } },
+                  onEscribir: encadenar(
+                    aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
+                    aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
+                  ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),
                   onQuitarObjetivo: (id) => guardarObjetivos(quitarObjetivo(objetivosRef.current, id)),

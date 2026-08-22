@@ -36,6 +36,7 @@ import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
 import "./conectores/whatsapp.js";
 import "./conectores/correo.js";
 import "./conectores/calendario.js";
+import "./conectores/checklists.js";
 
 // Los nombres se comparan sin tildes, sin mayúsculas y sin sobrar espacios: quien
 // pregunta escribe "la boda de fulanita", no "Boda Fulanita y Mengano".

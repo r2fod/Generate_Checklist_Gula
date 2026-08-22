@@ -6360,23 +6360,39 @@ hr {
    distintos haría que nadie abriera nunca el cerebro, y entonces lo que aprende mal
    no lo corrige nadie. */
 /* En su propia fila: con el título y los dos iconos al lado no cabían en 320px. */
+/* Cinco pestañas con texto no entran a lo ancho en un móvil estrecho, así que la fila
+   hace scroll de lado en vez de partirse en dos: dos filas de pestañas se comen la
+   mitad del alto útil del panel, que es justo donde va la conversación. */
 .asis-pestanas {
   display: flex;
-  gap: 6px;
-  padding: 8px 10px;
+  /* Que caigan a una segunda fila y no que se desplacen de lado. Con cinco pestañas en
+     320px, un carrusel deja "Gasto" fuera de la pantalla y nadie la encuentra —que es
+     exactamente lo que ya pasó con el muñeco. Partidas en dos filas se ven las cinco. */
+  flex-wrap: wrap;
+  justify-content: center;
+  /* Apretado a propósito: las cinco caben justas en una fila de 440px, y cada fila que
+     se añade se come 46px de conversación en un móvil. Por debajo de ese ancho bajan
+     solas a una segunda fila, que es lo que tiene que pasar. */
+  gap: 5px;
+  padding: 8px 6px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-subtle);
 }
 
 .asis-pestana {
-  flex: 1 1 0;
+  /* No se encogen por debajo de su texto: con cinco, "flex: 1 1 0" las apretaba hasta
+     dejarlas ilegibles antes de dejarlas bajar de fila. */
+  flex: 0 0 auto;
   justify-content: center;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   min-height: 40px;
-  padding: 7px 11px;
+  /* 7px de lado y no 11: con cinco pestañas, 11 sumaba 461px de ancho en una fila que
+     por dentro mide 418, y bajaba una a la segunda fila también en el ordenador, donde
+     sobra sitio. Con 7 suman 397 y entran las cinco. */
+  padding: 7px 7px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
@@ -6545,6 +6561,48 @@ hr {
 .asis-paso.es-coste { font-variant-numeric: tabular-nums; }
 .asis-paso.es-coste.es-gratis { border-style: dotted; }
 
+/* El total no dice DÓNDE se fue: una pregunta cara puede ser una vuelta gorda o seis
+   pequeñas, y cada caso se arregla distinto. Cuando hay más de una vuelta el chip pasa
+   a ser botón y abre el diario. Hereda el tamaño del chip para que la fila no se mueva
+   al aparecer el botón, y llega a 24px de alto, que es lo mínimo que se acierta con el
+   dedo sin agrandar la fila entera. */
+button.asis-paso.es-coste.es-abre {
+  font: inherit;
+  min-height: 24px;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+button.asis-paso.es-coste.es-abre:hover { background: var(--bg-hover, var(--bg-subtle)); }
+button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent-color); }
+.asis-vueltas { opacity: 0.65; }
+
+.asis-diario {
+  list-style: none;
+  margin: 5px 0 0;
+  padding: 6px 8px;
+  display: grid;
+  gap: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  animation: asis-diario-abre 0.18s ease-out;
+}
+.asis-diario li {
+  display: grid;
+  /* La columna de en medio fija y tabular: así las cifras quedan alineadas y se ve de
+     un vistazo cuál es la vuelta que se dispara. La tercera se encoge sola. */
+  grid-template-columns: 1.6em auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+.asis-diario-n { opacity: 0.6; }
+.asis-diario-tk { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.asis-diario-h { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes asis-diario-abre { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+
 /* Hoy, el mes y la media. Tres cifras en una fila: en el móvil se aprietan pero caben,
    y partirlas en tres filas hace que haya que hacer scroll para ver la media, que es
    justo la que dice si algo va mal. */
@@ -6658,7 +6716,8 @@ hr {
 
 @media (prefers-reduced-motion: reduce) {
   .asis-fondo, .asis-panel, .asis-msg, .asis-pendiente, .asis-pendientes,
-  .asis-pasos .asis-paso, .asis-hilo, .asis-ajustes, .companero, .companero.es-pensando {
+  .asis-pasos .asis-paso, .asis-hilo, .asis-ajustes, .companero, .companero.es-pensando,
+  .asis-diario {
     animation: none;
     transition: none;
   }

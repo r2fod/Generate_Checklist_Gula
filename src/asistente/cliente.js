@@ -106,6 +106,11 @@ export async function preguntar({
   const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}`;
   const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
   const usoTotal = { entrada: 0, salida: 0 };
+  // El diario: una línea por ida y vuelta al modelo, no una por pregunta. El total ya
+  // se enseña debajo de la respuesta, pero el total no dice DÓNDE se fue: una pregunta
+  // de 30.000 tokens puede ser una vuelta gorda o seis pequeñas, y se arregla distinto
+  // (en un caso se comprime el contexto, en el otro se recorta el número de vueltas).
+  const diario = [];
 
   for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
     const r = await fetch(url, {
@@ -122,7 +127,18 @@ export async function preguntar({
       throw fallo;
     }
 
-    if (d.uso) { usoTotal.entrada += d.uso.entrada || 0; usoTotal.salida += d.uso.salida || 0; }
+    if (d.uso) {
+      usoTotal.entrada += d.uso.entrada || 0;
+      usoTotal.salida += d.uso.salida || 0;
+      diario.push({
+        vuelta: vuelta + 1,
+        proveedor: d.proveedor || proveedor,
+        uso: { entrada: d.uso.entrada || 0, salida: d.uso.salida || 0 },
+        // Qué pidió el modelo en esta vuelta. Con esto se ve qué herramienta es la que
+        // devuelve tanto que dispara la vuelta siguiente.
+        herramientas: (d.llamadas || []).map(l => l.nombre),
+      });
+    }
     conversacion.push({ rol: "asistente", contenido: d.texto || "", llamadas: d.llamadas || [] });
 
     if (!d.llamadas || !d.llamadas.length) {
@@ -131,6 +147,7 @@ export async function preguntar({
         mensajes: conversacion, respuesta: d.texto || "", pasos,
         proveedor: d.proveedor || proveedor, recordados,
         disponibles: d.disponibles || null,
+        diario,
         // Lo que ha costado, para poder contarlo. Se suma lo de TODAS las vueltas: una
         // pregunta que llama a tres herramientas son cuatro idas y venidas al modelo, y
         // contar solo la última diría que costó la cuarta parte de lo que costó.
@@ -165,6 +182,10 @@ export async function preguntar({
     respuesta: "Me he quedado dando vueltas sin llegar a una respuesta. Prueba a preguntarlo más concreto.",
     pasos,
     proveedor,
+    // Aunque no haya salido respuesta, las vueltas se han pagado. No devolver el gasto
+    // aquí era regalarle al contador justo las preguntas que más cuestan.
+    uso: usoTotal,
+    diario,
   };
 }
 

@@ -3980,13 +3980,20 @@ async function main() {
         // Con los ajustes desplegados, que es lo que más ocupa: la rejilla de
         // proveedores, los muñecos y los campos.
         ["asistente ajustes", BANCO + "?asistente=1", [".asis-icono"]],
-        // Las tres pestañas: son las que se van a descolocar en un móvil y nadie se
-        // enteraría hasta abrirlas.
-        ["asistente humano", BANCO + "?asistente=1", ['.asis-pestana:nth-of-type(2)']],
-        ["asistente cerebro", BANCO + "?asistente=1", ['.asis-pestana:nth-of-type(3)']],
-        ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:nth-of-type(4)']],
+        // Las cinco pestañas, una a una: son las que se descolocan en un móvil y nadie
+        // se enteraría hasta abrirlas. Van por TEXTO y no por nth-of-type: al añadir
+        // Humano en medio, el "gasto" que apuntaba a la cuarta pasó a abrir Tareas sin
+        // que saltara nada — la prueba seguía verde mirando otra pantalla.
+        ["asistente humano", BANCO + "?asistente=1", ['.asis-pestana:has-text("Humano")']],
+        ["asistente cerebro", BANCO + "?asistente=1", ['.asis-pestana:has-text("Cerebro")']],
+        ["asistente tareas", BANCO + "?asistente=1", ['.asis-pestana:has-text("Tareas")']],
+        ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:has-text("Gasto")']],
       ];
-      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura", ".asis-panel", ".hum", ".asis-proveedores"];
+      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura",
+        // El panel entero y, dentro, lo que se descuadra por su cuenta: la fila de
+        // pestañas (cinco no caben a lo ancho en un móvil), el muñeco grande, la rejilla
+        // de proveedores, las tres cifras del gasto y los objetivos del cerebro.
+        ".asis-panel", ".asis-pestanas", ".hum", ".asis-proveedores", ".asis-gasto-cifras", ".cer-objetivos"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];

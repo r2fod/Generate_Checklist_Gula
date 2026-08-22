@@ -90,6 +90,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [pensando, setPensando] = useState(false);
   const [enCurso, setEnCurso] = useState("");
   const [hilo, setHilo] = useState([]);          // lo que se ve
+  // Qué respuesta tiene el diario abierto. Uno solo, y por índice: dos abiertos a la vez
+  // en un móvil dejan la conversación ilegible, y guardarlo por mensaje obligaría a
+  // meter estado dentro del hilo, que es justo lo que se guarda en el historial.
+  const [diarioAbierto, setDiarioAbierto] = useState(-1);
   const [mensajes, setMensajes] = useState([]);  // lo que se manda (con las llamadas)
   const finRef = useRef(null);
 
@@ -177,6 +181,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         const siguiente = [...h, {
           de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo,
           coste: costeDeUna(r.proveedor, r.uso),
+          diario: r.diario,
         }];
         // Se guarda al cerrar cada vuelta, no al cerrar el panel: cerrar el panel es
         // justo lo que antes lo perdía todo.
@@ -215,20 +220,36 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </button>
         </div>
 
-        {/* La charla y el cerebro son dos vistas del mismo panel: lo que sabe y lo que le
-            preguntas. Separarlas en dos sitios distintos haría que nadie abriera nunca el
-            cerebro, y entonces lo que aprende mal no lo corrige nadie.
-            Van en su PROPIA fila y no en la cabecera: con el título y los dos iconos al
-            lado no cabían en un móvil de 320px y se salían por la derecha. */}
+        {/* Las cinco vistas del mismo panel. Van en su PROPIA fila y no en la cabecera:
+            con el título y los tres iconos al lado no cabían en un móvil de 320px y se
+            salían por la derecha. Y en una fila que hace scroll de lado, porque cinco
+            pestañas con texto no entran a lo ancho en un móvil estrecho — repartirlas en
+            dos filas comería la mitad del alto útil del panel.
+
+            Charla y Cerebro juntas es a propósito: si lo que sabe viviera en otro sitio,
+            nadie abriría nunca esa pantalla y lo que aprende mal no lo corregiría nadie. */}
         <div className="asis-pestanas" role="tablist" aria-label="Vistas del asistente">
           <button type="button" role="tab" className={`asis-pestana${pestana === "charla" ? " es-activa" : ""}`}
             onClick={() => setPestana("charla")} aria-selected={pestana === "charla"}>
             <MessageCircle size={14} aria-hidden="true" /> Charla
           </button>
+          <button type="button" role="tab" className={`asis-pestana${pestana === "humano" ? " es-activa" : ""}`}
+            onClick={() => setPestana("humano")} aria-selected={pestana === "humano"}>
+            <User size={14} aria-hidden="true" /> Humano
+          </button>
           <button type="button" role="tab" className={`asis-pestana${pestana === "cerebro" ? " es-activa" : ""}`}
             onClick={() => setPestana("cerebro")} aria-selected={pestana === "cerebro"}>
             <Brain size={14} aria-hidden="true" /> Cerebro
             {(contexto.memoria || []).length > 0 && <em>{(contexto.memoria || []).length}</em>}
+          </button>
+          <button type="button" role="tab" className={`asis-pestana${pestana === "tareas" ? " es-activa" : ""}`}
+            onClick={() => setPestana("tareas")} aria-selected={pestana === "tareas"}>
+            <ListTodo size={14} aria-hidden="true" /> Tareas
+            {sinHacer(contexto.tareas || []).length > 0 && <em>{sinHacer(contexto.tareas || []).length}</em>}
+          </button>
+          <button type="button" role="tab" className={`asis-pestana${pestana === "gasto" ? " es-activa" : ""}`}
+            onClick={() => setPestana("gasto")} aria-selected={pestana === "gasto"}>
+            <Coins size={14} aria-hidden="true" /> Gasto
           </button>
         </div>
 
@@ -508,13 +529,54 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                     </span>
                   )}
                   {m.coste && (
-                    <span className={`asis-paso es-coste${m.coste.gratis ? " es-gratis" : ""}`}>
-                      {m.coste.tokens.toLocaleString("es-ES")} tk
-                      {!m.coste.gratis && ` · ${m.coste.euros.toFixed(3)}€`}
-                    </span>
+                    // Con más de una ida y vuelta, el chip abre el desglose. Con una
+                    // sola no hay nada que desglosar y un botón que no hace nada
+                    // enseña a no pulsarlo.
+                    m.diario && m.diario.length > 1 ? (
+                      <button
+                        type="button"
+                        className={`asis-paso es-coste es-abre${m.coste.gratis ? " es-gratis" : ""}${diarioAbierto === i ? " es-abierto" : ""}`}
+                        onClick={() => setDiarioAbierto(d => (d === i ? -1 : i))}
+                        aria-expanded={diarioAbierto === i}
+                        title={`${m.diario.length} idas y vueltas al modelo`}
+                      >
+                        {m.coste.tokens.toLocaleString("es-ES")} tk
+                        {!m.coste.gratis && ` · ${m.coste.euros.toFixed(3)}€`}
+                        {" "}<span className="asis-vueltas">×{m.diario.length}</span>
+                      </button>
+                    ) : (
+                      <span className={`asis-paso es-coste${m.coste.gratis ? " es-gratis" : ""}`}>
+                        {m.coste.tokens.toLocaleString("es-ES")} tk
+                        {!m.coste.gratis && ` · ${m.coste.euros.toFixed(3)}€`}
+                      </span>
+                    )
                   )}
                 </div>
               ) : null}
+              {/* El diario de la pregunta: una línea por vuelta, con lo que costó y qué
+                  pidió el modelo en ella. Es lo que hace falta para saber dónde apretar
+                  cuando una pregunta sale cara. */}
+              {diarioAbierto === i && m.diario && (
+                <ol className="asis-diario">
+                  {m.diario.map((v, j) => {
+                    const c = costeDeUna(v.proveedor, v.uso);
+                    return (
+                      <li key={j}>
+                        <span className="asis-diario-n">{v.vuelta}ª</span>
+                        <span className="asis-diario-tk">
+                          {c ? c.tokens.toLocaleString("es-ES") : 0} tk
+                          {c && !c.gratis ? ` · ${c.euros.toFixed(3)}€` : ""}
+                        </span>
+                        <span className="asis-diario-h">
+                          {v.herramientas && v.herramientas.length
+                            ? v.herramientas.map(h => h.replace(/_/g, " ")).join(", ")
+                            : "respuesta"}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
             </div>
           ))}
           {pensando && (

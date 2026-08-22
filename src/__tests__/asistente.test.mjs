@@ -27,6 +27,7 @@ import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../as
 import { parte, foto, queHaCambiado, comoVanLosObjetivos } from "../asistente/subconsciente.js";
 import { tituloDe, saneaCharlas, guardarCharla, borrarCharla, cuandoFue } from "../asistente/conversaciones.js";
 import { aplicarEnTareas, encadenar } from "../asistente/escrituraTareas.js";
+import { aplicarEnChecklists } from "../asistente/escrituraChecklists.js";
 import { paraLeerEnVozAlta, hayEscucha, hayVoz } from "../asistente/voz.js";
 import { NOMBRES_HERRAMIENTAS as TODAS_LAS_HERRAMIENTAS } from "../asistente/herramientas.js";
 import { buildChecklist as construye } from "../checklist-generadores.js";
@@ -165,11 +166,30 @@ console.log("\n── El bucle de herramientas ──");
   ok(r.pasos.length === 1 && r.pasos[0].nombre === "calcular_hielo" && r.pasos[0].resultado.kg > 0,
     "y queda apuntado qué herramienta se usó y qué contestó");
 
+  // El diario: una línea por ida y vuelta, no una por pregunta. El total solo dice
+  // cuánto; el diario dice en qué vuelta se fue, que es lo que se puede arreglar.
+  workerFalso([
+    { texto: "", llamadas: [{ id: "1", nombre: "calcular_hielo", argumentos: { comensales: 100 } }], uso: { entrada: 900, salida: 40 } },
+    { texto: "", llamadas: [{ id: "2", nombre: "calcular_hielo", argumentos: { comensales: 50 } }], uso: { entrada: 4000, salida: 30 } },
+    { texto: "Ya está.", uso: { entrada: 4200, salida: 60 } },
+  ]);
+  const conDiario = await preguntar({ texto: "¿cuánto hielo?", contexto: CTX, url: "http://falso", proveedor: "gemini" });
+  ok(conDiario.diario.length === 3, `el diario trae una línea por vuelta (${conDiario.diario.length})`);
+  ok(conDiario.diario[0].uso.entrada === 900 && conDiario.diario[2].uso.entrada === 4200,
+    "y cada una con lo que costó ella, no con el total");
+  ok(conDiario.uso.entrada === 9100 && conDiario.uso.salida === 130,
+    `y el total sigue siendo la suma (${conDiario.uso.entrada}+${conDiario.uso.salida})`);
+  ok(conDiario.diario[0].herramientas[0] === "calcular_hielo" && conDiario.diario[2].herramientas.length === 0,
+    "y qué pidió el modelo en cada vuelta, para ver cuál dispara la siguiente");
+
   // Un modelo que se empeña en pedir lo mismo no puede dejar el navegador dando vueltas
-  workerFalso([{ texto: "", llamadas: [{ id: "x", nombre: "calcular_hielo", argumentos: { comensales: 10 } }] }]);
+  workerFalso([{ texto: "", llamadas: [{ id: "x", nombre: "calcular_hielo", argumentos: { comensales: 10 } }], uso: { entrada: 100, salida: 10 } }]);
   const bucle = await preguntar({ texto: "hola", contexto: CTX, url: "http://falso" });
   ok(/dando vueltas/.test(bucle.respuesta), "el bucle tiene tope y lo dice en vez de colgarse");
   ok(bucle.pasos.length <= 6, `y no pasa de seis vueltas (${bucle.pasos.length})`);
+  // Quedarse sin vueltas no es gratis: esas idas y venidas se han pagado igual.
+  ok(bucle.uso && bucle.uso.entrada > 0 && bucle.diario.length === bucle.pasos.length,
+    `y aun sin respuesta se cuenta lo que costó (${bucle.uso ? bucle.uso.entrada : 0} tk)`);
 
   // Con OpenAI, una herramienta con datos se rechaza AQUÍ aunque el modelo la pida
   workerFalso([
@@ -927,6 +947,65 @@ console.log("\n── Encadenar dónde se escribe ──");
     "y si no la sabe hacer nadie, se dice en vez de fallar en silencio");
   ok(encadenar(null, soloTareas)({ que: "apuntar_tarea", datos: { texto: "Otra cosa" } }).apuntado,
     "un aplicador vacío en la cadena no la rompe");
+}
+
+console.log("\n── Crear checklists desde el calendario ──");
+{
+  const en5 = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  const base = {
+    apuntes: [
+      { id: "a1", fecha: en5, titulo: "Boda de prueba uno", tipo: "boda" },
+      { id: "a2", fecha: en5, titulo: "Boda de prueba dos", tipo: "boda" },
+      // Ni las vacaciones ni las recogidas llevan checklist: si entraran aquí, pedir
+      // "créame los próximos" crearía basura en el archivo.
+      { id: "a3", fecha: en5, titulo: "Vacaciones de alguien", tipo: "vacaciones" },
+      { id: "a4", fecha: en5, titulo: "Recoger camión", tipo: "recogida" },
+    ],
+    eventosGuardados: {},
+    conectores: { checklists: { puedeCrear: true } },
+    onEscribir: (p) => ({ propuesto: p.resumen, ids: p.datos.ids }),
+  };
+
+  // El nivel manda: era exactamente lo que fallaba —"Confianza" puesto y el asistente
+  // contestando que no podía crear nada, porque la herramienta no existía.
+  ok(ejecutar("crear_checklists", {}, { ...base, nivel: "consultar" }).error,
+    "en solo consultar no se puede crear");
+  const conf = ejecutar("crear_checklists", {}, { ...base, nivel: "confianza" });
+  ok(conf.ids && conf.ids.length === 2, `en confianza crea los que se acercan (${conf.ids && conf.ids.length})`);
+  ok(!conf.ids.includes("a3") && !conf.ids.includes("a4"),
+    "y deja fuera lo que nunca lleva checklist: vacaciones y recogidas");
+
+  // Por nombre, para "créame la de Alba"
+  const uno = ejecutar("crear_checklists", { cuales: ["prueba uno"] }, { ...base, nivel: "confianza" });
+  ok(uno.ids && uno.ids.length === 1 && uno.ids[0] === "a1", "se puede pedir una por su título");
+  ok(ejecutar("crear_checklists", { cuales: ["no existe"] }, { ...base, nivel: "confianza" }).error,
+    "y un título que no está en el calendario lo dice, no crea otra cosa");
+
+  // No pisa lo que ya existe: decir "he creado 5" cuando 3 ya estaban sería mentir
+  const yaEsta = {
+    ...base, nivel: "confianza",
+    eventosGuardados: { "Boda de prueba uno": {} },
+    apuntes: base.apuntes.map(a => (a.id === "a1" ? { ...a, evento: "Boda de prueba uno" } : a)),
+  };
+  ok(ejecutar("crear_checklists", { cuales: ["prueba uno"] }, yaEsta).nada,
+    "una que ya existe no se vuelve a crear");
+  ok(ejecutar("crear_checklists", {}, yaEsta).ids.length === 1,
+    "y al pedir los próximos solo entra la que falta");
+
+  // Apagado donde la app no sabe crearlas (el calendario suelto no tiene archivo)
+  ok(!catalogoParaModelo(false, {}, "confianza").map(h => h.name).includes("crear_checklists"),
+    "sin puedeCrear la herramienta ni se ofrece");
+
+  // El aplicador: crea de verdad y avisa de lo que le falta a lo creado
+  let promovidos = null;
+  const aplicar = aplicarEnChecklists({ apuntes: base.apuntes, promover: (x) => { promovidos = x; } });
+  const r = aplicar({ que: "crear_checklists", datos: { ids: ["a1", "a2"] } });
+  ok(promovidos && promovidos.length === 2, "el aplicador promueve los apuntes elegidos");
+  ok(r.creadas.length === 2 && /formulario/.test(r.aviso),
+    "y avisa de que les faltan los datos del formulario, en vez de darlas por completas");
+  ok(aplicar({ que: "apuntar_tarea", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+  ok(aplicar({ que: "crear_checklists", datos: { ids: ["fantasma"] } }).error,
+    "un apunte que ya no está lo dice");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
