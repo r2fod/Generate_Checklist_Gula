@@ -28,6 +28,7 @@ src/nube.js                 TODO lo que habla con Firestore, en un solo sitio
 src/fecha.js                hoy en ISO (local y UTC, y por qué son dos)
 src/texto.js                sinTildes / limpiaTexto / claveDeTexto (identidad por texto)
 src/almacen.js              localStorage con su try/catch, en un solo sitio
+src/diario.js               los últimos fallos de este navegador, SIN datos de nadie
 src/tema.js                 claro/oscuro + aplicarTemaInicial (la usan los dos arranques)
 src/precios.js              los 53 precios (pendientes de mudarse a Firestore)
 src/checklist-generadores.js  qué material lleva cada tipo de evento
@@ -224,6 +225,25 @@ hora, sitio, pax       marcada "sinConfigurar" equipamiento…
 **La lista de eventos que ve la oficina sale del ARCHIVO DE CHECKLISTS, no del
 calendario.** Por eso la checklist se crea pronto: si no existe, la oficina la escribe a
 mano y llega duplicada.
+
+## Saber qué ha pasado sin espiar a nadie
+
+`src/diario.js`. Antes, "esta mañana no me dejaba guardar" no se podía mirar en ningún
+sitio: lo que pasó estaba en la consola de un móvil ya cerrado. Ahora los fallos de la
+nube y los de pantalla quedan apuntados **en el navegador de quien los sufrió** —no se
+sube nada— y se copian de un toque desde la pantalla de fallo, para pegarlos en el chat.
+
+Cómo se garantiza que no lleva datos de personas, que es la parte que importa en un
+repositorio público:
+
+- **Lista blanca de sucesos** (`SUCESOS`): una etiqueta nueva hay que añadirla a mano, y
+  ese es el momento en que alguien mira si lo que va a apuntar lleva nombres.
+- **Lista blanca de datos**: números, booleanos y etiquetas cortas sin espacios. Un texto
+  libre no entra, porque es justo por ahí por donde viajarían los nombres.
+- **`sinDatosPersonales()`** tacha en el motivo del error lo entrecomillado (en esta app
+  casi siempre es el nombre de un evento, o sea de un cliente), correos, teléfonos y las
+  rutas de Firestore (el id sale del nombre). Y corta a 200 caracteres.
+- Veinte apuntes como mucho: el sitio que ocupa el diario se lo quita al archivo.
 
 ## Lo desduplicado (y lo que NO se unificó)
 

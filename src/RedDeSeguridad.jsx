@@ -10,6 +10,7 @@
 // empezar de cero solo después de haber podido guardarlo.
 import { Component } from "react";
 import { leerTexto, borrar } from "./almacen.js";
+import { apunta, leerDiario, comoTexto } from "./diario.js";
 
 const CLAVES = ["gula_checklist_estado", "gula_eventos_guardados", "gula_plantillas"];
 
@@ -40,6 +41,9 @@ export default class RedDeSeguridad extends Component {
     // A la consola también: si alguien está mirando con el móvil enchufado, ahí está
     // la pila entera, que en pantalla no cabe ni sirve de nada.
     console.error("La app ha fallado al dibujar:", error, info);
+    // Y al diario del navegador, ya limpio de nombres: es lo único que sigue existiendo
+    // mañana, cuando quien lo sufrió lo cuente de memoria.
+    apunta("pantalla-rota", { motivo: String((error && error.message) || error) });
   }
 
   render() {
@@ -62,6 +66,17 @@ export default class RedDeSeguridad extends Component {
             window.location.href = window.location.origin + window.location.pathname;
           }}
         >Empezar de cero (sin borrar los eventos guardados)</button>
+        {/* El diario de este navegador: las últimas cosas que fueron mal, con su hora y
+            SIN un solo nombre (ver src/diario.js). Se copia de un toque para pegarlo en
+            el chat del equipo, que es como llega de verdad un fallo a quien lo arregla. */}
+        <button
+          type="button"
+          onClick={() => {
+            const texto = comoTexto(leerDiario());
+            if (navigator.clipboard) navigator.clipboard.writeText(texto).catch(() => {});
+            window.alert(texto);
+          }}
+        >Ver y copiar los últimos fallos (sin datos de nadie)</button>
         <p className="link-roto-nota">Si vuelve a fallar después de empezar de cero, manda el fichero
           descargado y el texto de arriba: con eso se sabe qué lo rompió.</p>
       </div>

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import { hoyLocalISO } from "./fecha.js";
+import { apunta as apuntaEnDiario } from "./diario.js";
 import { sinTildes } from "./texto.js";
 import { leerTexto, leerJSON, guardarTexto, guardarJSON, borrar as borrarDelAlmacen } from "./almacen.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
@@ -828,14 +829,20 @@ export default function App({ onCerrarSesion } = {}) {
   const avisarFalloNube = (e) => {
     const codigo = String(e?.code || "");
     const msg = String(e?.message || e || "");
+    // Además del aviso en pantalla, queda apuntado en el diario del navegador (sin
+    // nombres, ver src/diario.js): el aviso se cierra y se olvida, y luego "esta mañana
+    // no me dejaba guardar" no se puede mirar en ningún sitio.
     if (/permission-denied|unauthenticated/i.test(codigo + " " + msg)) {
+      apuntaEnDiario("nube-denegada", { motivo: msg, codigo });
       setErrorNube("La sesión del equipo ha caducado. Los cambios están guardados en este dispositivo: vuelve a entrar para subirlos.");
       return;
     }
     if (/longer than|exceeds|maximum|too large|invalid-argument|resource-exhausted/i.test(codigo + " " + msg)) {
+      apuntaEnDiario("nube-llena", { motivo: msg, codigo });
       setErrorNube("El archivo de eventos ya no cabe en la nube. Borra o archiva eventos antiguos para poder seguir guardando.");
       return;
     }
+    apuntaEnDiario("nube-fallo", { motivo: msg, codigo });
     setErrorNube("No se ha podido guardar en la nube. Los cambios están en este dispositivo; revisa la conexión.");
   };
   const primerGuardadoRef = React.useRef(true);

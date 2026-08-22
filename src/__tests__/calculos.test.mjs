@@ -38,6 +38,7 @@ import { aISO, hoyLocalISO, hoyUTCISO, enDiasUTCISO } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
 import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
 import { aplicarTemaInicial } from "../tema.js";
+import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESOS, MAX_APUNTES } from "../diario.js";
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
@@ -1637,6 +1638,64 @@ console.log("\n══ Las animaciones en bucle no pueden mover la maqueta ══
   }
   ok(culpables.length === 0,
     `ninguna animación en bucle mueve la maqueta${culpables.length ? ` → ${culpables.join(" · ")}` : ""}`);
+}
+
+console.log("\n══ El diario de fallos: útil y sin un solo nombre ══");
+{
+  // Sin esto, "esta mañana no me dejaba guardar" no se puede mirar en ningún sitio: lo
+  // que pasó estaba en la consola de un móvil que ya se ha cerrado. Y como esto se pega
+  // en el WhatsApp del equipo y el repositorio es público, lo que NO puede llevar es el
+  // nombre de un cliente, de nadie del equipo, ni un teléfono.
+  const trastero = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (trastero.has(k) ? trastero.get(k) : null),
+    setItem: (k, v) => trastero.set(k, String(v)),
+    removeItem: (k) => trastero.delete(k),
+  };
+  borrarDiario();
+
+  // ─── Lo que sí apunta ───────────────────────────────────────────────────────
+  apunta("nube-denegada", { motivo: "Missing or insufficient permissions.", codigo: "permission-denied" });
+  const uno = leerDiario();
+  ok(uno.length === 1 && uno[0].que === "nube-denegada" && uno[0].codigo === "permission-denied",
+    "apunta lo que ha pasado con su código de error, que es lo que de verdad dice qué mirar");
+  ok(typeof uno[0].cuando === "number", "y cuándo, que es la mitad de lo que se pregunta");
+
+  // ─── Lo que NO apunta ───────────────────────────────────────────────────────
+  ok(leerDiario().every(a => !("nombreEvento" in a)),
+    "un dato que no está en la lista blanca no se guarda aunque se le pase");
+  apunta("nube-fallo", { motivo: "No se pudo guardar", nombreEvento: "Boda de Fulanita y Mengano", pax: 120 });
+  const dos = leerDiario()[0];
+  ok(!("nombreEvento" in dos) && dos.pax === 120,
+    "los números pasan (pax=120) y los textos libres NO: ahí es donde viajarían los nombres");
+
+  // El motivo sí es texto libre —viene del proveedor— así que va tachado.
+  ok(sinDatosPersonales("Fallo al escribir «Boda de Fulanita»") === "Fallo al escribir «nombre»",
+    "lo entrecomillado se tacha: en los mensajes de esta app casi siempre es el nombre de un evento");
+  ok(sinDatosPersonales("Avisa a fulanita@ejemplo.com o al 600 11 22 33") === "Avisa a «correo» o al «teléfono»",
+    "correos y teléfonos también");
+  ok(sinDatosPersonales("PERMISSION_DENIED en indice/evt_boda-fulanita-9f3a") === "PERMISSION_DENIED en indice/«id»",
+    "y la ruta del documento, porque el id sale del nombre del evento");
+  ok(sinDatosPersonales("x".repeat(500)).length <= 200, "un motivo kilométrico se corta: es un diario, no un volcado");
+
+  // ─── El tamaño y la etiqueta ────────────────────────────────────────────────
+  ok(apunta("lo-que-sea", { motivo: "x" }).length === leerDiario().length
+    && leerDiario().every(a => a.que !== "lo-que-sea"),
+    "una etiqueta que no está en SUCESOS no se apunta: añadir una obliga a pasar por la lista y mirar si lleva nombres");
+  for (let i = 0; i < MAX_APUNTES + 5; i++) apunta("nube-fallo", { intento: i });
+  ok(leerDiario().length === MAX_APUNTES,
+    `el diario no crece sin fin (${MAX_APUNTES} apuntes): el sitio que ocupa se lo quita al archivo de eventos`);
+  ok(leerDiario()[0].intento === MAX_APUNTES + 4, "y lo último que pasó va primero, que es lo que se mira");
+
+  // ─── Lo que se pega en el chat ──────────────────────────────────────────────
+  borrarDiario();
+  ok(comoTexto([]) === "Sin fallos apuntados en este dispositivo.", "sin fallos lo dice, en vez de dar un texto vacío");
+  apunta("pantalla-rota", { motivo: 'No se pudo leer "Boda de Fulanita"' });
+  const texto = comoTexto();
+  ok(texto.includes(SUCESOS["pantalla-rota"]) && !/Fulanita/.test(texto),
+    `lo que se copia se entiende y no lleva nombres → ${texto}`);
+
+  delete globalThis.localStorage;
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
