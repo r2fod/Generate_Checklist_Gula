@@ -139,9 +139,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       setRepaso(d);
       setAvisoRepaso({
         mal: false,
+        // El plural importa: con un solo evento salía "1 tienen algo sin poner", que
+        // suena a fallo del sistema y no a lo que es —un evento flojo de datos—.
         texto: d.eventos && d.eventos.length
-          ? `Ha mirado ${d.mirados} eventos y ${d.eventos.length} tienen algo sin poner. Lo tienes en Cerebro.`
-          : `Ha mirado ${d.mirados} eventos y no falta nada por poner.`,
+          ? `Ha mirado ${d.mirados} evento${d.mirados === 1 ? "" : "s"} y ${d.eventos.length} ${d.eventos.length === 1 ? "tiene" : "tienen"} algo sin poner. Lo tienes en Cerebro.`
+          : `Ha mirado ${d.mirados} evento${d.mirados === 1 ? "" : "s"} y no falta nada por poner.`,
       });
     } catch (e) {
       setAvisoRepaso({ mal: true, texto: `No se ha podido llegar al proxy: ${e.message}` });

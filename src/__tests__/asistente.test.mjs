@@ -762,6 +762,29 @@ console.log("\n── El asistente es el mismo en las dos apps ──");
     "y le pasa el guardar y el borrar de verdad, no solo el permiso");
 }
 
+console.log("\n── La migración de los precios ──");
+{
+  // Sacar los precios del repositorio (público: con los precios de compra dentro se
+  // ven los márgenes) va en DOS despliegues, y el segundo destruye si el primero no
+  // está hecho: la nube hoy solo guarda las diferencias, así que quitar PRECIOS_BASE
+  // sin haber subido el catálogo entero antes no es mudarlo, es borrarlo. La subida
+  // no se puede probar llamando a la nube desde aquí, pero sí vigilar el contrato de
+  // lo que sube: el catálogo ENTERO, nunca soloLosCambiados().
+  const fuente = (f) => readFileSync(new URL(f, import.meta.url), "utf8");
+  const app = fuente("../App.jsx");
+  const modal = fuente("../components/ModalModoCarga.jsx");
+  const subida = app.match(/const handleSubirTodosPrecios[\s\S]*?\n  };/)?.[0] || "";
+
+  ok(/leerPrecios\(\)/.test(subida) && /guardarPreciosNube\(/.test(subida),
+    "la migración sube el catálogo ENTERO (leerPrecios), no solo lo cambiado");
+  ok(!/soloLosCambiados/.test(subida),
+    "y no pasa por soloLosCambiados, que dejaría la nube con casi nada");
+  ok(/onSubirTodosPrecios=\{handleSubirTodosPrecios\}/.test(app),
+    "la pantalla de Precios llega hasta ese manejador");
+  ok(/Subir todos los precios a la nube/.test(modal),
+    "y la acción se llama como lo que hace, para que el dueño la encuentre");
+}
+
 console.log("\n── El Worker y el navegador ──");
 {
   // Esto no se puede probar llamando al Worker —no corre aquí—, pero sí se puede
@@ -975,6 +998,16 @@ console.log("\n── El repaso de la noche ──");
     try { await repasar(env); } catch (e) { m = e.message; }
     ok(espera.test(m), `sin ${quita} dice exactamente qué falta`);
   }
+
+  // El aviso que responde el botón conjuga el verbo: con un solo evento salía
+  // "1 tienen algo sin poner", que suena a fallo del sistema y no a lo que es —
+  // un evento flojo de datos. No se puede pulsar el botón desde aquí (llama al
+  // Worker), pero el contrato del texto sí se puede vigilar en la fuente.
+  const avisoRepaso = readFileSync(new URL("../asistente/Asistente.jsx", import.meta.url), "utf8");
+  ok(/d\.eventos\.length === 1 \? "tiene" : "tienen"/.test(avisoRepaso),
+    "el aviso del repaso conjuga: 1 tiene, 2 tienen");
+  ok(/d\.mirados === 1 \? "" : "s"/.test(avisoRepaso),
+    "y el contador también: 1 evento, 2 eventos");
 }
 
 console.log("\n── Hablarle y que conteste ──");
