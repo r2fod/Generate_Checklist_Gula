@@ -4,9 +4,11 @@
 <!-- Reglas principales de operación, idioma y respuestas -->
 - Pre-req: MUST read `CONTEXTO.md` before operating. Live production app (real truck dispatch).
 - Language: ALL code, comments, UI string literals, and git commits MUST be in SPANISH.
-- Output Style: DIRECT CODE ONLY. Zero preambles, zero summaries. Minimal line diffs only.
+- Output Style: DIRECT CODE ONLY. Zero preambles, zero summaries.
 - Privacy & Safety: PUBLIC REPO. NEVER leak real names, phones, €/pax, or buy prices. Use fake test data.
 - Context Sync: MUST update `CONTEXTO.md` within the exact SAME commit as code changes.
+- Standing Instructions: any new rule, workflow, or working style stated in conversation
+  MUST be added to THIS file when given — never left living only in chat history.
 
 ## DATA INTEGRITY (CRITICAL)
 <!-- Estructura de IDs clave: tocarlos destruye los checks de la app -->
@@ -16,8 +18,10 @@
 
 ## CODE & UI/UX
 <!-- Criterios de desarrollo y verificación visual -->
-- Principles: DRY, scalable design. No block rewriting for minor edits.
-- UI: Fully responsive (320px–1920px). MUST include smooth CSS/Framer animations (no flat layout jumps).
+- Principles: DRY, scalable design. Minimal diffs — no block rewriting for minor edits.
+- UI: Fully responsive (320px–1920px). MUST include smooth CSS animations/transitions
+  (no flat layout jumps). No Framer Motion or any animation library — plain CSS only,
+  it's what the entire project already uses.
 - Verification: Passing `build` or unit tests DOES NOT confirm UI state. MUST verify visual screenshots (`CONTEXTO.md`).
 
 ## ORCHESTRATOR MODE
