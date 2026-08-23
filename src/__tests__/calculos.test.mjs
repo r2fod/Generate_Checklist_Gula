@@ -1719,6 +1719,37 @@ console.log("\n══ El diario de fallos: útil y sin un solo nombre ══");
   delete globalThis.localStorage;
 }
 
+console.log("\n══ Las pantallas gordas llegan tarde, pero con red debajo ══");
+{
+  // React.lazy sin un <Suspense> encima NO da un aviso: lanza al pintar y tumba la app
+  // entera (pantalla en blanco). El build no lo caza y las pruebas de nodo tampoco, así
+  // que se comprueba en el fichero: cada componente perezoso, con su respaldo delante.
+  const app = readFileSync("src/App.jsx", "utf8");
+  const perezosos = [...app.matchAll(/const (\w+) = React\.lazy\(/g)].map(m => m[1]);
+  ok(perezosos.length >= 4, `hay pantallas perezosas de verdad (${perezosos.join(", ")})`);
+
+  const sinRespaldo = perezosos.filter(nombre => {
+    // Cada sitio donde se pinta tiene que llevar un <React.Suspense> por encima, cerca:
+    // el respaldo se pone justo antes, no en la raíz de la app (allí taparía TODA la
+    // pantalla en vez del hueco de la que se está abriendo).
+    const usos = [...app.matchAll(new RegExp(`<${nombre}[\\s/>]`, "g"))].map(m => m.index);
+    return usos.some(i => !/<React\.Suspense/.test(app.slice(Math.max(0, i - 400), i)));
+  });
+  ok(sinRespaldo.length === 0,
+    `ninguna pantalla perezosa se pinta sin Suspense (sin respaldo: ${sinRespaldo.join(", ") || "ninguna"})`);
+
+  // El respaldo va con estilos EN LÍNEA a propósito: las clases de esas pantallas viajan
+  // dentro del trozo que se está descargando, así que mientras carga no existen todavía.
+  const respaldo = readFileSync("src/components/CargandoPanel.jsx", "utf8");
+  ok(/position: "fixed"/.test(respaldo) && !/className=/.test(respaldo),
+    "el respaldo se coloca con estilos en línea, no con clases que aún no han llegado");
+
+  // Y Modo carga, que es la que se abre en el almacén con la cobertura justa, se pide
+  // sola en el primer rato muerto en vez de esperar al dedo sobre el botón.
+  ok(/alSobrarTiempo\(traerModoCarga/.test(app),
+    "Modo carga se precarga en el rato muerto: en el almacén no se espera a la red");
+}
+
 console.log("\n──────────────────────────────────────────────────────────");
 console.log(`  ${pasan} comprobaciones pasadas, ${fallos.length} fallidas`);
 if (fallos.length) { console.log("\n  Fallos:"); fallos.forEach(f => console.log(`   · ${f}`)); process.exit(1); }

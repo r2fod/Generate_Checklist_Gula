@@ -329,7 +329,7 @@ function avisoDePeso(nombre, bytes) {
 		documento: nombre,
 		bytes,
 		porcentaje: Math.round(parte * 100),
-		tono: parte >= URGE_DESDE ? "malo" : "ojo",
+		tono: parte >= URGE_DESDE ? "falta" : "raro",
 		texto: `El documento ${nombre} va por ${kB(bytes)} de los ${kB(TECHO_DOCUMENTO)} que caben (${Math.round(parte * 100)} %).`,
 		comoSeArregla: nombre.includes("calendario") ? "Saca del calendario los apuntes de años cerrados (Traer/exportar guarda una copia antes)." : "Es el archivo antiguo y solo se lee: se puede vaciar cuando se confirme que todo está en indice/evt_*."
 	};

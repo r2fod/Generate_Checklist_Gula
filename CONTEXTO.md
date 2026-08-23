@@ -267,6 +267,39 @@ Con esa medición delante se cambió solo esto:
 Banco de pruebas, dos modos nuevos: `?muchos=250` (calendario lleno) y `?boton=1` (el
 botón del asistente, para cronometrar del clic al panel).
 
+### Lo que se descarga al abrir la checklist (medido en bytes, no a ojo)
+
+Las tres pantallas gordas ya no viajan en el trozo que hay que esperar mirando la
+pantalla: **Modo carga** (723 líneas, solo la ve quien carga un camión), **la bandeja de
+la oficina** y **añadir varios items** van con `React.lazy` + `Suspense`.
+
+| Trozo inicial de la checklist | Antes | Después |
+|---|---|---|
+| `checklist-*.js` | 168,4 kB (50,1 gzip) | **129,3 kB (39,3 gzip)** |
+
+Son 11 kB gzip menos que descargar, analizar y ejecutar antes de ver nada, y encima el
+JavaScript que se deja de ejecutar en el arranque es el que más pesa al pintar. Modo
+carga se precarga sola en el primer rato muerto (`alSobrarTiempo`): en el almacén, con la
+cobertura justa, no se espera a la red con el camión delante.
+
+**El respaldo de `Suspense` va con estilos EN LÍNEA** (`components/CargandoPanel.jsx`):
+las clases de esas pantallas viajan dentro del trozo que se está descargando, así que
+mientras carga todavía no existen y el respaldo saldría descolocado. Hay prueba de que
+ninguna pantalla perezosa se pinta sin su `Suspense` — sin él, React no avisa: lanza al
+pintar y deja la pantalla en blanco.
+
+**Cuatro suscripciones dejaron de competir con el arranque**: memoria, objetivos, tareas
+y precios no se ven en la primera pantalla, así que entran en el primer rato muerto
+(`asistente/suscripcionDiferida.js`, que además borra los cuatro efectos idénticos que
+había en `App.jsx`). Sin `clave` en `alSobrarTiempo` a propósito: la deduplicación es
+permanente y en StrictMode el efecto se monta dos veces, así que con clave la segunda
+vuelta se saltaba y la app se quedaba SIN suscripción.
+
+**Lo que NO se tocó, y por qué:** los iconos (`lucide-react`) son 197 kB / 63 kB gzip, el
+trozo más grande de todos — pero son **95 iconos distintos** de verdad usados, no un
+barril mal sacudido. Quitar peso ahí es quitar iconos, que es una decisión de diseño, no
+una optimización.
+
 ## Saber qué falló, sin espiar a nadie
 
 `src/diario.js`. Antes, "esta mañana no me dejaba guardar" no se podía mirar: estaba en
@@ -445,13 +478,12 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ### Lo que queda abierto del plan
 
-1. **`Cerebro.jsx`: el aviso de documentos cerca del MiB se pinta como `<li>` suelto**,
-   fuera de un `<ul>`. HTML inválido y sin el `gap` que da `.cer-repaso-evento ul`.
-2. **Ese aviso usa tonos inventados** (`ojo`, `malo`) y el CSS solo conoce los tres de
-   `revision.js` (`falta`, `raro`, `acuerdate`): sale sin raya de color. Se arregla
-   usando el vocabulario de siempre, no añadiendo dos tonos más.
-   Los dos son interfaz → **piden captura**, y el contenedor de trabajo no tiene chromium.
-3. **Barrido del navegador (711) sin lanzar** desde N1, por lo mismo.
+1. ~~El aviso de documentos como `<li>` suelto~~ y ~~los tonos inventados `ojo`/`malo`~~:
+   **arreglados**. Van dentro de su `<ul>` y usan los tres tonos de `revision.js`, que son
+   los únicos que el CSS sabe pintar. Con pruebas de las dos cosas. Falta la captura.
+3. **Barrido del navegador (711) sin lanzar** desde N1, por lo mismo. Ahora importa más:
+   el `React.lazy` de Modo carga y de la bandeja cambia CUÁNDO aparecen esos modales, y
+   quien lo cubre es justo esa batería. Antes del próximo deploy, obligatorio.
 4. **Deploy B de precios**: ya está hecho (`PRECIOS_BASE` fuera). Lo que falta es la
    comprobación del dueño de los 53 en `indice/precios` desde otro dispositivo.
 5. **`deploy.yml`**: no se escribe hasta que el dueño dé el OK. No es un olvido.

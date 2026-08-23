@@ -1359,11 +1359,23 @@ console.log("\n── Lo que ya no se repinta ni se descarga tarde ──");
   // que se estaba guardando. Quien se entera es quien apunta una boda un sábado.
   ok(TECHO_DOCUMENTO === 1048576, "el techo es el de Firestore, 1 MiB, no un número redondo inventado");
   ok(avisoDePeso("indice/calendario", 120000) === null, "un documento normal no dice nada: el aviso que sale siempre no se lee");
+  // Los tonos son los TRES de revision.js. Se inventaron "ojo" y "malo" y el aviso salía
+  // sin raya de color: el CSS solo conoce es-falta, es-raro y es-acuerdate.
+  const TONOS = ["falta", "raro", "acuerdate"];
   const ojo = avisoDePeso("indice/calendario", 800000);
-  ok(ojo && ojo.tono === "ojo" && /781 kB/.test(ojo.texto), `a tres cuartos avisa sin alarmar → ${ojo && ojo.texto}`);
+  ok(ojo && ojo.tono === "raro" && /781 kB/.test(ojo.texto), `a tres cuartos avisa sin alarmar → ${ojo && ojo.texto}`);
   ok(ojo && /apuntes de años cerrados/.test(ojo.comoSeArregla), "y dice QUÉ hacer, no solo qué pasa");
   const malo = avisoDePeso("indice/eventosGuardados", 1000000);
-  ok(malo && malo.tono === "malo", "pasado el 90 % el tono cambia: ahí ya urge");
+  ok(malo && malo.tono === "falta", "pasado el 90 % el tono cambia: ahí ya urge");
+  ok(TONOS.includes(ojo.tono) && TONOS.includes(malo.tono),
+    "y los dos tonos son de los tres que el CSS sabe pintar, no un vocabulario paralelo");
+
+  // El aviso se pinta DENTRO de un <ul>, como los de cada evento: suelto era un <li>
+  // fuera de lista (HTML inválido) y sin la separación que da `.cer-repaso-evento ul`.
+  const cerebro = readFileSync("src/asistente/Cerebro.jsx", "utf8");
+  const trozoDocs = cerebro.slice(cerebro.indexOf("repaso.documentos"), cerebro.indexOf("repaso.eventos.length === 0"));
+  ok(/<ul>[\s\S]*<li className={`cer-aviso/.test(trozoDocs),
+    "los avisos de documentos van dentro de su <ul>, no como <li> sueltos");
   ok(malo && /solo se lee/.test(malo.comoSeArregla), "y el consejo es distinto para el archivo congelado que para el calendario");
 }
 

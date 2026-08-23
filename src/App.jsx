@@ -36,15 +36,20 @@ import {
 } from "./nube.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
-import ModalFormularioOficina from "./components/ModalFormularioOficina.jsx";
+// Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
+// solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se
+// abren de higos a brevas. Estaban las tres dentro del trozo que se descarga al abrir la
+// app, que es el que hay que esperar mirando la pantalla.
+const traerModoCarga = () => import("./components/ModalModoCarga.jsx");
+const ModalModoCarga = React.lazy(traerModoCarga);
+const ModalFormularioOficina = React.lazy(() => import("./components/ModalFormularioOficina.jsx"));
+const ModalAgregarItems = React.lazy(() => import("./components/ModalAgregarItems.jsx"));
 import ModalRecalcular from "./components/ModalRecalcular.jsx";
 import Dialogo from "./components/Dialogo.jsx";
 import SelectConOtro from "./components/SelectConOtro.jsx";
 import SegmentedControl from "./components/SegmentedControl.jsx";
 import ListaColapsable from "./components/ListaColapsable.jsx";
 import ModalVistaPrevia from "./components/ModalVistaPrevia.jsx";
-import ModalAgregarItems from "./components/ModalAgregarItems.jsx";
-import ModalModoCarga from "./components/ModalModoCarga.jsx";
 import FilaItem from "./components/FilaItem.jsx";
 import logoGula from "./assets/gula-logo.webp";
 import { sanearEstado, cambiosDeCantidad } from "./estado.js";
@@ -55,6 +60,9 @@ import {
   fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord,
 } from "./checklist-format.js";
 import { infoCategoria } from "./components/Iconos.jsx";
+import CargandoPanel from "./components/CargandoPanel.jsx";
+import useSuscripcionDiferida from "./asistente/suscripcionDiferida.js";
+import { alSobrarTiempo } from "./precarga.js";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
 import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
@@ -1886,17 +1894,20 @@ export default function App({ onCerrarSesion } = {}) {
   // "preciosAlDia" es solo una marca de tiempo para que el panel de precios, si está
   // abierto, se entere de que han cambiado y vuelva a leerlos. No lleva los precios
   // dentro a propósito: quien los quiera, que llame a leerPrecios().
+  // Modo carga se descarga sola cuando el navegador está parado: es la pantalla que se
+  // abre en el almacén, muchas veces con la cobertura justa, y ahí esperar a la red con
+  // el camión delante es lo que no puede pasar. Quien entra por el enlace de solo carga
+  // no espera a nada: al pintarse ya la pide.
+  useEffect(() => alSobrarTiempo(traerModoCarga, { clave: "modo-carga" }), []);
+
   const [preciosAlDia, setPreciosAlDia] = useState(0);
-  useEffect(() => {
-    if (!nubeActiva() || !haySesionEquipo) return;
-    const aplicar = (remotos) => {
-      if (!remotos) return;
-      fusionarPreciosNube(remotos);
-      setPreciosAlDia(Date.now());
-    };
-    cargarPreciosNube().then(aplicar).catch(() => { /* sin conexión: se usan los de aquí */ });
-    return suscribirPreciosNube(aplicar);
-  }, [haySesionEquipo]);
+  // Al rato muerto: los precios no se ven en la primera pantalla, solo en Modo carga, y
+  // hasta que llegan se dibuja con la copia local (leerPrecios() es síncrona).
+  useSuscripcionDiferida(nubeActiva() && haySesionEquipo, {
+    cargar: cargarPreciosNube,
+    suscribir: suscribirPreciosNube,
+    aplicar: (remotos) => { fusionarPreciosNube(remotos); setPreciosAlDia(Date.now()); },
+  });
 
   // ─── CUÁNTO SE BEBE EN CADA TIPO DE EVENTO ──────────────────────────────────
   // Mismo trato que los precios y por lo mismo: si cada móvil tuviera el suyo, dos
@@ -1968,14 +1979,12 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { vivo = false; corta(); };
   }, [haySesionEquipo]);
 
-  useEffect(() => {
-    if (!nubeActiva() || !haySesionEquipo) return;
-    let vivo = true;
-    const aplicar = (remota) => { if (vivo && remota) setMemoria(saneaMemoria(remota)); };
-    cargarMemoriaNube().then(aplicar).catch(() => { /* sin conexión: sin memoria, no pasa nada */ });
-    const corta = suscribirMemoriaNube(aplicar);
-    return () => { vivo = false; corta(); };
-  }, [haySesionEquipo]);
+  // El cerebro del asistente no se ve en la checklist: espera al rato muerto.
+  useSuscripcionDiferida(nubeActiva() && haySesionEquipo, {
+    cargar: cargarMemoriaNube,
+    suscribir: suscribirMemoriaNube,
+    aplicar: (remota) => setMemoria(saneaMemoria(remota)),
+  });
 
   // Una sola puerta para guardar: así el estado y la nube nunca se separan, y el
   // asistente puede llamar a esto sin saber que existe Firestore.
@@ -2010,14 +2019,11 @@ export default function App({ onCerrarSesion } = {}) {
     memoriaRef.current = reforzada;
   }, []);
 
-  useEffect(() => {
-    if (!nubeActiva() || !haySesionEquipo) return;
-    let vivo = true;
-    const aplicar = (r) => { if (vivo && r) setObjetivos(saneaObjetivos(r)); };
-    cargarObjetivosNube().then(aplicar).catch(() => { /* sin conexión: sin objetivos */ });
-    const corta = suscribirObjetivosNube(aplicar);
-    return () => { vivo = false; corta(); };
-  }, [haySesionEquipo]);
+  useSuscripcionDiferida(nubeActiva() && haySesionEquipo, {
+    cargar: cargarObjetivosNube,
+    suscribir: suscribirObjetivosNube,
+    aplicar: (r) => setObjetivos(saneaObjetivos(r)),
+  });
 
   const guardarObjetivos = React.useCallback((siguiente) => {
     const limpios = saneaObjetivos(siguiente);
@@ -2028,14 +2034,11 @@ export default function App({ onCerrarSesion } = {}) {
     }
   }, [haySesionEquipo]);
 
-  useEffect(() => {
-    if (!nubeActiva() || !haySesionEquipo) return;
-    let vivo = true;
-    const aplicar = (r) => { if (vivo && r) setTareas(saneaTareas(r)); };
-    cargarTareasNube().then(aplicar).catch(() => { /* sin conexión: sin tareas */ });
-    const corta = suscribirTareasNube(aplicar);
-    return () => { vivo = false; corta(); };
-  }, [haySesionEquipo]);
+  useSuscripcionDiferida(nubeActiva() && haySesionEquipo, {
+    cargar: cargarTareasNube,
+    suscribir: suscribirTareasNube,
+    aplicar: (r) => setTareas(saneaTareas(r)),
+  });
 
   const guardarTareas = React.useCallback((siguiente) => {
     // Se limpian las hechas de eventos que ya pasaron al guardar, no en una tarea
@@ -2818,19 +2821,10 @@ export default function App({ onCerrarSesion } = {}) {
   return (
     <>
       {modalPrevia  && <ModalVistaPrevia checklist={checklist} evtKey={evento} pax={pax} ninos={ninos} meta={metaHoja} onClose={() => setModalPrevia(false)} />}
-      {/* El calendario llega por import() perezoso, así que la primera vez hay un
-          instante de descarga. El respaldo dice qué está pasando en vez de dejar la
-          pantalla en blanco, y va con estilos EN LÍNEA: las clases del calendario viajan
-          dentro del trozo que se está descargando, así que mientras carga todavía no
-          existen y la pantalla saldría sin colocar. */}
+      {/* Las pantallas perezosas tardan un instante la primera vez. El respaldo dice qué
+          está pasando en vez de dejar la pantalla en blanco (ver CargandoPanel.jsx). */}
       {modalCalendario && (
-        <React.Suspense fallback={
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 1000, display: "flex",
-            alignItems: "center", justifyContent: "center",
-            background: "var(--bg-main, #fff)", color: "var(--text-muted, #666)",
-          }}>Abriendo el calendario…</div>
-        }>
+        <React.Suspense fallback={<CargandoPanel texto="Abriendo el calendario…" />}>
           <CalendarioEnChecklist
             onCerrar={() => setModalCalendario(false)}
             onAbrirEvento={(nombre) => { setModalCalendario(false); handleCargarEvento(nombre); }}
@@ -2839,6 +2833,7 @@ export default function App({ onCerrarSesion } = {}) {
         </React.Suspense>
       )}
       {modoCarga && (
+        <React.Suspense fallback={<CargandoPanel texto="Abriendo Modo carga…" />}>
         <ModalModoCarga
           onGuardarPrecios={handleGuardarPrecios}
           preciosAlDia={preciosAlDia}
@@ -2883,8 +2878,10 @@ export default function App({ onCerrarSesion } = {}) {
           // delante de una checklist que no puede tocar y sin forma clara de volver.
           sinCerrar={soloCarga}
         />
+        </React.Suspense>
       )}
       {modalFormulario && (
+        <React.Suspense fallback={<CargandoPanel texto="Abriendo la bandeja…" />}>
         <ModalFormularioOficina
           codigo={codigoFormulario}
           enlace={enlaceFormulario}
@@ -2902,8 +2899,13 @@ export default function App({ onCerrarSesion } = {}) {
           onBorrar={handleBorrarEnvio}
           onClose={() => setModalFormulario(false)}
         />
+        </React.Suspense>
       )}
-      {modalAgregar && <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />}
+      {modalAgregar && (
+        <React.Suspense fallback={<CargandoPanel texto="Abriendo…" />}>
+          <ModalAgregarItems checklist={checklist} categoriasDisponibles={categoriasDisponibles} onClose={() => setModalAgregar(false)} onConfirm={handleAgregarItems} />
+        </React.Suspense>
+      )}
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
       {modalRecalcular && <ModalRecalcular cambios={modalRecalcular} onClose={() => setModalRecalcular(null)} onAplicar={handleAplicarRecalculo} />}
 

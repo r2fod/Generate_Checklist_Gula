@@ -36,6 +36,11 @@ export const TECHO_DOCUMENTO = 1048576;
 const AVISA_DESDE = 0.75;   // 786 kB: hay que empezar a pensar en archivar
 const URGE_DESDE = 0.9;     // 943 kB: queda poco y la escritura que falle pierde datos
 
+// Los tonos son los MISMOS TRES de revision.js ("falta", "raro", "acuerdate") y no dos
+// nuevos. Se inventaron "ojo" y "malo", y el resultado fue un aviso sin raya de color:
+// el CSS solo conoce `.cer-aviso.es-falta`, `.es-raro` y `.es-acuerdate`. Un vocabulario
+// paralelo en la punta de la cadena se nota tres pantallas más allá.
+
 const kB = (bytes) => `${Math.round(bytes / 1024)} kB`;
 
 // Puro y exportado: así se prueba sin Firestore delante. Devuelve null cuando el
@@ -47,7 +52,7 @@ export function avisoDePeso(nombre, bytes) {
     documento: nombre,
     bytes,
     porcentaje: Math.round(parte * 100),
-    tono: parte >= URGE_DESDE ? "malo" : "ojo",
+    tono: parte >= URGE_DESDE ? "falta" : "raro",
     texto: `El documento ${nombre} va por ${kB(bytes)} de los ${kB(TECHO_DOCUMENTO)} que caben (${Math.round(parte * 100)} %).`,
     // Un aviso que no dice qué hacer se lee, se asiente y se deja para luego.
     comoSeArregla: nombre.includes("calendario")

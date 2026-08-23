@@ -138,13 +138,22 @@ export default function Cerebro({
           </p>
           {/* Los documentos que se acercan al MiB de Firestore. Va antes que los eventos
               porque no es "a esta boda le falta un dato": es "el sábado que viene alguien
-              va a apuntar una boda y no va a poder guardarla". */}
-          {(repaso.documentos || []).map((d, i) => (
-            <li className={`cer-aviso es-${d.tono}`} key={`doc-${i}`} style={{ listStyle: "none" }}>
-              {d.texto}
-              {d.comoSeArregla && <em> · {d.comoSeArregla}</em>}
-            </li>
-          ))}
+              va a apuntar una boda y no va a poder guardarla".
+              Dentro de un <ul> como los avisos de cada evento: sueltos eran <li> fuera de
+              lista —HTML inválido— y encima se quedaban sin la separación que da
+              `.cer-repaso-evento ul`, así que aparecían pegados unos a otros. */}
+          {(repaso.documentos || []).length > 0 && (
+            <div className="cer-repaso-evento">
+              <ul>
+                {repaso.documentos.map((d, i) => (
+                  <li className={`cer-aviso es-${d.tono}`} key={`doc-${i}`}>
+                    {d.texto}
+                    {d.comoSeArregla && <em> · {d.comoSeArregla}</em>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {repaso.eventos.length === 0 ? (
             // "0 avisos" con 0 mirados es un error mudo; con doce, una buena noticia. Por
             // eso se dice el número de arriba y aquí solo se celebra si de verdad miró.
