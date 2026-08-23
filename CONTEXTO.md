@@ -643,6 +643,12 @@ corrección — con `setDoc`, subir solo la diferencia sobrescribiría el docume
 **Repaso de la noche — montado y probado en producción.** Mira 11 eventos, escribe en
 `indice/avisos`; cron a las 05:00 UTC.
 
+**Ajustes del asistente, sin texto de instalación.** El párrafo de "las claves no viven
+aquí… `worker/README.md`…" era para quien monta el Worker, no para quien usa la app cada
+día — el dueño lo vio y no le aportaba nada. Se quitó de `Asistente.jsx`; se quedan solo
+las dos notas de privacidad por proveedor (automático / OpenAI), que sí son del día a
+día. La razón de por qué la clave no vive en la app pasó a comentario de código.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

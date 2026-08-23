@@ -449,22 +449,23 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               </div>
             )}
 
-            <p className="asis-explica">
-              Las claves no viven aquí: viven en el proxy. Sin él no hay asistente, y con
-              una clave metida en la app la leería cualquiera — el repositorio es público.
-              Los pasos para montarlo están en <code>worker/README.md</code>. La dirección
-              se comparte con el equipo —quien la ponga primero la deja para los demás—,
-              así que no debería hacer falta tocarla salvo para apuntar a otra.
-              {proveedor === "auto" && (
-                <> <strong>En automático</strong> se elige según lo que preguntes: lo gratis
+            {/* Cómo se monta la dirección del proxy (por qué la clave no vive en la app,
+                los pasos en worker/README.md) es cosa de quien instala el asistente, no
+                de quien lo usa cada día — no se enseña aquí, solo lo que cambia según el
+                proveedor elegido, que sí es relevante en el día a día (privacidad). */}
+            {proveedor === "auto" && (
+              <p className="asis-explica">
+                <strong>En automático</strong> se elige según lo que preguntes: lo gratis
                 para el día a día, el de pago solo cuando haya que comparar o recomendar, y
-                nunca OpenAI para nada que lleve nombres de clientes.</>
-              )}
-              {proveedor === "openai" && (
-                <> <strong>Con OpenAI solo funcionan las cuentas y los cálculos:</strong> no
-                se le manda ningún nombre de cliente ni ninguna fecha.</>
-              )}
-            </p>
+                nunca OpenAI para nada que lleve nombres de clientes.
+              </p>
+            )}
+            {proveedor === "openai" && (
+              <p className="asis-explica">
+                <strong>Con OpenAI solo funcionan las cuentas y los cálculos:</strong> no
+                se le manda ningún nombre de cliente ni ninguna fecha.
+              </p>
+            )}
           </div>
         )}
 
