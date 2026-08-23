@@ -6560,30 +6560,46 @@ hr {
 .jarvis-disco-medio { fill: currentColor; opacity: 0.22; }
 .jarvis-nucleo      { fill: currentColor; }
 
-/* El aro de barras gira siempre despacio; más rápido cuando hay algo que contar. Solo
-   transform —nunca una propiedad que provoque reflow— para que 16 barras girando no
-   cuesten nada (ver "Las animaciones en bucle no pueden mover la maqueta"). */
+/* El aro de barras gira siempre despacio; el ritmo cambia con lo que está haciendo, no
+   solo el color —a 40px (la cabecera) el color se nota poco, y el ritmo es lo que se ve
+   de reojo—. Buscando (pensando) va deprisa; escuchando va tranquilo, que es esperar,
+   no trabajar; hablando queda en medio. Solo transform —nunca una propiedad que
+   provoque reflow— para que ninguna de las barras cueste nada (ver "Las animaciones en
+   bucle no pueden mover la maqueta"). */
 .jarvis-barras { transform-origin: 100px 100px; animation: jarvis-girar 12s linear infinite; }
-.jarvis-aro.es-pensando .jarvis-barras,
-.jarvis-aro.es-oyendo .jarvis-barras,
-.jarvis-aro.es-hablando .jarvis-barras { animation-duration: 3s; }
-.jarvis-aro.es-error .jarvis-barras { animation-duration: 1.4s; }
+.jarvis-aro.es-pensando .jarvis-barras { animation-duration: 2.4s; }
+.jarvis-aro.es-oyendo .jarvis-barras   { animation-duration: 6s; }
+.jarvis-aro.es-hablando .jarvis-barras { animation-duration: 4s; }
+.jarvis-aro.es-error .jarvis-barras    { animation-duration: 1.1s; }
 @keyframes jarvis-girar { to { transform: rotate(360deg); } }
 
-/* El núcleo late — más deprisa cuanto más "urgente" el estado. */
+/* El núcleo late, y el compás es del estado: buscando es rápido y regular; escuchando
+   es un respiro largo, tranquilo; hablando es un compás más entrecortado, parecido a
+   quien habla y no a quien respira; el error es el más urgente de los cinco. */
 .jarvis-nucleo, .jarvis-disco-medio {
   transform-origin: 100px 100px;
   animation: jarvis-latido 2.6s ease-in-out infinite;
 }
-.jarvis-aro.es-pensando .jarvis-nucleo, .jarvis-aro.es-pensando .jarvis-disco-medio,
-.jarvis-aro.es-oyendo .jarvis-nucleo, .jarvis-aro.es-oyendo .jarvis-disco-medio,
-.jarvis-aro.es-hablando .jarvis-nucleo, .jarvis-aro.es-hablando .jarvis-disco-medio {
-  animation-duration: 0.9s;
+.jarvis-aro.es-pensando .jarvis-nucleo, .jarvis-aro.es-pensando .jarvis-disco-medio {
+  animation-duration: 0.8s;
 }
-.jarvis-aro.es-error .jarvis-nucleo, .jarvis-aro.es-error .jarvis-disco-medio { animation-duration: 0.5s; }
+.jarvis-aro.es-oyendo .jarvis-nucleo, .jarvis-aro.es-oyendo .jarvis-disco-medio {
+  animation-duration: 1.7s;
+}
+.jarvis-aro.es-hablando .jarvis-nucleo, .jarvis-aro.es-hablando .jarvis-disco-medio {
+  animation: jarvis-habla 0.55s cubic-bezier(0.3, 1.4, 0.6, 1) infinite;
+}
+.jarvis-aro.es-error .jarvis-nucleo, .jarvis-aro.es-error .jarvis-disco-medio { animation-duration: 0.4s; }
 @keyframes jarvis-latido {
   0%, 100% { transform: scale(1); opacity: 1; }
   50%      { transform: scale(1.12); opacity: 0.75; }
+}
+/* Un compás propio para hablar: menos redondo que el latido de los demás, como quien
+   habla a golpes de sílaba y no respira despacio. */
+@keyframes jarvis-habla {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  40%      { transform: scale(1.16); opacity: 1; }
+  60%      { transform: scale(0.96); opacity: 0.7; }
 }
 
 /* Los cinco estados, la misma paleta que ya usa el resto del asistente: nunca un color
