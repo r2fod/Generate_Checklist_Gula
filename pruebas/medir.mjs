@@ -98,8 +98,15 @@ if (!CHROMIUM) {
 // forma de llegar a la rejilla y al asistente sin sesión de equipo. Los números salen
 // un pelín peores que en producción (sin minificar), pero lo que se busca es comparar
 // antes y después, no publicar una cifra bonita.
-const PUERTO = 4179;
-const vite = spawn("npx", ["vite", "--port", String(PUERTO), "--strictPort"], { stdio: "ignore" });
+//
+// 4180 y no 4179: ese puerto ya es de `app.test.mjs` (su prueba de "la app instalada
+// recibe los cambios"). Y se lanza el binario de Vite directamente, no por `npx vite`:
+// `npx` mete un proceso de por medio y `vite.kill()` solo mataba a `npx`, dejando el
+// servidor de verdad huérfano y con el puerto ocupado para la siguiente vez que algo
+// lo necesitara —justo lo que rompió el barrido completo del navegador al correr
+// `npm run medir` antes de `npm run test` en la misma sesión—.
+const PUERTO = 4180;
+const vite = spawn(process.execPath, ["node_modules/.bin/vite", "--port", String(PUERTO), "--strictPort"], { stdio: "ignore" });
 const esperar = (msg) => new Promise(r => setTimeout(r, msg));
 await esperar(4000);
 

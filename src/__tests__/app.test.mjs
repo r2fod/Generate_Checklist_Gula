@@ -2285,6 +2285,26 @@ async function main() {
     // se trae la nueva; y el chunk donde vive el texto, para que no se sirva el cacheado.
     const renombrados = { [jsViejo]: nuevo };
     conElTexto.forEach(f => { if (f !== jsViejo) renombrados[f] = f.replace(/^([^-]+)-.*\.js$/, "$1-VERSIONNUEVA.js"); });
+    // Vite encadena los hashes: si un chunk importa a otro que cambia, la línea del
+    // import (con el nombre de fichero dentro) también cambia, y con ella SU contenido,
+    // así que en un despliegue de verdad ese chunk también se lleva un hash nuevo. Con
+    // los perezosos nuevos (Modo carga, la bandeja, añadir varios) que reexportan cosas
+    // de la propia entrada, quedarse solo con los dos de arriba deja un chunk con el
+    // nombre viejo pero apuntando a la entrada nueva por dentro: el service worker sirve
+    // la copia que ya tenía cacheada de ANTES del despliegue —con la entrada vieja
+    // dentro— en vez de pedir una versión nueva que nunca llega a existir con ese nombre.
+    let siguenSaliendo = true;
+    while (siguenSaliendo) {
+      siguenSaliendo = false;
+      for (const f of fs3.readdirSync(assets).filter(f => f.endsWith(".js") && !(f in renombrados))) {
+        const referenciaAlgoRenombrado = Object.keys(renombrados)
+          .some(viejo => fs3.readFileSync(`${assets}/${f}`, "utf8").includes(viejo));
+        if (referenciaAlgoRenombrado) {
+          renombrados[f] = f.replace(/^([^-]+)-.*\.js$/, "$1-VERSIONNUEVA.js");
+          siguenSaliendo = true;
+        }
+      }
+    }
     Object.entries(renombrados).forEach(([viejo, nue]) => {
       fs3.writeFileSync(`${assets}/${nue}`,
         fs3.readFileSync(`${assets}/${viejo}`, "utf8").replaceAll(MARCA, "CAMBIO VERSION NUEVA"));

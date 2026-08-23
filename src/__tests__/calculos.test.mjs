@@ -1602,6 +1602,20 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
   const copiasTema = ficheros.filter(f => f !== "src/tema.js"
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));
   ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);
+
+  // pruebas/medir.mjs lanzaba su Vite con `npx vite`, y `.kill()` solo mata a npx: el
+  // Vite de verdad se quedaba huérfano y con el puerto ocupado para la siguiente vez.
+  // Encima usaba el mismo puerto que `app.test.mjs`, así que ese huérfano tumbaba el
+  // barrido entero del navegador si alguien lanzaba `npm run medir` antes de `npm run
+  // test` en la misma sesión (como pasó al revisar esta rama).
+  const medir = readFileSync("pruebas/medir.mjs", "utf8");
+  ok(!/spawn\(\s*["']npx["']/.test(medir),
+    "medir.mjs lanza Vite directo (node_modules/.bin/vite), no por npx: así vite.kill() mata al proceso de verdad");
+  const appTest = readFileSync("src/__tests__/app.test.mjs", "utf8");
+  const puertosAppTest = [...appTest.matchAll(/PUERTO2?\s*=\s*(\d+)/g)].map(m => m[1]);
+  const puertoMedir = (medir.match(/const PUERTO\s*=\s*(\d+)/) || [])[1];
+  ok(!!puertoMedir && !puertosAppTest.includes(puertoMedir),
+    `medir.mjs (puerto ${puertoMedir}) no comparte puerto con app.test.mjs (${puertosAppTest.join(", ")})`);
 }
 
 console.log("\n══ Las animaciones en bucle no pueden mover la maqueta ══");

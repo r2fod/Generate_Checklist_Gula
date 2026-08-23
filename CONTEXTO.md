@@ -6,37 +6,43 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 - Rama `main` · Firebase: `gula-checklist`
 - **Reglas del dueño → `CLAUDE.md`** (se carga solo en cada sesión). Léelo primero.
 
-## ⚠ Estado de la rama `arena/01a02ba9-…`: qué comprobar ANTES de fusionar y publicar
+## ⚠ Estado de la rama `arena/01a02ba9-…`: verificada por otra sesión, con 2 fallos reales arreglados
 
-Esta rama va **10 commits por delante de `main`** y trae CI, desduplicación, rendimiento,
-reglas de Firestore, diario de fallos y tipado. Todo verde en lo que se puede lanzar sin
-navegador. **Lo que sigue es lo que hay que comprobar antes de tocar `main` o publicar**,
-y por qué cada cosa está en la lista.
+Esta rama va por delante de `main` y trae CI, desduplicación, rendimiento, reglas de
+Firestore, diario de fallos y tipado. Una sesión distinta (con chromium y Java
+disponibles, que es justo lo que le faltaba a quien la escribió) la ha comprobado
+entera: **`npm run test` (711/711), `TZ=Pacific/Auckland npm run test:rapido` y
+`npm run reglas:emulador` (28/28 contra el motor real) están en verde.**
 
-**a) Lo que se comprueba con un comando** (en el portátil, no en el contenedor):
+Por el camino aparecieron dos fallos reales, los dos ya arreglados y con su prueba:
 
-```
-npm ci
-npm run lint            # 0 ERRORES (los ~112 warnings de catch(e) son de la casa)
-npm run test:rapido     # tipos + cálculos + asistente + build + sincronización
-TZ=Pacific/Auckland npm run test:rapido    # las fechas, en un huso que no sea el nuestro
-npm run test            # ← LA IMPORTANTE: incluye los 711 del navegador (~45 min)
-npm run reglas:emulador # firestore.rules contra el motor real (pide Java)
-npm run medir           # rendimiento; con chromium delante da también los del navegador
-```
+1. **`pruebas/medir.mjs` tumbaba la batería completa si se lanzaba antes que `npm run
+   test` en la misma sesión.** Usaba el mismo puerto (4179) que la prueba de "la app
+   instalada" de `app.test.mjs`, y lanzaba Vite por `npx` — `vite.kill()` solo mata a
+   `npx`, así que el Vite de verdad se quedaba huérfano ocupando el puerto. Arreglado:
+   puerto propio (4180) y Vite lanzado directo (`node_modules/.bin/vite`), con una
+   prueba en `calculos.test.mjs` que vigila que no vuelva a compartir puerto ni a
+   pasar por `npx`.
+2. **La prueba "la app instalada recibe los cambios" fallaba de verdad al lanzarla
+   —no era un problema de la app.** Simulaba un despliegue renombrando solo la entrada
+   y el chunk con el texto de prueba, pero no tenía en cuenta que Vite **encadena los
+   hashes**: si un chunk perezoso importa a otro que cambia, su propio contenido
+   cambia y por tanto también su hash. Con los tres perezosos nuevos (Modo carga, la
+   bandeja, añadir varios) reexportando cosas de la entrada, la prueba dejaba un chunk
+   con el nombre viejo pero el contenido tocado, y el service worker servía la copia
+   que ya tenía cacheada de ANTES del cambio. Arreglado con un barrido de punto fijo
+   que también renombra cualquier chunk que referencie a uno ya renombrado —así se
+   simula de verdad el encadenado de hashes—. Confirmado con y sin cobertura.
 
-**b) Lo que NINGUNA prueba puede decirte, y hay que mirar con los ojos** (`CLAUDE.md`
-manda captura, y en el contenedor de trabajo no hay chromium):
+**Lo que sigue pidiendo ojos humanos** (`CLAUDE.md` manda captura; ninguna prueba lo
+verifica a nivel de píxel):
 
-1. **Modo carga, la bandeja de la oficina y "añadir varios items" ahora son perezosas.**
-   Ábrelas las tres: tienen que aparecer igual que siempre, con un respaldo de un
-   instante la primera vez. Es el cambio con más riesgo de toda la rama.
-2. **El calendario, con el mes lleno.** La rejilla ya no se repinta con cada foto de
-   Firestore; comprueba que un apunte hecho desde otro móvil sigue apareciendo solo.
-3. **Cerebro → El repaso de la noche.** Si hay aviso de documento cerca del MiB, tiene
-   que salir con su raya de color y separado, no pegado al de abajo.
-4. **Los avisos de recogidas y devoluciones.** Aquí había un fallo de un día (ver
-   `fecha.js`): mira que "hoy" y "mañana" digan lo que toca de verdad.
+1. **Cerebro → El repaso de la noche, con aviso de documento cerca del MiB.** El JSX y
+   las clases CSS están comprobados (por código y por una prueba de estructura), pero
+   nadie ha visto la raya de color renderizada de verdad.
+2. **Modo carga, la bandeja y "añadir varios items"**: el barrido de 711 los abre y
+   comprueba que aparecen, pero un vistazo humano al respaldo perezoso (un instante la
+   primera vez) sigue sin hacerse.
 
 **c) Lo que solo puede hacer el dueño** (aquí la API contesta `403`): mover
 `ci/test.yml` y `ci/deploy.yml` a `.github/workflows/`, proteger `main`, y **volver a
@@ -126,14 +132,13 @@ npm run reglas:deploy # firebase deploy --only firestore:rules
 npm run deploy        # predeploy = test; no publica en rojo
 ```
 
-**385 (cálculos) + 420 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
-Y aparte, `npm run reglas:emulador`: 26 comprobaciones de `firestore.rules` contra el
-motor real de Google (pide Java y el emulador; en el contenedor de trabajo se saltan).
+**387 (cálculos) + 420 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
+Y aparte, `npm run reglas:emulador`: 28 comprobaciones de `firestore.rules` contra el
+motor real de Google (pide Java y el emulador; en el contenedor de trabajo original se
+saltaban — otra sesión, con Java y chromium disponibles, los ha lanzado los dos).
 Batería completa: **~45 min** (barrido responsive: 9 anchos × 2 temas × 10 pantallas =
 180 cargas). No está colgada.
-⚠️ Los 711 del navegador **no se han vuelto a lanzar** desde la tanda CI/desduplicación:
-el contenedor donde se trabajó no tiene chromium ni puede bajarlo. Lánzalos antes del
-próximo deploy (es lo que hace `predeploy` de todas formas).
+Confirmado en verde de punta a punta (ver "Estado de la rama" arriba del todo).
 
 ### CI y publicación (`ci/*.yml`, todavía FUERA de su sitio)
 
@@ -553,8 +558,8 @@ el primero no tenía —el punto de logística— es la última fila, y es lo ú
 |---|---|---|
 | **N1** | CI en push/PR, check de `worker/pegar.js`, `deploy.yml`, proteger `main` | Código hecho. **Del dueño**: mover los dos `.yml` y proteger `main` |
 | **N2** | Desduplicar `texto`, `fecha`, `almacen`, `tema` + un solo `hoyISO()` | Hecho. Destapó un fallo de un día en los avisos, arreglado |
-| **N3** | Rendimiento: perezosas, suscripciones diferidas, jank | Hecho y medido: el arranque baja de 50,1 a 39,3 kB gzip. **Falta el barrido del navegador** |
-| **N4** | `firebase.json` + reglas contra el emulador de verdad | Hecho. Aquí se salta (sin Java); corre en CI y en el portátil |
+| **N3** | Rendimiento: perezosas, suscripciones diferidas, jank | Hecho y medido: el arranque baja de 50,1 a 39,3 kB gzip. Barrido del navegador: verde |
+| **N4** | `firebase.json` + reglas contra el emulador de verdad | Hecho y comprobado contra el motor real (28/28) |
 | **N5** | Observabilidad sin PII, con `__BUILD_ID__` | Hecho: `src/diario.js`, estructurado y con la compilación |
 | **N6** | Tipado gradual (`checkJs`) en los módulos de cálculo | Hecho: 13 ficheros. Cazó tres fallos reales |
 | **—** | **Logística: niños, hielo y contraste con el sector** | **SIN EMPEZAR.** Es el punto 2 del encargo y toca cantidades que salen en el camión |
@@ -566,17 +571,12 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ### Lo que queda abierto del plan
 
-1. **Los 711 del navegador, sin lanzar.** Ahora importa más que nunca: el `React.lazy` de
-   Modo carga y de la bandeja cambia CUÁNDO aparecen esos modales, y quien lo cubre es
-   justo esa batería. **Obligatorio antes del deploy** (y `predeploy` ya lo hace).
-2. **Las capturas.** Se arreglaron dos cosas de interfaz (el aviso de documentos, que era
-   un `<li>` suelto, y sus tonos) y se hicieron tres pantallas perezosas. Todo eso pide
-   ojo humano, y en el contenedor no hay chromium ni se puede descargar.
-3. **`npm run reglas:emulador` sin correr aquí**: hace falta Java y bajar el JAR, y la
-   descarga está cortada. Es el único sitio donde `firestore.rules` se comprueba de
-   verdad; hasta que se lance, lo que hay es el simulado —que reescribe las reglas— más
-   la prueba de coherencia entre ambos.
-4. **El punto 2 del encargo (logística) sin empezar**: coeficientes de niños en comida,
+1. **Las capturas.** Se arreglaron dos cosas de interfaz (el aviso de documentos, que era
+   un `<li>` suelto, y sus tonos) y se hicieron tres pantallas perezosas. El barrido de
+   711 confirma que todo aparece donde debe, pero el ojo humano sobre el respaldo
+   perezoso y la raya de color del aviso de documento sigue sin hacerse (ver "Estado de
+   la rama" arriba).
+2. **El punto 2 del encargo (logística) sin empezar**: coeficientes de niños en comida,
    refrescos y equipamiento; hielo en kg y en taxis con margen de derretimiento cuando no
    hay congelador; y contrastar los ratios con lo que usa el sector. Se ha dejado aparte a
    propósito: cambia cantidades que se cargan en un camión, así que va con los números
@@ -607,7 +607,6 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
   corre allí es el bundle viejo hasta que se pegue.
 - **`deploy.yml`**: ya escrito (`ci/deploy.yml`, con la batería entera como puerta).
   Al moverlo, comprobar que Settings → Pages sigue apuntando a la rama `gh-pages`.
-- **Lanzar `npm run test` entero** (los 711 del navegador) antes del próximo deploy.
 
 **2. Logística: los números que se cargan en el camión — SIN EMPEZAR**
 - **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
