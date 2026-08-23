@@ -189,6 +189,7 @@ function leerRatios() {
 }
 //#endregion
 //#region src/mesas.js
+/** @type {Record<string, { porMesa: number, alquiler: boolean, etiqueta: string }>} */
 const TIPOS_MESA = {
 	"Rectangular 1,8m": {
 		porMesa: 6,
