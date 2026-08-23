@@ -400,6 +400,50 @@ destruye lo marcado en el camión, sin recuperación y sin saber por qué.
 3. **Marcar apuntes en UNA sola escritura** — tres seguidas parten de la misma foto,
    solo sobrevive la última.
 
+## Plan de mejoras por niveles (N1–N6) — estado
+
+El plan lo dio el dueño en una sesión y **vivía solo en el chat**, que es justo lo que
+`CLAUDE.md` prohíbe. Queda aquí, con lo hecho, lo que falta y lo que se descartó **con su
+motivo**, para que la siguiente sesión no lo reinvente ni lo repita.
+
+| Nivel | Qué era | Estado |
+|---|---|---|
+| **N1** | CI en push/PR + check de `worker/pegar.js` regenerado + proteger `main` | Hecho el fichero (`ci/test.yml`); **falta moverlo** y proteger `main` (del dueño) |
+| **N2** | Desduplicar `fecha.js`, `texto.js`, `almacen.js`, `aplicarTemaInicial` | Hecho, con 3 pruebas que impiden volver a copiarlo |
+| **N3** | `firebase.json` + simulado cubriendo `publico/` y `envios/` | Hecho (`npm run reglas:deploy`, 15 comprobaciones nuevas) |
+| **N4** | Observabilidad sin PII | Hecho: `src/diario.js` + botón en la pantalla de fallo |
+| **N5** | Tipado gradual solo en módulos puros | Hecho: `jsconfig.json`, 6 ficheros, dentro de `test:rapido` |
+| **N6** | Rendimiento del asistente y el calendario, **midiendo antes** | Medido y aplicado; **2 fallos de interfaz abiertos** (abajo) |
+
+**Reglas que puso el dueño para todo el plan** (siguen vigentes): no partir `App.jsx` ni
+`index.css`, no cambiar el sistema de estado, no tocar las tres guardias ni la identidad
+`categoría::etiqueta`, ni un `useMemo`/`useCallback` sin medición delante, todo en
+español, repo público sin PII, y una prueba por cada fallo arreglado.
+
+### Lo que queda abierto del plan
+
+1. **`Cerebro.jsx`: el aviso de documentos cerca del MiB se pinta como `<li>` suelto**,
+   fuera de un `<ul>`. HTML inválido y sin el `gap` que da `.cer-repaso-evento ul`.
+2. **Ese aviso usa tonos inventados** (`ojo`, `malo`) y el CSS solo conoce los tres de
+   `revision.js` (`falta`, `raro`, `acuerdate`): sale sin raya de color. Se arregla
+   usando el vocabulario de siempre, no añadiendo dos tonos más.
+   Los dos son interfaz → **piden captura**, y el contenedor de trabajo no tiene chromium.
+3. **Barrido del navegador (711) sin lanzar** desde N1, por lo mismo.
+4. **Deploy B de precios**: ya está hecho (`PRECIOS_BASE` fuera). Lo que falta es la
+   comprobación del dueño de los 53 en `indice/precios` desde otro dispositivo.
+5. **`deploy.yml`**: no se escribe hasta que el dueño dé el OK. No es un olvido.
+
+### Descartado en este plan, y por qué
+
+- **Unificar UTC y local en una sola función de "hoy"** (parecía la desduplicación
+  obvia): mueve la frontera de "esto ya ha pasado" entre las 00:00 y las 02:00 de verano.
+- **Meter `useMemo` en el calendario**: medido, la aritmética son ~2,7 ms con 250
+  apuntes. El coste está en React pintando, y eso todavía no se ha medido.
+- **Cambiar las tres animaciones en bucle que no son `transform`/`opacity`** (degradado
+  del logo, boca del muñeco, aro del micro): son de pintado, no provocan reflow, y
+  tocarlas es riesgo visual a cambio de nada.
+- **Tipar `App.jsx`**: cientos de avisos que nadie miraría, tapando los que importan.
+
 ## Pendiente
 
 **0. Del dueño, fuera de la app** (30 segundos cada una, aquí no hay permiso):
