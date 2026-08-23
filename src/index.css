@@ -6295,11 +6295,18 @@ hr {
   color: var(--accent);
 }
 
+/* Antes era texto suelto flotando sobre el fondo del panel, sin ningún borde que lo
+   distinguiera del resto: en un panel oscuro, letra gris sobre gris parece que falta
+   algo, no que hay una nota. Con su propia tarjeta se lee como lo que es —una
+   explicación aparte—, no como relleno. */
 .asis-explica {
   margin: 0;
+  padding: 10px 12px;
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--text-muted);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
 }
 
 .asis-explica code {
@@ -6320,7 +6327,18 @@ hr {
   gap: 12px;
 }
 
-.asis-vacio { font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; }
+/* Mismo tratamiento que .asis-explica: una tarjeta, no texto suelto. Es lo primero que
+   se ve al abrir una pestaña vacía —Charla, Tareas, Gasto, Cerebro— y en gris plano
+   sobre el fondo del panel parecía que la pantalla no había cargado del todo. */
+.asis-vacio {
+  padding: 14px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+}
+.asis-vacio p { margin: 0; }
 .asis-vacio ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 
 .asis-msg { display: flex; flex-direction: column; gap: 4px; max-width: 100%; }
