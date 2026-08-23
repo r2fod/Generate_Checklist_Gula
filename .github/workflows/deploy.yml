@@ -74,8 +74,14 @@ jobs:
       - name: Qué compilación se publica
         run: cat dist/version.json
       - name: Publicar en gh-pages
+        # gh-pages valida -u con un parser de correo RFC 5322 estricto (el paquete
+        # email-addresses), y ese estándar no admite corchetes sueltos ni en el nombre
+        # ni en la parte local de la dirección — así que el "[bot]" del propio email de
+        # GitHub para Actions hace falta entrecomillarlo dos veces, en el nombre y en la
+        # dirección, o el parser lo rechaza entero y la publicación automática no llega
+        # a empezar. Comprobado con el mismo parser antes de subir esto.
         run: |
           npx gh-pages -d dist \
             -r "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            -u "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>" \
+            -u "\"github-actions[bot]\" <\"41898282+github-actions[bot]\"@users.noreply.github.com>" \
             -m "Publica ${{ github.sha }}"

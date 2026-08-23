@@ -6,15 +6,25 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 - Rama `main` · Firebase: `gula-checklist`
 - **Reglas del dueño → `CLAUDE.md`** (se carga solo en cada sesión). Léelo primero.
 
-## ⚠ Estado de la rama `arena/01a02ba9-…`: verificada por otra sesión, con 2 fallos reales arreglados
+## ⚠ El plan N1–N6 (CI, dedup, rendimiento, reglas, diario, tipado) ya está en `main`
 
-Esta rama va por delante de `main` y trae CI, desduplicación, rendimiento, reglas de
-Firestore, diario de fallos y tipado. Una sesión distinta (con chromium y Java
-disponibles, que es justo lo que le faltaba a quien la escribió) la ha comprobado
-entera: **`npm run test` (711/711), `TZ=Pacific/Auckland npm run test:rapido` y
-`npm run reglas:emulador` (28/28 contra el motor real) están en verde.**
+Se verificó entero (`npm run test` 711/711, `TZ=Pacific/Auckland npm run test:rapido`,
+`npm run reglas:emulador` 28/28 contra el motor real), se fusionó y **ya está publicado
+en producción**. La rama `arena/01a02ba9-…` sigue existiendo en el remoto (fusión
+limpia, sin nada que perder si se borra) por decisión del dueño, no porque falte algo
+por traer de ella.
 
-Por el camino aparecieron dos fallos reales, los dos ya arreglados y con su prueba:
+**CI y publicación, funcionando de verdad**: `.github/workflows/test.yml` y `deploy.yml`
+corren solos en cada push, y `main` está protegida (PR + los dos checks obligatorios).
+Un fallo real de CI ya cazado con esto en marcha: `gh-pages -u "github-actions[bot] <...>"`
+—el email de bot de GitHub, sin comillas— no pasa el parser RFC 5322 estricto que usa
+`gh-pages` (paquete `email-addresses`): rechaza el corchete suelto tanto en el nombre
+como en la parte local de la dirección. Se entrecomilla dos veces (nombre Y dirección) y
+pasa. Sin este fix, `deploy.yml` corría la batería entera (verde) y fallaba SOLO en el
+último paso, el de publicar — dos veces seguidas, siempre igual, siempre instantáneo.
+
+Por el camino de la verificación de esa rama aparecieron dos fallos reales más, los dos
+arreglados y con su prueba:
 
 1. **`pruebas/medir.mjs` tumbaba la batería completa si se lanzaba antes que `npm run
    test` en la misma sesión.** Usaba el mismo puerto (4179) que la prueba de "la app
@@ -44,9 +54,10 @@ verifica a nivel de píxel):
    comprueba que aparecen, pero un vistazo humano al respaldo perezoso (un instante la
    primera vez) sigue sin hacerse.
 
-**c) Lo que solo puede hacer el dueño** (aquí la API contesta `403`): mover
-`ci/test.yml` y `ci/deploy.yml` a `.github/workflows/`, proteger `main`, y **volver a
-pegar `worker/pegar.js` en Cloudflare** (el bundle cambió). Detalle en "Pendiente".
+**c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
+mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
+protegida con los dos checks obligatorios, y `worker/pegar.js` vuelto a pegar en
+Cloudflare (confirmado con "Repasar los eventos ahora").
 
 **d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños y la
 calibración del hielo (ver "Pendiente", punto 2). Nadie ha tocado esos números todavía.
@@ -140,7 +151,7 @@ Batería completa: **~45 min** (barrido responsive: 9 anchos × 2 temas × 10 pa
 180 cargas). No está colgada.
 Confirmado en verde de punta a punta (ver "Estado de la rama" arriba del todo).
 
-### CI y publicación (`ci/*.yml`, todavía FUERA de su sitio)
+### CI y publicación (`.github/workflows/*.yml`, ya en su sitio y corriendo solos)
 
 En cada push/PR: `npm ci` + `lint` + `test:rapido`, y un trabajo aparte que regenera
 `worker/pegar.js` y falla si sale distinto del subido (si la fuente cambió y nadie lo
@@ -156,14 +167,10 @@ Settings → Pages, así que no cambia de sitio nada y publicar a mano con `npm 
 sigue funcionando igual. Usa `npm run build`, no `npm run deploy`, para no repetir los
 45 minutos que el trabajo anterior ya pasó.
 
-**Los dos están en `ci/` y hay que moverlos a `.github/workflows/`.** GitHub rechaza el
-push entero cuando una App sin permiso `workflows` toca esa carpeta (*"refusing to allow
-a GitHub App to create or update workflow"*). Lo mueve el dueño:
-
-```
-git mv ci/test.yml .github/workflows/test.yml
-git mv ci/deploy.yml .github/workflows/deploy.yml
-```
+**Ya movidos.** Vivían en `ci/` porque GitHub rechaza el push entero cuando una App sin
+permiso `workflows` toca `.github/workflows/` (*"refusing to allow a GitHub App to
+create or update workflow"*) — solo el dueño podía moverlos, y lo hizo a mano desde la
+web de GitHub.
 
 ### Proceso — costó deploys rotos y trabajo perdido
 
@@ -596,19 +603,7 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ## Pendiente
 
-**0. Del dueño, fuera de la app** (30 segundos cada una, aquí no hay permiso):
-- **Mover `ci/test.yml` → `.github/workflows/test.yml`** (ver "CI"). Hasta entonces no
-  corre nada solo.
-- **Proteger `main`**: Settings → Branches, patrón `main`, pedir PR y exigir los checks
-  *Lint y pruebas rápidas* y *worker/pegar.js regenerado*. La API contesta `403 Resource
-  not accessible by integration`: es cosa de un administrador.
-- **Volver a pegar `worker/pegar.js` en Cloudflare**: la desduplicación tocó
-  `menus-especiales.js`, que va empaquetado dentro. Mismo comportamiento, pero lo que
-  corre allí es el bundle viejo hasta que se pegue.
-- **`deploy.yml`**: ya escrito (`ci/deploy.yml`, con la batería entera como puerta).
-  Al moverlo, comprobar que Settings → Pages sigue apuntando a la rama `gh-pages`.
-
-**2. Logística: los números que se cargan en el camión — SIN EMPEZAR**
+**1. Logística: los números que se cargan en el camión — SIN EMPEZAR**
 - **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
   eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
   separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
@@ -620,13 +615,13 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
   corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
   camión, no una constante cualquiera.
 
-**3. Del dueño, en la app** (necesita su sesión):
+**2. Del dueño, en la app** (necesita su sesión):
 - Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
 - Ratios de cumpleaños/producción: panel existe, falta medir un evento real.
-- Verificar los **53 precios** en `indice/precios` desde otro dispositivo (el Despliegue B
-  —quitar `PRECIOS_BASE`— ya está hecho; esto es la comprobación de que llegaron).
+- ~~Verificar los 53 precios en `indice/precios` desde otro dispositivo~~ — hecho,
+  confirmado por el dueño: llegaron los 53.
 
-**4. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
+**3. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
 segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
