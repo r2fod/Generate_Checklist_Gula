@@ -25,6 +25,7 @@ import { RATIOS_BEBIDA, factoresDeTipo } from "./bebida.js";
 // en coma flotante 100 * 1.1 da 110.00000000000001, así que el redondeo hacia arriba
 // se llevaba una unidad de más SIEMPRE que la cuenta caía justo en un entero — 100
 // copas pedían 111. Multiplicando por un entero primero no queda resto que redondear.
+/** @param {number} n @returns {number} */
 export const conMargen = (n) => Math.ceil((n * 11) / 10);
 
 // ─── HIELO ────────────────────────────────────────────────────────────────────
@@ -49,6 +50,11 @@ const MERMA_SIN_CONGELADOR = { verano: 1.35, invierno: 1.2 };
 
 // Devuelve las tres unidades porque las tres se usan: los kilos para pedirlo, las bolsas
 // para contarlo al cargar y los taxis para saber cuánto sitio ocupa en el camión.
+/**
+ * @param {number} pax
+ * @param {{ mesVerano?: boolean, horasBarra?: number, tieneCongelador?: boolean }} [opciones]
+ * @returns {{ kg: number, bolsas: number, taxis: number }}
+ */
 export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongelador = false } = {}) {
   const n = Math.max(0, Math.round(pax) || 0);
   if (!n) return { kg: 0, bolsas: 0, taxis: 0 };
@@ -64,6 +70,7 @@ export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongela
 
 // Cuántas copas/vasos caben en cada batea, por tipo
 export const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
+/** @param {number} units @param {number} size @returns {number} */
 export function bateas(units, size) { return Math.ceil(units / size); }
 
 // Botellas de 33cl por persona y DÍA en un rodaje. Va por temporada porque la
@@ -82,6 +89,7 @@ export const RENDIMIENTO_BARRIL = 0.85;
 
 // Cuántos tercios hay que llevar además del barril (o en vez de él). Con barril nunca
 // se baja del respaldo: si el tirador falla, quedarse a cero es quedarse sin cerveza.
+/** @param {number} terciosNecesarios @param {number} litrosBarril @param {number} numBarriles @returns {number} */
 export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
   const litrosUtiles = litrosBarril * Math.max(1, numBarriles) * RENDIMIENTO_BARRIL;
   const restantes = Math.max(0, terciosNecesarios * 0.33 - litrosUtiles);
@@ -101,6 +109,16 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
 // adultos, así que en una comunión de 60+25 faltaba agua y refresco para 25 personas.
 // "tipo" es el tipo de evento (boda, comunion...) y solo sirve para coger su factor de
 // bebida. Sin él todos valen 1, que es exactamente lo que salía antes de que existieran.
+/**
+ * @param {number} pax comensales totales (adultos + niños)
+ * @param {number} h horas de barra
+ * @param {boolean} mesVerano
+ * @param {boolean} tieneCongelador
+ * @param {boolean} [tieneBrindisCava]
+ * @param {number} [horasCopas]
+ * @param {{ alcoholPax?: number, tipo?: string }} [opciones] alcoholPax = solo adultos
+ * @returns {Record<string, any>}
+ */
 export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax, tipo = "" } = {}) {
   const factor = factoresDeTipo(tipo);
   // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
@@ -214,13 +232,14 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   };
 }
 
+/** @param {number} pax @param {number} h horas de copas @returns {Record<string, number>} */
 export function calcDestilados(pax, h) {
   // Factor de horas de copas acotado (máx. 1,75): en barras muy largas el consumo
   // de destilados por pax no sigue creciendo linealmente, igual que la cerveza/cristalería.
   const f = Math.min(1.75, h / 4);
-  const r  = (base) => Math.max(1, Math.round(base * f));
+  const r  = (/** @type {number} */ base) => Math.max(1, Math.round(base * f));
   // Estos licores no se compran de uno en uno: mínimo 2 botellas
-  const r2 = (base) => Math.max(2, Math.round(base * f));
+  const r2 = (/** @type {number} */ base) => Math.max(2, Math.round(base * f));
   // ─── Reparto entre destilados ───────────────────────────────────────────────
   // La referencia del sector para una barra libre española es 40% ginebra, 30% ron,
   // 20% whisky, 10% vodka. La ginebra ya iba por encima de esa referencia (47% del
@@ -260,6 +279,11 @@ export function calcDestilados(pax, h) {
 // medio de siete argumentos posicionales es una bomba de relojería: al primero que le
 // estorbe y lo quite, todos los de detrás se corren un sitio y "dobleCopa" pasa a leer
 // las horas de copas. Fuera antes de que pase.
+/**
+ * @param {number} pax @param {number} horasCopas @param {boolean} dobleCopa
+ * @param {boolean} tieneBrindisCava @param {boolean} llevaEntrante @param {number} [extraAguaDesayuno]
+ * @returns {Record<string, { u: number, b: number, size: number } | null>}
+ */
 export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
   // ─── CRISTALERÍA, AL EXTREMO ALTO DEL SECTOR ────────────────────────────────
   // Antes las copas de vino, agua y cava se multiplicaban por un factor de horas que
@@ -290,7 +314,7 @@ export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, ll
   const agua = conMargen(pax * VASOS_AGUA_POR_PAX * mult) + extraAguaDesayuno;
   const cubata = conMargen(pax * copasBarraPorPax);
   const cavaCopas = conMargen(pax * (tieneBrindisCava ? COPAS_CAVA_CON_BRINDIS : COPAS_CAVA_POR_PAX));
-  const fmt = (u, size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
+  const fmt = (/** @type {number} */ u, /** @type {number} */ size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
   return {
     agua: fmt(agua, BATEA.agua), cubata: fmt(cubata, BATEA.cubata),
     vino: fmt(vino, BATEA.vino), cava: fmt(cavaCopas, BATEA.cava),
@@ -302,6 +326,7 @@ export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, ll
 // dos de más ocupando sitio en el camión — mientras que en una boda de 200 se quedaban
 // cortas. Van por gente: 2 de mínimo y una más por cada 50 personas.
 //   40 → 2 · 100 → 3 · 150 → 4 · 200 → 5
+/** @param {number} pax @returns {number} */
 export function champaneras(pax) {
   return Math.max(2, Math.ceil(pax / 50) + 1);
 }
@@ -314,9 +339,14 @@ export function champaneras(pax) {
 //   · las de pasar comida van siempre (canapés, aperitivos, lo que sea)
 //   · si el servicio es entero en bandeja hacen falta bastantes más
 //   · y encima suman las del tipo elegido para el servicio (madera, plata o mixto)
+/**
+ * @param {number} pax
+ * @param {{ soloBandeja?: boolean, tipoBandejas?: string, extraMadera?: number, extraPlata?: number }} [opciones]
+ * @returns {{ pasar: number, madera: number, plata: number }}
+ */
 export function calcBandejas(pax, { soloBandeja = false, tipoBandejas = "Mixto", extraMadera = 0, extraPlata = 0 } = {}) {
   const pasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
-  const delTipo = (suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20))
+  const delTipo = (/** @type {string} */ suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20))
     : (tipoBandejas === suyo ? Math.max(2, Math.ceil(pax / 10)) : 0);
   return {
     pasar,

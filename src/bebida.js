@@ -35,6 +35,7 @@ export const RATIOS_BEBIDA = {
 // prueba unitaria comprueba que todas existen en una checklist de verdad).
 // "sobre" dice a quién se le reparte: el alcohol solo a los adultos, el refresco a todos
 // (los niños son justo los que más refresco beben).
+/** @type {Record<string, { nombre: string, sobre: "adultos"|"todos", items: string[] }>} */
 export const BEBIDAS = {
   vino:     { nombre: "Vino",     sobre: "adultos", items: ["Vino blanco", "Vino tinto"] },
   cerveza:  { nombre: "Cerveza",  sobre: "adultos", items: ["Cerveza Alhambra (tercios)"] },
@@ -57,15 +58,24 @@ export const FACTOR_NEUTRO = 1;
 // Fuera de 0,3–2 no hay un evento raro, hay un dedo resbalando: un 0,1 deja la boda sin
 // vino y un 5 pide cinco veces la bebida de un evento entero.
 const MIN_FACTOR = 0.3, MAX_FACTOR = 2;
+/** @param {unknown} n @returns {n is number} */
 export function esFactorValido(n) {
-  return Number.isFinite(n) && n >= MIN_FACTOR && n <= MAX_FACTOR;
+  return typeof n === "number" && Number.isFinite(n) && n >= MIN_FACTOR && n <= MAX_FACTOR;
 }
 
+/**
+ * Un mapa esparcido: tipo de evento → bebida → factor. Solo lo tocado.
+ * @typedef {Record<string, Record<string, number>>} Factores
+ */
+
+/** @param {unknown} brutos @returns {Factores} */
 export function saneaFactores(brutos) {
+  /** @type {Factores} */
   const limpio = {};
   if (!brutos || typeof brutos !== "object") return limpio;
+  const datos = /** @type {Record<string, any>} */ (brutos);
   TIPOS_BEBIDA.forEach(tipo => {
-    const fila = brutos[tipo];
+    const fila = datos[tipo];
     if (!fila || typeof fila !== "object") return;
     CLAVES_BEBIDA.forEach(bebida => {
       const n = Number(fila[bebida]);
@@ -81,14 +91,18 @@ export function saneaFactores(brutos) {
 // El estado vivo, igual que los ratios de personal: se pone una vez al arrancar (cuando
 // llega de la nube) y lo lee todo el mundo sin tener que pasárselo de componente en
 // componente hasta el generador de la checklist.
+/** @type {Factores} */
 let factores = {};
 
+/** @param {unknown} nuevos @returns {Factores} */
 export function ponFactores(nuevos) {
   factores = saneaFactores(nuevos);
   return leerFactores();
 }
 
+/** @returns {Factores} */
 export function leerFactores() {
+  /** @type {Factores} */
   const copia = {};
   Object.entries(factores).forEach(([tipo, fila]) => { copia[tipo] = { ...fila }; });
   return copia;
@@ -96,20 +110,24 @@ export function leerFactores() {
 
 // Lo que se sube a la nube: como ya se guarda esparcido, es la propia lista limpia. Se
 // mantiene la función para que el sitio que la usa no tenga que saber eso.
+/** @param {Factores} [valores] @returns {Factores} */
 export function factoresCambiados(valores = {}) { return saneaFactores(valores); }
 
 // Un solo factor, con su 1 por defecto. Es la única forma de leerlos en el cálculo: así
 // da igual que el tipo no exista (una checklist antigua) o que la bebida no se haya
 // tocado nunca.
+/** @param {Factores|null|undefined} valores @param {string} tipo @param {string} bebida @returns {number} */
 export function factorDe(valores, tipo, bebida) {
   const fila = valores && valores[tipo];
-  const n = fila && Number(fila[bebida]);
+  const n = fila ? Number(fila[bebida]) : NaN;
   return esFactorValido(n) ? n : FACTOR_NEUTRO;
 }
 
 // Los cuatro factores de un tipo, listos para calcBebidas. Sin argumento coge los que
 // haya puestos ahora mismo, que es lo que quiere el generador de la checklist.
+/** @param {string} tipo @param {Factores} [valores] @returns {Record<string, number>} */
 export function factoresDeTipo(tipo, valores = factores) {
+  /** @type {Record<string, number>} */
   const salida = {};
   CLAVES_BEBIDA.forEach(bebida => { salida[bebida] = factorDe(valores, tipo, bebida); });
   return salida;
@@ -117,6 +135,7 @@ export function factoresDeTipo(tipo, valores = factores) {
 
 // Cuántos factores están tocados, para poder avisar en la cabecera del panel sin
 // desplegarlo ("2 ajustados").
+/** @param {Factores} [valores] @returns {number} */
 export function cuantosAjustados(valores = factores) {
   return TIPOS_BEBIDA.reduce((acc, tipo) =>
     acc + CLAVES_BEBIDA.filter(b => factorDe(valores, tipo, b) !== FACTOR_NEUTRO).length, 0);
@@ -124,7 +143,13 @@ export function cuantosAjustados(valores = factores) {
 
 // Poner o quitar un factor sin pisar el resto de la fila. Poner el neutro es QUITARLO,
 // no guardar un 1: guardarlo congelaría el ratio de partida si algún día se corrige.
+/**
+ * @param {Factores|null|undefined} valores
+ * @param {string} tipo @param {string} bebida @param {unknown} valor
+ * @returns {Factores}
+ */
 export function conFactor(valores, tipo, bebida, valor) {
+  /** @type {Factores} */
   const copia = {};
   Object.entries(valores || {}).forEach(([t, fila]) => { copia[t] = { ...fila }; });
   const n = Number(valor);

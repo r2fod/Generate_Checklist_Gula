@@ -340,10 +340,24 @@ apuntes como mucho.
 ## Tipos, solo donde salen gratis
 
 `jsconfig.json` + `npm run tipos` (tsc con `checkJs`, sin emitir). **No es una migración
-a TypeScript**: solo comprueba el JSDoc de los módulos puros — `fecha`, `texto`,
-`almacen`, `precarga`, `diario`, `tema`. `App.jsx` de golpe daría cientos de avisos, y
-una lista que nadie mira tapa la que importa. Para añadir uno: que sea puro, meterlo en
-`include` y dejarlo verde en el MISMO commit.
+a TypeScript**: solo comprueba el JSDoc de los módulos puros. Hoy son **trece**: `fecha`,
+`texto`, `almacen`, `precarga`, `diario`, `tema` y los de cálculo — `calculos`, `bebida`,
+`mesas`, `manteles`, `carpas`, `paella`, `alquileres`. `App.jsx` de golpe daría cientos
+de avisos, y una lista que nadie mira tapa la que importa. Para añadir uno: que sea puro,
+meterlo en `include` y dejarlo verde en el MISMO commit.
+
+Los 91 avisos que salieron al meter los de cálculo eran casi todos "esto no dice qué
+recibe", pero **tres eran de verdad** y se arreglaron con el tipo delante:
+
+- `calcPaella` devolvía la CADENA `"3"` cuando el número de paelleras venía de un
+  `<input>` (`"3" > 0` es cierto, y se pasaba tal cual a la checklist).
+- `paxDelDiaGrande` hacía `parseInt` sobre algo que podía llegar como número.
+- `esFactorValido` se apoyaba en `Number.isFinite` con un valor sin tipo; ahora comprueba
+  también que sea un número de verdad y avisa a quien la llama (`n is number`), que es lo
+  que hacía falta para que `factorDe` no devolviera `null` disfrazado.
+
+`src/globales.d.ts` declara `__BUILD_ID__`, que no existe en ningún fichero: lo sustituye
+Vite al compilar.
 
 ## EL ASISTENTE
 

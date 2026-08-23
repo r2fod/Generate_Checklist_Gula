@@ -35,6 +35,13 @@
     "src/almacen.js",
     "src/precarga.js",
     "src/diario.js",
-    "src/tema.js"
+    "src/tema.js",
+    "src/calculos.js",
+    "src/bebida.js",
+    "src/mesas.js",
+    "src/manteles.js",
+    "src/carpas.js",
+    "src/paella.js",
+    "src/alquileres.js"
   ]
 }

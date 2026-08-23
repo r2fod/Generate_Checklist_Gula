@@ -2,6 +2,7 @@
 // Vive fuera de App.jsx porque es la parte que decide si alguien va a buscar el
 // material o no. Aquí se puede probar sola, sin navegador ni pantalla.
 
+/** @type {Record<string, { etiqueta: string, proveedor?: string }>} */
 export const ALQUILERES = {
   sillas:          { etiqueta: "Sillas" }, // el proveedor lo elige el selector: Dealde o Carvillo
   mesas:           { etiqueta: "Mesas redondas" }, // solo si se eligen redondas: las rectangulares son nuestras
@@ -16,12 +17,13 @@ export const DIAS_ANTES_RECOGIDA = 1, DIAS_DESPUES_DEVOLUCION = 1;
 
 // Suma (o resta) días a una fecha "AAAA-MM-DD" sin pasar por UTC: con toISOString()
 // una fecha de verano se iba un día atrás según la hora del navegador.
+/** @param {string} iso "AAAA-MM-DD" @param {number} dias @returns {string} */
 export function sumaDias(iso, dias) {
   if (!iso) return "";
   const d = new Date(iso + "T00:00:00");
   if (isNaN(d.getTime())) return "";
   d.setDate(d.getDate() + dias);
-  const dosCifras = (n) => String(n).padStart(2, "0");
+  const dosCifras = (/** @type {number} */ n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${dosCifras(d.getMonth() + 1)}-${dosCifras(d.getDate())}`;
 }
 
@@ -29,6 +31,10 @@ export function sumaDias(iso, dias) {
 // ("Recoger sillas"): el aviso ya pone "Recogida:" o "Devolución:" según toque.
 // Qué alquileres pide un estado de evento. Es la MISMA decisión que toman los
 // interruptores de la pantalla, pero mirando el estado en vez de reaccionar al clic.
+/**
+ * @param {Record<string, any>} [estado]
+ * @returns {Record<string, string|null>} clave del alquiler → concepto, o null si no toca
+ */
 function alquileresDe(estado = {}) {
   const esProduccion = estado.evento === "produccion";
   const sillas = estado.origenSillas;
@@ -49,6 +55,10 @@ function alquileresDe(estado = {}) {
 // abierto, y sin esto la app cargaría el material pero nadie iría a buscarlo.
 // Las escritas a mano no se tocan nunca, y las automáticas ya recogidas o devueltas
 // tampoco se quitan: eso ya ha pasado.
+/**
+ * @param {Record<string, any>} [estado]
+ * @returns {Array<Record<string, any>>} las recogidas del evento, a juego con sus alquileres
+ */
 export function recogidasConAlquileres(estado = {}) {
   const previas = Array.isArray(estado.recogidas) ? estado.recogidas : [];
   const quiere = alquileresDe(estado);
@@ -78,6 +88,7 @@ export function recogidasConAlquileres(estado = {}) {
   return resultado;
 }
 
+/** @param {string} clave @param {string} [proveedor] @returns {string} */
 export function conceptoAlquiler(clave, proveedor) {
   const a = ALQUILERES[clave];
   const quien = proveedor || (a && a.proveedor);

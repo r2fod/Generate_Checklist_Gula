@@ -12,6 +12,7 @@
 // La rectangular de 1,80 va a SEIS y no a siete u ocho, que es lo que dan las tablas:
 // aquí se juntan varias para hacer mesas largas, y al juntarlas se pierden las cabeceras
 // —que es justo de donde salen los comensales de más de esas tablas—.
+/** @type {Record<string, { porMesa: number, alquiler: boolean, etiqueta: string }>} */
 export const TIPOS_MESA = {
   "Rectangular 1,8m": { porMesa: 6, alquiler: false, etiqueta: "Mesas de 1,8m" },
   "Redonda 1,5m": { porMesa: 8, alquiler: true, etiqueta: "Mesas redondas 1,5m (alquiler)" },
@@ -21,11 +22,13 @@ export const TIPOS_MESA = {
 
 export const TIPO_MESA_POR_DEFECTO = "Rectangular 1,8m";
 
-export function tipoMesaValido(tipo) {
+/** @param {string} [tipo] @returns {string} uno de TIPOS_MESA, o el de por defecto */
+export function tipoMesaValido(tipo = TIPO_MESA_POR_DEFECTO) {
   return Object.prototype.hasOwnProperty.call(TIPOS_MESA, tipo) ? tipo : TIPO_MESA_POR_DEFECTO;
 }
 
 // Cuántas mesas hacen falta para sentar a esta gente, del tipo elegido
+/** @param {number} pax @param {string} [tipo] @returns {number} */
 export function mesasComensales(pax, tipo = TIPO_MESA_POR_DEFECTO) {
   const n = Math.max(0, Math.round(pax) || 0);
   if (!n) return 0;
@@ -39,6 +42,12 @@ export function mesasComensales(pax, tipo = TIPO_MESA_POR_DEFECTO) {
 // interesa verlas todas juntas en una línea como ha sido siempre. El nombre es además la
 // identidad del ítem: si esa línea cambiara de nombre se perderían sus marcas de carga y
 // sus cantidades corregidas a mano en todos los eventos que ya existen.
+/**
+ * @param {number} mesasCocina
+ * @param {number} pax
+ * @param {string} [tipo]
+ * @returns {Array<[string, string, boolean]>} [etiqueta, cantidad, esAlquiler]
+ */
 export function lineasDeMesas(mesasCocina, pax, tipo = TIPO_MESA_POR_DEFECTO) {
   const t = tipoMesaValido(tipo);
   const paraComer = mesasComensales(pax, t);
@@ -54,6 +63,7 @@ export function lineasDeMesas(mesasCocina, pax, tipo = TIPO_MESA_POR_DEFECTO) {
 }
 
 // Cuántas mesas hay que vestir en total (para los manteles)
+/** @param {number} mesasCocina @param {number} pax @param {string} [tipo] @returns {number} */
 export function mesasParaVestir(mesasCocina, pax, tipo = TIPO_MESA_POR_DEFECTO) {
   return (Math.max(0, Math.round(mesasCocina) || 0)) + mesasComensales(pax, tipo);
 }
