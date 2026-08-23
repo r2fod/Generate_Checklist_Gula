@@ -6,8 +6,48 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 - Rama `main` · Firebase: `gula-checklist`
 - **Reglas del dueño → `CLAUDE.md`** (se carga solo en cada sesión). Léelo primero.
 
+## ⚠ Estado de la rama `arena/01a02ba9-…`: qué comprobar ANTES de fusionar y publicar
+
+Esta rama va **10 commits por delante de `main`** y trae CI, desduplicación, rendimiento,
+reglas de Firestore, diario de fallos y tipado. Todo verde en lo que se puede lanzar sin
+navegador. **Lo que sigue es lo que hay que comprobar antes de tocar `main` o publicar**,
+y por qué cada cosa está en la lista.
+
+**a) Lo que se comprueba con un comando** (en el portátil, no en el contenedor):
+
+```
+npm ci
+npm run lint            # 0 ERRORES (los ~112 warnings de catch(e) son de la casa)
+npm run test:rapido     # tipos + cálculos + asistente + build + sincronización
+TZ=Pacific/Auckland npm run test:rapido    # las fechas, en un huso que no sea el nuestro
+npm run test            # ← LA IMPORTANTE: incluye los 711 del navegador (~45 min)
+npm run reglas:emulador # firestore.rules contra el motor real (pide Java)
+npm run medir           # rendimiento; con chromium delante da también los del navegador
+```
+
+**b) Lo que NINGUNA prueba puede decirte, y hay que mirar con los ojos** (`CLAUDE.md`
+manda captura, y en el contenedor de trabajo no hay chromium):
+
+1. **Modo carga, la bandeja de la oficina y "añadir varios items" ahora son perezosas.**
+   Ábrelas las tres: tienen que aparecer igual que siempre, con un respaldo de un
+   instante la primera vez. Es el cambio con más riesgo de toda la rama.
+2. **El calendario, con el mes lleno.** La rejilla ya no se repinta con cada foto de
+   Firestore; comprueba que un apunte hecho desde otro móvil sigue apareciendo solo.
+3. **Cerebro → El repaso de la noche.** Si hay aviso de documento cerca del MiB, tiene
+   que salir con su raya de color y separado, no pegado al de abajo.
+4. **Los avisos de recogidas y devoluciones.** Aquí había un fallo de un día (ver
+   `fecha.js`): mira que "hoy" y "mañana" digan lo que toca de verdad.
+
+**c) Lo que solo puede hacer el dueño** (aquí la API contesta `403`): mover
+`ci/test.yml` y `ci/deploy.yml` a `.github/workflows/`, proteger `main`, y **volver a
+pegar `worker/pegar.js` en Cloudflare** (el bundle cambió). Detalle en "Pendiente".
+
+**d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños y la
+calibración del hielo (ver "Pendiente", punto 2). Nadie ha tocado esos números todavía.
+
 ## Orden de lectura
 
+0. **El bloque de aquí arriba**, si vas a fusionar o publicar.
 1. `CLAUDE.md` (ya lo has leído: se carga solo).
 2. "Conceptos que hay que respetar" — identidad de item/apunte. Tocarlos sin cuidado
    borra el trabajo de quien está cargando un camión.
@@ -86,7 +126,9 @@ npm run reglas:deploy # firebase deploy --only firestore:rules
 npm run deploy        # predeploy = test; no publica en rojo
 ```
 
-**373 (cálculos) + 418 (asistente) + 216 (sincronización) + 711 (navegador), 0 fallos.**
+**385 (cálculos) + 420 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
+Y aparte, `npm run reglas:emulador`: 26 comprobaciones de `firestore.rules` contra el
+motor real de Google (pide Java y el emulador; en el contenedor de trabajo se saltan).
 Batería completa: **~45 min** (barrido responsive: 9 anchos × 2 temas × 10 pantallas =
 180 cargas). No está colgada.
 ⚠️ Los 711 del navegador **no se han vuelto a lanzar** desde la tanda CI/desduplicación:
@@ -502,14 +544,20 @@ El plan lo dio el dueño en una sesión y **vivía solo en el chat**, que es jus
 `CLAUDE.md` prohíbe. Queda aquí, con lo hecho, lo que falta y lo que se descartó **con su
 motivo**, para que la siguiente sesión no lo reinvente ni lo repita.
 
+Ojo con la numeración: el encargo llegó dos veces con el mismo trabajo en distinto orden
+(primero como "N1–N6", después como "Level 1–6" de un brief más largo). **La tabla va en
+el orden en que se ejecutó**, que es el del segundo. Lo que el segundo encargo añadía y
+el primero no tenía —el punto de logística— es la última fila, y es lo único sin empezar.
+
 | Nivel | Qué era | Estado |
 |---|---|---|
-| **N1** | CI en push/PR + check de `worker/pegar.js` regenerado + `deploy.yml` + proteger `main` | Escritos `ci/test.yml` y `ci/deploy.yml`; **falta moverlos** a `.github/workflows/` y proteger `main` (del dueño) |
-| **N2** | Desduplicar `fecha.js`, `texto.js`, `almacen.js`, `aplicarTemaInicial` | Hecho, con 3 pruebas que impiden volver a copiarlo |
-| **N3** | `firebase.json` + simulado cubriendo `publico/` y `envios/` | Hecho (`npm run reglas:deploy`, 15 comprobaciones nuevas) |
-| **N4** | Observabilidad sin PII | Hecho: `src/diario.js` + botón en la pantalla de fallo |
-| **N5** | Tipado gradual solo en módulos puros | Hecho: `jsconfig.json`, 6 ficheros, dentro de `test:rapido` |
-| **N6** | Rendimiento del asistente y el calendario, **midiendo antes** | Medido y aplicado; **2 fallos de interfaz abiertos** (abajo) |
+| **N1** | CI en push/PR, check de `worker/pegar.js`, `deploy.yml`, proteger `main` | Código hecho. **Del dueño**: mover los dos `.yml` y proteger `main` |
+| **N2** | Desduplicar `texto`, `fecha`, `almacen`, `tema` + un solo `hoyISO()` | Hecho. Destapó un fallo de un día en los avisos, arreglado |
+| **N3** | Rendimiento: perezosas, suscripciones diferidas, jank | Hecho y medido: el arranque baja de 50,1 a 39,3 kB gzip. **Falta el barrido del navegador** |
+| **N4** | `firebase.json` + reglas contra el emulador de verdad | Hecho. Aquí se salta (sin Java); corre en CI y en el portátil |
+| **N5** | Observabilidad sin PII, con `__BUILD_ID__` | Hecho: `src/diario.js`, estructurado y con la compilación |
+| **N6** | Tipado gradual (`checkJs`) en los módulos de cálculo | Hecho: 13 ficheros. Cazó tres fallos reales |
+| **—** | **Logística: niños, hielo y contraste con el sector** | **SIN EMPEZAR.** Es el punto 2 del encargo y toca cantidades que salen en el camión |
 
 **Reglas que puso el dueño para todo el plan** (siguen vigentes): no partir `App.jsx` ni
 `index.css`, no cambiar el sistema de estado, no tocar las tres guardias ni la identidad
@@ -518,20 +566,27 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ### Lo que queda abierto del plan
 
-1. ~~El aviso de documentos como `<li>` suelto~~ y ~~los tonos inventados `ojo`/`malo`~~:
-   **arreglados**. Van dentro de su `<ul>` y usan los tres tonos de `revision.js`, que son
-   los únicos que el CSS sabe pintar. Con pruebas de las dos cosas. Falta la captura.
-3. **Barrido del navegador (711) sin lanzar** desde N1, por lo mismo. Ahora importa más:
-   el `React.lazy` de Modo carga y de la bandeja cambia CUÁNDO aparecen esos modales, y
-   quien lo cubre es justo esa batería. Antes del próximo deploy, obligatorio.
-4. **Deploy B de precios**: ya está hecho (`PRECIOS_BASE` fuera). Lo que falta es la
-   comprobación del dueño de los 53 en `indice/precios` desde otro dispositivo.
-5. **`deploy.yml`**: no se escribe hasta que el dueño dé el OK. No es un olvido.
+1. **Los 711 del navegador, sin lanzar.** Ahora importa más que nunca: el `React.lazy` de
+   Modo carga y de la bandeja cambia CUÁNDO aparecen esos modales, y quien lo cubre es
+   justo esa batería. **Obligatorio antes del deploy** (y `predeploy` ya lo hace).
+2. **Las capturas.** Se arreglaron dos cosas de interfaz (el aviso de documentos, que era
+   un `<li>` suelto, y sus tonos) y se hicieron tres pantallas perezosas. Todo eso pide
+   ojo humano, y en el contenedor no hay chromium ni se puede descargar.
+3. **`npm run reglas:emulador` sin correr aquí**: hace falta Java y bajar el JAR, y la
+   descarga está cortada. Es el único sitio donde `firestore.rules` se comprueba de
+   verdad; hasta que se lance, lo que hay es el simulado —que reescribe las reglas— más
+   la prueba de coherencia entre ambos.
+4. **El punto 2 del encargo (logística) sin empezar**: coeficientes de niños en comida,
+   refrescos y equipamiento; hielo en kg y en taxis con margen de derretimiento cuando no
+   hay congelador; y contrastar los ratios con lo que usa el sector. Se ha dejado aparte a
+   propósito: cambia cantidades que se cargan en un camión, así que va con los números
+   delante y una prueba por ratio, no de propina al final de otro nivel.
 
 ### Descartado en este plan, y por qué
 
-- **Unificar UTC y local en una sola función de "hoy"** (parecía la desduplicación
-  obvia): mueve la frontera de "esto ya ha pasado" entre las 00:00 y las 02:00 de verano.
+- ~~No unificar UTC y local~~ — **se hizo al revés de lo que decía este apartado, y menos
+  mal**: al unificar en `hoyISO()` local apareció un fallo que llevaba en producción todos
+  los días del año (la ventana de avisos, corrida un día). Ver "Lo desduplicado".
 - **Meter `useMemo` en el calendario**: medido, la aritmética son ~2,7 ms con 250
   apuntes. El coste está en React pintando, y eso todavía no se ha medido.
 - **Cambiar las tres animaciones en bucle que no son `transform`/`opacity`** (degradado
@@ -554,13 +609,25 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
   Al moverlo, comprobar que Settings → Pages sigue apuntando a la rama `gh-pages`.
 - **Lanzar `npm run test` entero** (los 711 del navegador) antes del próximo deploy.
 
-**1. Del dueño, en la app** (necesita su sesión):
+**2. Logística: los números que se cargan en el camión — SIN EMPEZAR**
+- **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
+  eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
+  separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
+- **Hielo**: ya sale en kg, bolsas y taxis (1 taxi = 12 bolsas de 2 kg = 24 kg) y ya
+  aplica merma por derretimiento cuando no hay congelador (`MERMA_SIN_CONGELADOR`, 1,35
+  en verano y 1,2 en invierno). Falta **contrastar esos dos números con un evento real**:
+  salieron de una estimación, no de una medición.
+- **Contrastar los ratios con lo que usa el sector**, para no cargar de más ni quedarse
+  corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
+  camión, no una constante cualquiera.
+
+**3. Del dueño, en la app** (necesita su sesión):
 - Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
 - Ratios de cumpleaños/producción: panel existe, falta medir un evento real.
 - Verificar los **53 precios** en `indice/precios` desde otro dispositivo (el Despliegue B
   —quitar `PRECIOS_BASE`— ya está hecho; esto es la comprobación de que llegaron).
 
-**2. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
+**4. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
 segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
