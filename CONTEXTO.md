@@ -93,7 +93,7 @@ Batería completa: **~45 min** (barrido responsive: 9 anchos × 2 temas × 10 pa
 el contenedor donde se trabajó no tiene chromium ni puede bajarlo. Lánzalos antes del
 próximo deploy (es lo que hace `predeploy` de todas formas).
 
-### CI (`ci/test.yml`, todavía FUERA de su sitio)
+### CI y publicación (`ci/*.yml`, todavía FUERA de su sitio)
 
 En cada push/PR: `npm ci` + `lint` + `test:rapido`, y un trabajo aparte que regenera
 `worker/pegar.js` y falla si sale distinto del subido (si la fuente cambió y nadie lo
@@ -101,10 +101,22 @@ regeneró, el repo dice una cosa y Cloudflare corre otra). El barrido del navega
 un tercer trabajo, solo de noche (04:00 UTC) o a mano: 45 min en cada empujón y nadie
 mira el resultado.
 
-**Está en `ci/test.yml` y hay que moverlo a `.github/workflows/test.yml`.** GitHub
-rechaza el push entero cuando una App sin permiso `workflows` toca esa carpeta
-(*"refusing to allow a GitHub App to create or update workflow"*), así que lo mueve el
-dueño: `git mv ci/test.yml .github/workflows/test.yml`.
+**`ci/deploy.yml`** publica en Pages al fusionar en `main` (y a mano con *Run workflow*).
+Copia la regla del `predeploy` de siempre —**no se publica en rojo**—: el trabajo que sube
+`dist/` depende de otro que lanza la batería ENTERA, barrido del navegador incluido
+(~45 min). Sigue empujando a la rama `gh-pages`, que es lo que hay configurado hoy en
+Settings → Pages, así que no cambia de sitio nada y publicar a mano con `npm run deploy`
+sigue funcionando igual. Usa `npm run build`, no `npm run deploy`, para no repetir los
+45 minutos que el trabajo anterior ya pasó.
+
+**Los dos están en `ci/` y hay que moverlos a `.github/workflows/`.** GitHub rechaza el
+push entero cuando una App sin permiso `workflows` toca esa carpeta (*"refusing to allow
+a GitHub App to create or update workflow"*). Lo mueve el dueño:
+
+```
+git mv ci/test.yml .github/workflows/test.yml
+git mv ci/deploy.yml .github/workflows/deploy.yml
+```
 
 ### Proceso — costó deploys rotos y trabajo perdido
 
@@ -408,7 +420,7 @@ motivo**, para que la siguiente sesión no lo reinvente ni lo repita.
 
 | Nivel | Qué era | Estado |
 |---|---|---|
-| **N1** | CI en push/PR + check de `worker/pegar.js` regenerado + proteger `main` | Hecho el fichero (`ci/test.yml`); **falta moverlo** y proteger `main` (del dueño) |
+| **N1** | CI en push/PR + check de `worker/pegar.js` regenerado + `deploy.yml` + proteger `main` | Escritos `ci/test.yml` y `ci/deploy.yml`; **falta moverlos** a `.github/workflows/` y proteger `main` (del dueño) |
 | **N2** | Desduplicar `fecha.js`, `texto.js`, `almacen.js`, `aplicarTemaInicial` | Hecho, con 3 pruebas que impiden volver a copiarlo |
 | **N3** | `firebase.json` + simulado cubriendo `publico/` y `envios/` | Hecho (`npm run reglas:deploy`, 15 comprobaciones nuevas) |
 | **N4** | Observabilidad sin PII | Hecho: `src/diario.js` + botón en la pantalla de fallo |
@@ -455,7 +467,8 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 - **Volver a pegar `worker/pegar.js` en Cloudflare**: la desduplicación tocó
   `menus-especiales.js`, que va empaquetado dentro. Mismo comportamiento, pero lo que
   corre allí es el bundle viejo hasta que se pegue.
-- **`deploy.yml`**: no está escrito a propósito, esperando el OK. Hoy se publica a mano.
+- **`deploy.yml`**: ya escrito (`ci/deploy.yml`, con la batería entera como puerta).
+  Al moverlo, comprobar que Settings → Pages sigue apuntando a la rama `gh-pages`.
 - **Lanzar `npm run test` entero** (los 711 del navegador) antes del próximo deploy.
 
 **1. Del dueño, en la app** (necesita su sesión):

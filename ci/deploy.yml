@@ -1,0 +1,81 @@
+# ─── PUBLICAR EN GITHUB PAGES ─────────────────────────────────────────────────
+# Hasta ahora se publicaba a mano: `npm run deploy` desde el portátil de quien tocara el
+# código. Eso ya salió mal dos veces, y siempre por lo mismo — `deploy` sube lo que haya
+# en `dist/` AL TERMINAR, así que si alguien reconstruía por medio, o si la batería no se
+# había lanzado, se publicaba código sin probar y encima sin que quedara constancia de
+# desde qué máquina.
+#
+# La regla que este fichero copia del `predeploy` de siempre: **no se publica en rojo**.
+# El trabajo `publicar` depende del de `pruebas`, y ese lanza la batería ENTERA, barrido
+# del navegador incluido (~45 min). Es lento a propósito: publicar es lo único que ve el
+# equipo cargando un camión, y ahí sí se esperan los 45 minutos.
+#
+# Sigue publicando en la rama `gh-pages`, igual que `npm run deploy` (que es lo que hay
+# configurado hoy en Settings → Pages). Así esto no cambia de sitio nada: el día que
+# falle, publicar a mano sigue funcionando exactamente igual.
+name: Publicar
+
+on:
+  # Al fusionar en main. El paso por PR es lo que hace que a `main` no llegue nada que no
+  # haya pasado por las pruebas rápidas antes.
+  push:
+    branches: [main]
+  # Y a mano, para republicar sin tener que tocar el código (por ejemplo tras revertir).
+  workflow_dispatch:
+
+# Dos publicaciones a la vez se pisan la rama gh-pages. NO se cancela la que ya corre:
+# a mitad de un push a gh-pages, cancelar deja la rama a medias.
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # hace falta para empujar la rama gh-pages
+
+jobs:
+  pruebas:
+    name: La batería entera (~45 min)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:rapido
+      # playwright-core no trae navegador: se baja el chromium que espera la batería y se
+      # le pasa por CHROMIUM_PATH, que es el primer sitio donde mira.
+      - run: npx --yes playwright@1.62.1 install --with-deps chromium
+      - name: Localizar chromium
+        run: echo "CHROMIUM_PATH=$(ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1)" >> "$GITHUB_ENV"
+      - run: node src/__tests__/app.test.mjs
+
+  publicar:
+    name: Subir dist/ a gh-pages
+    needs: pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      # `npm run build` a secas, NO `npm run deploy`: ese arrastra el predeploy y volvería
+      # a lanzar los 45 minutos de batería que el trabajo de arriba ya ha pasado.
+      - run: npm run build
+      # Cada compilación lleva su BUILD_ID dentro y en version.json; así la app sabe
+      # comparar lo cargado con lo que hay en el servidor y avisar de que hay versión
+      # nueva (ver vite.config.js). Se enseña aquí para poder casar una queja con un
+      # despliegue concreto.
+      - name: Qué compilación se publica
+        run: cat dist/version.json
+      - name: Publicar en gh-pages
+        run: |
+          npx gh-pages -d dist \
+            -r "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            -u "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>" \
+            -m "Publica ${{ github.sha }}"
