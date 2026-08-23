@@ -820,7 +820,12 @@ export default function App({ onCerrarSesion } = {}) {
   // ya se restauró de forma síncrona (ver leerEstadoGuardado/estadoInicial arriba), así
   // que no hace falta guardia de "carga completada": no hay carrera con StrictMode.
   useEffect(() => {
-    guardarTexto("gula_checklist_estado", estadoActualJSON);
+    // Si esto devuelve false, lo que la persona lleva escrito NO se está guardando en
+    // este navegador (modo privado, o sin sitio). Es lo más grave que puede pasar aquí,
+    // y hasta ahora ocurría en silencio: queda apuntado con la compilación y el tamaño.
+    if (!guardarTexto("gula_checklist_estado", estadoActualJSON)) {
+      apuntaEnDiario("almacen-lleno", { bytes: estadoActualJSON.length });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoActualJSON]);
 

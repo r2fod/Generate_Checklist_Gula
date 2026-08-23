@@ -317,7 +317,19 @@ una optimización.
 ## Saber qué falló, sin espiar a nadie
 
 `src/diario.js`. Antes, "esta mañana no me dejaba guardar" no se podía mirar: estaba en
-la consola de un móvil ya cerrado. Ahora los fallos de nube y los de pantalla quedan
+la consola de un móvil ya cerrado. Cada apunte va **estructurado y siempre igual**:
+hora · [en qué app y con qué compilación] · qué pasó · motivo limpio · datos.
+
+La compilación (`__BUILD_ID__`, el mismo que va en `version.json`) es lo que permite
+casar una queja con un despliegue concreto: un móvil de montaje puede llevar días con el
+bundle viejo en caché, porque los `.js` van con hash y un `index.html` antiguo sigue
+apuntando a la compilación antigua. El "dónde" sale de la CARPETA (checklist/,
+formulario/, calendario/), no de nada que escriba una persona.
+
+Qué queda apuntado hoy: los tres fallos de nube, el asistente cuando el proveedor
+falla, la pantalla rota, y **que el navegador no haya podido guardar el estado** — eso
+último es lo más grave que puede pasar en la checklist (el trabajo no se está guardando)
+y hasta ahora ocurría en silencio. Ahora los fallos de nube y los de pantalla quedan
 apuntados **en el navegador de quien los sufrió** (no se sube nada) y se copian de un
 toque desde la pantalla de fallo. Tres cierres para que no se escape un dato de persona:
 lista blanca de sucesos, lista blanca de datos (números, booleanos y etiquetas cortas —

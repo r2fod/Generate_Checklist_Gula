@@ -28,6 +28,7 @@ const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
 import { leerTexto, guardarTexto } from "../almacen.js";
+import { apunta } from "../diario.js";
 
 const CLAVE_NIVEL = "gula_asistente_nivel";
 const CLAVE_PERSONALIDAD = "gula_asistente_personalidad";
@@ -267,7 +268,13 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
     } catch (err) {
       setHuboError(true);
-      setHilo(h => [...h, { de: "error", texto: String(err && err.message ? err.message : err) }]);
+      const motivo = String(err && err.message ? err.message : err);
+      // Al diario del navegador además de a la burbuja: el error se lee, se cierra el
+      // panel y se olvida, y luego "ayer el asistente no iba" no se puede mirar. El
+      // motivo pasa por sinDatosPersonales (ver src/diario.js) porque lo escribe el
+      // proveedor y puede traer dentro el trozo de pregunta que le mandamos.
+      apunta("proveedor-fallo", { motivo, proveedor: String(proveedor || "").slice(0, 20) });
+      setHilo(h => [...h, { de: "error", texto: motivo }]);
     } finally {
       setPensando(false);
       setEnCurso("");

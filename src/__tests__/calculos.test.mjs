@@ -1708,6 +1708,19 @@ console.log("\n══ El diario de fallos: útil y sin un solo nombre ══");
     `el diario no crece sin fin (${MAX_APUNTES} apuntes): el sitio que ocupa se lo quita al archivo de eventos`);
   ok(leerDiario()[0].intento === MAX_APUNTES + 4, "y lo último que pasó va primero, que es lo que se mira");
 
+  // ─── Estructurado: dónde y con qué compilación ──────────────────────────────
+  // Sin la compilación, una queja no se puede casar con ningún despliegue: el móvil de
+  // un montaje puede llevar días con el bundle viejo en caché. Y sin el "dónde", tres
+  // apps distintas escriben en el mismo diario sin saberse cuál fue.
+  borrarDiario();
+  apunta("nube-fallo", { motivo: "sin conexión" });
+  const estructurado = leerDiario()[0];
+  ok(typeof estructurado.version === "string" && estructurado.version.length > 0,
+    `cada apunte dice de qué compilación es (aquí "${estructurado.version}", que en node no hay build)`);
+  ok(typeof estructurado.donde === "string", "y en cuál de las tres apps ha pasado, sacado de la carpeta");
+  ok(!/[A-ZÁÉÍÓÚ][a-z]+ [A-ZÁÉÍÓÚ]/.test(JSON.stringify(estructurado)),
+    "y ahí dentro no hay nada con pinta de nombre de persona");
+
   // ─── Lo que se pega en el chat ──────────────────────────────────────────────
   borrarDiario();
   ok(comoTexto([]) === "Sin fallos apuntados en este dispositivo.", "sin fallos lo dice, en vez de dar un texto vacío");
@@ -1715,6 +1728,8 @@ console.log("\n══ El diario de fallos: útil y sin un solo nombre ══");
   const texto = comoTexto();
   ok(texto.includes(SUCESOS["pantalla-rota"]) && !/Fulanita/.test(texto),
     `lo que se copia se entiende y no lleva nombres → ${texto}`);
+  ok(/\[[a-z?]+ [\w.:-]+\]/.test(texto),
+    "y cada línea lleva delante dónde pasó y con qué compilación, entre corchetes");
 
   delete globalThis.localStorage;
 }

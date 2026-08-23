@@ -24,6 +24,28 @@
 import { leerJSON, guardarJSON, borrar } from "./almacen.js";
 
 const CLAVE = "gula_diario";
+
+// Qué compilación estaba corriendo. Sin esto, "esta mañana no me dejaba guardar" no se
+// puede casar con ningún despliegue: el móvil de un montaje puede llevar días con el
+// bundle viejo en caché (los .js van con hash, así que un index.html antiguo sigue
+// sirviendo la compilación antigua). Lo pone Vite en tiempo de compilación
+// (vite.config.js → define), y en node —las pruebas, el Worker— no existe.
+//
+// Se recorta a los diez primeros caracteres: el BUILD_ID es una fecha ISO completa y
+// entera no cabe en una línea de chat, pero "2026-08-23" ya dice de qué día es el código.
+const compilacion = () => {
+  try { return typeof __BUILD_ID__ === "string" ? __BUILD_ID__.slice(0, 10) : "desarrollo"; }
+  catch (e) { return "desarrollo"; }
+};
+
+// En cuál de las tres apps ha pasado. Sale de la CARPETA, que es lo que las separa
+// (checklist/, formulario/, calendario/), no de nada que escriba una persona.
+const dondeEstoy = () => {
+  try {
+    const t = String(location.pathname || "");
+    return ["checklist", "formulario", "calendario", "pruebas"].find(c => t.includes(`/${c}`)) || "raiz";
+  } catch (e) { return "?"; }
+};
 // Veinte llegan de sobra para "qué ha pasado hoy" y no engordan el almacén: el sitio que
 // ocupa el diario es sitio que le falta al archivo de eventos, que es lo que importa.
 export const MAX_APUNTES = 20;
@@ -105,6 +127,10 @@ export function apunta(que, { motivo = "", ...datos } = {}) {
   const apunte = {
     cuando: Date.now(),
     que,
+    // Estructurado y siempre igual: hora, qué, dónde y con qué versión. Un apunte que a
+    // veces trae una cosa y a veces otra no se puede leer de un vistazo ni comparar.
+    donde: dondeEstoy(),
+    version: compilacion(),
     ...(motivo ? { motivo: sinDatosPersonales(motivo) } : {}),
     ...datosLimpios(datos),
   };
@@ -127,8 +153,9 @@ export function comoTexto(diario = leerDiario()) {
   return diario.map(a => {
     const hora = new Date(a.cuando).toLocaleString("es-ES");
     const extra = Object.entries(a)
-      .filter(([k]) => !["cuando", "que", "motivo"].includes(k))
+      .filter(([k]) => !["cuando", "que", "motivo", "donde", "version"].includes(k))
       .map(([k, v]) => `${k}=${v}`).join(" ");
-    return `${hora} · ${SUCESOS[a.que]}${a.motivo ? ` · ${a.motivo}` : ""}${extra ? ` · ${extra}` : ""}`;
+    return `${hora} · [${a.donde || "?"} ${a.version || "?"}] ${SUCESOS[a.que]}`
+      + `${a.motivo ? ` · ${a.motivo}` : ""}${extra ? ` · ${extra}` : ""}`;
   }).join("\n");
 }

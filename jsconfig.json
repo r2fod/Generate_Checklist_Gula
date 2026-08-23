@@ -29,6 +29,7 @@
     "skipLibCheck": true
   },
   "include": [
+    "src/globales.d.ts",
     "src/fecha.js",
     "src/texto.js",
     "src/almacen.js",
