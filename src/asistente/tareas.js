@@ -15,7 +15,7 @@
 // Sin React ni nube: entra una lista, sale una lista.
 
 import { sinTildes, limpiaTexto } from "../texto.js";
-import { hoyUTCISO } from "../fecha.js";
+import { hoyISO } from "../fecha.js";
 
 export const MAX_TAREAS = 60;
 const MAX_TEXTO = 180;
@@ -27,8 +27,6 @@ const limpia = (t) => limpiaTexto(t, MAX_TEXTO);
 // la barra y colapsa los guiones. Lo que sí comparte es el sinTildes.
 const clave = (texto, evento) => sinTildes(`${limpia(texto)}|${evento || ""}`)
   .replace(/[^a-z0-9ñ|]/g, "-").replace(/-+/g, "-").slice(0, 70);
-
-const hoyISO = hoyUTCISO;
 
 // { id, texto, evento, hecho, creado, quien }
 export function saneaTareas(bruto) {

@@ -10,6 +10,7 @@
 //
 // Sin React: entran tokens, sale un número.
 import { leerTexto, leerJSON, guardarTexto, guardarJSON, borrar } from "../almacen.js";
+import { aISO } from "../fecha.js";
 
 // Precio por millón de tokens, en euros aproximados. Son de la web de cada uno y
 // cambian: el número exacto importa menos que el orden de magnitud, que es lo que hace
@@ -25,7 +26,9 @@ export const PRECIOS = {
 
 const CLAVE = "gula_asistente_gasto";
 export const mesActual = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-export const diaActual = (d = new Date()) => d.toISOString().slice(0, 10);
+// El gasto "de hoy" es el del día que va por el móvil de quien pregunta: preguntar a la
+// una de la mañana y ver el gasto de ayer no se entiende.
+export const diaActual = (d = new Date()) => aISO(d);
 
 const numero = (x) => (Number.isFinite(Number(x)) ? Math.max(0, Number(x)) : 0);
 

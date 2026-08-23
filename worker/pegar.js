@@ -212,8 +212,24 @@ const TIPOS_MESA = {
 	}
 };
 //#endregion
+//#region src/fecha.js
+/** El día de calendario de una fecha, tal y como lo ve este dispositivo.
+* @param {Date} f @returns {string} */
+const aISO = (f) => `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+/** Hoy. La única. @param {Date} [ahora] @returns {string} */
+const hoyISO = (ahora = /* @__PURE__ */ new Date()) => aISO(ahora);
+/** Dentro de N días (o hace N, con negativo). Suma por días de CALENDARIO —no 86.400.000
+* milisegundos— para que los cambios de hora de marzo y octubre no descuadren la ventana
+* en un día: esos dos días tienen 23 y 25 horas.
+* @param {number} n @param {Date} [ahora] @returns {string} */
+function enDiasISO(n, ahora = /* @__PURE__ */ new Date()) {
+	const d = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+	d.setDate(d.getDate() + Math.round(n));
+	return aISO(d);
+}
+//#endregion
 //#region src/asistente/revision.js
-const hoy = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+const hoy = hoyISO;
 const dias = (fecha) => Math.round((/* @__PURE__ */ new Date(`${fecha}T00:00:00`) - /* @__PURE__ */ new Date(`${hoy()}T00:00:00`)) / 864e5);
 const MES_CALIDO = [
 	5,
@@ -292,7 +308,7 @@ function revisarEvento(nombre, e = {}) {
 }
 function revisarProximos(eventosGuardados = {}, diasVista = 30) {
 	const desde = hoy();
-	const hasta = new Date(Date.now() + Math.max(1, diasVista) * 864e5).toISOString().slice(0, 10);
+	const hasta = enDiasISO(Math.max(1, diasVista));
 	return Object.entries(eventosGuardados).filter(([, e]) => (e.fechaEvento || "") >= desde && (e.fechaEvento || "") <= hasta).sort((a, b) => (a[1].fechaEvento || "").localeCompare(b[1].fechaEvento || "")).map(([nombre, e]) => ({
 		fecha: e.fechaEvento || "",
 		...revisarEvento(nombre, e)

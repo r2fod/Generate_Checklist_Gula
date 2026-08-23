@@ -21,13 +21,11 @@
 // Sin React ni nube: entran datos, sale un parte.
 import { revisarProximos } from "./revision.js";
 import { esTipoEvento } from "../calendario/apuntes.js";
-import { hoyUTCISO, enDiasUTCISO } from "../fecha.js";
+import { hoyISO, enDiasISO } from "../fecha.js";
 import { leerJSON, guardarJSON } from "../almacen.js";
 
-// En UTC, como estaban escritas aquí desde el principio: ver el porqué de que no se
-// unifiquen con las locales en src/fecha.js.
-const hoyISO = hoyUTCISO;
-const enDias = enDiasUTCISO;
+// Los dos, del día de calendario de quien mira (ver src/fecha.js).
+const enDias = enDiasISO;
 
 // ─── LA FOTO ──────────────────────────────────────────────────────────────────
 // Para saber qué ha cambiado hay que recordar cómo estaba. Se guarda lo mínimo: nombres

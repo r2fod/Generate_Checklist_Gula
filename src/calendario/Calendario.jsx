@@ -16,7 +16,7 @@ import {
   aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
   turnosDe, DIAS_ANTICIPACION, apuntesPorPromover,
 } from "./apuntes.js";
-import { hoyLocalISO } from "../fecha.js";
+import { hoyISO } from "../fecha.js";
 import { personalNecesario, resumenAsignados, loQueFalta, horasEntre, ROLES } from "../personal.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
@@ -27,9 +27,6 @@ function IconoTipo({ tipo, size = 13, className = "" }) {
   const Icono = ICONOS[(TIPOS[tipo] || {}).icono] || Heart;
   return <Icono size={size} className={`cal-icono tipo-${tipo} ${className}`} aria-hidden="true" />;
 }
-
-// "Hoy" vive en src/fecha.js: la misma cuenta estaba escrita en cuatro sitios.
-const hoyISO = hoyLocalISO;
 
 // Cuánto falta, en cristiano. A nivel de módulo porque lo usan los dos sitios que
 // enseñan cuentas atrás: "Lo que viene" y la vista de equipo.

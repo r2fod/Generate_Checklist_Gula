@@ -20,6 +20,10 @@ import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte, saneaLista, mismaLista } from "../calendario/apuntes.js";
+// Las fechas de las fixtures salen de la MISMA función que usa la app: con toISOString
+// (UTC) la batería fallaba en husos por delante de Greenwich, porque el "hoy" del test
+// y el de la app eran días distintos. Lo cazó lanzarla con TZ=Pacific/Auckland.
+import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
@@ -311,8 +315,8 @@ console.log("\n── El cerebro, desde el asistente ──");
 
 console.log("\n── El repaso ──");
 {
-  const hoy = new Date().toISOString().slice(0, 10);
-  const enUnMes = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+  const hoy = hoyISO();
+  const enUnMes = enDiasISO(20);
   const ctx = {
     eventosGuardados: {
       "Boda a medias": { evento: "boda", fechaEvento: enUnMes, sinConfigurar: true },
@@ -582,7 +586,7 @@ console.log("\n── Qué se le deja hacer ──");
 
 console.log("\n── ¿Esto tiene sentido? ──");
 {
-  const dentroDeUnMes = new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10);
+  const dentroDeUnMes = enDiasISO(20);
   const tono = (r, t) => r.avisos.filter(a => a.tono === t);
 
   // Un evento completo no debe inventarse problemas: un revisor que siempre encuentra
@@ -928,8 +932,8 @@ console.log("\n── El repaso de la noche ──");
   // camino no lo ejecuta nadie mirando: si se rompe, se rompe en silencio a las tres de
   // la mañana y nadie se entera hasta que falta un congelador en agosto.
   const EVENTOS = {
-    "Boda de prueba": { evento: "boda", pax: 120, fechaEvento: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10) },
-    "Comunión de prueba": { evento: "comunion", pax: 80, ninos: 20, fechaEvento: new Date(Date.now() + 400 * 86400000).toISOString().slice(0, 10), horaInicio: "13:00", ubicacion: "Finca de prueba" },
+    "Boda de prueba": { evento: "boda", pax: 120, fechaEvento: enDiasISO(6) },
+    "Comunión de prueba": { evento: "comunion", pax: 80, ninos: 20, fechaEvento: enDiasISO(400), horaInicio: "13:00", ubicacion: "Finca de prueba" },
   };
 
   const firestoreFalso = ({ falloEntrada = null } = {}) => {
@@ -1184,7 +1188,7 @@ console.log("\n── Lo que hay que hacer ──");
 
 console.log("\n── El subconsciente ──");
 {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = hoyISO();
   const ev = {
     "Boda A": { evento: "boda", fechaEvento: hoy, pax: 100, ubicacion: "Finca", origenSillas: "Dealde", horaInicio: "13:00", logisticaEquipo: [{ nombre: "A" }] },
     "Boda B": { evento: "boda", fechaEvento: hoy },
@@ -1248,7 +1252,7 @@ console.log("\n── Encadenar dónde se escribe ──");
 
 console.log("\n── Crear checklists desde el calendario ──");
 {
-  const en5 = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  const en5 = enDiasISO(5);
   const base = {
     apuntes: [
       { id: "a1", fecha: en5, titulo: "Boda de prueba uno", tipo: "boda" },

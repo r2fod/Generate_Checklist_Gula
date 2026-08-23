@@ -8,6 +8,7 @@
 import { chromium } from "playwright-core";
 import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
 import { recogidasConAlquileres } from "../alquileres.js";
+import { enDiasISO } from "../fecha.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
@@ -2356,7 +2357,9 @@ async function main() {
   // así que el mismo concepto aparecía dos veces seguidas y parecía duplicado. La
   // devolución solo debe avisar cuando ya se ha recogido... o cuando vence.
   console.log("\n── Avisos de recogidas y compras ──");
-  const dia = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  // El día de calendario, con la misma cuenta que la app (src/fecha.js). Con
+  // toISOString esto daba AYER en España, que es justo el fallo que se arregló.
+  const dia = (n) => enDiasISO(n);
   const chips = (p) => p.locator(".aviso-recogida-chip .aviso-recogida-texto").allInnerTexts();
 
   const abrirConAvisos = async (recogidas) => {

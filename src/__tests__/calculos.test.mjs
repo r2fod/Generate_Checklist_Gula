@@ -34,7 +34,7 @@ import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
-import { aISO, hoyLocalISO, hoyUTCISO, enDiasUTCISO } from "../fecha.js";
+import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
 import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
 import { aplicarTemaInicial } from "../tema.js";
@@ -1481,17 +1481,31 @@ console.log("\n══ Las mesas de los comensales ══");
 console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén) ══");
 {
   // ─── src/fecha.js ───────────────────────────────────────────────────────────
+  // Una sola función de "hoy", y es la del calendario del dispositivo: las fechas de
+  // esta app son días que escribe una persona ("la boda del 12"), no instantes.
   ok(aISO(new Date(2026, 8, 13)) === "2026-09-13", "aISO da el día del calendario del dispositivo, con ceros delante");
-  ok(hoyLocalISO(new Date(2026, 0, 5)) === "2026-01-05", "hoyLocalISO es ese mismo día, no el de UTC");
+  ok(hoyISO(new Date(2026, 0, 5, 23, 59)) === "2026-01-05", "hoyISO es ese día hasta el último minuto, no el de UTC");
 
-  // Las dos versiones NO se unifican a propósito: a las 00:30 de un día de verano en
-  // España, UTC va todavía por el día de ayer. Quien confunda una con otra mueve la
-  // frontera de "esto ya ha pasado" justo en las horas en las que se recoge un evento.
-  const medianocheLarga = new Date("2026-07-14T00:30:00+02:00");
-  ok(hoyLocalISO(medianocheLarga) !== hoyUTCISO(medianocheLarga) || true,
-    "hoyLocal y hoyUTC pueden dar días distintos: son dos funciones a posta, no un descuido");
-  ok(hoyUTCISO(new Date("2026-07-13T23:00:00Z")) === "2026-07-13", "hoyUTCISO va por UTC, como iban el subconsciente y las tareas");
-  ok(enDiasUTCISO(30, Date.parse("2026-07-13T12:00:00Z")) === "2026-08-12", "enDiasUTCISO cuenta 30 días en el mismo huso con el que se compara");
+  // EL FALLO QUE ESTABA EN PRODUCCIÓN, todos los días del año. Los avisos de recogidas
+  // hacían `hoy.setHours(0,0,0,0)` y luego `toISOString()`: poner el reloj a medianoche
+  // LOCAL y pasarlo a UTC da el día ANTERIOR en cualquier huso por delante de Greenwich,
+  // o sea siempre en España. La ventana de avisos iba corrida un día entero y "hoy"
+  // llegaba a la interfaz siendo ayer.
+  const mediaNocheLocal = new Date(2026, 7, 23);   // 23 de agosto, 00:00 de aquí
+  const comoSeHacia = mediaNocheLocal.toISOString().slice(0, 10);
+  ok(aISO(mediaNocheLocal) === "2026-08-23",
+    `aISO respeta el día local a medianoche (${aISO(mediaNocheLocal)}), que es cuando el viejo cálculo se iba a ayer`);
+  ok(comoSeHacia === "2026-08-23" || comoSeHacia === "2026-08-22",
+    `y la cuenta vieja da ${comoSeHacia} según el huso de la máquina: por eso no puede usarse para comparar días`);
+
+  // Las ventanas se suman por días de CALENDARIO, no por 86.400.000 ms: los dos días del
+  // cambio de hora tienen 23 y 25 horas, y con milisegundos la ventana se descuadra.
+  ok(enDiasISO(5, new Date(2026, 7, 23)) === "2026-08-28", "enDiasISO suma cinco días");
+  ok(enDiasISO(-60, new Date(2026, 7, 23)) === "2026-06-24", "y en negativo va hacia atrás (el suelo de los avisos)");
+  ok(enDiasISO(1, new Date(2026, 2, 28, 23, 0)) === "2026-03-29" && enDiasISO(1, new Date(2026, 9, 24, 23, 0)) === "2026-10-25",
+    "los días del cambio de hora (29 de marzo y 25 de octubre) siguen siendo un día, no 23 ni 25 horas");
+  ok(diaDeMs(Date.parse("2026-08-23T12:00:00Z")).length === 10 && diaDeMs(0) === "",
+    "diaDeMs agrupa por día y no inventa nada cuando no hay marca de tiempo");
 
   // El fallo de verdad al extraer aISO: se dejó como `export { aISO } from "…"`, que
   // reexporta pero NO define el nombre en el módulo, así que las funciones de abajo que
@@ -1577,6 +1591,13 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
   const copiasAlmacen = ficheros.filter(f => !conAlmacen.includes(f)
     && /localStorage\.(get|set|remove)Item/.test(sinComentarios(readFileSync(f, "utf8"))));
   ok(copiasAlmacen.length === 0, `el try/catch de localStorage vive solo en src/almacen.js (copias: ${copiasAlmacen.join(", ") || "ninguna"})`);
+
+  // Y que nadie vuelva a sacar un día de calendario de `toISOString()`: es la cuenta que
+  // daba ayer en España. Los nombres de fichero de las copias también pasaron por aquí.
+  const copiasUTC = ficheros.filter(f => f !== "src/fecha.js"
+    && /toISOString\(\)\.slice\(0, 10\)/.test(sinComentarios(readFileSync(f, "utf8"))));
+  ok(copiasUTC.length === 0,
+    `el día de hoy sale siempre de src/fecha.js, nunca de toISOString (copias: ${copiasUTC.join(", ") || "ninguna"})`);
 
   const copiasTema = ficheros.filter(f => f !== "src/tema.js"
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));

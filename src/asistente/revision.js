@@ -18,8 +18,11 @@
 import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
 import { PAX_POR_CAMARERO, leerRatios } from "../personal.js";
 import { TIPOS_MESA } from "../mesas.js";
+import { hoyISO, enDiasISO } from "../fecha.js";
 
-const hoy = () => new Date().toISOString().slice(0, 10);
+// En el navegador es el día de quien mira; en el Worker, que va en UTC, es el mismo día
+// que daba antes. Una sola cuenta para los dos (ver src/fecha.js).
+const hoy = hoyISO;
 const dias = (fecha) => Math.round((new Date(`${fecha}T00:00:00`) - new Date(`${hoy()}T00:00:00`)) / 86400000);
 
 // Los meses en los que el hielo se derrite de verdad. Es la misma idea que mesVerano en
@@ -122,7 +125,7 @@ export function revisarEvento(nombre, e = {}) {
 // Repasa TODOS los que se acercan, para el "¿está todo listo para este mes?".
 export function revisarProximos(eventosGuardados = {}, diasVista = 30) {
   const desde = hoy();
-  const hasta = new Date(Date.now() + Math.max(1, diasVista) * 86400000).toISOString().slice(0, 10);
+  const hasta = enDiasISO(Math.max(1, diasVista));
   return Object.entries(eventosGuardados)
     .filter(([, e]) => (e.fechaEvento || "") >= desde && (e.fechaEvento || "") <= hasta)
     .sort((a, b) => (a[1].fechaEvento || "").localeCompare(b[1].fechaEvento || ""))

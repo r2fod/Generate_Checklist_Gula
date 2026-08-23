@@ -11,7 +11,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
-import { hoyLocalISO } from "./fecha.js";
+import { hoyISO, aISO, enDiasISO } from "./fecha.js";
 import { apunta as apuntaEnDiario } from "./diario.js";
 import { sinTildes } from "./texto.js";
 import { leerTexto, leerJSON, guardarTexto, guardarJSON, borrar as borrarDelAlmacen } from "./almacen.js";
@@ -142,10 +142,9 @@ function esVerano(estacion, fechaISO) {
   return esFechaDeVerano(fechaISO);
 }
 
-// El día de hoy vive en src/fecha.js: estaba escrito cuatro veces y no de la misma
-// manera (dos por el calendario del móvil, dos en UTC). Se sigue exportando desde aquí
-// porque media App lo llama así.
-export const hoyISO = hoyLocalISO;
+// El día de hoy vive en src/fecha.js, uno solo para todo el repositorio. Se reexporta
+// porque media App lo llama desde aquí.
+export { hoyISO };
 
 // Qué temporada le toca a un evento guardado ANTES de que existiera este dato. Los que
 // ya han pasado se quedan clavados en lo que tuvieran: su lista es historia y no tiene
@@ -688,7 +687,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [verPasados, setVerPasados] = useState(false);
   const [filtroEventos, setFiltroEventos] = useState("");
   const { eventosPendientes, eventosPasados } = useMemo(() => {
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = hoyISO();
     const q = _norm(filtroEventos);
     const pend = [], pas = [];
     Object.keys(eventosGuardados).forEach(n => {
@@ -719,13 +718,15 @@ export default function App({ onCerrarSesion } = {}) {
   // tiempo (el dato sigue en el evento, solo desaparece del panel de avisos).
   const DIAS_AVISO_CADUCA = 60;
   const avisosRecogidas = useMemo(() => {
+    // OJO con lo que había aquí: `hoy.setHours(0,0,0,0)` seguido de `toISOString()` da
+    // el día ANTERIOR en cualquier huso por delante de Greenwich, o sea todo el año en
+    // España. La ventana entera iba corrida un día y "hoy" llegaba a la interfaz siendo
+    // ayer. Con aISO/enDiasISO se compara el día de calendario con el día de calendario.
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const hoyISO = hoy.toISOString().slice(0, 10);
-    const limite = new Date(hoy); limite.setDate(limite.getDate() + DIAS_AVISO);
-    const limiteISO = limite.toISOString().slice(0, 10);
+    const diaDeHoy = aISO(hoy);
+    const limiteISO = enDiasISO(DIAS_AVISO, hoy);
     const diasHasta = (f) => Math.round((new Date(f + "T00:00:00") - hoy) / 86400000);
-    const suelo = new Date(hoy); suelo.setDate(suelo.getDate() - DIAS_AVISO_CADUCA);
-    const sueloISO = suelo.toISOString().slice(0, 10);
+    const sueloISO = enDiasISO(-DIAS_AVISO_CADUCA, hoy);
     const dentroVentana = (f) => f && f <= limiteISO && f >= sueloISO;
     const avisos = [];
     Object.entries(eventosGuardados).forEach(([nombreEvt, datos]) => {
@@ -749,7 +750,7 @@ export default function App({ onCerrarSesion } = {}) {
       });
     });
     avisos.sort((a, b) => a.fecha.localeCompare(b.fecha));
-    return avisos.map(a => ({ ...a, hoyISO }));
+    return avisos.map(a => ({ ...a, hoyISO: diaDeHoy }));
   }, [eventosGuardados]);
   // Marca una recogida/devolución/compra como hecha desde el propio aviso: se guarda en el
   // evento afectado (nube incluida) y, si es el evento abierto, también en su estado vivo
@@ -2694,7 +2695,7 @@ export default function App({ onCerrarSesion } = {}) {
     const blob = new Blob([JSON.stringify(copia, null, 2)], { type: "application/json;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `Gula_copia_${new Date().toISOString().slice(0, 10)}_${Object.keys(eventosGuardados).length}eventos.json`;
+    a.download = `Gula_copia_${hoyISO()}_${Object.keys(eventosGuardados).length}eventos.json`;
     a.click();
     URL.revokeObjectURL(a.href);
     setGuardadoEventoMsg(`✓ Copia descargada con ${Object.keys(eventosGuardados).length} eventos`);
@@ -3132,7 +3133,7 @@ export default function App({ onCerrarSesion } = {}) {
           )}
         </div>
 
-        {linkAbierto && fechaEvento && fechaEvento < new Date().toISOString().slice(0, 10) && (
+        {linkAbierto && fechaEvento && fechaEvento < hoyISO() && (
           <div className="archivado-banner">📦 Este evento ya pasó — checklist archivada, solo para consulta.</div>
         )}
 

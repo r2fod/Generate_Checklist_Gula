@@ -20,6 +20,7 @@
 //
 // No importa React ni la nube: entran datos, sale un resultado. Se prueba con node.
 import { sinTildes } from "../texto.js";
+import { hoyISO, enDiasISO } from "../fecha.js";
 
 import { calcBebidas, calcHielo } from "../calculos.js";
 import { buildChecklist } from "../checklist-generadores.js";
@@ -367,8 +368,8 @@ export const HERRAMIENTAS = {
       parameters: { type: "object", properties: { dias: { type: "number", description: "Cuántos días mirar hacia delante. Por defecto 30." } } },
     },
     corre: (ctx, { dias = 30 } = {}) => {
-      const hoy = new Date().toISOString().slice(0, 10);
-      const limite = new Date(Date.now() + Math.max(1, Math.round(dias) || 30) * 86400000).toISOString().slice(0, 10);
+      const hoy = hoyISO();
+      const limite = enDiasISO(Math.max(1, Math.round(dias) || 30));
       const proximos = Object.entries(ctx.eventosGuardados || {})
         .filter(([, e]) => (e.fechaEvento || "") >= hoy && (e.fechaEvento || "") <= limite)
         .sort((a, b) => (a[1].fechaEvento || "").localeCompare(b[1].fechaEvento || ""));

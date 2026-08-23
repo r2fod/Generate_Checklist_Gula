@@ -12,6 +12,7 @@
 // La conexión y el armazón de las suscripciones, compartidos con nube.js (ver
 // src/firestore.js). Antes estaban aquí duplicados, con su propia promesa.
 import { getDb, nubeActiva, suscribir } from "../firestore.js";
+import { hoyISO } from "../fecha.js";
 
 export { nubeActiva };
 
@@ -43,7 +44,7 @@ export function limpiarAvisos(avisos = []) {
 // Deja SOLO lo que la oficina necesita para reconocer un evento. Esta función es la
 // frontera de lo que sale de la app: si algún día se añade un campo al evento, aquí
 // no aparece salvo que se ponga a mano, que es justo lo que se quiere.
-export function resumirParaOficina(eventosGuardados = {}, hoy = new Date().toISOString().slice(0, 10)) {
+export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO()) {
   return Object.entries(eventosGuardados)
     // El tipo va incluido para que, al elegir un evento que ya existe, el formulario
     // sepa qué preguntas tocan sin tener que preguntárselo otra vez a la oficina

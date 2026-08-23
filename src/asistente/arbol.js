@@ -15,6 +15,8 @@
 //   · DÍA     — "esto es de esta semana". Es como se sabe qué está al día.
 //
 // Sin React ni nube: entra una lista, sale un árbol.
+import { diaDeMs } from "../fecha.js";
+
 import { TEMAS, CLAVES_TEMA, FUENTES, poda, parecido } from "./memoria.js";
 
 // Lo que cabe entero antes de empezar a plegar. Por debajo de esto plegar solo quita
@@ -23,7 +25,9 @@ const CABEN_ENTEROS = 24;
 // Y el tamaño máximo del árbol que viaja en cada pregunta.
 const MAX_ARBOL = 2600;
 
-const dia = (ms) => (ms ? new Date(ms).toISOString().slice(0, 10) : "");
+// El día en el que se aprendió algo es el día que vivió la persona, no el de UTC: un
+// recuerdo de la una de la mañana pertenece a la noche que se acaba de trabajar.
+const dia = diaDeMs;
 
 // Qué tan "vivo" está un recuerdo: los puntos mandan, pero lo reciente sube. Sin esto,
 // algo que se dijo una vez hace un año y se usó mucho al principio tapa para siempre a

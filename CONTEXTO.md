@@ -210,11 +210,22 @@ checklist se crea pronto — si no existe, oficina la escribe a mano y llega dup
 
 ## Lo desduplicado (y lo que NO se unificó)
 
-- **`fecha.js`** — "hoy" estaba escrito 4 veces. Siguen siendo DOS funciones:
-  `hoyLocalISO()` (checklist y calendario) y `hoyUTCISO()` (subconsciente y tareas).
-  **No se unifican**: entre las 00:00 y las 02:00 de verano, UTC va por el día de ayer, y
-  eso mueve la frontera de "ya ha pasado" justo cuando se recoge un evento. Código nuevo:
-  `hoyLocalISO()`.
+- **`fecha.js`** — "hoy" estaba escrito de siete maneras y no todas daban el mismo día.
+  Ahora hay UNA, `hoyISO()`, y es la del calendario del dispositivo, porque las fechas de
+  esta app son días que escribe una persona ("la boda del 12"), no instantes. También
+  `enDiasISO(n)` (suma por días de calendario: los del cambio de hora tienen 23 y 25) y
+  `diaDeMs(ms)`. En el Worker no hay huso —Cloudflare va en UTC—, así que allí devuelve
+  exactamente lo que devolvía antes.
+
+  **Y unificarlas destapó un fallo que estaba en producción todos los días del año.** Los
+  avisos de recogidas hacían `hoy.setHours(0,0,0,0)` y luego `toISOString()`: poner el
+  reloj a medianoche LOCAL y pasarlo a UTC da el día ANTERIOR en cualquier huso por
+  delante de Greenwich, o sea siempre en España. La ventana de avisos iba corrida un día
+  y el "hoy" que viajaba a la interfaz era ayer. Arreglado, con prueba.
+
+  La batería se lanza ahora también con `TZ=Pacific/Auckland`: las fixtures que fijaban
+  fechas con `toISOString` mentían en husos por delante de Greenwich, y con eso se cazó.
+  Hay una prueba que prohíbe volver a sacar un día de calendario de `toISOString()`.
 - **`texto.js`** — `sinTildes` (3 conectores + `enrutado.js`, y con otro nombre en
   herramientas, menús especiales, apuntes y checklist-format) y
   `limpiaTexto`/`claveDeTexto` (memoria, objetivos, tareas, conversaciones). **No** se

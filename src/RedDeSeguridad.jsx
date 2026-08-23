@@ -11,6 +11,7 @@
 import { Component } from "react";
 import { leerTexto, borrar } from "./almacen.js";
 import { apunta, leerDiario, comoTexto } from "./diario.js";
+import { hoyISO } from "./fecha.js";
 
 const CLAVES = ["gula_checklist_estado", "gula_eventos_guardados", "gula_plantillas"];
 
@@ -22,7 +23,7 @@ function descargarTodo() {
   const url = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" }));
   const a = document.createElement("a");
   a.href = url;
-  a.download = `gula-copia-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `gula-copia-${hoyISO()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
