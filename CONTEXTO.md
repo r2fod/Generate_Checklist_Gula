@@ -657,6 +657,13 @@ día — el dueño lo vio y no le aportaba nada. Se quitó de `Asistente.jsx`; s
 las dos notas de privacidad por proveedor (automático / OpenAI), que sí son del día a
 día. La razón de por qué la clave no vive en la app pasó a comentario de código.
 
+**`.asis-explica` / `.asis-vacio`, con tarjeta propia.** El dueño lo vio en el móvil de
+verdad y no le gustó: texto gris suelto flotando sobre el fondo del panel, sin nada que
+lo distinguiera del resto —parecía que faltaba cargar algo, no que había una nota—. Las
+dos clases llevan ahora `background: var(--bg-subtle)` y su propio `border-radius`; como
+las usan Charla vacía, Tareas, Gasto y Cerebro, una sola clase mejora las cuatro
+pantallas a la vez. Comprobado con capturas en los dos temas antes de subirlo.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
