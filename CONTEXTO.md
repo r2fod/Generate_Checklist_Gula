@@ -9,7 +9,9 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 
 Si acabas de llegar, en este orden:
 
-1. **Estas reglas del dueño**, que están justo debajo. Saltárselas cuesta trabajo tirado.
+1. **`CLAUDE.md`**, con las reglas del dueño — Claude Code ya lo carga solo en cada
+   sesión, así que si estás leyendo esto es que ya lo has visto. Saltárselas cuesta
+   trabajo tirado.
 2. **"Conceptos que hay que respetar"** — la identidad de un item y la de un apunte. Son
    la diferencia entre una mejora y borrarle el trabajo a alguien que está cargando un
    camión.
@@ -39,19 +41,10 @@ calendario tiene dos documentos y no uno con un flag.
 
 ## Reglas del dueño (no negociables)
 
-1. **Todo en español**, código y comentarios.
-2. **Sin romper nada.** Está en producción y se usa cargando camiones.
-3. **Que no se quiten los checks hechos de los eventos.**
-4. **Responsive, sobre todo móvil** (320/360/390/412/480/768/1024/1280/1920).
-5. **El repositorio es público.** Nada que identifique a una persona en el código: ni
-   clientes, ni personal, ni teléfonos, ni €/pax. Eso vive en Firestore. En pruebas,
-   nombres inventados.
-6. Respuestas **breves**.
-7. **Este fichero se actualiza SIEMPRE, en el mismo commit que el cambio de código, no
-   después.** No es opcional ni algo que se hace "cuando hay tiempo": es la única forma
-   de que la siguiente sesión —de esta IA o de otra— sepa por dónde seguir sin releer
-   todo el código. Si arreglas algo, mueves algo o descartas un plan, esa frase de aquí
-   arriba que ya no es verdad se corrige en el mismo commit, no se deja para luego.
+**La lista completa vive en `CLAUDE.md`** — Claude Code lo carga solo en cada sesión, así
+que léelo primero y no aquí: dos copias del mismo texto es exactamente lo que su regla
+"no duplicar código" pide evitar, y aplica igual a la documentación. Si hay que añadir o
+corregir una regla del dueño, se toca en `CLAUDE.md`, no aquí.
 
 ## Cómo se revisa lo visual
 
@@ -141,7 +134,7 @@ Tres apps, cada una en SU carpeta (los ámbitos de PWA no pueden anidarse):
 indice/evt_<slug>-<hash>  archivo de checklists (un doc por evento)
 indice/eventosGuardados   doc antiguo: SOLO se lee, foto congelada de la migración
 indice/calendario         apuntes originales intactos + los dos códigos del calendario
-indice/precios            precios corregidos (solo lo cambiado)
+indice/precios            el catálogo ENTERO de precios (única fuente, ver "Hecho")
 indice/ratios             pax por camarero por tipo (solo lo cambiado)
 calendario/<codigo>       el calendario real     — enlace "?cal="
 calendario/<ver>          copia de solo lectura  — enlace "?ver=" (OTRO documento)
