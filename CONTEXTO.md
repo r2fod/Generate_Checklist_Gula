@@ -444,7 +444,8 @@ formularios).
 | `personalidad.js` | Cuatro tonos — solo cambian CÓMO habla |
 | `texto.js` | `sinMarcas()` — quita markdown de las respuestas (lo genérico está en `src/texto.js`) |
 | `revision.js` | Reglas de "esto no cuadra". **Puro: lo reusa el Worker** |
-| `Humano.jsx` / `Companero.jsx` | Ocho oficios: cuerpo entero y busto |
+| `Humano.jsx` / `Companero.jsx` | Ocho oficios (cuerpo entero y busto) + Jarvis |
+| `Jarvis.jsx` | El aro: única excepción a "personas, no objetos", pedida así por el dueño |
 | `companeros.js` | LISTA de compañeros + `companeroValido()`, aparte para node |
 
 ### Los compañeros
@@ -460,6 +461,18 @@ Se dibujan **dos veces**: cuerpo entero en `Humano.jsx` (pestaña Humano), busto
 `Companero.jsx` (cabecera, 30px — una persona entera ahí es una mancha). Lista en
 `companeros.js`; una prueba compara ambos ficheros (añadir en uno solo → desaparece en
 el otro al elegirlo).
+
+**Y un noveno que rompe la regla, a propósito.** El dueño pidió un aro tipo HUD que gire
+y cambie de color en vez de una persona — justo lo que "objetos con cara" descartaba
+arriba. Vive en `Jarvis.jsx`, generado por número (marcas y barras en bucle, no a mano)
+y sin nada compartido con el CUERPO/BUSTO de los otros ocho: ni parpadeo, ni gestos por
+herramienta (esos son de alguien con brazos). Entiende los mismos cinco estados que ya
+usa el resto del asistente —quieto, pensando, oyendo, hablando, error— cada uno con su
+color, tomado de tokens que ya existían (`--pj-fuego`, `--accent`, `--green-qty`,
+`--error-texto`) para no inventar una paleta nueva. `Companero.jsx` y `Humano.jsx` lo
+detectan por `cual === "jarvis"` y devuelven `<Jarvis>` antes de tocar el resto del
+dibujo; en la prueba de paridad lleva una entrada `jarvis: null` en los dos `OFICIOS`
+—nunca se lee, solo está para que la prueba lo siga contando como "en los dos sitios"—.
 
 Colores en tokens `--pj-*`, con versión oscura (blanco sobre fondo oscuro deslumbra).
 **Opacos, mezclados con el fondo — nunca la misma tinta a media opacidad**: con

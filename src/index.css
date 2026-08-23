@@ -6539,6 +6539,60 @@ hr {
   50%      { transform: translateY(-2px) scale(1.05); }
 }
 
+/* ─── EL ARO ──────────────────────────────────────────────────────────────────
+   Excepción a "personas, no objetos" (ver companeros.js): un aro que gira y cambia de
+   color en vez de un oficio. Todo el color sale de UNA variable por estado —los trazos
+   del SVG van en currentColor— para no repetir la paleta en cinco sitios. */
+.jarvis-aro {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--pj-metal-oscuro);
+  transition: color 0.4s ease;
+}
+
+.jarvis-borde, .jarvis-anillo, .jarvis-arco { stroke: currentColor; fill: none; }
+.jarvis-borde  { stroke-width: 1.5; opacity: 0.55; }
+.jarvis-anillo { stroke-width: 1.5; opacity: 0.4; }
+.jarvis-arco   { stroke-width: 2; opacity: 0.7; stroke-linecap: round; }
+.jarvis-marcas { opacity: 0.55; }
+.jarvis-barras { opacity: 0.85; }
+.jarvis-disco       { fill: currentColor; opacity: 0.14; }
+.jarvis-disco-medio { fill: currentColor; opacity: 0.22; }
+.jarvis-nucleo      { fill: currentColor; }
+
+/* El aro de barras gira siempre despacio; más rápido cuando hay algo que contar. Solo
+   transform —nunca una propiedad que provoque reflow— para que 16 barras girando no
+   cuesten nada (ver "Las animaciones en bucle no pueden mover la maqueta"). */
+.jarvis-barras { transform-origin: 100px 100px; animation: jarvis-girar 12s linear infinite; }
+.jarvis-aro.es-pensando .jarvis-barras,
+.jarvis-aro.es-oyendo .jarvis-barras,
+.jarvis-aro.es-hablando .jarvis-barras { animation-duration: 3s; }
+.jarvis-aro.es-error .jarvis-barras { animation-duration: 1.4s; }
+@keyframes jarvis-girar { to { transform: rotate(360deg); } }
+
+/* El núcleo late — más deprisa cuanto más "urgente" el estado. */
+.jarvis-nucleo, .jarvis-disco-medio {
+  transform-origin: 100px 100px;
+  animation: jarvis-latido 2.6s ease-in-out infinite;
+}
+.jarvis-aro.es-pensando .jarvis-nucleo, .jarvis-aro.es-pensando .jarvis-disco-medio,
+.jarvis-aro.es-oyendo .jarvis-nucleo, .jarvis-aro.es-oyendo .jarvis-disco-medio,
+.jarvis-aro.es-hablando .jarvis-nucleo, .jarvis-aro.es-hablando .jarvis-disco-medio {
+  animation-duration: 0.9s;
+}
+.jarvis-aro.es-error .jarvis-nucleo, .jarvis-aro.es-error .jarvis-disco-medio { animation-duration: 0.5s; }
+@keyframes jarvis-latido {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.12); opacity: 0.75; }
+}
+
+/* Los cinco estados, la misma paleta que ya usa el resto del asistente: nunca un color
+   nuevo inventado solo para esto. */
+.jarvis-aro.es-pensando { color: var(--pj-fuego); }
+.jarvis-aro.es-oyendo   { color: var(--accent); }
+.jarvis-aro.es-hablando { color: var(--green-qty); }
+.jarvis-aro.es-error    { color: var(--error-texto); }
+
 .asis-munecos { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .asis-muneco {
@@ -6758,7 +6812,7 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .asis-fondo, .asis-panel, .asis-msg, .asis-pendiente, .asis-pendientes,
   .asis-pasos .asis-paso, .asis-hilo, .asis-ajustes, .companero, .companero.es-pensando,
-  .asis-diario, .hum-elegir-uno {
+  .asis-diario, .hum-elegir-uno, .jarvis-barras, .jarvis-nucleo, .jarvis-disco-medio {
     animation: none;
     transition: none;
   }
