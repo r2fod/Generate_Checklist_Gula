@@ -43,6 +43,14 @@ export default function Jarvis({ estado = "quieto", size = 40 }) {
   return (
     <span className={`jarvis-aro es-${estado}`} aria-hidden="true" title="Jarvis">
       <svg width={size} height={size} viewBox="0 0 200 200" role="presentation">
+        {/* El resplandor del núcleo: un círculo desenfocado DEBAJO del núcleo de verdad,
+            igual que la sombra del suelo de los otros compañeros (Humano.jsx). Sin él el
+            centro quedaba plano —capas de opacidad, sin luz de verdad—, que es justo lo
+            que tenía la imagen de referencia y esto no. */}
+        <filter id="jarvisResplandor" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="6" />
+        </filter>
+        <circle className="jarvis-resplandor" cx="100" cy="100" r="16" filter="url(#jarvisResplandor)" />
         <circle className="jarvis-borde" cx="100" cy="100" r={RADIO} fill="none" />
         <g className="jarvis-marcas" stroke="currentColor" strokeWidth={grosor}>
           {Array.from({ length: marcas }, (_, i) => <Marca key={i} i={i} total={marcas} />)}
