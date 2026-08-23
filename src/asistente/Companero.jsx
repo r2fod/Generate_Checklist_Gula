@@ -12,6 +12,7 @@
 // Ninguno se parece al de OpenHuman: son formas simples de la casa.
 import { useState, useEffect } from "react";
 import { COMPANEROS, COMPANERO_POR_DEFECTO } from "./companeros.js";
+import Jarvis from "./Jarvis.jsx";
 
 // La lista vive en companeros.js: la comparten las dos pantallas y la leen las pruebas,
 // que corren en node y no entienden JSX. Se reexporta para no romper lo que ya importaba
@@ -66,6 +67,10 @@ const PELO_LARGO = <path d="M16 30 q-3 10 1 14 h4 q-4 -7 -2 -14 z M48 30 q3 10 -
 const PAJARITA = <path d="M28 47 l-5 -3 v6 z M36 47 l5 -3 v6 z" className="comp-detalle" />;
 
 const OFICIOS = {
+  // "jarvis" no dibuja nada aquí: es el único que no comparte el BUSTO de los demás
+  // (ver Jarvis.jsx). La clave vive igual en este objeto para que la prueba de paridad
+  // con Humano.jsx lo siga contando como "dibujado, no solo listado" en los dos sitios.
+  jarvis: null,
   cocinera:  <>{PELO_LARGO}{GORRO}</>,
   cocinero:  GORRO,
   camarero:  <><path d="M16 30 a16 16 0 0 1 32 0 q-8 -6 -18 -3 q-8 2 -14 3 z" className="comp-viste" />{PAJARITA}</>,
@@ -112,7 +117,7 @@ export default function Companero({ cual = COMPANERO_POR_DEFECTO, estado = "quie
   // desagradable a los diez segundos; con él parece que está ahí y ya está.
   const [parpadea, setParpadea] = useState(false);
   useEffect(() => {
-    if (cual === "ninguno" || estado !== "quieto") return;
+    if (cual === "ninguno" || cual === "jarvis" || estado !== "quieto") return;
     let vivo = true;
     const ciclo = () => {
       const espera = 2600 + Math.random() * 3400;
@@ -126,7 +131,11 @@ export default function Companero({ cual = COMPANERO_POR_DEFECTO, estado = "quie
     return () => { vivo = false; clearTimeout(id); };
   }, [cual, estado]);
 
-  if (cual === "ninguno" || !SILUETAS[cual]) return null;
+  if (cual === "ninguno") return null;
+  // El aro no tiene parpadeo ni BUSTO que dibujar: es su propio SVG, con su propia
+  // animación por CSS (ver .jarvis-aro en index.css).
+  if (cual === "jarvis") return <Jarvis estado={estado} size={size} />;
+  if (!SILUETAS[cual]) return null;
 
   return (
     <span className={`companero es-${estado}`} aria-hidden="true" title={COMPANEROS[cual].nombre}>

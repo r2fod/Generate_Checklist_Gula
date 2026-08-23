@@ -23,6 +23,10 @@ export const COMPANEROS = {
   parrillero: { nombre: "Parrillero", emoji: "🥘", oficio: "Paella y brasa" },
   sumiller:   { nombre: "Sumiller", emoji: "🍷", oficio: "Copa y paño" },
   repostera:  { nombre: "Repostera", emoji: "🎂", oficio: "Tarta y pañuelo" },
+  // Único que NO es una persona de la casa: pedido tal cual por el dueño, un aro que
+  // gira y cambia de color en vez de un oficio. Vive en su propio fichero (Jarvis.jsx),
+  // no en el CUERPO/BUSTO compartido — ver ese fichero para el porqué.
+  jarvis:     { nombre: "Jarvis", emoji: "🌀", oficio: "Aro que cambia de color" },
   ninguno:    { nombre: "Ninguno", emoji: "—", oficio: "Sin compañero" },
 };
 

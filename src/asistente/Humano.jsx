@@ -16,6 +16,7 @@ import { Mic, MicOff, Volume2, VolumeX, Loader2 } from "lucide-react";
 import { escuchar, hablar, callar, hayEscucha, hayVoz } from "./voz.js";
 import { gestoDeHerramienta } from "./gestos.js";
 import { COMPANEROS, CLAVES_COMPANERO, COMPANERO_POR_DEFECTO } from "./companeros.js";
+import Jarvis from "./Jarvis.jsx";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO } from "./personalidad.js";
 
 // Los cuatro son la misma cara dentro de un cuerpo distinto, igual que en el pequeño.
@@ -81,6 +82,11 @@ const BANDEJA = (
 );
 
 const OFICIOS = {
+  // "jarvis" no dibuja nada aquí: es el único que no comparte el CUERPO de los demás
+  // (ver Jarvis.jsx). La clave vive igual en este objeto para que la prueba de paridad
+  // con Companero.jsx lo siga contando como "dibujado, no solo listado" en los dos
+  // sitios.
+  jarvis: null,
   cocinera: (
     <>
       {MELENA}
@@ -273,6 +279,12 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
   // tiene su animación, y encimarlas hace que parezca nervioso en vez de vivo.
   const suyo = useGestos(gesto === "quieto");
 
+  // El aro no entiende gestos por herramienta (buscando, calculando…): esos son de
+  // alguien con brazos que puede señalar algo. Se queda con los cinco estados de
+  // siempre — el mismo repertorio que ya usa el resto del asistente.
+  const esJarvis = cual === "jarvis";
+  const estadoJarvis = oyendo ? "oyendo" : hablando ? "hablando" : estado;
+
   return (
     <div className="hum">
       <div className={`hum-escena es-${gesto}${suyo ? ` gesto-${suyo}` : ""}`}>
@@ -284,6 +296,9 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
             <span className="hum-aro es-tarde" />
           </>
         )}
+        {esJarvis ? (
+          <Jarvis estado={estadoJarvis} size={170} />
+        ) : (
         <svg viewBox="0 0 200 200" className="hum-svg" role="img" aria-label="El compañero del asistente">
           {/* ── EL VOLUMEN ──
               Lo que separa una silueta plana de algo con cuerpo son tres cosas, y las
@@ -337,6 +352,7 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
           {/* La boca se abre y cierra al hablar: es lo que hace que parezca que habla él */}
           <path className="hum-boca" d="M89 90 q11 9 22 0" fill="none" strokeWidth="6" strokeLinecap="round" />
         </svg>
+        )}
       </div>
 
       <p className="hum-estado">
