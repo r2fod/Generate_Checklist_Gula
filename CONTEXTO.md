@@ -162,10 +162,24 @@ envios/<id>               lo que manda la oficina
 `firebase use gula-checklist`). Solo despliega reglas — ni hosting ni funciones.
 Repo y consola se separaban en cuanto alguien tocaba una y olvidaba la otra.
 
-**`publico/` y `envios/` están probadas** en `sincronizacion.test.mjs` contra el Firestore
-simulado, que ahora las aplica de verdad: crear sí, listar no, corregir solo mientras
-nadie lo haya revisado, fecha del servidor. Eran las únicas colecciones a las que se
-llega SIN sesión y las únicas sin prueba: el simulado las denegaba todas.
+**Las reglas se prueban en dos sitios, y la diferencia importa:**
+
+- `src/__tests__/firestore-simulado.mjs` — las REESCRIBE en JavaScript. Rapidísimo y sin
+  red, y es lo que permite probar la sincronización entre dos dispositivos. Pero
+  comprueba lo que alguien creyó que dicen las reglas, no lo que dicen: un paréntesis mal
+  puesto en `firestore.rules` no lo caza. Ya cubre `publico/` y `envios/` (crear sí,
+  listar no, corregir solo mientras nadie lo haya revisado, fecha del servidor); antes las
+  denegaba todas, y eran las únicas colecciones a las que se llega SIN sesión.
+- `pruebas/reglas.test.mjs` — **el motor real de Google**, con
+  `@firebase/rules-unit-testing` cargando `firestore.rules` tal cual se despliega:
+  `npm run reglas:emulador` (o `npm run reglas:test` con el emulador ya levantado).
+  Necesita Java y bajar el JAR una vez; si no está, avisa y se salta en vez de fallar.
+  **En el contenedor de trabajo no corre** (sin Java y con la descarga cortada), así que
+  el único sitio donde de verdad se comprueban hoy es el trabajo `reglas` de CI.
+
+Y para que los dos no se separen en silencio, hay una prueba —de las que corren
+siempre— que compara las colecciones de `firestore.rules` con las que el simulado
+declara cubrir, y que el "todo lo demás, denegado" del final sigue en su sitio.
 
 ### Conceptos que hay que respetar
 

@@ -69,6 +69,28 @@ jobs:
             exit 1
           fi
 
+  reglas:
+    name: firestore.rules contra el emulador
+    runs-on: ubuntu-latest
+    # El simulado de las pruebas rápidas REESCRIBE las reglas en JavaScript: comprueba lo
+    # que alguien creyó que dicen, no lo que dicen. Esto las pasa por el motor real de
+    # Google. No corre en el contenedor de trabajo (no hay Java ni se puede bajar el JAR),
+    # así que este trabajo es el único sitio donde de verdad se comprueban.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      # El emulador de Firestore es un JAR.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: npm ci
+      - name: Lanzar el emulador y pasar las reglas
+        run: npx --yes firebase-tools@13 emulators:exec --only firestore "node pruebas/reglas.test.mjs"
+
   navegador:
     name: Barrido del navegador (~45 min)
     # Solo de noche o a mano: en cada push bloquearía las revisiones tres cuartos de hora.

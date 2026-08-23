@@ -1,5 +1,19 @@
-// Firestore de mentira con las MISMAS reglas de seguridad del proyecto
+// Firestore de mentira con las MISMAS reglas de seguridad del proyecto.
+//
+// Ojo con lo que ESTO es y lo que no: aquí las reglas están REESCRITAS en JavaScript, así
+// que comprueban lo que alguien creyó que dice `firestore.rules`, no lo que dice. Un
+// paréntesis mal puesto en el fichero de verdad no se caza desde aquí. Para eso está
+// `pruebas/reglas.test.mjs`, que pasa los mismos casos por el motor real de Google.
+//
+// Lo que sí garantiza este de aquí: que la sincronización entre dos dispositivos funciona
+// sin red y en milisegundos. Y para que los dos no se separen en silencio, más abajo se
+// declara qué colecciones cubre y hay una prueba que lo compara con el fichero real.
 export const almacen = new Map();          // "coleccion/id" -> data
+
+// Las colecciones que este simulado sabe aplicar. Si alguien añade una a
+// `firestore.rules` y no la pone aquí, la prueba de coherencia lo dice: el agujero
+// silencioso sería que el simulado la denegara todo y nadie se enterase hasta producción.
+export const COLECCIONES_CUBIERTAS = ["eventos", "indice", "calendario", "publico", "envios"];
 export const limpiarPrevios = () => previos.clear();
 const oyentes = [];
 // `datos` es lo que se quiere escribir y `previo` lo que ya había: las reglas de

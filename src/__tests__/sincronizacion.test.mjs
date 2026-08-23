@@ -4,7 +4,8 @@
 // dispositivos, que es donde estaban los fallos que no se veían de otra forma.
 //
 //   node src/__tests__/sincronizacion.test.mjs
-import { almacen, setSesion, limpiarPrevios, fakeDb, fakeFs, reglasPermiten } from './firestore-simulado.mjs';
+import { almacen, setSesion, limpiarPrevios, fakeDb, fakeFs, reglasPermiten, COLECCIONES_CUBIERTAS } from './firestore-simulado.mjs';
+import { readFileSync } from 'node:fs';
 import { ponConexionDePruebas } from '../firestore.js';
 // El nube.js DE VERDAD, el que se publica. Antes esto importaba una copia a mano de 288
 // líneas con la conexión cambiada, así que estas pruebas —que son la red que ha impedido
@@ -1146,3 +1147,39 @@ console.log('\n══ El buzón de la oficina: publico/ y envios/ ══');
   ok(almacen.get(`envios/${id}`).respuestas.pax === 140, 'lo guardado sigue siendo lo último válido, no lo rechazado');
   setSesion(true);
 }
+
+// ─── QUE EL SIMULADO Y LAS REGLAS DE VERDAD NO SE SEPAREN ─────────────────────
+// El simulado reescribe las reglas en JavaScript. Eso lo hace rápido y sin red, pero el
+// día que alguien añada una colección a `firestore.rules` —o quite una— el simulado
+// seguirá aplicando las de antes y estas pruebas dirán que todo va bien. El motor real
+// se prueba aparte (`npm run reglas:test`, necesita el emulador); esto es lo que corre
+// SIEMPRE y avisa de que los dos se han separado.
+console.log('\n══ El simulado cubre las mismas colecciones que firestore.rules ══');
+{
+  const reglas = readFileSync('firestore.rules', 'utf8');
+  // Los `match /coleccion/{id}` de primer nivel. Se salta el comodín final
+  // (`{document=**}`), que es el "todo lo demás, denegado".
+  // "databases" no es una colección: es el `match /databases/{database}/documents` que
+  // envuelve a todas. Se descarta a mano, que es más honesto que una expresión más lista.
+  const enElFichero = [...reglas.matchAll(/match\s+\/([a-zA-Z_]+)\/\{/g)].map(m => m[1]);
+  const unicas = [...new Set(enElFichero)].filter(c => c !== "databases");
+  ok(unicas.length >= 5, `se han leído las colecciones del fichero de reglas → ${unicas.join(', ')}`);
+
+  const faltan = unicas.filter(c => !COLECCIONES_CUBIERTAS.includes(c));
+  ok(faltan.length === 0,
+    `el simulado cubre todas las de firestore.rules (sin cubrir: ${faltan.join(', ') || 'ninguna'})`);
+
+  const sobran = COLECCIONES_CUBIERTAS.filter(c => !unicas.includes(c));
+  ok(sobran.length === 0,
+    `y no se ha quedado aplicando reglas de colecciones que ya no existen (${sobran.join(', ') || 'ninguna'})`);
+
+  // La regla de cierre tiene que seguir ahí: sin ella, una colección nueva nace abierta.
+  ok(/match\s+\/\{document=\*\*\}\s*\{\s*allow read, write: if false;/.test(reglas),
+    'y el "todo lo demás, denegado" del final sigue en su sitio');
+
+  // El simulado tiene que denegar de verdad lo que no conoce, no dejarlo pasar.
+  ok(reglasPermiten('loquesea/x', 'get', true) === false && reglasPermiten('loquesea/x', 'write', true) === false,
+    'una colección que no está en las reglas se deniega también en el simulado, con sesión y sin ella');
+}
+
+console.log('\n──────────────────────────────────────────────────────────');

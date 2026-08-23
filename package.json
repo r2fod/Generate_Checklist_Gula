@@ -16,6 +16,8 @@
     "tipos": "tsc -p jsconfig.json",
     "medir": "node pruebas/medir.mjs",
     "reglas:deploy": "firebase deploy --only firestore:rules",
+    "reglas:test": "node pruebas/reglas.test.mjs",
+    "reglas:emulador": "firebase emulators:exec --only firestore \"node pruebas/reglas.test.mjs\"",
     "test:calc": "node src/__tests__/calculos.test.mjs",
     "test:sync": "node src/__tests__/sincronizacion.test.mjs",
     "test:app": "node src/__tests__/app.test.mjs"
@@ -27,6 +29,7 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
