@@ -34,6 +34,7 @@ const EN_CRISTIANO = {
   buscar_eventos: "tus eventos",
   ver_evento: "el evento",
   ver_checklist: "la checklist",
+  progreso_carga: "el progreso de la carga",
   ver_escaleta: "la escaleta",
   ver_calendario: "el calendario",
   ver_cerebro: "lo que sé",
