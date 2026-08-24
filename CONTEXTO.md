@@ -818,6 +818,18 @@ cabiendo entero, ~676px). Comprobado en capturas a 1280×900, 1920×1080 y una p
 1366×768, con Charla y Gasto (la pestaña con más contenido de las cinco): cabe entero en
 las tres, sin recortes ni scroll de más.
 
+**"Poner el contador a cero" ya no usa el `confirm()` del navegador.** El dueño lo vio y
+no le gustó: letra de sistema, sin tema oscuro, sin ni un borde redondeado — desentonaba
+con el resto del panel. Era el ÚNICO sitio de toda la app que todavía usaba el diálogo
+nativo; todo lo demás que borra algo (`handleNuevoEvento`, borrar plantillas, borrar
+envíos…) ya pasa por el `Dialogo` propio de `App.jsx` (`components/Dialogo.jsx`, con
+`tipo: "confirm"`). Se trae el mismo componente a `Asistente.jsx`, con su propio estado
+local — el panel vive en su propio portal, aparte del árbol de la checklist, así que no
+comparte el `dialogo` de `App.jsx`. De paso, el mensaje ahora dice explícitamente que es
+por aparato y que no se puede deshacer, cosas que el `confirm()` de una línea no dejaba
+sitio para decir. Comprobado con capturas (los dos temas) y el ciclo completo: Cancelar
+no toca el contador, Confirmar sí lo pone a cero.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

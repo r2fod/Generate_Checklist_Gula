@@ -24,6 +24,7 @@ import { sinMarcas } from "./texto.js";
 import { queHacerConLaUrl } from "./proxy.js";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
 import { avisosConfig, saludoPendientes } from "./avisosConfig.js";
+import Dialogo from "../components/Dialogo.jsx";
 
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
@@ -82,6 +83,12 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [charlaId, setCharlaId] = useState("");
   const [verHistorial, setVerHistorial] = useState(false);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
+  // El confirm() nativo del navegador desentona con el resto de la app —letra de
+  // sistema, sin tema oscuro, sin ni un borde redondeado— y aquí era el único sitio que
+  // todavía lo usaba: el resto de acciones que borran algo (App.jsx) pasan por este
+  // mismo Dialogo. Se queda local a este componente y no compartido con App.jsx porque
+  // el panel vive en su propio portal, aparte del árbol de la checklist.
+  const [dialogo, setDialogo] = useState(null);
 
   // Si nadie ha puesto todavía una dirección EN ESTE MÓVIL, se busca la que ya haya
   // configurado el equipo: es la misma idea que los precios o los ratios —quien la
@@ -290,6 +297,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
   return (
     <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
+      {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
       {/* La pestaña va en la clase para que el CSS pueda tratarlas distinto: en el móvil
           Charla necesita toda la altura (lista de mensajes + campo de escribir), y las
           demás no —se quedaban con 400px en blanco debajo—. */}
@@ -598,7 +606,14 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
             {resumen(gasto).length > 0 && (
               <button type="button" className="btn btn-outline"
-                onClick={() => { if (confirm("¿Poner el contador a cero?")) setGasto(borrarGasto()); }}>
+                onClick={() => setDialogo({
+                  tipo: "confirm",
+                  titulo: "¿Poner el contador a cero?",
+                  mensaje: "Se borra lo que llevas consumido este mes en este aparato. No se puede deshacer.",
+                  textoConfirmar: "Poner a cero",
+                  peligro: true,
+                  onConfirm: () => setGasto(borrarGasto()),
+                })}>
                 Poner el contador a cero
               </button>
             )}
