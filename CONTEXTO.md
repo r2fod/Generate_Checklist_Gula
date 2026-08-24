@@ -535,6 +535,23 @@ comprueba sesión del equipo.
   se la quedaba para él, los demás veían el campo vacío. Ahora, si la nube no la tiene y
   este navegador sí, se sube sola al abrir el asistente.
 
+**Varias claves de Gemini, una por cuenta de Google.** El dueño preguntó si se podían
+usar varias cuentas suyas de Gmail para no quedarse sin la cuota gratis de Gemini a
+media tarde. `GEMINI_API_KEY` sigue siendo la única obligatoria; `GEMINI_API_KEY_2` y
+`GEMINI_API_KEY_3`, opcionales, son claves de OTRAS cuentas de Google, cada una con su
+propia cuota gratis aparte (se sacan igual que la primera, en
+<https://aistudio.google.com/apikey>, iniciando sesión con esa cuenta). La función
+`gemini()` en `worker/index.js` prueba las que estén puestas en orden y solo pasa a la
+siguiente si el fallo es DE CUOTA (HTTP 429 / `RESOURCE_EXHAUSTED`) — un error de otro
+tipo (clave mal puesta, modelo retirado) es el mismo en las tres cuentas, así que
+insistir con otra clave solo tardaría más en decir lo mismo. `clavesGemini(env)` — el
+filtrado de qué claves hay puestas y en qué orden — está exportado y probado aparte
+(`src/__tests__/asistente.test.mjs`) porque el resto de `gemini()` necesitaría mockear
+`fetch` y la respuesta entera de la API para probarse de verdad. **Ojo con el ToS:**
+crear cuentas de Google SOLO para esquivar el límite de cuota suele ir contra las
+condiciones de uso de Gemini; con cuentas reales del negocio, sin ese propósito, no hay
+problema — se lo advertí al dueño antes de tocar nada.
+
 ### El repaso de la noche
 
 Cron del Worker: `revisarProximos()` sobre los próximos 30 días → `indice/avisos`; la

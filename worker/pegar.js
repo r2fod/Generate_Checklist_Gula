@@ -493,6 +493,13 @@ async function quienEs(idToken, env) {
 		email: u.email || ""
 	} } : { fallo: "Firebase no reconoce a ese usuario." };
 }
+function clavesGemini(env) {
+	return [
+		env.GEMINI_API_KEY,
+		env.GEMINI_API_KEY_2,
+		env.GEMINI_API_KEY_3
+	].filter(Boolean);
+}
 async function gemini(cuerpo, env) {
 	const modelo = env.GEMINI_MODEL || "gemini-3.6-flash";
 	const contenidos = cuerpo.mensajes.map((m) => {
@@ -518,32 +525,41 @@ async function gemini(cuerpo, env) {
 			parts: [{ text: String(m.contenido || "") }]
 		};
 	});
-	const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${env.GEMINI_API_KEY}`, {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify({
-			contents: contenidos,
-			systemInstruction: { parts: [{ text: cuerpo.sistema }] },
-			tools: [{ functionDeclarations: cuerpo.herramientas }]
-		})
+	const cuerpoGemini = JSON.stringify({
+		contents: contenidos,
+		systemInstruction: { parts: [{ text: cuerpo.sistema }] },
+		tools: [{ functionDeclarations: cuerpo.herramientas }]
 	});
-	if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
-	const d = await r.json();
-	const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
-	const u = d.usageMetadata || {};
-	return {
-		uso: {
-			entrada: u.promptTokenCount || 0,
-			salida: u.candidatesTokenCount || 0
-		},
-		texto: partes.filter((p) => p.text).map((p) => p.text).join("").trim(),
-		llamadas: partes.filter((p) => p.functionCall).map((p, i) => ({
-			id: `g${i}`,
-			nombre: String(p.functionCall.name || "").split(":").pop(),
-			argumentos: p.functionCall.args || {},
-			firma: p.thoughtSignature || ""
-		}))
-	};
+	const claves = clavesGemini(env);
+	let ultimoFallo;
+	for (let i = 0; i < claves.length; i++) {
+		const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${claves[i]}`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: cuerpoGemini
+		});
+		if (r.ok) {
+			const d = await r.json();
+			const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+			const u = d.usageMetadata || {};
+			return {
+				uso: {
+					entrada: u.promptTokenCount || 0,
+					salida: u.candidatesTokenCount || 0
+				},
+				texto: partes.filter((p) => p.text).map((p) => p.text).join("").trim(),
+				llamadas: partes.filter((p) => p.functionCall).map((p, i2) => ({
+					id: `g${i2}`,
+					nombre: String(p.functionCall.name || "").split(":").pop(),
+					argumentos: p.functionCall.args || {},
+					firma: p.thoughtSignature || ""
+				}))
+			};
+		}
+		ultimoFallo = /* @__PURE__ */ new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+		if (r.status !== 429) throw ultimoFallo;
+	}
+	throw ultimoFallo;
 }
 async function claude(cuerpo, env) {
 	const mensajes = [];
@@ -717,6 +733,8 @@ const PROVEEDORES = {
 async function estado(env) {
 	const claves = [
 		"GEMINI_API_KEY",
+		"GEMINI_API_KEY_2",
+		"GEMINI_API_KEY_3",
 		"FIREBASE_API_KEY",
 		"ANTHROPIC_API_KEY",
 		"OPENAI_API_KEY",
@@ -820,4 +838,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { worker_default as default };
+export { clavesGemini, worker_default as default };

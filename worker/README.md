@@ -33,6 +33,18 @@ Firestore.
    | `FIREBASE_API_KEY` | Secret | La `apiKey` de la config de Firebase de la app (ya es pública, pero se guarda aquí igual) |
    | `ORIGENES` | Text | `https://TUUSUARIO.github.io,http://localhost:5173` |
 
+   Opcionales, si la cuota gratis de una sola cuenta de Gemini se os queda corta:
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `GEMINI_API_KEY_2` | Secret | Clave de una SEGUNDA cuenta de Google, con su propia cuota gratis aparte |
+   | `GEMINI_API_KEY_3` | Secret | Clave de una TERCERA cuenta, igual |
+
+   Si `GEMINI_API_KEY` se queda sin cuota (Google contesta 429), el Worker prueba solo
+   con estas antes de rendirse — no hace falta tocar nada más. Cada una se saca igual
+   que la primera, en <https://aistudio.google.com/apikey>, iniciando sesión con esa
+   otra cuenta.
+
    Opcionales, si algún día quieres otro motor:
 
    | Nombre | Tipo | Qué es |
