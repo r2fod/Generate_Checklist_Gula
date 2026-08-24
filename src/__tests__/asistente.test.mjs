@@ -15,6 +15,7 @@ import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
 import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
 import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
+import { avisosConfig } from "../asistente/avisosConfig.js";
 import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
 import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
@@ -1377,6 +1378,40 @@ console.log("\n── Lo que ya no se repinta ni se descarga tarde ──");
   ok(/<ul>[\s\S]*<li className={`cer-aviso/.test(trozoDocs),
     "los avisos de documentos van dentro de su <ul>, no como <li> sueltos");
   ok(malo && /solo se lee/.test(malo.comoSeArregla), "y el consejo es distinto para el archivo congelado que para el calendario");
+}
+
+console.log("\n══ Lo que falta por configurar (avisosConfig) ══");
+{
+  const almacen = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (almacen.has(k) ? almacen.get(k) : null),
+    setItem: (k, v) => almacen.set(k, String(v)),
+    removeItem: (k) => almacen.delete(k),
+  };
+
+  ok(avisosConfig().length === 2, "sin proxy y sin precios, avisa de los dos");
+  ok(avisosConfig().every(a => a.tono === "falta"), "los dos son 'falta': impiden que la app cuente bien, no un capricho");
+
+  almacen.set("gula_asistente_url", "https://asistente-gula.ejemplo.workers.dev");
+  ok(avisosConfig().length === 1 && /precio/.test(avisosConfig()[0].texto),
+    "con el proxy puesto, solo queda el aviso de los precios");
+
+  almacen.set("gula_precios_items", JSON.stringify({ "Copas de vino": 1.63 }));
+  ok(avisosConfig().length === 0, "con las dos cosas puestas, no avisa de nada");
+
+  almacen.delete("gula_asistente_url");
+  almacen.set("gula_precios_items", JSON.stringify({}));
+  ok(avisosConfig().length === 2, "un catálogo de precios vacío cuenta igual que no tenerlo");
+
+  delete globalThis.localStorage;
+
+  // El aviso se pinta con la MISMA tarjeta que ya usa el repaso de eventos
+  // (.cer-repaso-evento > ul > li.cer-aviso), no una nueva: reutilizar el CSS que ya
+  // existe es la mitad de por qué se hizo así.
+  const cerebro = readFileSync("src/asistente/Cerebro.jsx", "utf8");
+  const trozoConfig = cerebro.slice(cerebro.indexOf("Por configurar") - 200, cerebro.indexOf("Por configurar") + 600);
+  ok(/cer-repaso-evento/.test(trozoConfig) && /<li className={`cer-aviso/.test(trozoConfig),
+    "los avisos de configuración van en la misma tarjeta que los del repaso, no una nueva");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
