@@ -64,7 +64,12 @@ export default function Jarvis({ estado = "quieto", size = 40 }) {
         {!compacto && (
           <>
             <circle className="jarvis-anillo" cx="100" cy="100" r="50" fill="none" />
+            {/* Dos arcos, cada uno a su propio radio y girando a su propia velocidad (uno
+                a favor, otro en contra — ver index.css): es lo que hace que el centro no
+                se vea nunca igual dos veces seguidas, como el aro de referencia que pidió
+                el dueño ("que cambia líneas"). Un solo arco quieto no lo conseguía. */}
             <path className="jarvis-arco" d="M128 66 a46 46 0 0 1 8 44" fill="none" />
+            <path className="jarvis-arco2" d="M72 134 a38 38 0 0 1 -6 -34" fill="none" />
           </>
         )}
         <circle className="jarvis-disco" cx="100" cy="100" r="40" />

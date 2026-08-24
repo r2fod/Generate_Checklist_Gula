@@ -945,6 +945,30 @@ que no lo repita, para que no confunda al dueño. Comprobado con lint y test
 dentro del componente `Asistente.jsx` y reproducirlo de verdad necesitaría simular
 dos vueltas al modelo casi simultáneas, no solo funciones puras.
 
+**Jarvis, más parecido a la referencia del dueño ("un aro que gira y cambia de
+color", ver `Jarvis.jsx`) — quieto se veía apagado, y los arcos de dentro nunca se
+movían.** El dueño mandó una captura de un aro naranja tipo reactor y pidió que se
+pareciera, "que cambia líneas etc". La estructura ya era casi la misma (dial de
+marcas, aro de barras que gira, disco central que late) — lo que faltaba era esto:
+
+1. **Color de "quieto" apagado.** `.jarvis-aro` sin estado explícito caía en
+   `--pj-metal-oscuro` (gris), no en el ámbar de la referencia — quieto es como se ve
+   la mayor parte del tiempo, así que era la diferencia que más se notaba. Añadido
+   `.jarvis-aro.es-quieto { color: var(--pj-fuego); }`, el mismo tono que ya usa
+   "pensando" (se distinguen por ritmo, no por color — ver `jarvis-latido`/
+   `jarvis-girar` un poco más arriba en `index.css`).
+
+2. **Los arcos de dentro no giraban.** Había solo UNO (`jarvis-arco`), estático:
+   quieto se veía siempre exactamente igual, y la referencia no. Añadido un segundo
+   arco (`jarvis-arco2`, otro radio) y animados los dos con `jarvis-girar` —el mismo
+   keyframe que ya usa el aro de barras—, cada uno a su velocidad y en su sentido
+   (9s uno, 13s el otro y al revés) para que nunca lleguen a superponerse del todo,
+   que sería indistinguible de uno solo. Solo `transform`, mismo motivo de siempre
+   (ver "Las animaciones en bucle no pueden mover la maqueta").
+
+Comprobado con capturas en dos instantes seguidos: el arco visible cambia de
+posición entre una y otra, que es justo lo que antes no pasaba nunca.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
