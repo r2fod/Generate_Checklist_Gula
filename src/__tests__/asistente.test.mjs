@@ -34,7 +34,7 @@ import { queHacerConLaUrl } from "../asistente/proxy.js";
 import { readFileSync } from "node:fs";
 import { COMPANEROS, CLAVES_COMPANERO, CLAVES_DIBUJADAS, companeroValido, COMPANERO_POR_DEFECTO } from "../asistente/companeros.js";
 import { comoHabla, PERSONALIDADES, CLAVES_PERSONALIDAD } from "../asistente/personalidad.js";
-import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
+import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraHoy as recordatoriosDeHoy, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
 import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../asistente/arbol.js";
 import { parte, foto, queHaCambiado, comoVanLosObjetivos } from "../asistente/subconsciente.js";
@@ -1212,6 +1212,37 @@ console.log("\n── Lo que hay que hacer ──");
   ok(saneaTareas([{ texto: "x", id: "a" }, { texto: "y", id: "a" }]).length === 1, "no hay dos con el mismo id");
 }
 
+console.log("\n── Recordatorios: \"recuérdame tal cosa tal día\" (paraHoy) ──");
+{
+  const hoy = hoyISO();
+  const ayer = enDiasISO(-1);
+  const manana = enDiasISO(1);
+
+  let r = [];
+  ({ tareas: r } = apuntarTarea(r, "Pedir el hielo", { fecha: hoy }));
+  ({ tareas: r } = apuntarTarea(r, "Confirmar el DJ", { fecha: ayer }));
+  ({ tareas: r } = apuntarTarea(r, "Sin fecha, tarea normal"));
+  ({ tareas: r } = apuntarTarea(r, "Esto es de mañana", { fecha: manana }));
+
+  const hoyLista = recordatoriosDeHoy(r, hoy);
+  ok(hoyLista.length === 2, `hoy y lo atrasado salen, lo de mañana y lo sin fecha no (${hoyLista.length})`);
+  ok(hoyLista[0].texto === "Confirmar el DJ", "lo más atrasado sale primero: es lo que más lleva esperando");
+  ok(!hoyLista.some(x => /mañana/.test(x.texto)), "lo de mañana no cuenta como de hoy: no ha llegado su día");
+  ok(!hoyLista.some(x => /normal/.test(x.texto)), "una tarea sin fecha no es un recordatorio: no tiene día que cumplir");
+
+  const conHecha = marcarTarea(r, r.find(x => x.texto === "Pedir el hielo").id, true);
+  ok(recordatoriosDeHoy(conHecha, hoy).length === 1, "una vez hecha, deja de recordarse");
+
+  ({ tareas: r } = apuntarTarea(r, "Confirmar el DJ", { fecha: manana }));
+  ok(r.find(x => x.texto === "Confirmar el DJ").fecha === manana,
+    "repetirla con una fecha nueva la cambia: no hay que borrarla para correr el día");
+
+  ok(saneaTareas([{ texto: "x", fecha: "no es una fecha" }])[0].fecha === "",
+    "una fecha con formato raro se descarta, no se guarda tal cual");
+  ok(tareasContexto([{ id: "a", texto: "Pedir hielo", fecha: hoy, hecho: false, creado: 1 }]).includes(hoy),
+    "y la fecha viaja en lo que ve el modelo, para que sepa que es un recordatorio con día");
+}
+
 console.log("\n── El subconsciente ──");
 {
   const hoy = hoyISO();
@@ -1469,6 +1500,18 @@ console.log("\n══ Lo primero que dice, si hay algo pendiente (saludoPendient
   const conLasDosCosas = saludoPendientes(avisosNegocio, repasoConAvisos);
   ok(/precio/.test(conLasDosCosas) && /2 eventos/.test(conLasDosCosas),
     "con las dos cosas a la vez, las junta en una sola frase, no en dos saludos");
+
+  // Los recordatorios ("recuérdame tal cosa tal día"): tercera fuente, y va delante de
+  // las otras dos — es lo que alguien pidió que se le dijera A ÉL, no un aviso genérico.
+  ok(saludoPendientes([], null, []) === null, "sin recordatorios tampoco cambia nada");
+  const unRecordatorio = saludoPendientes([], null, [{ texto: "Pedir el hielo" }]);
+  ok(/Pedir el hielo/.test(unRecordatorio), `un recordatorio se dice tal cual → "${unRecordatorio}"`);
+  const dosRecordatorios = saludoPendientes([], null, [{ texto: "Pedir el hielo" }, { texto: "Llamar al DJ" }]);
+  ok(/Pedir el hielo/.test(dosRecordatorios) && /Llamar al DJ/.test(dosRecordatorios),
+    `con varios, se dicen los dos → "${dosRecordatorios}"`);
+  const todoJunto = saludoPendientes(avisosNegocio, repasoConAvisos, [{ texto: "Pedir el hielo" }]);
+  ok(todoJunto.indexOf("Pedir el hielo") < todoJunto.indexOf("precio"),
+    `el recordatorio va delante de los avisos genéricos → "${todoJunto}"`);
 }
 
 console.log("\n══ Varias cuentas de Gemini, si la primera se queda sin cuota (clavesGemini) ══");

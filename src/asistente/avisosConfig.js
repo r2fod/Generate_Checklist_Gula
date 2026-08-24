@@ -50,16 +50,25 @@ export function avisosConfig() {
 // NUEVA (hilo vacío en Asistente.jsx): repetirlo en cada respuesta sería spam, no un
 // aviso, y por eso decide QUÉ decir pero no CUÁNDO — eso lo decide quien lo llama.
 //
-// Sin React: entran los avisos de negocio y el repaso (o null si no ha corrido
-// todavía), sale un texto o null si no hay nada que decir — que es el caso normal, y
-// el caso normal no tiene por qué sonar a aviso.
-export function saludoPendientes(avisosNegocio, repaso) {
+// Sin React: entran los avisos de negocio, el repaso (o null si no ha corrido
+// todavía) y los recordatorios que tocan hoy (paraHoy(), en tareas.js), sale un texto
+// o null si no hay nada que decir — que es el caso normal, y el caso normal no tiene
+// por qué sonar a aviso.
+export function saludoPendientes(avisosNegocio, repaso, recordatoriosHoy = []) {
   const eventosConAvisos = repaso && Array.isArray(repaso.eventos)
     ? repaso.eventos.filter(e => e.avisos && e.avisos.length)
     : [];
-  if (!avisosNegocio.length && !eventosConAvisos.length) return null;
+  if (!avisosNegocio.length && !eventosConAvisos.length && !recordatoriosHoy.length) return null;
 
   const partes = [];
+  // Los recordatorios van primero: es lo que alguien pidió que se le dijera A ÉL, en
+  // concreto ("recuérdame...") — no es lo mismo que un aviso genérico del negocio o de
+  // un evento, y perderlo entre esos dos sería justo lo que se pidió que no pasara.
+  if (recordatoriosHoy.length) {
+    partes.push(recordatoriosHoy.length === 1
+      ? `Tenías apuntado: ${recordatoriosHoy[0].texto}.`
+      : `Tenías apuntado: ${recordatoriosHoy.map(t => t.texto).join("; ")}.`);
+  }
   if (avisosNegocio.length) partes.push(avisosNegocio.map(a => a.texto).join(" "));
   if (eventosConAvisos.length) {
     partes.push(
