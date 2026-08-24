@@ -6170,9 +6170,14 @@ hr {
 
 @media (min-width: 768px) {
   .asis-fondo { padding: 20px; background: rgba(15, 23, 42, 0.2); }
+  /* Más grande que antes (440×660) a propósito: en un monitor de escritorio se veía
+     pequeño de más, apretado en una esquina. En vw/vh y no en px fijos, para que crezca
+     con la pantalla de verdad y no se quede corto en una grande ni se salga en una
+     portátil pequeña (88vh en una de 768px de alto siguen siendo ~676px, parecido a
+     antes; en una de escritorio normal hay bastante más aire). */
   .asis-panel {
-    width: min(440px, 100%);
-    height: min(660px, 100%);
+    width: min(520px, 92vw);
+    height: min(760px, 88vh);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
