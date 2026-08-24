@@ -13,7 +13,7 @@ export function aplicarEnTareas({ tareas = [], guardar }) {
     const { que, datos } = propuesta || {};
 
     if (que === "apuntar_tarea") {
-      const r = apuntarTarea(tareas, datos.texto, { evento: datos.evento });
+      const r = apuntarTarea(tareas, datos.texto, { evento: datos.evento, fecha: datos.fecha });
       if (r.error) return { error: r.error };
       guardar(r.tareas);
       return r.yaEstaba

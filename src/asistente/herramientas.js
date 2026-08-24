@@ -520,23 +520,24 @@ export const HERRAMIENTAS = {
     datos: true,
     escribe: true,
     esquema: {
-      description: "Apunta algo que hay que hacer para que no se pierda: pedir material, llamar a un proveedor, confirmar algo. Si es de un evento concreto, dilo — así se puede mirar antes de ese evento y se cae sola cuando pasa.",
+      description: "Apunta algo que hay que hacer para que no se pierda: pedir material, llamar a un proveedor, confirmar algo. Si es de un evento concreto, dilo — así se puede mirar antes de ese evento y se cae sola cuando pasa. Si te piden 'recuérdame el 5 de septiembre que...' o algo con un día concreto, pon fecha: se lo dice la persona en cuanto abra el asistente ese día o después (no antes, y no si no vuelve a abrirlo justo ese día — no hay forma de avisar con la app cerrada).",
       parameters: {
         type: "object",
         properties: {
           texto: { type: "string", description: "Qué hay que hacer, en una frase." },
           evento: { type: "string", description: "De qué evento es, si lo es." },
+          fecha: { type: "string", description: "AAAA-MM-DD, calculada desde 'Hoy es...'. Solo si te han pedido un recordatorio para un día concreto; vacío para una tarea suelta sin fecha." },
         },
         required: ["texto"],
       },
     },
-    corre: (ctx, { texto = "", evento = "" } = {}) => {
+    corre: (ctx, { texto = "", evento = "", fecha = "" } = {}) => {
       if (!String(texto).trim()) return { error: "No me has dicho qué apuntar." };
       if (!ctx.onEscribir) return { error: "Esta pantalla no deja apuntar tareas." };
       return ctx.onEscribir({
         que: "apuntar_tarea",
-        resumen: `Apuntar: "${String(texto).trim()}"${evento ? ` (${evento})` : ""}`,
-        datos: { texto: String(texto).trim(), evento: String(evento || "") },
+        resumen: `Apuntar: "${String(texto).trim()}"${evento ? ` (${evento})` : ""}${fecha ? ` — recordatorio para el ${fecha}` : ""}`,
+        datos: { texto: String(texto).trim(), evento: String(evento || ""), fecha: String(fecha || "") },
       });
     },
   },

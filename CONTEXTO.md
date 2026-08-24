@@ -973,6 +973,48 @@ dos vueltas al modelo casi simultáneas, no solo funciones puras.
    de un borde —sin tocar su grosor— no dispara reflow, igual que `color` o `fill`.
    Añadida a la lista con el resto, no ignorada.
 
+**"Recuérdame tal cosa tal día" — recordatorios con fecha, dichos al abrir (y en voz,
+si toca).** Pedido tal cual: que el asistente sea más "interactivo", que diga cosas
+para que no se te olviden, y que "recuérdame X el día Y" funcione de verdad. Antes de
+tocar código se le preguntó al dueño CÓMO, porque las dos formas razonables de
+hacerlo cambian el tamaño del trabajo en un orden de magnitud:
+
+- ¿Avisa aunque la app esté cerrada (notificación push de verdad) o solo al abrirla
+  ese día? — **Eligió: al abrirla.** No hay Service Worker con push en este repo
+  (comprobado: `public/sw.js` no tiene nada de `PushManager`/`Notification`), así que
+  push habría sido infraestructura nueva de cero (permiso del navegador, claves VAPID,
+  un disparador en el servidor a esa hora exacta) y no funciona igual en todos los
+  móviles. Al abrirla no necesita nada de eso.
+- ¿Solo escrito, o también en voz? — **Eligió: también en voz.**
+
+Con eso decidido, NO se monta un sistema nuevo de recordatorios: se estira `tareas.js`
+—que ya guarda en la nube, ya se agrupa, ya se limpia solo— con un campo `fecha`
+opcional ("AAAA-MM-DD"). Una tarea sin fecha sigue siendo una tarea normal; con fecha,
+es un recordatorio. `paraHoy(lista, hoy)` filtra las que tienen fecha ya cumplida
+(hoy o antes — una que se pasó por no abrir la app ese día sigue mereciendo decirse,
+no callarse sola) y no están hechas, la más atrasada primero.
+
+`saludoPendientes()` (`avisosConfig.js`) gana un tercer parámetro,
+`recordatoriosHoy`, y los dice PRIMERO —antes que los avisos genéricos de negocio o de
+evento—: es lo que alguien pidió que se le dijera A ÉL, perderlo entre avisos
+genéricos habría sido justo lo que se pidió que no pasara. La herramienta
+`apuntar_tarea` gana un parámetro `fecha` opcional, con su fecha calculada por el
+propio modelo desde el "Hoy es..." que ya lleva el sistema (`cliente.js`) — el mismo
+mecanismo que ya usan `buscar_eventos`/`ver_calendario` para "próximos" y demás
+fechas relativas.
+
+Lo de la voz salió gratis: `Humano.jsx` ya lee en voz alta `ultimaRespuesta` en
+cuanto llega, si la voz está activa — nunca tocado. Lo único que hacía falta era que
+`ultimaRespuesta`, con el hilo todavía vacío (antes de la primera pregunta de la
+charla), fuera el saludo en vez de una cadena vacía. Un solo `? :` en
+`Asistente.jsx`, cero cambios en `Humano.jsx`.
+
+Comprobado con capturas y con `speechSynthesis.speak` interceptado en Playwright (sin
+audio real, pero sí se ve el texto exacto que intentó decir): el saludo aparece en
+Charla, el mismo texto llega a la voz en Humano, y en Tareas cada recordatorio lleva
+su fecha en una etiqueta pequeña (reutilizado `.asis-recuerdo-puntos`, el mismo pill
+que ya usan el contador de "veces" en Cerebro y Gasto — sin CSS nuevo).
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

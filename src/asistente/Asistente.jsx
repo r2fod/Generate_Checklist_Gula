@@ -14,7 +14,7 @@ import { tokenDeSesion } from "../auth.js";
 import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
 import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
-import { porEvento as tareasPorEvento, sinHacer } from "./tareas.js";
+import { porEvento as tareasPorEvento, sinHacer, paraHoy as recordatoriosDeHoy } from "./tareas.js";
 import Companero from "./Companero.jsx";
 import { COMPANERO_POR_DEFECTO, companeroValido } from "./companeros.js";
 import Humano from "./Humano.jsx";
@@ -326,8 +326,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // Lo primero que dice, si hay algo pendiente — pedido tal cual: que hable primero en
   // vez de obligar a ir a mirar Cerebro. Barato y local (dos lecturas de este
   // navegador, ver avisosConfig.js): se recalcula en cada render sin que se note, igual
-  // que ya hace Cerebro.jsx con lo mismo.
-  const saludo = saludoPendientes(avisosConfig(), repaso);
+  // que ya hace Cerebro.jsx con lo mismo. Los recordatorios ("recuérdame tal cosa tal
+  // día") entran por la misma puerta: si su fecha ya llegó, se dicen aquí en cuanto se
+  // abre el asistente — no hay forma de avisar con la app cerrada, así que esto es lo
+  // más cerca que se puede estar de eso.
+  const saludo = saludoPendientes(avisosConfig(), repaso, recordatoriosDeHoy(contexto.tareas || []));
 
   return (
     <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
@@ -543,6 +546,14 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                       {t.hecho ? <Check size={13} aria-hidden="true" /> : <span className="asis-tarea-vacia" />}
                     </button>
                     <span className="asis-recuerdo-texto">{t.texto}</span>
+                    {/* Mismo pill que ya usa el número de veces en Cerebro y Gasto: es
+                        "una etiqueta pequeña dentro de asis-recuerdo", que es justo lo
+                        que hace falta aquí, sin CSS nuevo. */}
+                    {t.fecha && (
+                      <span className="asis-recuerdo-puntos" title={`Recordatorio para el ${t.fecha}`}>
+                        {new Date(`${t.fecha}T00:00:00`).toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
+                      </span>
+                    )}
                     <button type="button" className="asis-recuerdo-borrar"
                       onClick={() => contexto.onQuitarTarea && contexto.onQuitarTarea(t.id)}
                       title="Quitarla" aria-label={`Quitar: ${t.texto}`}>
@@ -559,7 +570,12 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               cual={companero === "ninguno" ? COMPANERO_POR_DEFECTO : companero}
               estado={pensando ? "pensando" : huboError ? "error" : "quieto"}
               haciendo={enCurso}
-              ultimaRespuesta={[...hilo].reverse().find(m => m.de === "el")?.texto || ""}
+              // Con hilo vacío no hay ninguna respuesta de verdad que leer todavía —pero
+              // sí puede haber un saludo con recordatorios de hoy esperando, y pedido tal
+              // cual: que lo diga en voz, no solo escrito. Humano.jsx no sabe de dónde
+              // sale "ultimaRespuesta"; lee lo que le llegue, así que no hace falta
+              // tocar nada allí.
+              ultimaRespuesta={hilo.length ? ([...hilo].reverse().find(m => m.de === "el")?.texto || "") : (saludo || "")}
               vozActiva={vozActiva}
               onCambiarVoz={(v) => { setVozActiva(v); guardar(CLAVE_VOZ, v ? "1" : "0"); }}
               personalidad={personalidad}

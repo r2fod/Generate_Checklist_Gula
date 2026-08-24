@@ -162,6 +162,9 @@ function Banco() {
         contexto={{
           eventosGuardados: { "Boda de prueba uno": { evento: "boda", pax: 120, fechaEvento: dia(2), horaInicio: "14:00", ubicacion: "Finca de ejemplo" } },
           apuntes: saneaLista(DEMO),
+          // Un recordatorio ya cumplido, con fecha de hoy: es lo único que este banco no
+          // tenía forma de enseñar (paraHoy() en tareas.js) sin datos de mentira propios.
+          tareas: [{ id: "demo-recordatorio", texto: "Pedir el hielo para la boda de mañana", fecha: dia(0), hecho: false, creado: Date.now() }],
         }}
       />
     );

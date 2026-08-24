@@ -28,7 +28,9 @@ const limpia = (t) => limpiaTexto(t, MAX_TEXTO);
 const clave = (texto, evento) => sinTildes(`${limpia(texto)}|${evento || ""}`)
   .replace(/[^a-z0-9ñ|]/g, "-").replace(/-+/g, "-").slice(0, 70);
 
-// { id, texto, evento, hecho, creado, quien }
+const esFechaISO = (f) => /^\d{4}-\d{2}-\d{2}$/.test(String(f || ""));
+
+// { id, texto, evento, hecho, fecha, creado, quien }
 export function saneaTareas(bruto) {
   if (!Array.isArray(bruto)) return [];
   const vistos = new Set();
@@ -44,6 +46,9 @@ export function saneaTareas(bruto) {
       return {
         id, texto, evento,
         hecho: !!t.hecho,
+        // "AAAA-MM-DD" si es un recordatorio para un día concreto ("recuérdame el 5 de
+        // septiembre que..."); "" si es una tarea suelta sin fecha, que es la mayoría.
+        fecha: esFechaISO(t.fecha) ? t.fecha : "",
         creado: Number.isFinite(Number(t.creado)) ? Number(t.creado) : 0,
         quien: String(t.quien || "").slice(0, 60),
       };
@@ -52,22 +57,25 @@ export function saneaTareas(bruto) {
     .slice(0, MAX_TAREAS);
 }
 
-export function apuntarTarea(lista, texto, { evento = "", quien = "", ahora = Date.now() } = {}) {
+export function apuntarTarea(lista, texto, { evento = "", quien = "", ahora = Date.now(), fecha = "" } = {}) {
   const limpio = limpia(texto);
   if (!limpio) return { tareas: saneaTareas(lista), tarea: null, error: "No me has dicho qué apuntar." };
+  const fechaLimpia = esFechaISO(fecha) ? fecha : "";
   const actual = saneaTareas(lista);
   const id = clave(limpio, evento);
   const yaEsta = actual.find(t => t.id === id);
   if (yaEsta) {
     // Apuntar dos veces lo mismo no crea dos tareas: la desmarca si estaba hecha, que
-    // es lo que se quiere decir al repetirla.
-    const revivida = { ...yaEsta, hecho: false };
+    // es lo que se quiere decir al repetirla. Si esta vez trae una fecha nueva, la
+    // cambia — "recuérdamelo mejor el día 10" tiene que poder correr la fecha sin
+    // tener que borrar la tarea y volver a apuntarla.
+    const revivida = { ...yaEsta, hecho: false, fecha: fechaLimpia || yaEsta.fecha };
     return { tareas: actual.map(t => (t.id === id ? revivida : t)), tarea: revivida, yaEstaba: true };
   }
   if (actual.filter(t => !t.hecho).length >= MAX_TAREAS) {
     return { tareas: actual, tarea: null, error: `Ya hay ${MAX_TAREAS} tareas sin hacer. Cierra algunas antes de apuntar más.` };
   }
-  const nueva = { id, texto: limpio, evento, hecho: false, creado: ahora, quien: String(quien || "").slice(0, 60) };
+  const nueva = { id, texto: limpio, evento, hecho: false, fecha: fechaLimpia, creado: ahora, quien: String(quien || "").slice(0, 60) };
   return { tareas: [nueva, ...actual], tarea: nueva };
 }
 
@@ -111,12 +119,22 @@ export function porEvento(lista) {
 
 export const sinHacer = (lista) => saneaTareas(lista).filter(t => !t.hecho);
 
+// Los recordatorios que tocan HOY: sin hacer, con fecha puesta, y esa fecha ya
+// llegada. "Ya llegada" y no "es exactamente hoy" a propósito — uno que se le pasó por
+// no abrir la app ese día sigue mereciendo que se diga, no que se calle solo porque ya
+// no es "hoy". La más atrasada primero, que es la que más lleva esperando.
+export function paraHoy(lista, hoy = hoyISO()) {
+  return sinHacer(lista)
+    .filter(t => t.fecha && t.fecha <= hoy)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
 // Lo que viaja en la conversación: solo lo que queda por hacer, y con tope. Las hechas
 // no cambian ninguna respuesta.
 export function paraElContexto(lista, max = 20) {
   const pendientes = sinHacer(lista).slice(0, max);
   if (!pendientes.length) return "";
   return pendientes
-    .map(t => `- ${t.texto}${t.evento ? ` (${t.evento})` : ""}`)
+    .map(t => `- ${t.texto}${t.evento ? ` (${t.evento})` : ""}${t.fecha ? ` [recordatorio: ${t.fecha}]` : ""}`)
     .join("\n");
 }
