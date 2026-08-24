@@ -521,7 +521,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         ) : pestana === "gasto" ? (
           <div className="asis-hilo asis-cerebro">
             <p className="asis-explica">
-              Lo que llevas consumido este mes, contado en este navegador. Los precios son
+              Lo que llevas consumido este mes EN ESTE APARATO: el móvil y el ordenador
+              cuentan cada uno el suyo, no se suman ni se ven entre sí, así que es normal
+              que aquí veas un número distinto que en el otro. Los precios son
               aproximados y de la web de cada uno: el número exacto importa menos que el
               orden de magnitud, que es lo que hace falta para saber si una pregunta merece
               el modelo caro.
