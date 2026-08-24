@@ -6429,13 +6429,16 @@ hr {
    exactamente igual que en la cabecera y en la pestaña Humano, solo que fijo en
    la esquina. La sombra grande es lo que la separa del fondo y la hace flotar. */
 .asis-flotante-boton {
-  /* 68px, no 56: a 56 el dueño la vio y "casi no se nota de lo que es" —
-     coincide con TAMANO_BURBUJA en BotonAsistente.jsx, que ambos tienen que
-     mantener igual (ese valor también acota hasta dónde se puede arrastrar). */
-  width: 68px;
-  height: 68px;
+  /* 84px, no 56 ni 68: las dos veces anteriores el dueño la siguió viendo
+     pequeña — coincide con TAMANO_BURBUJA en BotonAsistente.jsx, que ambos
+     tienen que mantener igual (ese valor también acota hasta dónde se puede
+     arrastrar). El borde en acento (abajo) es la otra mitad del arreglo: un
+     borde de 1px gris se pierde contra el fondo de la app, así que además de
+     grande necesitaba un contorno que destacara por sí solo. */
+  width: 84px;
+  height: 84px;
   padding: 0;
-  border: 1px solid var(--border-color);
+  border: 2.5px solid var(--accent);
   border-radius: 50%;
   background: var(--card-bg);
   color: var(--accent);

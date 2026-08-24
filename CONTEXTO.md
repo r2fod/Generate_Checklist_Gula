@@ -899,6 +899,35 @@ también acota hasta dónde se puede arrastrar la burbuja sin salirse de la pant
 Comprobado con capturas: el busto (cara, gorro, hombros) ya se distingue con claridad
 en la esquina, sin invadir ni tapar nada de alrededor.
 
+**La burbuja, a 68px, TODAVÍA se veía pequeña.** El dueño insistió tras el arreglo
+anterior. La causa esta vez no era solo el tamaño: el borde de 1px en gris
+(`var(--border-color)`) apenas se distingue del fondo de la app en una esquina —
+poco contraste, no poco tamaño—. Subida otra vez, a 84px de círculo con el compañero
+a 54px, y el borde pasa de 1px gris a 2.5px en color de acento: un anillo que
+destaca por sí solo, sin llenar el círculo entero de color (eso ya se había
+descartado antes — ver el comentario de "Fondo NEUTRO" un poco más arriba en
+`index.css` — porque tapa el traje del compañero). Comprobado con capturas en los
+dos temas.
+
+**Al aprobar una propuesta escribiendo en el chat en vez de pulsar el botón, salían
+dos mensajes que parecían llevarse la contraria.** El dueño mandó una captura:
+"Hecho: Crear 5 checklists... Creadas..." y, justo debajo, "Te he dejado en pantalla
+la propuesta... Solo tienes que confirmarla ahí para que se generen" — como si el
+propio asistente no supiera si ya estaba hecho o no. Causa: aprobar una propuesta
+tiene DOS caminos que no se hablan entre sí — pulsar "Hacerlo" en la tarjeta de
+`pendientes` (que llama a `resolver()`), o simplemente escribir "sí, créalos" en el
+chat (que el modelo interpreta como una petición nueva y vuelve a llamar a
+`crear_checklists`). Si se hacen las dos casi a la vez, `escribir()` en
+`Asistente.jsx` apilaba una SEGUNDA tarjeta idéntica sin saber que la primera ya
+estaba ahí — y el modelo, con la respuesta de esa segunda llamada, contestaba "te lo
+he dejado en pantalla" justo cuando la primera ya se había aplicado y dicho "Hecho".
+Arreglado en `escribir()`: si ya hay una propuesta pendiente con el mismo `que` y el
+mismo `resumen`, no se apila otra — se le dice al modelo que YA estaba propuesta y
+que no lo repita, para que no confunda al dueño. Comprobado con lint y test
+(`npm run test:rapido`); no tiene prueba automática propia porque `escribir()` vive
+dentro del componente `Asistente.jsx` y reproducirlo de verdad necesitaría simular
+dos vueltas al modelo casi simultáneas, no solo funciones puras.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

@@ -38,12 +38,14 @@ const CLAVE_ESCONDIDO = "gula_asistente_flotante_escondido";
 // tú quieras" — el dueño la quiere DONDE LA DEJÓ, no donde nace por defecto.
 const CLAVE_POS = "gula_asistente_flotante_pos";
 
-// Antes 56/38: el dueño la vio y "casi no se nota de lo que es" — el propio
-// Companero.jsx avisa de que a 30px el busto "se queda en una mancha", y 38 no
-// mejoraba mucho eso. Subida a 68/46, que es lo que hizo falta para que el
-// busto se lea sin llegar al tamaño de la pestaña Humano (esa ya tiene su
-// propio dibujo grande, a 200px, pensado para leerse de lejos).
-const TAMANO_BURBUJA = 68;
+// Antes 56/38, luego 68/46: el dueño la seguía viendo pequeña las dos veces. No era
+// solo el tamaño del busto —Companero.jsx ya avisaba de que por debajo de cierto
+// tamaño "se queda en una mancha"—: el borde de 1px en gris apenas se distingue del
+// fondo de la app en la esquina, así que además del tamaño hacía falta contraste
+// propio (ver el anillo en acento en .asis-flotante-boton, index.css). Subida a
+// 84/54: un salto que se note de verdad, sin llegar al tamaño de la pestaña Humano
+// (esa ya tiene su propio dibujo grande, a 200px, pensado para leerse de lejos).
+const TAMANO_BURBUJA = 84;
 const MARGEN = 8;
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
@@ -146,8 +148,8 @@ export default function BotonAsistente({
             onPointerDown={alApoyar} onPointerMove={alMover} onPointerUp={alSoltar} onPointerCancel={alSoltar}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setAbierto(true); } }}>
             {companero === "ninguno"
-              ? <Sparkles size={28} aria-hidden="true" />
-              : <Companero cual={companero} size={46} estado="quieto" />}
+              ? <Sparkles size={32} aria-hidden="true" />
+              : <Companero cual={companero} size={54} estado="quieto" />}
           </button>
           <button type="button" className="asis-flotante-cerrar" onClick={esconder}
             title="Esconder el asistente" aria-label="Esconder el asistente">
