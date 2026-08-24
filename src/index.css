@@ -6295,17 +6295,24 @@ hr {
   color: var(--accent);
 }
 
-/* Antes era texto suelto flotando sobre el fondo del panel, sin ningún borde que lo
-   distinguiera del resto: en un panel oscuro, letra gris sobre gris parece que falta
-   algo, no que hay una nota. Con su propia tarjeta se lee como lo que es —una
-   explicación aparte—, no como relleno. */
+/* Antes era texto suelto flotando sobre el fondo del panel, y el primer intento de
+   arreglarlo (solo un relleno bg-subtle, sin borde) se quedaba corto: en claro,
+   bg-subtle (#f8fafc) casi no se distingue de card-bg (#fff), así que seguía
+   pareciendo una mancha, no una tarjeta. El borde completo es lo que la hace leerse
+   como una forma de verdad en vez de una sombra sucia. El borde izquierdo en el color
+   de acento —no en gris, que aquí no se notaba— la marca como nota del asistente y no
+   como una tarjeta de datos, que son las que llevan borde parejo (.asis-recuerdo,
+   .asis-gasto-cifras): con solo mirar el borde se sabe si lo de dentro es una
+   explicación o algo que se puede tocar. */
 .asis-explica {
   margin: 0;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 9px;
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--text-muted);
   background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
 }
 
@@ -6327,16 +6334,19 @@ hr {
   gap: 12px;
 }
 
-/* Mismo tratamiento que .asis-explica: una tarjeta, no texto suelto. Es lo primero que
-   se ve al abrir una pestaña vacía —Charla, Tareas, Gasto, Cerebro— y en gris plano
-   sobre el fondo del panel parecía que la pantalla no había cargado del todo. */
+/* Mismo tratamiento que .asis-explica pero con borde PAREJO, no el borde izquierdo
+   grueso de la nota: esto es lo primero que se ve al abrir una pestaña vacía —Charla,
+   Tareas, Gasto, Cerebro— y sin sombra ni borde de verdad seguía leyéndose como que la
+   pantalla no había cargado del todo, aunque ya llevara un relleno de fondo. */
 .asis-vacio {
   padding: 14px;
   font-size: 0.85rem;
   color: var(--text-muted);
   line-height: 1.5;
   background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
 }
 .asis-vacio p { margin: 0; }
 .asis-vacio ul { margin: 10px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
