@@ -670,6 +670,38 @@ primero que se ve al abrir una pestaña vacía. Como las usan Charla vacía, Tar
 Cerebro, una sola clase mejora las cuatro pantallas a la vez. Comprobado con capturas en
 los dos temas, en móvil (390/412px) y en escritorio, antes de subirlo.
 
+**El Gasto es por aparato, y ahora lo dice claro.** El dueño vio números distintos en el
+móvil y en el ordenador y lo tomó por un fallo. No lo es: `gasto.js` lo dice desde
+siempre ("No va a la nube a propósito: subir un contador en cada pregunta serían
+escrituras constantes por un número que solo sirve para mirarlo"), pero el texto en
+pantalla solo decía "contado en este navegador", que no deja claro que el móvil y el
+ordenador van cada uno por su cuenta. Reescrito en `Asistente.jsx` para decirlo sin
+rodeos: "EN ESTE APARATO: el móvil y el ordenador cuentan cada uno el suyo, no se suman
+ni se ven entre sí". Sin tocar `gasto.js` — el diseño no cambia, solo se explica mejor.
+
+**El asistente, en una burbuja flotante (`BotonAsistente.jsx`).** Pedido tal cual: "el
+muñeco en la parte inferior derecha como si fuera el botón de WhatsApp". Antes era un
+botón de texto más entre los de la cabecera (`btn btn-ghost`, "Asistente"), a un scroll
+de distancia en una checklist larga. Ahora `BotonAsistente` se dibuja fijo en la esquina
+inferior derecha (`position: fixed`, `z-index: 55` — por debajo del panel y de Modo carga,
+que lo tapa solo al abrirse), con la cara del compañero elegido dentro (lee
+`gula_asistente_companero` del navegador directamente, porque tiene que enseñarla ANTES
+de que el panel —que es quien de verdad la guarda— llegue a cargarse; con "Ninguno"
+elegido o "Jarvis" cae en Sparkles / el aro, según toque). Fondo NEUTRO (`card-bg`), no de
+acento: el compañero está pensado para vivir sobre un fondo neutro —el traje ya es un
+tinte de acento mezclado con el fondo, ver `.comp-viste`— así que un círculo sólido en
+acento lo dejaba casi invisible; probado primero así y corregido antes de subirlo.
+
+Con posibilidad de esconderla, que era la otra mitad del encargo: una aspa pequeña en la
+esquina de la burbuja la esconde, guardado en `gula_asistente_flotante_escondido` (este
+navegador). Escondida no desaparece del todo — queda una pastilla mucho más discreta en
+el mismo sitio, para no dejar el asistente sin ninguna puerta de vuelta. Se esconde sola
+mientras el panel está abierto (ahí ya se ve el muñeco grande en la pestaña Humano).
+`className`/`etiqueta` salieron de las props: ya no hay texto que rotular. Comprobado con
+capturas: los dos temas, con compañero por defecto, "Ninguno" y "Jarvis", y el ciclo
+completo esconder → recargar (sigue escondida) → mostrar → abrir el panel (la burbuja se
+esconde sola).
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

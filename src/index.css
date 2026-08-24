@@ -6402,8 +6402,101 @@ hr {
 .asis-escribir input { flex: 1 1 auto; min-width: 0; min-height: 44px; font-size: 16px; }
 .asis-escribir .btn { flex: 0 0 auto; min-height: 44px; min-width: 48px; }
 
+/* ─── LA BURBUJA FLOTANTE ──────────────────────────────────────────────────────
+   Pedida tal cual por el dueño: "el muñeco en la esquina, como el botón de
+   WhatsApp", en vez de un botón perdido arriba del todo en la cabecera, que en
+   una checklist larga queda a un scroll de distancia. Fija en la esquina, se ve
+   estés donde estés en la página. */
+.asis-flotante {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  /* Por debajo del propio panel (60) y de Modo carga (1000+ vía .preview-overlay):
+     con Modo carga abierto, que cubre la pantalla entera, la burbuja queda tapada
+     sola, sin tener que esconderla a mano para esa pantalla. */
+  z-index: 55;
+}
+
+/* Fondo NEUTRO, no de acento: el compañero se dibuja pensado para vivir sobre
+   card-bg —el traje ya es un tinte de acento mezclado con el fondo (ver
+   .comp-viste más abajo)—, así que un círculo sólido en acento le dejaba el
+   traje casi invisible encima y los ojos flotando solos. Con card-bg se ve
+   exactamente igual que en la cabecera y en la pestaña Humano, solo que fijo en
+   la esquina. La sombra grande es lo que la separa del fondo y la hace flotar. */
+.asis-flotante-boton {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.15s ease;
+}
+
+.asis-flotante-boton:hover { transform: scale(1.05); }
+.asis-flotante-boton:active { transform: scale(0.96); }
+
+/* La aspa para esconderla: pequeña y en la esquina de la burbuja, no un botón
+   aparte que se coma sitio. position: fixed en el padre también crea su propio
+   contexto para los hijos en absolute, así que ancla bien sin nada más. */
+.asis-flotante-cerrar {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.asis-flotante-cerrar:hover { color: var(--error-texto); border-color: var(--error-borde); }
+
+/* Escondida del todo, queda esta pestañita: mucho más discreta que la burbuja
+   entera, pero sigue en la esquina —el mismo sitio donde se fue a buscar la
+   última vez— para no dejar el asistente sin ninguna puerta de vuelta. */
+.asis-flotante-mini {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 55;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.6;
+  box-shadow: var(--shadow-sm);
+}
+
+.asis-flotante-mini:hover { opacity: 1; color: var(--accent); border-color: var(--accent); }
+
+.asis-flotante { animation: asis-flotante-entra 0.2s ease-out; }
+@keyframes asis-flotante-entra { from { transform: scale(0.85); opacity: 0; } to { transform: none; opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
   .asis-gira { animation: none; }
+  .asis-flotante { animation: none; }
+  .asis-flotante-boton, .asis-flotante-boton:hover, .asis-flotante-boton:active { transition: none; transform: none; }
 }
 
 /* ─── EL CEREBRO DEL ASISTENTE ────────────────────────────────────────────────
