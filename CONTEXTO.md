@@ -657,12 +657,18 @@ día — el dueño lo vio y no le aportaba nada. Se quitó de `Asistente.jsx`; s
 las dos notas de privacidad por proveedor (automático / OpenAI), que sí son del día a
 día. La razón de por qué la clave no vive en la app pasó a comentario de código.
 
-**`.asis-explica` / `.asis-vacio`, con tarjeta propia.** El dueño lo vio en el móvil de
-verdad y no le gustó: texto gris suelto flotando sobre el fondo del panel, sin nada que
-lo distinguiera del resto —parecía que faltaba cargar algo, no que había una nota—. Las
-dos clases llevan ahora `background: var(--bg-subtle)` y su propio `border-radius`; como
-las usan Charla vacía, Tareas, Gasto y Cerebro, una sola clase mejora las cuatro
-pantallas a la vez. Comprobado con capturas en los dos temas antes de subirlo.
+**`.asis-explica` / `.asis-vacio`, con tarjeta de verdad.** Primer intento: solo
+`background: var(--bg-subtle)`, sin borde. Insuficiente — el dueño lo volvió a ver en el
+móvil real y seguía sin gustarle: en claro, `bg-subtle` (#f8fafc) casi no se distingue de
+`card-bg` (#fff), así que la "tarjeta" seguía leyéndose como una mancha, no como una
+forma. Segundo intento, el que quedó: `border: 1px solid var(--border-color)` en las dos
+—igual que ya llevan `.asis-recuerdo` y `.asis-gasto-cifras`, así que ahora es
+consistente con el resto del panel—, y `.asis-explica` además con
+`border-left: 3px solid var(--accent)` para distinguir "nota del asistente" de "tarjeta
+de datos" de un vistazo; `.asis-vacio` suma `box-shadow: var(--shadow-sm)` por ser lo
+primero que se ve al abrir una pestaña vacía. Como las usan Charla vacía, Tareas, Gasto y
+Cerebro, una sola clase mejora las cuatro pantallas a la vez. Comprobado con capturas en
+los dos temas, en móvil (390/412px) y en escritorio, antes de subirlo.
 
 ## Decidido NO hacer (y por qué)
 
