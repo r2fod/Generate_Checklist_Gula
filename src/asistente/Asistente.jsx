@@ -23,6 +23,7 @@ import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permiso
 import { sinMarcas } from "./texto.js";
 import { queHacerConLaUrl } from "./proxy.js";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
+import { avisosConfig, saludoPendientes } from "./avisosConfig.js";
 
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
@@ -280,6 +281,12 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       setEnCurso("");
     }
   };
+
+  // Lo primero que dice, si hay algo pendiente — pedido tal cual: que hable primero en
+  // vez de obligar a ir a mirar Cerebro. Barato y local (dos lecturas de este
+  // navegador, ver avisosConfig.js): se recalcula en cada render sin que se note, igual
+  // que ya hace Cerebro.jsx con lo mismo.
+  const saludo = saludoPendientes(avisosConfig(), repaso);
 
   return (
     <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
@@ -610,15 +617,28 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         ) : (
         <div className="asis-hilo">
           {!hilo.length && (
-            <div className="asis-vacio">
-              <p>Pregúntame por tus eventos. Los números salen de las fórmulas de la app, no de mi cabeza.</p>
-              <ul>
-                <li>¿Cuánto hielo llevo a la boda de septiembre?</li>
-                <li>¿A qué hora hay que salir del obrador?</li>
-                <li>¿Qué eventos tengo sin configurar?</li>
-                <li>¿Cuánta gente hace falta para una comunión de 90?</li>
-              </ul>
-            </div>
+            <>
+              {/* Habla primero SOLO si hay algo que decir, y solo en una charla nueva: en
+                  cuanto hay hilo, esto ya no se ve —repetirlo en cada respuesta sería
+                  spam, no un aviso—. Es un mensaje de mentira, no una vuelta real: no
+                  entra en `mensajes` (lo que se manda al modelo) ni se guarda en el
+                  historial, así que no cuesta un token ni ensucia las conversaciones
+                  guardadas con una que nadie empezó de verdad. */}
+              {saludo && (
+                <div className="asis-msg es-el">
+                  <div className="asis-burbuja">{saludo}</div>
+                </div>
+              )}
+              <div className="asis-vacio">
+                <p>Pregúntame por tus eventos. Los números salen de las fórmulas de la app, no de mi cabeza.</p>
+                <ul>
+                  <li>¿Cuánto hielo llevo a la boda de septiembre?</li>
+                  <li>¿A qué hora hay que salir del obrador?</li>
+                  <li>¿Qué eventos tengo sin configurar?</li>
+                  <li>¿Cuánta gente hace falta para una comunión de 90?</li>
+                </ul>
+              </div>
+            </>
           )}
           {hilo.map((m, i) => (
             <div className={`asis-msg es-${m.de}`} key={i}>

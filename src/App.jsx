@@ -2668,6 +2668,10 @@ export default function App({ onCerrarSesion } = {}) {
   // o comprar en ESTE evento (los avisos globales incluyen los de otros eventos).
   const itemsCargados = useMemo(() => Object.values(checkeados).filter(Boolean).length, [checkeados]);
   const itemsPreparados = useMemo(() => Object.values(preparados).filter(Boolean).length, [preparados]);
+  // Lo que ha vuelto tras el evento — misma cuenta que las dos de arriba, para que el
+  // asistente pueda contestar "cuánto llevo cargado" y "cuánto ha vuelto" con el MISMO
+  // número que ya se ve en la ficha del Resumen, no uno recalculado aparte.
+  const itemsVueltos = useMemo(() => Object.values(vueltos).filter(Boolean).length, [vueltos]);
   const pendientesEvento = useMemo(() =>
     (recogidas || []).filter(r => r.concepto && (!r.recogido || (r.fechaDevolucion && !r.devuelto))).length
     + (compras || []).filter(c => c.concepto && !c.comprado).length,
@@ -3024,6 +3028,12 @@ export default function App({ onCerrarSesion } = {}) {
                   memoria,
                   objetivos,
                   tareas,
+                  // Mismos números que la ficha del Resumen (totalConceptos/itemsCargados/
+                  // itemsPreparados/itemsVueltos): así el asistente puede contestar "cuánto
+                  // llevo cargado" con lo que hay de verdad en pantalla, no un recuento
+                  // aparte que podría no coincidir si hay categorías o items renombrados a
+                  // mano (eso vive en este navegador, no en el evento guardado).
+                  progresoCarga: { total: totalConceptos, preparados: itemsPreparados, cargados: itemsCargados, vueltos: itemsVueltos },
                   onMarcarTarea: (id, hecho) => guardarTareas(marcarTarea(tareasRef.current, id, hecho)),
                   onQuitarTarea: (id) => guardarTareas(quitarTarea(tareasRef.current, id)),
                   // Los apuntes del calendario se EDITAN desde el calendario, que es

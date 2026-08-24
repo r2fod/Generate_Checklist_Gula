@@ -41,3 +41,31 @@ export function avisosConfig() {
 
   return avisos;
 }
+
+// ─── LO PRIMERO QUE DICE, SI HAY ALGO PENDIENTE ─────────────────────────────────
+// Pedido tal cual: que el asistente hable primero en vez de obligar a ir a mirar
+// Cerebro para enterarse. Junta las dos fuentes que YA existían —lo del negocio
+// (avisosConfig, arriba) y lo de cada evento (el repaso de la noche)— en una frase,
+// no en una lista larga: es un saludo, no un informe. Solo tiene sentido en una charla
+// NUEVA (hilo vacío en Asistente.jsx): repetirlo en cada respuesta sería spam, no un
+// aviso, y por eso decide QUÉ decir pero no CUÁNDO — eso lo decide quien lo llama.
+//
+// Sin React: entran los avisos de negocio y el repaso (o null si no ha corrido
+// todavía), sale un texto o null si no hay nada que decir — que es el caso normal, y
+// el caso normal no tiene por qué sonar a aviso.
+export function saludoPendientes(avisosNegocio, repaso) {
+  const eventosConAvisos = repaso && Array.isArray(repaso.eventos)
+    ? repaso.eventos.filter(e => e.avisos && e.avisos.length)
+    : [];
+  if (!avisosNegocio.length && !eventosConAvisos.length) return null;
+
+  const partes = [];
+  if (avisosNegocio.length) partes.push(avisosNegocio.map(a => a.texto).join(" "));
+  if (eventosConAvisos.length) {
+    partes.push(
+      `${eventosConAvisos.length} evento${eventosConAvisos.length === 1 ? "" : "s"} ` +
+      `${eventosConAvisos.length === 1 ? "tiene" : "tienen"} algo sin poner (lo ves con detalle en Cerebro).`,
+    );
+  }
+  return partes.join(" ");
+}

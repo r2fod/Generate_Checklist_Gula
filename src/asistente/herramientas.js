@@ -169,6 +169,32 @@ export const HERRAMIENTAS = {
     },
   },
 
+  // Sin nombre a propósito: solo tiene sentido para el evento que se tiene delante EN
+  // ESTE MOMENTO, con el móvil en una mano cargando el camión — preguntar por el
+  // progreso de otro evento no significa nada, nadie está cargando dos camiones a la
+  // vez. Los números vienen ya calculados de la app (ctx.progresoCarga, ver
+  // contexto.js): no se recalculan aquí reconstruyendo la checklist desde lo guardado,
+  // porque eso podría no coincidir con lo que se ve en pantalla si hay categorías o
+  // items renombrados a mano, que vive solo en este navegador.
+  progreso_carga: {
+    datos: false,
+    esquema: {
+      description: "Cuánto llevas cargado, preparado y vuelto del evento que tienes abierto ahora mismo, en número de items y en porcentaje. Para \"cuánto me queda\", \"cómo voy\", \"qué falta por cargar\". Solo vale para el evento delante; no admite nombre.",
+      parameters: { type: "object", properties: {} },
+    },
+    corre: (ctx) => {
+      const p = ctx.progresoCarga;
+      if (!p || !p.total) return { error: "No hay ninguna checklist con items abierta ahora mismo." };
+      const pct = (n) => Math.round((n / p.total) * 100);
+      return {
+        total: p.total,
+        preparados: p.preparados, porcentajePreparado: pct(p.preparados),
+        cargados: p.cargados, porcentajeCargado: pct(p.cargados),
+        vueltos: p.vueltos, porcentajeVuelto: pct(p.vueltos),
+      };
+    },
+  },
+
   ver_escaleta: {
     datos: true,
     esquema: {

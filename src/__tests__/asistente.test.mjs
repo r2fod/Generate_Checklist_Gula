@@ -15,7 +15,7 @@ import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
 import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
 import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
-import { avisosConfig } from "../asistente/avisosConfig.js";
+import { avisosConfig, saludoPendientes } from "../asistente/avisosConfig.js";
 import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
 import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
@@ -156,6 +156,16 @@ console.log("\n── Consultar de verdad ──");
   ok(ejecutar("ver_calendario", { desde: "2026-10-01" }, CTX).total === 1, "el calendario filtra por fechas");
   ok(ejecutar("simular_checklist", { tipo: "boda", adultos: 80 }, CTX).categorias.length > 5,
     "y se puede simular un evento que todavía no existe");
+
+  // El progreso de carga: mismos números que ya calcula App.jsx (totalConceptos/
+  // itemsCargados/itemsPreparados/itemsVueltos), no una reconstrucción aparte.
+  const conProgreso = { ...CTX, progresoCarga: { total: 40, preparados: 10, cargados: 4, vueltos: 0 } };
+  const prog = ejecutar("progreso_carga", {}, conProgreso);
+  ok(prog.total === 40 && prog.cargados === 4 && prog.porcentajeCargado === 10,
+    `cuenta items y porcentaje con los números que le pasa la app → ${prog.porcentajeCargado}%`);
+  ok(ejecutar("progreso_carga", {}, CTX).error, "sin ninguna checklist abierta ahora mismo, lo dice");
+  ok(ejecutar("progreso_carga", {}, { ...CTX, progresoCarga: { total: 0, preparados: 0, cargados: 0, vueltos: 0 } }).error,
+    "y con una checklist sin items tampoco calcula un porcentaje sobre cero");
 }
 
 console.log("\n── El bucle de herramientas ──");
@@ -1426,6 +1436,32 @@ console.log("\n══ Lo que falta por configurar (avisosConfig) ══");
   const trozoConfig = cerebro.slice(cerebro.indexOf("Por configurar") - 200, cerebro.indexOf("Por configurar") + 600);
   ok(/cer-repaso-evento/.test(trozoConfig) && /<li className={`cer-aviso/.test(trozoConfig),
     "los avisos de configuración van en la misma tarjeta que los del repaso, no una nueva");
+}
+
+console.log("\n══ Lo primero que dice, si hay algo pendiente (saludoPendientes) ══");
+{
+  ok(saludoPendientes([], null) === null, "sin nada pendiente, no hay saludo — el caso normal no suena a aviso");
+  ok(saludoPendientes([], { eventos: [] }) === null, "y un repaso que corrió sin encontrar nada tampoco dice nada");
+
+  const avisosNegocio = [{ texto: "No hay ningún precio cargado: el Resumen calcula el coste estimado a 0€.", tono: "falta" }];
+  const soloNegocio = saludoPendientes(avisosNegocio, null);
+  ok(/precio/.test(soloNegocio), "con un aviso de negocio y sin repaso, lo dice igual");
+
+  const repasoConAvisos = { eventos: [
+    { evento: "Boda de prueba", avisos: [{ texto: "sin hora de inicio", tono: "falta" }] },
+    { evento: "Comunión de prueba", avisos: [{ texto: "sin sitio", tono: "falta" }] },
+    { evento: "Sin nada raro", avisos: [] },
+  ] };
+  const soloEventos = saludoPendientes([], repasoConAvisos);
+  ok(/2 eventos/.test(soloEventos), `cuenta solo los que de verdad tienen algo, no los tres → "${soloEventos}"`);
+  ok(/Cerebro/.test(soloEventos), "y dice dónde ver el detalle, que un saludo no es sitio para una lista larga");
+
+  const conUno = saludoPendientes([], { eventos: [{ evento: "Boda de prueba", avisos: [{ texto: "x", tono: "falta" }] }] });
+  ok(/1 evento tiene/.test(conUno), `el singular no suena a plural → "${conUno}"`);
+
+  const conLasDosCosas = saludoPendientes(avisosNegocio, repasoConAvisos);
+  ok(/precio/.test(conLasDosCosas) && /2 eventos/.test(conLasDosCosas),
+    "con las dos cosas a la vez, las junta en una sola frase, no en dos saludos");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

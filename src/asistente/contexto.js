@@ -32,6 +32,7 @@ export function contextoDelAsistente({
   conectores = {},
   equipo = [],
   respuestasFormulario = null,
+  progresoCarga = null,
   onRecordar,
   onOlvidar,
   onUsoMemoria,
@@ -53,6 +54,13 @@ export function contextoDelAsistente({
     conectores,
     equipo,
     respuestasFormulario,
+    // Cuánto lleva cargado del evento abierto AHORA MISMO — los mismos números que ya
+    // se ven en la ficha del Resumen (totalConceptos/itemsCargados/itemsPreparados en
+    // App.jsx), no un recuento aparte: uno nuevo, calculado desde los datos guardados y
+    // no desde lo que hay de verdad en pantalla, podría no coincidir si alguien ha
+    // renombrado categorías o items a mano (eso vive en este navegador, no se guarda en
+    // el evento). null en apps sin Modo carga, como el calendario.
+    progresoCarga,
     onRecordar,
     onOlvidar,
     onUsoMemoria,

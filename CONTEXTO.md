@@ -784,6 +784,32 @@ Con test en `asistente.test.mjs`: capturado el `sistema` que de verdad se manda 
 Worker (mockeando `fetch`) y comprobado que lleva `Hoy es` con la fecha calculada de
 verdad (`hoyISO()`), no un valor puesto a mano que se quedaría obsoleto el día siguiente.
 
+**El asistente habla primero, si hay algo pendiente (`saludoPendientes`).** Segunda
+pieza de "que el asistente esté integrado, sepa qué hace y avise solo" — pedido tal
+cual: que hable primero en vez de obligar a ir a mirar Cerebro. `saludoPendientes`, en
+`avisosConfig.js`, junta las dos fuentes que YA existían —`avisosConfig()` (el negocio) y
+el repaso de la noche (cada evento)— en una frase, no un informe. Se pinta como una
+burbuja del asistente ENCIMA del saludo de bienvenida de Charla, pero solo con el hilo
+vacío (una charla nueva): repetirlo en cada respuesta sería spam. Es un mensaje de
+mentira — no entra en `mensajes` (lo que se manda al modelo, así que no cuesta ni un
+token) ni se guarda en el historial de conversaciones. Con test: sin nada pendiente no
+dice nada (el caso normal no suena a aviso), cuenta bien singular/plural, y con las dos
+fuentes a la vez las junta en una frase.
+
+**El asistente sabe cuánto llevas cargado (`progreso_carga`).** Tercera pieza: "que
+sepa en cada momento qué haces". Resultó que la pieza más razonable no era rastrear la
+pantalla entera —frágil, y Modo carga ni se puede abrir con la burbuja encima, que la
+tapa—, sino algo concreto y ya medido: cuánto llevas cargado del evento abierto. Los
+números NO se recalculan en `herramientas.js` reconstruyendo la checklist desde lo
+guardado (`catsDeEventoGuardado`): eso podría no coincidir con lo que se ve en pantalla
+si hay categorías o items renombrados a mano (vive en este navegador, no en el evento).
+En su lugar, `App.jsx` pasa los mismos números que ya calculaba para la ficha del
+Resumen (`totalConceptos`/`itemsCargados`/`itemsPreparados`, más un `itemsVueltos`
+nuevo que no existía) a través de `contexto.progresoCarga`, y la herramienta solo hace
+el porcentaje. Sin nombre a propósito: solo tiene sentido para el evento delante ahora
+mismo, nadie carga dos camiones a la vez. Con test: cuenta bien, y sin checklist abierta
+(o con una a cero items) lo dice en vez de calcular un porcentaje sobre cero.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
