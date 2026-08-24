@@ -194,6 +194,20 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       return { error: "Esta pantalla no deja cambiar nada. Explica dónde se hace a mano." };
     }
     if (NIVELES[nivel].confirma) {
+      // Sin esto, pedir dos veces lo mismo por el chat —por ejemplo, aprobar una
+      // propuesta escribiendo "sí, créalos" en vez de pulsar el botón de la tarjeta que
+      // ya está en pantalla— apilaba una SEGUNDA tarjeta idéntica, y el modelo contestaba
+      // "te lo he dejado en pantalla" justo encima de un "Hecho" que ya venía de la
+      // primera. Dos mensajes que parecen llevarse la contraria sobre lo mismo. Si ya
+      // hay una propuesta igual esperando, no se apila otra: se dice que ya está.
+      const repetida = pendientes.find(p => p.que === propuesta.que && p.resumen === propuesta.resumen);
+      if (repetida) {
+        return {
+          pendiente: true,
+          resumen: repetida.resumen,
+          mensaje: "Esto YA estaba propuesto y sigue esperando en pantalla, sin aplicar. No lo repitas: dile que lo confirme ahí.",
+        };
+      }
       const id = `p${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
       setPendientes(p => [...p, { ...propuesta, id }]);
       return {
