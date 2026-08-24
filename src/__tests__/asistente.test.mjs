@@ -1323,12 +1323,18 @@ console.log("\n── Crear checklists desde el calendario ──");
     "sin puedeCrear la herramienta ni se ofrece");
 
   // El aplicador: crea de verdad y avisa de lo que le falta a lo creado
-  let promovidos = null;
-  const aplicar = aplicarEnChecklists({ apuntes: base.apuntes, promover: (x) => { promovidos = x; } });
+  let promovidos = null, opcionesPromover = null;
+  const aplicar = aplicarEnChecklists({ apuntes: base.apuntes, promover: (x, o) => { promovidos = x; opcionesPromover = o; } });
   const r = aplicar({ que: "crear_checklists", datos: { ids: ["a1", "a2"] } });
   ok(promovidos && promovidos.length === 2, "el aplicador promueve los apuntes elegidos");
   ok(r.creadas.length === 2 && /formulario/.test(r.aviso),
     "y avisa de que les faltan los datos del formulario, en vez de darlas por completas");
+  // Bug real: crear_checklists ya elige por id, a mano, exactamente cuáles crear —
+  // si promover() los vuelve a filtrar por "próximo" (los 14 días de checklistsPorCrear,
+  // ver calculos.test.mjs), descarta en silencio los que caen más allá y no crea nada,
+  // aunque el asistente diga "Hecho". dias: Infinity es el bypass de ese segundo filtro.
+  ok(opcionesPromover && opcionesPromover.dias === Infinity,
+    "el aplicador le dice a promover() que no vuelva a filtrar por fecha: ya se ha elegido a mano");
   ok(aplicar({ que: "apuntar_tarea", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
   ok(aplicar({ que: "crear_checklists", datos: { ids: ["fantasma"] } }).error,
     "un apunte que ya no está lo dice");

@@ -830,6 +830,48 @@ por aparato y que no se puede deshacer, cosas que el `confirm()` de una línea n
 sitio para decir. Comprobado con capturas (los dos temas) y el ciclo completo: Cancelar
 no toca el contador, Confirmar sí lo pone a cero.
 
+**Bug real y serio: "crear checklists" decía "Hecho" y no creaba nada.** El dueño le
+pidió crear 5 bodas de dentro de 19-26 días, aprobó la propuesta, el asistente contestó
+"Hecho: Crear 5 checklists…" y no apareció ninguna en "Eventos guardados". Causa raíz:
+`checklistsPorCrear` (`calendario/apuntes.js`) vuelve a filtrar por "próximo" —los 14
+días de `DIAS_ANTICIPACION`, pensados para el arranque automático, que SÍ tiene que
+decidir solo qué crear entre TODOS los apuntes— pero `crear_checklists` ya elige a mano,
+por id, exactamente cuáles crear (el modelo pudo haber buscado con un `dias` más grande,
+o por nombre con `cuales`, sin límite de fecha). Ese segundo filtro, oculto dentro de
+`promoverApuntes`, descartaba en silencio cualquier apunte a más de 14 días — los 5
+estaban a 19-26.
+
+Arreglado enhebrando un `opciones` opcional desde `escrituraChecklists.js` hasta
+`checklistsPorCrear`: `aplicarEnChecklists` ahora llama a `promover(elegidos, { dias:
+Infinity })`, ya que quien llama aquí ya ha decidido qué crear y no necesita un segundo
+filtro por fecha. El arranque automático (`App.jsx`) y `CalendarioEnChecklist` siguen
+llamando sin opciones, así que conservan los 14 días por defecto — es el comportamiento
+correcto ahí, comprobado con test (`checklistsPorCrear` con dias: Infinity SÍ crea una
+boda de dentro de dos meses; sin él, no).
+
+Segundo fallo, más pequeño pero relacionado: `resolver()` en `Asistente.jsx` decía
+"Hecho: …" SIEMPRE tras aprobar una propuesta, sin mirar lo que de verdad devolvía
+`contexto.onEscribir` — así que aunque `crear_checklists` hubiera devuelto un error o un
+`{ nada: "..." }` (sin lanzar ninguna excepción), el panel decía "Hecho" igual. Ahora
+mira el resultado: error → burbuja de error; `nada` → se dice tal cual; si no, "Hecho"
+con el `aviso` pegado si lo trae (por ejemplo, que a lo creado le faltan pax/sitio/horas
+del formulario, que antes se perdía sin más).
+
+**El asistente ya no "se reinicia" al cerrar y volver a abrir.** El dueño lo vio y
+preguntó si era así a propósito — no lo era. `BotonAsistente` desmonta `Asistente.jsx`
+entero al cerrar el panel (por diseño, para no dejar suscripciones a la nube corriendo
+de fondo), así que TODO su estado local se perdía, incluidos `hilo` y `mensajes` —
+aunque ya se guardaban en `conversaciones.js` con cada vuelta, y el propio comentario de
+cabecera de ese fichero dice que ese guardado es justo para esto ("Al cerrar el panel se
+perdía todo... así que hay que volver a preguntarlo, y se paga otra vez"). El botón
+"Conversación nueva" del Historial tampoco tendría sentido si cada apertura ya
+empezara en blanco. `hilo`, `mensajes` y `charlaId` ahora se inicializan desde la última
+charla guardada (`leerCharlas()[0]`) en vez de vacíos — reabrir retoma donde se dejó, y
+"Conversación nueva" sigue siendo la manera explícita de empezar de cero. Comprobado con
+capturas: abrir por primera vez ya retoma lo guardado, cerrar desmonta el panel de
+verdad, reabrir sigue la misma charla, y "Conversación nueva" limpia sin tocar lo
+guardado (al no mandar nada nuevo, no se sobrescribe nada).
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

@@ -866,6 +866,15 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
   ok(!porNombre["Vacaciones de alguien"] && !porNombre["Prueba de menú"],
     "y ni las vacaciones ni una prueba de menú generan checklist");
 
+  // Bug real visto en producción: el asistente proponía crear 5 bodas de dentro de
+  // 19-26 días, decía "Hecho" y no se creaba ninguna — porque este mismo filtro de
+  // "próximo" (los 14 días de arriba) se aplicaba TAMBIÉN cuando ya se había elegido a
+  // mano, por id, exactamente cuáles crear. dias: Infinity es el bypass: quien ya
+  // decidió qué crear no necesita que se le vuelva a filtrar por fecha.
+  const { nuevas: conBypass } = checklistsPorCrear(lista, archivo, { hoy, dias: Infinity });
+  ok(conBypass["Boda de noviembre"],
+    "con dias: Infinity, la de dentro de dos meses SÍ se crea si se pide explícitamente");
+
   // Lo creado lleva lo que sabe el calendario, que es de lo que se trata
   ok(nuevas["Boda nueva"].evento === "boda" && nuevas["Boda nueva"].pax === 120
      && nuevas["Boda nueva"].ubicacion === "Finca inventada" && nuevas["Boda nueva"].fechaEvento === "2026-09-04",

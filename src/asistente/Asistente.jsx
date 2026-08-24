@@ -80,7 +80,15 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // El historial vive en este navegador: una conversación es de quien la tuvo. Lo que
   // sirve al equipo ya se guarda en el cerebro y en las tareas.
   const [charlas, setCharlas] = useState(() => leerCharlas());
-  const [charlaId, setCharlaId] = useState("");
+  // La última, para retomarla sola al abrir — no al cerrar el panel, sino al MONTARLO,
+  // que es cuando de verdad se pierde: BotonAsistente desmonta este componente entero
+  // al cerrar (por eso vive fuera, en localStorage, y no solo en este estado). Sin
+  // esto, cada apertura empezaba en blanco aunque la de hace un minuto siguiera
+  // guardada un clic más allá, en Historial — que es justo lo que este fichero de
+  // conversaciones dice arreglar en su propio comentario de cabecera, y el botón
+  // "Conversación nueva" de ahí abajo no tendría sentido si esto ya empezara en blanco
+  // siempre.
+  const [charlaId, setCharlaId] = useState(() => (charlas[0] ? charlas[0].id : ""));
   const [verHistorial, setVerHistorial] = useState(false);
   const [ajustes, setAjustes] = useState(() => !leer(CLAVE_URL));
   // El confirm() nativo del navegador desentona con el resto de la app —letra de
@@ -168,12 +176,12 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const [enCurso, setEnCurso] = useState("");
-  const [hilo, setHilo] = useState([]);          // lo que se ve
+  const [hilo, setHilo] = useState(() => (charlas[0] ? charlas[0].hilo : []));          // lo que se ve
   // Qué respuesta tiene el diario abierto. Uno solo, y por índice: dos abiertos a la vez
   // en un móvil dejan la conversación ilegible, y guardarlo por mensaje obligaría a
   // meter estado dentro del hilo, que es justo lo que se guarda en el historial.
   const [diarioAbierto, setDiarioAbierto] = useState(-1);
-  const [mensajes, setMensajes] = useState([]);  // lo que se manda (con las llamadas)
+  const [mensajes, setMensajes] = useState(() => (charlas[0] ? charlas[0].mensajes : []));  // lo que se manda (con las llamadas)
   const finRef = useRef(null);
 
   useEffect(() => { if (finRef.current) finRef.current.scrollIntoView({ block: "end" }); }, [hilo, pensando]);
@@ -211,8 +219,20 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       return;
     }
     try {
-      contexto.onEscribir(p);
-      setHilo(h => [...h, { de: "el", texto: `Hecho: ${p.resumen}` }]);
+      const r = contexto.onEscribir(p);
+      // "Hecho" tiene que decir lo que de verdad pasó, no darlo por sentado: un
+      // aplicador puede devolver un error o un "no hay nada que hacer" sin lanzar
+      // ninguna excepción —por ejemplo, crear_checklists cuando los apuntes elegidos
+      // ya no están en el calendario—, y decir "Hecho" igualmente sería mentir sobre
+      // algo que decide qué se carga en el camión.
+      if (r && r.error) {
+        setHilo(h => [...h, { de: "error", texto: r.error }]);
+      } else if (r && r.nada) {
+        setHilo(h => [...h, { de: "el", texto: r.nada }]);
+      } else {
+        const aviso = r && r.aviso ? ` ${r.aviso}` : "";
+        setHilo(h => [...h, { de: "el", texto: `Hecho: ${p.resumen}${aviso}` }]);
+      }
     } catch (err) {
       setHilo(h => [...h, { de: "error", texto: `No se ha podido aplicar: ${err && err.message ? err.message : err}` }]);
     }

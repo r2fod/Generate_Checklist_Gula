@@ -17,7 +17,16 @@ export function aplicarEnChecklists({ apuntes = [], promover }) {
     // herramienta contesta ya: el modelo no puede quedarse esperando a una escritura, y
     // lo que importa —las checklists— se crea en el mismo momento. Si el marcado falla
     // por conexión, se rehace solo al siguiente arranque.
-    promover(elegidos);
+    //
+    // { dias: Infinity }: promover() vuelve a filtrar por "próximo" con la misma
+    // función que usa el arranque automático (14 días por defecto) — bien para el
+    // arranque, que mira TODOS los apuntes y decide él solo cuáles tocan, pero mal
+    // aquí: aquí ya se ha elegido a mano, por id, exactamente cuáles crear (puede que
+    // el asistente los haya buscado a propósito con dias más grande, o por nombre con
+    // "cuales"), y sin este bypass ese segundo filtro los descartaba en silencio si
+    // caían más allá de los 14 días — el bug real que vio el dueño: pidió crear 5
+    // bodas de dentro de 19-26 días, el asistente dijo "Hecho" y no se creó ninguna.
+    promover(elegidos, { dias: Infinity });
     return {
       creadas: elegidos.map(a => a.titulo),
       aviso: "Creadas en el archivo con los datos del calendario (nombre, fecha, tipo). Les faltan los datos del formulario: pax, sitio, horas.",
