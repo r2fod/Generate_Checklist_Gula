@@ -6452,10 +6452,37 @@ hr {
   touch-action: none;
   box-shadow: var(--shadow-lg);
   transition: transform 0.15s ease;
+  /* "Que se note que está activo": un pulso lento que cambia de color, para que se
+     distinga incluso quieta y sin que haya que mirarla fijo. Iguales colores que ya
+     usa Jarvis para sus estados (fuego, acento, verde) — aquí no significan nada del
+     asistente en concreto, es solo vida visual, así que se reutiliza la paleta que ya
+     existe en vez de inventar una nueva. No toca "transform": si tocara, pisaría el
+     scale() del :hover/:active de debajo y el hover dejaría de notarse a mitad del
+     pulso. */
+  animation: asis-burbuja-viva 6s ease-in-out infinite;
 }
 
 .asis-flotante-boton:hover { transform: scale(1.05); }
 .asis-flotante-boton:active { transform: scale(0.96); cursor: grabbing; }
+
+@keyframes asis-burbuja-viva {
+  0%, 100% { border-color: var(--accent);    box-shadow: var(--shadow-lg), 0 0 0 0 var(--accent); }
+  33%      { border-color: var(--pj-fuego);  box-shadow: var(--shadow-lg), 0 0 14px 3px var(--pj-fuego); }
+  66%      { border-color: var(--green-qty); box-shadow: var(--shadow-lg), 0 0 14px 3px var(--green-qty); }
+}
+
+/* En escritorio hay sitio de sobra y el dueño la seguía viendo pequeña incluso a
+   84px: sube el círculo Y el dibujo de dentro (el <svg> de Companero.jsx, que trae su
+   tamaño puesto por atributo — la propiedad CSS gana sobre el atributo, así que esto
+   basta sin tocar nada en React). TAMANO_BURBUJA en BotonAsistente.jsx se queda en 84:
+   usarlo para acotar el arrastre en escritorio sale un pelín corto de lo que ahora se
+   ve, nunca largo, así que como mucho se puede arrastrar un poco menos pegada al
+   borde — nunca se sale de la pantalla. */
+@media (min-width: 768px) {
+  .asis-flotante-boton { width: 108px; height: 108px; }
+  .asis-flotante-boton svg { width: 68px; height: 68px; }
+  .asis-flotante-cerrar { top: -5px; right: -5px; }
+}
 
 /* La aspa para esconderla: pequeña y en la esquina de la burbuja, no un botón
    aparte que se coma sitio. position: fixed en el padre también crea su propio
@@ -6511,7 +6538,7 @@ hr {
 @media (prefers-reduced-motion: reduce) {
   .asis-gira { animation: none; }
   .asis-flotante { animation: none; }
-  .asis-flotante-boton, .asis-flotante-boton:hover, .asis-flotante-boton:active { transition: none; transform: none; }
+  .asis-flotante-boton, .asis-flotante-boton:hover, .asis-flotante-boton:active { transition: none; transform: none; animation: none; }
 }
 
 /* ─── EL CEREBRO DEL ASISTENTE ────────────────────────────────────────────────
