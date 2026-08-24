@@ -12,11 +12,11 @@
 // y lo que no le pase, el asistente no lo verá. Esa es la parte importante: el contexto
 // es lo único que existe para él, así que decirlo app por app es decir qué puede mirar
 // en cada sitio.
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles, X } from "lucide-react";
 import { alSobrarTiempo } from "../precarga.js";
-import { leerTexto, guardarTexto } from "../almacen.js";
+import { leerTexto, guardarTexto, leerJSON, guardarJSON } from "../almacen.js";
 import Companero from "./Companero.jsx";
 import { COMPANERO_POR_DEFECTO, companeroValido } from "./companeros.js";
 
@@ -33,6 +33,14 @@ const CLAVE_COMPANERO = "gula_asistente_companero";
 // Escondida a mano, por si el bulto en la esquina estorba en una pantalla concreta. Va
 // en este navegador, igual que el compañero: es gusto de cada uno, no algo del equipo.
 const CLAVE_ESCONDIDO = "gula_asistente_flotante_escondido";
+// Dónde la dejó quien la arrastró. Sin guardar: cae en su sitio de siempre (abajo a la
+// derecha, por CSS) cada vez que se abre la app, que es justo lo contrario de "donde
+// tú quieras" — el dueño la quiere DONDE LA DEJÓ, no donde nace por defecto.
+const CLAVE_POS = "gula_asistente_flotante_pos";
+
+const TAMANO_BURBUJA = 56;
+const MARGEN = 8;
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
 export default function BotonAsistente({
   contexto = {},
@@ -41,7 +49,13 @@ export default function BotonAsistente({
 }) {
   const [abierto, setAbierto] = useState(false);
   const [escondido, setEscondido] = useState(() => leerTexto(CLAVE_ESCONDIDO, "0") === "1");
+  const [pos, setPos] = useState(() => leerJSON(CLAVE_POS, null));
   const companero = companeroValido(leerTexto(CLAVE_COMPANERO, COMPANERO_POR_DEFECTO));
+  const flotanteRef = useRef(null);
+  // Lo que dura UN arrastre, de dedo abajo a dedo arriba. En un ref y no en estado: cada
+  // milímetro de movimiento dispara un pointermove, y meter eso en estado sería un
+  // render de React por milímetro.
+  const arrastreRef = useRef(null);
 
   // Se adelanta la descarga del panel al primer rato muerto: quien lo abre ya no espera
   // a la red con el dedo en el botón, que en un montaje es 3G de finca. Va en el sitio
@@ -49,25 +63,83 @@ export default function BotonAsistente({
   // haga en una y en la otra no. La clave impide que StrictMode lo lance dos veces.
   useEffect(() => alSobrarTiempo(traerElPanel, { clave: "asistente" }), []);
 
+  // Si giras el móvil o cambias el tamaño de la ventana con una posición guardada que ya
+  // no cabe, se reencaja dentro de la pantalla — pero SIN guardarlo: es un reencaje de
+  // pantalla, no una posición nueva elegida a mano, y guardarlo pisaría "donde la dejó"
+  // la próxima vez que la pantalla vuelva a su tamaño de siempre (el teclado del móvil
+  // también cambia el alto de la ventana al abrirse).
+  useEffect(() => {
+    if (!pos) return;
+    const reencajar = () => setPos(p => p && {
+      x: clamp(p.x, MARGEN, window.innerWidth - TAMANO_BURBUJA - MARGEN),
+      y: clamp(p.y, MARGEN, window.innerHeight - TAMANO_BURBUJA - MARGEN),
+    });
+    window.addEventListener("resize", reencajar);
+    return () => window.removeEventListener("resize", reencajar);
+  }, [pos]);
+
   const esconder = () => { setEscondido(true); guardarTexto(CLAVE_ESCONDIDO, "1"); };
   const mostrar = () => { setEscondido(false); guardarTexto(CLAVE_ESCONDIDO, "0"); };
 
+  // Un solo gesto sirve para las dos cosas —abrir con un toque, mover con un arrastre—
+  // y hay que distinguirlos por lo que pasa DESPUÉS de apoyar el dedo, no por dónde se
+  // apoya: por eso todo vive en pointerdown/move/up y no en onClick, que ya no sabría
+  // decir si lo de en medio fue un arrastre o un temblor de la mano.
+  const alApoyar = (e) => {
+    if (e.button !== undefined && e.button !== 0) return; // solo el botón principal
+    const r = flotanteRef.current.getBoundingClientRect();
+    arrastreRef.current = { x0: e.clientX, y0: e.clientY, izq: r.left, arr: r.top, x: r.left, y: r.top, movido: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const alMover = (e) => {
+    const a = arrastreRef.current;
+    if (!a) return;
+    const dx = e.clientX - a.x0, dy = e.clientY - a.y0;
+    // Menos de 6px es pulso de la mano al pulsar, no una intención de moverla: sin este
+    // margen, cada toque para ABRIRLA se leía como un arrastre de un píxel y no abría.
+    if (!a.movido && Math.hypot(dx, dy) > 6) a.movido = true;
+    if (a.movido) {
+      a.x = clamp(a.izq + dx, MARGEN, window.innerWidth - TAMANO_BURBUJA - MARGEN);
+      a.y = clamp(a.arr + dy, MARGEN, window.innerHeight - TAMANO_BURBUJA - MARGEN);
+      setPos({ x: a.x, y: a.y });
+    }
+  };
+  const alSoltar = () => {
+    const a = arrastreRef.current;
+    arrastreRef.current = null;
+    if (!a) return;
+    if (a.movido) guardarJSON(CLAVE_POS, { x: a.x, y: a.y });
+    else setAbierto(true);
+  };
+
   return (
     <>
-      {/* Fija en la esquina, como el botón de WhatsApp: es lo que pidió el dueño para no
-          tener que ir a buscarla arriba del todo cada vez. Se esconde mientras el panel
+      {/* Con portal a document.body, por la MISMA razón que el panel de abajo: la
+          cabecera tiene "animation: ... both", que deja un transform puesto para
+          siempre aunque la animación ya haya terminado, y eso rompe "position: fixed"
+          en cualquier descendiente —deja de ser fijo respecto a la PANTALLA y pasa a
+          serlo respecto a la cabecera—. Sin el portal la burbuja se quedaba pegada a
+          la esquina de la cabecera en vez de a la esquina de la pantalla: por eso
+          salía tapando el botón "Compartir" en vez de flotar donde tocaba.
+
+          Fija en la esquina por defecto, como el botón de WhatsApp, pero arrastrable a
+          donde se quiera —también pedido tal cual—: se agarra y se suelta donde toque,
+          y se queda ahí las próximas veces (CLAVE_POS). Se esconde mientras el panel
           está abierto —ahí ya se ve el propio muñeco grande en la pestaña Humano, dos a
           la vez sobra— y del todo si alguien la aparta con la aspa, que es justo lo que
           hace falta en Modo carga: la checklist entera para leer, sin nada flotando
           encima de las últimas filas. */}
-      {!abierto && (escondido ? (
+      {!abierto && createPortal(escondido ? (
         <button type="button" className="asis-flotante-mini" onClick={mostrar}
           title="Mostrar el asistente" aria-label="Mostrar el asistente">
           <Sparkles size={13} aria-hidden="true" />
         </button>
       ) : (
-        <div className="asis-flotante">
-          <button type="button" className="asis-flotante-boton" onClick={() => setAbierto(true)} title={titulo}>
+        <div className="asis-flotante" ref={flotanteRef}
+          style={pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}>
+          <button type="button" className="asis-flotante-boton" title={titulo}
+            onPointerDown={alApoyar} onPointerMove={alMover} onPointerUp={alSoltar} onPointerCancel={alSoltar}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setAbierto(true); } }}>
             {companero === "ninguno"
               ? <Sparkles size={22} aria-hidden="true" />
               : <Companero cual={companero} size={38} estado="quieto" />}
@@ -77,7 +149,7 @@ export default function BotonAsistente({
             <X size={11} aria-hidden="true" />
           </button>
         </div>
-      ))}
+      ), document.body)}
       {abierto && createPortal(
         // Con un portal a propósito, y no montado donde vive el botón: el panel es
         // "position: fixed" para cubrir toda la pantalla, pero fixed deja de ser fixed

@@ -16,6 +16,7 @@ import { useState } from "react";
 import { Trash2, Target, Plus, Check, Archive, Network, MoonStar } from "lucide-react";
 import { porTema, porFuente, porDia, grafo } from "./arbol.js";
 import { ESTADOS, MAX_OBJETIVOS, cuantosActivos } from "./objetivos.js";
+import Grafo from "./Grafo.jsx";
 
 const VISTAS = [
   { id: "temas", nombre: "Temas", eje: porTema },
@@ -203,24 +204,11 @@ export default function Cerebro({
         </p>
       )}
 
-      {/* El grafo: qué se conecta con qué. Sirve para ver de un vistazo que de una finca
-          sabes tres cosas y las tres son avisos, o que de un tipo de evento no sabes nada. */}
-      {vista === "grafo" && g && (
-        <div className="cer-grafo">
-          {g.nodos.slice(0, 40).map(n => {
-            const conecta = g.enlaces.filter(e => e.de === n.id || e.a === n.id).length;
-            return (
-              <span className="cer-nodo" key={n.id}
-                style={{ borderColor: COLOR_NODO[n.tipo], color: COLOR_NODO[n.tipo] }}
-                title={`${n.tipo} · ${conecta} conexion${conecta === 1 ? "" : "es"}`}>
-                {n.nombre}
-                {conecta > 0 && <em>{conecta}</em>}
-              </span>
-            );
-          })}
-          {!g.nodos.length && <p className="asis-vacio">Sin nada que conectar todavía.</p>}
-        </div>
-      )}
+      {/* El grafo de verdad: nodos y líneas, no una lista de píldoras. Sirve para ver de
+          un vistazo que de una finca sabes tres cosas y las tres son avisos, o que de un
+          tipo de evento no sabes nada — y ahora también CÓMO se conectan entre sí, no
+          solo cuántas conexiones tiene cada una. */}
+      {vista === "grafo" && g && <Grafo nodos={g.nodos} enlaces={g.enlaces} colores={COLOR_NODO} />}
 
       {/* Los tres ejes, pintados por el mismo bloque: devuelven la misma forma. */}
       {vista !== "grafo" && grupos.map(gr => (
