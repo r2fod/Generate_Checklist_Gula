@@ -1666,13 +1666,15 @@ console.log("\n══ Las animaciones en bucle no pueden mover la maqueta ══
   }
   ok(enBucle.size > 20, `se han encontrado las animaciones en bucle para revisarlas (${enBucle.size})`);
 
-  // Lo que SÍ puede animarse en bucle. transform y opacity no tocan la maqueta. Las tres
+  // Lo que SÍ puede animarse en bucle. transform y opacity no tocan la maqueta. Estas
   // excepciones son de pintado (no de maqueta) y están medidas y aceptadas:
   //   · form-logo-colores — el degradado del logo del formulario, 11 s por vuelta.
   //   · hum-habla         — la boca del muñeco, un path de SVG diminuto y solo mientras habla.
   //   · hum-micro-late    — el aro del micrófono, solo mientras está escuchando.
+  //   · asis-burbuja-viva — el pulso de la burbuja flotante, siempre en bucle: solo
+  //     border-color y box-shadow, ninguno de los dos de la lista DE_MAQUETA de abajo.
   // Ninguna provoca reflow; si alguien añade una que mueva la caja, esta prueba lo dice.
-  const SEGURAS = new Set(["transform", "opacity", "d", "background-position", "box-shadow", "color", "fill", "stroke"]);
+  const SEGURAS = new Set(["transform", "opacity", "d", "background-position", "box-shadow", "color", "fill", "stroke", "border-color"]);
   const DE_MAQUETA = /^(width|height|top|left|right|bottom|margin|padding|font-size|border-width|inset|max-height|min-height|max-width|min-width|flex|gap)/;
   const culpables = [];
   for (const nombre of enBucle) {
