@@ -504,10 +504,13 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {/* Los ajustes SUSTITUYEN a la pestaña, no se apilan encima. Apilados se comían
-            media pantalla de móvil en las cinco pestañas a la vez: entrabas en Humano y
-            veías la dirección del proxy y los proveedores antes que el muñeco. */}
-        {!ajustes && (pestana === "tareas" ? (
+        {/* Los ajustes y el historial SUSTITUYEN a la pestaña, no se apilan encima. Apilados
+            se comían media pantalla de móvil en las cinco pestañas a la vez: entrabas en
+            Humano y veías la dirección del proxy y los proveedores antes que el muñeco. Al
+            historial le faltaba este mismo guardado: se veía la lista de charlas guardadas
+            con el hilo de la conversación (o el saludo vacío) asomando por debajo, como un
+            texto rayado encima de otro. */}
+        {!ajustes && !verHistorial && (pestana === "tareas" ? (
           <div className="asis-hilo asis-cerebro">
             <p className="asis-explica">
               Lo que hay que hacer y no sale de ninguna checklist: pedir material, llamar a
@@ -759,7 +762,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
         {/* Encima del campo de escribir a propósito: es lo último que se mira antes de
             seguir preguntando, y así no se queda un cambio esperando sin que nadie lo vea. */}
-        {!ajustes && pestana === "charla" && pendientes.length > 0 && (
+        {!ajustes && !verHistorial && pestana === "charla" && pendientes.length > 0 && (
           <div className="asis-pendientes">
             {pendientes.map(p => (
               <div className="asis-pendiente" key={p.id}>
@@ -779,7 +782,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
           </div>
         )}
 
-        {!ajustes && pestana === "charla" && (
+        {!ajustes && !verHistorial && pestana === "charla" && (
         <form className="asis-escribir" onSubmit={enviar}>
           <input
             className="form-input" type="text" value={texto} placeholder="Escribe tu pregunta"

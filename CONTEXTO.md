@@ -872,6 +872,22 @@ capturas: abrir por primera vez ya retoma lo guardado, cerrar desmonta el panel 
 verdad, reabrir sigue la misma charla, y "Conversación nueva" limpia sin tocar lo
 guardado (al no mandar nada nuevo, no se sobrescribe nada).
 
+**Al abrir el Historial se veía la charla de detrás asomando, como texto rayado.**
+El dueño mandó una captura: al pulsar el icono de Historial, la lista de charlas
+guardadas aparecía con el hilo de la conversación (o la tarjeta de "Pregúntame por tus
+eventos" y el cuadro de escribir) superpuestos justo debajo, como dos capas de texto
+montadas una sobre otra. Causa: el bloque `{verHistorial && (...)}` de
+`Asistente.jsx` se añadió sin tocar la condición que pinta el cuerpo de cada pestaña
+(`{!ajustes && (pestana === "tareas" ? ... : ...)}`) ni la de los "pendientes" y el
+formulario de escribir (`{!ajustes && pestana === "charla" && ...}`) — todas ellas ya
+sabían apagarse por `ajustes` (el comentario decía explícitamente "los ajustes
+SUSTITUYEN a la pestaña, no se apilan encima"), pero nadie les enseñó a apagarse
+también por `verHistorial`, así que las tres seguían pintándose debajo de la lista.
+Arreglado añadiendo `!verHistorial` a esas tres condiciones, con el mismo criterio que
+ya se usaba para `ajustes`. Comprobado con Playwright: con el historial abierto,
+`.asis-hilo` y `.asis-vacio` no aparecen en la página (antes sí); al cerrarlo, el hilo
+vuelve a verse normal.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
