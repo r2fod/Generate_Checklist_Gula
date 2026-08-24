@@ -760,6 +760,30 @@ como esto. Con tests (`avisosConfig` en `asistente.test.mjs`): los dos avisos a 
 uno solo cuando falta uno, ninguno con las dos cosas puestas, y que un catálogo de
 precios vacío cuenta igual que no tenerlo.
 
+**Bug real, visto en producción: "eventos próximos" traía TODOS los guardados, pasados
+incluidos.** El dueño mandó una captura: pidió los próximos y salió una lista empezando
+en julio, con hoy ya pasado agosto. Causa raíz: el modelo no tiene ni idea de qué día es
+—`SISTEMA`, en `cliente.js`, nunca se lo decía—, así que cuando `buscar_eventos` o
+`ver_calendario` se llaman sin `desde`/`hasta` (porque el modelo no puede calcular una
+fecha relativa sin saber la de hoy) devuelven TODO sin filtrar, del más antiguo al más
+nuevo. Además, `buscar_eventos` lee el archivo de checklists GUARDADAS de esta app, no
+la agenda real del equipo (`ver_calendario`, sobre `apuntes`) — la pregunta pedía la
+agenda y el modelo cogió el archivo.
+
+Arreglado en dos sitios:
+- `cliente.js` calcula `Hoy es ${hoyISO()}` EN CADA PREGUNTA (no una vez al cargar el
+  módulo: una charla puede seguir abierta al cruzar la medianoche) y se lo dice al
+  modelo, con instrucciones de pasarlo como `desde`/`hasta` para "próximos", "esta
+  semana", etc.
+- Las descripciones de `buscar_eventos` y `ver_calendario` en `herramientas.js` ahora
+  dejan claro cuál es cuál: una es el archivo de la checklist (no filtra si no se le
+  pide), la otra es la agenda de verdad del equipo — y cada una menciona a la otra para
+  que el modelo elija bien.
+
+Con test en `asistente.test.mjs`: capturado el `sistema` que de verdad se manda al
+Worker (mockeando `fetch`) y comprobado que lleva `Hoy es` con la fecha calculada de
+verdad (`hoyISO()`), no un valor puesto a mano que se quedaría obsoleto el día siguiente.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

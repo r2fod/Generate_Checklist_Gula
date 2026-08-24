@@ -224,6 +224,20 @@ console.log("\n── El bucle de herramientas ──");
   let sinUrl = "";
   try { await preguntar({ texto: "hola", contexto: CTX }); } catch (e) { sinUrl = e.message; }
   ok(/no está configurado/.test(sinUrl), "sin dirección del Worker avisa en vez de fallar por la red");
+
+  // El modelo no sabe qué día es si no se lo dicen: "eventos próximos" salía trayendo
+  // TODOS los guardados sin filtrar —pasados incluidos— porque buscar_eventos y
+  // ver_calendario solo acotan por fecha si alguien les pasa desde/hasta, y sin saber
+  // qué es "hoy" el modelo no podía calcularlo. Visto en producción con una captura real.
+  let sistemaMandado = "";
+  globalThis.fetch = async (url, opciones) => {
+    sistemaMandado = JSON.parse(opciones.body).sistema;
+    return { ok: true, status: 200, json: async () => ({ texto: "Vale." }) };
+  };
+  await preguntar({ texto: "eventos próximos", contexto: CTX, url: "http://falso" });
+  ok(sistemaMandado.includes(`Hoy es ${hoyISO()}`), "el sistema lleva la fecha de hoy, calculada de verdad y no puesta a mano");
+  ok(/próximos.*desde\/hasta|desde\/hasta.*próximos/s.test(sistemaMandado),
+    "y le dice que la use para calcular desde/hasta en vez de dejarlas vacías");
 }
 
 console.log("\n── El cerebro ──");
