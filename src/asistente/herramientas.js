@@ -104,7 +104,7 @@ export const HERRAMIENTAS = {
   buscar_eventos: {
     datos: true,
     esquema: {
-      description: "Lista los eventos guardados, opcionalmente filtrando por texto (nombre, sitio) o por fecha. Úsalo cuando no sepas el nombre exacto de un evento.",
+      description: "Lista los eventos GUARDADOS de la checklist (el archivo de esta app, no la agenda del equipo), filtrando por texto (nombre, sitio) o por fecha. Úsalo cuando no sepas el nombre exacto de un evento. Sin desde/hasta salen TODOS, pasados incluidos: para \"los próximos\" o \"qué viene\" pasa desde con la fecha de hoy, o mejor usa ver_calendario, que es la agenda de verdad del equipo.",
       parameters: {
         type: "object",
         properties: {
@@ -280,7 +280,7 @@ export const HERRAMIENTAS = {
   ver_calendario: {
     datos: true,
     esquema: {
-      description: "Los apuntes del calendario del equipo en un rango de fechas: qué hay, cuándo y dónde.",
+      description: "La agenda de verdad del equipo en un rango de fechas: qué hay, cuándo y dónde. Es la herramienta para \"qué hay próximo\", \"qué toca esta semana\", \"qué eventos vienen\" — no buscar_eventos, que es el archivo de checklists guardadas y no filtra por fecha si no se lo pides. Sin desde/hasta no acota nada: pásalos siempre que la pregunta sea relativa a hoy.",
       parameters: {
         type: "object",
         properties: {

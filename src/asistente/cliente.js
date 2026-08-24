@@ -13,6 +13,7 @@ import { comprimir } from "./comprimir.js";
 import { candidatos, mereceOtroIntento, porQue } from "./enrutado.js";
 import { comoContarlo, NIVEL_POR_DEFECTO } from "./permisos.js";
 import { comoHabla } from "./personalidad.js";
+import { hoyISO } from "../fecha.js";
 
 // Un tope duro de vueltas. Sin él, un modelo que se empeñe en pedir la misma
 // herramienta una y otra vez deja el navegador dando vueltas y la factura corriendo.
@@ -109,7 +110,14 @@ export async function preguntar({
   // El tono va con las reglas duras, no en lugar de ellas: una personalidad solo añade
   // cómo se dice, nunca qué se puede tocar ni qué se puede callar.
   const tono = comoHabla(contexto.personalidad);
-  const conNivel = `${SISTEMA}\n\n${comoContarlo(nivel)}${tono ? `\n\n${tono}` : ""}`;
+  // Sin esto el modelo no tiene ni idea de qué día es: "eventos próximos" salía
+  // devolviendo TODOS los guardados sin filtrar —pasados incluidos, del más antiguo al
+  // más nuevo, porque buscar_eventos y ver_calendario solo acotan por fecha si alguien
+  // les PASA desde/hasta, y sin saber qué es "hoy" el modelo no podía calcularlo—. Se
+  // calcula aquí, en cada pregunta, y no una vez al cargar el módulo: una charla puede
+  // seguir abierta al cruzar la medianoche.
+  const hoy = `Hoy es ${hoyISO()} (AAAA-MM-DD). Para "próximos", "esta semana", "lo que viene" o cualquier fecha relativa a hoy, calcúlala desde aquí y pásala como desde/hasta a buscar_eventos o ver_calendario: sin fecha, esas herramientas devuelven TODO lo que hay, pasado incluido.`;
+  const conNivel = `${SISTEMA}\n\n${hoy}\n\n${comoContarlo(nivel)}${tono ? `\n\n${tono}` : ""}`;
   const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
   const usoTotal = { entrada: 0, salida: 0 };
   // El diario: una línea por ida y vuelta al modelo, no una por pregunta. El total ya
