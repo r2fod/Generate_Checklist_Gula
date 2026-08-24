@@ -888,6 +888,17 @@ ya se usaba para `ajustes`. Comprobado con Playwright: con el historial abierto,
 `.asis-hilo` y `.asis-vacio` no aparecen en la página (antes sí); al cerrarlo, el hilo
 vuelve a verse normal.
 
+**La burbuja flotante "casi no se notaba de lo que es".** A 56px de círculo con el
+compañero dibujado a 38px, el dueño la vio y no distinguía la ilustración. El propio
+`Companero.jsx` ya avisaba de esto en un comentario: por debajo de cierto tamaño el
+busto "se queda en una mancha" — 38px estaba pegado a ese límite. Subida a 68px de
+círculo con el compañero a 46px (Sparkles, para quien elige "ninguno", de 22 a 28);
+`TAMANO_BURBUJA` en `BotonAsistente.jsx` y el `width`/`height` de `.asis-flotante-boton`
+en `index.css` tienen que mantenerse iguales entre sí a propósito, porque ese número
+también acota hasta dónde se puede arrastrar la burbuja sin salirse de la pantalla.
+Comprobado con capturas: el busto (cara, gorro, hombros) ya se distingue con claridad
+en la esquina, sin invadir ni tapar nada de alrededor.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
