@@ -1218,9 +1218,9 @@ export default function App({ onCerrarSesion } = {}) {
   //
   // Devuelve los enlaces (qué apunte va con qué evento) para que el calendario pueda
   // marcarlos y contar lo que ha pasado.
-  const crearChecklistsDeApuntes = (apuntes) => {
+  const crearChecklistsDeApuntes = (apuntes, opciones) => {
     const archivo = eventosGuardadosRef.current || {};
-    const { nuevas, enlaces } = checklistsPorCrear(apuntes, archivo);
+    const { nuevas, enlaces } = checklistsPorCrear(apuntes, archivo, opciones);
     if (Object.keys(nuevas).length > 0) guardarEventos({ ...archivo, ...nuevas });
     return enlaces;
   };
@@ -1232,8 +1232,8 @@ export default function App({ onCerrarSesion } = {}) {
   // Vive aquí y no dentro del efecto de arranque porque ahora hay dos sitios que la
   // necesitan —el arranque y el asistente— y tener dos copias del mismo baile es
   // exactamente cómo se separan con el tiempo.
-  const promoverApuntes = React.useCallback(async (apuntes) => {
-    const enlaces = crearChecklistsDeApuntes(apuntes);
+  const promoverApuntes = React.useCallback(async (apuntes, opciones) => {
+    const enlaces = crearChecklistsDeApuntes(apuntes, opciones);
     if (!enlaces.length) return [];
     const creadas = enlaces.filter(e => e.nueva).map(e => e.nombre);
     try {
