@@ -744,6 +744,22 @@ por el contenido de los datos (no por su referencia, que cambia en cada render d
 Cerebro): sin eso, el grafo se hubiera reordenado solo cada vez que algo ajeno
 cambiara arriba.
 
+**Avisos de lo que falta por configurar (`avisosConfig.js`) — primera pieza de "que el
+asistente avise solo".** El repaso de la noche ya avisaba de lo que le falta a un
+EVENTO; esto es lo mismo pero para el NEGOCIO: si no hay proxy puesto (el asistente no
+puede contestar nada) o no hay ningún precio cargado (el Resumen calcula a 0€), sale un
+aviso en Cerebro, con la MISMA tarjeta que ya usa el repaso (`.cer-aviso`, tono
+"falta") — no una nueva. Sin avisos no se pinta nada, ni un "todo en orden": eso sería
+ruido en el caso normal. A propósito NO avisa de "ratios de personal sin ajustar":
+comprobado en `personal.js`, los de boda/comunión/corporativo son datos MEDIDOS de
+verdad, no un hueco — avisar de eso habría sido decir que falta algo que ya está bien
+puesto. "Equipo del calendario sin cargar" se queda fuera por ahora: vive solo en
+Firestore + estado de React (`useCalendarioNube.js`), sin lectura local como
+`leerPrecios()`, así que traerlo aquí pide enhebrar datos entre apps y no es tan barato
+como esto. Con tests (`avisosConfig` en `asistente.test.mjs`): los dos avisos a la vez,
+uno solo cuando falta uno, ninguno con las dos cosas puestas, y que un catálogo de
+precios vacío cuenta igual que no tenerlo.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

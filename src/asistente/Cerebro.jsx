@@ -13,9 +13,10 @@
 // Los tres ejes devuelven la misma forma, así que los pinta UN componente. Añadir un
 // cuarto eje mañana es una función en arbol.js, no una pantalla nueva aquí.
 import { useState } from "react";
-import { Trash2, Target, Plus, Check, Archive, Network, MoonStar } from "lucide-react";
+import { Trash2, Target, Plus, Check, Archive, Network, MoonStar, Settings } from "lucide-react";
 import { porTema, porFuente, porDia, grafo } from "./arbol.js";
 import { ESTADOS, MAX_OBJETIVOS, cuantosActivos } from "./objetivos.js";
+import { avisosConfig } from "./avisosConfig.js";
 import Grafo from "./Grafo.jsx";
 
 const VISTAS = [
@@ -59,9 +60,37 @@ export default function Cerebro({
 
   const g = vista === "grafo" ? grafo(memoria, eventosGuardados) : null;
   const grupos = vista !== "grafo" ? (VISTAS.find(v => v.id === vista).eje)(memoria) : [];
+  // Barato y local (dos lecturas de este navegador): se recalcula en cada render sin
+  // que se note, así que no hace falta memoizarlo como el grafo, que sí hace física.
+  const avisos = avisosConfig();
 
   return (
     <div className="asis-hilo asis-cerebro">
+      {/* ── LO QUE FALTA POR CONFIGURAR ──
+          Antes que "lo que importa ahora": un proxy sin poner o unos precios sin
+          cargar no son una prioridad que se elige, son un hueco que impide que el
+          resto de la app cuente bien. Sin avisos no se pinta nada —ni un "todo en
+          orden"—, que sería ruido en el caso normal, que es que no falte nada. */}
+      {avisos.length > 0 && (
+        <div className="cer-repaso">
+          <div className="cer-titulo">
+            <Settings size={14} aria-hidden="true" />
+            <span>Por configurar</span>
+            <em>{avisos.length}</em>
+          </div>
+          <div className="cer-repaso-evento">
+            <ul>
+              {avisos.map((a, i) => (
+                <li className={`cer-aviso es-${a.tono}`} key={i}>
+                  {a.texto}
+                  {a.comoSeArregla && <em> · {a.comoSeArregla}</em>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* ── LO QUE LE IMPORTA ── */}
       <div className="cer-objetivos">
         <div className="cer-titulo">
