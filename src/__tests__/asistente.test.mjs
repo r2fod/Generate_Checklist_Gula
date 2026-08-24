@@ -28,6 +28,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
+import { clavesGemini } from "../../worker/index.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
 import { readFileSync } from "node:fs";
@@ -1468,6 +1469,17 @@ console.log("\n══ Lo primero que dice, si hay algo pendiente (saludoPendient
   const conLasDosCosas = saludoPendientes(avisosNegocio, repasoConAvisos);
   ok(/precio/.test(conLasDosCosas) && /2 eventos/.test(conLasDosCosas),
     "con las dos cosas a la vez, las junta en una sola frase, no en dos saludos");
+}
+
+console.log("\n══ Varias cuentas de Gemini, si la primera se queda sin cuota (clavesGemini) ══");
+{
+  ok(clavesGemini({}).length === 0, "sin ninguna clave puesta, no hay nada que probar");
+  ok(clavesGemini({ GEMINI_API_KEY: "a" }).join(",") === "a",
+    "con solo la obligatoria, es la única de la lista");
+  ok(clavesGemini({ GEMINI_API_KEY: "a", GEMINI_API_KEY_2: "b", GEMINI_API_KEY_3: "c" }).join(",") === "a,b,c",
+    "con las tres puestas, se prueban en orden: la principal primero");
+  ok(clavesGemini({ GEMINI_API_KEY: "a", GEMINI_API_KEY_3: "c" }).join(",") === "a,c",
+    "la _2 es opcional de verdad: sin ella, se salta a la _3 sin dejar un hueco vacío en medio");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

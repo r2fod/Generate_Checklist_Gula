@@ -99,6 +99,17 @@ async function quienEs(idToken, env) {
 // el suyo. Aquí se traduce a la ida y a la vuelta, y la app ve siempre lo mismo.
 
 // Gemini. Es el que va por defecto: tiene capa gratuita de verdad.
+//
+// Varias claves, una por cuenta de Google: GEMINI_API_KEY es la única obligatoria;
+// GEMINI_API_KEY_2 y GEMINI_API_KEY_3 son opcionales, cada una con su propia cuota
+// gratis diaria aparte. Si la que se está usando se agota, Google contesta 429
+// (RESOURCE_EXHAUSTED) y aquí se prueba con la siguiente antes de rendirse — sin eso,
+// la primera cuenta que llegue a su tope tira abajo Gemini entero el resto del día,
+// aunque las otras dos sigan con cuota de sobra.
+export function clavesGemini(env) {
+  return [env.GEMINI_API_KEY, env.GEMINI_API_KEY_2, env.GEMINI_API_KEY_3].filter(Boolean);
+}
+
 async function gemini(cuerpo, env) {
   // El nombre del modelo caduca. Google retiró gemini-2.5-flash "para cuentas nuevas"
   // sin avisar, y el Worker contestaba un 404 que no decía nada de por qué. Por eso el
@@ -124,35 +135,44 @@ async function gemini(cuerpo, env) {
     }
     return { role: m.rol === "asistente" ? "model" : "user", parts: [{ text: String(m.contenido || "") }] };
   });
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: contenidos,
-        systemInstruction: { parts: [{ text: cuerpo.sistema }] },
-        tools: [{ functionDeclarations: cuerpo.herramientas }],
-      }),
-    },
-  );
-  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  const d = await r.json();
-  const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
-  const u = d.usageMetadata || {};
-  return {
-    uso: { entrada: u.promptTokenCount || 0, salida: u.candidatesTokenCount || 0 },
-    texto: partes.filter(p => p.text).map(p => p.text).join("").trim(),
-    llamadas: partes.filter(p => p.functionCall).map((p, i) => ({
-      id: `g${i}`,
-      // Gemini a veces devuelve el nombre con un prefijo suyo ("default_api:que_falta").
-      // La app busca la herramienta por su nombre exacto, así que se limpia aquí: si no,
-      // contesta "no existe ninguna herramienta que se llame así" y no es verdad.
-      nombre: String(p.functionCall.name || "").split(":").pop(),
-      argumentos: p.functionCall.args || {},
-      firma: p.thoughtSignature || "",
-    })),
-  };
+  const cuerpoGemini = JSON.stringify({
+    contents: contenidos,
+    systemInstruction: { parts: [{ text: cuerpo.sistema }] },
+    tools: [{ functionDeclarations: cuerpo.herramientas }],
+  });
+
+  const claves = clavesGemini(env);
+  let ultimoFallo;
+  for (let i = 0; i < claves.length; i++) {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${claves[i]}`,
+      { method: "POST", headers: { "content-type": "application/json" }, body: cuerpoGemini },
+    );
+    if (r.ok) {
+      const d = await r.json();
+      const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+      const u = d.usageMetadata || {};
+      return {
+        uso: { entrada: u.promptTokenCount || 0, salida: u.candidatesTokenCount || 0 },
+        texto: partes.filter(p => p.text).map(p => p.text).join("").trim(),
+        llamadas: partes.filter(p => p.functionCall).map((p, i2) => ({
+          id: `g${i2}`,
+          // Gemini a veces devuelve el nombre con un prefijo suyo ("default_api:que_falta").
+          // La app busca la herramienta por su nombre exacto, así que se limpia aquí: si no,
+          // contesta "no existe ninguna herramienta que se llame así" y no es verdad.
+          nombre: String(p.functionCall.name || "").split(":").pop(),
+          argumentos: p.functionCall.args || {},
+          firma: p.thoughtSignature || "",
+        })),
+      };
+    }
+    ultimoFallo = new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    // Solo se prueba la siguiente CLAVE si el fallo es DE CUOTA. Cualquier otro error
+    // (clave mal puesta, modelo retirado, petición mal formada) es el mismo fallo para
+    // las tres cuentas — insistir con otra clave solo tardaría más en decir lo mismo.
+    if (r.status !== 429) throw ultimoFallo;
+  }
+  throw ultimoFallo;
 }
 
 // Claude. El de más calidad, y el que se paga por token.
@@ -292,7 +312,7 @@ const PROVEEDORES = {
 // contesta. No enseña ninguna clave —solo cuántos caracteres tiene y qué dice Google—,
 // así que se puede abrir desde el navegador sin miedo.
 async function estado(env) {
-  const claves = ["GEMINI_API_KEY", "FIREBASE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY"];
+  const claves = ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "FIREBASE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY"];
   const puestas = {};
   claves.forEach(k => {
     const v = String(env[k] || "");
