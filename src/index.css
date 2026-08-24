@@ -6434,13 +6434,17 @@ hr {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
+  cursor: grab;
+  /* Sin esto, en el móvil el primer milímetro de arrastre lo interpreta el propio
+     navegador como "empezar a hacer scroll de la página" y nunca llega a nuestro
+     pointermove: se movía la checklist de debajo, no la burbuja. */
+  touch-action: none;
   box-shadow: var(--shadow-lg);
   transition: transform 0.15s ease;
 }
 
 .asis-flotante-boton:hover { transform: scale(1.05); }
-.asis-flotante-boton:active { transform: scale(0.96); }
+.asis-flotante-boton:active { transform: scale(0.96); cursor: grabbing; }
 
 /* La aspa para esconderla: pequeña y en la esquina de la burbuja, no un botón
    aparte que se coma sitio. position: fixed en el padre también crea su propio
@@ -7585,38 +7589,81 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   margin-top: 3px;
 }
 
-/* El grafo, como etiquetas conectadas. Sin líneas: en un móvil un grafo con aristas de
-   verdad no se lee, y lo que hace falta saber —de qué sabes mucho y de qué nada— se ve
-   igual de bien con el número de conexiones al lado. */
-.cer-grafo {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+/* ─── EL GRAFO DE VERDAD ──────────────────────────────────────────────────────
+   Antes eran etiquetas sueltas sin ninguna línea entre ellas, por miedo a que un grafo
+   con aristas de verdad no se leyera en un móvil. Con el viewBox de SVG escalando el
+   dibujo entero al ancho del panel —lo mismo que ya hacen Jarvis y Companero— se lee
+   igual de bien a 320px que en escritorio: es geometría, no una imagen de tamaño fijo. */
+.cer-grafo-svg-wrap {
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-subtle);
 }
 
-.cer-nodo {
+.cer-grafo-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 600 / 420;
+}
+
+.cer-grafo-enlaces line {
+  stroke: var(--border-color-strong);
+  stroke-width: 1;
+}
+
+.cer-grafo-nodo {
+  stroke: var(--card-bg);
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: r 0.12s ease;
+}
+
+.cer-grafo-nodo:hover, .cer-grafo-nodo:focus-visible { stroke: var(--text-main); }
+.cer-grafo-nodo.es-elegido { stroke: var(--text-main); stroke-width: 2; }
+.cer-grafo-nodo:focus-visible { outline: none; }
+
+.cer-grafo-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.cer-grafo-leyenda-item {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  max-width: 100%;
-  padding: 5px 10px;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 0.76rem;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
 }
 
-.cer-nodo em {
-  font-style: normal;
-  font-size: 0.9em;
-  font-weight: 700;
-  opacity: 0.7;
+.cer-grafo-leyenda-item em {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
 }
+
+/* El detalle del nodo elegido, DEBAJO del dibujo y no flotando encima de él: en un
+   móvil un tooltip pegado al dedo tapa el propio nodo que se acaba de tocar. */
+.cer-grafo-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  font-size: 0.8rem;
+}
+
+.cer-grafo-detalle span { color: var(--text-muted); font-size: 0.76rem; text-transform: capitalize; }
 
 /* ─── HISTORIAL Y TAREAS ──────────────────────────────────────────────────────
    Antes, al cerrar el panel se perdía la conversación entera: había que volver a

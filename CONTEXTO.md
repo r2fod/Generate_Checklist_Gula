@@ -702,6 +702,48 @@ capturas: los dos temas, con compañero por defecto, "Ninguno" y "Jarvis", y el 
 completo esconder → recargar (sigue escondida) → mostrar → abrir el panel (la burbuja se
 esconde sola).
 
+**Bug real en la burbuja, visto en producción y arreglado: se quedaba pegada a la
+cabecera, no a la pantalla.** El dueño mandó una captura real: la burbuja salía tapando
+el botón "Compartir", arriba del todo, en vez de en la esquina inferior. Causa: `.app-header`
+lleva `animation: slideUpFade ... both`, y `both` deja puesto el `transform:
+translateY(0)` del último fotograma PARA SIEMPRE, aunque la animación ya haya acabado —y
+eso convierte a la cabecera en el "contenedor" de cualquier descendiente con `position:
+fixed`, que deja de fijarse a la pantalla y pasa a fijarse a ELLA. Es el mismo bug que ya
+se había arreglado en el panel del asistente (con un portal a `document.body`, comentado
+en su día en el propio código) pero la burbuja se me había quedado fuera de ese portal al
+añadirla. Arreglado envolviéndola en el mismo `createPortal(..., document.body)`. El
+banco de pruebas que usé para las capturas de antes (`?boton=1`) no reproducía el bug
+porque no monta la cabecera real con su animación — para esta lo hice con un banco
+aparte que sí la incluye, medí la posición real de la burbuja con y sin portal, y hasta
+entonces no se veía. Buena lección: probar el componente aislado no basta cuando el bug
+depende de un antepasado que el aislado no tiene.
+
+**El arrastre de la burbuja (pedido tal cual: "que pueda moverla donde quiera").**
+`pointerdown`/`pointermove`/`pointerup` en vez de `onClick` — un solo gesto sirve para
+abrir con un toque y mover con un arrastre, y hay que decidir cuál fue DESPUÉS de ver si
+hubo más de 6px de movimiento (menos que eso es el pulso de la mano al pulsar, no una
+intención de arrastrar). La posición se guarda en `gula_asistente_flotante_pos` (este
+navegador) solo cuando SÍ hubo arrastre; un toque simple sigue abriendo el panel y no
+toca la posición. Se reencaja dentro de la pantalla si la ventana cambia de tamaño (girar
+el móvil), pero sin guardar ese reencaje — así el teclado del móvil, que también cambia
+el alto de la ventana al abrirse, no pisa "donde la dejó" la próxima vez.
+
+**El Grafo, de verdad, con líneas (`Grafo.jsx`).** La pestaña Grafo de Cerebro llevaba
+tiempo siendo una lista de píldoras sueltas con un número de conexiones al lado, por
+decisión consciente de entonces: "en un móvil un grafo con aristas de verdad no se lee".
+El dueño pidió lo de OpenHuman, así que antes de construir nada se comprobó en su código
+de verdad (clonado en modo lectura) si existe — y SÍ: `MemoryGraph.tsx`, un grafo de
+fuerzas en SVG puro, sin ninguna librería, con una relajación de muelles+repulsión que
+corre una vez y ya. Traído aquí con el mismo enfoque: `Grafo.jsx` recibe los `nodos` y
+`enlaces` que ya calculaba `arbol.js` (no cambia ese fichero, los datos ya estaban
+listos) y los coloca con la misma física, dentro de un `viewBox` que escala solo con el
+ancho del panel — se lee igual a 320px que en escritorio, que es justo lo que preocupaba
+en su día. Clic en un nodo abre un detalle DEBAJO del dibujo (nombre, tipo, conexiones),
+no un tooltip flotando encima que en el móvil tapa lo que se acaba de tocar. Memoizado
+por el contenido de los datos (no por su referencia, que cambia en cada render de
+Cerebro): sin eso, el grafo se hubiera reordenado solo cada vez que algo ajeno
+cambiara arriba.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
