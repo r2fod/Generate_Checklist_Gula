@@ -945,6 +945,34 @@ que no lo repita, para que no confunda al dueño. Comprobado con lint y test
 dentro del componente `Asistente.jsx` y reproducirlo de verdad necesitaría simular
 dos vueltas al modelo casi simultáneas, no solo funciones puras.
 
+**La burbuja, a 84px, TODAVÍA se veía pequeña en escritorio — y el dueño pidió que
+"pareciera activa".** Tercera vuelta sobre lo mismo. Dos peticiones juntas:
+
+1. Más grande en escritorio en concreto (no en móvil, donde 84px ya iba sobrado de
+   sitio). Solución con el mismo criterio que ya se usó para el panel: un
+   `@media (min-width: 768px)` que sube el círculo a 108px. El truco es CÓMO se sube
+   el dibujo de dentro sin tocar React: el `<svg>` de `Companero.jsx` trae su tamaño
+   puesto por *atributo* (`width={size}`), y la propiedad CSS gana sobre el atributo,
+   así que `.asis-flotante-boton svg { width: 68px; height: 68px; }` basta.
+   `TAMANO_BURBUJA` en `BotonAsistente.jsx` se queda en 84 aposta: usarlo para acotar
+   el arrastre en escritorio sale un pelín corto de lo que ahora se ve (nunca largo),
+   así que como mucho se puede arrastrar un poco menos pegada al borde — nunca se sale
+   de la pantalla.
+
+2. Que se note que está activa incluso quieta: un pulso de 6s en bucle que cicla el
+   borde entre los mismos tres colores que ya usa Jarvis para sus estados (fuego,
+   acento, verde) — aquí no significan nada del asistente en concreto, es solo vida
+   visual, así que se reutiliza la paleta que ya existe. A propósito NO anima
+   `transform`: si lo hiciera, pisaría el `scale()` del `:hover`/`:active` y el hover
+   dejaría de notarse a mitad del pulso. Apagado en `prefers-reduced-motion: reduce`,
+   igual que el resto de animaciones del asistente.
+
+   La prueba "Las animaciones en bucle no pueden mover la maqueta"
+   (`calculos.test.mjs`) cazó esto al vuelo: `border-color` no estaba en su lista de
+   propiedades seguras (solo `color`, no `border-color`), aunque cambiar solo el color
+   de un borde —sin tocar su grosor— no dispara reflow, igual que `color` o `fill`.
+   Añadida a la lista con el resto, no ignorada.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
