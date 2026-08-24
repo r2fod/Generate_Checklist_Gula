@@ -810,6 +810,14 @@ el porcentaje. Sin nombre a propósito: solo tiene sentido para el evento delant
 mismo, nadie carga dos camiones a la vez. Con test: cuenta bien, y sin checklist abierta
 (o con una a cero items) lo dice en vez de calcular un porcentaje sobre cero.
 
+**El panel del asistente, más grande en escritorio.** El dueño lo vio pequeño de más en
+un monitor de escritorio, apretado en una esquina. Era 440×660px fijos; ahora
+`min(520px, 92vw)` × `min(760px, 88vh)` — en vw/vh y no en px sueltos, para que crezca de
+verdad en una pantalla grande sin desbordar una portátil pequeña (a 768px de alto sigue
+cabiendo entero, ~676px). Comprobado en capturas a 1280×900, 1920×1080 y una portátil de
+1366×768, con Charla y Gasto (la pestaña con más contenido de las cinco): cabe entero en
+las tres, sin recortes ni scroll de más.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
