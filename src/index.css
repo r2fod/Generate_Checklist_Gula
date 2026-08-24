@@ -6429,8 +6429,11 @@ hr {
    exactamente igual que en la cabecera y en la pestaña Humano, solo que fijo en
    la esquina. La sombra grande es lo que la separa del fondo y la hace flotar. */
 .asis-flotante-boton {
-  width: 56px;
-  height: 56px;
+  /* 68px, no 56: a 56 el dueño la vio y "casi no se nota de lo que es" —
+     coincide con TAMANO_BURBUJA en BotonAsistente.jsx, que ambos tienen que
+     mantener igual (ese valor también acota hasta dónde se puede arrastrar). */
+  width: 68px;
+  height: 68px;
   padding: 0;
   border: 1px solid var(--border-color);
   border-radius: 50%;
