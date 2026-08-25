@@ -1039,6 +1039,18 @@ marcas, aro de barras que gira, disco central que late) — lo que faltaba era e
 Comprobado con capturas en dos instantes seguidos: el arco visible cambia de
 posición entre una y otra, que es justo lo que antes no pasaba nunca.
 
+**En el móvil, el panel cambiaba de tamaño al cambiar de pestaña — y eso ya NO se
+quiere.** Era a propósito, de antes de esta sesión: Gasto (cuatro párrafos y un
+campo) a pantalla completa dejaba 426px en blanco debajo, así que en el móvil el
+panel se ajustaba al contenido en todas las pestañas menos Charla. El dueño lo vio y
+no le gustó — encogía y se estiraba al cambiar de pestaña, y no se parecía a cómo se
+ve en escritorio (que SIEMPRE mide lo mismo, 520×760 aprox., sin importar la
+pestaña). Pedido tal cual: el mismo tamaño en las cinco pestañas, también en el
+móvil. Quitada la regla `@media (max-width: 767px) { .asis-panel:not(.es-charla)
+{...} }` entera — se acepta el hueco en blanco de Gasto a cambio de que el panel no
+cambie de tamaño solo. Comprobado con Playwright: las cinco pestañas miden
+exactamente el alto de la pantalla (antes Gasto medía bastante menos).
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
