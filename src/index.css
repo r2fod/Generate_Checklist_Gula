@@ -6150,23 +6150,13 @@ hr {
   overflow: hidden;
 }
 
-/* ─── EN EL MÓVIL, UNA HOJA QUE CRECE CON SU CONTENIDO ───────────────────────
-   El panel se estiraba a pantalla completa siempre, así que Gasto —que son cuatro
-   párrafos y un campo— dejaba 426px en blanco debajo y parecía que faltaba algo por
-   cargar. Medido: 844px de panel para 296 de contenido.
-
-   Charla se queda a pantalla completa a propósito: tiene la lista de mensajes y el
-   campo de escribir abajo, y una hoja que crece con cada respuesta daría saltos. */
-@media (max-width: 767px) {
-  .asis-panel:not(.es-charla) {
-    height: auto;
-    max-height: 100%;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-  /* Sin esto el contenido sigue estirándose y la hoja vuelve a ocupar todo */
-  .asis-panel:not(.es-charla) .asis-hilo,
-  .asis-panel:not(.es-charla) .asis-ajustes { flex: 0 1 auto; }
-}
+/* Antes, en el móvil, el panel se ajustaba al contenido en todas las pestañas menos
+   Charla (Gasto son cuatro párrafos y un campo, y a pantalla completa dejaba 426px en
+   blanco debajo). El dueño lo vio: cambiar de pestaña encogía y estiraba el panel a
+   cada rato, y no se parecía a cómo se ve en escritorio (ahí SIEMPRE mide lo mismo,
+   ver @media (min-width: 768px) más abajo). Pedido tal cual: el mismo tamaño en las
+   cinco pestañas, también en el móvil — el hueco en blanco de Gasto se acepta a
+   cambio de que el panel no cambie de tamaño solo. */
 
 @media (min-width: 768px) {
   .asis-fondo { padding: 20px; background: rgba(15, 23, 42, 0.2); }
