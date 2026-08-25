@@ -1084,6 +1084,63 @@ normal. Comprobado con Playwright montando el modal en un banco de pruebas tempo
 la mitad del ancho de la nota; después ocupa el ancho completo disponible junto al
 icono.
 
+**La personalidad ("Directo", "Bromista"...) no se notaba al probarla en la pestaña
+Humano sin haber preguntado nada.** El dueño la cambiaba, le daba a "Contesta en voz
+alta" y sonaba siempre igual. No era un fallo de que la personalidad no llegara al
+modelo —sí llegaba, correctamente, a cada pregunta real (`cliente.js` ya se la pasaba
+al sistema)—: lo que se oye ahí SIN haber preguntado nada es el saludo automático
+(avisos pendientes / recordatorios de hoy, `saludoPendientes` en avisosConfig.js), y
+ese saludo está hecho a propósito SIN pasar por el modelo (mismo motivo de siempre:
+gratis y sin conexión). Por eso sonaba idéntico con cualquier personalidad puesta —
+nunca pasaba por el sistema que sí varía con ella. Arreglado con una envoltura por
+personalidad, a mano y sin modelo (`ENVOLTURA_SALUDO` en avisosConfig.js): el
+CONTENIDO del saludo no cambia nunca —son las mismas reglas duras de siempre—, pero
+"Directo" lo deja tal cual, "Cercano" lo abre con un "Oye, antes de nada:", "Bromista"
+le añade un cierre ligero, y "Parco" quita los puntos y los cambia por "·"
+(telegráfico, como pide su propia definición). Comprobado con Playwright cambiando de
+personalidad y leyendo el saludo en la pestaña Charla (que enseña el mismo texto que
+Humano lee en voz alta): las cuatro suenan distintas.
+
+**La voz sonaba "muy artificial".** El dueño lo pidió tal cual: más natural, más
+humana. `voz.js` usaba `SpeechSynthesisUtterance` sin elegir ninguna voz, así que el
+navegador cogía la que tuviera puesta por defecto — casi siempre la voz LOCAL del
+sistema, la más robótica de las que suele haber instaladas. Dos arreglos, uno gratis y
+uno de pago, con el gratis siempre activo y el de pago como mejora si hay conexión:
+
+1. **Elegir la mejor voz del propio navegador** (`mejorVoz` en voz.js): entre las
+   voces del idioma, prioriza las DE RED (`localService === false` — las de Google en
+   Android/Chrome, servidas por internet igual que el resto de voz de Google, y que se
+   nota de inmediato que suenan mejor) y si no hay, las que digan
+   "Enhanced"/"Premium"/"Neural" en el nombre (así marca iOS/Edge las suyas). Cuesta
+   cero, no necesita conexión ni proxy configurado, y es la que se usa siempre que la
+   de la nube (abajo) no esté disponible o no dé tiempo.
+2. **Voz de Gemini, si hay proxy y hay tiempo** (ruta nueva `/__voz` en
+   worker/index.js, llamada desde `hablar()` en voz.js con un tope de 4 segundos):
+   bastante más natural que cualquier voz del navegador. Reutiliza las MISMAS claves
+   de Gemini que ya usa el chat (`clavesGemini`) — no hace falta pegar ningún secreto
+   nuevo en Cloudflare si ya se tiene Gemini puesto para el chat. Gemini devuelve el
+   audio en PCM crudo, sin envolver; se envuelve en un WAV mínimo en el propio
+   navegador (`pcmAUrlDeAudio`) porque `<audio>` no reproduce PCM crudo tal cual.
+   Documentado en worker/README.md (dos variables opcionales: `GEMINI_TTS_MODEL` y
+   `GEMINI_TTS_VOZ`, ninguna obligatoria).
+
+Es un EXTRA sobre la voz del navegador, nunca una base: si no hay proxy, si no hay
+conexión, si el Worker tarda más del tope o si falla por lo que sea, se seguía con la
+voz local (mejorada por el punto 1) sin que se note la espera ni salga ningún error en
+pantalla — nadie se queda muda por esto. Al escribir el `useEffect` que dispara todo
+esto apareció un fallo real, no de la función en sí sino del cableado: `yaLeido.current`
+(la marca de "esto ya se ha dicho", para no repetir el saludo al volver a la pestaña) se
+ponía ANTES de esperar el token de sesión; con StrictMode (que monta-desmonta-remonta a
+propósito en desarrollo) el primer montaje marcaba la respuesta como "ya dicha" y se
+cancelaba antes de llegar a hablar, y el remontado de verdad ya no decía nada al
+encontrarla marcada — en producción (sin ese doble montaje) no se habría notado nunca,
+pero en `npm run dev` el asistente se habría quedado mudo en la pestaña Humano.
+Arreglado moviendo la marca a DESPUÉS de esperar el token, dentro del mismo guardián
+`vivo` que ya cancelaba intentos obsoletos. Comprobado con Playwright en tres escenarios:
+sin nube disponible (elige la voz de red, no la local por defecto), con el Worker
+devolviendo audio (se reproduce el de la nube y NO se cae también a la local) y con el
+Worker fallando (cae a la local sin ningún error de página sin capturar).
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

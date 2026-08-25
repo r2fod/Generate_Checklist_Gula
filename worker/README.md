@@ -58,6 +58,13 @@ Firestore.
    > retirado. No hay que tocar el código: se añade `GEMINI_MODEL` con el nombre que
    > diga el propio error y se despliega. Pasa cada pocos meses.
 
+   Opcionales, para la voz natural (pestaña Humano — ver más abajo):
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `GEMINI_TTS_MODEL` | Text | Para fijar otro modelo de voz, el día que Google retire el de por defecto (mismo motivo que `GEMINI_MODEL`, arriba) |
+   | `GEMINI_TTS_VOZ` | Text | El nombre de la voz de Gemini (`Kore` por defecto). Google tiene varias, todas en español |
+
 ## Usar cualquier otro modelo
 
 El proveedor `compatible` es un hueco abierto: casi todo el mundo habla hoy el mismo
@@ -94,6 +101,14 @@ Cambiar de modelo es cambiar estas tres variables. No hay que tocar la app.
   le llega para entrenar, así que la app solo le ofrece las herramientas de calcular
   —hielo, bebida, personal—, nunca las que devuelven nombres, fechas o sitios. Y si aun
   así pidiera una, el cliente la rechaza.
+
+## Voz más natural en la pestaña Humano (automático)
+
+Si ya tienes `GEMINI_API_KEY` puesta (el paso 1), esto funciona solo: la pestaña Humano
+intenta primero una voz de Gemini —bastante más natural que la del navegador— y si no
+hay conexión, tarda demasiado (más de 4 segundos) o falla por lo que sea, sigue con la
+voz del propio navegador sin que se note la espera. No hay que activar nada ni pegar
+ningún secreto nuevo; para desactivarlo del todo bastaría con no tener `GEMINI_API_KEY`.
 
 ## El repaso de la noche (opcional)
 

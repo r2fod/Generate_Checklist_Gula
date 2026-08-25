@@ -175,6 +175,53 @@ async function gemini(cuerpo, env) {
   throw ultimoFallo;
 }
 
+// ─── VOZ NATURAL (Gemini TTS) ─────────────────────────────────────────────────
+// Un extra sobre el chat, no un proveedor más: la app sigue funcionando con la voz del
+// propio navegador si esto falla o no está configurado (ver src/asistente/voz.js). Por
+// eso reutiliza las MISMAS claves de Gemini que ya usa el chat (clavesGemini, arriba):
+// no hace falta pegar ningún secreto nuevo en el panel de Cloudflare para tener voz más
+// natural, si ya se tiene Gemini puesto.
+//
+// Gemini devuelve audio en crudo (PCM, sin envolver en WAV ni en nada reproducible tal
+// cual) — envolverlo es cosa del navegador (ver pcmAUrlDeAudio en voz.js), aquí solo se
+// pasa tal cual junto con la frecuencia real que diga el mimeType, por si Google la
+// cambia algún día sin avisar (como ya ha pasado con nombres de modelo, ver `gemini`
+// arriba).
+async function vozDeGemini(texto, env) {
+  const modelo = env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+  const voz = env.GEMINI_TTS_VOZ || "Kore";
+  const claves = clavesGemini(env);
+  let ultimoFallo;
+  for (let i = 0; i < claves.length; i++) {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${claves[i]}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: texto }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voz } } },
+          },
+        }),
+      },
+    );
+    if (r.ok) {
+      const d = await r.json();
+      const parte = ((((d.candidates || [])[0] || {}).content || {}).parts || [])[0];
+      const datos = parte && parte.inlineData;
+      if (!datos || !datos.data) throw new Error("Gemini no ha devuelto ningún audio.");
+      const frecuencia = Number((String(datos.mimeType || "").match(/rate=(\d+)/) || [])[1]) || 24000;
+      return { audio: datos.data, frecuencia };
+    }
+    ultimoFallo = new Error(`Gemini TTS ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    // Mismo criterio que en `gemini`: solo se prueba la siguiente clave si es cuota.
+    if (r.status !== 429) throw ultimoFallo;
+  }
+  throw ultimoFallo;
+}
+
 // Claude. El de más calidad, y el que se paga por token.
 async function claude(cuerpo, env) {
   const mensajes = [];
@@ -417,6 +464,30 @@ export default {
         return json({ ...(await repasar(env)), dias: DIAS_VISTA }, 200, origen);
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+      }
+    }
+
+    // ─── LA VOZ NATURAL ───────────────────────────────────────────────────────
+    // Misma sesión de equipo que todo lo demás — no es un altavoz público — y el mismo
+    // patrón de arriba: se contesta siempre con json(), con las cabeceras CORS puestas,
+    // aunque falle. Un extra sobre el chat, por eso su propio error nunca tumba nada más
+    // que esta respuesta: quien llama (voz.js) ya sabe seguir con la voz del navegador
+    // si esto contesta que no.
+    if (new URL(req.url).pathname === "/__voz") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      if (!clavesGemini(env).length) {
+        return json({ error: "Sin GEMINI_API_KEY puesta no hay voz en la nube." }, 501, origen);
+      }
+      let cuerpoVoz;
+      try { cuerpoVoz = JSON.parse(await req.text()); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+      const texto = String(cuerpoVoz.texto || "").trim();
+      if (!texto) return json({ error: "Nada que decir." }, 400, origen);
+      try {
+        return json(await vozDeGemini(texto, env), 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
       }
     }
 

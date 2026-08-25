@@ -6,8 +6,12 @@
 // la otra. Poder decir "¿cuánto hielo llevo a la boda del doce?" y que conteste sin
 // tocar nada es la diferencia entre usarla y dejarla en el bolsillo.
 //
-// La voz la pone el navegador, no un modelo: no gasta un solo token. Solo la pregunta y
-// la respuesta pasan por el asistente, igual que si se escribieran.
+// La voz sale del navegador de por sí (no gasta un solo token, y funciona sin
+// conexión) y si HAY proxy configurado se intenta antes una voz más natural con
+// Gemini (mismas claves que ya usa el chat) — pero es un extra: si tarda, si falla o si
+// no hay conexión, se sigue con la del navegador sin que se note la espera (ver
+// voz.js). La pregunta y la respuesta, en los dos casos, pasan por el asistente igual
+// que si se escribieran.
 //
 // Dibujado en SVG a mano, como el pequeño de la cabecera, y por lo mismo: pesa nada,
 // se ve nítido en cualquier pantalla y cambia de color con el tema.
@@ -18,6 +22,7 @@ import { gestoDeHerramienta } from "./gestos.js";
 import { COMPANEROS, CLAVES_COMPANERO, COMPANERO_POR_DEFECTO } from "./companeros.js";
 import Jarvis from "./Jarvis.jsx";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO } from "./personalidad.js";
+import { tokenDeSesion } from "../auth.js";
 
 // Los cuatro son la misma cara dentro de un cuerpo distinto, igual que en el pequeño.
 // ─── LOS SIETE OFICIOS ────────────────────────────────────────────────────────
@@ -235,7 +240,7 @@ function useGestos(activo) {
   return gesto;
 }
 
-export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad }) {
+export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "" }) {
   const [oyendo, setOyendo] = useState(false);
   const [dictado, setDictado] = useState("");
   const [aviso, setAviso] = useState("");
@@ -247,8 +252,30 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
   // leído para no repetirla al volver a esta pestaña.
   useEffect(() => {
     if (!vozActiva || !ultimaRespuesta || ultimaRespuesta === yaLeido.current) return;
-    yaLeido.current = ultimaRespuesta;
-    hablar(ultimaRespuesta, { onEmpieza: () => setHablando(true), onAcaba: () => setHablando(false) });
+    // El token se pide de nuevo cada vez (Firebase lo cachea y solo llama a la red
+    // cuando el suyo ha caducado): así nunca se manda uno caducado, sin tener que
+    // guardarlo aparte ni refrescarlo a mano. Si no hay proxy configurado, `nube` se
+    // manda vacío y hablar() ni lo intenta.
+    //
+    // "yaLeido" se marca DESPUÉS de esperar el token, no antes: si esto se cancela
+    // (el efecto se vuelve a montar con la misma respuesta antes de que el token
+    // llegue —pasa en cada carga con StrictMode, que monta-desmonta-remonta a
+    // propósito para cazar fallos como este— y también, aunque más raro, si de verdad
+    // se cambia de pestaña y se vuelve mientras el token está en camino) el intento
+    // cancelado NO deja marcado que "ya se dijo", y el remontado de verdad sí llega a
+    // hablar. Marcarlo antes de esperar dejaba la respuesta sin decir nunca en ese caso.
+    let vivo = true;
+    (async () => {
+      const token = urlProxy ? await tokenDeSesion().catch(() => "") : "";
+      if (!vivo) return;
+      yaLeido.current = ultimaRespuesta;
+      hablar(ultimaRespuesta, {
+        onEmpieza: () => setHablando(true),
+        onAcaba: () => setHablando(false),
+        nube: urlProxy ? { url: urlProxy, token } : null,
+      });
+    })();
+    return () => { vivo = false; };
   }, [ultimaRespuesta, vozActiva]);
 
   // Al salir de la pantalla se calla y se suelta el micro. Un asistente que sigue

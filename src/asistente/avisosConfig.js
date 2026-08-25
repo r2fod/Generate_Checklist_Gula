@@ -54,7 +54,23 @@ export function avisosConfig() {
 // todavía) y los recordatorios que tocan hoy (paraHoy(), en tareas.js), sale un texto
 // o null si no hay nada que decir — que es el caso normal, y el caso normal no tiene
 // por qué sonar a aviso.
-export function saludoPendientes(avisosNegocio, repaso, recordatoriosHoy = []) {
+// El contenido de los avisos NUNCA cambia con la personalidad —son las mismas reglas
+// duras que ya no toca personalidad.js (números, alergias, lo que puede tocar)—; lo
+// único que varía es la envoltura, y a mano, sin pasar por el modelo: mismo motivo que
+// el resto de este fichero ("sin nube"), y la única forma de que la pestaña Humano
+// suene distinta al cambiar de personalidad incluso ANTES de haber preguntado nada,
+// que es justo donde vive el selector — si no, "Bromista" y "Directo" sonaban
+// exactamente igual la primera vez que alguien probaba el asistente.
+const ENVOLTURA_SALUDO = {
+  directo: (frase) => frase,
+  cercano: (frase) => `Oye, antes de nada: ${frase}`,
+  bromista: (frase) => `${frase} Aviso dado, que conste.`,
+  // "Casi telegráfico" (ver personalidad.js): fuera los puntos que separan frase de
+  // frase, a golpe de "·" en su lugar — más corto de leer y de oír.
+  parco: (frase) => frase.replace(/\.\s+/g, " · ").replace(/\.$/, ""),
+};
+
+export function saludoPendientes(avisosNegocio, repaso, recordatoriosHoy = [], personalidad = "directo") {
   const eventosConAvisos = repaso && Array.isArray(repaso.eventos)
     ? repaso.eventos.filter(e => e.avisos && e.avisos.length)
     : [];
@@ -76,5 +92,7 @@ export function saludoPendientes(avisosNegocio, repaso, recordatoriosHoy = []) {
       `${eventosConAvisos.length === 1 ? "tiene" : "tienen"} algo sin poner (lo ves con detalle en Cerebro).`,
     );
   }
-  return partes.join(" ");
+  const frase = partes.join(" ");
+  const envolver = ENVOLTURA_SALUDO[personalidad] || ENVOLTURA_SALUDO.directo;
+  return envolver(frase);
 }
