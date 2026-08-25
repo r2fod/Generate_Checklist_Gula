@@ -1177,6 +1177,19 @@ imagen, se instaló solo para esto— porque una captura suelta no enseña el mo
    `.asis-flotante-boton`), y volver a tocar la burbuja reabre directamente en Humano
    (`aria-selected="true"`), no en Charla.
 
+**Y encima, la burbuja flotante (54px) seguía sin el anillo ni los arcos.** El dueño
+preguntó directamente: "esa animación también tiene que tenerla la burbuja, ¿no?". El
+umbral que decide si Jarvis se dibuja simplificado (`compacto` en `conteos()`,
+Jarvis.jsx) estaba en `size < 80`, y la burbuja usa 54px —por debajo, así que caía del
+lado compacto y perdía el anillo y los dos arcos justo donde el asistente se ve todo
+el rato (la esquina de la pantalla). Bajado el umbral a `size < 50`: la cabecera
+(30px, el único sitio que de verdad necesita la versión simplificada) se queda igual,
+y la burbuja (54px) pasa a dibujarse con el mismo detalle que la pestaña Humano
+(170px), sin inventar un tercer nivel de detalle. Comprobado con Playwright a
+`deviceScaleFactor: 3` (como se ve en un móvil de verdad): el anillo y el arco
+aparecen en la burbuja y se leen limpios, no emborronados; la cabecera sigue sin
+ellos.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
