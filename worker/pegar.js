@@ -871,12 +871,13 @@ var worker_default = {
 		}, 501, origen);
 		if (!Array.isArray(cuerpo.mensajes) || !cuerpo.mensajes.length) return json({ error: "No hay conversación que mandar." }, 400, origen);
 		try {
+			const salida = await p.habla(env)({
+				sistema: String(cuerpo.sistema || ""),
+				mensajes: cuerpo.mensajes,
+				herramientas: Array.isArray(cuerpo.herramientas) ? cuerpo.herramientas : []
+			});
 			return json({
-				...await p.habla(env)({
-					sistema: String(cuerpo.sistema || ""),
-					mensajes: cuerpo.mensajes,
-					herramientas: Array.isArray(cuerpo.herramientas) ? cuerpo.herramientas : []
-				}),
+				...salida,
 				proveedor: nombre,
 				disponibles: disponiblesEn(env)
 			}, 200, origen);

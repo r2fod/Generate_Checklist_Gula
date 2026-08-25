@@ -1241,6 +1241,32 @@ una clave real de Gemini desde este entorno —el mismo límite ya señalado al 
 de arriba—, así que queda pendiente de que el dueño confirme en su móvil tras el
 despliegue si ahora sí se nota la voz de la nube.
 
+**Primer punto del plan de mejoras: B1, dependencias.** Traído `ANALISIS.md` y
+`PLAN_MEJORAS.md` de la revisión a fondo (ver más abajo su propia entrada), y
+arrancado el "orden recomendado" por B1 (la dependencia más pequeña e
+independiente): `npm audit fix` quitó los 2 HIGH (`nanoid`, `postcss`, ambos
+solo de build, ninguno llega al bundle final) y `npm update` subió las
+versiones menores dentro de lo que ya permitía el rango de `package.json`
+(vite 8.1.1→8.2.2, react/react-dom 19.2.7→19.2.8, lucide-react 1.26.0→1.34.0,
+firebase 12.17.1→12.18.0, más `@types/react`, `@types/react-dom`,
+`@vitejs/plugin-react` y `oxlint`) — sin tocar `package.json` a mano, todo
+dentro del `^` que ya había. `typescript` (5.9.3→7.0.2, mayor) se deja fuera
+a propósito: no es "menor" y no estaba pedido. `npm audit`: 0
+vulnerabilidades. `test:rapido` (tipos, cálculos, asistente, build,
+sincronización) en verde. El lint sube de 116 a 126 avisos, pero son avisos
+NUEVOS que caza la versión más reciente de `oxlint` sobre código que ya
+estaba ahí (dos `set-state-in-effect` en `Formulario.jsx`) — 0 errores, nada
+que rompa, y no se tocan en este mismo PR para no mezclar "subir versiones"
+con "cambiar comportamiento"; quedan anotados para una pasada de limpieza
+aparte. El CI cazó algo que se me había escapado: `npm update` sube también
+`rolldown` como dependencia indirecta (1.1.3→1.2.5), y la nueva versión
+genera `worker/pegar.js` con una forma de código ligeramente distinta para
+el mismo `worker/index.js` (hoistea el `await` a una variable antes de
+esparcirlo, en vez de esparcir la promesa resuelta directamente) — mismo
+comportamiento, solo el CI de "regenerado" (compara `worker/pegar.js` byte a
+byte contra lo que saldría de compilar `worker/index.js` ahora mismo) lo
+cazó, y por eso hacía falta el commit de regeneración aparte.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
