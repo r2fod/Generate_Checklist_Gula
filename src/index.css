@@ -7049,30 +7049,20 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   place-items: center;
   width: min(58vw, 190px);
   aspect-ratio: 1;
-  /* La caja encoge de verdad (no solo el dibujo de dentro): así minimizar libera sitio
-     de verdad debajo —la charla, los elegidores— en vez de dejar un hueco en blanco del
-     tamaño de antes. El tamaño del <svg> de Jarvis cambia a la vez (ver Humano.jsx), así
-     que los dos encogen juntos y no se ve un dibujo grande recortado dentro de una caja
-     pequeña ni al revés. */
-  transition: width 0.3s ease;
 }
 
 /* Solo Jarvis se puede minimizar —el resto de compañeros no tienen este botón, ver
-   Humano.jsx— así que solo aquí hace falta decir "esto se toca". Con filter y no con
-   transform: .hum-escena YA anima transform sin parar (hum-respira, la respiración,
-   más abajo) y una animación en bucle pisa cualquier transform de :hover/:active en la
-   misma propiedad — no se habría visto nunca. */
+   Humano.jsx— así que solo aquí hace falta decir "esto se toca". Minimizar cierra el
+   panel entero y vuelve a la burbuja flotante (mismo "cerrar" de siempre, ver
+   Asistente.jsx onMinimizar): no hay un tamaño intermedio que animar aquí. Con filter
+   y no con transform en el hover/active: .hum-escena YA anima transform sin parar
+   (hum-respira, la respiración, más abajo) y una animación en bucle pisa cualquier
+   transform de :hover/:active en la misma propiedad — no se habría visto nunca. */
 .hum-escena.es-jarvis { cursor: pointer; }
 .hum-escena.es-jarvis:hover { filter: brightness(1.08); }
 .hum-escena.es-jarvis:active { filter: brightness(0.92); }
-.hum-escena.es-jarvis-mini { width: min(28vw, 110px); }
 
 .hum-svg { width: 100%; height: 100%; overflow: visible; }
-/* El <svg> que dibuja Jarvis.jsx (dentro de su <span class="jarvis-aro">) también
-   encoge con transición, para el navegador que sepa animar el atributo width/height de
-   un SVG — si no sabe, simplemente salta de un tamaño al otro sin transición, no se
-   rompe nada. */
-.hum-escena.es-jarvis .jarvis-aro svg { transition: width 0.3s ease, height 0.3s ease; }
 
 /* Los colores salen de los tokens del tema: el compañero se adapta a claro y oscuro
    sin una sola regla duplicada.
@@ -7286,7 +7276,6 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
   .hum-escena, .hum-ojo, .hum-boca, .hum-aro, .hum-micro { animation: none; }
-  .hum-escena, .hum-escena.es-jarvis .jarvis-aro svg { transition: none; }
 }
 
 /* ─── LOS GESTOS QUE HACE SOLO ────────────────────────────────────────────────

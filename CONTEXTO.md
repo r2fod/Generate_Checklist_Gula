@@ -1160,17 +1160,22 @@ imagen, se instaló solo para esto— porque una captura suelta no enseña el mo
 2. **Minimizar el reactor al tocarlo, en la pestaña Humano.** El segundo vídeo no
    llegaba a enseñar ningún clic de verdad (7.7s enteros de la misma rotación en
    reposo), así que se preguntó dónde quería el control antes de tocar nada — eligió
-   Humano. Tocar a Jarvis ahí encoge la caja (`.hum-escena`, antes fija en
-   `min(58vw,190px)` da igual lo que hubiera dentro) Y el `<svg>` de Jarvis A LA VEZ
-   —los dos con transición, 0.3s—, a 90px y no menos: por debajo de 80 Jarvis pasa a
-   modo compacto (pierde el anillo y los arcos, ver Jarvis.jsx) y el minimizado tiene
-   que seguir pareciendo el mismo reactor, solo que más pequeño. Solo Jarvis lo hace —
-   los demás compañeros no tienen este botón—. El estado no se guarda entre visitas a
-   la pestaña: es un "ahora me estorba", no una preferencia. Comprobado con Playwright
-   en móvil y escritorio: la caja pasa de 190px a ~120px y vuelve a ~190px al tocar
-   otra vez, con los arcos todavía presentes en el tamaño pequeño; en el móvil de
-   prueba, minimizarlo deja ver la cuarta opción de personalidad ("Parco") sin hacer
-   scroll, que antes quedaba cortada.
+   Humano. Primera versión: tocar a Jarvis encogía solo la caja del muñeco
+   (`.hum-escena`) y su `<svg>`, dejando todo lo demás del panel (el micro, "Cómo te
+   habla"…) del mismo tamaño de siempre. Un TERCER vídeo ("aquí se ve mejor") enseñó
+   que no era eso: en la referencia, minimizar hace desaparecer el panel ENTERO y deja
+   solo un reactor pequeño flotando en la esquina con una aspa para cerrarlo — que es
+   ni más ni menos que nuestra PROPIA burbuja flotante (BotonAsistente.jsx), ya hecha y
+   ya probada. Rehecho antes de fusionar nada: tocar a Jarvis en Humano llama al mismo
+   `onCerrar` de siempre (el que ya usa el aspa del panel), sin ningún tamaño
+   intermedio que inventar ni animar. La única pieza nueva de verdad: la pestaña activa
+   ahora se guarda (`gula_asistente_pestana`, Asistente.jsx) — antes el panel se
+   desmontaba entero al cerrarse y volvía a abrir siempre en Charla, así que "minimizar
+   y volver a abrir" habría aterrizado en el sitio equivocado sin esto. Solo Jarvis
+   tiene este botón —los demás compañeros no—. Comprobado con Playwright: tocar el
+   reactor en Humano cierra el panel y deja la burbuja (0 `.asis-panel`, 1
+   `.asis-flotante-boton`), y volver a tocar la burbuja reabre directamente en Humano
+   (`aria-selected="true"`), no en Charla.
 
 ## Decidido NO hacer (y por qué)
 
