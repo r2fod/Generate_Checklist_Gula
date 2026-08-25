@@ -36,7 +36,9 @@ export const KG_POR_BOLSA = 2;
 // Kilos por persona. El sector maneja 0,7-1 kg/pax con barra en verano y 0,3-0,5 sin
 // barra o en invierno: eso cubre lo que va en el vaso Y lo de conservar bebida en las
 // bañeras. Aquí se coge el extremo alto, como en toda la bebida.
-const KG_HIELO_POR_PAX = { verano: 0.9, invierno: 0.5 };
+// Exportada para que sector.js pueda comparar este número contra el del sector sin
+// duplicarlo — sigue siendo calculos.js quien decide el valor, sector.js solo lo lee.
+export const KG_HIELO_POR_PAX = { verano: 0.9, invierno: 0.5 };
 
 // Sin barra se sigue necesitando hielo —los refrescos y el agua de la comida van fríos—
 // pero bastante menos: no hay cubatas.

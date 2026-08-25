@@ -5,7 +5,9 @@
 // qué saber la cuenta. Teniéndolo en un solo sitio, cambiar la ración cambia las dos.
 
 // Una paellera da de comer a unas 30 personas. De ahí sale el número.
-const PERSONAS_POR_PAELLA = 30;
+// Exportada para que sector.js pueda comparar este ratio contra el del sector sin
+// duplicarlo — sigue siendo este fichero quien decide el valor.
+export const PERSONAS_POR_PAELLA = 30;
 
 /** @param {number} [pax] @returns {number} */
 export function paellasPorPax(pax = 0) {

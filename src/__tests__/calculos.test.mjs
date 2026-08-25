@@ -40,6 +40,8 @@ import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlma
 import { aplicarTemaInicial } from "../tema.js";
 import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESOS, MAX_APUNTES } from "../diario.js";
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
+import { PERSONAS_POR_PAELLA } from "../paella.js";
+import { SECTOR, compararRatios } from "../asistente/sector.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
 let pasan = 0;
@@ -1757,6 +1759,45 @@ console.log("\n══ El diario de fallos: útil y sin un solo nombre ══");
     "y cada línea lleva delante dónde pasó y con qué compilación, entre corchetes");
 
   delete globalThis.localStorage;
+}
+
+console.log("\n══ El sector, como banda de sanidad ══");
+{
+  // Dentro de la banda: ni por encima ni por debajo, delta 0. No es para pisar lo
+  // medido — solo para saber si un número está dentro de lo normal.
+  const dentro = compararRatios({ vino: 0.4 });
+  ok(dentro.find(r => r.id === "vino").tono === "dentro", "un ratio dentro de la banda sale 'dentro'");
+  ok(dentro.find(r => r.id === "vino").deltaPct === 0, "y sin delta, porque no hace falta ajustar nada");
+
+  // Por debajo: el ejemplo de la propia app, la boda a 9 pax/camarero contra la banda
+  // de banquete del sector (12-15) — a propósito, medición de 19 eventos reales.
+  const camareros = compararRatios({ camareros_banquete: 9 });
+  ok(camareros.find(r => r.id === "camareros_banquete").tono === "por-debajo",
+    "menos pax por camarero que la banda del sector sale 'por-debajo' (más gente que el sector, no menos servicio)");
+
+  // Por encima: la paella de 1 cada 30, si el sector dijera menos personas por
+  // paellera, tendría que salir "por-encima" (más gente por paellera de la que da el
+  // sector, o sea menos paella por persona).
+  const porEncima = compararRatios({ paella: 40 });
+  ok(porEncima.find(r => r.id === "paella").tono === "por-encima" && porEncima.find(r => r.id === "paella").deltaPct > 0,
+    "un ratio por encima de la banda lleva el delta en positivo");
+
+  // Sin dato: un ratio que existe en SECTOR pero no se le ha pasado ningún actual — no
+  // se omite, sale marcado como "sin-dato". La regla de oro: cada afirmación sale de un
+  // dato, y "no lo sé" también tiene que salir de algún sitio, no de omitir la fila.
+  const sinDato = compararRatios({ vino: 0.4 });
+  ok(sinDato.find(r => r.id === "hielo_verano").tono === "sin-dato",
+    "un ratio sin actual que comparar sale 'sin-dato', no se omite en silencio");
+  ok(sinDato.find(r => r.id === "hielo_verano").actual === null, "y su 'actual' es null, no un 0 que parecería un dato real");
+
+  // Todos los ratios de SECTOR tienen banda [min, max] con min <= max: un min > max
+  // dejaría cualquier número marcado "por-debajo" Y "por-encima" a la vez, imposible.
+  const bandasValidas = Object.values(SECTOR).every(r => Array.isArray(r.banda) && r.banda.length === 2 && r.banda[0] <= r.banda[1]);
+  ok(bandasValidas, "todas las bandas del sector son [min, max] con min <= max");
+
+  // Los ratios propios de la casa que sector.js compara existen de verdad en sus
+  // ficheros — que sector.js no se quede comparando contra un número que ya no existe.
+  ok(PERSONAS_POR_PAELLA === 30, "la paella sigue en paella.js con el mismo valor que documenta sector.js");
 }
 
 console.log("\n══ Las pantallas gordas llegan tarde, pero con red debajo ══");

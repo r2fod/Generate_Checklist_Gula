@@ -444,6 +444,7 @@ formularios).
 | `personalidad.js` | Cuatro tonos — solo cambian CÓMO habla |
 | `texto.js` | `sinMarcas()` — quita markdown de las respuestas (lo genérico está en `src/texto.js`) |
 | `revision.js` | Reglas de "esto no cuadra". **Puro: lo reusa el Worker** |
+| `sector.js` | Banda del sector (fuentes públicas, sin validar) + `compararRatios()` |
 | `Humano.jsx` / `Companero.jsx` | Ocho oficios (cuerpo entero y busto) + Jarvis |
 | `Jarvis.jsx` | El aro: única excepción a "personas, no objetos", pedida así por el dueño |
 | `companeros.js` | LISTA de compañeros + `companeroValido()`, aparte para node |
@@ -1266,6 +1267,51 @@ esparcirlo, en vez de esparcir la promesa resuelta directamente) — mismo
 comportamiento, solo el CI de "regenerado" (compara `worker/pegar.js` byte a
 byte contra lo que saldría de compilar `worker/index.js` ahora mismo) lo
 cazó, y por eso hacía falta el commit de regeneración aparte.
+
+**A1 del plan: comparar los ratios propios con el sector.** Se preguntó si el
+asistente puede comparar los números de la casa con los del sector para
+saber si están dentro de lo normal — y, a raíz de eso, también si el
+asistente puede aprender de los datos reales de los eventos en vez de
+depender del sector, y qué "comida" se podría calibrar así (se acabó en la
+paella: es la cantidad que sí tiene un ratio fijo y calculable, `1 paellera
+cada 30 pax`). Nuevo `src/asistente/sector.js`: la tabla del sector como
+dato puro (`SECTOR`, con nombre, unidad, banda `[min, max]` y fuente por
+ratio) y `compararRatios(actuales)`, que devuelve tono `dentro` /
+`por-encima` / `por-debajo` / `sin-dato` y el delta % — sin inventar nada:
+un ratio sin `actual` que compararle sale marcado `sin-dato`, no se omite en
+silencio. Nueva herramienta de solo lectura `comparar_con_sector` en
+`herramientas.js` (sin dueño, no depende de ningún evento): junta los
+ratios EN VIVO de sus ficheros de siempre (`leerRatios()` de personal.js
+para camareros —así respeta cualquier ajuste guardado en Firestore, no el
+valor de fábrica—, `RATIOS_BEBIDA` de bebida.js, `KG_HIELO_POR_PAX` de
+calculos.js y `PERSONAS_POR_PAELLA` de paella.js, las dos últimas
+exportadas para esto) y los pasa por `compararRatios`. Con filtro opcional
+por nombre ("dime lo de la paella").
+
+**Ojo con lo que devuelve, a propósito.** La banda del sector NO es para
+pisar lo medido: la boda a 9 pax/camarero sigue midiendo 19 eventos reales
+y sale "por-debajo" de la banda del sector (12-15) porque aquí se pone MÁS
+gente que el sector, no menos — eso ya estaba documentado en personal.js
+como decisión intencional, y la propia descripción de la herramienta se lo
+dice al modelo para que no lo lea como un fallo a corregir. Los ratios que
+de verdad se benefician de esto son los que nadie ha medido todavía
+(paella, cumpleaños, producción): ahí el sector es la única referencia que
+hay. Los números de `SECTOR` son de fuentes públicas recogidas el
+2026-08-25, **sin validar contra el equipo** — se lo dice la propia
+descripción de la herramienta al modelo, para que lo diga si alguien
+pregunta por su fiabilidad. La banda de la paella en concreto es la más
+floja de todas: sale de una ración genérica de arroz por persona, no de
+paelleras reales, y así queda anotado en el propio `sector.js`.
+
+**Lo que se dejó fuera de este PR, a propósito.** El punto 4 del diseño
+(`aplicar_ratio`, escribir el ajuste en `indice/ratios`) y el 5 (aviso
+nocturno determinista) estaban marcados "opcional" en `PLAN_MEJORAS.md`;
+esto es solo la parte de LEER y comparar. Cocina y "margen" se quedan fuera
+de la comparación en vivo (están en la tabla del sector como referencia,
+pero cocina no tiene un ratio único con el que compararla — depende del
+tramo de pax — y margen no es un ratio de cantidad, es una recomendación de
+precio): forzar un número ahí habría sido inventarlo, justo lo que este
+fichero existe para no hacer.
 
 ## Decidido NO hacer (y por qué)
 
