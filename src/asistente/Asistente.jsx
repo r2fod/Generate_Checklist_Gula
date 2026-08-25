@@ -35,6 +35,11 @@ import { apunta } from "../diario.js";
 const CLAVE_NIVEL = "gula_asistente_nivel";
 const CLAVE_PERSONALIDAD = "gula_asistente_personalidad";
 const CLAVE_VOZ = "gula_asistente_voz";
+// Qué pestaña se ve. Guardada para que minimizar el reactor (Jarvis, en Humano) y
+// volver a abrir la burbuja deje "como antes" y no siempre en Charla: el panel entero
+// se desmonta al cerrarse (ver BotonAsistente.jsx), así que sin esto se perdía sola.
+const CLAVE_PESTANA = "gula_asistente_pestana";
+const PESTANAS_VALIDAS = ["charla", "humano", "cerebro", "tareas", "gasto"];
 
 // El almacén del navegador, con su try/catch, vive en src/almacen.js. Aquí "" y null se
 // tratan igual: un ajuste guardado en blanco es un ajuste sin poner.
@@ -55,7 +60,11 @@ const PROVEEDORES = [
 ];
 
 export default function Asistente({ contexto, onCerrar, onOlvidar }) {
-  const [pestana, setPestana] = useState("charla");
+  const [pestana, setPestanaCruda] = useState(() => {
+    const p = leer(CLAVE_PESTANA, "charla");
+    return PESTANAS_VALIDAS.includes(p) ? p : "charla";
+  });
+  const setPestana = (p) => { setPestanaCruda(p); guardar(CLAVE_PESTANA, p); };
   const [url, setUrl] = useState(() => leer(CLAVE_URL));
   const [proveedor, setProveedor] = useState(() => leer(CLAVE_PROVEEDOR, "auto") || "auto");
   // Lo que el Worker dice que tiene configurado. Hasta la primera respuesta no se sabe,
@@ -582,6 +591,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               personalidad={personalidad}
               onCambiarCompanero={(k) => { setCompanero(k); guardar(CLAVE_COMPANERO, k); }}
               onCambiarPersonalidad={(k) => { setPersonalidad(k); guardar(CLAVE_PERSONALIDAD, k); }}
+              // Tocar a Jarvis lo minimiza: mismo "cerrar" de siempre (vuelve a la burbuja
+              // flotante), no un estado nuevo — la pestaña queda guardada (CLAVE_PESTANA,
+              // arriba) para que al volver a abrir esté "como antes" y no en Charla.
+              onMinimizar={onCerrar}
               // Lo dictado entra por la MISMA puerta que lo escrito: mismas herramientas,
               // mismos permisos, mismo enrutado. Hablarle no es un camino aparte.
               onPregunta={(t) => enviar(null, t)}

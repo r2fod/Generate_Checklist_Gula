@@ -240,7 +240,7 @@ function useGestos(activo) {
   return gesto;
 }
 
-export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "" }) {
+export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "", onMinimizar }) {
   const [oyendo, setOyendo] = useState(false);
   const [dictado, setDictado] = useState("");
   const [aviso, setAviso] = useState("");
@@ -314,7 +314,17 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
 
   return (
     <div className="hum">
-      <div className={`hum-escena es-${gesto}${suyo ? ` gesto-${suyo}` : ""}`}>
+      <div
+        className={`hum-escena es-${gesto}${suyo ? ` gesto-${suyo}` : ""}${esJarvis && onMinimizar ? " es-jarvis" : ""}`}
+        {...(esJarvis && onMinimizar ? {
+          role: "button",
+          tabIndex: 0,
+          onClick: onMinimizar,
+          onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onMinimizar(); } },
+          "aria-label": "Minimizar el asistente",
+          title: "Minimizar",
+        } : {})}
+      >
         {/* Los aros solo cuando escucha: sin ellos no se sabe si el micro está abierto,
             y eso es justo lo que hay que ver de un vistazo. */}
         {oyendo && (

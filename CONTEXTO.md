@@ -1141,6 +1141,55 @@ sin nube disponible (elige la voz de red, no la local por defecto), con el Worke
 devolviendo audio (se reproduce el de la nube y NO se cae también a la local) y con el
 Worker fallando (cae a la local sin ningún error de página sin capturar).
 
+**Jarvis: la animación no se parecía a la del vídeo de referencia (OpenHuman), y
+minimizar el reactor al tocarlo.** Dos pedidos seguidos, con vídeo de por medio en los
+dos (grabaciones de pantalla, extraídos los fotogramas con ffmpeg —no había en la
+imagen, se instaló solo para esto— porque una captura suelta no enseña el movimiento).
+
+1. **La animación.** Comparando fotograma a fotograma el vídeo contra capturas de
+   nuestro propio Jarvis (mismo tamaño, banco de pruebas temporal), la estructura ya
+   era la misma —dial de marcas, aro de barras girando, dos arcos a su propio ritmo,
+   núcleo con resplandor— pero el vídeo se ve mucho más vivo: arcos gruesos y bien
+   visibles, aro de barras tupido como una turbina. El nuestro tenía los arcos casi a
+   trazo fino (2px/1.5px) y solo 16 barras finas con hueco de sobra entre una y otra.
+   Arreglado subiendo el grosor de los arcos (3px/2.5px, más opacidad) y las barras a
+   24, más anchas (Jarvis.jsx, index.css) — nada de colores ni del resplandor tocado,
+   pedido tal cual ("sin quitar lo de que cambie de color y el resplandor"). Sigue
+   siendo SVG + CSS puro, cero librerías (confirmado al dueño, que preguntó por el
+   rendimiento).
+2. **Minimizar el reactor al tocarlo, en la pestaña Humano.** El segundo vídeo no
+   llegaba a enseñar ningún clic de verdad (7.7s enteros de la misma rotación en
+   reposo), así que se preguntó dónde quería el control antes de tocar nada — eligió
+   Humano. Primera versión: tocar a Jarvis encogía solo la caja del muñeco
+   (`.hum-escena`) y su `<svg>`, dejando todo lo demás del panel (el micro, "Cómo te
+   habla"…) del mismo tamaño de siempre. Un TERCER vídeo ("aquí se ve mejor") enseñó
+   que no era eso: en la referencia, minimizar hace desaparecer el panel ENTERO y deja
+   solo un reactor pequeño flotando en la esquina con una aspa para cerrarlo — que es
+   ni más ni menos que nuestra PROPIA burbuja flotante (BotonAsistente.jsx), ya hecha y
+   ya probada. Rehecho antes de fusionar nada: tocar a Jarvis en Humano llama al mismo
+   `onCerrar` de siempre (el que ya usa el aspa del panel), sin ningún tamaño
+   intermedio que inventar ni animar. La única pieza nueva de verdad: la pestaña activa
+   ahora se guarda (`gula_asistente_pestana`, Asistente.jsx) — antes el panel se
+   desmontaba entero al cerrarse y volvía a abrir siempre en Charla, así que "minimizar
+   y volver a abrir" habría aterrizado en el sitio equivocado sin esto. Solo Jarvis
+   tiene este botón —los demás compañeros no—. Comprobado con Playwright: tocar el
+   reactor en Humano cierra el panel y deja la burbuja (0 `.asis-panel`, 1
+   `.asis-flotante-boton`), y volver a tocar la burbuja reabre directamente en Humano
+   (`aria-selected="true"`), no en Charla.
+
+**Y encima, la burbuja flotante (54px) seguía sin el anillo ni los arcos.** El dueño
+preguntó directamente: "esa animación también tiene que tenerla la burbuja, ¿no?". El
+umbral que decide si Jarvis se dibuja simplificado (`compacto` en `conteos()`,
+Jarvis.jsx) estaba en `size < 80`, y la burbuja usa 54px —por debajo, así que caía del
+lado compacto y perdía el anillo y los dos arcos justo donde el asistente se ve todo
+el rato (la esquina de la pantalla). Bajado el umbral a `size < 50`: la cabecera
+(30px, el único sitio que de verdad necesita la versión simplificada) se queda igual,
+y la burbuja (54px) pasa a dibujarse con el mismo detalle que la pestaña Humano
+(170px), sin inventar un tercer nivel de detalle. Comprobado con Playwright a
+`deviceScaleFactor: 3` (como se ve en un móvil de verdad): el anillo y el arco
+aparecen en la burbuja y se leen limpios, no emborronados; la cabecera sigue sin
+ellos.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

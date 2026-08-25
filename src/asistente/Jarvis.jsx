@@ -9,16 +9,27 @@
 // Los estados que sabe pintar son los mismos cinco que ya usa el resto del asistente:
 // quieto, pensando, oyendo, hablando, error. Cada uno tiene su color (ver index.css) Y
 // su ritmo propio —pensando busca deprisa, oyendo respira tranquilo esperando, hablando
-// late como quien habla, error urge—: solo el color se notaba poco a 40px, que es el
+// late como quien habla, error urge—: solo el color se notaba poco a 30px, que es el
 // tamaño real de la cabecera, así que el ritmo es lo que lo distingue de un vistazo ahí.
 const RADIO = 92;
 
-// A 40px (la cabecera) 60 marcas se emborronan en un aro difuso: no se leen como dial,
-// solo como textura. Menos marcas y más gruesas siguen leyéndose ahí; a tamaño grande
-// (la pestaña Humano) el detalle fino sí se aprecia.
+// A 30px (la cabecera, el único sitio que queda por debajo del umbral) 60 marcas se
+// emborronan en un aro difuso: no se leen como dial, solo como textura. Menos marcas y
+// más gruesas siguen leyéndose ahí.
+//
+// El umbral está en 50 y no en 80 a propósito: la burbuja flotante mide 54px
+// (BotonAsistente.jsx) y el dueño pidió que se viera "como la de Humano" —el mismo
+// dibujo, con el mismo detalle, solo que más pequeño—, no una versión simplificada. Con
+// el umbral en 80 la burbuja caía del lado compacto y perdía el anillo y los arcos
+// justo donde más se ve el asistente (la esquina de la pantalla, todo el rato).
+//
+// 24 barras y no 16: en el vídeo de referencia ("esa animación es la que quiero para
+// Jarvis") el aro de barras se ve tupido, como una turbina, casi sin huecos entre una
+// y la siguiente. Con 16 y más finas quedaba más como marcas de reloj sueltas que como
+// una turbina girando.
 function conteos(size) {
-  const compacto = size < 80;
-  return { marcas: compacto ? 24 : 60, barras: compacto ? 10 : 16, grosor: compacto ? 3 : 1.5 };
+  const compacto = size < 50;
+  return { marcas: compacto ? 24 : 60, barras: compacto ? 12 : 24, grosor: compacto ? 3 : 1.5 };
 }
 
 // Cada 5ª marca del dial, más larga, como las horas de un reloj.
@@ -32,14 +43,14 @@ const Marca = ({ i, total }) => (
 // El aro de barras: lo que gira y da la sensación de que está trabajando.
 const Barra = ({ i, total }) => (
   <rect
-    x="96.5" y="30" width="7" height="16" rx="1.5"
+    x="95.5" y="29" width="9" height="19" rx="1.5"
     transform={`rotate(${(i / total) * 360} 100 100)`}
   />
 );
 
 export default function Jarvis({ estado = "quieto", size = 40 }) {
   const { marcas, barras, grosor } = conteos(size);
-  const compacto = size < 80;
+  const compacto = size < 50;
   return (
     <span className={`jarvis-aro es-${estado}`} aria-hidden="true" title="Jarvis">
       <svg width={size} height={size} viewBox="0 0 200 200" role="presentation">
@@ -58,9 +69,9 @@ export default function Jarvis({ estado = "quieto", size = 40 }) {
         <g className="jarvis-barras" fill="currentColor">
           {Array.from({ length: barras }, (_, i) => <Barra key={i} i={i} total={barras} />)}
         </g>
-        {/* El anillo y el arco de detalle no se ven a 40px —quedan por debajo del
-            píxel—, así que ahí ni se pintan: es DOM que nadie mira, en un icono que
-            está siempre en pantalla en la cabecera. */}
+        {/* El anillo y el arco de detalle solo se quitan a 30px (la cabecera) —ahí sí
+            quedan por debajo del píxel—; a partir de 50px, incluida la burbuja
+            flotante (54px), se pintan igual que en la pestaña Humano. */}
         {!compacto && (
           <>
             <circle className="jarvis-anillo" cx="100" cy="100" r="50" fill="none" />
