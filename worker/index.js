@@ -188,7 +188,16 @@ async function gemini(cuerpo, env) {
 // cambia algún día sin avisar (como ya ha pasado con nombres de modelo, ver `gemini`
 // arriba).
 async function vozDeGemini(texto, env) {
-  const modelo = env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+  // Sonaba a voz del navegador incluso con Gemini configurado: el modelo por defecto
+  // de antes (gemini-2.5-flash-preview-tts) ya no está — Google lo ha ido moviendo a
+  // gemini-3.1-flash-tts-preview (confirmado contra la documentación y el .proto
+  // oficial en agosto de 2026) —, así que la llamada fallaba con un error normal
+  // (no de cuota, un 404), vozDeGemini() lo lanzaba, el Worker contestaba 502 y
+  // voz.js caía en silencio a la voz local — sin ningún aviso visible de que la nube
+  // nunca llegaba a usarse. Mismo motivo que ya obligó a poner GEMINI_MODEL aparte
+  // para el chat: el nombre del modelo caduca, así que GEMINI_TTS_MODEL sigue siendo
+  // la vía para pisarlo sin tocar código el día que esto también cambie.
+  const modelo = env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
   const voz = env.GEMINI_TTS_VOZ || "Kore";
   const claves = clavesGemini(env);
   let ultimoFallo;

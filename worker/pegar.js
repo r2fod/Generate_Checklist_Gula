@@ -562,7 +562,7 @@ async function gemini(cuerpo, env) {
 	throw ultimoFallo;
 }
 async function vozDeGemini(texto, env) {
-	const modelo = env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+	const modelo = env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
 	const voz = env.GEMINI_TTS_VOZ || "Kore";
 	const claves = clavesGemini(env);
 	let ultimoFallo;

@@ -1217,6 +1217,30 @@ leyendo `scrollTop`/`scrollHeight` del panel en tres puntos (arriba del todo, a
 mitad, abajo del todo) contra capturas: arriba del todo no sale sombra por arriba,
 abajo del todo no sale por abajo, y a mitad salen las dos.
 
+**La voz seguía sonando artificial en móvil, incluso después de lo de arriba.** El dueño
+avisó de que, pese al arreglo de `mejorVoz`/voz de Gemini, en su móvil (y quizás en PC)
+seguía sonando como la voz local de siempre. Sospecha directa: la voz de Gemini nunca
+llegaba a usarse y todo caía en silencio a la ruta 1 (voz del navegador) sin que se viera
+ningún aviso — exactamente el comportamiento "nadie se queda muda por esto" documentado
+arriba, que aquí jugaba en contra porque escondía el fallo real. Comprobado: el modelo
+por defecto de `vozDeGemini()` (worker/index.js) era `gemini-2.5-flash-preview-tts`, que
+ya no existe — la llamada fallaba con un 404 normal (no de cuota), `vozDeGemini()` lo
+lanzaba, el Worker contestaba 502 y `voz.js` caía a la local sin dejar rastro visible.
+Verificado contra fuentes en vivo de Google (con `ai.google.dev`, `firebase.google.com` y
+otros dominios de la documentación bloqueados por el proxy de este entorno, pero
+`raw.githubusercontent.com`/`github.com` sí accesibles): la forma del JSON de la llamada
+(`generationConfig.responseModalities`, `speechConfig.voiceConfig...`) seguía siendo
+correcta contra el `.proto` oficial de `googleapis/googleapis`, y `generateContent` (el
+endpoint que se usa) sigue totalmente soportado en agosto de 2026 pese a existir ya una
+"Interactions API" más nueva — no hacía falta ningún cambio de arquitectura, solo el
+nombre del modelo estaba caducado. Mismo motivo que ya obligó a separar `GEMINI_MODEL`
+para el chat (Google retira nombres de modelo sin avisar): cambiado el valor por defecto
+a `gemini-3.1-flash-tts-preview`, dejando `GEMINI_TTS_MODEL` (ya existía desde el punto 2
+de arriba) como la vía para pisarlo el día que esto vuelva a pasar. Sin verificar contra
+una clave real de Gemini desde este entorno —el mismo límite ya señalado al entregar lo
+de arriba—, así que queda pendiente de que el dueño confirme en su móvil tras el
+despliegue si ahora sí se nota la voz de la nube.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
