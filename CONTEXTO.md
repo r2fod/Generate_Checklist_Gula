@@ -1190,6 +1190,12 @@ y la burbuja (54px) pasa a dibujarse con el mismo detalle que la pestaña Humano
 aparecen en la burbuja y se leen limpios, no emborronados; la cabecera sigue sin
 ellos.
 
+**Una de las preguntas de ejemplo del chat vacío sonaba de trámite.** El dueño vio
+"¿A qué hora hay que salir del obrador?" y dijo que no le gustaba, sin especificar la
+forma nueva. Cambiada a "¿A qué hora salimos del obrador?" — quita el "hay que", que
+suena a obligación impuesta, por algo más directo, como lo preguntaría alguien del
+equipo de verdad (Asistente.jsx, la lista de `asis-vacio`).
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
