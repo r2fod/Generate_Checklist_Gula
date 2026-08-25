@@ -83,7 +83,12 @@ export default function ModalAgregarItems({ checklist, categoriasDisponibles, on
           {paso === "pegar" && (
             <>
               <div className="agregar-nota">
-                <Info size={14} /> Pega una lista de items, uno por línea. Puedes incluir la cantidad separada por tabulador, dos puntos o guion (ej. <em>"Vasos de tubo: 50"</em>); si no pones cantidad se añade con "1".
+                <Info size={14} />
+                {/* Todo el texto en UN solo span: "agregar-nota" es flex, así que sin este
+                    envoltorio cada trozo de texto que quedaba suelto entre el <em> (antes y
+                    después) se convertía en su propia columna flex en vez de fluir como un
+                    párrafo — se veía partido en 3 bloques uno al lado del otro. */}
+                <span>Pega una lista de items, uno por línea. Puedes incluir la cantidad separada por tabulador, dos puntos o guion (ej. <em>"Vasos de tubo: 50"</em>); si no pones cantidad se añade con "1".</span>
               </div>
               <div className="agregar-campo">
                 <label className="agregar-label">Items a añadir</label>
@@ -95,7 +100,7 @@ export default function ModalAgregarItems({ checklist, categoriasDisponibles, on
                   style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.85rem", fontFamily: "monospace", cursor: "text", resize: "vertical" }}
                 />
               </div>
-              {error && <div className="agregar-error"><AlertTriangle size={14} /> {error}</div>}
+              {error && <div className="agregar-error"><AlertTriangle size={14} /> <span>{error}</span></div>}
               <button onClick={analizar} disabled={!texto.trim()} className="agregar-btn-principal">
                 Analizar →
               </button>
@@ -106,7 +111,7 @@ export default function ModalAgregarItems({ checklist, categoriasDisponibles, on
           {paso === "confirmar" && (
             <>
               <div className="agregar-ok">
-                ✓ {propuestos.length} items interpretados. Desmarca los que no quieras añadir — los ya presentes en la checklist aparecen desmarcados por defecto para no duplicar.
+                <span>✓ {propuestos.length} items interpretados. Desmarca los que no quieras añadir — los ya presentes en la checklist aparecen desmarcados por defecto para no duplicar.</span>
               </div>
               <div className="agregar-lista">
                 {propuestos.map((p, idx) => (
