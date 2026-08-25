@@ -237,6 +237,23 @@ body {
   max-height: calc(100vh - 110px);
   overflow-y: auto;
   padding-right: 4px;
+  /* Sombra que avisa de que sigue habiendo más config por debajo (o por encima): sin
+     esto el panel parecía "cortado" en vez de "con más si sigues bajando", y como
+     tiene scroll PROPIO —distinto del de la página, que mueve la lista de la
+     derecha— nadie se enteraba de que hacía falta pasar el ratón por encima y seguir
+     bajando ahí también. Truco sin JS: dos capas que tapan el borde (se mueven CON
+     el contenido, background-attachment:local) y dos sombras que se quedan fijas
+     (background-attachment:scroll) — la sombra solo asoma por debajo de la capa que
+     la tapa cuando esa capa ya se ha desplazado fuera de la vista, que es justo
+     cuando de verdad queda algo por ver en esa dirección. */
+  background:
+    linear-gradient(var(--bg-color) 30%, transparent),
+    linear-gradient(transparent, var(--bg-color) 70%) 0 100%,
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.18), transparent),
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.18), transparent) 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 24px, 100% 24px, 100% 10px, 100% 10px;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .checklist-main {
