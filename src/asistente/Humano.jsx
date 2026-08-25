@@ -245,6 +245,10 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
   const [dictado, setDictado] = useState("");
   const [aviso, setAviso] = useState("");
   const [hablando, setHablando] = useState(false);
+  // Solo para Jarvis (ver más abajo): minimizarlo deja ver mejor lo de detrás —el
+  // hilo de la charla, los elegidores— sin tener que cerrar el panel. No se guarda
+  // entre visitas a propósito: es un "ahora mismo me estorba", no una preferencia.
+  const [jarvisMini, setJarvisMini] = useState(false);
   const mando = useRef(null);
   const yaLeido = useRef("");
 
@@ -314,7 +318,17 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
 
   return (
     <div className="hum">
-      <div className={`hum-escena es-${gesto}${suyo ? ` gesto-${suyo}` : ""}`}>
+      <div
+        className={`hum-escena es-${gesto}${suyo ? ` gesto-${suyo}` : ""}${esJarvis ? " es-jarvis" : ""}${esJarvis && jarvisMini ? " es-jarvis-mini" : ""}`}
+        {...(esJarvis ? {
+          role: "button",
+          tabIndex: 0,
+          onClick: () => setJarvisMini(m => !m),
+          onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setJarvisMini(m => !m); } },
+          "aria-label": jarvisMini ? "Agrandar el reactor" : "Minimizar el reactor",
+          title: jarvisMini ? "Agrandar" : "Minimizar",
+        } : {})}
+      >
         {/* Los aros solo cuando escucha: sin ellos no se sabe si el micro está abierto,
             y eso es justo lo que hay que ver de un vistazo. */}
         {oyendo && (
@@ -324,7 +338,10 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
           </>
         )}
         {esJarvis ? (
-          <Jarvis estado={estadoJarvis} size={170} />
+          // 90 y no menos: por debajo de 80 Jarvis pasa a modo compacto (conteos() en
+          // Jarvis.jsx) y pierde el anillo y los arcos — minimizado tiene que seguir
+          // pareciendo el mismo reactor, solo que más pequeño, no uno con menos detalle.
+          <Jarvis estado={estadoJarvis} size={jarvisMini ? 90 : 170} />
         ) : (
         <svg viewBox="0 0 200 200" className="hum-svg" role="img" aria-label="El compañero del asistente">
           {/* ── EL VOLUMEN ──

@@ -1141,6 +1141,37 @@ sin nube disponible (elige la voz de red, no la local por defecto), con el Worke
 devolviendo audio (se reproduce el de la nube y NO se cae también a la local) y con el
 Worker fallando (cae a la local sin ningún error de página sin capturar).
 
+**Jarvis: la animación no se parecía a la del vídeo de referencia (OpenHuman), y
+minimizar el reactor al tocarlo.** Dos pedidos seguidos, con vídeo de por medio en los
+dos (grabaciones de pantalla, extraídos los fotogramas con ffmpeg —no había en la
+imagen, se instaló solo para esto— porque una captura suelta no enseña el movimiento).
+
+1. **La animación.** Comparando fotograma a fotograma el vídeo contra capturas de
+   nuestro propio Jarvis (mismo tamaño, banco de pruebas temporal), la estructura ya
+   era la misma —dial de marcas, aro de barras girando, dos arcos a su propio ritmo,
+   núcleo con resplandor— pero el vídeo se ve mucho más vivo: arcos gruesos y bien
+   visibles, aro de barras tupido como una turbina. El nuestro tenía los arcos casi a
+   trazo fino (2px/1.5px) y solo 16 barras finas con hueco de sobra entre una y otra.
+   Arreglado subiendo el grosor de los arcos (3px/2.5px, más opacidad) y las barras a
+   24, más anchas (Jarvis.jsx, index.css) — nada de colores ni del resplandor tocado,
+   pedido tal cual ("sin quitar lo de que cambie de color y el resplandor"). Sigue
+   siendo SVG + CSS puro, cero librerías (confirmado al dueño, que preguntó por el
+   rendimiento).
+2. **Minimizar el reactor al tocarlo, en la pestaña Humano.** El segundo vídeo no
+   llegaba a enseñar ningún clic de verdad (7.7s enteros de la misma rotación en
+   reposo), así que se preguntó dónde quería el control antes de tocar nada — eligió
+   Humano. Tocar a Jarvis ahí encoge la caja (`.hum-escena`, antes fija en
+   `min(58vw,190px)` da igual lo que hubiera dentro) Y el `<svg>` de Jarvis A LA VEZ
+   —los dos con transición, 0.3s—, a 90px y no menos: por debajo de 80 Jarvis pasa a
+   modo compacto (pierde el anillo y los arcos, ver Jarvis.jsx) y el minimizado tiene
+   que seguir pareciendo el mismo reactor, solo que más pequeño. Solo Jarvis lo hace —
+   los demás compañeros no tienen este botón—. El estado no se guarda entre visitas a
+   la pestaña: es un "ahora me estorba", no una preferencia. Comprobado con Playwright
+   en móvil y escritorio: la caja pasa de 190px a ~120px y vuelve a ~190px al tocar
+   otra vez, con los arcos todavía presentes en el tamaño pequeño; en el móvil de
+   prueba, minimizarlo deja ver la cuarta opción de personalidad ("Parco") sin hacer
+   scroll, que antes quedaba cortada.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
