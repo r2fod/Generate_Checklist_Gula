@@ -715,7 +715,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                 <p>Pregúntame por tus eventos. Los números salen de las fórmulas de la app, no de mi cabeza.</p>
                 <ul>
                   <li>¿Cuánto hielo llevo a la boda de septiembre?</li>
-                  <li>¿A qué hora hay que salir del obrador?</li>
+                  <li>¿A qué hora salimos del obrador?</li>
                   <li>¿Qué eventos tengo sin configurar?</li>
                   <li>¿Cuánta gente hace falta para una comunión de 90?</li>
                 </ul>
