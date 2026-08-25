@@ -16,6 +16,7 @@ import { comprimir, ahorro } from "../asistente/comprimir.js";
 import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
 import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
 import { avisosConfig, saludoPendientes } from "../asistente/avisosConfig.js";
+import { marcarActualizando, confirmaSiActualizado } from "../asistente/actualizacion.js";
 import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
 import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
@@ -1487,6 +1488,30 @@ console.log("\n══ Lo que falta por configurar (avisosConfig) ══");
     "los avisos de configuración van en la misma tarjeta que los del repaso, no una nueva");
 }
 
+console.log("\n══ El asistente se entera de las actualizaciones (actualizacion.js) ══");
+{
+  const almacen = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (almacen.has(k) ? almacen.get(k) : null),
+    setItem: (k, v) => almacen.set(k, String(v)),
+    removeItem: (k) => almacen.delete(k),
+  };
+
+  ok(confirmaSiActualizado("build-1") === null, "sin ninguna actualización marcada, no hay nada que confirmar");
+
+  marcarActualizando("build-2", ["Cosa nueva uno", "Cosa nueva dos"]);
+  ok(confirmaSiActualizado("build-1") === null,
+    "si el build actual NO es el que se esperaba, no se confirma nada — no se inventa una actualización que no ha llegado");
+  // Y la marca sigue puesta: la siguiente carga que sí cuadre debe poder confirmarla.
+  const confirmado = confirmaSiActualizado("build-2");
+  ok(Array.isArray(confirmado) && confirmado.join(",") === "Cosa nueva uno,Cosa nueva dos",
+    "cuando el build actual SÍ es el esperado, confirma con los cambios que se marcaron");
+  ok(confirmaSiActualizado("build-2") === null,
+    "y una vez confirmada, la marca se borra: no se repite en el siguiente arranque");
+
+  delete globalThis.localStorage;
+}
+
 console.log("\n══ Lo primero que dice, si hay algo pendiente (saludoPendientes) ══");
 {
   ok(saludoPendientes([], null) === null, "sin nada pendiente, no hay saludo — el caso normal no suena a aviso");
@@ -1542,6 +1567,26 @@ console.log("\n══ Lo primero que dice, si hay algo pendiente (saludoPendient
   // Sin personalidad (llamada de siempre, sin el cuarto argumento) se comporta como
   // "directo": nadie que ya llamara a esto sin saber de personalidades se rompe.
   ok(saludoPendientes([], null, recordUno) === conDirecto, "sin decir personalidad, se comporta como directo");
+
+  // El aviso de actualización: pendiente vs. ya aplicada son DOS mensajes distintos,
+  // y va primero de todo — es lo más reciente que le ha pasado a la app.
+  const pendiente = { cambios: ["La voz suena más natural."], aplicada: false };
+  const conPendiente = saludoPendientes([], null, [], "directo", pendiente);
+  ok(/^Hay una actualización disponible: La voz suena más natural\./.test(conPendiente),
+    `avisa de que hay una actualización disponible → "${conPendiente}"`);
+
+  const aplicada = { cambios: ["La voz suena más natural."], aplicada: true };
+  const conAplicada = saludoPendientes([], null, [], "directo", aplicada);
+  ok(conAplicada === "Me acabo de actualizar: La voz suena más natural.",
+    `y si ya se aplicó, lo dice en pasado, no como si siguiera pendiente → "${conAplicada}"`);
+
+  const conTodoJunto = saludoPendientes([], null, recordUno, "directo", aplicada);
+  ok(conTodoJunto.startsWith("Me acabo de actualizar"), "y va delante de los recordatorios y avisos de siempre");
+
+  ok(saludoPendientes([], null, [], "directo", { cambios: [], aplicada: true }) === null,
+    "sin cambios de verdad no hay nada que decir, aunque venga marcado como aplicada");
+  ok(saludoPendientes([], null, [], "directo", null) === null,
+    "y sin aviso de actualización (llamada de siempre) se comporta exactamente igual que antes");
 }
 
 console.log("\n══ Varias cuentas de Gemini, si la primera se queda sin cuota (clavesGemini) ══");

@@ -2357,17 +2357,37 @@ async function main() {
     // cargado, y entonces la comprobación no dice nada.
     ok(await p.locator(".item-row").count() > 20, "la app ha cargado su checklist");
     ok(await p.locator(".version-nueva-banner").count() === 0, "y con la misma versión no avisa de nada");
-    // Se publica una versión nueva con la app abierta
-    fs2.writeFileSync("dist/version.json", JSON.stringify({ id: "2099-01-01T00:00:00.000Z" }));
+    // Se publica una versión nueva con la app abierta, esta vez con sus cambios: el
+    // aviso también tiene que decir QUÉ trae, no solo que hay algo.
+    fs2.writeFileSync("dist/version.json", JSON.stringify({
+      id: "2099-01-01T00:00:00.000Z",
+      cambios: ["Cambio de prueba uno", "Cambio de prueba dos"],
+    }));
     await p.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
     await p.waitForTimeout(1300);
     const avisa = await p.locator(".version-nueva-banner").count() === 1;
     ok(avisa, "al publicar una versión nueva, avisa");
     if (avisa) {
+      const cambiosMostrados = await p.locator(".version-nueva-cambios li").allTextContents();
+      ok(cambiosMostrados.join("|") === "Cambio de prueba uno|Cambio de prueba dos",
+        `y enseña los cambios de esa versión → ${cambiosMostrados.join(" · ")}`);
+
+      // El botón se pone en "Actualizando…" ANTES de recargar de verdad: hay medio
+      // segundo de margen entre el clic y el reload() real (ver App.jsx), así que se
+      // puede comprobar el estado intermedio sin tener que anular la navegación —
+      // anular window.location.reload no funciona en Chromium (es "unforgeable" por
+      // el propio navegador, la asignación no lanza pero tampoco hace nada).
       await p.locator(".version-nueva-btn").click();
-      await p.waitForTimeout(2600);
-      ok(await p.locator(".item-row").count() > 20, `y el botón recarga sin perder el evento (${await p.locator(".item-row").count()} items)`);
-    } else ok(false, "y el botón recarga sin perder el evento");
+      await p.waitForTimeout(150);
+      const boton = p.locator(".version-nueva-btn");
+      ok((await boton.textContent()).includes("Actualizando"), "al pulsar, el botón dice que se está actualizando");
+      ok(await boton.isDisabled(), "y se deshabilita, para que no se pueda pulsar dos veces");
+      ok(await p.locator(".version-nueva-btn .icono-gira").count() === 1, "con su icono girando, para que se note que algo está pasando");
+      // Y la recarga de verdad llega después, sin que haga falta pulsar otra vez.
+      await p.waitForTimeout(1500);
+      ok(await p.locator(".item-row").count() > 20, `y la recarga llega sola, sin perder el evento (${await p.locator(".item-row").count()} items)`);
+    } else ok(false, "y enseña los cambios de esa versión");
+
     fs2.writeFileSync("dist/version.json", original);
     await c.close();
   }

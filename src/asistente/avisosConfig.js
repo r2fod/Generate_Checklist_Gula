@@ -70,16 +70,35 @@ const ENVOLTURA_SALUDO = {
   parco: (frase) => frase.replace(/\.\s+/g, " · ").replace(/\.$/, ""),
 };
 
-export function saludoPendientes(avisosNegocio, repaso, recordatoriosHoy = [], personalidad = "directo") {
+/**
+ * Lo de la actualización, en una frase. Aparte de las demás partes porque son DOS
+ * mensajes distintos según el momento (antes/después de pulsar Actualizar en el
+ * banner de arriba, ver actualizacion.js) y solo tiene sentido uno de los dos a la vez.
+ * @param {{ cambios: string[], aplicada: boolean } | null} avisoActualizacion
+ * @returns {string}
+ */
+function fraseActualizacion(avisoActualizacion) {
+  if (!avisoActualizacion || !avisoActualizacion.cambios.length) return "";
+  const cambios = avisoActualizacion.cambios.join(" ");
+  return avisoActualizacion.aplicada
+    ? `Me acabo de actualizar: ${cambios}`
+    : `Hay una actualización disponible: ${cambios} Dale a Actualizar arriba cuando quieras.`;
+}
+
+export function saludoPendientes(avisosNegocio, repaso, recordatoriosHoy = [], personalidad = "directo", avisoActualizacion = null) {
   const eventosConAvisos = repaso && Array.isArray(repaso.eventos)
     ? repaso.eventos.filter(e => e.avisos && e.avisos.length)
     : [];
-  if (!avisosNegocio.length && !eventosConAvisos.length && !recordatoriosHoy.length) return null;
+  const fraseVersion = fraseActualizacion(avisoActualizacion);
+  if (!avisosNegocio.length && !eventosConAvisos.length && !recordatoriosHoy.length && !fraseVersion) return null;
 
   const partes = [];
-  // Los recordatorios van primero: es lo que alguien pidió que se le dijera A ÉL, en
-  // concreto ("recuérdame...") — no es lo mismo que un aviso genérico del negocio o de
-  // un evento, y perderlo entre esos dos sería justo lo que se pidió que no pasara.
+  // La actualización va primero: es lo más reciente que le ha pasado a la app, y "me
+  // acabo de actualizar" pierde el sentido si llega después de tres frases de otra cosa.
+  if (fraseVersion) partes.push(fraseVersion);
+  // Los recordatorios van justo después: es lo que alguien pidió que se le dijera A ÉL,
+  // en concreto ("recuérdame...") — no es lo mismo que un aviso genérico del negocio o
+  // de un evento, y perderlo entre esos dos sería justo lo que se pidió que no pasara.
   if (recordatoriosHoy.length) {
     partes.push(recordatoriosHoy.length === 1
       ? `Tenías apuntado: ${recordatoriosHoy[0].texto}.`

@@ -43,6 +43,7 @@ export function contextoDelAsistente({
   onMarcarTarea,
   onQuitarTarea,
   nivel,
+  avisoActualizacion = null,
 } = {}) {
   return {
     eventosGuardados,
@@ -76,6 +77,9 @@ export function contextoDelAsistente({
     onMarcarTarea,
     onQuitarTarea,
     nivel,
+    // { cambios, aplicada } o null — ver actualizacion.js. Sin recorte: no lleva nada
+    // sensible, son las mismas frases que ya se ven en el banner de arriba.
+    avisoActualizacion,
   };
 }
 
