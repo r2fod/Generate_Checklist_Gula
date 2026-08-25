@@ -1051,6 +1051,39 @@ móvil. Quitada la regla `@media (max-width: 767px) { .asis-panel:not(.es-charla
 cambie de tamaño solo. Comprobado con Playwright: las cinco pestañas miden
 exactamente el alto de la pantalla (antes Gasto medía bastante menos).
 
+**El destello de la burbuja flotante dejaba ver un cuadrado que parpadeaba y
+desaparecía rápido.** Lo reportó el dueño viéndolo en el móvil. `asis-burbuja-viva`
+(el pulso de `.asis-flotante-boton`, ver más arriba) llevaba el halo del `box-shadow`
+de "sin blur ni spread" (`0 0 0 0`, en reposo) a "14px de blur, 3px de spread" (en el
+punto de más color) y vuelta a empezar. Animar un `box-shadow` con `border-radius`
+hasta un tamaño degenerado —blur y spread los dos en 0 a la vez— hace que algunos
+motores pierdan el recorte circular durante un frame y se vea el cuadrado de la caja
+de sombra sin recortar, justo en el instante en que el halo colapsa: coincide con "al
+finalizar el destello", que es lo que describió. Arreglado dejando el blur (14px) y
+el spread (3px) SIEMPRE fijos en las tres paradas del keyframe, y animando solo el
+color hasta `transparent` para el reposo en vez de hasta un tamaño de 0 — el halo se
+sigue viendo igual (invisible en reposo, con color en los otros dos tramos) pero el
+`box-shadow` nunca llega a un tamaño degenerado. Comprobado por Playwright leyendo el
+`box-shadow` calculado cada 150ms durante un ciclo entero (42 muestras): el blur y el
+spread del halo se quedan en 14px/3px en las 42, solo cambia el color/alpha.
+
+**La nota de ayuda del modal "Añadir varios items" salía partida en tres columnas en
+vez de fluir como un párrafo.** Lo reportó el dueño con una captura del móvil.
+`.agregar-nota` (y las hermanas `.agregar-ok`/`.agregar-error`, mismo grupo de
+clases) es `display: flex`, pensada para un icono + un bloque de texto. Pero el JSX
+metía el icono directamente seguido de texto suelto, un `<em>` y más texto suelto
+como hijos DIRECTOS del div: en React eso son varios nodos de texto hermanos, y cada
+nodo de texto que cuelga suelto de un contenedor flex se convierte en su propio
+elemento flex — así que el texto de antes del `<em>`, el `<em>` y el texto de después
+quedaban cada uno en su propia "columna" en vez de fluir en un único párrafo.
+Arreglado envolviendo todo el texto (incluido el `<em>` de en medio) en un único
+`<span>` en los tres casos (`agregar-nota`, `agregar-ok`, el `{error}` de
+`agregar-error`) — un solo hijo de texto, un solo elemento flex, fluye como párrafo
+normal. Comprobado con Playwright montando el modal en un banco de pruebas temporal
+(borrado después de comprobar, no se sube): antes el `<span>` de texto medía menos de
+la mitad del ancho de la nota; después ocupa el ancho completo disponible junto al
+icono.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

@@ -6455,8 +6455,14 @@ hr {
 .asis-flotante-boton:hover { transform: scale(1.05); }
 .asis-flotante-boton:active { transform: scale(0.96); cursor: grabbing; }
 
+/* El blur y el spread se quedan SIEMPRE en 14px/3px: solo cambia el color (hasta
+   transparent en el reposo). Antes el reposo bajaba blur y spread hasta "0 0", y
+   animar un box-shadow redondeado hasta un tamaño degenerado hace que algunos
+   motores pierdan el recorte circular un frame y se vea un cuadrado — el "destello"
+   que parpadeaba y desaparecía rápido que reportó el dueño. Con el tamaño fijo el
+   halo nunca colapsa, así que no hay recorte que perder. */
 @keyframes asis-burbuja-viva {
-  0%, 100% { border-color: var(--accent);    box-shadow: var(--shadow-lg), 0 0 0 0 var(--accent); }
+  0%, 100% { border-color: var(--accent);    box-shadow: var(--shadow-lg), 0 0 14px 3px transparent; }
   33%      { border-color: var(--pj-fuego);  box-shadow: var(--shadow-lg), 0 0 14px 3px var(--pj-fuego); }
   66%      { border-color: var(--green-qty); box-shadow: var(--shadow-lg), 0 0 14px 3px var(--green-qty); }
 }
