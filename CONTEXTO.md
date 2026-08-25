@@ -1258,7 +1258,14 @@ NUEVOS que caza la versión más reciente de `oxlint` sobre código que ya
 estaba ahí (dos `set-state-in-effect` en `Formulario.jsx`) — 0 errores, nada
 que rompa, y no se tocan en este mismo PR para no mezclar "subir versiones"
 con "cambiar comportamiento"; quedan anotados para una pasada de limpieza
-aparte.
+aparte. El CI cazó algo que se me había escapado: `npm update` sube también
+`rolldown` como dependencia indirecta (1.1.3→1.2.5), y la nueva versión
+genera `worker/pegar.js` con una forma de código ligeramente distinta para
+el mismo `worker/index.js` (hoistea el `await` a una variable antes de
+esparcirlo, en vez de esparcir la promesa resuelta directamente) — mismo
+comportamiento, solo el CI de "regenerado" (compara `worker/pegar.js` byte a
+byte contra lo que saldría de compilar `worker/index.js` ahora mismo) lo
+cazó, y por eso hacía falta el commit de regeneración aparte.
 
 ## Decidido NO hacer (y por qué)
 
