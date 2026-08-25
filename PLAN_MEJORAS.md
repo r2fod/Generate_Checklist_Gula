@@ -59,9 +59,16 @@ con los números de verdad del equipo antes de meterla en `sector.js`**):
 | Refrescos | 7,4 uds/comensal (unidad a confirmar) | 1-1,5 L/persona |
 | Hielo | 0,9/0,5 kg/pax × 0,6 sin barra × 1,35/1,2 merma | 0,7-1 kg/pax con barra verano; 0,3-0,5 sin barra (ya está en el comentario de `calculos.js`) |
 | Margen | extremo alto de cada banda | +10-15 % recomendado |
+| Paella | 1 paellera cada 30 pax (`PERSONAS_POR_PAELLA`, `paella.js`), talla por tramos (≤40 pequeña, ≤80 mediana, resto grande) | ración de sector ≈150-200 g de arroz seco/persona; por validar de ahí cuántas personas da cada talla de paellera antes de meterlo en la tabla |
+
+**Añadido a petición del dueño:** la paella es el primer candidato de "sin
+ningún dato que lo valide" — ni calibración propia (nadie ha marcado
+"Vuelve" en paella todavía) ni sector. Es donde más se nota la diferencia
+entre "banda de sanidad" (esto, mientras no haya histórico) y "medido de
+verdad" (en cuanto lo haya, ver C3 abajo).
 
 **Tamaño:** 1 PR, 1-2 días con pruebas. **Depende de:** nada (y alimenta a
-C2 y A2).
+C2, C3 y A2).
 
 ### A2 — Auditorías que proponen mejoras
 
@@ -84,6 +91,12 @@ aprobación). Falta el nombre y cerrar el bucle **hallazgo → propuesta**.
      silencio.
    - Catálogo dormido: precio de compra sin tocar en 12 meses.
    - Mismo sitio, checklist que diverge de la anterior.
+   - **Catálogo con huecos**: X de Y ítems sin precio cargado (el Resumen ya
+     lo cuenta por evento — "86 de 109 sin precio todavía" — pero solo lo ve
+     quien entra a ESE evento; nadie lo ve de un vistazo para todos).
+   - **Roturas sin revisar**: eventos con roturas apuntadas que nadie ha
+     valorado en precio. El subconsciente ya sabe contarlas (`subconsciente.js`)
+     pero solo si se le pregunta; falta que avise solo.
    Corre donde corre lo igual: Worker por la noche (como el repaso) y al
    abrir el panel (como el subconsciente) → `indice/avisos`.
 2. **La boca.** Herramienta de solo lectura `ver_auditoria`: lee los
@@ -242,6 +255,7 @@ fase 1, no el camino que la sustituye.
 |---|---|---|---|
 | C1 | **Coeficientes de niños** en comida, refrescos y equipamiento | Hoy solo el alcohol separa adultos (`alcoholPax`); el resto va sobre el total sin distinguir | Medio, con datos reales delante |
 | C2 | **Hielo: calibrar la merma de verdad** — extender el patrón de `calibracionBebida` al hielo (la "vuelta" ya soporta cantidad: `true` = todo, o número) y contrastar 1,35/1,2 con el sector | Los números salieron de una estimación, no de una medición; la mecánica ya existe para la bebida, es estirarla | Medio |
+| C3 | **Comida: calibrar raciones con datos reales** — mismo patrón que C2, aplicado a paella y demás cantidades de comida (frituras, bandejas). El marcador "Vuelve ✓" ya es genérico por ítem (`checklist-format.js`, no es solo de bebida), así que la parte que falta es la misma que en C2: agrupar por categoría de comida y sacar la mediana con ≥3 eventos | Hoy la paella y el resto van a ratio fijo (1 cada 30 pax), sin dato propio ni de sector detrás; en cuanto haya 3+ eventos con la vuelta marcada, el dato real manda sobre el ratio fijo — igual que ya pasa con la bebida | Medio, depende de A1 (paella) para la banda de sanidad mientras no hay histórico |
 
 ## D. Futuro (mucho valor, mucho trabajo)
 
@@ -260,18 +274,21 @@ fase 1, no el camino que la sustituye.
 
 1. **B1** — dependencias: pequeña, independiente, y el resto se apoya en una
    toolchain sin HIGH.
-2. **A1** — sector: alimenta a C2 y a A2.
+2. **A1** — sector (incluida la paella): alimenta a C2, C3 y A2.
 3. **C2** — hielo con sector + calibración propia.
-4. **A2** — auditorías (reglas → `ver_auditoria` → modo a pedido).
-5. **B2 + B3 + B4 + B7** — los pequeños del asistente y de la seguridad del
+4. **C3** — comida (paella y demás) con sector + calibración propia, mismo
+   patrón que C2.
+5. **A2** — auditorías (reglas → `ver_auditoria` → modo a pedido), incluidas
+   las dos nuevas (catálogo con huecos, roturas sin revisar).
+6. **B2 + B3 + B4 + B7** — los pequeños del asistente y de la seguridad del
    repo (agrupables en una PR si se mantiene limpia).
-6. **C1** — niños: primero medir un evento real, luego el número.
-7. **A4 v1** — vista Marketing (analizador en el Worker + capturas de
+7. **C1** — niños: primero medir un evento real, luego el número.
+8. **A4 v1** — vista Marketing (analizador en el Worker + capturas de
    Instagram con visión + estrategia + modo maestro). Con A2 en pie, el
    plan de marketing es su primer cliente.
-8. **B5 · B6 · B8** — profesionalización sin prisa.
-9. **A4 v2/v3 y D\*** — redes con visión, publicar de verdad y el resto,
-   cuando toque.
+9. **B5 · B6 · B8** — profesionalización sin prisa.
+10. **A4 v2/v3 y D\*** — redes con visión, publicar de verdad y el resto,
+    cuando toque.
 
 ## No hacer (ratificado)
 
