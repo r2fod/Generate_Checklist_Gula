@@ -1512,6 +1512,25 @@ console.log("\n══ Lo primero que dice, si hay algo pendiente (saludoPendient
   const todoJunto = saludoPendientes(avisosNegocio, repasoConAvisos, [{ texto: "Pedir el hielo" }]);
   ok(todoJunto.indexOf("Pedir el hielo") < todoJunto.indexOf("precio"),
     `el recordatorio va delante de los avisos genéricos → "${todoJunto}"`);
+
+  // La personalidad: el CONTENIDO no cambia nunca (son las mismas reglas duras de
+  // siempre), pero la envoltura sí — es lo que hace que la pestaña Humano suene
+  // distinta al cambiar de personalidad ANTES de haber preguntado nada, que es justo
+  // donde vive el selector. Sin esto, "Bromista" y "Directo" sonaban exactamente igual
+  // la primera vez.
+  const recordUno = [{ texto: "Pedir el hielo" }];
+  const conDirecto = saludoPendientes([], null, recordUno, "directo");
+  const conCercano = saludoPendientes([], null, recordUno, "cercano");
+  const conBromista = saludoPendientes([], null, recordUno, "bromista");
+  const conParco = saludoPendientes([], null, recordUno, "parco");
+  ok(conDirecto === "Tenías apuntado: Pedir el hielo.", `directo es el de siempre, sin envolver → "${conDirecto}"`);
+  ok(conCercano !== conDirecto && /Pedir el hielo/.test(conCercano), `cercano suena distinto → "${conCercano}"`);
+  ok(conBromista !== conDirecto && /Pedir el hielo/.test(conBromista), `bromista suena distinto → "${conBromista}"`);
+  ok(conParco !== conDirecto && /Pedir el hielo/.test(conParco), `parco suena distinto → "${conParco}"`);
+  ok(!conParco.includes("."), `parco es telegráfico, sin puntos → "${conParco}"`);
+  // Sin personalidad (llamada de siempre, sin el cuarto argumento) se comporta como
+  // "directo": nadie que ya llamara a esto sin saber de personalidades se rompe.
+  ok(saludoPendientes([], null, recordUno) === conDirecto, "sin decir personalidad, se comporta como directo");
 }
 
 console.log("\n══ Varias cuentas de Gemini, si la primera se queda sin cuota (clavesGemini) ══");
