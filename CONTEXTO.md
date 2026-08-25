@@ -445,6 +445,7 @@ formularios).
 | `texto.js` | `sinMarcas()` — quita markdown de las respuestas (lo genérico está en `src/texto.js`) |
 | `revision.js` | Reglas de "esto no cuadra". **Puro: lo reusa el Worker** |
 | `sector.js` | Banda del sector (fuentes públicas, sin validar) + `compararRatios()` |
+| `actualizacion.js` | Marca/confirma la actualización pendiente entre recarga y arranque |
 | `Humano.jsx` / `Companero.jsx` | Ocho oficios (cuerpo entero y busto) + Jarvis |
 | `Jarvis.jsx` | El aro: única excepción a "personas, no objetos", pedida así por el dueño |
 | `companeros.js` | LISTA de compañeros + `companeroValido()`, aparte para node |
@@ -1312,6 +1313,69 @@ pero cocina no tiene un ratio único con el que compararla — depende del
 tramo de pax — y margen no es un ratio de cantidad, es una recomendación de
 precio): forzar un número ahí habría sido inventarlo, justo lo que este
 fichero existe para no hacer.
+
+**El aviso de "hay una versión nueva" no decía QUÉ traía, y no se notaba que
+el clic en Actualizar hacía algo.** Dos pedidos seguidos del dueño: que el
+banner enseñe los cambios (bugs arreglados, cosas nuevas) antes de recargar,
+y que el asistente también avise de la actualización, lea los cambios y
+confirme cuando ya se ha aplicado — no solo el banner de arriba, que hay
+quien abre directamente la Charla.
+
+1. **De dónde sale el texto.** Nuevo `src/cambios.js`: una lista a mano, con
+   revisión, no generada — mismo estilo que `precios.js` y `sector.js`.
+   Frases para quien carga el camión ("la voz suena más natural"), no para
+   quien programa ("fix(worker): ..."). La entrada más reciente va primero;
+   `ultimoCambio()` la da suelta. `vite.config.js` la importa y publica sus
+   `cambios` dentro de `version.json` en cada build — solo la última
+   entrada, no el historial entero: es un aviso que se ve de pasada, no una
+   página de notas.
+2. **El banner (App.jsx).** El fetch que ya comparaba `__BUILD_ID__` ahora
+   también lee `cambios` de `version.json` y los pinta en una lista dentro
+   del aviso. El botón "Actualizar" tenía un fallo real de UX: llamaba a
+   `window.location.reload()` sin más, así que en una conexión lenta no se
+   notaba que el clic había hecho algo hasta que la pantalla cambiaba de
+   golpe. Ahora pone el botón en "Actualizando…" (con icono `RefreshCw`
+   girando, `.icono-gira` — genérico, reusa el mismo `@keyframes` que ya
+   tenía `.asis-gira` del asistente) y espera **medio segundo antes de
+   recargar de verdad**. Ese medio segundo no es capricho: la primera
+   versión usaba un doble `requestAnimationFrame` (dos fotogramas, ~32ms)
+   pensando que bastaba con pintar el cambio antes de navegar — y sí se
+   pintaba, pero 32ms es tan imperceptible para una persona como no poner
+   nada, así que no arreglaba lo que se pedía arreglar. `setTimeout(…, 500)`
+   sí se nota.
+3. **El asistente confirma la actualización de verdad, no solo avisa.**
+   Nuevo `src/asistente/actualizacion.js`: `marcarActualizando(id, cambios)`
+   se llama justo antes de recargar y deja dicho a qué build se está
+   actualizando (en `localStorage`, `gula_actualizando_a`); `confirmaSiActualizado(buildActual)`
+   se llama al arrancar y, SOLO si el build de esta carga es justo el que se
+   esperaba, devuelve los cambios y borra la marca — así no se repite la
+   confirmación en cada arranque siguiente, y si la recarga no llegó a
+   aplicar la versión nueva (sin conexión, caché) no se inventa una
+   confirmación que no ha pasado. `avisosConfig.js` → `saludoPendientes()`
+   gana un quinto parámetro, `avisoActualizacion` (`{ cambios, aplicada }`):
+   compone "Hay una actualización disponible: …" o "Me acabo de
+   actualizar: …" según el momento, y va el PRIMERO de todo el saludo — es
+   lo más reciente que le ha pasado a la app. Como el resto de este
+   fichero, es determinista y sin nube: si `vozActiva` está puesta, se lee
+   en voz alta igual que cualquier otro saludo, sin cablear nada nuevo para
+   eso.
+4. **Cableado.** `contextoDelAsistente()` (contexto.js) gana el campo
+   `avisoActualizacion`, sin recorte (no lleva nada sensible, son las
+   mismas frases del banner). App.jsx lo calcula: `actualizacionAplicada`
+   se comprueba UNA vez al montar (`useState(() => confirmaSiActualizado(__BUILD_ID__))`);
+   si no hay nada que confirmar, se mira si hay una versión nueva esperando
+   y se compone el aviso "pendiente" en su lugar — nunca los dos a la vez,
+   uno es consecuencia del otro.
+
+**Cazado en pruebas, no a ojo:** intentar anular `window.location.reload`
+desde un test (`window.location.reload = () => {}`) no lanza pero tampoco
+hace nada — Chromium lo trata como "unforgeable" (protección del propio
+navegador). La primera versión de la prueba se quedó callada ahí (el clic
+disparaba una recarga de verdad, la página volvía al estado inicial, y la
+prueba veía "Actualizar" en vez de "Actualizando…" sin explicar por qué).
+Arreglado aprovechando el medio segundo de margen real: el test pulsa,
+espera bien por debajo de esos 500ms y comprueba el estado intermedio, y
+LUEGO espera a que la recarga de verdad llegue sola.
 
 ## Decidido NO hacer (y por qué)
 

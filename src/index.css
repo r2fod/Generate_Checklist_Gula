@@ -4962,6 +4962,24 @@ hr {
   padding: 8px 18px;
 }
 
+.version-nueva-btn:disabled { opacity: 0.7; cursor: wait; }
+
+/* Genérico, no solo del botón de actualizar: cualquier icono de "esto está en marcha"
+   fuera del asistente (que ya tiene el suyo, .asis-gira). Reusa el mismo giro. */
+.icono-gira { animation: asis-girar 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .icono-gira { animation: none; } }
+
+/* Qué trae la versión nueva: mismo tono que .cambios-remotos-detalle span, en lista
+   para que cada cambio se lea suelto y no como un párrafo corrido. */
+.version-nueva-cambios {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--text-main);
+}
+.version-nueva-cambios li { margin-top: 2px; }
+
 /* ─── ZONAS TÁCTILES EN MÓVIL ──────────────────────────────────────────────────
    Medido: 71 botones y casillas por debajo de 32px de alto o ancho — los ✎/✕ de cada
    item median 27px y las casillas 16-20px, cuando lo cómodo son 44. Cargando un camión

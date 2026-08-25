@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
+import { ultimoCambio } from './src/cambios.js'
 
 // Identificador de esta compilación. Va DENTRO del bundle y también se publica en
 // version.json, así la app puede comparar lo que tiene cargado con lo que hay en el
@@ -17,10 +18,13 @@ export default defineConfig({
     {
       name: 'gula-version',
       generateBundle(_opciones, bundle) {
+        // Los cambios de ESTA compilación, para el aviso de "hay una versión nueva":
+        // solo la entrada más reciente de cambios.js, no el historial entero — es un
+        // aviso que se ve de pasada antes de recargar, no una página de notas.
         this.emitFile({
           type: 'asset',
           fileName: 'version.json',
-          source: JSON.stringify({ id: BUILD_ID }),
+          source: JSON.stringify({ id: BUILD_ID, cambios: ultimoCambio()?.cambios || [] }),
         })
         // Lista de ficheros de ESTA compilación, para que el service worker pueda
         // guardárselos al instalarse. Sin esto no llega a verlos: se registra cuando la

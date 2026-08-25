@@ -42,6 +42,7 @@ import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESO
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
 import { PERSONAS_POR_PAELLA } from "../paella.js";
 import { SECTOR, compararRatios } from "../asistente/sector.js";
+import { CAMBIOS, ultimoCambio } from "../cambios.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
 let pasan = 0;
@@ -1798,6 +1799,29 @@ console.log("\n══ El sector, como banda de sanidad ══");
   // Los ratios propios de la casa que sector.js compara existen de verdad en sus
   // ficheros — que sector.js no se quede comparando contra un número que ya no existe.
   ok(PERSONAS_POR_PAELLA === 30, "la paella sigue en paella.js con el mismo valor que documenta sector.js");
+}
+
+console.log("\n══ Qué ha cambiado, para quien lo usa ══");
+{
+  // La más reciente es la PRIMERA: es lo que enseña ultimoCambio(), y es lo único que
+  // vite.config.js publica en version.json — un cambio mal ordenado se enseñaría como
+  // "lo nuevo" sin serlo.
+  ok(ultimoCambio() === CAMBIOS[0], "ultimoCambio() es la primera entrada de la lista");
+  ok(Array.isArray(ultimoCambio().cambios) && ultimoCambio().cambios.length > 0,
+    "la entrada más reciente trae al menos un cambio");
+
+  // Cada entrada tiene fecha AAAA-MM-DD y una lista de frases no vacías: un hueco en
+  // blanco ahí se vería como una línea vacía en el aviso de "hay una versión nueva".
+  const fechaValida = (f) => /^\d{4}-\d{2}-\d{2}$/.test(f);
+  ok(CAMBIOS.every(e => fechaValida(e.fecha)), "todas las entradas llevan fecha AAAA-MM-DD");
+  ok(CAMBIOS.every(e => Array.isArray(e.cambios) && e.cambios.length > 0 && e.cambios.every(c => c.trim().length > 0)),
+    "y ninguna se ha quedado con la lista de cambios vacía o con una frase en blanco");
+
+  // Orden: más reciente primero. Con solo una entrada esto es trivialmente cierto, pero
+  // la prueba está para el día que haya dos y alguien las escriba en el orden que no es.
+  const fechas = CAMBIOS.map(e => e.fecha);
+  ok(JSON.stringify(fechas) === JSON.stringify([...fechas].sort().reverse()),
+    "las entradas están ordenadas de más reciente a más antigua");
 }
 
 console.log("\n══ Las pantallas gordas llegan tarde, pero con red debajo ══");

@@ -88,6 +88,7 @@ const CalendarioEnChecklist = React.lazy(() => import("./calendario/EnChecklist.
 // habría sido copiar todo eso. Lo copiado se separa; ya nos pasó con el espejo de la nube.
 import BotonAsistente from "./asistente/BotonAsistente.jsx";
 import { contextoDelAsistente, eventoAbierto } from "./asistente/contexto.js";
+import { marcarActualizando, confirmaSiActualizado } from "./asistente/actualizacion.js";
 // Qué checklists tocan crear de los eventos que ya se acercan. Va en apuntes.js (y no
 // aquí) porque es lo que sabe el CALENDARIO: qué apuntes se acercan, cuáles ya tienen
 // checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
@@ -689,6 +690,23 @@ export default function App({ onCerrarSesion } = {}) {
   // version.json del servidor (pidiéndolo sin caché) al abrir, al volver a la pestaña
   // y cada 10 minutos. Si no hay conexión, no se dice nada.
   const [versionNueva, setVersionNueva] = useState(false);
+  // Qué trae la versión nueva, en frases para quien la usa (ver cambios.js). Aparte de
+  // versionNueva porque uno es "hay algo" y el otro es "qué es": sin cambios.length no
+  // se pinta la lista, pero el aviso sigue saliendo igual.
+  const [cambiosNuevaVersion, setCambiosNuevaVersion] = useState([]);
+  // El id de la versión nueva, para poder marcar "a esto me estoy actualizando" justo
+  // antes de recargar (ver actualizacion.js) — sin esto, el arranque de después no
+  // tiene con qué comparar para saber si la actualización llegó de verdad.
+  const [idNuevaVersion, setIdNuevaVersion] = useState(null);
+  // Si esta carga ES la que se esperaba tras pulsar Actualizar: se comprueba UNA vez al
+  // montar, con el build de ahora mismo, y se borra la marca en cuanto se comprueba —
+  // no es una función que se pueda seguir llamando después, sino la respuesta a "¿la
+  // actualización que se pidió antes de recargar ha llegado?".
+  const [actualizacionAplicada] = useState(() => confirmaSiActualizado(__BUILD_ID__));
+  // Feedback de que el clic en "Actualizar" ha registrado: recargar tarda un momento
+  // (más en 4G), y sin esto no se notaba que había pasado algo hasta que la pantalla
+  // parpadeaba de golpe.
+  const [actualizando, setActualizando] = useState(false);
   // Los eventos ya pasados se ocultan por defecto: la lista principal muestra solo los
   // PENDIENTES (fecha futura, el más cercano arriba; los sin fecha al final). Los pasados
   // quedan detrás de un "Ver pasados" para no perder el acceso a ellos.
@@ -1583,8 +1601,12 @@ export default function App({ onCerrarSesion } = {}) {
         // versión nueva dejaría de saltar sin que se notara.
         const r = await fetch(`../version.json?t=${Date.now()}`, { cache: "no-store" });
         if (!r.ok) return;
-        const { id } = await r.json();
-        if (!cancelado && id && id !== __BUILD_ID__) setVersionNueva(true);
+        const { id, cambios } = await r.json();
+        if (!cancelado && id && id !== __BUILD_ID__) {
+          setVersionNueva(true);
+          setCambiosNuevaVersion(Array.isArray(cambios) ? cambios : []);
+          setIdNuevaVersion(id);
+        }
       } catch (e) { /* sin conexión o servida desde fichero: se ignora */ }
     };
     comprobar();
@@ -3056,6 +3078,14 @@ export default function App({ onCerrarSesion } = {}) {
                   onRecordar: handleRecordar,
                   onOlvidar: handleOlvidar,
                   onUsoMemoria: handleUsoMemoria,
+                  // Lo primero: si esta carga es la actualización que se pidió, se
+                  // confirma UNA vez (actualizacionAplicada ya viene calculado al
+                  // montar). Si no, y hay una versión nueva esperando, se avisa de
+                  // ella — nunca las dos cosas a la vez, la una es consecuencia de
+                  // la otra.
+                  avisoActualizacion: actualizacionAplicada
+                    ? { cambios: actualizacionAplicada, aplicada: true }
+                    : (versionNueva && cambiosNuevaVersion.length ? { cambios: cambiosNuevaVersion, aplicada: false } : null),
                 })}
               />
             )}
@@ -3159,8 +3189,28 @@ export default function App({ onCerrarSesion } = {}) {
             <div className="cambios-remotos-detalle">
               <strong>⬆️ Hay una versión nueva de la app</strong>
               <span>Tus datos no se tocan: se recarga la página y ya está.</span>
+              {cambiosNuevaVersion.length > 0 && (
+                <ul className="version-nueva-cambios">
+                  {cambiosNuevaVersion.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+              )}
             </div>
-            <button className="btn btn-green version-nueva-btn" onClick={() => window.location.reload()}>Actualizar</button>
+            <button className="btn btn-green version-nueva-btn" disabled={actualizando}
+              onClick={() => {
+                setActualizando(true);
+                // Deja dicho a qué build se está actualizando ANTES de recargar: es lo
+                // único que hace posible que, tras el reload, el asistente sepa que la
+                // actualización llegó y lo confirme (ver actualizacion.js).
+                if (idNuevaVersion) marcarActualizando(idNuevaVersion, cambiosNuevaVersion);
+                // Medio segundo de margen antes de recargar de verdad: no es solo
+                // pintar el cambio (para eso bastaría un requestAnimationFrame), es
+                // que se VEA — un parpadeo de un par de fotogramas es tan imperceptible
+                // como no poner nada, que es justo lo que se quería arreglar.
+                setTimeout(() => window.location.reload(), 500);
+              }}>
+              <RefreshCw size={14} className={actualizando ? "icono-gira" : ""} aria-hidden="true" />
+              {actualizando ? "Actualizando…" : "Actualizar"}
+            </button>
           </div>
         )}
 

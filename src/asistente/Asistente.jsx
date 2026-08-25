@@ -339,7 +339,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // día") entran por la misma puerta: si su fecha ya llegó, se dicen aquí en cuanto se
   // abre el asistente — no hay forma de avisar con la app cerrada, así que esto es lo
   // más cerca que se puede estar de eso.
-  const saludo = saludoPendientes(avisosConfig(), repaso, recordatoriosDeHoy(contexto.tareas || []), personalidad);
+  const saludo = saludoPendientes(avisosConfig(), repaso, recordatoriosDeHoy(contexto.tareas || []), personalidad, contexto.avisoActualizacion);
 
   return (
     <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
