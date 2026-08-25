@@ -25,6 +25,7 @@ const REGLAS = [
   // Mirar y buscar no es lo mismo: buscar es no saber dónde está, mirar es abrirlo.
   { como: /^(ver_|simular)/, gesto: "buscando", frase: "Mirando" },
   { como: /^calcular/, gesto: "calculando", frase: "Sacando" },
+  { como: /^comparar/, gesto: "calculando", frase: "Comparando" },
   { como: /^mensaje/, gesto: "creando", frase: "Escribiendo" },
 ];
 
@@ -44,6 +45,7 @@ const EN_CRISTIANO = {
   calcular_bebida: "la bebida",
   calcular_hielo: "el hielo",
   calcular_personal: "la gente",
+  comparar_con_sector: "con el sector",
   simular_checklist: "una checklist de prueba",
   crear_checklists: "las checklists",
   ver_tareas: "las tareas",

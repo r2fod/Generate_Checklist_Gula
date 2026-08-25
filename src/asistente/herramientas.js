@@ -22,12 +22,15 @@
 import { sinTildes } from "../texto.js";
 import { hoyISO, enDiasISO } from "../fecha.js";
 
-import { calcBebidas, calcHielo } from "../calculos.js";
+import { calcBebidas, calcHielo, KG_HIELO_POR_PAX } from "../calculos.js";
 import { buildChecklist } from "../checklist-generadores.js";
 import { escaletaDelEvento, resumenEscaleta } from "../escaleta.js";
 import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
-import { personalNecesario } from "../personal.js";
+import { personalNecesario, leerRatios } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
+import { RATIOS_BEBIDA } from "../bebida.js";
+import { PERSONAS_POR_PAELLA } from "../paella.js";
+import { compararRatios } from "./sector.js";
 import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
 import { conHerramientasDeConectores } from "./conectores.js";
 import { puede as permiteNivel, NIVEL_POR_DEFECTO } from "./permisos.js";
@@ -300,6 +303,39 @@ export const HERRAMIENTAS = {
       const n = Math.max(0, Math.round(comensales) || 0);
       if (!n) return { error: "Hacen falta los comensales." };
       return personalNecesario(tipo, n);
+    },
+  },
+
+  // Sin dueño: compara ratios generales de la casa (no de ningún evento) contra bandas
+  // públicas del sector. El delta y la banda salen SIEMPRE de sector.js, nunca de la
+  // cabeza del modelo — es la misma regla de oro que el resto de herramientas.
+  comparar_con_sector: {
+    datos: false,
+    esquema: {
+      description: "Compara los ratios propios de la casa (camareros, vino, cerveza, cava, hielo, paella) contra bandas públicas del sector de catering/eventos, para saber si un número está dentro de lo normal, por encima o por debajo. OJO: los ratios medidos con eventos reales (camareros de boda/comunión, hielo, bebida) pueden estar fuera de la banda A PROPÓSITO — no es un fallo, es cómo se trabaja aquí, y ese motivo suele estar comentado en el propio fichero del ratio. Sirve sobre todo para lo que NADIE ha medido todavía (paella, cumpleaños, producción): ahí el sector es la única referencia que hay. Los números del sector son de fuentes públicas, sin validar contra el equipo — dilo si alguien pregunta por su fiabilidad.",
+      parameters: {
+        type: "object",
+        properties: {
+          ratio: { type: "string", description: "Parte del nombre de un ratio concreto (por ejemplo 'paella' o 'hielo'). Vacío para compararlos todos." },
+        },
+      },
+    },
+    corre: (ctx, { ratio = "" } = {}) => {
+      const ratiosCamareros = leerRatios();
+      const actuales = {
+        camareros_banquete: ratiosCamareros.boda,
+        camareros_corporativo: ratiosCamareros.corporativo,
+        vino: RATIOS_BEBIDA.vino,
+        cerveza_verano: RATIOS_BEBIDA.cerveza.verano,
+        cava: RATIOS_BEBIDA.cava,
+        hielo_verano: KG_HIELO_POR_PAX.verano,
+        hielo_invierno: KG_HIELO_POR_PAX.invierno,
+        paella: PERSONAS_POR_PAELLA,
+      };
+      const comparados = compararRatios(actuales)
+        .filter(r => !ratio || normaliza(r.nombre).includes(normaliza(ratio)) || normaliza(r.id).includes(normaliza(ratio)));
+      if (!comparados.length) return { error: `No hay ningún ratio del sector que se parezca a "${ratio}".` };
+      return { ratios: comparados };
     },
   },
 

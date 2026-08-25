@@ -143,6 +143,17 @@ console.log("\n── Consultar de verdad ──");
   ok(ejecutar("calcular_hielo", { comensales: 110, verano: true, horasBarra: 5 }).kg > 0, "y el hielo sale en kilos");
   ok(ejecutar("calcular_bebida", { adultos: 0 }).error, "sin comensales lo dice en vez de devolver ceros");
 
+  // comparar_con_sector: sin dueño, no depende de ningún evento, y los ratios propios
+  // salen de los ficheros de la casa (personal.js, bebida.js, calculos.js, paella.js),
+  // no de un número inventado dentro de la herramienta.
+  const sector = ejecutar("comparar_con_sector", {}, CTX);
+  ok(sector.ratios && sector.ratios.length >= 7, `compara todos los ratios de golpe → ${sector.ratios ? sector.ratios.length : 0}`);
+  ok(sector.ratios.find(r => r.id === "camareros_banquete").tono === "por-debajo",
+    "los camareros de boda/comunión salen 'por-debajo' de la banda del sector, que es la medición real de 19 eventos");
+  const soloPaella = ejecutar("comparar_con_sector", { ratio: "paella" }, CTX);
+  ok(soloPaella.ratios.length === 1 && soloPaella.ratios[0].id === "paella", "filtrando por nombre solo trae ese ratio");
+  ok(ejecutar("comparar_con_sector", { ratio: "unicornios" }, CTX).error, "y un nombre que no existe lo dice, no se inventa una fila");
+
   const ch = ejecutar("ver_checklist", { nombre: "fulanita", categoria: "bebida" }, CTX);
   ok(ch.categorias && ch.categorias.length >= 1 && ch.categorias[0].items.length > 3,
     `una categoría suelta trae sus items → ${ch.categorias ? ch.categorias[0].categoria : "?"}`);
