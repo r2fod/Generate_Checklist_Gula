@@ -1196,6 +1196,27 @@ forma nueva. Cambiada a "¿A qué hora salimos del obrador?" — quita el "hay q
 suena a obligación impuesta, por algo más directo, como lo preguntaría alguien del
 equipo de verdad (Asistente.jsx, la lista de `asis-vacio`).
 
+**En escritorio, la columna de configuración (izquierda) y la lista de conceptos
+(derecha) se mueven con dos scrolls distintos, y no se notaba.** El dueño mandó una
+captura: para ver el final de la configuración (equipamiento, bandejas, nevera...)
+hacía falta poner el ratón encima de esa columna y bajar AHÍ, un gesto distinto del
+que mueve la lista de la derecha (que es el scroll normal de la página). `.config-
+sidebar` es `position: sticky` con su propio `overflow-y: auto` — a propósito, para
+poder cambiar cualquier ajuste sin perder de vista dónde ibas en una lista de 135
+conceptos —, pero sin ningún aviso visual de que seguía habiendo más por debajo (o
+por encima), el panel parecía "cortado" en vez de "con más si sigues bajando".
+Antes de tocar nada se comprobó que no había un TERCER scroll escondido en ningún
+otro sitio de esta pantalla (`.main-layout`, `.checklist-main`, `.category-section`:
+los tres en `overflow-y: visible` o `hidden`, ninguno con scroll propio) — pedido
+explícito del dueño. Arreglado con el truco de "sombras de scroll" sin JS (dos capas
+que tapan el borde y se mueven CON el contenido, `background-attachment: local`, más
+dos sombras que se quedan fijas, `background-attachment: scroll`): la sombra solo
+asoma cuando la capa que la tapa ya se ha desplazado fuera de la vista, que es justo
+cuando de verdad queda algo por ver en esa dirección. Comprobado con Playwright
+leyendo `scrollTop`/`scrollHeight` del panel en tres puntos (arriba del todo, a
+mitad, abajo del todo) contra capturas: arriba del todo no sale sombra por arriba,
+abajo del todo no sale por abajo, y a mitad salen las dos.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
