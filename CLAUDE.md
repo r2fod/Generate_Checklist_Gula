@@ -23,6 +23,10 @@
   (no flat layout jumps). No Framer Motion or any animation library — plain CSS only,
   it's what the entire project already uses.
 - Verification: Passing `build` or unit tests DOES NOT confirm UI state. MUST verify visual screenshots (`CONTEXTO.md`).
+- Unit Tests: EVERY new feature, module or function MUST ship with its unit tests
+  in the SAME commit (node battery: calculos/asistente/sincronización) — not only
+  bug fixes. One test per behavior, with the porqué in its text. Untested code
+  does not merge.
 
 ## ORCHESTRATOR MODE
 <!-- Manejo de tareas complejas y subagentes -->
