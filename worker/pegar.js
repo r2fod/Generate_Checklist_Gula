@@ -446,6 +446,48 @@ async function repasar(env) {
 	await guardarAvisos(env, token, contenido);
 	return contenido;
 }
+const CLAVES_VOZ_GEMINI = [
+	{
+		id: "Kore",
+		nombre: "Kore",
+		tono: "Firme y con seguridad (la de por defecto hasta ahora)"
+	},
+	{
+		id: "Charon",
+		nombre: "Charon",
+		tono: "Clara y explicativa — la más parecida a un asistente tipo Jarvis"
+	},
+	{
+		id: "Sadaltager",
+		nombre: "Sadaltager",
+		tono: "Con aire de autoridad, como quien sabe de lo que habla"
+	},
+	{
+		id: "Umbriel",
+		nombre: "Umbriel",
+		tono: "Tranquila, sin prisa"
+	},
+	{
+		id: "Puck",
+		nombre: "Puck",
+		tono: "Animada y con energía"
+	},
+	{
+		id: "Aoede",
+		nombre: "Aoede",
+		tono: "Fresca y natural"
+	},
+	{
+		id: "Achird",
+		nombre: "Achird",
+		tono: "Cercana, como un compañero más"
+	},
+	{
+		id: "Leda",
+		nombre: "Leda",
+		tono: "Joven y con vida"
+	}
+].map((v) => v.id);
 //#endregion
 //#region worker/index.js
 const CORS = (origen) => ({
@@ -561,9 +603,12 @@ async function gemini(cuerpo, env) {
 	}
 	throw ultimoFallo;
 }
-async function vozDeGemini(texto, env) {
+function vozElegida(vozCliente, env) {
+	return (CLAVES_VOZ_GEMINI.includes(vozCliente) ? vozCliente : null) || env.GEMINI_TTS_VOZ || "Kore";
+}
+async function vozDeGemini(texto, env, vozCliente) {
 	const modelo = env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
-	const voz = env.GEMINI_TTS_VOZ || "Kore";
+	const voz = vozElegida(vozCliente, env);
 	const claves = clavesGemini(env);
 	let ultimoFallo;
 	for (let i = 0; i < claves.length; i++) {
@@ -846,7 +891,7 @@ var worker_default = {
 			const texto = String(cuerpoVoz.texto || "").trim();
 			if (!texto) return json({ error: "Nada que decir." }, 400, origen);
 			try {
-				return json(await vozDeGemini(texto, env), 200, origen);
+				return json(await vozDeGemini(texto, env, String(cuerpoVoz.voz || "")), 200, origen);
 			} catch (e) {
 				return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
 			}
@@ -890,4 +935,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { clavesGemini, worker_default as default };
+export { clavesGemini, worker_default as default, vozElegida };

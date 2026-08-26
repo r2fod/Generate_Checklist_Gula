@@ -19,6 +19,7 @@
 // Cloudflare sin instalar nada. Ver worker/README.md.
 
 import { repasar, DIAS_VISTA } from "./repaso.js";
+import { CLAVES_VOZ_GEMINI } from "../src/asistente/vozGemini.js";
 
 const CORS = (origen) => ({
   "Access-Control-Allow-Origin": origen,
@@ -187,7 +188,17 @@ async function gemini(cuerpo, env) {
 // pasa tal cual junto con la frecuencia real que diga el mimeType, por si Google la
 // cambia algún día sin avisar (como ya ha pasado con nombres de modelo, ver `gemini`
 // arriba).
-async function vozDeGemini(texto, env) {
+// Qué voz usar, en un sitio aparte y exportado para poder probarlo sin llamar a
+// Gemini de verdad — mismo motivo que clavesGemini(). Quien pregunta puede elegir la
+// suya desde los Ajustes del asistente (ver vozGemini.js); validada aquí otra vez —no
+// basta con que el cliente ya la valide, un cliente cualquiera podría mandar lo que
+// quisiera— para no colarle a Gemini un voiceName inventado. Sin elegir ninguna válida,
+// manda GEMINI_TTS_VOZ como hasta ahora, y a falta de eso, "Kore".
+export function vozElegida(vozCliente, env) {
+  return (CLAVES_VOZ_GEMINI.includes(vozCliente) ? vozCliente : null) || env.GEMINI_TTS_VOZ || "Kore";
+}
+
+async function vozDeGemini(texto, env, vozCliente) {
   // Sonaba a voz del navegador incluso con Gemini configurado: el modelo por defecto
   // de antes (gemini-2.5-flash-preview-tts) ya no está — Google lo ha ido moviendo a
   // gemini-3.1-flash-tts-preview (confirmado contra la documentación y el .proto
@@ -198,7 +209,7 @@ async function vozDeGemini(texto, env) {
   // para el chat: el nombre del modelo caduca, así que GEMINI_TTS_MODEL sigue siendo
   // la vía para pisarlo sin tocar código el día que esto también cambie.
   const modelo = env.GEMINI_TTS_MODEL || "gemini-3.1-flash-tts-preview";
-  const voz = env.GEMINI_TTS_VOZ || "Kore";
+  const voz = vozElegida(vozCliente, env);
   const claves = clavesGemini(env);
   let ultimoFallo;
   for (let i = 0; i < claves.length; i++) {
@@ -494,7 +505,7 @@ export default {
       const texto = String(cuerpoVoz.texto || "").trim();
       if (!texto) return json({ error: "Nada que decir." }, 400, origen);
       try {
-        return json(await vozDeGemini(texto, env), 200, origen);
+        return json(await vozDeGemini(texto, env, String(cuerpoVoz.voz || "")), 200, origen);
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
       }

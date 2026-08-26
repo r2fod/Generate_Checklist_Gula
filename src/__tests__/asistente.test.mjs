@@ -29,7 +29,8 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini } from "../../worker/index.js";
+import { clavesGemini, vozElegida } from "../../worker/index.js";
+import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
 import { readFileSync } from "node:fs";
@@ -1598,6 +1599,24 @@ console.log("\n══ Varias cuentas de Gemini, si la primera se queda sin cuota
     "con las tres puestas, se prueban en orden: la principal primero");
   ok(clavesGemini({ GEMINI_API_KEY: "a", GEMINI_API_KEY_3: "c" }).join(",") === "a,c",
     "la _2 es opcional de verdad: sin ella, se salta a la _3 sin dejar un hueco vacío en medio");
+}
+
+console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) ══");
+{
+  ok(CLAVES_VOZ_GEMINI.length === VOCES_GEMINI.length && CLAVES_VOZ_GEMINI.every(id => typeof id === "string" && id.length > 0),
+    "todas las voces curadas tienen un id de verdad");
+  ok(vozGeminiValida("Charon") === "Charon", "una voz de la lista se acepta tal cual");
+  ok(vozGeminiValida("unicornio") === "", "una voz inventada no se cuela: cae en \"\" (automática)");
+  ok(vozGeminiValida("") === "", "vacío sigue siendo vacío, no revienta");
+
+  // vozElegida: quien pregunta manda, si lo que pide es de verdad una de las curadas.
+  ok(vozElegida("Charon", {}) === "Charon", "la voz que pide quien pregunta, si es válida, gana");
+  ok(vozElegida("Charon", { GEMINI_TTS_VOZ: "Umbriel" }) === "Charon",
+    "y gana incluso si el Worker tiene puesta otra por defecto");
+  ok(vozElegida("nombre-inventado", { GEMINI_TTS_VOZ: "Umbriel" }) === "Umbriel",
+    "una voz que el cliente manda pero NO está en la lista no se cuela a Gemini: se ignora, no se rechaza la petición entera");
+  ok(vozElegida("", { GEMINI_TTS_VOZ: "Umbriel" }) === "Umbriel", "sin elegir ninguna, manda GEMINI_TTS_VOZ como hasta ahora");
+  ok(vozElegida("", {}) === "Kore", "y sin nada de nada, cae en \"Kore\", el mismo por defecto de siempre");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

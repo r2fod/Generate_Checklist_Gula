@@ -446,6 +446,7 @@ formularios).
 | `revision.js` | Reglas de "esto no cuadra". **Puro: lo reusa el Worker** |
 | `sector.js` | Banda del sector (fuentes públicas, sin validar) + `compararRatios()` |
 | `actualizacion.js` | Marca/confirma la actualización pendiente entre recarga y arranque |
+| `vozGemini.js` | 8 voces curadas + validación — la misma lista la usa el Worker |
 | `Humano.jsx` / `Companero.jsx` | Ocho oficios (cuerpo entero y busto) + Jarvis |
 | `Jarvis.jsx` | El aro: única excepción a "personas, no objetos", pedida así por el dueño |
 | `companeros.js` | LISTA de compañeros + `companeroValido()`, aparte para node |
@@ -1376,6 +1377,53 @@ prueba veía "Actualizar" en vez de "Actualizando…" sin explicar por qué).
 Arreglado aprovechando el medio segundo de margen real: el test pulsa,
 espera bien por debajo de esos 500ms y comprueba el estado intermedio, y
 LUEGO espera a que la recarga de verdad llegue sola.
+
+**Cada uno puede elegir su voz de Gemini, no una fija para todo el equipo.**
+Tras el arreglo del modelo de voz, el dueño notó que sonaba con "Kore" (voz
+femenina por defecto) y preguntó por una más parecida a Jarvis; buscada la
+tabla de las ~30 voces de Gemini con su carácter (fuente de terceros — los
+dominios oficiales de Google siguen bloqueados desde aquí), la más cercana
+es "Charon" ("informativa y clara"). En vez de solo decir cuál poner a mano
+en Cloudflare, se preguntó si el propio asistente podía dejar elegir, y
+tiene más sentido: antes era UNA voz igual para todo el equipo
+(`GEMINI_TTS_VOZ`), puesta por quien instala el Worker, no por quien habla
+con el asistente cada día.
+
+1. **`src/asistente/vozGemini.js`** (nuevo): un puñado CURADO de 8 voces (no
+   las ~30 — un desplegable con "Sadaltager" y "Zubenelgenubi" sin
+   explicación es ilegible para quien no sabe qué es eso), cada una con su
+   tono en una frase. A mano, con revisión, no generado — mismo estilo que
+   `precios.js`/`sector.js`/`cambios.js`. `vozGeminiValida()` sanea contra
+   la lista; lo que no está en ella cae en `""` ("automática").
+2. **El selector, en Ajustes** (Asistente.jsx): chips iguales a los de nivel
+   y proveedor, con "Automática" (deja mandar al Worker, es el estado de
+   siempre) más las 8 curadas. Se guarda en `localStorage`
+   (`gula_asistente_voz_gemini`), por dispositivo — igual que la
+   personalidad o el nivel de permiso, cada uno el suyo.
+3. **De Ajustes al Worker**: la voz elegida viaja en `nube.voz` (Humano.jsx
+   → `hablar()` → `pedirVozDeNube()`, voz.js) hasta el cuerpo del POST a
+   `/__voz`. En el Worker, **se vuelve a validar contra la MISMA lista**
+   (`worker/index.js` importa `CLAVES_VOZ_GEMINI` directamente de
+   `src/asistente/vozGemini.js` — un único sitio con la lista, sin
+   duplicarla; rolldown la deja inlineada en `pegar.js` igual que ya hace
+   con `repaso.js`): no basta con que el cliente ya la valide, un cliente
+   cualquiera podría mandar lo que quisiera, y colarle a Gemini un
+   `voiceName` inventado tira la petición entera. La lógica de "qué voz
+   manda" se sacó a `vozElegida(vozCliente, env)`, exportada aparte —mismo
+   motivo que `clavesGemini()`: para poder probarla sin llamar a Gemini de
+   verdad—: la del cliente si es válida, si no `GEMINI_TTS_VOZ`, si no
+   "Kore", en ese orden.
+4. **Verificado con capturas** (CLAUDE.md lo exige para cambios visuales):
+   el arnés aislado de Asistente.jsx de siempre, en móvil y escritorio —
+   los 9 chips (Automática + 8) caben en dos filas sin desbordar en
+   ninguno de los dos anchos. Comprobado también por DOM directo que elegir
+   una voz activa su chip, desactiva "Automática", cambia la nota
+   explicativa y se guarda — el primer intento con `getByRole` de
+   Playwright se hizo un lío con dos botones de nombre parecido
+   ("Automático" del proveedor de chat vs "Automática" de la voz) y daba
+   timeouts raros; no era un fallo de verdad, así que se verificó por
+   consulta directa al DOM en vez de perseguir la causa exacta del lío de
+   Playwright.
 
 ## Decidido NO hacer (y por qué)
 

@@ -23,6 +23,7 @@ import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permiso
 import { sinMarcas } from "./texto.js";
 import { queHacerConLaUrl } from "./proxy.js";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
+import { VOCES_GEMINI, vozGeminiValida } from "./vozGemini.js";
 import { avisosConfig, saludoPendientes } from "./avisosConfig.js";
 import Dialogo from "../components/Dialogo.jsx";
 
@@ -35,6 +36,10 @@ import { apunta } from "../diario.js";
 const CLAVE_NIVEL = "gula_asistente_nivel";
 const CLAVE_PERSONALIDAD = "gula_asistente_personalidad";
 const CLAVE_VOZ = "gula_asistente_voz";
+// "" = la que tenga puesta el Worker por defecto (GEMINI_TTS_VOZ). Aparte de CLAVE_VOZ
+// (que es solo el interruptor on/off): se puede tener la voz encendida sin haber
+// elegido ninguna en concreto todavía.
+const CLAVE_VOZ_GEMINI = "gula_asistente_voz_gemini";
 // Qué pestaña se ve. Guardada para que minimizar el reactor (Jarvis, en Humano) y
 // volver a abrir la burbuja deje "como antes" y no siempre en Charla: el panel entero
 // se desmonta al cerrarse (ver BotonAsistente.jsx), así que sin esto se perdía sola.
@@ -86,6 +91,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // permiso sería un cartel, no un permiso.
   const [pendientes, setPendientes] = useState([]);
   const [vozActiva, setVozActiva] = useState(() => leer(CLAVE_VOZ, "1") === "1");
+  const [vozGemini, setVozGemini] = useState(() => vozGeminiValida(leer(CLAVE_VOZ_GEMINI, "")));
   // El historial vive en este navegador: una conversación es de quien la tuvo. Lo que
   // sirve al equipo ya se guarda en el cerebro y en las tareas.
   const [charlas, setCharlas] = useState(() => leerCharlas());
@@ -484,6 +490,39 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               <span className="asis-nota">{NIVELES[nivel].resumen}</span>
             </label>
 
+            {/* La voz de la nube: antes era una elegida a mano en Cloudflare
+                (GEMINI_TTS_VOZ), igual para todo el equipo. Aquí cada uno la suya, sin
+                tocar nada del servidor — "Automática" deja mandar al Worker, como
+                siempre. Solo cambia la voz de Gemini; la del navegador (de respaldo si
+                la nube falla o no hay proxy) sigue siendo la mejor que tenga cada
+                aparato, eso no se elige a mano. */}
+            <label className="asis-campo">
+              <span>Voz de la nube (Gemini)</span>
+              <div className="asis-niveles">
+                <button
+                  type="button"
+                  className={`bebida-chip${!vozGemini ? " es-activa" : ""}`}
+                  onClick={() => { setVozGemini(""); guardar(CLAVE_VOZ_GEMINI, ""); }}
+                  aria-pressed={!vozGemini}
+                >
+                  Automática
+                </button>
+                {VOCES_GEMINI.map(v => (
+                  <button
+                    key={v.id} type="button"
+                    className={`bebida-chip${vozGemini === v.id ? " es-activa" : ""}`}
+                    onClick={() => { setVozGemini(v.id); guardar(CLAVE_VOZ_GEMINI, v.id); }}
+                    aria-pressed={vozGemini === v.id}
+                  >
+                    {v.nombre}
+                  </button>
+                ))}
+              </div>
+              <span className="asis-nota">
+                {vozGemini ? VOCES_GEMINI.find(v => v.id === vozGemini)?.tono : "La que tenga puesta el Worker."}
+              </span>
+            </label>
+
             {/* El compañero se elige en la pestaña Humano, mirándolo a tamaño grande, y
                 no aquí: a 30px las siete siluetas se parecen tanto que había que elegir
                 a ciegas. Y tenerlo en dos sitios era mantener dos elegidores del mismo
@@ -587,6 +626,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               ultimaRespuesta={hilo.length ? ([...hilo].reverse().find(m => m.de === "el")?.texto || "") : (saludo || "")}
               vozActiva={vozActiva}
               onCambiarVoz={(v) => { setVozActiva(v); guardar(CLAVE_VOZ, v ? "1" : "0"); }}
+              vozGemini={vozGemini}
               urlProxy={url}
               personalidad={personalidad}
               onCambiarCompanero={(k) => { setCompanero(k); guardar(CLAVE_COMPANERO, k); }}
