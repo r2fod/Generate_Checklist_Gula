@@ -63,7 +63,7 @@ Firestore.
    | Nombre | Tipo | Qué es |
    |---|---|---|
    | `GEMINI_TTS_MODEL` | Text | Para fijar otro modelo de voz, el día que Google retire el de por defecto (mismo motivo que `GEMINI_MODEL`, arriba) |
-   | `GEMINI_TTS_VOZ` | Text | El nombre de la voz de Gemini (`Kore` por defecto). Google tiene varias, todas en español |
+   | `GEMINI_TTS_VOZ` | Text | El nombre de la voz de Gemini por defecto (`Kore` si no se pone). Cada persona puede elegir la suya desde Ajustes → Voz de la nube en el propio asistente; esto solo manda para quien no ha elegido ninguna |
 
 ## Usar cualquier otro modelo
 

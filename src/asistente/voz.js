@@ -139,14 +139,14 @@ function hablarLocal(texto, { idioma, onEmpieza, onAcaba }) {
 // MISMA sesión de Firebase. No hay clave nueva que configurar: el Worker reutiliza las
 // claves de Gemini que ya tenga puestas para el chat (ver worker/index.js, ruta
 // "/__voz").
-async function pedirVozDeNube(texto, { idioma, url, token, tope = 4000 }) {
+async function pedirVozDeNube(texto, { idioma, url, token, tope = 4000, voz = "" }) {
   const cortar = new AbortController();
   const fuera = setTimeout(() => cortar.abort(), tope);
   try {
     const r = await fetch(`${String(url).replace(/\/+$/, "")}/__voz`, {
       method: "POST",
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ texto, idioma }),
+      body: JSON.stringify({ texto, idioma, voz }),
       signal: cortar.signal,
     });
     if (!r.ok) return null;

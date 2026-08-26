@@ -240,7 +240,7 @@ function useGestos(activo) {
   return gesto;
 }
 
-export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "", onMinimizar }) {
+export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, vozGemini = "", personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "", onMinimizar }) {
   const [oyendo, setOyendo] = useState(false);
   const [dictado, setDictado] = useState("");
   const [aviso, setAviso] = useState("");
@@ -272,10 +272,15 @@ export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto"
       hablar(ultimaRespuesta, {
         onEmpieza: () => setHablando(true),
         onAcaba: () => setHablando(false),
-        nube: urlProxy ? { url: urlProxy, token } : null,
+        nube: urlProxy ? { url: urlProxy, token, voz: vozGemini } : null,
       });
     })();
     return () => { vivo = false; };
+    // urlProxy y vozGemini se leen dentro a propósito sin ir en la lista: este efecto
+    // solo tiene que repetirse cuando llega una respuesta NUEVA o se enciende/apaga la
+    // voz, nunca porque cambie la URL del proxy o la voz elegida en Ajustes mientras la
+    // MISMA respuesta sigue en pantalla — eso releería en voz alta algo que ya se dijo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ultimaRespuesta, vozActiva]);
 
   // Al salir de la pantalla se calla y se suelta el micro. Un asistente que sigue
