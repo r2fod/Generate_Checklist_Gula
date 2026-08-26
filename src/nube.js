@@ -249,20 +249,20 @@ export function suscribirArchivoNube(cb) {
 }
 
 // ─── LOS AJUSTES QUE SON DEL EQUIPO, NO DE UN MÓVIL ───────────────────────────
-// Precios, ratios de personal y factores de bebida son la misma cosa tres veces: un
-// puñado de números que tienen que valer lo mismo para todo el mundo. Si cada uno
-// tuviera los suyos, dos personas mirando el mismo sábado verían que hacen falta 22
-// personas o 28 según quién mire, y el mismo evento costaría 340€ o 410€.
+// Precios, ratios de personal, factores de bebida y factores de hielo son la misma
+// cosa cuatro veces: un puñado de números que tienen que valer lo mismo para todo el
+// mundo. Si cada uno tuviera los suyos, dos personas mirando el mismo sábado verían que
+// hacen falta 22 personas o 28 según quién mire, y el mismo evento costaría 340€ o 410€.
 //
-// Los tres cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
+// Los cuatro cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
 // hace falta tocar firestore.rules, y es lo correcto —esto son ajustes internos, no algo
 // que deba leer quien entra por un enlace compartido. Guardan SOLO lo que
 // alguien ha cambiado, para que una corrección de los valores de partida en una versión
-// nueva siga llegando a todo lo que nadie ha tocado. Y los tres llegan solos desde otro
+// nueva siga llegando a todo lo que nadie ha tocado. Y los cuatro llegan solos desde otro
 // dispositivo: un catálogo que hay que recargar para ver al día es otra vez una hoja
 // suelta.
 //
-// Estaban escritos tres veces, palabra por palabra salvo el nombre del documento y el
+// Estaban escritos cuatro veces, palabra por palabra salvo el nombre del documento y el
 // del campo. Aquí se escriben una.
 function ajusteCompartido(ruta, campo) {
   return {
@@ -319,6 +319,14 @@ const BEBIDA = ajusteCompartido("indice/bebida", "bebida");
 export const guardarBebidaNube = BEBIDA.guardar;
 export const cargarBebidaNube = BEBIDA.cargar;
 export const suscribirBebidaNube = BEBIDA.suscribir;
+
+// Cuánto hielo por tipo de evento respecto a lo que la app carga hoy (ver el factor de
+// calculos.js). La merma por derretimiento salió de una estimación; esto es lo que la
+// vuelve medición: sale del histórico de lo que volvió (en kilos), igual que la bebida.
+const HIELO = ajusteCompartido("indice/hielo", "hielo");
+export const guardarHieloNube = HIELO.guardar;
+export const cargarHieloNube = HIELO.cargar;
+export const suscribirHieloNube = HIELO.suscribir;
 
 // Lo que el asistente ha aprendido del equipo (ver asistente/memoria.js). Es el ajuste
 // compartido más claro de todos: si cada móvil recordara sus cosas, el asistente sabría

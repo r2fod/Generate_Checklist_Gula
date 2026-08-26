@@ -59,8 +59,9 @@ mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `m
 protegida con los dos checks obligatorios, y `worker/pegar.js` vuelto a pegar en
 Cloudflare (confirmado con "Repasar los eventos ahora").
 
-**d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños y la
-calibración del hielo (ver "Pendiente", punto 2). Nadie ha tocado esos números todavía.
+**d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños (ver
+"Pendiente", punto 2). La calibración del hielo ya está montada (ver "Hecho"); solo
+le falta que el equipo marque la vuelta en tres eventos para que el número salga solo.
 
 ## Orden de lectura
 
@@ -602,7 +603,7 @@ el primero no tenía —el punto de logística— es la última fila, y es lo ú
 | **N4** | `firebase.json` + reglas contra el emulador de verdad | Hecho y comprobado contra el motor real (28/28) |
 | **N5** | Observabilidad sin PII, con `__BUILD_ID__` | Hecho: `src/diario.js`, estructurado y con la compilación |
 | **N6** | Tipado gradual (`checkJs`) en los módulos de cálculo | Hecho: 13 ficheros. Cazó tres fallos reales |
-| **—** | **Logística: niños, hielo y contraste con el sector** | **SIN EMPEZAR.** Es el punto 2 del encargo y toca cantidades que salen en el camión |
+| **—** | **Logística: niños, hielo y contraste con el sector** | **En marcha.** El contraste con el sector está montado (A1, ver "Hecho"); el hielo se calibra solo (C2, ver "Hecho"); queda lo de los niños, con datos reales delante |
 
 **Reglas que puso el dueño para todo el plan** (siguen vigentes): no partir `App.jsx` ni
 `index.css`, no cambiar el sistema de estado, no tocar las tres guardias ni la identidad
@@ -636,14 +637,12 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ## Pendiente
 
-**1. Logística: los números que se cargan en el camión — SIN EMPEZAR**
+**1. Logística: los números que se cargan en el camión — en marcha**
 - **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
   eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
   separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
-- **Hielo**: ya sale en kg, bolsas y taxis (1 taxi = 12 bolsas de 2 kg = 24 kg) y ya
-  aplica merma por derretimiento cuando no hay congelador (`MERMA_SIN_CONGELADOR`, 1,35
-  en verano y 1,2 en invierno). Falta **contrastar esos dos números con un evento real**:
-  salieron de una estimación, no de una medición.
+- **Hielo: hecho** (ver "Hecho", C2 del plan). Falta lo que falta siempre: que el
+  equipo marque la vuelta del hielo en tres eventos para que el factor salga medido.
 - **Contrastar los ratios con lo que usa el sector**, para no cargar de más ni quedarse
   corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
   camión, no una constante cualquiera.
@@ -660,6 +659,22 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**C2 del plan — calibración del hielo con lo que volvió — montado.** La merma por
+derretimiento (`MERMA_SIN_CONGELADOR`, 1,35/1,2) era una estimación; ahora se calibra
+contra los eventos reales con el MISMO patrón que la bebida: `calibracionHielo()` en
+`calibracion.js` reutiliza `consumoDeBebida()` tal cual (la línea "Hielo" ya soporta
+cantidad en "Vuelve": true = volvió todo, o los kilos que volvieron), mediana con 3+
+eventos, acotado 0,3–2, y converge (aplicar la sugerencia y volver a medir da 1). El
+factor vive en `calculos.js` (esparcido por tipo, como los de bebida) y multiplica los
+kilos FINALES —después de temporada, barra y merma— para que absorba a la vez "llevamos
+más hielo de lo que dice el manual" y "la merma no es la nuestra". Se ve y se aplica en
+el nuevo PanelHielo del Modo carga (junto al de bebida, donde se mira la vuelta), y
+sube a `indice/hielo` con el mismo `ajusteCompartido` que los demás ajustes (las reglas
+de `indice/{doc}` no se tocaron). `calcular_hielo` del asistente recibe `tipo` para dar
+el MISMO número que la checklist. La banda del sector (A1) sigue comparando el ratio
+base, no el factor: el factor es ajuste del equipo, la banda es referencia. 15
+comprobaciones nuevas, `test:rapido` en verde.
 
 **Migración de precios a Firestore — cerrada, los tres pasos.** `src/precios.js` tenía
 53 precios de compra en el código (repo público → revelaban márgenes). Subidos desde

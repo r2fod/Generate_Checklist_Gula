@@ -95,7 +95,10 @@ export function checklistDeEventoGuardado(ev) {
 // que ya sabe la app —temporada, horas de barra, brindis, niños— sin repetir su cuenta.
 // Y al multiplicar por el factor vigente el ajuste converge: aplicar la sugerencia y
 // volver a medir da 1, no otra corrección encima.
-const MIN_EVENTOS_BEBIDA = 3;
+// Tres y no dos: dos eventos son una anécdota, y cambiar la carga de todo un tipo de
+// evento por dos casos es peor que no tocar nada. El mismo umbral rige lo que se mide
+// con la vuelta: bebida e hielo.
+const MIN_EVENTOS_MEDIR = 3;
 
 // Lo cargado y lo vuelto de un item, buscando la clave con el nombre de categoría tal
 // cual y también renombrado: la marca se guardó con el nombre que la categoría tenía en
@@ -168,7 +171,7 @@ export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) 
   const salida = {};
   Object.entries(proporciones).forEach(([tipo, porBebida]) => {
     Object.entries(porBebida).forEach(([bebida, lista]) => {
-      if (lista.length < MIN_EVENTOS_BEBIDA) return;
+      if (lista.length < MIN_EVENTOS_MEDIR) return;
       const factor = redondeaFactor(mediana(lista) * factorDe(factoresActuales, tipo, bebida));
       if (!esFactorValido(factor)) return;
       if (!salida[tipo]) salida[tipo] = {};
@@ -181,6 +184,36 @@ export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) 
 // Dos decimales: la precisión de "se bebió un 83%" es la que hay, y un 0,8271 en una
 // casilla del panel solo da sensación de exactitud donde no la hay.
 const redondeaFactor = (n) => Math.round(n * 100) / 100;
+
+// ─── CUÁNTO HIELO SE USÓ DE VERDAD ────────────────────────────────────────────
+// La misma cuenta que la bebida, con otro item: la línea "Hielo" ya soporta cantidad en
+// "Vuelve" (true = volvió todo, o los kilos que volvieron), así que no hace falta marcar
+// nada nuevo. Se compara contra la checklist reconstruida —lo que la app cargaría HOY
+// para ese evento, con su temporada, su barra, su merma y su factor vigente— y no
+// contra el ratio pelado: por lo mismo que en la bebida, así queda fuera todo lo que la
+// app ya sabe, y el factor converge (aplicar la sugerencia y volver a medir da 1).
+const ITEM_HIELO = "Hielo";
+export function calibracionHielo(eventosGuardados = {}, factoresActuales = {}) {
+  const proporciones = {};
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.evento || !ev.vueltos) return;
+    if (!TIPOS_BEBIDA.includes(ev.evento)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(ev); } catch (e) { return; }
+    if (!cats.length) return;
+    const r = consumoDeBebida(ev, cats, [ITEM_HIELO]);
+    if (!r) return;
+    (proporciones[ev.evento] ||= []).push(r.consumo / r.carga);
+  });
+  const salida = {};
+  Object.entries(proporciones).forEach(([tipo, lista]) => {
+    if (lista.length < MIN_EVENTOS_MEDIR) return;
+    const factor = redondeaFactor(mediana(lista) * Number(factoresActuales[tipo] || 1));
+    if (!esFactorValido(factor)) return;
+    salida[tipo] = { factor, nEventos: lista.length };
+  });
+  return salida;
+}
 
 // Las categorías con sus cantidades, tal y como saldrían hoy. checklistDeEventoGuardado
 // se queda solo con las etiquetas; la calibración necesita también los números.

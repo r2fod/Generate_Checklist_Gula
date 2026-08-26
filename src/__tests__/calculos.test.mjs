@@ -17,6 +17,7 @@ import {
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
   calcHielo, KG_POR_TAXI, KG_POR_BOLSA,
+  ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo, factorHieloDe,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
@@ -30,7 +31,7 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados }
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
-import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
+import { calibracionBebida, calibracionHielo, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
@@ -1343,6 +1344,97 @@ console.log("\n══ Las mesas de los comensales ══");
   // Un evento sin vueltos, uno con el tipo cambiado a mano y uno vacío no revientan nada
   ok(Object.keys(calibracionBebida({ x: { evento: "boda", pax: 50 }, y: {}, z: { evento: "inventado", vueltos: {} } }, {})).length === 0,
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
+}
+
+// ─── CUÁNTO HIELO SE USÓ DE VERDAD ────────────────────────────────────────────
+{
+  console.log("\n── Calibración de hielo con lo que volvió ──");
+  ponFactoresHielo({});
+
+  // La línea "Hielo" tiene que existir DE VERDAD en una checklist. Si alguien la renombra
+  // en el generador, la calibración deja de encontrarla y se queda callada para siempre —
+  // un fallo que no da error, solo silencio. La misma trampa que las líneas de bebida.
+  const catsH = buildChecklist("boda", 100, 2, 4, 0, { mesVerano: true });
+  const etiquetasH = new Set(catsH.flatMap(c => c.items.filter(Boolean).map(it => it[0])));
+  ok(etiquetasH.has("Hielo"), "la línea de hielo existe en la checklist de verdad");
+
+  // El factor de hielo guarda las mismas reglas que el de bebida: esparcido, acotado, y
+  // poner el neutro lo quita en vez de congelar un 1.
+  const puestoH = conFactorHielo({}, "boda", 1.2);
+  ok(puestoH.boda === 1.2, "conFactorHielo pone el factor");
+  ok(Object.keys(conFactorHielo(puestoH, "boda", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  ok(Object.keys(ponFactoresHielo({ boda: 9, comunion: 1.1 })).length === 1
+      && leerFactoresHielo().comunion === 1.1,
+    "fuera de 0,3–2 se rechaza (un 9 es un dedo resbalando, no un evento)");
+  ok(factoresHieloCambiados({ boda: 0.8 }).boda === 0.8, "y lo sube a la nube limpio");
+  ok(factorHieloDe() === 1 && factorHieloDe("boda") === 1, "sin tocar, todo arranca en 1");
+  ponFactoresHielo({});
+
+  // calcHielo aplica el factor SOLO al tipo al que se le pasó, no a los demás:
+  // dos bodas de 100 pax no pueden cargar hielo distinto por quién las mire.
+  const kgNeutro = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "boda" }).kg;
+  ponFactoresHielo({ boda: 2 });
+  const kgFactor = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "boda" }).kg;
+  const kgOtroTipo = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "comunion" }).kg;
+  ok(kgFactor > kgNeutro, `con factor 2 el kilo sube (${kgNeutro} → ${kgFactor})`);
+  ok(kgOtroTipo === kgNeutro, "y no se lo lleva a otro tipo que nadie ha medido");
+  ponFactoresHielo({});
+
+  // Un evento con la vuelta del hielo apuntada: sale X, vuelve la mitad → se usó la mitad.
+  // La vuelta puede ser en kilos (no solo "true = todo"), y esa es la ventaja frente a
+  // una caja: el hielo se pesa.
+  const eventoH = { evento: "boda", pax: 100, ninos: 0, fechaEvento: "2026-07-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4,
+    mesVerano: true, tipoCongelador: "Mediana" };
+  const catsBodaH = catsDeEventoGuardado(eventoH);
+  const conVueltaHielo = (frac) => {
+    const vueltos = {};
+    catsBodaH.forEach(c => c.items.filter(Boolean).forEach(it => {
+      if (it[0] !== "Hielo") return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${it[0]}`] = String(Math.round(qty * frac));
+    }));
+    return { ...eventoH, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada: dos son una anécdota.
+  const dosH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5) };
+  ok(Object.keys(calibracionHielo(dosH, {})).length === 0, "con dos eventos no se pronuncia");
+
+  const tresH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) };
+  const calH = calibracionHielo(tresH, {});
+  ok(calH.boda && Math.abs(calH.boda.factor - 0.5) < 0.03,
+    `con tres, vuelve la mitad → factor ~0,5 (${calH.boda && calH.boda.factor})`);
+  ok(calH.boda && calH.boda.nEventos === 3, "y dice en cuántos eventos se ha medido");
+
+  // La mediana, no la media: un evento en el que no volvió nada no arrastra al resto.
+  const raroH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5), c: conVueltaHielo(0.5), d: conVueltaHielo(0) };
+  ok(Math.abs(calibracionHielo(raroH, {}).boda.factor - 0.5) < 0.03,
+    "un evento en el que no volvió nada no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+  // Si no, cada visita al panel bajaría el hielo otro tanto hasta dejarlo en nada.
+  ponFactoresHielo({ boda: 0.5 });
+  const yaAjustadoH = { a: conVueltaHielo(0), b: conVueltaHielo(0), c: conVueltaHielo(0) };
+  const segH = calibracionHielo(yaAjustadoH, { boda: 0.5 });
+  ok(segH.boda && Math.abs(segH.boda.factor - 0.5) < 0.03,
+    `con el factor ya puesto y consumo clavado, se queda en 0,5 (${segH.boda && segH.boda.factor})`);
+  ponFactoresHielo({});
+
+  // Sin la vuelta del hielo apuntada no dice nada: adivinar cuánta se usó es peor que
+  // callarse. Y "vuelven más kilos de los que salieron" es imposible y no se cuenta.
+  const sinVueltaH = { ...eventoH, vueltos: { "Bebidas frías::Cava": true } };
+  ok(Object.keys(calibracionHielo({ a: sinVueltaH, b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) }, {})).length === 0,
+    "un evento sin la vuelta del hielo se descarta y quedan dos");
+  const masQueSalió = {};
+  catsBodaH.forEach(c => c.items.filter(Boolean).forEach(it => {
+    if (it[0] === "Hielo") masQueSalió[`${c.nombre}::${it[0]}`] = "9999";
+  }));
+  ok(Object.keys(calibracionHielo({ a: { ...eventoH, vueltos: masQueSalió }, b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) }, {})).length === 0,
+    "y volver más de lo que salió tira el evento entero");
+
+  ponFactoresHielo({});
 }
 
 // ─── LOS MENÚS QUE HAY QUE HACER APARTE ───────────────────────────────────────

@@ -30,6 +30,7 @@ import {
   resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
+  cargarHieloNube, guardarHieloNube, suscribirHieloNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
@@ -68,8 +69,9 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion, calibracionBebida } from "./calibracion.js";
+import { calcularCalibracion, calibracionBebida, calibracionHielo } from "./calibracion.js";
 import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
+import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados } from "./calculos.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
@@ -2006,6 +2008,18 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { vivo = false; corta(); };
   }, [haySesionEquipo]);
 
+  // Lo mismo que la bebida, para el hielo: el factor por tipo de evento que calibra la
+  // merma (una estimación) contra lo que de verdad volvió. Mismo equipo, misma regla.
+  const [factoresHielo, setFactoresHielo] = useState(() => leerFactoresHielo());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresHielo(ponFactoresHielo(remotos)); };
+    cargarHieloNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirHieloNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
   // El cerebro del asistente no se ve en la checklist: espera al rato muerto.
   useSuscripcionDiferida(nubeActiva() && haySesionEquipo, {
     cargar: cargarMemoriaNube,
@@ -2086,12 +2100,26 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  const handleCambiarHielo = (siguiente) => {
+    setFactoresHielo(ponFactoresHielo(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarHieloNube(factoresHieloCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
   // Lo que dice el histórico: de cada evento con la vuelta apuntada sale cuánto se bebió
   // de verdad. Se recalcula solo cuando cambia el archivo o los factores, que es caro
   // —reconstruye la checklist de cada evento guardado— y no cambia por escribir un pax.
   const bebidaMedida = useMemo(
     () => calibracionBebida(eventosGuardados, factoresBebida),
     [eventosGuardados, factoresBebida],
+  );
+
+  // Lo mismo que la bebida, con la vuelta del hielo: cuánto se usó de verdad por tipo.
+  const hieloMedido = useMemo(
+    () => calibracionHielo(eventosGuardados, factoresHielo),
+    [eventosGuardados, factoresHielo],
   );
 
   // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
@@ -2871,6 +2899,9 @@ export default function App({ onCerrarSesion } = {}) {
           factoresBebida={factoresBebida}
           calibracionBebida={bebidaMedida}
           onCambiarBebida={handleCambiarBebida}
+          factoresHielo={factoresHielo}
+          calibracionHielo={hieloMedido}
+          onCambiarHielo={handleCambiarHielo}
           checklist={checklist}
           preparados={preparados}
           marcasRevisar={marcasRevisar}

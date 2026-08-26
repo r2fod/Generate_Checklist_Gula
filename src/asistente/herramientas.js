@@ -267,7 +267,7 @@ export const HERRAMIENTAS = {
   calcular_hielo: {
     datos: false,
     esquema: {
-      description: "Los kilos, bolsas y sacas de hielo que hacen falta. Depende de la temporada, de si hay barra y de si en el sitio hay congelador donde guardarlo.",
+      description: "Los kilos, bolsas y sacas de hielo que hacen falta. Depende de la temporada, de si hay barra y de si en el sitio hay congelador donde guardarlo. Pasa 'tipo' para que salga el mismo número que la checklist (aplicado el factor que el equipo tenga medido para ese tipo).",
       parameters: {
         type: "object",
         properties: {
@@ -275,14 +275,15 @@ export const HERRAMIENTAS = {
           verano: { type: "boolean" },
           horasBarra: { type: "number", description: "Horas de barra en total. 0 si no hay." },
           hayCongelador: { type: "boolean" },
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion. Vacío si no se sabe." },
         },
         required: ["comensales"],
       },
     },
-    corre: (ctx, { comensales = 0, verano = false, horasBarra = 0, hayCongelador = false } = {}) => {
+    corre: (ctx, { comensales = 0, verano = false, horasBarra = 0, hayCongelador = false, tipo = "" } = {}) => {
       const n = Math.max(0, Math.round(comensales) || 0);
       if (!n) return { error: "Hacen falta los comensales." };
-      return calcHielo(n, { mesVerano: !!verano, horasBarra: Number(horasBarra) || 0, tieneCongelador: !!hayCongelador });
+      return calcHielo(n, { mesVerano: !!verano, horasBarra: Number(horasBarra) || 0, tieneCongelador: !!hayCongelador, tipo: String(tipo) });
     },
   },
 
