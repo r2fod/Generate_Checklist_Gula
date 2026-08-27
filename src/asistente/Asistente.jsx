@@ -8,7 +8,7 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy, Paperclip } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
@@ -203,6 +203,22 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       setTimeout(() => setCopiado(x => (x === i ? -1 : x)), 1500);
     } catch (e) { /* sin permiso del portapapeles: el botón se queda como estaba */ }
   };
+  // Captura adjunta (marketing v2): el modelo NO la ve — la ve analizar_captura — y
+  // la imagen viaja en el contexto, nunca en la conversación que se manda. Una por
+  // pregunta: al enviar, se consume.
+  const [captura, setCaptura] = useState(null);
+  const [avisoCaptura, setAvisoCaptura] = useState(null);
+  const inputCaptura = useRef(null);
+  const elegirCaptura = (f) => {
+    if (!f) return;
+    if (!/^image\//.test(f.type || "")) { setAvisoCaptura("Esa no es una imagen: adjunta una captura (jpg o png)."); return; }
+    if (f.size > 8 * 1024 * 1024) { setAvisoCaptura("La imagen pesa demasiado (más de 8 MB): haz la captura en una o dos pantallas."); return; }
+    const lector = new FileReader();
+    lector.onload = () => { setAvisoCaptura(null); setCaptura({ dataUrl: String(lector.result), mime: f.type, nombre: f.name || "captura" }); };
+    lector.onerror = () => setAvisoCaptura("No he podido leer la imagen: prueba con otra captura.");
+    lector.readAsDataURL(f);
+  };
+  const quitarCaptura = () => { setCaptura(null); setAvisoCaptura(null); };
   // Preguntar al Worker que pinge a cada proveedor: enterarse EL VIERNES de que el
   // modelo existe y la clave vale, no el sábado. Cada ping es un mensaje de dos
   // tokens (ver salud() en worker/index.js), y solo se hace al pulsar.
@@ -307,7 +323,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const enviar = async (e, dictado = "") => {
     if (e) e.preventDefault();
     const pregunta = (dictado || texto).trim();
-    if (!pregunta || pensando) return;
+    if ((!pregunta && !captura) || pensando) return;
     // El tope se comprueba ANTES de mandar nada: preguntar y luego decir que no había
     // presupuesto sería haberlo gastado igual.
     if (proveedor !== "auto" && !esGratis(proveedor)) {
@@ -329,10 +345,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         mensajes,
         // El repaso entra en el contexto para que "ver_repaso" lo lea: lo carga este
         // panel de Firestore, no la app, así que no viene en el contexto de fuera.
-        // token y urlProxy para las herramientas que miran fuera (analizar_web):
-        // la url la manda la app, no el modelo, que la inventaría, y el token no
-        // sale del navegador (el contexto no viaja por la red).
-        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir, token, urlProxy: url },
+        // token, urlProxy y captura para las herramientas que miran fuera
+        // (analizar_web, analizar_captura): la url y la imagen las manda la app, no
+        // el modelo, que las inventaría, y el token no sale del navegador (el
+        // contexto no viaja por la red).
+        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir, token, urlProxy: url, captura: captura ? captura.dataUrl : "", capturaMime: captura ? captura.mime : "" },
         url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
@@ -954,13 +971,36 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
         {!ajustes && !verHistorial && pestana === "charla" && (
         <form className="asis-escribir" onSubmit={enviar}>
+          {captura && (
+            <div className="asis-adjunto">
+              <img src={captura.dataUrl} alt="Captura adjunta" />
+              <span className="asis-adjunto-nombre">{captura.nombre}</span>
+              <button type="button" onClick={quitarCaptura} aria-label="Quitar la captura" title="Quitar la captura">
+                <X size={12} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          {avisoCaptura && <p className="asis-adjunto-aviso">{avisoCaptura}</p>}
+          <button
+            type="button" className="asis-clip"
+            onClick={() => inputCaptura.current && inputCaptura.current.click()}
+            disabled={pensando}
+            aria-label="Adjuntar una captura"
+            title="Adjuntar una captura (por ejemplo, tu Instagram o el de la competencia)"
+          >
+            <Paperclip size={15} aria-hidden="true" />
+          </button>
+          <input
+            ref={inputCaptura} type="file" accept="image/*" hidden
+            onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; elegirCaptura(f); }}
+          />
           <input
             className="form-input" type="text" value={texto} placeholder="Escribe tu pregunta"
             aria-label="Pregunta para el asistente"
             onChange={e => setTexto(e.target.value)}
             disabled={pensando}
           />
-          <button type="submit" className="btn" disabled={pensando || !texto.trim()} aria-label="Enviar">
+          <button type="submit" className="btn" disabled={pensando || (!texto.trim() && !captura)} aria-label="Enviar">
             <Send size={15} aria-hidden="true" />
           </button>
         </form>

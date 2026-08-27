@@ -7634,6 +7634,27 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .asis-copiar.es-copiado { opacity: 1; color: var(--green-qty); }
 @media (hover: none) { .asis-copiar { opacity: 0.55; } }
 
+/* Marketing v2: la captura adjunta. Miniatura con su aspa sobre la línea de
+   escribir; el modelo no la ve — la ve analizar_captura (Gemini es el ojo). */
+.asis-adjunto {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 8px;
+  padding: 3px 6px 3px 4px; max-width: 100%;
+  border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg);
+}
+.asis-adjunto img { width: 30px; height: 30px; object-fit: cover; border-radius: 6px; flex: none; }
+.asis-adjunto-nombre { font-size: 0.72rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asis-adjunto button { flex: none; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 3px; border-radius: 5px; transition: color 0.15s; }
+.asis-adjunto button:hover { color: var(--error-texto); }
+.asis-adjunto-aviso { margin: 0 0 8px; font-size: 0.75rem; color: var(--error-texto); }
+.asis-clip {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.asis-clip:hover { color: var(--accent); border-color: var(--accent); }
+.asis-clip[disabled] { opacity: 0.5; cursor: default; }
+
 .asis-salud { margin: 8px 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.5; }
 .asis-salud-ping strong { margin-right: 2px; }
 .asis-salud-ping.es-ok strong { color: var(--green-qty); }

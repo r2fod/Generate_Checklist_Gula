@@ -110,7 +110,7 @@ export async function preguntar({
   const soloSinDatos = ENTRENAN_CON_LO_QUE_LES_LLEGA.includes(proveedor);
   const nivel = contexto.nivel || NIVEL_POR_DEFECTO;
   const herramientas = catalogoParaModelo(soloSinDatos, contexto.conectores || {}, nivel);
-  const conversacion = [...mensajes, { rol: "usuario", contenido: texto }];
+  const conversacion = [...mensajes, { rol: "usuario", contenido: texto || (contexto.captura ? "(ha adjuntado una captura de pantalla)" : "") }];
   const pasos = [];
   // Lo aprendido viaja en cada pregunta; los ids vuelven para poder reforzar lo que de
   // verdad se ha usado, que es lo que separa un recuerdo útil de uno que alguien apuntó
@@ -128,7 +128,13 @@ export async function preguntar({
   // seguir abierta al cruzar la medianoche.
   const hoy = `Hoy es ${hoyISO()} (AAAA-MM-DD). Para "próximos", "esta semana", "lo que viene" o cualquier fecha relativa a hoy, calcúlala desde aquí y pásala como desde/hasta a buscar_eventos o ver_calendario: sin fecha, esas herramientas devuelven TODO lo que hay, pasado incluido.`;
   const conNivel = `${SISTEMA}\n\n${hoy}\n\n${comoContarlo(nivel)}${tono ? `\n\n${tono}` : ""}`;
-  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
+  // Con captura adjunta: el modelo solo recibe texto — la imagen viaja en el
+  // contexto (ctx) y la ve analizar_captura, no él. Sin esta nota intentaría
+  // describir lo que no ve.
+  const conAdjunto = contexto.captura
+    ? `${conNivel}\n\nEl usuario ha adjuntado una captura de pantalla en este mensaje: pásala a analizar_captura (con su pregunta, si la tiene). No intentes describir lo que hay en ella sin llamar a la herramienta: tú no la ves.`
+    : conNivel;
+  const { sistema, ids: recordados } = conMemoria(conAdjunto, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
   const usoTotal = { entrada: 0, salida: 0 };
   // El diario: una línea por ida y vuelta al modelo, no una por pregunta. El total ya
   // se enseña debajo de la respuesta, pero el total no dice DÓNDE se fue: una pregunta

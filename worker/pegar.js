@@ -943,6 +943,35 @@ function extraerWeb(html, url) {
 		preciosVisibles: (texto.match(/[0-9]{1,5}(?:[.,][0-9]{1,2})?\s*€|€\s*[0-9]{1,5}(?:[.,][0-9]{1,2})?/g) || []).slice(0, 10)
 	};
 }
+const PROMPT_OJO = `Eres el ojo del asistente de una empresa de catering. Describe esta captura para una estrategia de captación de clientes: de quién es el perfil o la página, cuántos seguidores si se llega a leer, qué tipo de contenido hay (platos, eventos, equipo, clientes, detrás de cámaras), qué se repite y qué falta para que alguien te pida presupuesto (forma de contactarse, reseñas, precios orientativos, llamada a la acción). En frases cortas y al grano, en español, y sin inventar lo que no se ve: si algo no se distingue, dilo.`;
+async function visionGemini(pregunta, imagenBase64, mime, env) {
+	const claves = clavesGemini(env);
+	if (!claves.length) throw new Error("Sin GEMINI_API_KEY puesta no hay visión: la captura no tiene quién la mire.");
+	const modelo = env.GEMINI_MODEL || "gemini-3.6-flash";
+	const texto = pregunta ? `${PROMPT_OJO}\n\nLo que el usuario quiere saber de ella: ${pregunta}` : PROMPT_OJO;
+	let ultimoFallo;
+	for (const clave of claves) {
+		const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${clave}`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ contents: [{
+				role: "user",
+				parts: [{ text: texto }, { inline_data: {
+					mime_type: mime || "image/jpeg",
+					data: imagenBase64
+				} }]
+			}] })
+		});
+		if (r.ok) {
+			const analisis = (((((await r.json()).candidates || [])[0] || {}).content || {}).parts || []).filter((p) => p.text).map((p) => p.text).join(" ").trim();
+			if (!analisis) throw new Error("Gemini no ha devuelto nada que leer de la imagen.");
+			return analisis;
+		}
+		ultimoFallo = /* @__PURE__ */ new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+		if (r.status !== 429) throw ultimoFallo;
+	}
+	throw ultimoFallo;
+}
 const disponiblesEn = (env) => Object.entries(PROVEEDORES).filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every((k) => env[k])).map(([nombre]) => nombre);
 var worker_default = {
 	async scheduled(evento, env, ctx) {
@@ -1004,6 +1033,25 @@ var worker_default = {
 				return json({ error: `No se ha podido llegar a la web: ${String(e && e.message ? e.message : e).slice(0, 120)}` }, 502, origen);
 			}
 		}
+		if (new URL(req.url).pathname === "/__vision") {
+			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			let cuerpo;
+			try {
+				cuerpo = JSON.parse(await req.text());
+			} catch (e) {
+				return json({ error: "Cuerpo ilegible" }, 400, origen);
+			}
+			const b64 = String(cuerpo.imagen || "").replace(/^data:image\/\w+;base64,/, "");
+			if (!b64) return json({ error: "No hay ninguna imagen que analizar." }, 400, origen);
+			if (b64.length > 8e6) return json({ error: "La imagen pesa demasiado (más de ~6 MB): hazla en una o dos pantallas." }, 413, origen);
+			try {
+				return json({ analisis: await visionGemini(String(cuerpo.pregunta || ""), b64, String(cuerpo.mime || "image/jpeg"), env) }, 200, origen);
+			} catch (e) {
+				return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
+			}
+		}
 		if (new URL(req.url).pathname === "/__voz") {
 			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
 			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
@@ -1062,4 +1110,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { clavesGemini, worker_default as default, extraerWeb, salud, urlAnalizable, vozElegida };
+export { clavesGemini, worker_default as default, extraerWeb, salud, urlAnalizable, visionGemini, vozElegida };

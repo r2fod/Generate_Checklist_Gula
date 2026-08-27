@@ -64,6 +64,8 @@ verifica a nivel de píxel):
    (`.asis-salud`); el motivo de un fallo va tal cual detrás del nombre.
 7. **Botón de copiar en las burbujas del asistente (A4 v1):** aparece al pasar por la
    burbuja (en móvil va siempre a medio opaco) y sale en verde al copiar.
+8. **Clip y miniatura de captura (A4 v2a):** botón del clip en la línea de escribir
+   (misma altura que el input) y la miniatura con su aspa sobre la línea.
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -76,7 +78,7 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **nueve commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **diez commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
 con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
@@ -84,9 +86,10 @@ paquete **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no adivina,
 cabecera corregida y barrido de datos reales en la batería), **B5+B6** (README real y
 salud de proveedores desde Ajustes), **B8** (línea base de pintado en el CI
 nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App de la
-sesión no tiene permiso `workflows`, ver "Hecho") y el **A4 v1** (marketing: análisis
-de webs + estrategia). Detalle y porqués en "Hecho". `test:rapido` en verde (tipos +
-439 calculos + 554 asistente + build + sincronización).
+sesión no tiene permiso `workflows`, ver "Hecho"), el **A4 v1** (marketing: análisis
+de webs + estrategia) y el **A4 v2a** (redes por captura y visión de Gemini).
+Detalle y porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 562
+asistente + build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
@@ -702,12 +705,33 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 - ~~Verificar los 53 precios en `indice/precios` desde otro dispositivo~~ — hecho,
   confirmado por el dueño: llegaron los 53.
 
+**3b. Marketing v2b — estrategia en la nube (A4 del plan).** La parte de capturas ya
+está (v2a). Falta: colección `marketing/` con sus reglas (más simulado y emulador,
+como todo lo demás) para que la estrategia —canales, contenido, puertas— la guarde el
+asistente y la recuerde entre conversaciones en vez de repetirla.
+
 **3. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
 segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**A4 v2a del plan — redes por captura y visión de Gemini — montado.** (La otra
+mitad de v2, la estrategia en la nube, está en "Pendiente".) Instagram y compañía
+no enseñan su contenido a un scraper anónimo (muro de login), así que lo que ve el
+asistente es lo que el usuario le fotografía.
+- Clip en la charla para adjuntar la captura: miniatura con su aspa, tope de 8 MB,
+  una por pregunta (se consume al enviar). La imagen viaja en el CONTEXTO (nunca en
+  la conversación que se manda): el modelo solo recibe texto.
+- `analizar_captura` (conector marketing, solo lectura): el Worker manda la imagen a
+  Gemini — y SOLO a Gemini: la captura puede mostrar clientes en las fotos, y la
+  barrera de datos no se salta por la puerta de atrás. Mismas claves que el chat, con
+  su rotación por cuota; el 404 de modelo retirado llega tal cual.
+- El sistema le dice al modelo, pregunta a pregunta, que hay captura adjunta y que
+  él no la ve (la ve la herramienta): sin esa nota intentaría describir lo que no ve.
+- `pegar.js` regenerado (el CI lo compara byte a byte).
+8 comprobaciones nuevas, `test:rapido` en verde.
 
 **A4 del plan — Marketing v1 (análisis de webs + estrategia) — montado.** El hueco
 por donde el asistente crece en la otra dirección: no los eventos que ya hay, sino

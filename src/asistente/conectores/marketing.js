@@ -1,20 +1,24 @@
 // ─── CONECTOR: MARKETING ──────────────────────────────────────────────────────
 // El hueco por donde el asistente crece en la otra dirección: no solo los eventos
-// que ya hay, sino los que todavía no hay. v1 (A4 del plan) es analizar webs —
-// la propia o la de la competencia— y convertirlo en estrategia; v2 trae las
-// redes sociales por captura del móvil con visión (Instagram no enseña su
-// contenido a un scraper anónimo: el muro de login, ver worker/index.js).
+// que ya hay, sino los que todavía no hay.
 //
-// datos: false, y no por despiste: la extracción es de una web PÚBLICA, no de
-// datos de clientes. Por aquí pasa "la web tiene botón de reserva", no "la boda
-// de García". Lo que se prepara con esto (posts, guiones, planes) se escribe en
-// la conversación, listo para copiar, y en tareas con fecha con apuntar_tarea.
+// v1: analizar webs (la propia o la de la competencia) y convertirlo en estrategia.
+// v2: las redes sociales por captura del móvil: Instagram y compañía no enseñan su
+//     contenido a un scraper anónimo (muro de login), así que lo que ve el asistente
+//     es lo que el usuario le fotografía. El ojo es Gemini (worker: visionGemini),
+//     nunca otro proveedor: la captura puede mostrar clientes en las fotos, y la
+//     barrera de datos no se salta por la puerta de atrás.
+//
+// datos: false, y no por despiste: lo que se analiza es contenido PÚBLICO (una web,
+// la propia o la de la competencia, o la captura que el usuario elige enseñar), no
+// datos de clientes de la app. Lo que se prepara con esto (posts, guiones, planes)
+// se escribe en la conversación, listo para copiar, y en tareas con fecha.
 import { registrarConector } from "../conectores.js";
 
 export default registrarConector({
   id: "marketing",
   nombre: "Marketing",
-  descripcion: "Analizar webs (propia o de la competencia) para la estrategia de captación.",
+  descripcion: "Analizar webs y capturas de redes para la estrategia de captación.",
   escribeFuera: false,
   necesita: [],
   herramientas: {
@@ -52,6 +56,42 @@ export default registrarConector({
           const d = await r.json().catch(() => ({}));
           if (!r.ok || d.error) return { error: d.error || `La web no ha dejado analizarse (${r.status}).` };
           return d;
+        } catch (e) {
+          return { error: `No se ha podido llegar al proxy: ${e && e.message ? e.message : e}` };
+        }
+      },
+    },
+    analizar_captura: {
+      datos: false,
+      esquema: {
+        description: "Analiza la captura de pantalla que el usuario acaba de adjuntar: un perfil de Instagram o TikTok, su rejilla, un post, una página de Google, lo que sea. Describe quién es, qué contenido hay, qué se repite y qué falta para captar clientes. Tú no ves la imagen: la ve esta herramienta, y solo se puede llamar cuando hay captura adjunta en el mensaje.",
+        parameters: {
+          type: "object",
+          properties: {
+            pregunta: { type: "string", description: "Lo que el usuario quiere saber de la captura, si ha dicho algo." },
+          },
+        },
+      },
+      corre: async (ctx, { pregunta = "" } = {}) => {
+        const base = String(ctx.urlProxy || "").replace(/\/+$/, "");
+        if (!base) {
+          return { error: "El asistente no está configurado: falta la dirección del Worker, y sin ella no puede ver capturas." };
+        }
+        if (!ctx.captura) {
+          return { error: "No hay ninguna captura adjunta en este mensaje: que el usuario la adjunte con el clip, al lado del cuadro de escribir." };
+        }
+        try {
+          const r = await fetch(`${base}/__vision`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...(ctx.token ? { authorization: `Bearer ${ctx.token}` } : {}),
+            },
+            body: JSON.stringify({ imagen: ctx.captura, mime: ctx.capturaMime || "image/jpeg", pregunta }),
+          });
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok || d.error) return { error: d.error || `No se ha podido analizar la captura (${r.status}).` };
+          return { analisis: d.analisis };
         } catch (e) {
           return { error: `No se ha podido llegar al proxy: ${e && e.message ? e.message : e}` };
         }

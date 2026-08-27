@@ -31,7 +31,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb, visionGemini } from "../../worker/index.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
@@ -1882,6 +1882,44 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(todas({}).analizar_web, "el conector de marketing encendido en el catálogo");
   ok(!HERRAMIENTAS.analizar_web && todas({}).analizar_web.conector === "marketing",
     "y se sabe que viene del conector, no de casa");
+
+  // ── La captura: el ojo es Gemini, y solo Gemini ──
+  // La captura es de un perfil propio, que puede mostrar clientes en las fotos:
+  // OpenAI entrena con lo que recibe, así que la imagen solo va a Gemini.
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: "Perfil de catering, 2.300 seguidores, platos y eventos." }] } }],
+  }), { status: 200 });
+  const ojo = await visionGemini("¿qué hace bien?", "aW1hZ2VuZmFr", "image/jpeg", { GEMINI_API_KEY: "prueba" });
+  ok(ojo.includes("Perfil de catering"), "Gemini describe la captura y lo que devuelve es lo que llega");
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: "models/bad-model is not found" } }), { status: 404 });
+  let falloOjo = "";
+  try { await visionGemini("", "x", "image/jpeg", { GEMINI_API_KEY: "prueba" }); } catch (e) { falloOjo = e.message; }
+  ok(falloOjo.includes("404") && falloOjo.includes("not found"), "y si el modelo no existe, el 404 llega tal cual");
+  let sinClaveOjo = "";
+  try { await visionGemini("", "x", "image/jpeg", {}); } catch (e) { sinClaveOjo = e.message; }
+  ok(sinClaveOjo.includes("GEMINI_API_KEY"), "sin clave, lo dice en vez de fallar a ciegas");
+
+  // analizar_captura: sin proxy, no configurado; sin captura, lo dice; con los dos,
+  // el análisis llega.
+  ok((await ejecutar("analizar_captura", {}, { ...CTX, captura: "aW1hZ2Vu" })).error
+      .includes("no está configurado"), "sin Worker, lo dice en vez de fallar en silencio");
+  globalThis.fetch = async () => new Response(JSON.stringify({ analisis: "Rejilla de platos y eventos." }), { status: 200 });
+  const sinCaptura = await ejecutar("analizar_captura", {}, { ...CTX, urlProxy: "http://falso.example" });
+  ok(sinCaptura.error && sinCaptura.error.toLowerCase().includes("no hay ninguna captura"), "sin captura, lo dice");
+  const conCaptura = await ejecutar("analizar_captura", { pregunta: "mi instagram" }, { ...CTX, urlProxy: "http://falso.example", captura: "aW1hZ2VuZmFr" });
+  ok(conCaptura.analisis && conCaptura.analisis.includes("Rejilla"), "con captura y proxy, el análisis llega");
+  globalThis.fetch = fetchReal;
+
+  // El sistema le dice al modelo que hay captura: él no la ve, la ve la herramienta.
+  let sistemaConCaptura = "";
+  globalThis.fetch = async (url, opciones) => {
+    sistemaConCaptura = JSON.parse(opciones.body).sistema;
+    return { ok: true, status: 200, json: async () => ({ texto: "Vale." }) };
+  };
+  await preguntar({ texto: "", contexto: { ...CTX, captura: "aW1hZ2Vu" }, url: "http://falso" });
+  ok(sistemaConCaptura.includes("captura") && sistemaConCaptura.includes("analizar_captura"),
+    "con captura adjunta, el sistema le dice que no la ve y qué herramienta la ve");
+  globalThis.fetch = fetchReal;
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
