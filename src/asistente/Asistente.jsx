@@ -8,10 +8,10 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy, Paperclip } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy, Paperclip, Bell, BellOff } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
-import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
+import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube, guardarSuscripcionNube, borrarSuscripcionNube } from "../nube.js";
 import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
 import { porEvento as tareasPorEvento, sinHacer, paraHoy as recordatoriosDeHoy } from "./tareas.js";
@@ -30,7 +30,8 @@ import Dialogo from "../components/Dialogo.jsx";
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
-import { leerTexto, guardarTexto } from "../almacen.js";
+import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
+import { idDeAparato, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "./push.js";
 import { apunta } from "../diario.js";
 
 const CLAVE_NIVEL = "gula_asistente_nivel";
@@ -238,6 +239,78 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       setAvisoSalud({ mal: true, texto: `No se ha podido llegar al proxy: ${e.message}` });
     } finally {
       setProbando(false);
+    }
+  };
+
+  // ─── AVISOS EN ESTE TELÉFONO (PUSH) ──────────────────────────────────────────
+  // Un recordatorio al que le llega el día no puede esperar a que alguien abra la
+  // app: el Worker lo empuja aquí (ver worker/index.js). Esta pantalla solo decide
+  // si este teléfono los recibe: pide permiso, se suscribe con la clave pública del
+  // Worker y sube la suscripción al equipo (indice/push-<id>, ver nube.js). Por
+  // APARATO, como el gasto: el aviso lo recibe el teléfono.
+  const [pushEstado, setPushEstado] = useState(null);   // { activo, mal, texto }
+  const [activandoPush, setActivandoPush] = useState(false);
+  useEffect(() => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushEstado({ activo: false, mal: false, texto: "Este navegador no da avisos." });
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setPushEstado({ activo: false, mal: false, texto: "Los avisos están bloqueados en el navegador: hay que activarlos en la configuración del sitio." });
+      return;
+    }
+    const sus = leerJSON(CLAVE_SUSC, null);
+    setPushEstado({ activo: Notification.permission === "granted" && suscripcionLista(sus), mal: false, texto: "" });
+  }, []);
+  const activarPush = async () => {
+    setActivandoPush(true);
+    try {
+      if (!("Notification" in window) || !("PushManager" in window)) throw new Error("este navegador no da avisos");
+      const permiso = await Notification.requestPermission();
+      if (permiso !== "granted") throw new Error("el navegador no ha dado permiso para avisos");
+      if (!url) throw new Error("falta la dirección del proxy: sin ella, nadie sabe a quién avisar");
+      const token = await tokenDeSesion().catch(() => "");
+      const r = await fetch(`${url.replace(/\/+$/, "")}/__vapid`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.vapidPublico) throw new Error(d.error || "el Worker no tiene los avisos configurados todavía (le falta VAPID_CLAVE)");
+      const registro = await navigator.serviceWorker.getRegistration();
+      if (!registro) throw new Error("no hay service worker registrado: recarga la página y vuelve a probar");
+      const sus = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: clavePúblicaABytes(d.vapidPublico),
+      });
+      const serializada = sus.toJSON ? sus.toJSON() : sus;
+      if (!suscripcionLista(serializada)) throw new Error("la suscripción no ha salido completa");
+      guardarJSON(CLAVE_SUSC, serializada);
+      try {
+        await guardarSuscripcionNube(idDeAparato(localStorage), serializada);
+      } catch (e) {
+        // Sin conexión o sin sesión: se queda en este teléfono y sube en la próxima
+        // vez que se active. El aviso, mientras, no llega; no se finge que sí.
+        setPushEstado({ activo: true, mal: false, texto: "Activado en este teléfono, pero no ha subido al equipo: con conexión y sesión, vuelve a activar para que el Worker la vea." });
+        setActivandoPush(false);
+        return;
+      }
+      setPushEstado({ activo: true, mal: false, texto: "" });
+    } catch (e) {
+      setPushEstado({ activo: false, mal: true, texto: `No se han podido activar los avisos: ${e.message}.` });
+    } finally {
+      setActivandoPush(false);
+    }
+  };
+  const desactivarPush = async () => {
+    setActivandoPush(true);
+    try {
+      const registro = await navigator.serviceWorker.getRegistration();
+      const sus = registro && (await registro.pushManager.getSubscription());
+      if (sus) await sus.unsubscribe();
+      borrarDelAlmacen(CLAVE_SUSC);
+      try { await borrarSuscripcionNube(idDeAparato(localStorage)); } catch (e) { /* sin conexión: se borrará la próxima vez */ }
+      setPushEstado({ activo: false, mal: false, texto: "" });
+    } finally {
+      setActivandoPush(false);
     }
   };
 
@@ -605,6 +678,26 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                 </p>
               </div>
             )}
+
+            {/* ─── AVISOS EN ESTE TELÉFONO (PUSH) ──
+                El recordatorio al que le llega el día no espera a que alguien abra la
+                app: el Worker (ver worker/index.js) lo empuja a este teléfono. Aquí se
+                decide si este aparato los recibe. Por aparato, como el gasto: el aviso
+                lo recibe el teléfono, no la cuenta. */}
+            <div className="asis-repaso-lanzar">
+              <button type="button" className="btn btn-outline" disabled={activandoPush}
+                onClick={pushEstado?.activo ? desactivarPush : activarPush}>
+                {activandoPush
+                  ? <Loader2 size={14} className="asis-gira" aria-hidden="true" />
+                  : pushEstado?.activo ? <Bell size={14} aria-hidden="true" /> : <BellOff size={14} aria-hidden="true" />}
+                {activandoPush ? "Trabajando…" : pushEstado?.activo ? "Avisos activos: desactivar" : "Activar avisos en este teléfono"}
+              </button>
+              {pushEstado && pushEstado.texto && <p className={`asis-explica${pushEstado.mal ? " es-mal" : ""}`}>{pushEstado.texto}</p>}
+              <p className="asis-explica">
+                Cuando a un recordatorio con fecha le llega su día, el teléfono avisa aunque
+                la app esté cerrada. Solo este teléfono, y solo recordatorios con fecha.
+              </p>
+            </div>
 
             {/* Los proveedores, probados de verdad: cada uno contesta a un mensaje de dos
                 tokens y se ve si el modelo existe y la clave vale. Para el viernes antes

@@ -33,6 +33,7 @@ import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
 import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb, visionGemini } from "../../worker/index.js";
 import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
+import { idDeAparato, CLAVE_ID, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "../asistente/push.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
@@ -1962,6 +1963,45 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(ajustes({ que: "guardar_estrategia", datos: e }).guardada, "el aplicador guarda lo que tiene forma");
   ok(ajustes({ que: "guardar_estrategia", datos: { fase: "sin canales" } }).error, "y rechaza lo que no la tiene");
   ok(ajustes({ que: "apuntar_tarea" }) === null, "lo que no es suyo sigue pasándolo a la cadena");
+}
+
+// ─── AVISOS EN ESTE TELÉFONO: LO PURO DEL PUSH (D1a) ──────────────────────────
+{
+  console.log("\n── Avisos en este teléfono (lo puro del push) ──");
+  const almacenFalso = () => {
+    const d = new Map();
+    return { getItem: (k) => (d.has(k) ? d.get(k) : null), setItem: (k, v) => d.set(k, String(v)), removeItem: (k) => d.delete(k) };
+  };
+
+  // El id del aparato: uno por aparato, estable, y no depende de la persona que lo
+  // use (el aviso lo recibe el teléfono, no la cuenta).
+  const a = almacenFalso();
+  const id1 = idDeAparato(a);
+  ok(id1.length >= 8, "el id del aparato se genera");
+  ok(idDeAparato(a) === id1, "y es estable: el mismo teléfono, el mismo id");
+  ok(idDeAparato(almacenFalso()) !== id1, "otro teléfono, otro id");
+  const roto = almacenFalso();
+  roto.setItem(CLAVE_ID, "corto");
+  const regenerado = idDeAparato(roto);
+  ok(regenerado !== "corto" && regenerado.length >= 8, "y un id corrompido se regenera");
+  ok(typeof CLAVE_SUSC === "string" && CLAVE_SUSC.startsWith("gula_push_"), "la suscripción vive en su clave de almacén");
+
+  // La clave pública: base64url → bytes, con el padding repuesto. 65 bytes es lo que
+  // da una clave P-256 sin comprimir, que es lo que pide el navegador.
+  const bytes = new Uint8Array(65);
+  for (let i = 0; i < 65; i++) bytes[i] = i;
+  const b64 = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const deVuelta = clavePúblicaABytes(b64);
+  ok(deVuelta.length === 65 && deVuelta[64] === 64, "la clave pública vuelve a bytes con su longitud (65 de P-256)");
+  ok(clavePúblicaABytes("").length === 0, "y sin clave, cero bytes, no un fallo");
+
+  // Una suscripción usable tiene los cuatro pedazos; sin uno, empujar a ella es tirar
+  // el aviso a la basura.
+  const susOk = { endpoint: "https://fcm.ejemplo/x", expirationTime: 123, keys: { p256dh: "a", auth: "b" } };
+  ok(suscripcionLista(susOk), "una suscripción completa vale");
+  ok(!suscripcionLista({ ...susOk, keys: { p256dh: "a" } }), "sin auth, no vale");
+  ok(!suscripcionLista({ ...susOk, endpoint: "" }), "sin endpoint, no vale");
+  ok(!suscripcionLista(null), "y sin suscripción, no vale");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

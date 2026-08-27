@@ -336,6 +336,29 @@ export const guardarEstrategiaNube = MARKETING.guardar;
 export const cargarEstrategiaNube = MARKETING.cargar;
 export const suscribirEstrategiaNube = MARKETING.suscribir;
 
+// ─── SUSCRIPCIONES DE AVISOS (PUSH), POR APARATO ──────────────────────────────
+// La suscripción de push de un teléfono, para que el Worker (ver worker/index.js)
+// sepa a quién empujar un recordatorio al que le llega el día. Vive en
+// indice/push-<id> —no en una colección nueva— porque la regla de indice/{doc}
+// ya lo cubre con sesión, y el Worker la lee igual que lee los eventos: lista
+// indice y filtra por prefijo (push- como evt_). Por aparato, no por persona: el
+// aviso lo recibe el teléfono.
+export async function guardarSuscripcionNube(idAparato, suscripcion) {
+  const conexion = await getDb();
+  if (!conexion) return 0;
+  const { db, fs } = conexion;
+  const actualizado = Date.now();
+  await fs.setDoc(fs.doc(db, "indice", `push-${idAparato}`),
+    { suscripcion: JSON.stringify(suscripcion), actualizado });
+  return actualizado;
+}
+export async function borrarSuscripcionNube(idAparato) {
+  const conexion = await getDb();
+  if (!conexion) return;
+  const { db, fs } = conexion;
+  await fs.deleteDoc(fs.doc(db, "indice", `push-${idAparato}`));
+}
+
 // Cuánta paella y bandejas por tipo de evento respecto a lo que la app carga hoy (ver
 // comida.js). Mismo patrón: sale del histórico de lo que volvió sin usar, así que tiene
 // que verlo el equipo entero o cada móvil cargaría un camión distinto.
