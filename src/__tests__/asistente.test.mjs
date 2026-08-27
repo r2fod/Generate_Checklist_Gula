@@ -31,7 +31,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb, visionGemini } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves } from "../../worker/index.js";
 import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
 import { idDeAparato, CLAVE_ID, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "../asistente/push.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
@@ -2002,6 +2002,44 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(!suscripcionLista({ ...susOk, keys: { p256dh: "a" } }), "sin auth, no vale");
   ok(!suscripcionLista({ ...susOk, endpoint: "" }), "sin endpoint, no vale");
   ok(!suscripcionLista(null), "y sin suscripción, no vale");
+}
+
+// ─── WORKER: LOS AVISOS DEL DÍA (D1b) ─────────────────────────────────────────
+{
+  console.log("\n── Worker: los avisos del día ──");
+  const hoy = hoyISO();
+  const tareas = [
+    { id: "1", texto: "Comprar hielo", evento: "Boda de prueba", fecha: hoy, hecho: false },
+    { id: "2", texto: "Ya hecha", fecha: hoy, hecho: true },
+    { id: "3", texto: "Para mañana", fecha: enDiasISO(1), hecho: false },
+    { id: "4", texto: "Sin fecha", fecha: "", hecho: false },
+    { id: "5", texto: "De ayer", fecha: enDiasISO(-1), hecho: false },
+  ];
+  const paraHoy = tareasParaPush(tareas, hoy);
+  ok(paraHoy.length === 1 && paraHoy[0].texto === "Comprar hielo",
+    "solo lo que toca HOY y no está hecho: ni lo de mañana, ni el de ayer, ni lo hecho, ni lo sin fecha");
+  ok(tareasParaPush([], hoy).length === 0, "y sin tareas, cero avisos");
+
+  const payload = payloadDeRecordatorio(tareas[0]);
+  ok(payload.url === "./checklist/", "el aviso lleva a la checklist, donde el recordatorio espera en su lista");
+  ok(payload.cuerpo.includes("Boda de prueba"), "y lleva el evento entre paréntesis, para saber de qué es sin abrir la app");
+  ok(payloadDeRecordatorio({ texto: "x".repeat(300) }).cuerpo.length <= 200,
+    "y el cuerpo va acotado: una notificación es una campana, no un documento");
+
+  // Las claves VAPID: sin ellas, el fallo DICE con qué se arregla; con ellas, la
+  // pública sale derivada de la privada (la app no pega nada).
+  ok(vapidClaves({}).fallo, "sin VAPID_CLAVE, lo dice en vez de fallar a ciegas");
+  // El par se genera como lo genera Cloudflare (npx web-push generate-vapid-keys):
+  // base64url, no DER — la privada se pega tal cual y la pública sale derivada.
+  const webpush = (await import("web-push")).default;
+  const par = webpush.generateVAPIDKeys();
+  const pub = vapidClaves({ VAPID_CLAVE: par.privateKey, VAPID_MAILTO: "mailto:gula@ejemplo.com" });
+  ok(pub.publico === par.publicKey,
+    "con el par, la derivada es la MISMA pública que venía en el par (si no, el teléfono no descifra nada)");
+  ok(vapidClaves({ VAPID_CLAVE: par.privateKey.slice(0, 20), VAPID_MAILTO: "mailto:gula@ejemplo.com" }).fallo,
+    "y con una copia TRUNCADA, lo dice en vez de aceptarla: Node la rellenaría de ceros y 'funcionaría' con una clave distinta a la generada (al corregirla después, los teléfonos tendrían que re-suscribirse)");
+  ok(vapidClaves({ VAPID_CLAVE: par.privateKey, VAPID_MAILTO: "gula@ejemplo.com" }).fallo,
+    "y sin el mailto: en el asunto, lo pide en vez de intentarlo a ciegas");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

@@ -78,7 +78,8 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **once commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **trece commits por delante de `main`** (y D1
+añade el push: ver "Hecho"): el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
 con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
@@ -89,7 +90,7 @@ nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App d
 sesión no tiene permiso `workflows`, ver "Hecho"), el **A4 v1** (marketing: análisis
 de webs + estrategia), el **A4 v2a** (redes por captura y visión de Gemini) y el
 **A4 v2b** (estrategia de captación guardada en `indice/marketing`). Detalle y
-porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 577 asistente +
+porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 597 asistente +
 build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
@@ -705,6 +706,11 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 - Ratios de cumpleaños/producción: panel existe, falta medir un evento real.
 - ~~Verificar los 53 precios en `indice/precios` desde otro dispositivo~~ — hecho,
   confirmado por el dueño: llegaron los 53.
+- **En el Worker, para que lleguen los avisos (D1)**: el par VAPID — `VAPID_CLAVE`
+  (Secret) y `VAPID_MAILTO` (una `mailto:`), más la flag `nodejs_compat` marcada a mano.
+  El par se genera con `npx web-push generate-vapid-keys`; el paso a paso, en
+  `worker/README.md`. Mientras no estén, el aviso no se pierde: al abrir la app sale el
+  recordatorio de hoy en su lista (`paraHoy`).
 
 **3. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
@@ -712,6 +718,39 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**D1 del plan — avisos en este teléfono (push) — montado.** El recordatorio al que
+le llega el día no espera a que alguien abra la app: llega al teléfono con la app
+cerrada. Si el teléfono estaba apagado, no pasa nada grave: la app enseña el mismo
+recordatorio al abrirse (`paraHoy` de tareas.js), así que el aviso se retrasa, no
+se pierde.
+- **La parte de la app**: `asistente/push.js` (puro: el id del aparato —uno por
+  teléfono, estable, como el gasto—, la clave pública VAPID en bytes y la validación
+  de una suscripción; el almacén se recibe como parámetro, la excepción de siempre).
+  En Ajustes del asistente, "Activar avisos en este teléfono": permiso → suscripción
+  con la clave pública que da el Worker → suscripción subida al equipo en
+  `indice/push-<id>` (la regla de `indice/{doc}` ya la cubre con sesión: sin tocar
+  reglas, y el Worker la leerá igual que lee los eventos, por prefijo, como `evt_`).
+  Sin conexión, se queda en el teléfono y lo DICE.
+- **El service worker**: los manejadores `push` y `notificationclick` (el payload lo
+  decide el Worker; al tocarlo se vuelve a la checklist). `VERSION` a v5 para que
+  se active en los equipos.
+- **El Worker**: `web-push` (empaquetado por rolldown con el resto, como
+  `revision.js`). `VAPID_CLAVE` (Secret) y `VAPID_MAILTO` como variables del Worker
+  (ver `worker/README.md`; hay UNA casilla que hay que marcar a mano: la flag de
+  compatibilidad `nodejs_compat`, porque `web-push` usa `node:crypto`). La clave
+  pública se DERIVA de la privada (`vapidClaves`) y la app la pide en
+  `/__vapid`: nadie pega nada. La privada se exige de 32 bytes exactos: Node
+  rellenaría de ceros una copia truncada y "funcionaría" con una clave distinta a la
+  generada (al corregirla después, la pública derivada cambiaría y los teléfonos
+  tendrían que re-suscribirse), así que el fallo lo dice y apunta a `npx web-push
+  generate-vapid-keys`. Cada noche, en el cron que ya corre el repaso,
+  `avisosDelDia`: tareas con `fecha === hoy` y no hechas (no `<`: el aviso es para
+  su día, y no se reenvía cada día hasta que se haga) × cada teléfono suscrito, con
+  TTL de 60 s. Que un teléfono no reciba no tumba el resto.
+- Lo puro (`tareasParaPush`, `payloadDeRecordatorio`, `vapidClaves` y `push.js` de
+  la app) tiene pruebas; la orquestación de `avisosDelDia` se prueba en el propio
+  cron (mismo patrón que el repaso).
 
 **A4 v2b del plan — estrategia de captación en la nube — montado.** La estrategia
 (canales, contenido, puertas, fase) es un documento de equipo que el asistente diseña,

@@ -20,6 +20,9 @@
 
 import { repasar, DIAS_VISTA } from "./repaso.js";
 import { CLAVES_VOZ_GEMINI } from "../src/asistente/vozGemini.js";
+import { hoyISO } from "../src/fecha.js";
+import webpush from "web-push";
+import { createECDH } from "node:crypto";
 
 const CORS = (origen) => ({
   "Access-Control-Allow-Origin": origen,
@@ -577,6 +580,139 @@ const disponiblesEn = (env) =>
     .filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every(k => env[k]))
     .map(([nombre]) => nombre);
 
+// ─── LOS AVISOS DEL DÍA (PUSH): EL RECORDATORIO LLEGA AL TELÉFONO ─────────────
+// El cron de cada noche (el mismo que el repaso) empuja los recordatorios a los que
+// les llega el día a cada teléfono suscrito en indice/push-<id> (ver push.js en la
+// app). Sin modelo y sin tokens: es un aviso con título y cuerpo, y el teléfono lo
+// muestra con la app cerrada. Si el teléfono estaba apagado, no pasa nada grave: la
+// app enseña el mismo recordatorio al abrirse (paraHoy en tareas.js), así que el
+// aviso se retrasa, no se pierde.
+//
+// Las claves son VAPID (el estándar de Web Push): la PRIVADA vive aquí como secreto
+// del Worker (VAPID_CLAVE), el asunto (VAPID_MAILTO, un mailto: de dónde viene el
+// aviso) también, y la PÚBLICA se DERIVA de la privada — la app no pega nada, la pide
+// en /__vapid. Para generar el par: npx web-push generate-vapid-keys.
+//
+// web-push usa node:crypto, así que el Worker necesita la compatibilidad Node.js
+// (nodejs_compat) activada en la configuración de Cloudflare: es la única casilla
+// que hay que marcar a mano (ver worker/README.md).
+// Qué toca HOY: fecha === hoy, no < — el recordatorio es para su día y el cron corre
+// una vez al día; con < se reenviaría cada día hasta que se hiciera. Y sin fecha no es
+// recordatorio, es tarea suelta: no toca.
+export function tareasParaPush(tareas = [], hoy) {
+  return (Array.isArray(tareas) ? tareas : [])
+    .filter(t => t && t.fecha === hoy && !t.hecho)
+    .slice(0, 20);   // si el equipo apunta 200 recordatorios para el mismo día, el problema es del día, no 200 notificaciones
+}
+
+// Lo que ve el teléfono. Corto: una notificación es una campana, no un documento. La
+// url lleva a la checklist, donde el recordatorio espera en su lista.
+export function payloadDeRecordatorio(tarea) {
+  const cuerpo = tarea.evento ? `${tarea.texto} (${tarea.evento})` : tarea.texto;
+  return { titulo: "Gula · recordatorio", cuerpo: String(cuerpo).slice(0, 200), url: "./checklist/" };
+}
+
+// Las claves VAPID. Si faltan, el fallo DICE qué falta y con qué se arregla: un Worker
+// sin claves no puede adivinar que le falta una clave.
+export function vapidClaves(env) {
+  const clave = String(env.VAPID_CLAVE || "").trim();
+  const asunto = String(env.VAPID_MAILTO || "").trim();
+  if (!clave) return { fallo: "Falta VAPID_CLAVE en el Worker: generad el par con npx web-push generate-vapid-keys y ponedlo en Settings → Variables." };
+  if (!/^mailto:/i.test(asunto)) return { fallo: "Falta VAPID_MAILTO (una dirección mailto:) en el Worker: es el 'de' del aviso, y Web Push lo pide." };
+  // La pública se deriva de la privada (P-256): así solo se pega una clave y la app
+  // pide la pública en /__vapid. Si la privada no es un P-256 válido, el fallo lo dice.
+  let publico;
+  try {
+    const bytes = Buffer.from(clave, "base64url");
+    // La privada VAPID es un escalar de 256 bits: 32 bytes exactos. Node NO lo
+    // rechaza si es más corta (la rellena de ceros y "funciona"), pero con una
+    // clave DISTINTA a la generada: al corregir la copia truncada después, la
+    // pública derivada cambiaría y los teléfonos tendrían que re-suscribirse.
+    // Mejor rechazarla ya, con la dirección de la solución.
+    if (bytes.length !== 32) throw new Error("tamaño");
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(bytes);
+    publico = ecdh.getPublicKey().toString("base64url");
+  } catch (e) {
+    return { fallo: "VAPID_CLAVE no parece una clave privada VAPID válida (P-256 en base64url, 43 caracteres). Volved a copiarla entera de npx web-push generate-vapid-keys." };
+  }
+  return { publico, clave, asunto };
+}
+
+// Las suscripciones del equipo: los documentos de indice/ con prefijo push-, igual que
+// los eventos se leen con evt_ (mismo paginado que leerEventos en repaso.js).
+async function leerSuscripciones(env, token) {
+  const base = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice`;
+  const lista = [];
+  let pagina = "";
+  for (let vuelta = 0; vuelta < 20; vuelta++) {
+    const url = `${base}?pageSize=300${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ""}`;
+    const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Firestore no deja leer las suscripciones (${(d.error && d.error.message) || r.status}).`);
+    (d.documents || []).forEach(doc => {
+      const id = String(doc.name || "").split("/").pop();
+      if (!id.startsWith("push-")) return;
+      const c = campos(doc);
+      try {
+        const s = JSON.parse(c.suscripcion || "null");
+        if (s && s.endpoint && s.keys) lista.push(s);
+      } catch (e) { /* un documento roto no es un push: se salta y se sigue */ }
+    });
+    if (!d.nextPageToken) break;
+    pagina = d.nextPageToken;
+  }
+  return lista;
+}
+
+// Las tareas apuntadas por el equipo: un único documento (indice/tareas, el mismo que
+// escribe la app). Que no exista todavía no es un fallo: es que nadie ha apuntado nada.
+async function leerTareas(env, token) {
+  const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/tareas`;
+  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!r.ok) return [];
+  const c = campos(await r.json().catch(() => ({})));
+  try { return JSON.parse(c.tareas || "[]"); } catch (e) { return []; }
+}
+
+// Lo que corre el cron: cada recordatorio que toca hoy × cada teléfono suscrito, un
+// aviso. Que un teléfono no reciba (apagado, sin datos) no tumba el resto: se anota y
+// se sigue. TTL corto a propósito: es un aviso de esta mañana, no un correo que espera.
+export async function avisosDelDia(env) {
+  const token = await entrar(env);
+  const claves = vapidClaves(env);
+  if (claves.fallo) return { enviados: 0, fallos: [claves.fallo] };
+  const hoy = hoyISO();
+  const paraHoy = tareasParaPush(await leerTareas(env, token), hoy);
+  if (!paraHoy.length) return { enviados: 0, fallos: [] };
+  const aparatos = await leerSuscripciones(env, token);
+  if (!aparatos.length) return { enviados: 0, fallos: [] };
+  let enviados = 0;
+  const fallos = [];
+  for (const tarea of paraHoy) {
+    const payload = JSON.stringify(payloadDeRecordatorio(tarea));
+    for (const sus of aparatos) {
+      try {
+        // generateRequestDetails hace la criptografía VAPID + RFC 8291 (web-push,
+        // probada) y devuelve la petición lista; el envío va por fetch, que es lo
+        // nativo de Workers (web-push's sendNotification usa node:https, que en
+        // Workers está limitado).
+        const det = webpush.generateRequestDetails(sus, payload, {
+          TTL: 60,
+          vapidDetails: { subject: claves.asunto, publicKey: claves.publico, privateKey: claves.clave },
+        });
+        const r = await fetch(det.endpoint, { method: det.method, headers: det.headers, body: det.body });
+        if (r.ok) enviados++;
+        else fallos.push(`${String(tarea.texto).slice(0, 30)} → HTTP ${r.status}`);
+      } catch (e) {
+        fallos.push(`${String(tarea.texto).slice(0, 30)} → ${(e && e.message) || "fallo sin detalle"}`);
+      }
+    }
+  }
+  if (fallos.length) console.warn(`Avisos: ${fallos.length} sin entregar: ${fallos.slice(0, 5).join(" | ")}`);
+  return { enviados, aparatos: aparatos.length, fallos };
+}
+
 export default {
   // ─── EL REPASO DE LA NOCHE ──────────────────────────────────────────────────
   // Lo dispara el cron de Cloudflare, sin nadie delante. No usa el modelo: son las
@@ -590,6 +726,14 @@ export default {
       repasar(env)
         .then(r => console.log(`Repaso: ${r.eventos.length} eventos con avisos de ${r.mirados} mirados.`))
         .catch(e => console.error(`El repaso ha fallado: ${e && e.message ? e.message : e}`)),
+    );
+    // Los recordatorios a los que les llega el día, a los teléfonos suscritos. Fallar
+    // aquí no tumba el repaso: son dos waitUntils separados, como corresponde a dos
+    // trabajos distintos.
+    ctx.waitUntil(
+      avisosDelDia(env)
+        .then(r => console.log(`Avisos del día: ${r.enviados} avisos entregados${r.fallos && r.fallos.length ? `; ${r.fallos.length} sin entregar` : ""}.`))
+        .catch(e => console.error(`Los avisos del día han fallado: ${e && e.message ? e.message : e}`)),
     );
   },
 
@@ -686,6 +830,18 @@ export default {
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
       }
+    }
+
+    // ─── LA CLAVE PÚBLICA DE LOS AVISOS ──────────────────────────────────────
+    // La app la pide para suscribirse (ver push.js). No es un secreto —es la mitad
+    // pública del par VAPID— pero la pide con sesión como todo lo demás: no es de
+    // cualquiera. Si faltan las claves, el fallo dice con qué se arregla.
+    if (new URL(req.url).pathname === "/__vapid") {
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      const claves = vapidClaves(env);
+      if (claves.fallo) return json({ error: claves.fallo }, 501, origen);
+      return json({ vapidPublico: claves.publico }, 200, origen);
     }
 
     // ─── LA VOZ NATURAL ───────────────────────────────────────────────────────
