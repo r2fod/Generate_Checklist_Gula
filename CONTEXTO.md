@@ -60,6 +60,8 @@ verifica a nivel de píxel):
    el de bebida.
 5. **Sección "Oportunidades" de Cerebro (A2 del plan):** tarjetas con la raya verde
    nueva `es-oportunidad`; solo se pinta con avisos (el caso normal no suena a aviso).
+6. **"Probar los proveedores" en Ajustes (B6):** botón y su lista de estados
+   (`.asis-salud`); el motivo de un fallo va tal cual detrás del nombre.
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -72,14 +74,14 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **seis commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **siete commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
-con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras) y el
-paquete de los pequeños **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no
-adivina, cabecera corregida y barrido de datos reales en la batería). Detalle y
-porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 522 asistente +
-build + sincronización).
+con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
+paquete **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no adivina,
+cabecera corregida y barrido de datos reales en la batería) y **B5+B6** (README real
+y salud de proveedores desde Ajustes). Detalle y porqués en "Hecho". `test:rapido` en
+verde (tipos + 439 calculos + 527 asistente + build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
@@ -701,6 +703,22 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**B5+B6 del plan — README real y salud de proveedores — hechos.**
+- **B5**: `README.md` deja de ser el boilerplate de Vite y dice lo que es el repo
+  para quien llega (las tres apps, el asistente y dónde viven las claves, comandos,
+  nube, pruebas), apuntando a CONTEXTO.md y CLAUDE.md para el detalle.
+- **B6**: la salud de los proveedores se puede comprobar desde Ajustes del
+  asistente. Nuevo `salud()` exportado en `worker/index.js` + ruta `/__salud` (misma
+  sesión y mismo patrón que `/__repaso`): a cada proveedor configurado se le manda un
+  mensaje de DOS tokens y se ve si el modelo existe y la clave vale — el motivo llega
+  tal cual ("Gemini 404: … not found" dice por sí solo que el nombre del modelo ha
+  cambiado; es el fallo que ya ha costado dos veces enterarse a ciegas, con
+  gemini-2.5-flash y el TTS). Sin claves, dice qué falta en cada uno sin gastar ni un
+  token. A demanda (un botón), no en cada pregunta. Lo que NO se hizo: el smoke test
+  en CI — el Worker pide sesión de equipo y su URL no vive en el repo a propósito,
+  así que CI no puede llamarlo sin secretos; el botón del viernes es el mecanismo.
+  `worker/pegar.js` regenerado (CI lo compara byte a byte). 5 comprobaciones nuevas.
 
 **B2+B3+B4+B7 del plan — los pequeños — hechos.**
 - **B2**: la frase de "Solo consultar" es precisa ("No puedes cambiar nada **de la

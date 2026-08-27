@@ -431,6 +431,41 @@ async function estado(env) {
   };
 }
 
+// ─── SALUD DE LOS PROVEEDORES ─────────────────────────────────────────────────
+// Google retiró gemini-2.5-flash "para cuentas nuevas" sin avisar, y el Worker
+// contestó un 404 que no decía nada por qué: el nombre del modelo había caducado.
+// La forma de enterarse es PREGUNTAR antes del sábado, no después: cada proveedor
+// configurado contesta a un mensaje de dos tokens y se ve si el modelo existe y la
+// clave vale. A demanda (alguien pulsa el botón de Ajustes), no en cada pregunta —
+// cada ping cuesta unos pocos tokens.
+//
+// Exportada para probarla en la batería: la parte de fetch se queda lo más fina
+// posible, y lo que sí se comprueba a fondo es lo que pasa cuando hay o no claves.
+export async function salud(env) {
+  const pings = [];
+  for (const [nombre, p] of Object.entries(PROVEEDORES)) {
+    const falta = [p.clave, p.ademas].filter(Boolean).filter(k => !env[k]);
+    if (falta.length) {
+      pings.push({ nombre, estado: "sin configurar", falta: falta.join(" y ") });
+      continue;
+    }
+    try {
+      const r = await p.habla(env)({
+        mensajes: [{ rol: "usuario", contenido: "Di solo: ok" }],
+        sistema: "",
+        herramientas: [],
+      });
+      pings.push({ nombre, estado: "ok", contesta: String(r.texto || "").slice(0, 40) });
+    } catch (e) {
+      // El motivo tal cual: "Gemini 404: … not found" dice por sí solo que el modelo
+      // ha cambiado, y un 401 que la clave no vale. Interpretarlo es peor que
+      // enseñarlo, que es lo que ha costado enterarse de las otras dos veces.
+      pings.push({ nombre, estado: "error", motivo: String(e && e.message ? e.message : e) });
+    }
+  }
+  return { pings };
+}
+
 // Qué proveedores están de verdad utilizables con lo que hay configurado. La app lo
 // necesita para poder elegir sola: sin esto tendría que adivinar, y adivinar mal
 // significa mandar la pregunta a un proveedor sin clave y comerse el error.
@@ -482,6 +517,22 @@ export default {
       if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
       try {
         return json({ ...(await repasar(env)), dias: DIAS_VISTA }, 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+      }
+    }
+
+    // ─── PROBAR LOS PROVEEDORES ──────────────────────────────────────────────
+    // Misma sesión que el resto, mismo patrón que /__repaso (y por las mismas
+    // razones: el navegador manda un OPTIONS antes, y la respuesta va por json()
+    // con sus cabeceras). Sirve para comprobar EL VIERNES que el modelo existe y
+    // la clave vale, no el sábado en plena carga del camión.
+    if (new URL(req.url).pathname === "/__salud") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      try {
+        return json(await salud(env), 200, origen);
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
       }

@@ -188,6 +188,30 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     }
   };
 
+  const [probando, setProbando] = useState(false);
+  const [avisoSalud, setAvisoSalud] = useState(null);
+  // Preguntar al Worker que pinge a cada proveedor: enterarse EL VIERNES de que el
+  // modelo existe y la clave vale, no el sábado. Cada ping es un mensaje de dos
+  // tokens (ver salud() en worker/index.js), y solo se hace al pulsar.
+  const probarProveedores = async () => {
+    setProbando(true);
+    setAvisoSalud(null);
+    try {
+      const token = await tokenDeSesion().catch(() => "");
+      const r = await fetch(`${url.replace(/\/+$/, "")}/__salud`, {
+        method: "POST",
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) { setAvisoSalud({ mal: true, texto: d.error || `Ha fallado (${r.status}).` }); return; }
+      setAvisoSalud({ pings: d.pings || [] });
+    } catch (e) {
+      setAvisoSalud({ mal: true, texto: `No se ha podido llegar al proxy: ${e.message}` });
+    } finally {
+      setProbando(false);
+    }
+  };
+
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const [enCurso, setEnCurso] = useState("");
@@ -545,6 +569,36 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                   Lo mismo que hace solo cada noche. Mira los eventos de los próximos 30 días
                   y deja escrito lo que falta por poner; se ve en Cerebro. No usa el modelo,
                   así que no gasta tokens.
+                </p>
+              </div>
+            )}
+
+            {/* Los proveedores, probados de verdad: cada uno contesta a un mensaje de dos
+                tokens y se ve si el modelo existe y la clave vale. Para el viernes antes
+                del fin de semana con eventos, no para el sábado en plena carga. */}
+            {url && (
+              <div>
+                <button type="button" className="btn btn-ghost" onClick={probarProveedores} disabled={probando}>
+                  {probando ? "Probando…" : "Probar los proveedores"}
+                </button>
+                {avisoSalud && (avisoSalud.mal
+                  ? <p className="asis-explica es-mal">{avisoSalud.texto}</p>
+                  : (
+                    <ul className="asis-salud">
+                      {avisoSalud.pings.map(p => (
+                        <li key={p.nombre} className={`asis-salud-ping${p.estado === "ok" ? " es-ok" : p.estado === "error" ? " es-error" : " es-sin"}`}>
+                          <strong>{p.nombre}</strong>
+                          {p.estado === "ok" && <> responde{p.contesta ? ` ("${p.contesta}")` : ""}</>}
+                          {p.estado === "sin configurar" && <> sin configurar (falta {p.falta})</>}
+                          {p.estado === "error" && <> — {p.motivo}</>}
+                        </li>
+                      ))}
+                    </ul>
+                  ))}
+                <p className="asis-explica">
+                  Le manda a cada proveedor un mensaje de dos tokens para comprobar que el
+                  modelo existe y la clave vale. Cada prueba gasta unos pocos tokens de la
+                  cuenta de cada proveedor.
                 </p>
               </div>
             )}

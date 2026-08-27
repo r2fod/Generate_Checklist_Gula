@@ -7621,6 +7621,14 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .cer-aviso em { font-style: normal; color: var(--text-muted); }
 /* Los mismos tres tonos que usa revision.js, y la diferencia importa: "falta" impide
    calcular, "raro" huele mal, "acuérdate" hay que hacerlo fuera de la app. */
+/* El estado de cada proveedor al probarlos: el color del nombre dice el veredicto,
+   el motivo va tal cual detrás (un "Gemini 404: not found" se explica solo). */
+.asis-salud { margin: 8px 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.5; }
+.asis-salud-ping strong { margin-right: 2px; }
+.asis-salud-ping.es-ok strong { color: var(--green-qty); }
+.asis-salud-ping.es-error strong { color: var(--error-texto); }
+.asis-salud-ping.es-sin strong { color: var(--text-muted); }
+
 .cer-aviso.es-falta { border-left-color: var(--error-texto); }
 .cer-aviso.es-raro { border-left-color: var(--aviso-texto-suave); }
 .cer-aviso.es-acuerdate { border-left-color: var(--accent); }

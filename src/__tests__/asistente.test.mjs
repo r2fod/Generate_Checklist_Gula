@@ -31,7 +31,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud } from "../../worker/index.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
@@ -1770,6 +1770,44 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(ajustes({ que: "apuntar_tarea" }) === null, "lo que no es suyo lo pasa al siguiente");
   ok(ajustes({ que: "aplicar_calibracion", datos: { area: "inexistente", tipo: "boda", factor: 1 } }).error,
     "y un área desconocida se dice, no se inventa");
+}
+
+// ─── SALUD DE LOS PROVEEDORES ─────────────────────────────────────────────────
+{
+  console.log("\n── Salud de los proveedores ──");
+  const fetchReal = globalThis.fetch;
+
+  // Nada configurado: ni siquiera pregunta — dice qué falta en cada uno (no ping,
+  // no coste).
+  let llamadas = 0;
+  globalThis.fetch = async () => { llamadas++; throw new Error("no debería llamar a nadie"); };
+  const sinNada = await salud({});
+  ok(sinNada.pings.length === 4 && sinNada.pings.every(p => p.estado === "sin configurar"),
+    "sin claves, dice qué falta en cada proveedor sin gastar ni un token");
+  ok(llamadas === 0, "y de verdad no llamó a nadie");
+
+  // Con la clave y el modelo respondiendo: ok, con la respuesta.
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: "ok" }] } }],
+    usageMetadata: { promptTokenCount: 2, candidatesTokenCount: 1 },
+  }), { status: 200 });
+  const bien = await salud({ GEMINI_API_KEY: "prueba" });
+  ok(bien.pings.find(p => p.nombre === "gemini")?.estado === "ok",
+    "con la clave puesta y el modelo respondiendo, ok");
+
+  // El caso que ha costado dos veces enterarse a ciegas: Google retira un nombre de
+  // modelo sin avisar. El 404 llega TAL CUAL, que es lo que dice qué ha cambiado.
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: { message: "models/gemini-9.9-flash is not found" },
+  }), { status: 404 });
+  const roto = await salud({ GEMINI_API_KEY: "prueba" });
+  const g = roto.pings.find(p => p.nombre === "gemini");
+  ok(g.estado === "error" && g.motivo.includes("404") && g.motivo.includes("not found"),
+    "modelo retirado: el 404 llega tal cual, sin interpretar");
+  ok(roto.pings.find(p => p.nombre === "claude").estado === "sin configurar",
+    "y el que no tiene clave sigue en su sitio, sin confundirse con el roto");
+
+  globalThis.fetch = fetchReal;
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

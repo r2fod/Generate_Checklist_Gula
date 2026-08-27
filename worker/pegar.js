@@ -852,6 +852,42 @@ async function estado(env) {
 		coincide: huella === "353f1b0dd087" ? "✅ SÍ, es la clave correcta" : "❌ NO, la guardada es OTRA clave (¿la de Gemini?)"
 	};
 }
+async function salud(env) {
+	const pings = [];
+	for (const [nombre, p] of Object.entries(PROVEEDORES)) {
+		const falta = [p.clave, p.ademas].filter(Boolean).filter((k) => !env[k]);
+		if (falta.length) {
+			pings.push({
+				nombre,
+				estado: "sin configurar",
+				falta: falta.join(" y ")
+			});
+			continue;
+		}
+		try {
+			const r = await p.habla(env)({
+				mensajes: [{
+					rol: "usuario",
+					contenido: "Di solo: ok"
+				}],
+				sistema: "",
+				herramientas: []
+			});
+			pings.push({
+				nombre,
+				estado: "ok",
+				contesta: String(r.texto || "").slice(0, 40)
+			});
+		} catch (e) {
+			pings.push({
+				nombre,
+				estado: "error",
+				motivo: String(e && e.message ? e.message : e)
+			});
+		}
+	}
+	return { pings };
+}
 const disponiblesEn = (env) => Object.entries(PROVEEDORES).filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every((k) => env[k])).map(([nombre]) => nombre);
 var worker_default = {
 	async scheduled(evento, env, ctx) {
@@ -873,6 +909,16 @@ var worker_default = {
 					...await repasar(env),
 					dias: 30
 				}, 200, origen);
+			} catch (e) {
+				return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+			}
+		}
+		if (new URL(req.url).pathname === "/__salud") {
+			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			try {
+				return json(await salud(env), 200, origen);
 			} catch (e) {
 				return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
 			}
@@ -935,4 +981,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { clavesGemini, worker_default as default, vozElegida };
+export { clavesGemini, worker_default as default, salud, vozElegida };
