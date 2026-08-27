@@ -74,14 +74,17 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **siete commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **ocho commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
 con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
 paquete **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no adivina,
-cabecera corregida y barrido de datos reales en la batería) y **B5+B6** (README real
-y salud de proveedores desde Ajustes). Detalle y porqués en "Hecho". `test:rapido` en
-verde (tipos + 439 calculos + 527 asistente + build + sincronización).
+cabecera corregida y barrido de datos reales en la batería), **B5+B6** (README real y
+salud de proveedores desde Ajustes) y **B8** (línea base de pintado en el CI
+nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App de la
+sesión no tiene permiso `workflows`, ver "Hecho"). Detalle y porqués en "Hecho".
+`test:rapido` en verde (tipos + 439 calculos + 527 asistente + build +
+sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
@@ -703,6 +706,26 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**B8 del plan — línea base de pintado en CI — listo, pendiente de aplicar por el
+dueño.** El trabajo de navegador de `test.yml` ya descargaba chromium y lo dejaba en
+`CHROMIUM_PATH`, pero `medir` nunca se ejecutaba ahí: el único sitio donde se medía
+era el portátil de quien corría la batería. Sin número de referencia no se detecta la
+regresión de pintado, y sin detección la regla de "no optimizar sin número" se queda
+a medio hacer. El cambio son tres líneas al final del trabajo `navegador`, pero la
+App de la sesión NO PUEDE subirlo: GitHub rechaza el push cuando una App sin
+permiso `workflows` toca `.github/workflows/` (el mismo motivo por el que los ymls
+vivieron en `ci/` y se movieron a mano). El dueño lo aplica desde la web de GitHub
+(`test.yml` → editar → después de la línea de `app.test.mjs`):
+
+```yaml
+      # Línea base de pintado (B8 del plan): el número que convierte "¿va más lento
+      # que antes?" en un hecho. Va aquí, no en cada push, porque necesita chromium.
+      - run: npm run medir
+```
+
+Aplicado, el log del trabajo nocturno muestra la rejilla con 250 apuntes, el cambio
+de mes y el abrir del asistente; lo que se compara es ese log contra el anterior.
 
 **B5+B6 del plan — README real y salud de proveedores — hechos.**
 - **B5**: `README.md` deja de ser el boilerplate de Vite y dice lo que es el repo
