@@ -329,6 +329,13 @@ export const guardarHieloNube = HIELO.guardar;
 export const cargarHieloNube = HIELO.cargar;
 export const suscribirHieloNube = HIELO.suscribir;
 
+// La estrategia de captación (ver asistente/estrategia.js). Mismo patrón: ajuste de
+// equipo en indice/, lo lee y lo actualiza el asistente, y lo ve todo el equipo.
+const MARKETING = ajusteCompartido("indice/marketing", "estrategia");
+export const guardarEstrategiaNube = MARKETING.guardar;
+export const cargarEstrategiaNube = MARKETING.cargar;
+export const suscribirEstrategiaNube = MARKETING.suscribir;
+
 // Cuánta paella y bandejas por tipo de evento respecto a lo que la app carga hoy (ver
 // comida.js). Mismo patrón: sale del histórico de lo que volvió sin usar, así que tiene
 // que verlo el equipo entero o cada móvil cargaría un camión distinto.

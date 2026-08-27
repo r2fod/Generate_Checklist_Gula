@@ -32,6 +32,7 @@ import {
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
   cargarHieloNube, guardarHieloNube, suscribirHieloNube,
   cargarComidaNube, guardarComidaNube, suscribirComidaNube,
+  cargarEstrategiaNube, guardarEstrategiaNube, suscribirEstrategiaNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
@@ -74,6 +75,7 @@ import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionCo
 import { ponFactores, leerFactores, factoresCambiados, conFactor } from "./bebida.js";
 import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo } from "./calculos.js";
 import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados, conFactorComida } from "./comida.js";
+import { saneaEstrategia } from "./asistente/estrategia.js";
 import { oportunidadesNegocio } from "./asistente/revision.js";
 import { aplicarEnAjustes } from "./asistente/escrituraAjustes.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
@@ -2132,6 +2134,27 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  // La estrategia de captación: documento de equipo (no por aparato), lo lee y lo
+  // actualiza el asistente. Sin conexión o sin sesión, null: el asistente lo dice.
+  const [estrategia, setEstrategia] = useState(null);
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remota) => { if (vivo) setEstrategia(remota || null); };
+    cargarEstrategiaNube().then(aplicar).catch(() => { /* sin conexión: sin estrategia */ });
+    const corta = suscribirEstrategiaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+  const handleCambiarEstrategia = (nueva) => {
+    const sana = saneaEstrategia(nueva);
+    if (!sana) return { error: "Esa no tiene forma de estrategia: faltan canales, contenido, puertas o fase." };
+    setEstrategia(sana);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarEstrategiaNube(sana).catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+    return { guardada: true, actualizada: sana.actualizada };
+  };
+
   // Lo que dice el histórico: de cada evento con la vuelta apuntada sale cuánto se bebió
   // de verdad. Se recalcula solo cuando cambia el archivo o los factores, que es caro
   // —reconstruye la checklist de cada evento guardado— y no cambia por escribir un pax.
@@ -3137,6 +3160,9 @@ export default function App({ onCerrarSesion } = {}) {
                   memoria,
                   objetivos,
                   tareas,
+                  // La estrategia de captación, si la hay: para proponer marketing sin
+                  // contradecir lo acordado (ver asistente/estrategia.js).
+                  estrategia,
                   // Mismos números que la ficha del Resumen (totalConceptos/itemsCargados/
                   // itemsPreparados/itemsVueltos): así el asistente puede contestar "cuánto
                   // llevo cargado" con lo que hay de verdad en pantalla, no un recuento
@@ -3173,6 +3199,7 @@ export default function App({ onCerrarSesion } = {}) {
                         handleCambiarComida(conFactorComida(factoresComida, tipo, clave, factor));
                         return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
                       },
+                      aplicarEstrategia: (datos) => handleCambiarEstrategia(datos),
                     }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),

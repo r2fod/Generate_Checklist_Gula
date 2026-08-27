@@ -32,6 +32,7 @@ import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
 import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb, visionGemini } from "../../worker/index.js";
+import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
@@ -1920,6 +1921,47 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(sistemaConCaptura.includes("captura") && sistemaConCaptura.includes("analizar_captura"),
     "con captura adjunta, el sistema le dice que no la ve y qué herramienta la ve");
   globalThis.fetch = fetchReal;
+}
+
+// ─── ESTRATEGIA DE CAPTACIÓN (A4 v2b) ─────────────────────────────────────────
+{
+  console.log("\n── Estrategia de captación ──");
+  const e = { canales: ["Instagram", "Google"], contenido: ["Reels de platos", "Antes/después de montajes"], puertas: ["WhatsApp"], fase: "Empezando: 3 reels por semana" };
+
+  // El modelo puede proponer cualquier cosa: aquí se le pone forma.
+  const sana = saneaEstrategia(e);
+  ok(sana && sana.canales.length === 2 && sana.actualizada, "una estrategia con forma sale sana, con su fecha");
+  ok(!saneaEstrategia({ ...e, fase: "" }), "sin fase, es un borrador, no una estrategia");
+  ok(!saneaEstrategia("no es un objeto"), "ni un texto a secas");
+  const larga = saneaEstrategia({ ...e, fase: "x".repeat(900), contenido: ["y".repeat(200)] });
+  ok(larga.fase.length <= 500 && larga.contenido[0].length <= 80, "y lo que se alarga, se corta");
+
+  ok(estrategiaEnFrase(null) === "", "sin estrategia, la frase está vacía");
+  ok(estrategiaEnFrase(sana).includes("Instagram") && estrategiaEnFrase(sana).includes("3 reels"),
+    "y en frase lleva lo acordado");
+
+  // ver_estrategia: sin ella, lo dice; con ella, la devuelve.
+  ok(ejecutar("ver_estrategia", {}, CTX).nada, "sin estrategia guardada, lo dice en vez de inventar una");
+  const conEstrategia = ejecutar("ver_estrategia", {}, { ...CTX, estrategia: sana });
+  ok(conEstrategia.canales && conEstrategia.canales[0] === "Instagram", "y guardada, la devuelve tal cual");
+
+  // guardar_estrategia: escribe por onEscribir, con la forma de siempre. Con nivel
+  // confianza: es una herramienta de escritura y con "consultar" (el por defecto)
+  // tiene que quedar bloqueada, que es lo que toca.
+  let escrita = null;
+  const rGuardar = ejecutar("guardar_estrategia", e, { nivel: "confianza", onEscribir: (p) => { escrita = p; return { guardada: true }; } });
+  ok(escrita && escrita.que === "guardar_estrategia" && escrita.datos.fase === e.fase && rGuardar.guardada,
+    "la escritura pasa por onEscribir con los datos intactos");
+  ok(ejecutar("guardar_estrategia", e, {}).error, "y sin puerta de escritura, lo dice");
+
+  // El aplicador sanea por la puerta de la app: lo que no tiene forma, no se guarda.
+  const hechos = [];
+  const ajustes = aplicarEnAjustes({
+    aplicarEstrategia: (datos) => { hechos.push(datos); return saneaEstrategia(datos) ? { guardada: true } : { error: "sin forma" }; },
+  });
+  ok(ajustes({ que: "guardar_estrategia", datos: e }).guardada, "el aplicador guarda lo que tiene forma");
+  ok(ajustes({ que: "guardar_estrategia", datos: { fase: "sin canales" } }).error, "y rechaza lo que no la tiene");
+  ok(ajustes({ que: "apuntar_tarea" }) === null, "lo que no es suyo sigue pasándolo a la cadena");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

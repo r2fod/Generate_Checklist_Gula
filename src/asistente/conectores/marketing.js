@@ -97,5 +97,45 @@ export default registrarConector({
         }
       },
     },
+    // ── La estrategia, guardada para no repetirla de memoria ──
+    ver_estrategia: {
+      datos: false,
+      esquema: {
+        description: "La estrategia de captación guardada por el equipo: canales, contenido, puertas y en qué fase está. Léela antes de proponer nada de marketing para no contradecir lo acordado, y cuando pregunten '¿y lo del Instagram?', '¿en qué va la captación?', '¿qué hemos acordado?'",
+        parameters: { type: "object", properties: {} },
+      },
+      corre: (ctx) => {
+        const e = ctx.estrategia;
+        if (!e || !Array.isArray(e.canales)) {
+          return { nada: "Todavía no hay estrategia guardada: si la persona quiere, diseña una (canales, contenido, puertas, fase) y guárdala con guardar_estrategia." };
+        }
+        return e;
+      },
+    },
+    guardar_estrategia: {
+      datos: false,
+      escribe: true,
+      esquema: {
+        description: "Guarda o actualiza la estrategia de captación (canales, contenido, puertas, fase). Léela antes con ver_estrategia y guarda el documento COMPLETO: se sobrescribe entero. Solo cuando la persona lo pida o apruebe; nunca por tu cuenta.",
+        parameters: {
+          type: "object",
+          properties: {
+            canales: { type: "array", items: { type: "string" }, description: "Dónde estar: Instagram, TikTok, Google, web… (hasta 10, en corto)." },
+            contenido: { type: "array", items: { type: "string" }, description: "Qué publicar: tipos de contenido con frecuencia si hace falta (hasta 20, en corto)." },
+            puertas: { type: "array", items: { type: "string" }, description: "A qué lleva la gente: WhatsApp, formulario de presupuesto, teléfono… (hasta 10, en corto)." },
+            fase: { type: "string", description: "Dónde está la captación y hacia dónde va, en una frase o dos (hasta 500 caracteres)." },
+          },
+          required: ["canales", "contenido", "puertas", "fase"],
+        },
+      },
+      corre: (ctx, args = {}) => {
+        if (!ctx.onEscribir) return { error: "Esta pantalla no deja guardar la estrategia." };
+        return ctx.onEscribir({
+          que: "guardar_estrategia",
+          resumen: "Guardar la estrategia de captación",
+          datos: args,
+        });
+      },
+    },
   },
 });

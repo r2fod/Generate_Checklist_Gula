@@ -78,7 +78,7 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **diez commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **once commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
 con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
@@ -87,9 +87,10 @@ cabecera corregida y barrido de datos reales en la batería), **B5+B6** (README 
 salud de proveedores desde Ajustes), **B8** (línea base de pintado en el CI
 nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App de la
 sesión no tiene permiso `workflows`, ver "Hecho"), el **A4 v1** (marketing: análisis
-de webs + estrategia) y el **A4 v2a** (redes por captura y visión de Gemini).
-Detalle y porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 562
-asistente + build + sincronización).
+de webs + estrategia), el **A4 v2a** (redes por captura y visión de Gemini) y el
+**A4 v2b** (estrategia de captación guardada en `indice/marketing`). Detalle y
+porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 577 asistente +
+build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
@@ -705,11 +706,6 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 - ~~Verificar los 53 precios en `indice/precios` desde otro dispositivo~~ — hecho,
   confirmado por el dueño: llegaron los 53.
 
-**3b. Marketing v2b — estrategia en la nube (A4 del plan).** La parte de capturas ya
-está (v2a). Falta: colección `marketing/` con sus reglas (más simulado y emulador,
-como todo lo demás) para que la estrategia —canales, contenido, puertas— la guarde el
-asistente y la recuerde entre conversaciones en vez de repetirla.
-
 **3. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
 segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
@@ -717,8 +713,26 @@ de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
 
+**A4 v2b del plan — estrategia de captación en la nube — montado.** La estrategia
+(canales, contenido, puertas, fase) es un documento de equipo que el asistente diseña,
+actualiza y lee antes de proponer marketing, para no contradecir lo acordado en cada
+conversación.
+- Vive en `indice/marketing`, no en una colección nueva: es un ajuste de equipo como
+  precios o ratios, y la regla de `indice/{doc}` ya lo cubre — sin tocar reglas ni
+  emulador. Mismo `ajusteCompartido` que el resto: lo ve todo el equipo, llega solo.
+- `asistente/estrategia.js` puro: `saneaEstrategia` le pone forma a lo que propone el
+  modelo (los cuatro campos, largos con tope; sin forma, no se guarda) y
+  `estrategiaEnFrase` la cuenta en una frase.
+- Herramientas en el conector marketing: `ver_estrategia` (solo lectura; sin ella,
+  lo dice en vez de inventar) y `guardar_estrategia` (escribe: pasa por
+  `onEscribir`, con su tarjeta en "Con permiso" y su saneado por la puerta de la
+  app — la misma que el guardado a mano).
+- El Worker no está en esto: el documento es de Firestore y la app lo lee y escribe
+  directa, como los ratios. `pegar.js` no cambia.
+15 comprobaciones nuevas, `test:rapido` en verde.
+
 **A4 v2a del plan — redes por captura y visión de Gemini — montado.** (La otra
-mitad de v2, la estrategia en la nube, está en "Pendiente".) Instagram y compañía
+mitad de v2 —la estrategia en la nube— es v2b, arriba.) Instagram y compañía
 no enseñan su contenido a un scraper anónimo (muro de login), así que lo que ve el
 asistente es lo que el usuario le fotografía.
 - Clip en la charla para adjuntar la captura: miniatura con su aspa, tope de 8 MB,
