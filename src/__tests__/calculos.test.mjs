@@ -1823,6 +1823,30 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
   ok(copiasUTC.length === 0,
     `el día de hoy sale siempre de src/fecha.js, nunca de toISOString (copias: ${copiasUTC.join(", ") || "ninguna"})`);
 
+  // ─── Repo público: ningún dato real ────────────────────────────────────────
+  // Ya se colaron tres nombres reales una vez (ver CONTEXTO) y el catálogo de
+  // precios de compra vivió en el código, revelando márgenes en un repo público.
+  // El barrido automático es el único cierre que no depende de que alguien se
+  // acuerde. Lo que NO se barre y por qué: __tests__ (los fixtures son
+  // ficticios A PROPÓSITO y los patrones viven ahí para probar
+  // sinDatosPersonales); los € sueltos (hay ejemplos redondos en comentarios;
+  // el riesgo real era el catálogo, que se comprueba abajo); worker/pegar.js
+  // (generado; el CI lo compara byte a byte contra la fuente).
+  const telefono = /(^|[^\d])(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}([^\d]|$)/;
+  const correo = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
+  const correoFicticio = /@(ejemplo\.com|example\.\w+|gula\.local)\b|equipo@gula\.com/;
+  const datosReales = [];
+  ficheros.forEach(f => {
+    readFileSync(f, "utf8").split("\n").forEach((linea, i) => {
+      if (telefono.test(linea)) datosReales.push(`${f}:${i + 1} (teléfono)`);
+      if (correo.test(linea) && !correoFicticio.test(linea)) datosReales.push(`${f}:${i + 1} (correo)`);
+    });
+  });
+  ok(datosReales.length === 0,
+    `ningún teléfono ni correo real en src/ (barrido: ${datosReales.slice(0, 3).join("; ") || "limpio"})`);
+  ok(ficheros.every(f => !readFileSync(f, "utf8").includes("PRECIOS_BASE")),
+    "PRECIOS_BASE no existe en el código: los precios de compra viven en Firestore (ver \"Hecho\")");
+
   const copiasTema = ficheros.filter(f => f !== "src/tema.js"
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));
   ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);

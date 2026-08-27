@@ -625,6 +625,8 @@ console.log("\n── Qué se le deja hacer ──");
   // Un nivel inventado cae en el más prudente, no en el más permisivo
   ok(!permite("crear_apunte", "inventado", escribe).puede, "un nivel que no existe no abre la puerta");
   ok(comoContarlo("consultar").includes("No puedes cambiar nada"), "al modelo se le dice lo que puede");
+  ok(comoContarlo("consultar").includes("memoria"),
+    "y en consultar se le dice que su memoria sí puede guardarla: sin eso, la frase le contradecía las herramientas que tenía (recordar/olvidar)");
   ok(comoContarlo("permiso").includes("aprueba"), "y que en permiso hay que aprobarlo");
 }
 
@@ -1622,6 +1624,26 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     "una voz que el cliente manda pero NO está en la lista no se cuela a Gemini: se ignora, no se rechaza la petición entera");
   ok(vozElegida("", { GEMINI_TTS_VOZ: "Umbriel" }) === "Umbriel", "sin elegir ninguna, manda GEMINI_TTS_VOZ como hasta ahora");
   ok(vozElegida("", {}) === "Kore", "y sin nada de nada, cae en \"Kore\", el mismo por defecto de siempre");
+}
+
+// ─── DOS EVENTOS QUE SE PARECEN: NO SE ADIVINA ───────────────────────────────
+{
+  console.log("\n── Dos eventos que se parecen: no se adivina ──");
+  const ctxDos = { ...CTX, eventosGuardados: {
+    "Boda de García": { evento: "boda", pax: 100, ninos: 0, fechaEvento: enDiasISO(10), horaInicio: "13:00", ubicacion: "Finca A" },
+    "Boda García en la finca": { evento: "boda", pax: 80, ninos: 0, fechaEvento: enDiasISO(20), horaInicio: "14:00", ubicacion: "Finca B" },
+  }};
+  const ambiguo = ejecutar("ver_evento", { nombre: "boda garcia" }, ctxDos);
+  ok(ambiguo.error && ambiguo.error.includes("Boda de García") && ambiguo.error.includes("en la finca"),
+    "dos candidatos empatados: se listan y se pide detalle, no se adivina");
+  const exacto = ejecutar("ver_evento", { nombre: "Boda de García" }, ctxDos);
+  ok(!exacto.error && exacto.adultos === 100, "un nombre EXACTO se coge sin preguntar");
+  const unoSolo = ejecutar("ver_evento", { nombre: "garcía en la finca" }, ctxDos);
+  ok(!unoSolo.error && unoSolo.adultos === 80, "y con un solo candidato, se coge");
+  // La misma regla en todas las herramientas que buscan por nombre.
+  ok(ejecutar("ver_checklist", { nombre: "boda garcia" }, ctxDos).error, "ver_checklist no adivina");
+  ok(ejecutar("ver_escaleta", { nombre: "boda garcia" }, ctxDos).error, "ni ver_escaleta");
+  ok(ejecutar("revisar_evento", { nombre: "boda garcia" }, ctxDos).error, "ni revisar_evento");
 }
 
 // ─── LA AUDITORÍA DE NEGOCIO (OPORTUNIDADES) ──────────────────────────────────

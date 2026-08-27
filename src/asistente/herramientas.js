@@ -6,12 +6,14 @@
 //
 // Esa es toda la seguridad del asunto, y por eso está escrita así:
 //
-//   · Todas son de SOLO LECTURA. Ninguna escribe nada. Las de escribir vendrán después,
-//     con confirmación en pantalla, y aun así habrá cuatro que no se expondrán nunca:
-//     marcar cargado, marcar preparado, marcar vuelto y apuntar roturas. La identidad de
-//     un item es "categoría::etiqueta"; renombrar o marcar por su cuenta destruiría el
-//     trabajo de quien está cargando el camión, que es lo único que esta app no puede
-//     permitirse perder.
+//   · Las que escriben (tareas, apuntes del calendario, calibraciones) llevan
+//     escribe: true y las gobierna permisos.js: en "Solo consultar" ni se
+//     ofrecen, en "Con permiso" se proponen y se aprueban, en "Confianza" se
+//     aplican y se cuentan. Y hay una lista que no se expone en NINGUN nivel
+//     (ver NUNCA en permisos.js): marcar cargado, preparado o vuelto, roturas,
+//     renombrar item o categoría, borrar evento o archivo. La identidad de un
+//     item es "categoría::etiqueta"; tocarla destruye el trabajo de quien está
+//     cargando el camión, que es lo único que esta app no puede permitirse perder.
 //
 //   · Cada una dice si sus datos son SENSIBLES. Las que devuelven nombres de clientes,
 //     fechas o sitios llevan datos: true, y el cliente se niega a mandarlas a un
@@ -61,6 +63,13 @@ function coincide(nombre, busca) {
 
 // El evento que se está pidiendo. Sin nombre devuelve el que está abierto: "¿cuánto
 // hielo llevo?" casi siempre se pregunta con el evento delante.
+//
+// Con nombre, devuelve lo encontrado — o lo que hay que resolver ANTES de
+// encontrarlo: dos candidatos empatados al top no se adivinan. Adivinar entre dos
+// "Boda García" es jugársela con los datos de alguien; el conector de calendario ya
+// lo hacía ("Hay X que se parecen… dime cuál"), y esto lo iguala. Un empate en la
+// primera posición es ambigüedad; un nombre EXACTO (puntos 2) no lo es: es EL
+// nombre, no uno parecido.
 function buscaEvento(ctx, nombre) {
   const archivo = ctx.eventosGuardados || {};
   if (!nombre || !String(nombre).trim()) {
@@ -70,7 +79,12 @@ function buscaEvento(ctx, nombre) {
     .map(([n, d]) => ({ nombre: n, datos: d, puntos: coincide(n, nombre) }))
     .filter(c => c.puntos > 0)
     .sort((a, b) => b.puntos - a.puntos);
-  return candidatos.length ? candidatos[0] : null;
+  if (!candidatos.length) return null;
+  const [primero, segundo] = candidatos;
+  if (segundo && primero.puntos < 2 && segundo.puntos === primero.puntos) {
+    return { error: `Hay ${candidatos.length} que se parecen a "${nombre}": ${candidatos.slice(0, 3).map(c => c.nombre).join(", ")}. Dime cuál con más detalle.` };
+  }
+  return primero;
 }
 
 const noEncontrado = (nombre) => ({
@@ -135,6 +149,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       return ev ? resumeEvento(ev.nombre, ev.datos) : noEncontrado(nombre);
     },
   },
@@ -153,6 +168,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "", categoria = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       if (!ev) return noEncontrado(nombre);
       let cats;
       try { cats = catsDeEventoGuardado(ev.datos); } catch (e) { return { error: "No he podido reconstruir esa checklist." }; }
@@ -206,6 +222,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       if (!ev) return noEncontrado(nombre);
       const e = ev.datos;
       let totalItems = 0;
@@ -481,6 +498,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       if (!ev) return noEncontrado(nombre);
       const r = revisarEvento(ev.nombre, ev.datos);
       return r.todoEnOrden

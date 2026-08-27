@@ -72,13 +72,14 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **cuatro commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **seis commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
-con sus tests unitarios") y el **A2** (auditoría de negocio que propone mejoras).
-Detalle y porqués en "Hecho". `test:rapido` en verde (tipos + 437 calculos, +
-asistente con las 24 comprobaciones nuevas de la auditoría, + build +
-sincronización).
+con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras) y el
+paquete de los pequeños **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no
+adivina, cabecera corregida y barrido de datos reales en la batería). Detalle y
+porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 522 asistente +
+build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
@@ -700,6 +701,27 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**B2+B3+B4+B7 del plan — los pequeños — hechos.**
+- **B2**: la frase de "Solo consultar" es precisa ("No puedes cambiar nada **de la
+  app**"): su memoria (recordar/olvidar) está disponible en todos los niveles —no es
+  un dato de la app, es su propio estado, y el equipo la lee y la borra a mano en
+  Cerebro—. Antes, la frase a secas contradecía a las herramientas que sí tenía
+  (la trampa nº2, la que ya costó un bug).
+- **B3**: `buscaEvento` ya no adivina: dos candidatos empatados al top se listan y se
+  pide detalle ("Hay 2 que se parecen… dime cuál con más detalle"), el mismo criterio
+  y la misma frase que el conector de calendario; un nombre EXACTO se coge sin
+  preguntar. Vale para ver_evento, ver_checklist, ver_escaleta y revisar_evento.
+- **B4**: la cabecera de `herramientas.js` ya no dice "Todas son de SOLO LECTURA" —
+  dejó de ser cierto cuando llegaron las de escribir. Describe el sistema real
+  (escribe: true + permisos.js + la lista NUNCA).
+- **B7**: prueba nueva que barre `src/` en cada batería (salvo `__tests__`, donde los
+  patrones viven A PROPÓSITO como fixtures ficticios): un teléfono español real o un
+  correo que no sea de los ficticios conocidos fallan la suite, y se comprueba
+  directamente que `PRECIOS_BASE` no existe en el código (el catálogo de precios de
+  compra vive en Firestore). Lo que ya pasó una vez (tres nombres reales) y lo que
+  pasó otra (precios en un repo público) queda cerrado por la batería, no por la
+  memoria.
 
 **A2 del plan — auditoría de negocio que propone mejoras — montada.** Las reglas
 viven en `revision.js` (`oportunidadesNegocio`, puro, mismo motor que el repaso:
