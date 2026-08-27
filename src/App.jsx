@@ -70,10 +70,12 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida } from "./calibracion.js";
-import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
-import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados } from "./calculos.js";
-import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados } from "./comida.js";
+import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida, huecosDeCatalogo } from "./calibracion.js";
+import { ponFactores, leerFactores, factoresCambiados, conFactor } from "./bebida.js";
+import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo } from "./calculos.js";
+import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados, conFactorComida } from "./comida.js";
+import { oportunidadesNegocio } from "./asistente/revision.js";
+import { aplicarEnAjustes } from "./asistente/escrituraAjustes.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
@@ -2150,6 +2152,29 @@ export default function App({ onCerrarSesion } = {}) {
     [eventosGuardados, factoresComida],
   );
 
+  // La auditoría de negocio: lo que los datos ya saben y todavía no se ha hecho
+  // (medidas sin aplicar, roturas sin precio, eventos sin vuelta, huecos del
+  // catálogo). Se calcula aquí porque la app es quien lo tiene todo en memoria —
+  // precios, factores y medidas — y se la pasa al asistente y a Cerebro. Los
+  // huecos del catálogo van aparte porque reconstruyen la checklist (calibracion.js
+  // es quien importa el generador; revision.js no, para no engordar el Worker).
+  const oportunidades = useMemo(() => {
+    const precios = leerPrecios();
+    return [
+      ...oportunidadesNegocio({
+        eventosGuardados, precios,
+        calibracionBebida: bebidaMedida, calibracionHielo: hieloMedido, calibracionComida: comidaMedida,
+        factoresBebida, factoresHielo, factoresComida,
+      }),
+      ...huecosDeCatalogo(eventosGuardados, precios).map(h => ({
+        tono: "oportunidad",
+        texto: `En "${h.nombre}" (${h.fecha}), ${h.sinPrecio} de ${h.total} líneas no tienen precio (${h.ejemplos.join(", ")}${h.sinPrecio > 3 ? "…" : ""}): el Resumen va a quedarse corto.`,
+        comoSeArregla: "Ponlos en Modo carga → Resumen → precios.",
+        propuesta: null,
+      })),
+    ];
+  }, [eventosGuardados, factoresBebida, factoresHielo, factoresComida, bebidaMedida, hieloMedido, comidaMedida, preciosAlDia]);
+
   // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
   // no el catálogo entero: si no, el día que se corrija un precio de partida en una
   // versión nueva, la copia subida lo taparía para todo el equipo.
@@ -3133,6 +3158,22 @@ export default function App({ onCerrarSesion } = {}) {
                     aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
                     aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
                     aplicarEnCalendario({ apuntes: apuntesCalendario, guardar: guardarApunte, borrar: borrarApunte }),
+                    // Un factor medido se aplica por la MISMA puerta que el botón del
+                    // panel: mismo ponFactores, misma subida a la nube, mismo saneado.
+                    aplicarEnAjustes({
+                      aplicarBebida: (tipo, clave, factor) => {
+                        handleCambiarBebida(conFactor(factoresBebida, tipo, clave, factor));
+                        return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
+                      },
+                      aplicarHielo: (tipo, factor) => {
+                        handleCambiarHielo(conFactorHielo(factoresHielo, tipo, factor));
+                        return { aplicado: `factor ${factor} para el hielo en ${tipo}` };
+                      },
+                      aplicarComida: (tipo, clave, factor) => {
+                        handleCambiarComida(conFactorComida(factoresComida, tipo, clave, factor));
+                        return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
+                      },
+                    }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),
@@ -3148,6 +3189,10 @@ export default function App({ onCerrarSesion } = {}) {
                   avisoActualizacion: actualizacionAplicada
                     ? { cambios: actualizacionAplicada, aplicada: true }
                     : (versionNueva && cambiosNuevaVersion.length ? { cambios: cambiosNuevaVersion, aplicada: false } : null),
+                  // Lo que los datos ya saben y no se ha hecho. Solo la checklist lo
+                  // calcula (es quien tiene precios y medidas); el calendario no pasa
+                  // nada y ver_auditoria le dice la verdad en vez de inventar.
+                  oportunidades,
                 })}
               />
             )}

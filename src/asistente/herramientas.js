@@ -629,6 +629,68 @@ export const HERRAMIENTAS = {
       return { tipo, comensales: a + (ninos || 0), categorias: salida };
     },
   },
+
+  // ─── LA AUDITORÍA ────────────────────────────────────────────────────────────
+  // El equivalente de "¿cómo va el negocio?" a nivel de negocio, no de un evento.
+  // Lo que devuelve no lo opina el modelo: lo calculan las reglas de revision.js con
+  // los datos que la app ya tiene, y aquí solo se leen. La diferencia con revisar_todo
+  // (que mira si un evento está listo) es que esto mira si el negocio está perdiendo
+  // dinero o dejando de aprender.
+  ver_auditoria: {
+    datos: true,
+    esquema: {
+      description: "La auditoría de negocio: lo que los datos ya saben y todavía no se ha hecho — medidas sin aplicar, roturas sin precio, eventos de los que no se puede aprender, huecos del catálogo. Úsala cuando pregunten '¿cómo va el negocio?', '¿qué se puede mejorar?', '¿qué debería mirar?'. Si alguna dice que se puede aplicar un factor medido, se ofrece con aplicar_calibracion (lo aprueba la persona).",
+      parameters: { type: "object", properties: {} },
+    },
+    corre: (ctx) => {
+      const lista = ctx.oportunidades;
+      if (lista === undefined || lista === null) {
+        return { error: "En esta pantalla no hay auditoría de negocio: se hace desde la checklist, donde están los precios y las medidas." };
+      }
+      if (!lista.length) return { todoEnOrden: true, mensaje: "No hay nada pendiente de los datos: ni medidas sin aplicar ni fugas que ver." };
+      return {
+        total: lista.length,
+        oportunidades: lista.map(a => ({
+          texto: a.texto,
+          comoSeArregla: a.comoSeArregla || "",
+          // El valor exacto para aplicar_calibracion, para que el modelo no lo saque de
+          // la cabeza: se copia, no se redondea ni se adivina.
+          datos: a.propuesta ? a.propuesta.datos : undefined,
+        })),
+      };
+    },
+  },
+
+  // Aplica un factor medido. Escribe, así que va con permiso como todo lo demás, y la
+  // propuesta sale por onEscribir igual que el resto (tarjeta "Hacerlo" en "Con
+  // permiso", directo en "Confianza"). El número TIENE que ser el que dio ver_auditoria
+  // o el panel: si la persona pide un número de la nada, eso se hace en el panel, no
+  // por aquí.
+  aplicar_calibracion: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Aplica un factor medido (el que sale del histórico de lo que volvió) a la bebida, el hielo o la comida de un tipo de evento. Solo con el factor que dio ver_auditoria o el panel del Modo carga: no se inventan números.",
+      parameters: {
+        type: "object",
+        properties: {
+          area: { type: "string", description: "bebida, hielo o comida." },
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
+          clave: { type: "string", description: "bebida: vino, cerveza, cava o refresco. comida: paella o bandejas. Para hielo se deja vacío." },
+          factor: { type: "number", description: "El factor medido, con dos decimales." },
+        },
+        required: ["area", "tipo", "factor"],
+      },
+    },
+    corre: (ctx, { area = "", tipo = "", clave = "", factor = 1 } = {}) => {
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los ajustes." };
+      return ctx.onEscribir({
+        que: "aplicar_calibracion",
+        resumen: `Aplicar el factor ${factor} a ${clave || "hielo"} en ${tipo}`,
+        datos: { area, tipo, clave, factor: Number(factor) },
+      });
+    },
+  },
 };
 
 export const NOMBRES_HERRAMIENTAS = Object.keys(HERRAMIENTAS);

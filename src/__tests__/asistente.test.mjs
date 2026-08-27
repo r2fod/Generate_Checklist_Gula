@@ -18,7 +18,9 @@ import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGr
 import { avisosConfig, saludoPendientes } from "../asistente/avisosConfig.js";
 import { marcarActualizando, confirmaSiActualizado } from "../asistente/actualizacion.js";
 import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
-import { revisarEvento, revisarProximos } from "../asistente/revision.js";
+import { revisarEvento, revisarProximos, oportunidadesNegocio } from "../asistente/revision.js";
+import { huecosDeCatalogo, catsDeEventoGuardado } from "../calibracion.js";
+import { aplicarEnAjustes } from "../asistente/escrituraAjustes.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte, saneaLista, mismaLista } from "../calendario/apuntes.js";
@@ -100,10 +102,13 @@ console.log("\n── Lo que el asistente NO puede hacer ──");
 console.log("\n── Los datos de clientes y quién puede verlos ──");
 {
   // El catálogo recortado es lo único que se le manda a un proveedor que entrena con lo
-  // que recibe. Si esto falla, se están regalando los clientes.
-  const recortado = catalogoParaModelo(true).map(h => h.name);
+  // que recibe. Si esto falla, se están regalando los clientes. El nivel no importa en
+  // esta comprobación (con "consultar" caerían las de escribir y la comparación con
+  // SIN_DATOS sería otra cosa: los permisos), así que se pide con confianza: aquí se
+  // comprueba la barrera de datos, no los permisos.
+  const recortado = catalogoParaModelo(true, {}, "confianza").map(h => h.name);
   ok(recortado.length === SIN_DATOS.length && recortado.every(n => !HERRAMIENTAS[n].datos),
-    `el catálogo recortado son solo las de calcular → ${recortado.join(", ")}`);
+    `el catálogo recortado son solo las que no llevan datos de clientes → ${recortado.join(", ")}`);
   ok(!recortado.includes("buscar_eventos") && !recortado.includes("ver_evento") && !recortado.includes("ver_calendario"),
     "y no lleva ninguna que devuelva nombres, fechas o sitios");
   // El catálogo entero lleva las de casa Y las de los conectores encendidos: si esto
@@ -1617,6 +1622,132 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     "una voz que el cliente manda pero NO está en la lista no se cuela a Gemini: se ignora, no se rechaza la petición entera");
   ok(vozElegida("", { GEMINI_TTS_VOZ: "Umbriel" }) === "Umbriel", "sin elegir ninguna, manda GEMINI_TTS_VOZ como hasta ahora");
   ok(vozElegida("", {}) === "Kore", "y sin nada de nada, cae en \"Kore\", el mismo por defecto de siempre");
+}
+
+// ─── LA AUDITORÍA DE NEGOCIO (OPORTUNIDADES) ──────────────────────────────────
+{
+  console.log("\n── La auditoría de negocio (oportunidades) ──");
+
+  // Sin datos no dice nada: una auditoría sin datos no es una auditoría.
+  ok(oportunidadesNegocio({}).length === 0, "sin datos no dice nada");
+
+  // Medido y sin aplicar: el corazón. La medida (0,5) y el factor vigente (1) no
+  // coinciden → oportunidad con propuesta que lleva los datos EXACTOS: el modelo
+  // los copia, no los saca de la cabeza.
+  const conMedida = oportunidadesNegocio({
+    calibracionBebida: { comunion: { vino: { factor: 0.5, nEventos: 3 } } },
+  });
+  ok(conMedida.length === 1 && conMedida[0].tono === "oportunidad", "una medida sin aplicada es una oportunidad");
+  ok(conMedida[0].texto.includes("50 %") && conMedida[0].texto.includes("de más"),
+    "y dice que se carga de más, con el porcentaje");
+  ok(conMedida[0].propuesta && conMedida[0].propuesta.que === "aplicar_calibracion"
+      && conMedida[0].propuesta.datos.area === "bebida"
+      && conMedida[0].propuesta.datos.clave === "vino"
+      && conMedida[0].propuesta.datos.factor === 0.5,
+    "y la propuesta lleva los datos exactos para aplicarlos");
+
+  // Ya aplicada: no se repite (eso es ruido, no auditoría).
+  ok(oportunidadesNegocio({
+    calibracionBebida: { comunion: { vino: { factor: 0.5, nEventos: 3 } } },
+    factoresBebida: { comunion: { vino: 0.5 } },
+  }).length === 0, "una medida ya aplicada no se repite");
+
+  // El hielo y la comida pasan por su área.
+  ok(oportunidadesNegocio({ calibracionHielo: { boda: { factor: 0.8, nEventos: 4 } } })[0]
+      ?.propuesta?.datos?.area === "hielo", "el hielo pasa por su área");
+  ok(oportunidadesNegocio({ calibracionComida: { boda: { paella: { factor: 0.5, nEventos: 3 } } } })[0]
+      ?.propuesta?.datos?.clave === "paella", "y la paella por su grupo");
+
+  // Tope de 6: el panel los tiene todos y la auditoría no es una pared de botones.
+  const muchasMedidas = { calibracionBebida: {}, calibracionHielo: {} };
+  ["boda", "comunion", "corporativo", "cumpleanos", "produccion"].forEach(t => {
+    muchasMedidas.calibracionBebida[t] = { vino: { factor: 0.9, nEventos: 3 }, cerveza: { factor: 0.9, nEventos: 3 } };
+    muchasMedidas.calibracionHielo[t] = { factor: 0.9, nEventos: 3 };
+  });
+  ok(oportunidadesNegocio(muchasMedidas).length === 6, "quince medidas no son quince botones (tope de 6)");
+
+  // Roturas sin precio: la fuga que se ve como "gratis".
+  const conRoturas = { "Boda García": { evento: "boda", pax: 100, fechaEvento: enDiasISO(-5),
+    roturas: { "Cristalería::Copa de vino": "3", "Cristalería::Vaso": "2" } } };
+  ok(oportunidadesNegocio({ eventosGuardados: conRoturas }).some(a => a.texto.includes("5 roturas")),
+    "cuenta todas las roturas sin precio (3 + 2)");
+  ok(!oportunidadesNegocio({ eventosGuardados: conRoturas, precios: { "Copa de vino": 2, Vaso: 1 } })
+      .some(a => a.texto.includes("roturas")),
+    "y con precio, la fuga desaparece");
+
+  // Eventos sin vuelta: aprendizaje perdido. Pasados de los últimos 30 días, a lo
+  // sumo 3 nombres; los futuros y los con vuelta no cuentan.
+  const sinVuelta = oportunidadesNegocio({ eventosGuardados: {
+    "Boda 1": { evento: "boda", pax: 80, fechaEvento: enDiasISO(-3) },
+    "Boda 2": { evento: "boda", pax: 60, fechaEvento: enDiasISO(-7) },
+    "Boda 3": { evento: "boda", pax: 90, fechaEvento: enDiasISO(-10) },
+    "Boda 4": { evento: "boda", pax: 50, fechaEvento: enDiasISO(-12) },
+    "Boda Futura": { evento: "boda", pax: 50, fechaEvento: enDiasISO(10) },
+    "Boda Con Vuelta": { evento: "boda", pax: 50, fechaEvento: enDiasISO(-5), vueltos: { "Bebidas frías::Cava": true } },
+  } });
+  const avisoSinVuelta = sinVuelta.find(a => a.texto.includes("vuelta"));
+  ok(avisoSinVuelta && avisoSinVuelta.texto.includes("Boda 1") && avisoSinVuelta.texto.includes("1 más"),
+    "los pasados sin vuelta se listan (3 nombres y el resto contado)");
+  ok(avisoSinVuelta && !avisoSinVuelta.texto.includes("Futura") && !avisoSinVuelta.texto.includes("Con Vuelta"),
+    "y no se lleva por delante a los futuros ni a los con vuelta");
+
+  // Huecos del catálogo: solo eventos de verdad, por etiqueta base, máximo 3.
+  const eventoHueco = { evento: "boda", pax: 100, ninos: 0, fechaEvento: enDiasISO(10),
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4, mesVerano: true };
+  const huecos = huecosDeCatalogo({ "Boda Hueca": eventoHueco }, {});
+  ok(huecos.length === 1 && huecos[0].nombre === "Boda Hueca" && huecos[0].sinPrecio >= 5,
+    "un evento próximo sin catálogo aparece con sus huecos");
+  ok(huecosDeCatalogo({ "Boda Lejana": { ...eventoHueco, fechaEvento: enDiasISO(40) } }, {}).length === 0,
+    "y fuera de la ventana de 30 días no cuenta");
+  // Hueco pequeño no es noticia: catálogo casi completo (faltan 2 de 60 líneas) →
+  // el Resumen se queda 2 líneas corto, que se mira en el propio Resumen.
+  const catsHueco = catsDeEventoGuardado(eventoHueco);
+  const casiCompleto = Object.fromEntries(
+    catsHueco.flatMap(c => c.items.filter(Boolean)).map(it => [it[0], 1]));
+  const [quita1, quita2] = Object.keys(casiCompleto);
+  delete casiCompleto[quita1];
+  delete casiCompleto[quita2];
+  ok(huecosDeCatalogo({ "Boda Casi Completa": eventoHueco }, casiCompleto).length === 0,
+    "ni un hueco pequeño (2 de 60) es noticia: el umbral evita el ruido");
+
+  // ver_auditoria: lee, no opina. Y "no hay datos" no es "todo en orden".
+  const conLista = ejecutar("ver_auditoria", {}, { oportunidades: [{ tono: "oportunidad", texto: "t", comoSeArregla: "c",
+    propuesta: { que: "aplicar_calibracion", resumen: "r", datos: { area: "hielo", tipo: "boda", factor: 0.8 } } }] });
+  ok(conLista.total === 1 && conLista.oportunidades[0].datos.area === "hielo",
+    "devuelve la lista con sus datos de aplicación (se copian, no se recuerdan)");
+  ok(ejecutar("ver_auditoria", {}, { oportunidades: [] }).todoEnOrden,
+    "con lista vacía, dice todo en orden a conciencia");
+  ok(ejecutar("ver_auditoria", {}).error,
+    "y en una pantalla sin la auditoría lo dice, en vez de decir todo en orden");
+
+  // aplicar_calibracion: escribe por la misma puerta que el resto, y el nivel decide
+  // si ni siquiera se ofrece. (nivel: "confianza" — con "consultar" la ejecución se
+  // rechaza antes de tocar onEscribir, que es justo lo que las dos pruebas de abajo
+  // comprueban a nivel de catálogo.)
+  let escrita = null;
+  const rAplicar = ejecutar("aplicar_calibracion", { area: "bebida", tipo: "comunion", clave: "vino", factor: 0.5 },
+    { nivel: "confianza", onEscribir: (p) => { escrita = p; return { ok: true }; } });
+  ok(escrita && escrita.que === "aplicar_calibracion" && escrita.datos.factor === 0.5 && rAplicar.ok,
+    "la escritura pasa por onEscribir con { que, resumen, datos }");
+  ok(!catalogoParaModelo(false, {}, "consultar").some(t => t.name === "aplicar_calibracion"),
+    "en \"Solo consultar\" ni se ofrece");
+  ok(catalogoParaModelo(false, {}, "confianza").some(t => t.name === "aplicar_calibracion"),
+    "y en \"Confianza\" sí");
+
+  // aplicarEnAjustes: cada área a su puerta; lo que no es suyo, lo pasa (encadenar).
+  const hechos = [];
+  const ajustes = aplicarEnAjustes({
+    aplicarBebida: (t, c, f) => { hechos.push(["bebida", t, c, f]); return { ok: true }; },
+    aplicarHielo: (t, f) => { hechos.push(["hielo", t, f]); return { ok: true }; },
+    aplicarComida: (t, c, f) => { hechos.push(["comida", t, c, f]); return { ok: true }; },
+  });
+  ajustes({ que: "aplicar_calibracion", datos: { area: "bebida", tipo: "boda", clave: "vino", factor: 0.7 } });
+  ajustes({ que: "aplicar_calibracion", datos: { area: "hielo", tipo: "boda", factor: 0.8 } });
+  ajustes({ que: "aplicar_calibracion", datos: { area: "comida", tipo: "boda", clave: "paella", factor: 0.5 } });
+  ok(hechos.length === 3 && hechos[0][1] === "boda" && hechos[0][2] === "vino", "cada área va a su puerta");
+  ok(ajustes({ que: "apuntar_tarea" }) === null, "lo que no es suyo lo pasa al siguiente");
+  ok(ajustes({ que: "aplicar_calibracion", datos: { area: "inexistente", tipo: "boda", factor: 1 } }).error,
+    "y un área desconocida se dice, no se inventa");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

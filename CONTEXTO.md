@@ -58,6 +58,8 @@ verifica a nivel de píxel):
 4. **PanelComida (C3 del plan):** panel nuevo del Modo carga (paella y bandejas por
    tipo, con la convención "lo vuelto es lo no usado" en la nota). Mismas clases que
    el de bebida.
+5. **Sección "Oportunidades" de Cerebro (A2 del plan):** tarjetas con la raya verde
+   nueva `es-oportunidad`; solo se pinta con avisos (el caso normal no suena a aviso).
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -70,21 +72,24 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **tres commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **cuatro commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
-paella y bandejas— con lo que volvió) y la regla nueva de `CLAUDE.md` ("lo nuevo entra
-con sus tests unitarios"). Detalle y porqués en "Hecho". `test:rapido` en verde
-(tipos + 437 calculos, incluidas las 36 comprobaciones nuevas de hielo y comida, +
-asistente + build + sincronización).
+paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
+con sus tests unitarios") y el **A2** (auditoría de negocio que propone mejoras).
+Detalle y porqués en "Hecho". `test:rapido` en verde (tipos + 437 calculos, +
+asistente con las 24 comprobaciones nuevas de la auditoría, + build +
+sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
-1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2 y C3 solo
-   ha corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de Modo
-   carga donde se montan PanelHielo y PanelComida.
-2. **Visto humano de PanelHielo y PanelComida** (`CLAUDE.md` manda captura): 390/412
-   y escritorio, dos temas, con `animations: "disabled"`. Reusan las clases
-   `cal-ratios`/`cal-ratio` del panel de bebida, pero nadie los ha visto renderizados.
+1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2, C3 y A2
+   solo ha corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de
+   Modo carga (PanelHielo, PanelComida) y el asistente.
+2. **Visto humano de PanelHielo, PanelComida y la sección "Oportunidades" de
+   Cerebro** (`CLAUDE.md` manda captura): 390/412 y escritorio, dos temas, con
+   `animations: "disabled"`. Los paneles reusan las clases `cal-ratios`/`cal-ratio`
+   del panel de bebida y la sección reusa `cer-aviso` (tono verde nuevo
+   `es-oportunidad`), pero nadie lo ha visto renderizado.
 3. **El factor de hielo o de comida sin datos no es un bug**: la mecánica está montada
    y el número saldrá solo cuando el equipo marque la vuelta en 3 eventos (el hielo
    puede ser en kilos; la paella, las que no salieron). Un 1 en el panel es "aún sin
@@ -695,6 +700,27 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**A2 del plan — auditoría de negocio que propone mejoras — montada.** Las reglas
+viven en `revision.js` (`oportunidadesNegocio`, puro, mismo motor que el repaso:
+no se ha montado un motor nuevo, que fue el motivo de descartar Tinyflows) con un
+tono nuevo, `oportunidad` —nada roto, pero se deja dinero o aprendizaje en la
+mesa; el CSS le da su raya verde—. Cuatro reglas: **medido y sin aplicar** (lee
+las calibraciones de C2/C3 y propone aplicar el factor con `aplicar_calibracion`,
+que escribe por la MISMA puerta que el botón del panel —`escrituraAjustes.js`,
+encadenada en App—), **roturas sin precio** (la fuga que se ve como "gratis"),
+**eventos pasados sin vuelta** (aprendizaje perdido, 30 días, 3 nombres) y
+**huecos del catálogo** (en `calibracion.js`, no en `revision.js`, porque
+reconstruye la checklist: no se mete el generador en el bundle del Worker). La
+app lo calcula al tenerlo todo en memoria y lo pasa al asistente (`ver_auditoria`,
+que en una pantalla sin datos dice que no hay auditoría, no "todo en orden") y a
+Cerebro (sección "Oportunidades", que no se pinta sin avisos). El sistema le
+dice al modelo cuando usarlo y que los datos de aplicación se copian, no se
+inventan. Decisión documentada: corre **al abrir la app, no en el repaso
+nocturno** — el dato que aporta valor (precios, medidas) es local, y una copia
+nocturna sería stale sin avisar de nada que el repaso no avise ya; si algún día
+el repaso lo necesita, las reglas son puras y ya están exportadas. 24
+comprobaciones nuevas, `test:rapido` en verde.
 
 **C3 del plan — calibración de la comida (paella y bandejas) con lo que volvió —
 montado.** La paella (1 cada 30 pax) y las bandejas (por tramos de pax) eran ratios

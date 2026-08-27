@@ -7624,6 +7624,9 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .cer-aviso.es-falta { border-left-color: var(--error-texto); }
 .cer-aviso.es-raro { border-left-color: var(--aviso-texto-suave); }
 .cer-aviso.es-acuerdate { border-left-color: var(--accent); }
+/* oportunidad: nada roto, pero se deja dinero o aprendizaje en la mesa — el verde es
+   "esto sale a cuenta", no "todo va bien" (eso no se pinta, ver Cerebro). */
+.cer-aviso.es-oportunidad { border-left-color: var(--green-qty); }
 
 .cer-objetivo {
   display: flex;

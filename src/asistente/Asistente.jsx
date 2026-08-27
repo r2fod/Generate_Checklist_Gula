@@ -731,6 +731,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             objetivos={contexto.objetivos || []}
             eventosGuardados={contexto.eventosGuardados || {}}
             repaso={repaso}
+            oportunidades={contexto.oportunidades}
             onOlvidar={onOlvidar}
             onPonerObjetivo={contexto.onPonerObjetivo}
             onCambiarEstadoObjetivo={contexto.onCambiarEstadoObjetivo}

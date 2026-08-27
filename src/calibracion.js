@@ -3,6 +3,7 @@ import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
 import { buildChecklist } from "./checklist-generadores.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "./bebida.js";
 import { COMIDAS, CLAVES_COMIDA } from "./comida.js";
+import { hoyISO, enDiasISO } from "./fecha.js";
 
 // ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
 // Las estimaciones de tiempos-carga.js son de sector. En cuanto hay eventos con el
@@ -256,6 +257,46 @@ export function calibracionHielo(eventosGuardados = {}, factoresActuales = {}) {
     salida[tipo] = { factor, nEventos: lista.length };
   });
   return salida;
+}
+
+// ─── HUECOS DEL CATÁLOGO ──────────────────────────────────────────────────────
+// El Resumen solo cobra lo que tiene precio. Un item sin precio no es "gratis", es
+// "no cobrado": el total se queda corto en silencio. Esto mira los eventos que están
+// por cargar y cuenta cuántas líneas van a quedar fuera del coste.
+//
+// Vive aquí (no en revision.js) porque necesita reconstruir la checklist, y quien
+// importa el generador es este fichero: meterlo en revision.js engordaría el Worker
+// con una cuenta que solo se hace en la app.
+//
+// La comprobación va por la etiqueta base: si se renombró a mano y solo el nombre
+// nuevo tiene precio, cuenta como sin precio — aproximación a la baja, y el aviso
+// sigue siendo cierto: alguien tiene que mirarlo. Umbrales (10 líneas, 5 sin precio)
+// para no convertir un eventillo en noticia.
+export function huecosDeCatalogo(eventosGuardados = {}, precios = {}) {
+  const desde = hoyISO();
+  const hasta = enDiasISO(30);
+  const salidas = [];
+  Object.entries(eventosGuardados).forEach(([nombre, e]) => {
+    if (!e || !e.evento) return;
+    if (!((e.fechaEvento || "") >= desde && (e.fechaEvento || "") <= hasta)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(e); } catch (err) { return; }
+    let total = 0, sinPrecio = 0;
+    const ejemplos = [];
+    cats.forEach(c => c.items.filter(Boolean).forEach(it => {
+      const qty = aNumero(it[1]);
+      if (qty === null || qty <= 0) return;
+      total++;
+      if (precios[it[0]] === undefined) {
+        sinPrecio++;
+        if (ejemplos.length < 3) ejemplos.push(it[0]);
+      }
+    }));
+    if (total >= 10 && sinPrecio >= 5) {
+      salidas.push({ nombre, fecha: e.fechaEvento || "", total, sinPrecio, ejemplos });
+    }
+  });
+  return salidas.sort((a, b) => b.sinPrecio - a.sinPrecio).slice(0, 3);
 }
 
 // Las categorías con sus cantidades, tal y como saldrían hoy. checklistDeEventoGuardado
