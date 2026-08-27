@@ -55,6 +55,9 @@ verifica a nivel de píxel):
    primera vez) sigue sin hacerse.
 3. **PanelHielo (C2 del plan):** panel nuevo del Modo carga. Reusa clase por clase la
    estructura del panel de bebida, pero nadie lo ha visto renderizado en un móvil.
+4. **PanelComida (C3 del plan):** panel nuevo del Modo carga (paella y bandejas por
+   tipo, con la convención "lo vuelto es lo no usado" en la nota). Mismas clases que
+   el de bebida.
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -65,29 +68,34 @@ Cloudflare (confirmado con "Repasar los eventos ahora").
 "Pendiente", punto 2). La calibración del hielo ya está montada (ver "Hecho"); solo
 le falta que el equipo marque la vuelta en tres eventos para que el número salga solo.
 
-## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + regla de tests)
+## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **dos commits por delante de `main`**: el **C2 del
-plan** (calibración del hielo con lo que volvió; detalle y porqués en "Hecho") y la
-regla nueva de `CLAUDE.md` ("lo nuevo entra con sus tests unitarios"). `test:rapido`
-en verde (tipos + 416 calculos, incluidas las 15 comprobaciones nuevas de hielo, +
+La rama `arena/01a038bc-…` lleva **tres commits por delante de `main`**: el **C2 del
+plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
+paella y bandejas— con lo que volvió) y la regla nueva de `CLAUDE.md` ("lo nuevo entra
+con sus tests unitarios"). Detalle y porqués en "Hecho". `test:rapido` en verde
+(tipos + 437 calculos, incluidas las 36 comprobaciones nuevas de hielo y comida, +
 asistente + build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
-1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2 solo ha
-   corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de Modo
-   carga donde se monta PanelHielo.
-2. **Visto humano de PanelHielo** (`CLAUDE.md` manda captura): 390/412 y escritorio,
-   dos temas, con `animations: "disabled"`. Reusa las clases `cal-ratios`/`cal-ratio`
-   del panel de bebida, pero nadie lo ha visto renderizado todavía.
-3. **El factor de hielo sin datos no es un bug**: la mecánica está montada y el número
-   saldrá solo cuando el equipo marque la vuelta del hielo en 3 eventos (puede ser en
-   kilos). Un 1 en el panel es "aún sin medir", no "roto".
-4. `worker/pegar.js` NO se ha tocado en C2: el check de CI "regenerado" pasa de
+1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2 y C3 solo
+   ha corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de Modo
+   carga donde se montan PanelHielo y PanelComida.
+2. **Visto humano de PanelHielo y PanelComida** (`CLAUDE.md` manda captura): 390/412
+   y escritorio, dos temas, con `animations: "disabled"`. Reusan las clases
+   `cal-ratios`/`cal-ratio` del panel de bebida, pero nadie los ha visto renderizados.
+3. **El factor de hielo o de comida sin datos no es un bug**: la mecánica está montada
+   y el número saldrá solo cuando el equipo marque la vuelta en 3 eventos (el hielo
+   puede ser en kilos; la paella, las que no salieron). Un 1 en el panel es "aún sin
+   medir", no "roto".
+4. **La convención de la comida**: lo vuelto es lo NO usado — en la paella, las que
+   no salieron; en las bandejas, las que no se usaron para pasar. PanelComida lo dice
+   en pantalla, pero conviene que el equipo lo lea antes de marcar vueltas de verdad.
+5. `worker/pegar.js` NO se ha tocado en C2/C3: el check de CI "regenerado" pasa de
    largo, no hay nada que reencolar en Cloudflare.
 
-El resto del plan (C3, A2, A4…) sigue pendiente en `PLAN_MEJORAS.md`, en el orden
+El resto del plan (A2, A4, C1…) sigue pendiente en `PLAN_MEJORAS.md`, en el orden
 escrito allí.
 
 ## Orden de lectura
@@ -687,6 +695,25 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**C3 del plan — calibración de la comida (paella y bandejas) con lo que volvió —
+montado.** La paella (1 cada 30 pax) y las bandejas (por tramos de pax) eran ratios
+fijos sin dato detrás; ahora se calibran contra los eventos reales con el mismo
+patrón que la bebida y el hielo: `calibracionComida()` en `calibracion.js` reutiliza
+`consumoDeBebida()` — que ahora acepta un matcher para etiquetas dinámicas ("Paella
+<talla>", sin pisar "Paletas de paella" ni "Descansadores de paella") — con la
+misma convención que la bebida, hecha explícita para el equipo: **lo vuelto es lo NO
+usado** (en la paella, las que no salieron; en las bandejas, las que no se usaron
+para pasar). Con ella "lo cargado − lo vuelto" es lo que de verdad se usó, y el
+factor converge. El factor vive en el nuevo `comida.js` (esparcido por tipo ×
+grupo, mismas reglas que la bebida) y se aplica en `paellasPorPax`/`calcPaella`
+(allí el número a mano manda) y en la cuenta por pax de `calcBandejas` (los extras
+manuales no se escalan). Se ve y se aplica en PanelComida del Modo carga (junto a
+los de bebida y hielo) y sube a `indice/comida` con el mismo `ajusteCompartido`
+(las reglas no se tocaron). Lo que NO cuenta: los eventos con paella a mano (ese
+número no es el ratio) se salta, y las frituras no se calibran (su número es manual
+por evento, no hay ratio base que calibrar). 21 comprobaciones nuevas, `test:rapido`
+en verde.
 
 **C2 del plan — calibración del hielo con lo que volvió — montado.** La merma por
 derretimiento (`MERMA_SIN_CONGELADOR`, 1,35/1,2) era una estimación; ahora se calibra

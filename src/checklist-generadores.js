@@ -261,7 +261,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
-    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: evtKey });
   // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
@@ -282,7 +282,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esCorporativo, ["Atril + micrófono", "—"]),
     opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
     ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
-    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas).n)]),
+    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas, evtKey).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
     opt(tipoNevera !== "No lleva", [tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]),
@@ -293,7 +293,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
   ]});
 
-  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
+  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, evtKey).n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
   const nPlanchas  = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
@@ -302,7 +302,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas);
+    const p = calcPaella(pax, tipoPaella, numPaellas, evtKey);
     // Difusor y trípode se comparten con las frituras (misma herramienta), se suman en vez de listar aparte
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusor", String(p.n + numFritura)], ["Trípode", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
   }
@@ -486,7 +486,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
-    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: "cumpleanos" });
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -522,7 +522,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo)
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas);
+    const p = calcPaella(pax, tipoPaella, numPaellas, "cumpleanos");
     // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode", String(p.n + numFritura)]);
   }
@@ -533,7 +533,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const nPlanchasCumple = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", String(nPlanchasCumple)]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0) + numFritura + nPlanchasCumple;
+  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "cumpleanos").n : 0) + numFritura + nPlanchasCumple;
   if (bombonasCumple > 0) paellaItems.push(["Bombonas llenas", String(bombonasCumple)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
@@ -688,7 +688,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
-    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: "produccion" });
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -773,11 +773,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo).
   // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco.
-  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
+  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "produccion").n : 0;
   const numParavientos = numPaellaProd + numFritura;
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas);
+    const p = calcPaella(pax, tipoPaella, numPaellas, "produccion");
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
   }
   paellaItems.push(["Trípode", String(1 + numFritura)]);

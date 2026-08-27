@@ -194,7 +194,7 @@ export const PREGUNTAS = [
     nota: (r) => {
       const pax = paxDeLaGente(r);
       return pax
-        ? `Con ${pax} personas salen ${paellasPorPax(pax)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
+        ? `Con ${pax} personas salen ${paellasPorPax(pax, r.tipo)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
         : "Cada paella lleva su paleta, su trípode y su bombona.";
     },
     opciones: [
@@ -203,7 +203,7 @@ export const PREGUNTAS = [
         valor: "otras", texto: "Otro número",
         conNumero: "¿Cuántas?",
         campoNumero: "numPaellas",
-        sugerido: (r) => paellasPorPax(paxDeLaGente(r)) || 1,
+        sugerido: (r) => paellasPorPax(paxDeLaGente(r), r.tipo) || 1,
       },
     ],
     si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),

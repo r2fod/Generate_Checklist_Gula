@@ -12,6 +12,7 @@
 // calcula con ellos, allí se decide cuáles son. Ese fichero no importa nada, así que
 // esta flecha no tiene vuelta.
 import { RATIOS_BEBIDA, factoresDeTipo, esFactorValido, TIPOS_BEBIDA } from "./bebida.js";
+import { factorComidaVigente } from "./comida.js";
 
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas: es el
 // buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan pedir un
@@ -414,13 +415,17 @@ export function champaneras(pax) {
 //   · y encima suman las del tipo elegido para el servicio (madera, plata o mixto)
 /**
  * @param {number} pax
- * @param {{ soloBandeja?: boolean, tipoBandejas?: string, extraMadera?: number, extraPlata?: number }} [opciones]
+ * @param {{ soloBandeja?: boolean, tipoBandejas?: string, extraMadera?: number, extraPlata?: number, tipo?: string }} [opciones]
  * @returns {{ pasar: number, madera: number, plata: number }}
  */
-export function calcBandejas(pax, { soloBandeja = false, tipoBandejas = "Mixto", extraMadera = 0, extraPlata = 0 } = {}) {
-  const pasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
-  const delTipo = (/** @type {string} */ suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20))
-    : (tipoBandejas === suyo ? Math.max(2, Math.ceil(pax / 10)) : 0);
+export function calcBandejas(pax, { soloBandeja = false, tipoBandejas = "Mixto", extraMadera = 0, extraPlata = 0, tipo = "" } = {}) {
+  // El factor de comida (ver comida.js) escala la cuenta por pax, NO los extras
+  // manuales: los extraMadera/extraPlata son una decisión puntual de este evento y no
+  // se cargan en el factor.
+  const f = factorComidaVigente(tipo, "bandejas");
+  const pasar = Math.max(2, Math.ceil((pax / 20) * f)) + (soloBandeja ? Math.max(2, Math.ceil((pax / 30) * f)) : 0);
+  const delTipo = (/** @type {string} */ suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil((pax / 20) * f))
+    : (tipoBandejas === suyo ? Math.max(2, Math.ceil((pax / 10) * f)) : 0);
   return {
     pasar,
     madera: pasar + delTipo("Madera") + extraMadera,

@@ -31,6 +31,7 @@ import {
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
   cargarHieloNube, guardarHieloNube, suscribirHieloNube,
+  cargarComidaNube, guardarComidaNube, suscribirComidaNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
@@ -69,9 +70,10 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion, calibracionBebida, calibracionHielo } from "./calibracion.js";
+import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida } from "./calibracion.js";
 import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
 import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados } from "./calculos.js";
+import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados } from "./comida.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
@@ -2108,6 +2110,26 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  // Lo mismo que la bebida y el hielo, para la comida (paella y bandejas): cuánto se
+  // usó de verdad por tipo, con la convención "lo vuelto es lo no usado" (ver comida.js).
+  const [factoresComida, setFactoresComida] = useState(() => leerFactoresComida());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresComida(ponFactoresComida(remotos)); };
+    cargarComidaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirComidaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarComida = (siguiente) => {
+    setFactoresComida(ponFactoresComida(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarComidaNube(factoresComidaCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
   // Lo que dice el histórico: de cada evento con la vuelta apuntada sale cuánto se bebió
   // de verdad. Se recalcula solo cuando cambia el archivo o los factores, que es caro
   // —reconstruye la checklist de cada evento guardado— y no cambia por escribir un pax.
@@ -2120,6 +2142,12 @@ export default function App({ onCerrarSesion } = {}) {
   const hieloMedido = useMemo(
     () => calibracionHielo(eventosGuardados, factoresHielo),
     [eventosGuardados, factoresHielo],
+  );
+
+  // Paella y bandejas con la vuelta marcada: el dato real manda sobre el ratio fijo.
+  const comidaMedida = useMemo(
+    () => calibracionComida(eventosGuardados, factoresComida),
+    [eventosGuardados, factoresComida],
   );
 
   // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
@@ -2902,6 +2930,9 @@ export default function App({ onCerrarSesion } = {}) {
           factoresHielo={factoresHielo}
           calibracionHielo={hieloMedido}
           onCambiarHielo={handleCambiarHielo}
+          factoresComida={factoresComida}
+          calibracionComida={comidaMedida}
+          onCambiarComida={handleCambiarComida}
           checklist={checklist}
           preparados={preparados}
           marcasRevisar={marcasRevisar}
@@ -4116,11 +4147,11 @@ export default function App({ onCerrarSesion } = {}) {
                       className="form-input"
                       value={numPaellas || ""}
                       min="1"
-                      placeholder={String(calcPaella(pax, tipoPaella, 0).n)}
+                      placeholder={String(calcPaella(pax, tipoPaella, 0, evento).n)}
                       onChange={e => setNumPaellas(Math.max(0, parseInt(e.target.value) || 0))}
                     />
                     <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                      En blanco salen {calcPaella(pax, tipoPaella, 0).n} por la gente
+                      En blanco salen {calcPaella(pax, tipoPaella, 0, evento).n} por la gente
                     </span>
                   </div>
                 </>

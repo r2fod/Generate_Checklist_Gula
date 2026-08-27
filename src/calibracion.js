@@ -2,6 +2,7 @@ import { estimarTiemposCarga, FASES_TIEMPO } from "./tiempos-carga.js";
 import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
 import { buildChecklist } from "./checklist-generadores.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "./bebida.js";
+import { COMIDAS, CLAVES_COMIDA } from "./comida.js";
 
 // ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
 // Las estimaciones de tiempos-carga.js son de sector. En cuanto hay eventos con el
@@ -113,10 +114,13 @@ function aNumero(x) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Lo que se consumió de una bebida en un evento guardado, y lo que se habría cargado.
-// Devuelve null si falta algún dato: una sola línea del grupo sin apuntar la vuelta ya
-// falsea el total (si no apuntas el tinto, el vino sale como si se hubiera bebido entero).
-function consumoDeBebida(ev, cats, labels) {
+// Lo que se consumió de un grupo en un evento guardado, y lo que se habría cargado.
+// "grupo" es la lista de etiquetas exactas (bebida) o un matcher (comida, para
+// etiquetas dinámicas como "Paella <talla>"). Devuelve null si falta algún dato: una
+// sola línea del grupo sin apuntar la vuelta ya falsea el total (si no apuntas el
+// tinto, el vino sale como si se hubiera bebido entero).
+function consumoDeBebida(ev, cats, grupo) {
+  const esDeGrupo = (label) => (typeof grupo === "function" ? grupo(label) : grupo.includes(label));
   const renom = ev.categoriasRenombradas || {};
   const vueltos = ev.vueltos || {};
   const overrides = ev.overridesManuales || {};
@@ -125,7 +129,7 @@ function consumoDeBebida(ev, cats, labels) {
     const mostrada = renom[cat.nombre] ?? cat.nombre;
     for (const it of cat.items) {
       const label = it[0];
-      if (!labels.includes(label)) continue;
+      if (!esDeGrupo(label)) continue;
       encontrados++;
       const override = marcaDe(overrides, cat.nombre, mostrada, label);
       const qty = aNumero(override !== undefined ? override : it[1]);
@@ -176,6 +180,45 @@ export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) 
       if (!esFactorValido(factor)) return;
       if (!salida[tipo]) salida[tipo] = {};
       salida[tipo][bebida] = { factor, nEventos: lista.length };
+    });
+  });
+  return salida;
+}
+
+// ─── CUÁNTA COMIDA SE USÓ DE VERDAD ───────────────────────────────────────────
+// La misma cuenta que la bebida y el hielo: lo que salió menos lo que volvió SIN USAR.
+// La convención (que el panel de comida dice en pantalla) es la que la bebida ya usa,
+// hecha explícita para el equipo: en la paella, lo que vuelve es la que no salió; en
+// las bandejas, la que no se usó para pasar. Con ella "cargado − vuelto" es lo que de
+// verdad se usó, y el factor converge como el resto.
+//
+// NO cuentan los eventos con paella a mano (numPaellas > 0): ese número no es el
+// ratio, y medirlo contra el ratio sesgaría el factor para siempre. Las frituras no
+// están aquí: su número es manual por evento, no hay ratio base que calibrar.
+export function calibracionComida(eventosGuardados = {}, factoresActuales = {}) {
+  const proporciones = {};
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.evento || !ev.vueltos) return;
+    if (!TIPOS_BEBIDA.includes(ev.evento)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(ev); } catch (e) { return; }
+    if (!cats.length) return;
+    CLAVES_COMIDA.forEach(clave => {
+      if (clave === "paella" && (Number(ev.numPaellas) || 0) > 0) return;
+      const r = consumoDeBebida(ev, cats, COMIDAS[clave].esDeGrupo);
+      if (!r) return;
+      if (!proporciones[ev.evento]) proporciones[ev.evento] = {};
+      (proporciones[ev.evento][clave] ||= []).push(r.consumo / r.carga);
+    });
+  });
+  const salida = {};
+  Object.entries(proporciones).forEach(([tipo, porClave]) => {
+    Object.entries(porClave).forEach(([clave, lista]) => {
+      if (lista.length < MIN_EVENTOS_MEDIR) return;
+      const factor = redondeaFactor(mediana(lista) * Number(factorDe(factoresActuales, tipo, clave)));
+      if (!esFactorValido(factor)) return;
+      if (!salida[tipo]) salida[tipo] = {};
+      salida[tipo][clave] = { factor, nEventos: lista.length };
     });
   });
   return salida;

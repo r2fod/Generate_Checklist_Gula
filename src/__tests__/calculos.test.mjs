@@ -31,7 +31,7 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados }
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
-import { calibracionBebida, calibracionHielo, catsDeEventoGuardado } from "../calibracion.js";
+import { calibracionBebida, calibracionHielo, calibracionComida, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
@@ -41,7 +41,8 @@ import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlma
 import { aplicarTemaInicial } from "../tema.js";
 import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESOS, MAX_APUNTES } from "../diario.js";
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
-import { PERSONAS_POR_PAELLA } from "../paella.js";
+import { PERSONAS_POR_PAELLA, paellasPorPax, calcPaella } from "../paella.js";
+import { ponFactoresComida, leerFactoresComida, conFactorComida } from "../comida.js";
 import { SECTOR, compararRatios } from "../asistente/sector.js";
 import { CAMBIOS, ultimoCambio } from "../cambios.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -1435,6 +1436,125 @@ console.log("\n══ Las mesas de los comensales ══");
     "y volver más de lo que salió tira el evento entero");
 
   ponFactoresHielo({});
+}
+
+// ─── CUÁNTA COMIDA SE USÓ DE VERDAD (PAELLA Y BANDEJAS) ────────────────────────
+{
+  console.log("\n── Calibración de comida con lo que volvió ──");
+  ponFactoresComida({});
+
+  // Anti-silencio: las líneas que busca la calibración tienen que existir DE VERDAD
+  // en una checklist. La paella tiene etiqueta dinámica ("Paella <talla>"), así que va
+  // por matcher — y el matcher no puede pisar "Paletas de paella" ni "Descansadores".
+  const catsComida = buildChecklist("boda", 100, 2, 4, 0, { mesVerano: true, llevaPaella: true });
+  const etiquetasC = catsComida.flatMap(c => c.items.filter(Boolean).map(it => it[0]));
+  const lineasPaella = etiquetasC.filter(l => l.startsWith("Paella "));
+  ok(lineasPaella.length === 1 && lineasPaella[0] === "Paella grande",
+    "con 100 pax hay una línea de paella (grande) y el matcher la encuentra");
+  ok(etiquetasC.includes("Paletas de paella") && etiquetasC.includes("Descansadores de paella"),
+    "las líneas que comparten el nombre existen y el matcher no las cuenta");
+  ok(etiquetasC.includes("Bandejas de madera") && etiquetasC.includes("Bandejas de plata"),
+    "y las dos líneas de bandejas existen");
+
+  // El factor de comida guarda las mismas reglas que los demás: esparcido, acotado,
+  // y poner el neutro lo quita.
+  const puestoC = conFactorComida({}, "boda", "paella", 1.2);
+  ok(puestoC.boda.paella === 1.2, "conFactorComida pone el factor");
+  ok(Object.keys(conFactorComida(puestoC, "boda", "paella", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  ok(Object.keys(ponFactoresComida({ boda: { paella: 9, bandejas: 1.1 } })).length === 1
+      && leerFactoresComida().boda.bandejas === 1.1,
+    "fuera de 0,3–2 se rechaza (un 9 es un dedo resbalando, no un evento)");
+  ponFactoresComida({});
+
+  // calcPaella aplica el factor por tipo, y el número a mano manda sobre él.
+  const neutraC = paellasPorPax(100, "boda");
+  ponFactoresComida({ boda: { paella: 2 } });
+  const conFactorC = paellasPorPax(100, "boda");
+  const otroTipoC = paellasPorPax(100, "comunion");
+  ok(conFactorC > neutraC, `con factor 2 la cuenta de paella sube (${neutraC} → ${conFactorC})`);
+  ok(otroTipoC === neutraC, "y no se lo lleva a otro tipo que nadie ha medido");
+  ok(calcPaella(100, "Auto", 3, "boda").n === 3, "y el número a mano manda sobre el factor");
+  ponFactoresComida({});
+
+  // calcBandejas escala la cuenta por pax, NO los extras manuales: los extras son una
+  // decisión puntual de este evento, no el ratio.
+  const bandejasNeutras = calcBandejas(100, {});
+  ponFactoresComida({ boda: { bandejas: 2 } });
+  const bandejasFactor = calcBandejas(100, { tipo: "boda" });
+  const bandejasExtra = calcBandejas(100, { tipo: "boda", extraMadera: 5 });
+  ok(bandejasFactor.madera > bandejasNeutras.madera, "con factor 2 las bandejas de madera suben");
+  ok(bandejasExtra.madera - bandejasFactor.madera === 5, "y los extras manuales no se escalan");
+  ponFactoresComida({});
+
+  // Un evento con la vuelta marcada: salen 4 paellas, vuelven 2 SIN USAR → se usaron
+  // 2 de 4. La convención (la que el panel de comida dice en pantalla) es la que la
+  // bebida ya usa: lo vuelto es lo no usado.
+  const eventoC = { evento: "boda", pax: 100, ninos: 0, fechaEvento: "2026-07-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4,
+    mesVerano: true, tipoCongelador: "Mediana", llevaPaella: true };
+  const catsC = catsDeEventoGuardado(eventoC);
+  // La vuelta se construye contra la reconstrucción ACTUAL (refleja el factor
+  // vigente): en la prueba de convergencia eso importa de verdad.
+  const conVueltaComida = (fracPaella, fracBandeja, extra = {}) => {
+    const cats = catsDeEventoGuardado({ ...eventoC, ...extra });
+    const vueltos = {};
+    cats.forEach(c => c.items.filter(Boolean).forEach(it => {
+      const label = it[0];
+      const esPaella = label.startsWith("Paella ");
+      const esBandeja = label === "Bandejas de madera" || label === "Bandejas de plata";
+      if (!esPaella && !esBandeja) return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${label}`] = String(Math.round(qty * (esPaella ? fracPaella : fracBandeja)));
+    }));
+    return { ...eventoC, ...extra, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada (ni de la paella ni de las bandejas).
+  ok(Object.keys(calibracionComida({ a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "con dos eventos no se pronuncia");
+
+  const tresC = { a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) };
+  const calC = calibracionComida(tresC, {});
+  ok(calC.boda?.paella && Math.abs(calC.boda.paella.factor - 0.5) < 0.03,
+    `con tres y media vuelta de paellas, factor de paella ~0,5 (${calC.boda?.paella?.factor})`);
+  ok(calC.boda?.bandejas && Math.abs(calC.boda.bandejas.factor - 0.5) < 0.03,
+    `y las bandejas se calibran en paralelo (${calC.boda?.bandejas?.factor})`);
+  ok(calC.boda?.paella && calC.boda.paella.nEventos === 3, "y dice en cuántos eventos se ha medido");
+
+  // La mediana, no la media: un evento en el que no salió ninguna paella no arrastra.
+  const raroC = { a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5), d: conVueltaComida(0, 0.5) };
+  ok(Math.abs(calibracionComida(raroC, {}).boda.paella.factor - 0.5) < 0.03,
+    "un evento en el que no salió ninguna paella no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+  ponFactoresComida({ boda: { paella: 0.5 } });
+  const yaAjustadoC = { a: conVueltaComida(0, 0), b: conVueltaComida(0, 0), c: conVueltaComida(0, 0) };
+  const segC = calibracionComida(yaAjustadoC, { boda: { paella: 0.5 } });
+  ok(segC.boda?.paella && Math.abs(segC.boda.paella.factor - 0.5) < 0.03,
+    `con el factor ya puesto y todo usado, se queda en 0,5 (${segC.boda?.paella?.factor})`);
+  ponFactoresComida({});
+
+  // Las paellas a mano NO cuentan: ese número no es el ratio, y medirlo contra el
+  // ratio sesgaría el factor para siempre. Las bandejas del mismo evento sí.
+  const tresManual = { a: conVueltaComida(0.5, 0.5, { numPaellas: 3 }), b: conVueltaComida(0.5, 0.5, { numPaellas: 3 }), c: conVueltaComida(0.5, 0.5, { numPaellas: 3 }) };
+  const calManual = calibracionComida(tresManual, {});
+  ok(!calManual.boda?.paella, "tres eventos con paella a mano no calibran la paella");
+  ok(calManual.boda?.bandejas, "pero sí calibran las bandejas");
+
+  // Sin la vuelta marcada no dice nada, y "vuelven más de las que salieron" es
+  // imposible y tira el evento entero.
+  ok(Object.keys(calibracionComida({ a: { ...eventoC, vueltos: { "Bebidas frías::Cava": true } }, b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "un evento sin la vuelta marcada se descarta y con dos no se pronuncia");
+  const masQueSalióC = {};
+  catsC.forEach(c => c.items.filter(Boolean).forEach(it => {
+    const label = it[0];
+    if (label.startsWith("Paella ") || label === "Bandejas de madera" || label === "Bandejas de plata") masQueSalióC[`${c.nombre}::${label}`] = "9999";
+  }));
+  ok(Object.keys(calibracionComida({ a: { ...eventoC, vueltos: masQueSalióC }, b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "y volver más de lo que salió tira el evento entero");
+
+  ponFactoresComida({});
 }
 
 // ─── LOS MENÚS QUE HAY QUE HACER APARTE ───────────────────────────────────────

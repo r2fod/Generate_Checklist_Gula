@@ -249,20 +249,21 @@ export function suscribirArchivoNube(cb) {
 }
 
 // ─── LOS AJUSTES QUE SON DEL EQUIPO, NO DE UN MÓVIL ───────────────────────────
-// Precios, ratios de personal, factores de bebida y factores de hielo son la misma
-// cosa cuatro veces: un puñado de números que tienen que valer lo mismo para todo el
-// mundo. Si cada uno tuviera los suyos, dos personas mirando el mismo sábado verían que
-// hacen falta 22 personas o 28 según quién mire, y el mismo evento costaría 340€ o 410€.
+// Precios, ratios de personal y factores de bebida, hielo y comida son la misma
+// cosa cinco veces: un puñado de números que tienen que valer lo mismo para todo
+// el mundo. Si cada uno tuviera los suyos, dos personas mirando el mismo sábado
+// verían que hacen falta 22 personas o 28 según quién mire, y el mismo evento
+// costaría 340€ o 410€.
 //
-// Los cuatro cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
+// Los cinco cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
 // hace falta tocar firestore.rules, y es lo correcto —esto son ajustes internos, no algo
 // que deba leer quien entra por un enlace compartido. Guardan SOLO lo que
 // alguien ha cambiado, para que una corrección de los valores de partida en una versión
-// nueva siga llegando a todo lo que nadie ha tocado. Y los cuatro llegan solos desde otro
+// nueva siga llegando a todo lo que nadie ha tocado. Y los cinco llegan solos desde otro
 // dispositivo: un catálogo que hay que recargar para ver al día es otra vez una hoja
 // suelta.
 //
-// Estaban escritos cuatro veces, palabra por palabra salvo el nombre del documento y el
+// Estaban escritos cinco veces, palabra por palabra salvo el nombre del documento y el
 // del campo. Aquí se escriben una.
 function ajusteCompartido(ruta, campo) {
   return {
@@ -327,6 +328,14 @@ const HIELO = ajusteCompartido("indice/hielo", "hielo");
 export const guardarHieloNube = HIELO.guardar;
 export const cargarHieloNube = HIELO.cargar;
 export const suscribirHieloNube = HIELO.suscribir;
+
+// Cuánta paella y bandejas por tipo de evento respecto a lo que la app carga hoy (ver
+// comida.js). Mismo patrón: sale del histórico de lo que volvió sin usar, así que tiene
+// que verlo el equipo entero o cada móvil cargaría un camión distinto.
+const COMIDA = ajusteCompartido("indice/comida", "comida");
+export const guardarComidaNube = COMIDA.guardar;
+export const cargarComidaNube = COMIDA.cargar;
+export const suscribirComidaNube = COMIDA.suscribir;
 
 // Lo que el asistente ha aprendido del equipo (ver asistente/memoria.js). Es el ajuste
 // compartido más claro de todos: si cada móvil recordara sus cosas, el asistente sabría
