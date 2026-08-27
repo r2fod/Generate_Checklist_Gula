@@ -53,6 +53,8 @@ verifica a nivel de píxel):
 2. **Modo carga, la bandeja y "añadir varios items"**: el barrido de 711 los abre y
    comprueba que aparecen, pero un vistazo humano al respaldo perezoso (un instante la
    primera vez) sigue sin hacerse.
+3. **PanelHielo (C2 del plan):** panel nuevo del Modo carga. Reusa clase por clase la
+   estructura del panel de bebida, pero nadie lo ha visto renderizado en un móvil.
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -62,6 +64,31 @@ Cloudflare (confirmado con "Repasar los eventos ahora").
 **d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños (ver
 "Pendiente", punto 2). La calibración del hielo ya está montada (ver "Hecho"); solo
 le falta que el equipo marque la vuelta en tres eventos para que el número salga solo.
+
+## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + regla de tests)
+
+La rama `arena/01a038bc-…` lleva **dos commits por delante de `main`**: el **C2 del
+plan** (calibración del hielo con lo que volvió; detalle y porqués en "Hecho") y la
+regla nueva de `CLAUDE.md` ("lo nuevo entra con sus tests unitarios"). `test:rapido`
+en verde (tipos + 416 calculos, incluidas las 15 comprobaciones nuevas de hielo, +
+asistente + build + sincronización).
+
+**Antes de fusionar o desplegar, verificar:**
+
+1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2 solo ha
+   corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de Modo
+   carga donde se monta PanelHielo.
+2. **Visto humano de PanelHielo** (`CLAUDE.md` manda captura): 390/412 y escritorio,
+   dos temas, con `animations: "disabled"`. Reusa las clases `cal-ratios`/`cal-ratio`
+   del panel de bebida, pero nadie lo ha visto renderizado todavía.
+3. **El factor de hielo sin datos no es un bug**: la mecánica está montada y el número
+   saldrá solo cuando el equipo marque la vuelta del hielo en 3 eventos (puede ser en
+   kilos). Un 1 en el panel es "aún sin medir", no "roto".
+4. `worker/pegar.js` NO se ha tocado en C2: el check de CI "regenerado" pasa de
+   largo, no hay nada que reencolar en Cloudflare.
+
+El resto del plan (C3, A2, A4…) sigue pendiente en `PLAN_MEJORAS.md`, en el orden
+escrito allí.
 
 ## Orden de lectura
 
@@ -129,7 +156,8 @@ Mira `src/asistente/` antes de escribir — el estilo es marcado y desentona rá
   copiarse.
 - **Los avisos dicen qué hacer**, no solo qué pasó (el motivo del proveedor va tal cual,
   ahorra abrir logs de Cloudflare).
-- Una prueba por fallo arreglado, con el porqué en su texto.
+- Una prueba por fallo arreglado **y por cada comportamiento nuevo** (regla ya en
+  CLAUDE.md), con el porqué en su texto.
 
 ## Comandos
 
