@@ -466,6 +466,73 @@ export async function salud(env) {
   return { pings };
 }
 
+// ─── ANALIZAR WEBS ─────────────────────────────────────────────────────────────
+// A4 del plan (v1): la herramienta analizar_web pide una dirección y el Worker la
+// trae y la reduce a lo que cuenta para captar clientes. Dos cosas la gobiernan:
+//
+//   · La dirección la elige la persona, así que se valida el destino antes de
+//     fetchear: nunca se mira red privada ni localhost. Esta ruta, abierta, sería
+//     un agujero para sondear redes desde dentro.
+//   · Sin dependencias (el Worker se pega tal cual, sin nada que instalar): la
+//     extracción va a regex, y extrae lo que importa, no el DOM entero.
+//
+// Redes sociales no por aquí (v2): Instagram y compañía no enseñan su contenido a
+// un scraper anónimo (muro de login), y lo que sirve allí es la captura del móvil
+// con visión, que es otro camino.
+const HOST_BLOQUEADOS = /^(localhost|.*\.localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1|\[?fe80|\[?f[cd][0-9a-f]{2}:)/i;
+
+/** @param {unknown} url @returns {{ ok: boolean, url?: string, motivo?: string }} */
+export function urlAnalizable(url) {
+  try {
+    const u = new URL(String(url || ""));
+    if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, motivo: "Solo se analizan direcciones http o https." };
+    if (HOST_BLOQUEADOS.test(u.hostname)) return { ok: false, motivo: "Esa dirección no se analiza: es de red privada." };
+    return { ok: true, url: u.toString() };
+  } catch (e) {
+    return { ok: false, motivo: "Esa no parece una dirección completa (falta el https://)." };
+  }
+}
+
+// Lo que cuenta para captar clientes, y no el DOM entero. Todo con tope: el
+// resultado viaja al modelo, y una página de 400 h2 no va a la conversación.
+export function extraerWeb(html, url) {
+  const texto = String(html);
+  const limpio = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const titulo = limpio(texto.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]).slice(0, 120);
+  const descripcion = limpio(
+    texto.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["']/i)?.[1]
+    || texto.match(/<meta[^>]+content=["']([\s\S]*?)["'][^>]+name=["']description["']/i)?.[1]);
+  const encabezados = (tag) => [...texto.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi"))]
+    .map(m => limpio(m[1])).filter(Boolean);
+  const enlaces = [...texto.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map(m => ({ href: String(m[1]), texto: limpio(m[2]) }))
+    .filter(l => l.texto)
+    .slice(0, 60);
+  // Lo que dice "hazlo ya": un enlace con verbo de acción en el texto o en la
+  // dirección (wa.me, /contacto, /reservar...). Sin esto, "¿pueden pedirme
+  // presupuesto desde la web?" se contesta a ciegas.
+  const palabraCTA = /^(reserv|contact|presupuest|pedir|pedido|cotiz|solicita|informa|llamen|llama|escríben|escriben|visít|visita|booking|book|agenda|whatsapp|telegram|menu|menú)/i;
+  const ctas = enlaces
+    .filter(l => palabraCTA.test(l.texto) || palabraCTA.test(l.href.replace(/^https?:\/\//, "").split(/[?#]/)[0]))
+    .slice(0, 10)
+    .map(l => ({ texto: l.texto.slice(0, 60), href: l.href.slice(0, 120) }));
+  const whatsapp = (enlaces.find(l => /wa\.me|api\.whatsapp|whatsapp/i.test(l.href)) || {}).href || null;
+  return {
+    url,
+    titulo: titulo || "(sin título)",
+    descripcion: descripcion.slice(0, 300) || "(sin meta description)",
+    secciones: encabezados("h2").slice(0, 12),
+    tituloPrincipal: encabezados("h1").slice(0, 3),
+    movilAdaptado: /<meta[^>]+name=["']viewport["']/i.test(texto),
+    imagenesSinAlt: (texto.match(/<img(?![^>]*\balt=)[^>]*>/gi) || []).length,
+    nEnlaces: enlaces.length,
+    ctas,
+    whatsapp: whatsapp ? whatsapp.slice(0, 120) : null,
+    telefonos: (texto.match(/(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}/g) || []).slice(0, 5),
+    preciosVisibles: (texto.match(/[0-9]{1,5}(?:[.,][0-9]{1,2})?\s*€|€\s*[0-9]{1,5}(?:[.,][0-9]{1,2})?/g) || []).slice(0, 10),
+  };
+}
+
 // Qué proveedores están de verdad utilizables con lo que hay configurado. La app lo
 // necesita para poder elegir sola: sin esto tendría que adivinar, y adivinar mal
 // significa mandar la pregunta a un proveedor sin clave y comerse el error.
@@ -535,6 +602,33 @@ export default {
         return json(await salud(env), 200, origen);
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+      }
+    }
+
+    // ─── ANALIZAR UNA WEB ──────────────────────────────────────────────────
+    // Misma sesión que el resto. El cuerpo lleva la url; la respuesta es la
+    // extracción estructurada (extraerWeb). No toca Firestore: lo que se mira
+    // es la web, no la app.
+    if (new URL(req.url).pathname === "/__analizar") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      let cuerpo;
+      try { cuerpo = JSON.parse(await req.text()); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+      const chequeo = urlAnalizable(cuerpo.url);
+      if (!chequeo.ok) return json({ error: chequeo.motivo }, 400, origen);
+      try {
+        const r = await fetch(chequeo.url, {
+          redirect: "follow",
+          signal: AbortSignal.timeout(8000),
+          headers: { "user-agent": "Mozilla/5.0 (compatible; GulaChecklist/1.0)" },
+        });
+        if (!r.ok) return json({ error: `La web contestó ${r.status}: no se ha podido analizar.` }, 502, origen);
+        const html = await r.text();
+        if (html.length > 2000000) return json({ error: "La página pesa demasiado para analizarla (más de 2 MB)." }, 413, origen);
+        return json(extraerWeb(html, chequeo.url), 200, origen);
+      } catch (e) {
+        return json({ error: `No se ha podido llegar a la web: ${String(e && e.message ? e.message : e).slice(0, 120)}` }, 502, origen);
       }
     }
 

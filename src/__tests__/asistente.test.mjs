@@ -31,7 +31,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida, salud } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb } from "../../worker/index.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
@@ -106,8 +106,13 @@ console.log("\n── Los datos de clientes y quién puede verlos ──");
   // esta comprobación (con "consultar" caerían las de escribir y la comparación con
   // SIN_DATOS sería otra cosa: los permisos), así que se pide con confianza: aquí se
   // comprueba la barrera de datos, no los permisos.
+  // La comparación va contra el catálogo COMPLETO (de casa + conectores encendidos),
+  // no contra SIN_DATOS (solo de casa): un conector puede añadir herramientas sin
+  // datos de clientes (analizar_web mira webs públicas) y siguen siendo mandables.
+  const catalogoCompleto = todas({});
   const recortado = catalogoParaModelo(true, {}, "confianza").map(h => h.name);
-  ok(recortado.length === SIN_DATOS.length && recortado.every(n => !HERRAMIENTAS[n].datos),
+  const sinDatosEsperado = Object.keys(catalogoCompleto).filter(n => !catalogoCompleto[n].datos);
+  ok(recortado.length === sinDatosEsperado.length && recortado.every(n => !catalogoCompleto[n].datos),
     `el catálogo recortado son solo las que no llevan datos de clientes → ${recortado.join(", ")}`);
   ok(!recortado.includes("buscar_eventos") && !recortado.includes("ver_evento") && !recortado.includes("ver_calendario"),
     "y no lleva ninguna que devuelva nombres, fechas o sitios");
@@ -1808,6 +1813,75 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     "y el que no tiene clave sigue en su sitio, sin confundirse con el roto");
 
   globalThis.fetch = fetchReal;
+}
+
+// ─── MARKETING: ANALIZAR WEBS (A4 v1) ─────────────────────────────────────────
+{
+  console.log("\n── Marketing: analizar webs (A4 v1) ──");
+
+  // La dirección la elige la persona: la ruta /__analizar fetchea lo que le den.
+  // Sin esta puerta, sería un agujero para sondear redes desde dentro.
+  ok(urlAnalizable("https://www.gula.es").ok, "una web normal se puede analizar");
+  ok(urlAnalizable("http://gula.es").ok, "http también (que el Worker decida el resto)");
+  ok(!urlAnalizable("ftp://gula.es").ok, "y no otros protocolos");
+  ok(!urlAnalizable("gula.es").ok, "ni una dirección sin protocolo");
+  ok(!urlAnalizable("https://localhost/x").ok, "localhost nunca");
+  ok(!urlAnalizable("https://127.0.0.1/x").ok, "ni loopback");
+  ok(!urlAnalizable("https://192.168.1.5").ok, "ni red doméstica");
+  ok(!urlAnalizable("https://10.0.0.7").ok, "ni corporativa");
+  ok(!urlAnalizable("https://172.16.5.5").ok, "ni privada 172.16-31");
+  ok(urlAnalizable("https://172.32.5.5").ok, "172.32 SÍ es pública (fuera del bloque)");
+  ok(!urlAnalizable("https://169.254.169.254/latest").ok, "ni la metadata de la máquina");
+  ok(!urlAnalizable("https://[::1]/x").ok, "ni el loopback ipv6");
+
+  // La extracción: lo que cuenta para captar clientes, con topes y sin DOM.
+  const html = `
+    <html><head>
+      <title>Gula Catering · Catering en Sevilla</title>
+      <meta name="description" content="Catering para bodas y eventos en Sevilla.">
+      <meta name="viewport" content="width=device-width">
+    </head><body>
+      <h1>Catering de verdad</h1>
+      <h2>Nuestras bodas</h2><h2>Opiniones</h2>
+      <a href="/contacto">Contactar</a>
+      <a href="https://wa.me/34600000000">Pedir presupuesto</a>
+      <a href="/menú">Ver menú desde 35 €</a>
+      <a href="/privada">Zona privada</a>
+      <img src="a.jpg"><img src="b.jpg" alt="paella">
+    </body></html>`;
+  const extra = extraerWeb(html, "https://www.gula.es/");
+  ok(extra.titulo.includes("Gula Catering"), "saca el título");
+  ok(extra.descripcion.includes("Catering para bodas"), "y la meta description");
+  ok(extra.secciones.includes("Nuestras bodas") && extra.secciones.includes("Opiniones"), "las secciones (h2)");
+  ok(extra.movilAdaptado === true, "y si está adaptada a móvil (viewport)");
+  ok(extra.ctas.length >= 2 && extra.ctas.some(c => c.texto.includes("Contactar")),
+    "los botones de acción, con su texto");
+  ok(extra.whatsapp && extra.whatsapp.includes("wa.me"), "y el enlace de WhatsApp, que es la puerta de captación");
+  ok(extra.preciosVisibles.some(p => p.includes("35")), "los precios visibles");
+  ok(extra.imagenesSinAlt === 1, "cuántas imágenes no llevan alt (accesibilidad y buscadores)");
+
+  // Y una web sin nada de eso no inventa botones.
+  const vacia = extraerWeb("<html><head><title>Solo texto</title></head><body><p>Hola</p></body></html>", "https://vacia.es/");
+  ok(vacia.ctas.length === 0 && !vacia.whatsapp && vacia.descripcion.startsWith("(sin"),
+    "una web sin CTAs no sale con CTAs inventados");
+
+  // La herramienta: sin proxy configurado, lo dice; con proxy y la web contestando,
+  // devuelve la extracción; y el error del Worker va tal cual.
+  const fetchReal = globalThis.fetch;
+  ok((await ejecutar("analizar_web", { url: "https://gula.es" }, { ...CTX, urlProxy: "" })).error
+      .includes("no está configurado"), "sin Worker, lo dice en vez de fallar en silencio");
+  globalThis.fetch = async () => new Response(JSON.stringify(extra), { status: 200 });
+  const conProxy = await ejecutar("analizar_web", { url: "https://gula.es" }, { ...CTX, urlProxy: "http://falso.example" });
+  ok(conProxy.titulo.includes("Gula Catering"), "con el Worker contestando, devuelve la extracción");
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "La web contestó 404: no se ha podido analizar." }), { status: 502 });
+  const rota = await ejecutar("analizar_web", { url: "https://gula.es/bad" }, { ...CTX, urlProxy: "http://falso.example" });
+  ok(rota.error && rota.error.includes("404"), "y el fallo del Worker va tal cual, sin decorar");
+  globalThis.fetch = fetchReal;
+
+  // En el catálogo, como el resto de conectores: se enciende sola (no necesita nada).
+  ok(todas({}).analizar_web, "el conector de marketing encendido en el catálogo");
+  ok(!HERRAMIENTAS.analizar_web && todas({}).analizar_web.conector === "marketing",
+    "y se sabe que viene del conector, no de casa");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

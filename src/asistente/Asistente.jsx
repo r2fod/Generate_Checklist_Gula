@@ -8,7 +8,7 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
 import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
@@ -190,6 +190,19 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
   const [probando, setProbando] = useState(false);
   const [avisoSalud, setAvisoSalud] = useState(null);
+  // Qué burbuja se acaba de copiar (índice del hilo, -1 = ninguna). El texto que el
+  // asistente prepara (post, guion, mensaje) se copia con un toque, en el gesto de
+  // quien pulsa: el portapapeles solo se puede escribir así, y aquí el gesto es el botón.
+  const [copiado, setCopiado] = useState(-1);
+  const copiarMensaje = async (i) => {
+    const m = hilo[i];
+    if (!m) return;
+    try {
+      await navigator.clipboard.writeText(sinMarcas(m.texto));
+      setCopiado(i);
+      setTimeout(() => setCopiado(x => (x === i ? -1 : x)), 1500);
+    } catch (e) { /* sin permiso del portapapeles: el botón se queda como estaba */ }
+  };
   // Preguntar al Worker que pinge a cada proveedor: enterarse EL VIERNES de que el
   // modelo existe y la clave vale, no el sábado. Cada ping es un mensaje de dos
   // tokens (ver salud() en worker/index.js), y solo se hace al pulsar.
@@ -316,7 +329,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         mensajes,
         // El repaso entra en el contexto para que "ver_repaso" lo lea: lo carga este
         // panel de Firestore, no la app, así que no viene en el contexto de fuera.
-        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir },
+        // token y urlProxy para las herramientas que miran fuera (analizar_web):
+        // la url la manda la app, no el modelo, que la inventaría, y el token no
+        // sale del navegador (el contexto no viaja por la red).
+        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir, token, urlProxy: url },
         url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
@@ -822,7 +838,22 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               {/* Sin markdown: se le pide al modelo que no lo use, pero pedirlo no basta
                   —se olvida cada tantas respuestas y el que se olvida no avisa—, así que
                   se limpia aquí, que es el único sitio donde se puede garantizar. */}
-              <div className="asis-burbuja">{m.de === "el" ? sinMarcas(m.texto) : m.texto}</div>
+              <div className="asis-burbuja">
+                {m.de === "el" ? sinMarcas(m.texto) : m.texto}
+                {/* El texto que el asistente prepara (post, guion, mensaje) se copia
+                    tal cual: "listo para copiar" no vale si hay que seleccionarlo a mano. */}
+                {m.de === "el" && (
+                  <button
+                    type="button"
+                    className={`asis-copiar${copiado === i ? " es-copiado" : ""}`}
+                    title={copiado === i ? "Copiado" : "Copiar el texto"}
+                    aria-label={copiado === i ? "Copiado" : "Copiar el texto"}
+                    onClick={() => copiarMensaje(i)}
+                  >
+                    {copiado === i ? <Check size={11} aria-hidden="true" /> : <Copy size={11} aria-hidden="true" />}
+                  </button>
+                )}
+              </div>
               {/* De dónde sale lo que acaba de decir */}
               {(m.pasos && m.pasos.length > 0) || m.coste || (m.quien && disponibles.length > 1) ? (
                 <div className="asis-pasos">

@@ -39,6 +39,12 @@ Cómo trabajas:
   Sus avisos salen de reglas con los datos de la app, no de tu cabeza. Si uno dice que
   se puede aplicar un factor medido y la persona lo pide, se hace con aplicar_calibracion
   copiando sus datos —lo aprueba ella en la pantalla, no tú—, y nunca se inventa un número.
+- Para captar clientes o mirar el marketing: analizar_web (pide la dirección completa,
+  con https://) y el plan se apunta con apuntar_tarea, con fecha cuando toque. Para
+  guiar paso a paso, UN paso a la vez y esperando a que la persona confirme lo anterior
+  antes de pasar al siguiente: lo que está hecho es lo que ella dice, no lo que tú supones.
+  Los textos que prepares (post, mensaje de WhatsApp, guion de vídeo) van en texto
+  plano, listos para copiar tal cual.
 
 Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con recordar: una frase corta, concreta y en tercera persona. No guardes lo que ya sale de un cálculo (cuánta cerveza, cuánto hielo) ni datos de un evento suelto que ya están en la app; guarda lo que NO está escrito en ninguna parte y servirá el mes que viene. Si algo que recordabas resulta ser falso, lo borras con olvidar.`;
 
@@ -183,7 +189,11 @@ export async function preguntar({
           contenido: { error: "Esa herramienta no está disponible con este proveedor porque devuelve datos de clientes." } });
         continue;
       }
-      const crudo = ejecutar(llamada.nombre, llamada.argumentos, contexto);
+      // Promise.resolve: las herramientas de casa son síncronas (el 99%), pero una
+      // puede ser asíncrona (analizar_web mira fuera) sin que el bucle tenga que
+      // saberlo. Un resultado que fuera una Promise sin esperar se stringify como
+      // {} y el modelo creería que la herramienta no devolvió nada.
+      const crudo = await Promise.resolve(ejecutar(llamada.nombre, llamada.argumentos, contexto));
       // Se comprime ANTES de meterlo en la conversación, no al mandarlo: el resultado se
       // queda ahí y viaja otra vez en cada pregunta siguiente. Comprimir a la salida
       // ahorraría una vez; comprimir aquí ahorra todas.

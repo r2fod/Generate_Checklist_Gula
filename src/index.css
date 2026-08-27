@@ -7623,6 +7623,17 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
    calcular, "raro" huele mal, "acuérdate" hay que hacerlo fuera de la app. */
 /* El estado de cada proveedor al probarlos: el color del nombre dice el veredicto,
    el motivo va tal cual detrás (un "Gemini 404: not found" se explica solo). */
+/* Copiar el texto de una respuesta del asistente (posts, guiones, mensajes): aparece
+   al pasar por la burbuja; en pantallas sin hover (móvil) va siempre algo visible. */
+.asis-copiar {
+  float: right; margin: 0 0 4px 8px; padding: 2px 4px; border: none;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  border-radius: 4px; opacity: 0; transition: opacity 0.15s, color 0.15s;
+}
+.asis-msg:hover .asis-copiar, .asis-copiar:focus-visible { opacity: 1; }
+.asis-copiar.es-copiado { opacity: 1; color: var(--green-qty); }
+@media (hover: none) { .asis-copiar { opacity: 0.55; } }
+
 .asis-salud { margin: 8px 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.5; }
 .asis-salud-ping strong { margin-right: 2px; }
 .asis-salud-ping.es-ok strong { color: var(--green-qty); }

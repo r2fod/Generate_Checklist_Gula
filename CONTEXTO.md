@@ -62,6 +62,8 @@ verifica a nivel de píxel):
    nueva `es-oportunidad`; solo se pinta con avisos (el caso normal no suena a aviso).
 6. **"Probar los proveedores" en Ajustes (B6):** botón y su lista de estados
    (`.asis-salud`); el motivo de un fallo va tal cual detrás del nombre.
+7. **Botón de copiar en las burbujas del asistente (A4 v1):** aparece al pasar por la
+   burbuja (en móvil va siempre a medio opaco) y sale en verde al copiar.
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -74,17 +76,17 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **ocho commits por delante de `main`**: el **C2 del
+La rama `arena/01a038bc-…` lleva **nueve commits por delante de `main`**: el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
 con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
 paquete **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no adivina,
 cabecera corregida y barrido de datos reales en la batería), **B5+B6** (README real y
-salud de proveedores desde Ajustes) y **B8** (línea base de pintado en el CI
+salud de proveedores desde Ajustes), **B8** (línea base de pintado en el CI
 nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App de la
-sesión no tiene permiso `workflows`, ver "Hecho"). Detalle y porqués en "Hecho".
-`test:rapido` en verde (tipos + 439 calculos + 527 asistente + build +
-sincronización).
+sesión no tiene permiso `workflows`, ver "Hecho") y el **A4 v1** (marketing: análisis
+de webs + estrategia). Detalle y porqués en "Hecho". `test:rapido` en verde (tipos +
+439 calculos + 554 asistente + build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
 
@@ -706,6 +708,31 @@ segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
 ## Hecho (referencia, no acción)
+
+**A4 del plan — Marketing v1 (análisis de webs + estrategia) — montado.** El hueco
+por donde el asistente crece en la otra dirección: no los eventos que ya hay, sino
+los que todavía no hay.
+- Nuevo conector `marketing` con la herramienta `analizar_web` (solo lectura,
+  `datos: false` — lo que se extrae es una web pública, no datos de clientes): se
+  pide la dirección completa y el Worker la trae y devuelve la extracción
+  estructurada (título, descripción, secciones, botones de acción, WhatsApp,
+  teléfonos, precios visibles, imágenes sin alt, viewport móvil).
+- El Worker no trae lo que le digan tal cual: `urlAnalizable` rechaza lo que no es
+  http(s), localhost, loopback, redes privadas (10/192.168/172.16-31/169.254) y el
+  loopback ipv6 — esta ruta, abierta, sería un agujero para sondear redes desde
+  dentro. Tope de 8 s y 2 MB.
+- Las redes sociales son la v2, no la v1: Instagram y compañía no enseñan su
+  contenido a un scraper anónimo (muro de login); por ahí el camino es la captura
+  del móvil con visión.
+- El bucle del asistente aprendió a esperar herramientas asíncronas
+  (`Promise.resolve` en cliente.js; las de casa siguen síncronas y la que mira
+  fuera es la primera asíncrona).
+- El modo "un paso a la vez y esperar a que se confirme" está en el sistema; los
+  textos que prepara (post, guion, mensaje) se copian con un toque: botón en la
+  burbuja, y el portapapeles dentro del gesto de quien pulsa.
+- El plan de la estrategia sigue usando `apuntar_tarea` con fecha (mecanismo
+  existente + recordatorios): no hay infraestructura nueva.
+27 comprobaciones nuevas, `test:rapido` en verde.
 
 **B8 del plan — línea base de pintado en CI — listo, pendiente de aplicar por el
 dueño.** El trabajo de navegador de `test.yml` ya descargaba chromium y lo dejaba en

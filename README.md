@@ -26,9 +26,9 @@ Las tres comparten los cálculos (`src/calculos.js`, `src/checklist-generadores.
 La checklist y el calendario llevan un asistente de IA generativa (`src/asistente/`):
 un modelo por un **Cloudflare Worker** que hace de proxy —las claves API son
 secretos del Worker, nunca viven en el bundle—, con herramientas, permisos
-graduados (consultar / permiso / confianza), memoria propia, auditoría de negocio
-y calibración de ratios con los eventos reales. Cómo se monta el Worker:
-`worker/README.md`.
+graduados (consultar / permiso / confianza), memoria propia, auditoría de negocio,
+análisis de webs para la captación de clientes y calibración de ratios con los
+eventos reales. Cómo se monta el Worker: `worker/README.md`.
 
 ## Comandos
 
