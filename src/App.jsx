@@ -33,7 +33,11 @@ import {
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
+  guardarRatiosNube,
+  cargarCristaleriaNube, guardarCristaleriaNube, suscribirCristaleriaNube,
 } from "./nube.js";
+import { ponRatios, ratiosCambiados } from "./personal.js";
+import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
@@ -76,6 +80,9 @@ import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistent
 import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
 import { aplicarEnChecklists } from "./asistente/escrituraChecklists.js";
 import { aplicarEnCalendario } from "./asistente/escrituraCalendario.js";
+import { aplicarEnRatios } from "./asistente/escrituraRatios.js";
+import { aplicarEnBebida } from "./asistente/escrituraBebida.js";
+import { aplicarEnCristaleria } from "./asistente/escrituraCristaleria.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1996,6 +2003,15 @@ export default function App({ onCerrarSesion } = {}) {
       .catch(() => { /* sin conexión */ });
   }, [escribirEnCalendario]);
 
+  // Para el asistente (ver escrituraRatios.js): el mismo ponRatios que deja el valor
+  // puesto para TODA la app —esta pantalla no tiene su propio estado de ratios, calcula
+  // con leerRatios() donde hace falta— y la misma subida a la nube que ya hacía el panel
+  // de Ratios del calendario, solo lo cambiado y sin esperar a que termine.
+  const guardarRatiosAsistente = React.useCallback((siguiente) => {
+    ponRatios(siguiente);
+    if (nubeActiva()) guardarRatiosNube(ratiosCambiados(siguiente)).catch(() => { /* se reintenta al siguiente cambio */ });
+  }, []);
+
   const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo) return;
@@ -2082,6 +2098,26 @@ export default function App({ onCerrarSesion } = {}) {
     setFactoresBebida(ponFactores(siguiente));
     if (nubeActiva() && haySesionEquipo) {
       guardarBebidaNube(factoresCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+  // Mismo patrón que factoresBebida, para la cristalería (ver cristaleria.js). Sin
+  // panel manual todavía: hoy solo lo toca el asistente (aplicar_factor_cristaleria),
+  // pero vive aquí y no solo en memoria para que el equipo entero cargue lo mismo.
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) ponFactoresCristaleria(remotos); };
+    cargarCristaleriaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirCristaleriaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarCristaleria = (siguiente) => {
+    ponFactoresCristaleria(siguiente);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarCristaleriaNube(factoresCristaleriaCambiados(siguiente))
         .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
     }
   };
@@ -3071,6 +3107,9 @@ export default function App({ onCerrarSesion } = {}) {
                     aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
                     aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
                     aplicarEnCalendario({ apuntes: apuntesCalendario, guardar: guardarApunte, borrar: borrarApunte }),
+                    aplicarEnRatios({ guardar: guardarRatiosAsistente }),
+                    aplicarEnBebida({ guardar: handleCambiarBebida }),
+                    aplicarEnCristaleria({ guardar: handleCambiarCristaleria }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),

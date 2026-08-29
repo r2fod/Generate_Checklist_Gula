@@ -320,6 +320,14 @@ export const guardarBebidaNube = BEBIDA.guardar;
 export const cargarBebidaNube = BEBIDA.cargar;
 export const suscribirBebidaNube = BEBIDA.suscribir;
 
+// Cuánta cristalería se carga respecto a lo de siempre (ver cristaleria.js). A
+// diferencia de la bebida, no va por tipo de evento: calcCristaleria calcula igual
+// para todos, así que el ajuste tampoco distingue.
+const CRISTALERIA = ajusteCompartido("indice/cristaleria", "cristaleria");
+export const guardarCristaleriaNube = CRISTALERIA.guardar;
+export const cargarCristaleriaNube = CRISTALERIA.cargar;
+export const suscribirCristaleriaNube = CRISTALERIA.suscribir;
+
 // Lo que el asistente ha aprendido del equipo (ver asistente/memoria.js). Es el ajuste
 // compartido más claro de todos: si cada móvil recordara sus cosas, el asistente sabría
 // una cosa distinta según quién preguntara. Y va aquí y no en el navegador porque lo

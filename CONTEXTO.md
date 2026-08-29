@@ -1464,6 +1464,123 @@ antes de tocar nada):
   pero no se tocó, es tarea de B4 en sí), B5 (README raíz sigue siendo el boilerplate de
   Vite), B6, B7, B8, C1, C2, C3 — ninguno se ha tocado, solo se confirmó que faltan.
 
+## El asistente ya puede cambiar ratios de personal y factores de bebida
+
+**Lo que se vio:** el dueño le pidió al asistente, en Charla, que quitara tres camareros
+de una boda. El asistente calculó bien el ahorro (`calcular_personal`) pero contestó que
+no podía aplicarlo: "eso solo se puede cambiar a mano en los ajustes de la app". El
+dueño preguntó por qué, si los niveles de permiso (consultar/con permiso/confianza)
+existen precisamente para dejarle escribir cuando se le da permiso.
+
+**Por qué pasaba:** no era un fallo de permisos, es que no existía NINGUNA herramienta
+que supiera cambiar un ratio — ni siquiera en "Confianza" había nada que ejecutar. El
+propio A1 ya lo dejaba anotado como opcional y sin construir ("Opcional: `aplicar_ratio`
+con `escribe: true`... no hicieron falta"): la infraestructura de guardado
+(`ponRatios`/`guardarRatiosNube` para personal, `ponFactores`/`guardarBebidaNube` para
+bebida) ya existía desde antes —la usa el panel del calendario— pero nunca se conectó a
+una herramienta del asistente.
+
+**Lo que se pidió primero, y por qué no**: el dueño preguntó si el asistente podía
+"modificar cualquier cosa de la app" con los permisos adecuados, ya que está "super
+integrado". Se le explicó por qué eso es mal camino y se acordó lo de abajo en su lugar
+— queda razonado en `PLAN_MEJORAS.md`, en "No hacer": una herramienta genérica no puede
+llevar puesta la validación de cada campo, y ensancharía sin darse cuenta la lista
+`NUNCA` (marcar cargado, borrar un evento...) que existe justo para que un fallo del
+modelo no destruya el trabajo de quien carga el camión.
+
+**Lo que se construyó, dos herramientas concretas, mismo patrón que `apuntar_tarea`:**
+
+1. **`aplicar_ratio`** (`herramientas.js`) — cambia comensales por camarero de un tipo de
+   evento. Valida que el tipo exista y que el número esté en 1-60 (reutilizando
+   `saneaRatios`, la misma puerta por la que entra un cambio a mano) ANTES de proponerlo,
+   así que `onEscribir` nunca recibe basura.
+2. **`aplicar_factor_bebida`** — cambia cuánto se bebe de vino/cerveza/cava/refresco en un
+   tipo de evento, como múltiplo (1 = de siempre), que es como ya lo guarda `bebida.js`.
+   Valida tipo, bebida y que el factor esté en 0,3-2 (`esFactorValido`, ya existente).
+
+**El aplicador, aparte de la herramienta** (mismo motivo que `escrituraCalendario.js`: la
+herramienta no tiene por qué saber cómo se persiste algo):
+
+- `src/asistente/escrituraRatios.js` — `aplicarEnRatios({ guardar })`. Manda el juego de
+  ratios ENTERO a `guardar`, no solo el que cambia: como `ponRatios` parte siempre de los
+  valores de fábrica, mandar solo uno habría reseteado a los demás si alguien los había
+  tocado antes. Se enganchó en `App.jsx` (con un `guardarRatiosAsistente` nuevo, que hace
+  lo mismo que ya hacía el panel de Ratios del calendario) y en `calendario/main.jsx`
+  (reutilizando literalmente la `cambiarRatios` que ya usa el panel — cero lógica nueva
+  ahí).
+- `src/asistente/escrituraBebida.js` — `aplicarEnBebida({ guardar })`. Los factores se
+  guardan esparcidos (bebida.js), así que aquí lo que hay que conservar es la fila del
+  TIPO de evento que se esté tocando (para que cambiar la cerveza no borre un ajuste de
+  vino hecho un minuto antes), no el juego entero. Solo enganchado en `App.jsx`
+  (reutilizando `handleCambiarBebida`, que ya existía): el calendario no tiene panel de
+  bebida, así que no había nada que reutilizar ahí.
+
+**Por qué no se tocó el hielo**: el dueño preguntó también por "los cálculos" en
+general. `KG_HIELO_POR_PAX` y `MERMA_SIN_CONGELADOR` (`calculos.js`) son constantes fijas
+en el código, sin el mecanismo de guardado esparcido que ya tienen personal y bebida —
+hacerlas ajustables es justo C2 en `PLAN_MEJORAS.md` ("depende de datos reales, no de un
+número puesto a mano"), y construirlo aquí de prisa habría sido saltarse esa calibración
+a propósito. Se dijo así de claro y se dejó para cuando toque C2.
+
+**Verificado:** `aplicar_en_ratios`/`aplicar_en_bebida` probados con un `guardar` de
+mentira (comprueba justo el caso que costaba pensar: un segundo ajuste del mismo tipo de
+evento no borra el primero). Las dos herramientas probadas con los tres niveles de
+permiso (en "Solo consultar" no dejan, en "Confianza" sí, y con `onEscribir` ausente —
+una pantalla que no lo ofrezca— lo dicen sin reventar). `test:rapido` en verde (515 en
+asistente.test.mjs, +2 sobre las 513 de antes). Sin captura: no hay UI nueva, la
+propuesta se enseña con la MISMA tarjeta de confirmación que ya usa `apuntar_tarea`, ya
+verificada visualmente en su día.
+
+Un efecto colateral bueno, no buscado: al cambiar `catalogoParaModelo(true)` para incluir
+estas dos (`datos: false`, sin dueño), una prueba antigua asumía que "sin datos" y "el
+catálogo recortado a nivel por defecto" eran la misma lista — dejó de serlo en cuanto
+existió una herramienta sin datos PERO que escribe (antes todas las que escribían
+llevaban `datos: true`). Corregida para comprobar la propiedad real: el catálogo
+recortado nunca lleva una herramienta con datos, se ponga el nivel que se ponga.
+
+## Cristalería, tercer ajuste del mismo tipo — y por qué vajilla/cubertería aún no
+
+Mismo hilo que el de arriba (ratios de personal y bebida): el dueño preguntó por poder
+ajustar también cristalería, platos y cubiertos. Se analizaron las tres, con el código
+delante, antes de tocar nada:
+
+**Cristalería — construida, mismo patrón.** Nuevo `src/cristaleria.js` (factores
+`vino`/`agua`/`cava`/`cubata`, 0,3-2, plano — SIN tipo de evento, porque
+`calcCristaleria` (`calculos.js`) tampoco distingue boda de comunión: añadirle esa
+distinción habría sido tocar algo que nadie pidió). Nueva herramienta
+`aplicar_factor_cristaleria` + su aplicador `escrituraCristaleria.js` + `indice/cristaleria`
+en la nube (cubierto ya por la regla genérica `match /indice/{doc}`, sin tocar
+`firestore.rules`). Enganchado solo en `App.jsx` — **sin panel manual todavía**: por
+ahora la única forma de tocarlo es pidiéndoselo al asistente, a diferencia de ratios y
+bebida que ya tenían su panel en el calendario antes de esto. Es una simplificación
+consciente, no un olvido — se puede añadir un panel el día que haga falta, sin tocar
+la parte del asistente.
+
+Verificado que con el factor en 1 (nadie lo ha tocado) `calcCristaleria` da EXACTAMENTE
+los mismos números de siempre — la prueba fija 144 copas de cava para 100 pax sin
+brindis, y sigue dando 144 después de este cambio. Y que ajustar una clave (p. ej.
+cava) no toca las demás (vino sigue igual), tanto en el cálculo puro como en el
+aplicador con un segundo ajuste seguido.
+
+**Vajilla y cubertería (platos, cubiertos) — analizadas y aplazadas, no descartadas.**
+A diferencia de cristalería (una función central, `calcCristaleria`), su cálculo
+(`platosDoble`, `cubiertosDoble`) está escrito TRES veces dentro de
+`checklist-generadores.js`, una copia por función de tipo de evento (boda, comunión,
+corporativo), sin ninguna función compartida a la que engancharle un factor. Meter el
+ajuste ahí habría significado o bien tocar tres sitios a la vez con el riesgo de que se
+desincronicen, o hacer un refactor de extraer la fórmula común primero — que es trabajo
+aparte, con su propia prueba de que no cambia ningún número existente, no algo para
+colar de paso en esta sesión. Queda anotado en `PLAN_MEJORAS.md` como el siguiente paso
+natural.
+
+**Lo de las 12h de "Cóctel / aperitivo" — descartado, y por qué.** El dueño preguntó si
+convenía subir ese tope (el deslizador va a `max="12"`, mientras que "Copas" ya llega a
+24h) y de paso si se podía dejar CONFIGURABLE en vez de fijo. Se recomendó no montar un
+ajuste nuevo para esto: es el límite de un único `<input type="range">`, sin dato ni
+lógica detrás, y crear un sitio de guardado y una pantalla para tocar un solo número
+sería más código que el propio problema. El dueño decidió dejarlo tal cual está (12h) —
+no hacía falta ni subirlo.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
