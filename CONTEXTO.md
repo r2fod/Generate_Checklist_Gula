@@ -1641,6 +1641,70 @@ enteraba de que existía `leerRatios()`. `test:rapido` en verde después: 411 (+
 distinta de las copas de agua de cristalería. Sigue sin mecanismo de ajuste, anotado en
 el plan junto a hielo (C2) para cuando toque.
 
+## Segundo bug del mismo hilo: la pantalla de la checklist nunca cargaba el ratio de la nube
+
+Siguiendo el mismo hilo ("¿y qué más tiene ratios que se me haya escapado?"), un
+segundo agujero, más silencioso que el anterior: `App.jsx` (la pantalla de la
+checklist, `checklist/index.html`) **nunca llamaba a `cargarRatiosNube()` ni a
+`suscribirRatiosNube()`**. Esas dos funciones existían en `nube.js` desde que se
+construyó el panel de Ratios del calendario, pero solo las usaba
+`calendario/useCalendarioNube.js` — el calendario. La checklist arrancaba SIEMPRE con
+`leerRatios()` en los valores de fábrica (9/10/20), y solo se enteraba de un ratio
+ajustado por el equipo si, en esa misma sesión de navegador, alguien abría el
+calendario embebido (`CalendarioEnChecklist`) o el asistente aplicaba un cambio con
+`aplicar_ratio` — ambos caminos comparten el mismo estado de módulo de `personal.js`,
+así que "tocan" `leerRatios()` de rebote, pero nada lo cargaba por su cuenta al abrir
+la checklist sola.
+
+En la práctica el efecto era pequeño —basta con tocar cualquier campo del evento
+(pax, tipo…) para que `baseChecklist` recalculara con lo que hubiera llegado
+mientras tanto— pero era el mismo hueco que el bug anterior, en el sitio de al lado:
+el dato SÍ estaba en Firestore, y la pantalla que más lo necesita no iba a buscarlo.
+
+**Arreglado en `App.jsx`**: nuevo `useState`+`useEffect` para `ratiosPersonal`,
+calcado del que ya tenía `factoresBebida` (carga al montar + se suscribe, solo si hay
+sesión de equipo — `nubeActiva() && haySesionEquipo`, igual que todos los demás
+ajustes compartidos). `guardarRatiosAsistente` (la que usa `aplicar_ratio` del
+asistente) ahora también actualiza ese estado, para que un panel abierto se entere sin
+esperar a otro recálculo — y de paso se le añadió el `&& haySesionEquipo` que le
+faltaba en la condición de subida a la nube (los demás ajustes compartidos lo llevan
+todos; a este se le había quedado fuera al construirlo en la sesión anterior).
+
+## El ratio de personal también se calibra solo, como la bebida
+
+Pedido explícito: "¿y no recomiendas que se vaya reajustando las cosas que
+autocalcula... aparte de si se lo pides al asistente?" — y la idea de que
+`numCamareros` (el campo donde alguien pone a mano cuántos camareros hicieron falta
+de VERDAD en un evento, porque el automático no encajaba) ya es, sin que nadie lo
+pensara así, el mismo tipo de dato con el que se sacaron los ratios de partida — ver
+la cabecera de `personal.js`: "salen de contar el personal que se puso de verdad en
+19 eventos". `calibracionPersonal` (nueva, en `calibracion.js`) hace justo eso, pero
+actualizado con cada evento nuevo en vez de una vez y para siempre: por cada tipo de
+evento con ≥3 eventos guardados que tengan `numCamareros` puesto a mano, calcula
+`pax / numCamareros` de cada uno y toma la MEDIANA (un evento raro no descoloca el
+ratio de los demás, igual que en `calibracionBebida`).
+
+Un evento que ADEMÁS tenga `paxPorCamarero` puesto a mano para sí mismo se descarta:
+ese campo ya es "aquí quiero un ratio distinto a propósito", y mezclarlo con "el
+ratio de serie se quedó corto" ensuciaría la medida con una decisión ya tomada, no
+con un fallo del automático.
+
+**Se enseña donde ya se enseñaba la de bebida**: el Resumen del Modo carga, con el
+MISMO componente que ya tenía el calendario (`calendario/Ratios.jsx`), ahora con una
+prop `calibracion` opcional (por defecto vacía, así que el calendario en solitario —
+que no tiene el archivo de eventos guardados— no cambia nada). Mismo patrón visual
+que `PanelBebida.jsx`: en cuanto hay 3 eventos medidos, sale "1 cada 14 · 3 ev." con
+un botón para usarlo, y una vez puesto se queda como etiqueta ("✓ medido") en vez de
+invitar a pulsarlo otra vez. Sin duplicar el panel ni su CSS — ya existían los dos.
+
+Verificado con Playwright de verdad, en el navegador: tres bodas guardadas con
+`pax:140, numCamareros:10` (140÷10 = 14 exacto, sin ambigüedad de redondeo) hacen
+salir "1 cada 14 · 3 ev." en la fila de Boda; al pulsarlo el campo pasa a 14 y la
+cabecera dice "1 ajustado"; y con eso puesto, una boda de 135 pax pide 10 camareros
+en la checklist real (135÷14, antes 15 con el 9 de fábrica) — la cadena completa,
+del botón al número que se carga en el camión. 420 comprobaciones en
+`calculos.test.mjs` (+10), sin cambios en el resto.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

@@ -56,6 +56,33 @@ sacarlo a una función común (mismo motivo que ya justificó extraer
 número que se corrige en dos). Es el siguiente paso natural, no una
 decisión de no hacerlo.
 
+**Segundo bug del mismo hilo, también arreglado**: auditando a fondo se vio
+que `App.jsx` (la pantalla de la checklist) nunca llamaba a
+`cargarRatiosNube()`/`suscribirRatiosNube()` — existían en `nube.js` desde
+que se construyó el panel del calendario, pero solo las usaba el
+calendario. La checklist arrancaba siempre con los ratios de fábrica hasta
+que algo (abrir el calendario embebido, o el asistente) los pusiera en
+memoria de rebote. Arreglado con el mismo patrón que `factoresBebida`
+(carga + suscripción al montar, solo con sesión de equipo) — ver
+CONTEXTO.md, "Segundo bug del mismo hilo".
+
+**El ratio de personal ya se autocalibra, como la bebida** (pedido:
+"¿no recomiendas que se vaya reajustando lo que autocalcula?", respondido
+con el propio dato que ya había: el campo `numCamareros`, donde alguien
+pone a mano cuántos camareros hicieron falta de verdad, es el mismo tipo
+de dato con el que se sacaron los ratios de partida — ver la cabecera de
+`personal.js`). `calibracionPersonal` (`calibracion.js`) compara, por tipo
+de evento con ≥3 eventos guardados con `numCamareros` puesto a mano, la
+mediana de `pax/numCamareros` — descartando los eventos que además tengan
+su propio `paxPorCamarero`, que ya es una decisión tomada y no una señal de
+que el ratio de serie se quedara corto. Se enseña en el Resumen del Modo
+carga con el MISMO componente `Ratios.jsx` que ya tenía el calendario
+(nueva prop `calibracion`, opcional y vacía por defecto), mismo patrón
+visual que el panel de bebida: sale el ratio medido con un botón para
+usarlo en cuanto hay datos de sobra. Verificado con Playwright de verdad,
+del botón a la checklist. Ver CONTEXTO.md, "El ratio de personal también
+se calibra solo, como la bebida".
+
 ### A2 — Auditorías que proponen mejoras
 
 **Por qué:** se pidió que el asistente haga auditorías y proponga mejoras. El

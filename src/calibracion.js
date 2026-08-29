@@ -2,6 +2,7 @@ import { estimarTiemposCarga, FASES_TIEMPO } from "./tiempos-carga.js";
 import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
 import { buildChecklist } from "./checklist-generadores.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "./bebida.js";
+import { PAX_POR_CAMARERO, saneaRatios } from "./personal.js";
 
 // ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
 // Las estimaciones de tiempos-carga.js son de sector. En cuanto hay eventos con el
@@ -193,4 +194,41 @@ export function catsDeEventoGuardado(ev) {
     numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   };
   return buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
+}
+
+// ─── CUÁNTA GENTE HIZO FALTA DE VERDAD ────────────────────────────────────────
+// El mismo principio que calibracionBebida, pero para el ratio de sala: el dato honesto
+// no está en ningún manual, está en los eventos donde alguien puso a mano el número de
+// camareros (numCamareros) porque el automático no encajaba. Ese campo, comparado con
+// los pax del evento, es EXACTAMENTE cómo se sacaron los ratios de partida — ver la
+// cabecera de personal.js: "salen de contar el personal que se puso de verdad en 19
+// eventos". Aquí se hace lo mismo, pero se actualiza solo con cada evento nuevo en vez
+// de una vez y para siempre.
+//
+// Se descartan los eventos que ADEMÁS tuvieran puesto paxPorCamarero: ese campo ya es
+// "aquí quiero un ratio distinto a propósito para este evento", y mezclarlo con "el
+// ratio de serie se quedó corto" ensuciaría la medida con algo que no es un fallo del
+// ratio, es una decisión ya tomada.
+const MIN_EVENTOS_PERSONAL = 3;
+
+// { boda: { ratio: 8, nEventos: 4 }, ... } — solo lo que tiene datos suficientes. Lo que
+// no aparece es que nadie ha puesto numCamareros a mano lo bastante como para fiarse.
+export function calibracionPersonal(eventosGuardados = {}) {
+  const porTipo = {};
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !(ev.evento in PAX_POR_CAMARERO)) return;
+    if (Number(ev.paxPorCamarero) > 0) return;
+    const pax = Number(ev.pax) || 0;
+    const num = Number(ev.numCamareros) || 0;
+    if (pax <= 0 || num <= 0) return;
+    (porTipo[ev.evento] ||= []).push(pax / num);
+  });
+  const salida = {};
+  Object.entries(porTipo).forEach(([tipo, lista]) => {
+    if (lista.length < MIN_EVENTOS_PERSONAL) return;
+    const ratio = saneaRatios({ [tipo]: Math.round(mediana(lista)) })[tipo];
+    if (ratio === undefined) return;
+    salida[tipo] = { ratio, nEventos: lista.length };
+  });
+  return salida;
 }
