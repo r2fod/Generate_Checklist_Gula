@@ -642,6 +642,39 @@ console.log("\n══ Cuánta gente hace falta: contra lo que se puso de verdad 
     "cumpleaños y producción se marcan como no medidos: nadie ha comprobado su ratio");
 }
 
+console.log("\n══ El ratio ajustable llega de verdad a la checklist (bug real, cazado) ══");
+{
+  // personalNecesario() (arriba) SÍ leía leerRatios() desde siempre — la usan el
+  // calendario y calcular_personal del asistente. Pero buildChecklist(), la que genera
+  // la checklist DE VERDAD, tenía su propio 9/10/20 escrito en checklist-generadores.js
+  // sin mirar leerRatios() para nada: cambiar el ratio desde el panel del calendario (o
+  // desde el asistente con aplicar_ratio) movía la previsión, pero la checklist seguía
+  // cargando con el número de fábrica. Se cazó al conectar el asistente y comprobar a
+  // fondo que el cambio llegaba a todas partes.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return parseInt(String(it[1]), 10);
+    }
+    return null;
+  };
+
+  // Antes del arreglo esto daría SIEMPRE 15 (135/9), pasase lo que pasase con el ratio.
+  ponRatios({ boda: 15 });
+  ok(cantidadItem(buildChecklist("boda", 135, 2, 4, 0, {}), "Camareros") === 9,
+    "con el ratio de boda a 15 (a mano), la checklist pide 9 camareros para 135 pax, no los 15 de fábrica");
+  ponRatios({});
+  ok(cantidadItem(buildChecklist("boda", 135, 2, 4, 0, {}), "Camareros") === 15,
+    "y al quitar el ajuste, vuelve a los 15 de fábrica (135/9)");
+
+  // El mismo bug, en la otra rama de código (cumpleanos no recibe evtKey: usa una
+  // clave fija "cumpleanos", no el parámetro, así que es un arreglo aparte).
+  ponRatios({ cumpleanos: 10 });
+  ok(cantidadItem(buildChecklist("cumpleanos", 100, 0, 3, 0, {}), "Camareros") === 10,
+    "y lo mismo en cumpleaños: con el ratio a 10, pide 10 camareros para 100 pax");
+  ponRatios({});   // se dejan como estaban para el resto de la batería
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,

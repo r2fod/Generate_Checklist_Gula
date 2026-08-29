@@ -35,6 +35,17 @@ app": cada ajuste escribible es su propia herramienta, con su propia
 validación y su propio resumen — ver la nota en "No hacer" sobre por qué.
 Sin aviso en el repaso de la noche — no hizo falta.
 
+**Bug real cazado y arreglado al construir esto**: `buildChecklist()`
+(`checklist-generadores.js`), la que genera la checklist de un evento,
+tenía su propio 9/10/20 escrito a mano sin mirar `leerRatios()` para nada
+— cambiar el ratio (a mano en el calendario, o con `aplicar_ratio`) nunca
+había llegado a la checklist de verdad, solo a la previsión del calendario
+y a `calcular_personal`. Arreglado (ver CONTEXTO.md, "Bug real: el ratio de
+personal ajustable no llegaba a la checklist"): ahora los tres generadores
+que calculan camareros caen a `leerRatios()` cuando no hay un ratio puesto
+a mano para ESE evento. Sin riesgo para lo que ya había: por defecto da
+exactamente los mismos números de siempre.
+
 **Vajilla y cubertería (platos, cubiertos), pendiente**: el dueño lo pidió
 también, pero a diferencia de bebida/cristalería su cálculo (`platosDoble`,
 `cubiertosDoble` en `checklist-generadores.js`) está escrito TRES veces,
@@ -225,7 +236,7 @@ vulnerabilidades, batería completa en verde.
 | # | Ítem | Por qué | Tamaño |
 |---|---|---|---|
 | C1 | **Coeficientes de niños** en comida, refrescos y equipamiento | Hoy solo el alcohol separa adultos (`alcoholPax`); el resto va sobre el total sin distinguir | Medio, con datos reales delante |
-| C2 | **Hielo: calibrar la merma de verdad** — extender el patrón de `calibracionBebida` al hielo (la "vuelta" ya soporta cantidad: `true` = todo, o número) y contrastar 1,35/1,2 con el sector | Los números salieron de una estimación, no de una medición; la mecánica ya existe para la bebida, es estirarla | Medio |
+| C2 | **Hielo (`KG_HIELO_POR_PAX`) y agua embotellada de rodajes (`BOTELLAS_AGUA_POR_PAX`): calibrar de verdad** — extender el patrón de `calibracionBebida` a las dos (la "vuelta" ya soporta cantidad: `true` = todo, o número) y contrastar con el sector | Los números salieron de una estimación, no de una medición; la mecánica ya existe para la bebida, es estirarla. El agua de rodajes se encontró auditando ratios a fondo — no estaba anotada en ningún sitio hasta ahora | Medio |
 | C3 | **Comida: calibrar raciones con datos reales** — mismo patrón que C2, aplicado a paella y demás cantidades de comida (frituras, bandejas). El marcador "Vuelve ✓" ya es genérico por ítem (`checklist-format.js`, no es solo de bebida), así que la parte que falta es la misma que en C2: agrupar por categoría de comida y sacar la mediana con ≥3 eventos | Hoy la paella y el resto van a ratio fijo (1 cada 30 pax), sin dato propio ni de sector detrás; en cuanto haya 3+ eventos con la vuelta marcada, el dato real manda sobre el ratio fijo — igual que ya pasa con la bebida | Medio. La banda de sanidad de la paella mientras no hay histórico ya la da A1 (hecho) |
 
 ## D. Futuro (mucho valor, mucho trabajo)
