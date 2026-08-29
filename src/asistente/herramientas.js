@@ -29,6 +29,7 @@ import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
 import { personalNecesario, leerRatios, saneaRatios } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
 import { RATIOS_BEBIDA, TIPOS_BEBIDA, CLAVES_BEBIDA, esFactorValido, leerFactores, FACTOR_NEUTRO } from "../bebida.js";
+import { CLAVES_CRISTALERIA, esFactorValido as esFactorCristaleriaValido, leerFactoresCristaleria, factorCristaleria } from "../cristaleria.js";
 import { PERSONAS_POR_PAELLA } from "../paella.js";
 import { compararRatios } from "./sector.js";
 import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
@@ -407,6 +408,36 @@ export const HERRAMIENTAS = {
         que: "aplicar_factor_bebida",
         resumen: `Cambiar ${bebida} en ${tipo}: ×${antes} → ×${limpio} (para toda la app)`,
         datos: { tipo, bebida, factor: limpio },
+      });
+    },
+  },
+
+  // Mismo patrón, para la cristalería. Sin tipo de evento: calcCristaleria calcula
+  // igual para todos, así que el ajuste tampoco distingue boda de comunión.
+  aplicar_factor_cristaleria: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuánta cristalería se carga (copas de vino, agua, cava o cubata), como múltiplo de lo de siempre: 1 es \"como siempre\", 0.8 es \"un 20% menos\". Hoy la cristalería va fija al extremo alto del sector con un 10% de margen para roturas, sin dato propio detrás — este ajuste es para cuando el dueño ya sabe, por experiencia, que sobra o falta. Vale para TODA la app desde ya y se guarda para el equipo entero. Úsalo solo cuando te lo pidan a ti, nunca por iniciativa propia.",
+      parameters: {
+        type: "object",
+        properties: {
+          clave: { type: "string", description: "vino, agua, cava o cubata." },
+          factor: { type: "number", description: "Múltiplo sobre lo de siempre, entre 0.3 y 2. 1 es sin cambios." },
+        },
+        required: ["clave", "factor"],
+      },
+    },
+    corre: (ctx, { clave = "", factor = 0 } = {}) => {
+      if (!CLAVES_CRISTALERIA.includes(clave)) return { error: `"${clave}" no es cristalería que se ajuste así. Las claves son: ${CLAVES_CRISTALERIA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorCristaleriaValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los factores de cristalería." };
+      const antes = factorCristaleria(leerFactoresCristaleria(), clave);
+      return ctx.onEscribir({
+        que: "aplicar_factor_cristaleria",
+        resumen: `Cambiar cristalería (${clave}): ×${antes} → ×${limpio} (para toda la app)`,
+        datos: { clave, factor: limpio },
       });
     },
   },

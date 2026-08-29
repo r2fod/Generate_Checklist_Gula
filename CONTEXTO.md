@@ -1538,6 +1538,49 @@ existió una herramienta sin datos PERO que escribe (antes todas las que escrib�
 llevaban `datos: true`). Corregida para comprobar la propiedad real: el catálogo
 recortado nunca lleva una herramienta con datos, se ponga el nivel que se ponga.
 
+## Cristalería, tercer ajuste del mismo tipo — y por qué vajilla/cubertería aún no
+
+Mismo hilo que el de arriba (ratios de personal y bebida): el dueño preguntó por poder
+ajustar también cristalería, platos y cubiertos. Se analizaron las tres, con el código
+delante, antes de tocar nada:
+
+**Cristalería — construida, mismo patrón.** Nuevo `src/cristaleria.js` (factores
+`vino`/`agua`/`cava`/`cubata`, 0,3-2, plano — SIN tipo de evento, porque
+`calcCristaleria` (`calculos.js`) tampoco distingue boda de comunión: añadirle esa
+distinción habría sido tocar algo que nadie pidió). Nueva herramienta
+`aplicar_factor_cristaleria` + su aplicador `escrituraCristaleria.js` + `indice/cristaleria`
+en la nube (cubierto ya por la regla genérica `match /indice/{doc}`, sin tocar
+`firestore.rules`). Enganchado solo en `App.jsx` — **sin panel manual todavía**: por
+ahora la única forma de tocarlo es pidiéndoselo al asistente, a diferencia de ratios y
+bebida que ya tenían su panel en el calendario antes de esto. Es una simplificación
+consciente, no un olvido — se puede añadir un panel el día que haga falta, sin tocar
+la parte del asistente.
+
+Verificado que con el factor en 1 (nadie lo ha tocado) `calcCristaleria` da EXACTAMENTE
+los mismos números de siempre — la prueba fija 144 copas de cava para 100 pax sin
+brindis, y sigue dando 144 después de este cambio. Y que ajustar una clave (p. ej.
+cava) no toca las demás (vino sigue igual), tanto en el cálculo puro como en el
+aplicador con un segundo ajuste seguido.
+
+**Vajilla y cubertería (platos, cubiertos) — analizadas y aplazadas, no descartadas.**
+A diferencia de cristalería (una función central, `calcCristaleria`), su cálculo
+(`platosDoble`, `cubiertosDoble`) está escrito TRES veces dentro de
+`checklist-generadores.js`, una copia por función de tipo de evento (boda, comunión,
+corporativo), sin ninguna función compartida a la que engancharle un factor. Meter el
+ajuste ahí habría significado o bien tocar tres sitios a la vez con el riesgo de que se
+desincronicen, o hacer un refactor de extraer la fórmula común primero — que es trabajo
+aparte, con su propia prueba de que no cambia ningún número existente, no algo para
+colar de paso en esta sesión. Queda anotado en `PLAN_MEJORAS.md` como el siguiente paso
+natural.
+
+**Lo de las 12h de "Cóctel / aperitivo" — descartado, y por qué.** El dueño preguntó si
+convenía subir ese tope (el deslizador va a `max="12"`, mientras que "Copas" ya llega a
+24h) y de paso si se podía dejar CONFIGURABLE en vez de fijo. Se recomendó no montar un
+ajuste nuevo para esto: es el límite de un único `<input type="range">`, sin dato ni
+lógica detrás, y crear un sitio de guardado y una pantalla para tocar un solo número
+sería más código que el propio problema. El dueño decidió dejarlo tal cual está (12h) —
+no hacía falta ni subirlo.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

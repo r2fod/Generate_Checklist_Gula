@@ -22,8 +22,10 @@ import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
 import { aplicarEnRatios } from "../asistente/escrituraRatios.js";
 import { aplicarEnBebida } from "../asistente/escrituraBebida.js";
+import { aplicarEnCristaleria } from "../asistente/escrituraCristaleria.js";
 import { leerRatios, ponRatios } from "../personal.js";
 import { leerFactores, ponFactores } from "../bebida.js";
+import { ponFactoresCristaleria } from "../cristaleria.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte, saneaLista, mismaLista } from "../calendario/apuntes.js";
 // Las fechas de las fixtures salen de la MISMA función que usa la app: con toISOString
@@ -201,6 +203,21 @@ console.log("\n── Consultar de verdad ──");
     "una bebida que no se calibra (aquí, un item suelto) lo dice, no inventa una fila");
   ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "vino", factor: 5 }, conOnEscribirBebida).error,
     "y un factor fuera de 0,3-2 tampoco se cuela: un 5 pediría cinco veces la bebida de un evento entero");
+
+  // aplicar_factor_cristaleria: mismo patrón, sin tipo de evento (calcCristaleria
+  // calcula igual para todos).
+  ok(ejecutar("aplicar_factor_cristaleria", { clave: "vino", factor: 0.8 }, { ...CTX, nivel: "consultar" }).error,
+    "en solo consultar tampoco se puede tocar la cristalería");
+  let propuestoCristaleria = null;
+  const conOnEscribirCristaleria = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuestoCristaleria = p; return { hecho: p.resumen }; } };
+  const rc = ejecutar("aplicar_factor_cristaleria", { clave: "cava", factor: 0.7 }, conOnEscribirCristaleria);
+  ok(rc.hecho && /×1 → ×0\.7/.test(rc.hecho), `sin tocar antes, parte de ×1 → "${rc.hecho}"`);
+  ok(propuestoCristaleria.datos.clave === "cava" && propuestoCristaleria.datos.factor === 0.7,
+    "y lo que llega a onEscribir trae la clave y el factor limpio");
+  ok(ejecutar("aplicar_factor_cristaleria", { clave: "cuchara", factor: 1 }, conOnEscribirCristaleria).error,
+    "una clave que no es cristalería lo dice, no inventa una fila");
+  ok(ejecutar("aplicar_factor_cristaleria", { clave: "vino", factor: 5 }, conOnEscribirCristaleria).error,
+    "y un factor fuera de 0,3-2 tampoco se cuela");
 
   const ch = ejecutar("ver_checklist", { nombre: "fulanita", categoria: "bebida" }, CTX);
   ok(ch.categorias && ch.categorias.length >= 1 && ch.categorias[0].items.length > 3,
@@ -1413,6 +1430,27 @@ console.log("\n── El aplicador de factores de bebida (escrituraBebida.js) �
     `el ajuste anterior de la misma boda viaja intacto → ${JSON.stringify(recibido)}`);
 
   ponFactores({});   // se dejan como estaban para el resto de la batería
+}
+
+console.log("\n── El aplicador de cristalería (escrituraCristaleria.js) ──");
+{
+  let recibido = null;
+  const aplicar = aplicarEnCristaleria({ guardar: (siguiente) => { recibido = siguiente; } });
+
+  ok(aplicar({ que: "aplicar_ratio", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+
+  const r1 = aplicar({ que: "aplicar_factor_cristaleria", datos: { clave: "vino", factor: 0.8 } });
+  ok(r1.cambiado === "vino" && r1.ahora === 0.8, `dice qué cambió y a qué valor → ${JSON.stringify(r1)}`);
+  ok(recibido.vino === 0.8, "a guardar le llega el factor nuevo");
+
+  // Un segundo ajuste no puede borrar el primero: es plano, no por tipo de evento, así
+  // que aquí el riesgo es más simple que en bebida pero el motivo es el mismo.
+  ponFactoresCristaleria({ vino: 0.8 });
+  const r2 = aplicar({ que: "aplicar_factor_cristaleria", datos: { clave: "cava", factor: 1.2 } });
+  ok(r2.ahora === 1.2 && recibido.vino === 0.8 && recibido.cava === 1.2,
+    `el ajuste anterior viaja intacto → ${JSON.stringify(recibido)}`);
+
+  ponFactoresCristaleria({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n── Crear checklists desde el calendario ──");

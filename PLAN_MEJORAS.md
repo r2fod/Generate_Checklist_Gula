@@ -20,16 +20,30 @@ producción, paella): no pisa un ratio ya medido con eventos reales aunque
 caiga fuera de la banda del sector, que es intencional y va comentado en el
 propio fichero de ese ratio.
 
-**`aplicar_ratio` y `aplicar_factor_bebida`, hechos también** (a petición del
-dueño, tras probar que el asistente calculaba bien pero no podía tocar el
-número): dos herramientas de escritura —pasan por `ctx.onEscribir`, por
-tanto por el nivel de permiso, igual que `apuntar_tarea`— para cambiar los
-pax/camarero (`personal.js`) y los factores de bebida (`bebida.js`) que
-antes solo se tocaban a mano en el panel del calendario. No hay
-`aplicar_ratio` genérico para "cualquier cosa de la app": cada ajuste
-escribible es su propia herramienta, con su propia validación y su propio
-resumen — ver la nota en "No hacer" sobre por qué. Sin aviso en el repaso de
-la noche — no hizo falta.
+**`aplicar_ratio`, `aplicar_factor_bebida` y `aplicar_factor_cristaleria`,
+hechos también** (a petición del dueño, tras probar que el asistente
+calculaba bien pero no podía tocar el número): tres herramientas de
+escritura —pasan por `ctx.onEscribir`, por tanto por el nivel de permiso,
+igual que `apuntar_tarea`— para cambiar los pax/camarero (`personal.js`),
+los factores de bebida (`bebida.js`, por tipo de evento) y los de
+cristalería (`cristaleria.js`, nuevo, sin tipo de evento porque
+`calcCristaleria` tampoco distingue). Los dos primeros ya tenían panel
+manual en el calendario; cristalería no lo tiene todavía —de momento solo
+se ajusta pidiéndoselo al asistente— y es candidata a tenerlo el día que
+haga falta. No hay `aplicar_ratio` genérico para "cualquier cosa de la
+app": cada ajuste escribible es su propia herramienta, con su propia
+validación y su propio resumen — ver la nota en "No hacer" sobre por qué.
+Sin aviso en el repaso de la noche — no hizo falta.
+
+**Vajilla y cubertería (platos, cubiertos), pendiente**: el dueño lo pidió
+también, pero a diferencia de bebida/cristalería su cálculo (`platosDoble`,
+`cubiertosDoble` en `checklist-generadores.js`) está escrito TRES veces,
+una por función de tipo de evento, en vez de en una función compartida como
+`calcCristaleria`. Antes de poder ajustarlo con un factor limpio hace falta
+sacarlo a una función común (mismo motivo que ya justificó extraer
+`personal.js`/`bebida.js` en su día: un número escrito en tres sitios es un
+número que se corrige en dos). Es el siguiente paso natural, no una
+decisión de no hacerlo.
 
 ### A2 — Auditorías que proponen mejoras
 

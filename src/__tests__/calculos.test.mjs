@@ -30,6 +30,8 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados }
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
+import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
+  esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
@@ -256,6 +258,33 @@ console.log("\n══ Cristalería ══");
     `y el brindis sube las de cava a 1,5 por cabeza (${normal.cava.u} → ${conBrindis.cava.u})`);
   ok(normal.chupito === null && calcCristaleria(100, 5, false, false, true).chupito !== null,
     "los vasos de chupito solo salen si hay entrante de chupito");
+}
+
+console.log("\n══ Factores de cristalería (cristaleria.js) ══");
+{
+  // Sin nadie tocando nada, esFactorCristaleriaValido/saneaFactoresCristaleria se
+  // comportan igual que su equivalente de bebida — mismo rango, mismo motivo.
+  ok(esFactorCristaleriaValido(1) && !esFactorCristaleriaValido(0.1) && !esFactorCristaleriaValido(5),
+    "el rango válido es 0,3-2, igual que bebida");
+  ok(Object.keys(saneaFactoresCristaleria({ vino: 0.8, unicornio: 2 })).join() === "vino",
+    "una clave que no existe se descarta, no se cuela");
+  ok(factorCristaleria({}, "vino") === FACTOR_NEUTRO, "sin tocar nada, el factor es neutro (1)");
+
+  // El efecto real: con el factor a 1 (de partida) el número tiene que ser EXACTAMENTE
+  // el mismo de siempre — la prueba de arriba ya fija 144 copas de cava para 100 pax,
+  // sin brindis, 5h. Si esto cambiara, cualquiera que no haya tocado el ajuste vería
+  // su camión cambiar de un día para otro sin haber pedido nada.
+  const sinTocar = calcCristaleria(100, 5, false, false, false);
+  ok(sinTocar.cava.u === 144, "de partida, calcCristaleria da lo de siempre");
+
+  ponFactoresCristaleria({ cava: 0.5 });
+  const conFactorBajo = calcCristaleria(100, 5, false, false, false);
+  ok(conFactorBajo.cava.u < sinTocar.cava.u,
+    `con el factor de cava a la mitad, salen menos copas de cava (${sinTocar.cava.u} → ${conFactorBajo.cava.u})`);
+  ok(conFactorBajo.vino.u === sinTocar.vino.u,
+    "y el vino no se toca: cada clave de cristalería es su propio ajuste");
+
+  ponFactoresCristaleria({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n══ Champaneras ══");
