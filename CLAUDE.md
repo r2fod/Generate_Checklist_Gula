@@ -27,6 +27,22 @@
   in the SAME commit (node battery: calculos/asistente/sincronización) — not only
   bug fixes. One test per behavior, with the porqué in its text. Untested code
   does not merge.
+- Test Fixtures: when a test's input comes from an external API/spec (browser API,
+  SDK response), the fixture MUST match what that API returns in the NORMAL case —
+  not whatever value is convenient to write. Check the spec or a real run first.
+  A green suite built on a fake shape (e.g. `expirationTime: 123` instead of the
+  real-world `null`) hides a bug that breaks the feature for every real user.
+- External-URL Fetches: any route that fetches a URL chosen by the caller (SSRF
+  surface — e.g. a "analyze this website" tool) MUST validate the DESTINATION on
+  EVERY redirect hop, not just the starting URL (`redirect: "follow"` alone is not
+  a fix), and its private-network blocklist MUST also catch IPv4 addresses mapped
+  into IPv6 (`::ffff:a.b.c.d`), not just bare IPv4/IPv6 prefixes.
+- Arena/other-AI Branches: an all-green CI on a branch from another AI session
+  (arena) is NOT a substitute for a security- and correctness-focused human-style
+  review before merging to main — it verifies the tests that were written, not the
+  ones that should have been. Any new route touching user-supplied URLs, external
+  API response shapes, secrets, or auth MUST get that review first (see CONTEXTO.md
+  "Doce trampas" for concrete examples this already caught).
 
 ## ORCHESTRATOR MODE
 <!-- Manejo de tareas complejas y subagentes -->

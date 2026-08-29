@@ -544,7 +544,7 @@ Colores en tokens `--pj-*`, con versión oscura (blanco sobre fondo oscuro deslu
 transparencia cada pieza solapada sumaba color y dejaba costura (cuello a través de la
 chaquetilla).
 
-### Nueve trampas que no hay que repetir
+### Doce trampas que no hay que repetir
 
 1. **Barrera de datos.** Cada herramienta declara `datos: true/false`. A un proveedor
    que entrena con lo que recibe (OpenAI) solo se le ofrecen las de calcular, nunca las
@@ -585,6 +585,32 @@ chaquetilla).
    siempre (Gasto: 844px de panel para 296 de contenido → 426 en blanco parecían algo
    sin cargar). Charla y Humano sí van enteras a propósito (evitan saltos). Lo decide la
    clase `es-<pestaña>` del panel.
+
+10. **Validar la URL de partida no basta si la ruta sigue redirects.** `analizar_web`
+    (A4) comprobaba la dirección que pedía la persona, pero hacía `fetch(url,
+    { redirect: "follow" })`: una web pública (que pasa el filtro) puede contestar con
+    un 302 a `169.254.169.254` o a `localhost`, y el fetch lo sigue solo — el filtro de
+    arriba no sirve de nada. Cualquier ruta que fetchee una URL elegida por quien
+    pregunta tiene que revalidar CADA salto del redirect, no solo el primero
+    (`fetchValidando` en `worker/index.js`, con tope de saltos).
+
+11. **Un filtro de "red privada" en IPv4 no cubre IPv6 que mapea esa misma IPv4.**
+    `http://[::ffff:127.0.0.1]/` es el mismo loopback de siempre, pero un filtro que
+    solo mira prefijos IPv4 (`127.`, `10.`, `192.168.`...) lo deja pasar como "pública"
+    si no decodifica primero la IPv4 escondida dentro del IPv6 (`hostBloqueado` en
+    `worker/index.js`). Cazado auditando la rama arena antes de fusionar #155 —
+    `npm run test:rapido` en verde no lo veía.
+
+12. **Un test con un valor "cómodo" en vez del real de la plataforma cuela un bug
+    entero.** `suscripcionLista` (push.js) exigía que `expirationTime` fuera un
+    número, y su propia prueba usaba `expirationTime: 123`. El caso NORMAL de un
+    `PushSubscription` real (Chrome, Firefox, sin caducidad puesta) es
+    `expirationTime: null` — con lo cual "Activar avisos" fallaba siempre en la
+    práctica, aunque el navegador se hubiera suscrito bien. Cuando el fixture de un
+    test viene de una API externa (del navegador, de un SDK...), tiene que ser el
+    valor que esa API da DE VERDAD en el caso normal, no el que sea cómodo de escribir
+    — si hay duda, se mira el spec o se prueba en un navegador real antes de escribir
+    el `ok(...)`.
 
 ### El proxy (Cloudflare Worker)
 
