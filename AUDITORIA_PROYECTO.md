@@ -198,13 +198,14 @@
 
 | # | Severidad | Fichero | Hallazgo |
 |---|---|---|---|
-| 1 | P2 (código muerto) | `conversaciones.js:88`, `subconsciente.js:48-53`, `cliente.js:98`, `conectores.js:67` | Cuatro exports sin uso en todo el árbol: `borrarTodas`, `leerFoto`/`guardarFoto`, `nuevaConversacion` (Asistente.jsx no la importa) y `olvidarConectores`. O se cablean o se borran: el código muerto en un repo que presume de "un sitio por preocupación" es ruido que engaña al que busca |
-| 2 | P2 (naming) | `preguntas.js:837` vs `personal.js:204`; `arbol.js:59` vs `apuntes.js:180` | Dos nombres con dos significados: `loQueFalta` (lo que falta del formulario / lo que falta de personal) y `porDia` (agrupar memoria / agrupar apuntes). No hay conflicto real (se importan por nombre en su dominio), pero el mismo nombre para dos cosas distintas es justo lo que el barrido anti-duplicación no caza y lo que hace que quien busque "loQueFalta" encuentre primero la otra |
+| 1 | P2 (código muerto) | `conversaciones.js:88`, `cliente.js:98`, `conectores.js:67` | Tres exports sin uso en todo el árbol: `borrarTodas`, `nuevaConversacion` (Asistente.jsx no la importa) y `olvidarConectores` (dice "solo para las pruebas" y ninguna prueba lo usa). **Hecho:** eliminados en la limpieza P2 (el import huérfano de `borrar` en conversaciones.js también). Ojo: `leerFoto`/`guardarFoto` de `subconsciente.js`, que este mismo barrido marcó como sin uso, se quedaron — son la pieza de persistencia que falta para cablear el módulo (ver hallazgo 8) |
+| 2 | P2 (naming) | `preguntas.js:837` vs `personal.js:204`; `arbol.js:59` vs `apuntes.js:180` | Dos nombres con dos significados: `loQueFalta` (lo que falta del formulario / lo que falta de personal) y `porDia` (agrupar memoria / agrupar apuntes). No hay conflicto real (se importan por nombre en su dominio), pero el mismo nombre para dos cosas distintas es justo lo que el barrido anti-duplicación no caza y lo que hace que quien busque "loQueFalta" encuentre primero la otra. **Hecho:** `loQueFalta` → `respuestasQueFaltan` (formulario) y `personalQueFalta` (personal); `porDia` → `memoriaPorDia` (árbol de la memoria). El de apuntes.js se queda: es el que mide `medir.mjs` y el de toda la cuenta del calendario |
 | 3 | P2 (tendencia) | todo `src/` | Warnings de lint 116 → 126 → 149 entre el análisis de agosto y hoy: todos de la casa, 0 errores, pero el comentario de CONTEXTO dice "vigilar que no siga creciendo" y lleva creciendo tres veces |
 | 4 | P3 (estilo) | 16 ficheros | Sin la cabecera `// ─── TÍTULO ───` de la casa en las 3 primeras líneas (los 10 componentes de `components/`, `App.jsx`, `main.jsx`, `calibracion.js`, `checklist-format.js`, `tiempos-carga.js` — varios llevan la sección más abajo). Cosmético, pero es la única regla de estilo que no está al 100 % |
 | 5 | P1 (verificación) | la rama entera | La batería de navegador (711) no ha corrido contra esta rama: solo `test:rapido`. Es la verificación pre-fusión que falta, y este contenedor no la puede correr (no puede bajar chromium) |
 | 6 | P1 (aplicación) | `test.yml` | B8 sin aplicar por el dueño (la App de la sesión no tiene permiso `workflows`): sin el número de pintado, ninguna optimización futura de React es medible |
 | 7 | P1 (datos) | `sector.js` | La tabla del sector sigue marcada **SIN validar** contra los números de verdad del equipo (la paella, la más floja: 30-35 es una primera estimación de 150-200 g de arroz, no una medición) |
+| 8 | P1 (módulo sin cablear) | `subconsciente.js` (167 l) | Refina el hallazgo 1: el problema no eran dos exports sueltos — **todo el módulo** (`parte`, `foto`, `queHaCambiado`, `comoVanLosObjetivos`) está construido y probado, pero ninguna pantalla llama a `parte()`. CONTEXTO lo documentaba como "repaso al abrir", y lo que de verdad mira al abrir es `avisosConfig.js`. No se borra (es código probado y con diseño pensado) ni se cablea a ciegas (cablearlo es un cambio visual y `CLAUDE.md` manda captura): queda documentado en CONTEXTO ("Pendiente" 4) con la decisión que falta — dónde se enseña |
 
 ### Riesgos conocidos y su mitigación (verificados, no inventados)
 
@@ -232,9 +233,9 @@
 5. El evento de 250 pax, el del 9-10 de octubre, y marcar la vuelta en 3 eventos (bebida, hielo, paella) para que C2/C3 pasen de mecánica a número.
 6. El visto humano de PanelHielo/PanelComida/"Oportunidades" (la regla de la captura).
 
-**P2 — cuando toque una pasada de limpieza (se puede agrupar):**
-7. Borrar o cablear los 4 exports muertos (hallazgo 1).
-8. Renombrar uno de cada pareja de nombres dobles (hallazgo 2) — `loQueFalta` → `respuestasQueFaltan` (formulario) y `personalQueFalta` (personal) dejarían el nombre a una sola cosa.
+**P2 — pasada de limpieza (hecha la del 2026-08-29 salvo el 9):**
+7. ~~Borrar o cablear los 4 exports muertos (hallazgo 1).~~ Hecho: 3 eliminados; `leerFoto`/`guardarFoto` se quedan como pieza de cableado del hallazgo 8.
+8. ~~Renombrar uno de cada pareja de nombres dobles (hallazgo 2).~~ Hecho: `respuestasQueFaltan`, `personalQueFalta`, `memoriaPorDia`.
 9. Una pasada de `catch (e)` para que los warnings dejen de crecer (hallazgo 3).
 
 **P3 — cosmético / a plazos:**

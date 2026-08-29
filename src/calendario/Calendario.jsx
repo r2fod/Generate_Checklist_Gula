@@ -17,7 +17,7 @@ import {
   turnosDe, DIAS_ANTICIPACION, apuntesPorPromover,
 } from "./apuntes.js";
 import { hoyISO } from "../fecha.js";
-import { personalNecesario, resumenAsignados, loQueFalta, horasEntre, ROLES } from "../personal.js";
+import { personalNecesario, resumenAsignados, personalQueFalta, horasEntre, ROLES } from "../personal.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
@@ -644,7 +644,7 @@ function Asignados({ apunte, equipo, necesario, turnos, onCambiar }) {
   const lista = borrador;
   const aplicar = (siguiente) => { setBorrador(siguiente); onCambiar(siguiente); };
   const r = resumenAsignados(lista);
-  const falta = loQueFalta(necesario, lista);
+  const falta = personalQueFalta(necesario, lista);
   const faltanTotal = falta.sala + falta.cocina + falta.logistica;
 
   const cambiar = (i, campo, valor) => aplicar(lista.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));

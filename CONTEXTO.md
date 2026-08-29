@@ -488,11 +488,11 @@ formularios).
 | Fichero | Qué es |
 |---|---|
 | `cliente.js` | Bucle de herramientas + mensaje de sistema. Máx. 6 vueltas |
-| `herramientas.js` | 18 propias + conectores. Cada una declara `datos` y `escribe` |
-| `conectores/` | WhatsApp, correo, calendario, checklists — hueco por donde crece |
+| `herramientas.js` | 23 propias + conectores. Cada una declara `datos` y `escribe` |
+| `conectores/` | WhatsApp, correo, calendario, checklists, marketing — hueco por donde crece |
 | `permisos.js` | 3 niveles + lista `NUNCA` |
 | `memoria.js` / `arbol.js` | Cerebro: recuerdos con fuente, árbol tema/fuente/día |
-| `subconsciente.js` | Repaso al abrir. Determinista, 0 tokens, sin red |
+| `subconsciente.js` | Qué ha cambiado / cómo van los objetivos / qué toca hoy. Determinista, 0 tokens, sin red. **Construido y probado, pero SIN cablear a ninguna pantalla todavía** (ver "Pendiente") |
 | `objetivos.js` / `tareas.js` | Lo que importa / lo pendiente |
 | `enrutado.js` | Elige proveedor según la pregunta |
 | `gasto.js` | Tokens/euros por proveedor, mes, día. Tope |
@@ -716,6 +716,16 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
 segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
+
+**4. Subconsciente sin cablear** (hallazgo de la auditoría del 2026-08-29).
+`subconsciente.js` está construido y probado —qué ha cambiado desde la última vez, cómo
+van los objetivos, qué toca hoy— pero **ninguna pantalla lo llama**: `parte()` no tiene
+importador, y `leerFoto`/`guardarFoto` (la foto anterior que `parte()` espera como
+`fotoAnterior`) no las usa nadie. La línea del mapa de módulos decía "repaso al abrir" y
+eso no era cierto; el que mira lo de este navegador al abrir es `avisosConfig.js`, que
+sí está cableado al saludo. Falta decidir DÓNDE se enseña (el saludo ya junta
+`avisosConfig` + repaso del Worker + recordatorios de hoy) y, con la decisión, la
+captura que manda `CLAUDE.md` — por eso no se cablea a ciegas.
 
 ## Hecho (referencia, no acción)
 

@@ -14,7 +14,7 @@
 // cuarto eje mañana es una función en arbol.js, no una pantalla nueva aquí.
 import { useState } from "react";
 import { Trash2, Target, Plus, Check, Archive, Network, MoonStar, Settings, TrendingUp } from "lucide-react";
-import { porTema, porFuente, porDia, grafo } from "./arbol.js";
+import { porTema, porFuente, memoriaPorDia, grafo } from "./arbol.js";
 import { ESTADOS, MAX_OBJETIVOS, cuantosActivos } from "./objetivos.js";
 import { avisosConfig } from "./avisosConfig.js";
 import Grafo from "./Grafo.jsx";
@@ -22,7 +22,7 @@ import Grafo from "./Grafo.jsx";
 const VISTAS = [
   { id: "temas", nombre: "Temas", eje: porTema },
   { id: "fuentes", nombre: "Fuentes", eje: porFuente },
-  { id: "dias", nombre: "Días", eje: porDia },
+  { id: "dias", nombre: "Días", eje: memoriaPorDia },
   { id: "grafo", nombre: "Grafo", eje: null },
 ];
 

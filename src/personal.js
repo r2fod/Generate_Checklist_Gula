@@ -201,7 +201,7 @@ export function resumenAsignados(lista) {
 
 // Qué falta por cubrir de cada rol. Negativo no existe: si hay más gente de la que la
 // cuenta pedía, es que ese evento la necesitaba y el que sobra es el cálculo.
-export function loQueFalta(necesario, asignados) {
+export function personalQueFalta(necesario, asignados) {
   const r = resumenAsignados(asignados);
   return {
     sala: Math.max(0, necesario.sala - r.porRol.sala),

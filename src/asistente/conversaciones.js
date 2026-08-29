@@ -11,7 +11,7 @@
 // Sin React: entra una lista, sale una lista.
 
 import { limpiaTexto } from "../texto.js";
-import { leerJSON, guardarJSON, borrar } from "../almacen.js";
+import { leerJSON, guardarJSON } from "../almacen.js";
 
 const CLAVE = "gula_asistente_charlas";
 // Cuántas se guardan. Con más, la lista deja de servir para encontrar algo y localStorage
@@ -83,11 +83,6 @@ export function guardarCharla(lista, { id, hilo, mensajes }) {
 
 export function borrarCharla(lista, id) {
   return escribir(saneaCharlas(lista).filter(c => c.id !== id));
-}
-
-export function borrarTodas() {
-  borrar(CLAVE);
-  return [];
 }
 
 // "hace 5 min", "ayer", "12 sept". Una fecha completa en una lista de veinte no se lee.

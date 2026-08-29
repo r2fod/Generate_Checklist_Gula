@@ -23,7 +23,7 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
-import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados,
+import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
 import { mesasComensales, lineasDeMesas, mesasParaVestir, tipoMesaValido, TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "../mesas.js";
@@ -646,10 +646,10 @@ console.log("\n══ Quién va a cada evento: horas e importe ══");
     "y se avisa de cuántos van sin horario y sin importe");
 
   // Lo que falta por cubrir, contra lo que hace falta de verdad
-  const falta = loQueFalta(personalNecesario("boda", 135), gente);
+  const falta = personalQueFalta(personalNecesario("boda", 135), gente);
   ok(falta.sala === 14 && falta.cocina === 4 && falta.logistica === 2,
     `de una boda de 135 pax, con tres asignados faltan ${falta.sala} de sala y ${falta.logistica} de logística`);
-  ok(loQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
+  ok(personalQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
     "y si sobra gente de un rol, no sale un número negativo");
 }
 

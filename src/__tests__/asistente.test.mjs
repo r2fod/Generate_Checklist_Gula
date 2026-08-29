@@ -42,7 +42,7 @@ import { COMPANEROS, CLAVES_COMPANERO, CLAVES_DIBUJADAS, companeroValido, COMPAN
 import { comoHabla, PERSONALIDADES, CLAVES_PERSONALIDAD } from "../asistente/personalidad.js";
 import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraHoy as recordatoriosDeHoy, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
-import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../asistente/arbol.js";
+import { arbol, contextoPlegado, grafo, porTema, porFuente, memoriaPorDia } from "../asistente/arbol.js";
 import { parte, foto, queHaCambiado, comoVanLosObjetivos } from "../asistente/subconsciente.js";
 import { tituloDe, saneaCharlas, guardarCharla, borrarCharla, cuandoFue } from "../asistente/conversaciones.js";
 import { aplicarEnTareas, encadenar } from "../asistente/escrituraTareas.js";
@@ -1106,7 +1106,7 @@ console.log("\n── El árbol de la memoria ──");
       `el eje ${["temas", "fuentes", "días"][i]} devuelve la forma común`);
   });
   ok(a.temas.length === 3 && a.fuentes.length === 3, "tres temas y tres fuentes distintas");
-  ok(porDia(mem).length === 1, "y todo lo de hoy va en un día");
+  ok(memoriaPorDia(mem).length === 1, "y todo lo de hoy va en un día");
 
   // La fuente viaja pegada al recuerdo: es lo que permite contrastarlo
   const ctx = contextoPlegado(mem);

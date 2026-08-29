@@ -6,7 +6,7 @@
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo, useRef } from "react";
-import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, loQueFalta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
+import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
 import FondoIconos from "./FondoIconos.jsx";
@@ -490,7 +490,7 @@ export default function Formulario({ codigo }) {
 
   // ── Repaso antes de enviar ─────────────────────────────────────────────────
   if (paso >= preguntas.length) {
-    const falta = loQueFalta(respuestas);
+    const falta = respuestasQueFaltan(respuestas);
     const sinContestar = (pr) => respuestas[pr.id] === undefined || respuestas[pr.id] === null;
     const suNombre = (respuestas.nombre || eventoDestino || "").trim().toLowerCase();
     const yaMandado = suNombre

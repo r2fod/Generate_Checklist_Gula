@@ -93,10 +93,6 @@ ${texto}`;
   return { sistema: salida, ids };
 }
 
-// Una conversación viva. Se guarda la lista de mensajes en el formato neutro que
-// entiende el Worker; la traducción a cada proveedor es cosa suya.
-export function nuevaConversacion() { return []; }
-
 // Manda un mensaje y devuelve { mensajes, respuesta, pasos }. "pasos" son las
 // herramientas que se han usado, para poder enseñarlas: un asistente que da un número
 // sin decir de dónde sale es un asistente en el que no se puede confiar.
