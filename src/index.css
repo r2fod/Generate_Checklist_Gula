@@ -7571,14 +7571,18 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   opacity: 0.85;
 }
 
-/* El botón de repasar ahora, en los ajustes del asistente. */
+/* El botón de repasar ahora, avisos y salud de proveedores, en los ajustes del
+   asistente: mismo patrón de columna (botón + texto que explica), reutilizado en
+   los tres. El .btn de por sí da 36px (9px de padding × 2 + el texto): por debajo
+   de los 40px de pulgar que pide el resto de la app — se cazó auditando #155 con
+   la batería de navegador completa, que test:rapido no corre. */
 .asis-repaso-lanzar {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 10px 0;
 }
-.asis-repaso-lanzar .btn { justify-content: center; gap: 6px; }
+.asis-repaso-lanzar .btn { justify-content: center; gap: 6px; min-height: 40px; }
 .asis-explica.es-mal, .asis-nota.es-mal { color: var(--error-texto); }
 
 .cer-repaso {

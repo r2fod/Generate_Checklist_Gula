@@ -703,7 +703,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
                 tokens y se ve si el modelo existe y la clave vale. Para el viernes antes
                 del fin de semana con eventos, no para el sábado en plena carga. */}
             {url && (
-              <div>
+              <div className="asis-repaso-lanzar">
                 <button type="button" className="btn btn-ghost" onClick={probarProveedores} disabled={probando}>
                   {probando ? "Probando…" : "Probar los proveedores"}
                 </button>
