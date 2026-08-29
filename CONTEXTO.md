@@ -198,7 +198,7 @@ npm run reglas:deploy # firebase deploy --only firestore:rules
 npm run deploy        # predeploy = test; no publica en rojo
 ```
 
-**387 (cálculos) + 420 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
+**439 (cálculos) + 597 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
 Y aparte, `npm run reglas:emulador`: 28 comprobaciones de `firestore.rules` contra el
 motor real de Google (pide Java y el emulador; en el contenedor de trabajo original se
 saltaban — otra sesión, con Java y chromium disponibles, los ha lanzado los dos).
