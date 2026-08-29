@@ -1581,6 +1581,54 @@ lógica detrás, y crear un sitio de guardado y una pantalla para tocar un solo 
 sería más código que el propio problema. El dueño decidió dejarlo tal cual está (12h) —
 no hacía falta ni subirlo.
 
+## Bug real: el ratio de personal ajustable no llegaba a la checklist
+
+**Lo que se vio, buscando "qué más tiene ratios" a petición del dueño:** hay DOS
+fórmulas distintas para "cuántos camareros":
+
+1. `personalNecesario()`/`salaNecesaria()` (`personal.js`) — SÍ leía `leerRatios()`
+   desde siempre. La usan el calendario (previsión de personal) y `calcular_personal`
+   del asistente.
+2. `buildChecklist()` (`checklist-generadores.js`) — la que genera la checklist DE
+   VERDAD (las líneas "Camareros", "Delantales", "Bandeja camareros", "Litos") —
+   tenía su PROPIO 9/10/20 escrito directamente en el código, sin mirar `leerRatios()`
+   para nada.
+
+Consecuencia real: cambiar el ratio desde el panel del calendario —o desde
+`aplicar_ratio`, la herramienta nueva de esta sesión— movía la previsión del
+calendario y lo que contestaba el asistente, pero la checklist de un evento seguía
+cargando con el 9/10/20 de fábrica. Esto **no lo introdujo esta sesión**: el panel
+manual del calendario ya tenía este mismo problema desde antes; solo se destapó al
+conectar el asistente y ponerse a comprobar a fondo que el cambio llegaba a todas
+partes, que era justo lo que `aplicar_ratio` prometía en su propia descripción
+("vale para TODA la app desde ya") y no era verdad del todo.
+
+**Arreglado en `checklist-generadores.js`** (tres sitios, uno por generador que calcula
+camareros): ahora todos caen a `leerRatios()[tipo]` en vez del número fijo, cuando no
+hay un ratio puesto A MANO para ese evento en concreto (que sigue mandando por encima,
+sin cambios ahí). Sin riesgo de romper nada existente: `leerRatios()` siempre trae los
+9/10/20 de fábrica si nadie ha tocado el ajuste, así que el comportamiento por defecto
+es idéntico — solo cambia cuando el ratio SÍ se ha ajustado, que es exactamente el caso
+que estaba roto.
+
+Dos generadores (cumpleaños y producción) no reciben el tipo de evento como parámetro
+—`generadorDe()` lo descarta antes de llamarlos, porque cada uno solo se usa para su
+propio tipo— así que ahí se usa la clave fija (`leerRatios().cumpleanos`,
+`leerRatios().produccion`) en vez de una variable.
+
+**Verificado con una prueba que antes habría fallado en silencio**: se pone el ratio de
+boda a 15 y se comprueba que una boda de 135 pax pide 9 camareros (135÷15), no los 15
+de fábrica (135÷9) — y lo mismo para cumpleaños, que es la otra rama de código
+(hardcoded key, no `evtKey`). Antes de este arreglo, las dos pruebas habrían dado 15 y
+10 respectivamente PASE LO QUE PASE con el ratio, porque `buildChecklist` ni se
+enteraba de que existía `leerRatios()`. `test:rapido` en verde después: 411 (+3) en
+`calculos.test.mjs`, sin cambios en el resto.
+
+**De paso, un ratio más que no estaba en ningún inventario ni en `PLAN_MEJORAS.md`:**
+`BOTELLAS_AGUA_POR_PAX` (`calculos.js`), el agua embotellada de rodajes/producción —
+distinta de las copas de agua de cristalería. Sigue sin mecanismo de ajuste, anotado en
+el plan junto a hielo (C2) para cuando toque.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
