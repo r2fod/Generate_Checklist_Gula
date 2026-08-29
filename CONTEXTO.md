@@ -44,15 +44,20 @@ arreglados y con su prueba:
    que también renombra cualquier chunk que referencie a uno ya renombrado —así se
    simula de verdad el encadenado de hashes—. Confirmado con y sin cobertura.
 
-**Lo que sigue pidiendo ojos humanos** (`CLAUDE.md` manda captura; ninguna prueba lo
-verifica a nivel de píxel):
+**Ojos humanos, ya hecho** (`CLAUDE.md` manda captura; ninguna prueba lo verifica a
+nivel de píxel, así que se comprobó con dos bancos puntuales — montados, mirados con
+Playwright y borrados antes de este commit, no se quedan en el repo):
 
-1. **Cerebro → El repaso de la noche, con aviso de documento cerca del MiB.** El JSX y
-   las clases CSS están comprobados (por código y por una prueba de estructura), pero
-   nadie ha visto la raya de color renderizada de verdad.
-2. **Modo carga, la bandeja y "añadir varios items"**: el barrido de 711 los abre y
-   comprueba que aparecen, pero un vistazo humano al respaldo perezoso (un instante la
-   primera vez) sigue sin hacerse.
+1. **Cerebro → El repaso de la noche, con aviso de documento cerca del MiB.** Montado
+   solo con `<Cerebro repaso={…}>` y tres avisos de mentira, uno por tono. Confirmado por
+   color computado, no solo por clase CSS: `es-falta` sale en rojo oscuro
+   (`rgb(153,27,27)`), `es-raro` en ámbar (`rgb(180,83,9)`), `es-acuerdate` en índigo
+   (`rgb(79,70,229)`) — los tres se distinguen bien de un vistazo.
+2. **Modo carga, la bandeja y "añadir varios items"**: contra `npm run dev` con la red
+   ralentizada a propósito (para poder cazar el frame), los tres respaldos perezosos
+   salen centrados con su texto (“Abriendo Modo carga…”, “Abriendo…”, y el de la bandeja
+   que no llegó a cazarse por ir de caché pero cargó bien) y los tres paneles se abren
+   sin fallos ni contenido a medias.
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
@@ -611,16 +616,17 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ### Lo que queda abierto del plan
 
-1. **Las capturas.** Se arreglaron dos cosas de interfaz (el aviso de documentos, que era
-   un `<li>` suelto, y sus tonos) y se hicieron tres pantallas perezosas. El barrido de
-   711 confirma que todo aparece donde debe, pero el ojo humano sobre el respaldo
-   perezoso y la raya de color del aviso de documento sigue sin hacerse (ver "Estado de
-   la rama" arriba).
-2. **El punto 2 del encargo (logística) sin empezar**: coeficientes de niños en comida,
-   refrescos y equipamiento; hielo en kg y en taxis con margen de derretimiento cuando no
-   hay congelador; y contrastar los ratios con lo que usa el sector. Se ha dejado aparte a
-   propósito: cambia cantidades que se cargan en un camión, así que va con los números
-   delante y una prueba por ratio, no de propina al final de otro nivel.
+1. ~~Las capturas.~~ — **hecho**. Se arreglaron dos cosas de interfaz (el aviso de
+   documentos, que era un `<li>` suelto, y sus tonos) y se hicieron tres pantallas
+   perezosas. El barrido de 711 confirma que todo aparece donde debe, y el ojo humano
+   sobre el respaldo perezoso y la raya de color del aviso de documento también quedó
+   comprobado (ver "Estado de la rama" arriba).
+2. **El punto 2 del encargo (logística), a medias**: contrastar los ratios con el sector
+   ya está (`sector.js` + `comparar_con_sector`, ver A1 en `PLAN_MEJORAS.md`). Quedan
+   coeficientes de niños en comida, refrescos y equipamiento, y calibrar hielo con un
+   evento real — se han dejado aparte a propósito: cambian cantidades que se cargan en un
+   camión, así que van con los números delante y una prueba por ratio, no de propina al
+   final de otro nivel.
 
 ### Descartado en este plan, y por qué
 
@@ -636,17 +642,19 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ## Pendiente
 
-**1. Logística: los números que se cargan en el camión — SIN EMPEZAR**
+**1. Logística: los números que se cargan en el camión — A MEDIAS**
+- ~~Contrastar los ratios con lo que usa el sector~~ — **hecho** (A1: `sector.js` +
+  `comparar_con_sector`, ver `PLAN_MEJORAS.md`). Es banda de sanidad para lo NO medido,
+  no pisa lo ya medido con datos propios.
 - **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
   eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
   separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
+  Sigue sin empezar: hace falta medir un evento real antes de tocar el número (C1 en
+  `PLAN_MEJORAS.md`).
 - **Hielo**: ya sale en kg, bolsas y taxis (1 taxi = 12 bolsas de 2 kg = 24 kg) y ya
   aplica merma por derretimiento cuando no hay congelador (`MERMA_SIN_CONGELADOR`, 1,35
   en verano y 1,2 en invierno). Falta **contrastar esos dos números con un evento real**:
-  salieron de una estimación, no de una medición.
-- **Contrastar los ratios con lo que usa el sector**, para no cargar de más ni quedarse
-  corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
-  camión, no una constante cualquiera.
+  salieron de una estimación, no de una medición (C2 en `PLAN_MEJORAS.md`).
 
 **2. Del dueño, en la app** (necesita su sesión):
 - Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
