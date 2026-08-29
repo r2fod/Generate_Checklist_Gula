@@ -262,8 +262,12 @@ console.log("\n══ Cristalería ══");
 
 console.log("\n══ Factores de cristalería (cristaleria.js) ══");
 {
-  // Sin nadie tocando nada, esFactorCristaleriaValido/saneaFactoresCristaleria se
-  // comportan igual que su equivalente de bebida — mismo rango, mismo motivo.
+  // No es que "se comporten igual" por casualidad: es LA MISMA función, compartida
+  // por factorAjuste.js. Si esto fallara, alguien habría vuelto a copiar el rango en
+  // vez de importarlo, y los dos podrían acabar diciendo cosas distintas sin que se
+  // notara hasta que alguien pusiera un 0,25 y colara por un lado y no por el otro.
+  ok(esFactorCristaleriaValido === esFactorValido,
+    "esFactorValido de cristalería y de bebida son la misma función, no una copia");
   ok(esFactorCristaleriaValido(1) && !esFactorCristaleriaValido(0.1) && !esFactorCristaleriaValido(5),
     "el rango válido es 0,3-2, igual que bebida");
   ok(Object.keys(saneaFactoresCristaleria({ vino: 0.8, unicornio: 2 })).join() === "vino",
