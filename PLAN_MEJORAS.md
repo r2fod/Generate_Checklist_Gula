@@ -83,9 +83,14 @@ usarlo en cuanto hay datos de sobra. Verificado con Playwright de verdad,
 del botón a la checklist. Ver CONTEXTO.md, "El ratio de personal también
 se calibra solo, como la bebida".
 
-### A2 — Auditorías que proponen mejoras
+### A2 — Auditorías que proponen mejoras — **hecho**
 
-**Por qué:** se pidió que el asistente haga auditorías y proponga mejoras. El
+Las tres capas de abajo, construidas: `revision.js` con el tono `oportunidad` (4
+reglas deterministas), `ver_auditoria` de solo lectura, y `aplicar_calibracion`
+para aplicar lo que propone (con la misma validación que las demás herramientas
+de ajuste). Sección "Oportunidades" en Cerebro. Ver CONTEXTO.md, "Hecho".
+
+**Por qué (contexto original):** se pidió que el asistente haga auditorías y proponga mejoras. El
 asistente ya tiene la mitad del cuerpo de un auditor (reglas puras probadas,
 repaso de la noche, calibración desde el histórico, flujo de propuestas con
 aprobación). Falta el nombre y cerrar el bucle **hallazgo → propuesta**.
@@ -133,9 +138,15 @@ el primer auditor al que dejan de leer.
 **Tamaño:** 2 PRs (reglas + `ver_auditoria` / modo a pedido). **Depende de:**
 nada ya (A1, del que dependían varias reglas, está hecho).
 
-### A4 — Vista Marketing: el asistente como experto en marketing digital
+### A4 — Vista Marketing: el asistente como experto en marketing digital — **v1, v2a y v2b hechos**
 
-**Por qué:** se pidió una vista donde el asistente analice una web o una red
+`analizar_web` por el Worker (con bloqueo de redes privadas — revisado y reforzado
+tras la fusión, ver "Doce trampas" nº10 y 11), redes sociales por captura con
+visión de Gemini (v2a), estrategia de captación guardada en `indice/marketing`
+(v2b), modo maestro y textos listos para copiar. Solo queda **v3** (publicar de
+verdad por OAuth), sin fecha prometida — ver más abajo. Ver CONTEXTO.md, "Hecho".
+
+**Por qué (contexto original):** se pidió una vista donde el asistente analice una web o una red
 social, dé pautas para que los vídeos funcionen, diseñe el embudo para
 captar clientes, entregue la estrategia con sus herramientas, guíe paso a
 paso en tiempo real "como un maestro" e incluso lo haga por ti.
@@ -248,56 +259,70 @@ fase 1, no el camino que la sustituye.
 **B1 (dependencias) ya está hecho** — `npm audit fix` + menores, 0
 vulnerabilidades, batería completa en verde.
 
+**B2, B3, B4, B5, B6 y B7 — hechos.** Frase de "solo consultar" que ya no
+contradice `recordar`/`olvidar` (permisos.js), `buscar_eventos` desambigua con
+dos candidatos, comentario de `herramientas.js` corregido, README real, salud de
+proveedores en Ajustes (`/__salud`), y el barrido anti-datos-reales corre en cada
+`test:rapido` (ver "Doce trampas" nº12: un fixture de test tiene que reflejar el
+valor real de la API externa, no uno cómodo — ese barrido no habría cazado eso,
+son cosas distintas). Ver CONTEXTO.md, "Hecho".
+
+| # | Ítem | Estado |
+|---|---|---|
+| B8 | **Línea base de pintado de React en CI** | Texto listo en CONTEXTO.md; falta que el dueño añada las 3 líneas a `.github/workflows/test.yml` (permiso de workflows que un PR normal no tiene) |
+
+## C. Negocio — lo que sale en el camión
+
+**C2 (hielo) y C3 (comida: paella y bandejas) — mecánica hecha**, mismo patrón
+que `calibracionBebida` (PanelHielo, PanelComida, `indice/hielo`, `indice/comida`).
+Lo que falta no es código: es que el equipo marque la vuelta en ≥3 eventos de
+cada uno para que el factor pase de "sin medir" a un número real — ver
+CONTEXTO.md, "Pendiente".
+
 | # | Ítem | Por qué | Tamaño |
 |---|---|---|---|
-| B2 | **`recordar`/`olvidar` en "Solo consultar"**: no llevan `escribe: true` y por tanto funcionan en el nivel read-only, contradiciendo la frase de sistema ("No puedes cambiar nada") | Es el antipatrón "el sistema contradice al nivel de permiso" que ya costó un bug (trampa nº2 de CONTEXTO) | Pequeño + prueba |
-| B3 | **Ambigüedad en la búsqueda de eventos**: `buscar_eventos` coge el primer candidato aunque haya dos "Boda García"; el conector de calendario sí obliga a desambiguar | Con dos candidatos, adivinar es jugársela con los datos de alguien | Pequeño + prueba |
-| B4 | **Comentario obsoleto** en la cabecera de `herramientas.js` ("Todas son de SOLO LECTURA") | Comentario = porqué; un comentario falso es peor que no tenerlo | 5 minutos |
-| B5 | **README real** (hoy es el boilerplate de Vite) | El repo es público; `CONTEXTO.md` es para agentes, el README es para humanos: qué es, cómo se monta el Worker, comandos | Pequeño |
-| B6 | **Salud de proveedores/modelos**: ping por proveedor en Ajustes + smoke test en CI | Cazar un modelo retirado antes del sábado, no después (ya pasó con `gemini-2.5-flash`) | Medio |
-| B7 | **Prueba "no hay datos reales"**: barrido de patrones de teléfono/correo/precio sobre `src/` en cada batería | Ya se colaron tres nombres reales una vez; el barrido automático es el único cierre que no depende de la memoria | Pequeño |
-| B8 | **Línea base de pintado de React en CI** (punto `medir` al chromium que CI ya descarga) | Es el único coste de rendimiento sin medir; sin el número, ninguna optimización (regla de la casa) | Medio |
+| C1 | **Coeficientes de niños** en comida, refrescos y equipamiento | Hoy solo el alcohol separa adultos (`alcoholPax`); el resto va sobre el total sin distinguir. Sin empezar a propósito — antes hay que medir un evento real | Medio, con datos reales delante |
 
-## C. Negocio — lo que sale en el camión (pendiente de CONTEXTO, ordenado)
+## D. Futuro
 
-| # | Ítem | Por qué | Tamaño |
-|---|---|---|---|
-| C1 | **Coeficientes de niños** en comida, refrescos y equipamiento | Hoy solo el alcohol separa adultos (`alcoholPax`); el resto va sobre el total sin distinguir | Medio, con datos reales delante |
-| C2 | **Hielo (`KG_HIELO_POR_PAX`) y agua embotellada de rodajes (`BOTELLAS_AGUA_POR_PAX`): calibrar de verdad** — extender el patrón de `calibracionBebida` a las dos (la "vuelta" ya soporta cantidad: `true` = todo, o número) y contrastar con el sector | Los números salieron de una estimación, no de una medición; la mecánica ya existe para la bebida, es estirarla. El agua de rodajes se encontró auditando ratios a fondo — no estaba anotada en ningún sitio hasta ahora | Medio |
-| C3 | **Comida: calibrar raciones con datos reales** — mismo patrón que C2, aplicado a paella y demás cantidades de comida (frituras, bandejas). El marcador "Vuelve ✓" ya es genérico por ítem (`checklist-format.js`, no es solo de bebida), así que la parte que falta es la misma que en C2: agrupar por categoría de comida y sacar la mediana con ≥3 eventos | Hoy la paella y el resto van a ratio fijo (1 cada 30 pax), sin dato propio ni de sector detrás; en cuanto haya 3+ eventos con la vuelta marcada, el dato real manda sobre el ratio fijo — igual que ya pasa con la bebida | Medio. La banda de sanidad de la paella mientras no hay histórico ya la da A1 (hecho) |
+**D1 (push de recordatorios, VAPID) — hecho.** App + service worker + Worker
+con `avisosDelDia` en el cron. Falta la aplicación del dueño en Cloudflare: par
+VAPID (`VAPID_CLAVE`/`VAPID_MAILTO`) + flag `nodejs_compat` — paso a paso en
+`worker/README.md`. Mientras no estén, no se pierde nada: al abrir la app sale
+igual el recordatorio de hoy.
 
-## D. Futuro (mucho valor, mucho trabajo)
-
-- **D1 — Push para los recordatorios** (VAPID + PWA + trigger en el
-  Worker): hoy "recuérdame X" solo se cumple al abrir la app. Fue decisión
-  del dueño para no montar la infraestructura; esta es esa infraestructura,
-  para el día que un recordatorio de "a las 6:47 sale el camión" valga
-  más que abrirla a tiempo.
+- **A4 v3 — publicar de verdad vía OAuth** (Meta/TikTok), confirmación
+  acción a acción. Grande, sin fecha: revisión de app en Meta incluida.
 - **D2 — Gasto global**: el Worker agrega los contadores por aparato y el
   equipo ve el total. Solo si se quiere (hoy está documentado y explicado
   en pantalla que va por aparato).
 - **D3 — Memoria semántica** (embeddings en el Worker): solo cuando las
   respuestas se noten peores al crecer los recuerdos.
 
-## Orden recomendado
+## Lo que queda de verdad (todo lo de arriba, hecho o con su porqué de por qué no)
 
-**B1 y A1 ya están hechos** (dependencias, y sector con paella incluida) —
-el resto arranca desde aquí:
-
-1. **C2** — hielo con sector + calibración propia.
-2. **C3** — comida (paella y demás) con sector + calibración propia, mismo
-   patrón que C2.
-3. **A2** — auditorías (reglas → `ver_auditoria` → modo a pedido), incluidas
-   las dos nuevas (catálogo con huecos, roturas sin revisar).
-4. **B2 + B3 + B4 + B7** — los pequeños del asistente y de la seguridad del
-   repo (agrupables en una PR si se mantiene limpia).
-5. **C1** — niños: primero medir un evento real, luego el número.
-6. **A4 v1** — vista Marketing (analizador en el Worker + capturas de
-   Instagram con visión + estrategia + modo maestro). Con A2 en pie, el
-   plan de marketing es su primer cliente.
-7. **B5 · B6 · B8** — profesionalización sin prisa.
-8. **A4 v2/v3 y D\*** — redes con visión, publicar de verdad y el resto,
-   cuando toque.
+1. **Tuyas, para aplicar** (código ya listo, esperando acción fuera de un PR):
+   - B8: las 3 líneas en `.github/workflows/test.yml` (permiso de workflows).
+   - D1: par VAPID + `nodejs_compat` en el Worker de Cloudflare.
+   - Re-pegar `worker/pegar.js` en Cloudflare (cambió de verdad: `analizar_web`,
+     VAPID, visión).
+   - Visto humano de los elementos nuevos que lo piden — lista en CONTEXTO.md.
+2. **Con datos reales, cuando los haya** (nadie puede acelerarlo desde el código):
+   - C1 (niños): medir un evento real antes de escribir el número.
+   - C2/C3: marcar la vuelta del hielo y de la paella en ≥3 eventos cada uno.
+   - Ratios de cumpleaños/producción: el panel ya existe, falta medir un evento.
+   - Validar la tabla del sector con un evento de 250 pax y uno de octubre.
+3. **Decisión del dueño, no de código:**
+   - Unificar o no `aplicar_factor_bebida` (#154) y `aplicar_calibracion` con
+     `area: "bebida"` (esta rama) en una sola herramienta — documentado en
+     CONTEXTO.md, "Hecho", ambas funcionan hoy sin pisarse.
+   - A4 v2 (API de Meta) y v3 (OAuth, publicar de verdad) — grandes, sin fecha.
+   - D2, D3 — solo si hace falta.
+4. **Pendiente de cablear, sin decisión tomada todavía:** el subconsciente
+   (`subconsciente.js`) está construido y probado pero ninguna pantalla lo llama
+   — falta decidir DÓNDE se enseña. Ver CONTEXTO.md, "Pendiente".
+5. **Tinyflows — decidido NO hacer por ahora** (segundo motor de reglas junto a
+   `revision.js`; el repaso de la noche cubre el 80% del valor sin eso).
 
 ## No hacer (ratificado)
 
@@ -320,5 +345,5 @@ que las sustituya a todas.
 
 **El control graduado del asistente (consultar / permiso / confianza, con la
 lista `NUNCA`) se mantiene tal cual** — no es una mejora pendiente, es la
-razón por la que el asistente no destruye el trabajo del camión. Única
-corrección pendiente sobre esto: B2, arriba.
+razón por la que el asistente no destruye el trabajo del camión. B2 (la
+corrección sobre esto) ya está hecha.
