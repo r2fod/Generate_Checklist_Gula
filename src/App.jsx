@@ -33,7 +33,9 @@ import {
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
+  guardarRatiosNube,
 } from "./nube.js";
+import { ponRatios, ratiosCambiados } from "./personal.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
@@ -76,6 +78,8 @@ import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistent
 import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
 import { aplicarEnChecklists } from "./asistente/escrituraChecklists.js";
 import { aplicarEnCalendario } from "./asistente/escrituraCalendario.js";
+import { aplicarEnRatios } from "./asistente/escrituraRatios.js";
+import { aplicarEnBebida } from "./asistente/escrituraBebida.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -1996,6 +2000,15 @@ export default function App({ onCerrarSesion } = {}) {
       .catch(() => { /* sin conexión */ });
   }, [escribirEnCalendario]);
 
+  // Para el asistente (ver escrituraRatios.js): el mismo ponRatios que deja el valor
+  // puesto para TODA la app —esta pantalla no tiene su propio estado de ratios, calcula
+  // con leerRatios() donde hace falta— y la misma subida a la nube que ya hacía el panel
+  // de Ratios del calendario, solo lo cambiado y sin esperar a que termine.
+  const guardarRatiosAsistente = React.useCallback((siguiente) => {
+    ponRatios(siguiente);
+    if (nubeActiva()) guardarRatiosNube(ratiosCambiados(siguiente)).catch(() => { /* se reintenta al siguiente cambio */ });
+  }, []);
+
   const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo) return;
@@ -3071,6 +3084,8 @@ export default function App({ onCerrarSesion } = {}) {
                     aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
                     aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
                     aplicarEnCalendario({ apuntes: apuntesCalendario, guardar: guardarApunte, borrar: borrarApunte }),
+                    aplicarEnRatios({ guardar: guardarRatiosAsistente }),
+                    aplicarEnBebida({ guardar: handleCambiarBebida }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),

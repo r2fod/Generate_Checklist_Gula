@@ -20,6 +20,10 @@ import { marcarActualizando, confirmaSiActualizado } from "../asistente/actualiz
 import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
 import { revisarEvento, revisarProximos } from "../asistente/revision.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
+import { aplicarEnRatios } from "../asistente/escrituraRatios.js";
+import { aplicarEnBebida } from "../asistente/escrituraBebida.js";
+import { leerRatios, ponRatios } from "../personal.js";
+import { leerFactores, ponFactores } from "../bebida.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte, saneaLista, mismaLista } from "../calendario/apuntes.js";
 // Las fechas de las fixtures salen de la MISMA función que usa la app: con toISOString
@@ -102,10 +106,17 @@ console.log("\n── Los datos de clientes y quién puede verlos ──");
   // El catálogo recortado es lo único que se le manda a un proveedor que entrena con lo
   // que recibe. Si esto falla, se están regalando los clientes.
   const recortado = catalogoParaModelo(true).map(h => h.name);
-  ok(recortado.length === SIN_DATOS.length && recortado.every(n => !HERRAMIENTAS[n].datos),
-    `el catálogo recortado son solo las de calcular → ${recortado.join(", ")}`);
+  ok(recortado.every(n => !HERRAMIENTAS[n].datos) && recortado.every(n => SIN_DATOS.includes(n)),
+    `el catálogo recortado nunca lleva una con datos de clientes → ${recortado.join(", ")}`);
   ok(!recortado.includes("buscar_eventos") && !recortado.includes("ver_evento") && !recortado.includes("ver_calendario"),
     "y no lleva ninguna que devuelva nombres, fechas o sitios");
+  // Con nivel por defecto (solo consultar), las que escriben no salen aunque no tengan
+  // dueño (aplicar_ratio, aplicar_factor_bebida): el nivel decide SI puede escribir, el
+  // "datos" decide si un proveedor que entrena con lo que recibe puede verla. Con
+  // "confianza" sí entran, y ahí el catálogo recortado es SIN_DATOS entero.
+  const recortadoConfianza = catalogoParaModelo(true, {}, "confianza").map(h => h.name);
+  ok(recortadoConfianza.length === SIN_DATOS.length && recortadoConfianza.every(n => !HERRAMIENTAS[n].datos),
+    `con permiso de escribir, el catálogo recortado es SIN_DATOS entero → ${recortadoConfianza.join(", ")}`);
   // El catálogo entero lleva las de casa Y las de los conectores encendidos: si esto
   // fuera solo las de casa, una integración nueva no llegaría nunca al modelo.
   // Con el nivel por defecto (solo consultar) las de escribir NO salen, así que se
@@ -155,6 +166,41 @@ console.log("\n── Consultar de verdad ──");
   const soloPaella = ejecutar("comparar_con_sector", { ratio: "paella" }, CTX);
   ok(soloPaella.ratios.length === 1 && soloPaella.ratios[0].id === "paella", "filtrando por nombre solo trae ese ratio");
   ok(ejecutar("comparar_con_sector", { ratio: "unicornios" }, CTX).error, "y un nombre que no existe lo dice, no se inventa una fila");
+
+  // aplicar_ratio: la otra mitad de comparar_con_sector. Escribe, así que el nivel manda
+  // igual que en crear_checklists — era exactamente lo que fallaba antes de que existiera
+  // esta herramienta: "confianza" puesto y el asistente contestando que no podía cambiar
+  // el ratio, porque no había ninguna herramienta para hacerlo.
+  ok(ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 12 }, { ...CTX, nivel: "consultar" }).error,
+    "en solo consultar no se puede cambiar un ratio");
+  let propuesto = null;
+  const conOnEscribir = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuesto = p; return { hecho: p.resumen }; } };
+  const r = ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 12 }, conOnEscribir);
+  ok(r.hecho && /boda: 9 → 12/.test(r.hecho), `el resumen dice antes y después → "${r.hecho}"`);
+  ok(propuesto.que === "aplicar_ratio" && propuesto.datos.tipo === "boda" && propuesto.datos.paxPorCamarero === 12,
+    "y lo que le llega a onEscribir trae el tipo y el número ya limpio");
+  ok(ejecutar("aplicar_ratio", { tipo: "unicornios", paxPorCamarero: 12 }, conOnEscribir).error,
+    "un tipo de evento que no existe lo dice, no inventa un ratio nuevo");
+  ok(ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 0 }, conOnEscribir).error,
+    "y un número fuera de rango (aquí, 0) tampoco se cuela");
+  ok(ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 12 }, { ...CTX, nivel: "confianza" }).error,
+    "sin onEscribir en el contexto (una pantalla que no lo ofrece) lo dice, no revienta");
+
+  // aplicar_factor_bebida: mismo patrón, para lo que ya vivía en el panel del calendario
+  // como "gente por comensal, pero de beber". El factor es un múltiplo (1 = de siempre),
+  // no una cantidad — así lo guarda bebida.js.
+  ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "vino", factor: 0.6 }, { ...CTX, nivel: "consultar" }).error,
+    "en solo consultar tampoco se puede tocar la bebida");
+  let propuestoBebida = null;
+  const conOnEscribirBebida = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuestoBebida = p; return { hecho: p.resumen }; } };
+  const rb = ejecutar("aplicar_factor_bebida", { tipo: "comunion", bebida: "refresco", factor: 1.4 }, conOnEscribirBebida);
+  ok(rb.hecho && /×1 → ×1\.4/.test(rb.hecho), `sin tocar antes, parte de ×1 (de siempre) → "${rb.hecho}"`);
+  ok(propuestoBebida.datos.tipo === "comunion" && propuestoBebida.datos.bebida === "refresco" && propuestoBebida.datos.factor === 1.4,
+    "y lo que llega a onEscribir trae los tres datos limpios");
+  ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "cocacola", factor: 1 }, conOnEscribirBebida).error,
+    "una bebida que no se calibra (aquí, un item suelto) lo dice, no inventa una fila");
+  ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "vino", factor: 5 }, conOnEscribirBebida).error,
+    "y un factor fuera de 0,3-2 tampoco se cuela: un 5 pediría cinco veces la bebida de un evento entero");
 
   const ch = ejecutar("ver_checklist", { nombre: "fulanita", categoria: "bebida" }, CTX);
   ok(ch.categorias && ch.categorias.length >= 1 && ch.categorias[0].items.length > 3,
@@ -1318,6 +1364,55 @@ console.log("\n── Encadenar dónde se escribe ──");
     "y si no la sabe hacer nadie, se dice en vez de fallar en silencio");
   ok(encadenar(null, soloTareas)({ que: "apuntar_tarea", datos: { texto: "Otra cosa" } }).apuntado,
     "un aplicador vacío en la cadena no la rompe");
+}
+
+console.log("\n── El aplicador de ratios (escrituraRatios.js) ──");
+{
+  const antes = leerRatios();
+  let recibido = null;
+  const aplicar = aplicarEnRatios({ guardar: (siguiente) => { recibido = siguiente; } });
+
+  ok(aplicar({ que: "apuntar_tarea", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+
+  const r = aplicar({ que: "aplicar_ratio", datos: { tipo: "boda", paxPorCamarero: 12 } });
+  ok(r.cambiado === "boda" && r.antes === antes.boda && r.ahora === 12,
+    `dice qué cambió, de dónde venía y a dónde va → ${JSON.stringify(r)}`);
+  ok(recibido.boda === 12, "a guardar le llega el nuevo valor");
+  // El punto que costó pensarlo: si solo se mandara el campo que cambia, un "guardar" que
+  // parte de los valores de fábrica (como ponRatios) resetearía los demás sin que nadie
+  // lo pidiera. Por eso se manda el juego entero, con los valores ACTUALES de partida.
+  Object.keys(antes).filter(k => k !== "boda").forEach(tipo => {
+    ok(recibido[tipo] === antes[tipo], `y los demás ratios viajan sin tocar (${tipo}: ${recibido[tipo]})`);
+  });
+
+  ponRatios({});   // se dejan como estaban para el resto de la batería
+}
+
+console.log("\n── El aplicador de factores de bebida (escrituraBebida.js) ──");
+{
+  let recibido = null;
+  const aplicar = aplicarEnBebida({ guardar: (siguiente) => { recibido = siguiente; } });
+
+  ok(aplicar({ que: "aplicar_ratio", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+
+  const r1 = aplicar({ que: "aplicar_factor_bebida", datos: { tipo: "boda", bebida: "vino", factor: 0.6 } });
+  ok(r1.cambiado === "vino en boda" && r1.ahora === 0.6, `dice qué cambió y a qué valor → ${JSON.stringify(r1)}`);
+  ok(recibido.boda.vino === 0.6, "a guardar le llega el factor nuevo, esparcido por tipo");
+
+  // Segundo ajuste del MISMO tipo, otra bebida: no puede borrar el primero. Es justo lo
+  // que se probó a mano antes de escribir esto —cambiar el vino y luego la cerveza de la
+  // misma boda— y es donde un guardar() que solo mandara el campo tocado se habría
+  // comido el ajuste anterior.
+  const previos = { boda: { vino: 0.6 } };
+  const aplicar2 = aplicarEnBebida({
+    guardar: (siguiente) => { recibido = siguiente; },
+  });
+  ponFactores(previos);
+  const r2 = aplicar2({ que: "aplicar_factor_bebida", datos: { tipo: "boda", bebida: "cerveza", factor: 1.3 } });
+  ok(r2.ahora === 1.3 && recibido.boda.vino === 0.6 && recibido.boda.cerveza === 1.3,
+    `el ajuste anterior de la misma boda viaja intacto → ${JSON.stringify(recibido)}`);
+
+  ponFactores({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n── Crear checklists desde el calendario ──");

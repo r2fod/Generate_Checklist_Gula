@@ -18,9 +18,18 @@ incluida la paella) + `compararRatios()` (tono `dentro`/`por-encima`/
 `comparar_con_sector`. Es banda de sanidad para lo NO medido (cumpleaños,
 producción, paella): no pisa un ratio ya medido con eventos reales aunque
 caiga fuera de la banda del sector, que es intencional y va comentado en el
-propio fichero de ese ratio. Sin `aplicar_ratio` ni aviso en el repaso de la
-noche — no hicieron falta, el "reajustar" ya vivía en el panel del
-calendario desde antes.
+propio fichero de ese ratio.
+
+**`aplicar_ratio` y `aplicar_factor_bebida`, hechos también** (a petición del
+dueño, tras probar que el asistente calculaba bien pero no podía tocar el
+número): dos herramientas de escritura —pasan por `ctx.onEscribir`, por
+tanto por el nivel de permiso, igual que `apuntar_tarea`— para cambiar los
+pax/camarero (`personal.js`) y los factores de bebida (`bebida.js`) que
+antes solo se tocaban a mano en el panel del calendario. No hay
+`aplicar_ratio` genérico para "cualquier cosa de la app": cada ajuste
+escribible es su propia herramienta, con su propia validación y su propio
+resumen — ver la nota en "No hacer" sobre por qué. Sin aviso en el repaso de
+la noche — no hizo falta.
 
 ### A2 — Auditorías que proponen mejoras
 
@@ -244,6 +253,18 @@ No partir `App.jsx`/`index.css`; ningún `useMemo` sin medición; sin
 librerías de animación; no Tinyflows; no partir el CSS; no tipar
 `App.jsx` de golpe; no tocar las tres guardias ni las identidades. Todo con
 su motivo en CONTEXTO, que sigue vigente.
+
+**No una herramienta "modifica cualquier cosa de la app" genérica**,
+propuesta y descartada en conversación. Cada cosa que el asistente puede
+escribir es su propia herramienta, con su propio nombre, su propia
+validación (rango de un número, que el tipo de evento exista) y su propio
+resumen de confirmación — igual que `apuntar_tarea`, `aplicar_ratio` o
+`aplicar_factor_bebida`. Una genérica no podría llevar esas comprobaciones
+puestas de antemano, porque no sabría qué va a tocar; y ampliaría sin darse
+cuenta la lista `NUNCA` de arriba, que existe justo para que un fallo del
+modelo no pueda borrar el trabajo de quien está cargando el camión. El
+camino es seguir añadiendo herramientas concretas según haga falta, no una
+que las sustituya a todas.
 
 **El control graduado del asistente (consultar / permiso / confianza, con la
 lista `NUNCA`) se mantiene tal cual** — no es una mejora pendiente, es la
