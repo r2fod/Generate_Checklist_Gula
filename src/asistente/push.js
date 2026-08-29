@@ -32,12 +32,16 @@ export function clavePúblicaABytes(base64url) {
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
-// Una suscripción usable tiene los cuatro pedazos: sin uno, empujar a ella es
-// tirar el aviso a la basura.
+// Una suscripción usable tiene los tres pedazos que de verdad hacen falta para
+// empujarle un aviso: sin uno, es tirarlo a la basura. expirationTime NO es uno de
+// ellos — el caso normal (Chrome, Firefox...) es que la suscripción no caduque
+// nunca, y ahí vale null, no un número: exigir un número aquí rechazaba la
+// suscripción de siempre y "Activar avisos" fallaba SIEMPRE con "no ha salido
+// completa", aunque el navegador la hubiera dado bien. El Worker que de verdad
+// envía (avisosDelDia, en worker/index.js) tampoco lo mira: solo endpoint y keys.
 /** @param {unknown} s @returns {boolean} */
 export function suscripcionLista(s) {
   return !!s && typeof s === "object"
     && typeof s.endpoint === "string" && s.endpoint.length > 0
-    && s.keys && typeof s.keys.p256dh === "string" && typeof s.keys.auth === "string"
-    && Number.isFinite(s.expirationTime);
+    && s.keys && typeof s.keys.p256dh === "string" && typeof s.keys.auth === "string";
 }

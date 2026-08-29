@@ -482,18 +482,72 @@ export async function salud(env) {
 // Redes sociales no por aquí (v2): Instagram y compañía no enseñan su contenido a
 // un scraper anónimo (muro de login), y lo que sirve allí es la captura del móvil
 // con visión, que es otro camino.
-const HOST_BLOQUEADOS = /^(localhost|.*\.localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1|\[?fe80|\[?f[cd][0-9a-f]{2}:)/i;
+//
+// Cuatro octetos contra los rangos privados/reservados de IPv4 — se comparan como
+// números, no como texto, porque el mismo rango se puede colar disfrazado de IPv6
+// (ver hostBloqueado). "0.x" también cae aquí: es la dirección "esta misma máquina".
+function ipv4Privada(a, b, c, d) {
+  return a === 127 || a === 0 || a === 10
+    || (a === 192 && b === 168)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31);
+}
+
+// El hostname que da new URL() ya viene normalizado (decimal/octal/hex de un IPv4
+// se convierten a la forma con puntos), así que el único disfraz que sobrevive es
+// meter el IPv4 DENTRO de un IPv6 ("IPv4-mapeada": ::ffff:127.0.0.1, o su misma
+// forma en hexadecimal, ::ffff:7f00:1). Sin esta comprobación, [::ffff:127.0.0.1]
+// pasaba como dirección "pública" siendo el mismo loopback de siempre.
+function hostBloqueado(hostnameBruto) {
+  const h = String(hostnameBruto || "").toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) return ipv4Privada(+v4[1], +v4[2], +v4[3], +v4[4]);
+  const v6 = h.replace(/^\[|\]$/g, "");
+  if (v6 === "::1" || v6 === "::") return true;              // loopback / sin especificar
+  if (/^fe80:/.test(v6)) return true;                         // link-local
+  if (/^f[cd][0-9a-f]{2}:/.test(v6)) return true;              // ULA, fc00::/7
+  const mapeadaDecimal = v6.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (mapeadaDecimal) return ipv4Privada(+mapeadaDecimal[1], +mapeadaDecimal[2], +mapeadaDecimal[3], +mapeadaDecimal[4]);
+  const mapeadaHex = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mapeadaHex) {
+    const alto = parseInt(mapeadaHex[1], 16), bajo = parseInt(mapeadaHex[2], 16);
+    return ipv4Privada(alto >> 8, alto & 0xff, bajo >> 8, bajo & 0xff);
+  }
+  return false;
+}
 
 /** @param {unknown} url @returns {{ ok: boolean, url?: string, motivo?: string }} */
 export function urlAnalizable(url) {
   try {
     const u = new URL(String(url || ""));
     if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, motivo: "Solo se analizan direcciones http o https." };
-    if (HOST_BLOQUEADOS.test(u.hostname)) return { ok: false, motivo: "Esa dirección no se analiza: es de red privada." };
+    if (hostBloqueado(u.hostname)) return { ok: false, motivo: "Esa dirección no se analiza: es de red privada." };
     return { ok: true, url: u.toString() };
   } catch (e) {
     return { ok: false, motivo: "Esa no parece una dirección completa (falta el https://)." };
   }
+}
+
+// La comprobación de arriba solo vale para la URL de PARTIDA: una web pública puede
+// contestar con un redirect a una privada (169.254.169.254, localhost...) y fetch()
+// lo seguiría solo, coladero completo del filtro. Aquí se sigue A MANO, comprobando
+// CADA salto igual que el primero, hasta un tope — una cadena de redirects infinita
+// no puede colgar la petición.
+export async function fetchValidando(urlInicial, opciones, maxSaltos = 5) {
+  let actual = urlInicial;
+  for (let salto = 0; salto <= maxSaltos; salto++) {
+    const r = await fetch(actual, { ...opciones, redirect: "manual" });
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+      const destino = new URL(r.headers.get("location"), actual).toString();
+      const chequeo = urlAnalizable(destino);
+      if (!chequeo.ok) throw new Error(`Redirige a una dirección que no se analiza: ${chequeo.motivo}`);
+      actual = chequeo.url;
+      continue;
+    }
+    return r;
+  }
+  throw new Error("Demasiados redirects seguidos (más de 5): no se sigue.");
 }
 
 // Lo que cuenta para captar clientes, y no el DOM entero. Todo con tope: el
@@ -798,8 +852,7 @@ export default {
       const chequeo = urlAnalizable(cuerpo.url);
       if (!chequeo.ok) return json({ error: chequeo.motivo }, 400, origen);
       try {
-        const r = await fetch(chequeo.url, {
-          redirect: "follow",
+        const r = await fetchValidando(chequeo.url, {
           signal: AbortSignal.timeout(8000),
           headers: { "user-agent": "Mozilla/5.0 (compatible; GulaChecklist/1.0)" },
         });

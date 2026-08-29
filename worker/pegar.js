@@ -890,7 +890,27 @@ async function salud(env) {
 	}
 	return { pings };
 }
-const HOST_BLOQUEADOS = /^(localhost|.*\.localhost|127\.|0\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1|\[?fe80|\[?f[cd][0-9a-f]{2}:)/i;
+function ipv4Privada(a, b, c, d) {
+	return a === 127 || a === 0 || a === 10 || a === 192 && b === 168 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31;
+}
+function hostBloqueado(hostnameBruto) {
+	const h = String(hostnameBruto || "").toLowerCase();
+	if (h === "localhost" || h.endsWith(".localhost")) return true;
+	const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+	if (v4) return ipv4Privada(+v4[1], +v4[2], +v4[3], +v4[4]);
+	const v6 = h.replace(/^\[|\]$/g, "");
+	if (v6 === "::1" || v6 === "::") return true;
+	if (/^fe80:/.test(v6)) return true;
+	if (/^f[cd][0-9a-f]{2}:/.test(v6)) return true;
+	const mapeadaDecimal = v6.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+	if (mapeadaDecimal) return ipv4Privada(+mapeadaDecimal[1], +mapeadaDecimal[2], +mapeadaDecimal[3], +mapeadaDecimal[4]);
+	const mapeadaHex = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+	if (mapeadaHex) {
+		const alto = parseInt(mapeadaHex[1], 16), bajo = parseInt(mapeadaHex[2], 16);
+		return ipv4Privada(alto >> 8, alto & 255, bajo >> 8, bajo & 255);
+	}
+	return false;
+}
 /** @param {unknown} url @returns {{ ok: boolean, url?: string, motivo?: string }} */
 function urlAnalizable(url) {
 	try {
@@ -899,7 +919,7 @@ function urlAnalizable(url) {
 			ok: false,
 			motivo: "Solo se analizan direcciones http o https."
 		};
-		if (HOST_BLOQUEADOS.test(u.hostname)) return {
+		if (hostBloqueado(u.hostname)) return {
 			ok: false,
 			motivo: "Esa dirección no se analiza: es de red privada."
 		};
@@ -913,6 +933,23 @@ function urlAnalizable(url) {
 			motivo: "Esa no parece una dirección completa (falta el https://)."
 		};
 	}
+}
+async function fetchValidando(urlInicial, opciones, maxSaltos = 5) {
+	let actual = urlInicial;
+	for (let salto = 0; salto <= maxSaltos; salto++) {
+		const r = await fetch(actual, {
+			...opciones,
+			redirect: "manual"
+		});
+		if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+			const chequeo = urlAnalizable(new URL(r.headers.get("location"), actual).toString());
+			if (!chequeo.ok) throw new Error(`Redirige a una dirección que no se analiza: ${chequeo.motivo}`);
+			actual = chequeo.url;
+			continue;
+		}
+		return r;
+	}
+	throw new Error("Demasiados redirects seguidos (más de 5): no se sigue.");
 }
 function extraerWeb(html, url) {
 	const texto = String(html);
@@ -1137,8 +1174,7 @@ var worker_default = {
 			const chequeo = urlAnalizable(cuerpo.url);
 			if (!chequeo.ok) return json({ error: chequeo.motivo }, 400, origen);
 			try {
-				const r = await fetch(chequeo.url, {
-					redirect: "follow",
+				const r = await fetchValidando(chequeo.url, {
 					signal: AbortSignal.timeout(8e3),
 					headers: { "user-agent": "Mozilla/5.0 (compatible; GulaChecklist/1.0)" }
 				});
@@ -1234,4 +1270,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, payloadDeRecordatorio, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };
+export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, fetchValidando, payloadDeRecordatorio, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };

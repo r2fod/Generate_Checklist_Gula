@@ -37,7 +37,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida, salud, urlAnalizable, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, fetchValidando, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves } from "../../worker/index.js";
 import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
 import { idDeAparato, CLAVE_ID, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "../asistente/push.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
@@ -1981,6 +1981,45 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(urlAnalizable("https://172.32.5.5").ok, "172.32 SÍ es pública (fuera del bloque)");
   ok(!urlAnalizable("https://169.254.169.254/latest").ok, "ni la metadata de la máquina");
   ok(!urlAnalizable("https://[::1]/x").ok, "ni el loopback ipv6");
+  // El mismo loopback disfrazado de IPv6 "mapeada": sin esto, [::ffff:127.0.0.1] pasaba
+  // como dirección pública siendo el mismo 127.0.0.1 de siempre.
+  ok(!urlAnalizable("https://[::ffff:127.0.0.1]/x").ok, "ni loopback mapeado en ipv6 (forma decimal)");
+  ok(!urlAnalizable("https://[::ffff:7f00:1]/x").ok, "ni loopback mapeado en ipv6 (forma hex, la misma dirección)");
+  ok(!urlAnalizable("https://[::ffff:192.168.1.5]/x").ok, "ni red doméstica mapeada en ipv6");
+
+  // urlAnalizable solo mira la dirección DE PARTIDA: una web pública puede contestar
+  // con un redirect a una privada, y fetch() lo seguiría solo — el coladero completo
+  // del filtro de arriba. fetchValidando tiene que revalidar CADA salto igual que el
+  // primero. Se sustituye fetch por uno falso (nada de red de verdad, como en el
+  // resto del fichero) para comprobar el bucle sin depender de un servidor.
+  {
+    const fetchReal = globalThis.fetch;
+    const falsa = (mapa) => async (url) => {
+      const r = mapa[String(url)];
+      if (!r) throw new Error(`sin mock para ${url}`);
+      return new Response(r.cuerpo || "", { status: r.status, headers: r.cabeceras || {} });
+    };
+    globalThis.fetch = falsa({
+      "https://gula.es/": { status: 302, cabeceras: { location: "http://169.254.169.254/latest/meta-data" } },
+    });
+    let falloRedirect = "";
+    try { await fetchValidando("https://gula.es/", {}); } catch (e) { falloRedirect = e.message; }
+    ok(falloRedirect.includes("no se analiza"), `un redirect a una privada se corta, no se sigue (${falloRedirect})`);
+
+    globalThis.fetch = falsa({
+      "https://gula.es/": { status: 301, cabeceras: { location: "https://www.gula.es/" } },
+      "https://www.gula.es/": { status: 200, cuerpo: "<title>Gula</title>" },
+    });
+    const r = await fetchValidando("https://gula.es/", {});
+    ok(r.status === 200 && (await r.text()).includes("Gula"), "un redirect a otra web pública sí se sigue");
+
+    let saltos = 0;
+    globalThis.fetch = async () => { saltos++; return new Response("", { status: 302, headers: { location: "https://gula.es/" } }); };
+    let falloBucle = "";
+    try { await fetchValidando("https://gula.es/", {}); } catch (e) { falloBucle = e.message; }
+    ok(falloBucle.includes("Demasiados redirects") && saltos <= 7, `una cadena de redirects sin fin no cuelga la petición (${saltos} saltos, ${falloBucle})`);
+    globalThis.fetch = fetchReal;
+  }
 
   // La extracción: lo que cuenta para captar clientes, con topes y sin DOM.
   const html = `
@@ -2141,10 +2180,12 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(deVuelta.length === 65 && deVuelta[64] === 64, "la clave pública vuelve a bytes con su longitud (65 de P-256)");
   ok(clavePúblicaABytes("").length === 0, "y sin clave, cero bytes, no un fallo");
 
-  // Una suscripción usable tiene los cuatro pedazos; sin uno, empujar a ella es tirar
-  // el aviso a la basura.
-  const susOk = { endpoint: "https://fcm.ejemplo/x", expirationTime: 123, keys: { p256dh: "a", auth: "b" } };
-  ok(suscripcionLista(susOk), "una suscripción completa vale");
+  // Una suscripción usable tiene los tres pedazos que hacen falta; sin uno, empujar a
+  // ella es tirar el aviso a la basura. expirationTime null (el caso normal, sin
+  // caducidad) tiene que valer: exigir un número ahí rechazaba TODA suscripción real.
+  const susOk = { endpoint: "https://fcm.ejemplo/x", expirationTime: null, keys: { p256dh: "a", auth: "b" } };
+  ok(suscripcionLista(susOk), "una suscripción completa, sin caducidad (el caso normal), vale");
+  ok(suscripcionLista({ ...susOk, expirationTime: 123 }), "y con caducidad puesta también vale");
   ok(!suscripcionLista({ ...susOk, keys: { p256dh: "a" } }), "sin auth, no vale");
   ok(!suscripcionLista({ ...susOk, endpoint: "" }), "sin endpoint, no vale");
   ok(!suscripcionLista(null), "y sin suscripción, no vale");
