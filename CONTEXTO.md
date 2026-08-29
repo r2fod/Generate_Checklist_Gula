@@ -1433,6 +1433,37 @@ con el asistente cada día.
    consulta directa al DOM en vez de perseguir la causa exacta del lío de
    Playwright.
 
+## Respuesta de `comparar_con_sector` más breve, y `PLAN_MEJORAS.md` auditado
+
+**Lo que se vio:** el dueño probó "¿cómo vamos de camareros comparado con el sector?" y
+la respuesta enumeraba los ocho ratios uno por uno con sus dos números cada uno, aunque
+casi todos estuvieran dentro de rango — larga de leer y más tokens de los que hacía
+falta para decir lo que de verdad importa (qué está fuera de rango).
+
+**Arreglado sin tocar la lógica**: `compararRatios()` y la herramienta siguen
+devolviendo el dato completo tal cual —los números SIEMPRE salen de la herramienta, eso
+no cambia—, pero la `description` de `comparar_con_sector` (`herramientas.js`) ahora le
+pide al modelo que sea breve: destacar primero lo que está fuera de rango o sin dato
+(con su número), y resumir en una frase lo que está dentro sin repetir cifra por cifra,
+salvo que pidan el detalle de todos. Es guía de cómo contarlo, no de qué contar — el
+mismo patrón que ya usaba el aviso "OJO: los ratios medidos con eventos reales..." de la
+misma descripción. No se prueba con un test unitario (es fraseo del modelo, no lógica),
+igual que esa otra nota ya existente tampoco lo estaba.
+
+**De paso, `PLAN_MEJORAS.md` auditado a fondo** (verificado en código, no de memoria,
+antes de tocar nada):
+- **A1 (sector) y B1 (dependencias) confirmados hechos al 100%** — recortado su diseño
+  extenso a una nota de una línea con lo que quedó construido, y todas las referencias
+  que dependían de ellos (A2, C3, "Orden recomendado") actualizadas a "ya está".
+- **A3 no era una tarea pendiente** (era una decisión: "el control graduado se
+  mantiene") — trasladada a "No hacer (ratificado)", que es donde vive ese tipo de nota.
+- **Confirmado en código que siguen sin empezar**: A2 (sin `oportunidad` en
+  `revision.js` ni `ver_auditoria`), A4 (sin `/__analizar` ni `analizar_web`), B2
+  (`recordar`/`olvidar` siguen sin `escribe: true`), B3, B4 (el comentario "Todas son de
+  SOLO LECTURA" en `herramientas.js` sigue ahí, y sigue siendo falso — quedó documentado
+  pero no se tocó, es tarea de B4 en sí), B5 (README raíz sigue siendo el boilerplate de
+  Vite), B6, B7, B8, C1, C2, C3 — ninguno se ha tocado, solo se confirmó que faltan.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que

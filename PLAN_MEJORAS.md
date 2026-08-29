@@ -10,65 +10,17 @@
 
 ## A. Lo pedido en conversación (estructurado)
 
-### A1 — Benchmark sectorial: comparar con el sector y reajustar
+### A1 — Benchmark sectorial: comparar con el sector — **hecho**
 
-**Por qué:** se preguntó si el asistente puede comparar nuestros números con
-los del sector para ver si estamos en el rango y reajustar. Hoy NO: no hay
-fuente de datos del sector en la app, y la regla de oro prohíbe que el modelo
-use su cabeza para los números ("los números SIEMPRE salen de las
-herramientas"). Pero la infraestructura ya existe al 80 %: `indice/ratios` +
-`ponRatios` + panel en el calendario (el "reajustar" ya funciona y está
-validado), autocalibración desde el histórico (`calibracionBebida`: mediana
-de *lo que salió − lo que volvió*, mín. 3 eventos, factor acotado 0,3–2) y
-aviso "ratio sin comprobar". Falta solo el sector **como dato** y la
-**herramienta** que los compare.
-
-**Diseño (estilo de la casa):**
-
-1. `src/asistente/sector.js` — puro, con JSDoc: la tabla del sector como
-   dato, con la fuente de cada número (el estilo de `precios.js` cuando se
-   migró a Firestore). Se edita a mano, con revisión, no se genera.
-2. Función pura `compararRatios(actuales, sector)` — el patrón de
-   `revision.js`: sale cada ratio con tono `dentro` / `por encima` /
-   `por debajo` y el delta %.
-3. Herramienta de SOLO lectura `comparar_con_sector` (`datos: false`, los
-   ratios no tienen dueño): el asistente responde "¿estamos en el rango?"
-   con dato, y si no, dice que no hay dato.
-4. Opcional: `aplicar_ratio` con `escribe: true` → pasa por el sistema de
-   permisos normal y escribe en el `indice/ratios` que ya existe.
-5. Opcional: aviso determinista en el repaso de la noche (0 tokens): ratio
-   activo fuera de banda → `indice/avisos` → se ve en Cerebro.
-
-**Decisión que manda:** el sector es **banda de sanidad para lo no medido**
-(cumpleaños 20 pax/camarero, producción, la merma del hielo, los factores de
-bebida por tipo que arrancan en 1). NO es para pisar lo medido: la boda a 9
-pax/camarero es medición de 19 eventos, y si el sector dice 12-15, la
-diferencia es intencional y está comentada en `personal.js` ("los del sector
-se quedaban cortos para cómo se trabaja aquí").
-
-**Tabla inicial** (fuentes públicas recogidas el 2026-08-25; **por validar
-con los números de verdad del equipo antes de meterla en `sector.js`**):
-
-| Ratio | Nosotros (hoy) | Sector (fuente pública) |
-|---|---|---|
-| Camareros | boda/comunión 9 · corporativo 10 (medido) | banquete 1/12-15 · cena 1/8-12 · buffet 1/20-30 · corporativo 1/20-30 |
-| Cocina | (en `personal.js`) | 1/40-50 en banquete; 100-200 pax → 3-5 |
-| Vino | 0,72 botella/adulto | 1 botella/2-3 personas; boda media 40-50 tinto + 30-40 blanco por 100-150 |
-| Cerveza | 3,0/2,0 tercios/adulto (1,0/0,66 L) | 1,5-2 botellines/persona con barra; boda completa ≈0,5-0,7 L/invitado |
-| Cava | 0,2/adulto (1/5) | 1/6-8 solo por brindis |
-| Refrescos | 7,4 uds/comensal (unidad a confirmar) | 1-1,5 L/persona |
-| Hielo | 0,9/0,5 kg/pax × 0,6 sin barra × 1,35/1,2 merma | 0,7-1 kg/pax con barra verano; 0,3-0,5 sin barra (ya está en el comentario de `calculos.js`) |
-| Margen | extremo alto de cada banda | +10-15 % recomendado |
-| Paella | 1 paellera cada 30 pax (`PERSONAS_POR_PAELLA`, `paella.js`), talla por tramos (≤40 pequeña, ≤80 mediana, resto grande) | ración de sector ≈150-200 g de arroz seco/persona; por validar de ahí cuántas personas da cada talla de paellera antes de meterlo en la tabla |
-
-**Añadido a petición del dueño:** la paella es el primer candidato de "sin
-ningún dato que lo valide" — ni calibración propia (nadie ha marcado
-"Vuelve" en paella todavía) ni sector. Es donde más se nota la diferencia
-entre "banda de sanidad" (esto, mientras no haya histórico) y "medido de
-verdad" (en cuanto lo haya, ver C3 abajo).
-
-**Tamaño:** 1 PR, 1-2 días con pruebas. **Depende de:** nada (y alimenta a
-C2, C3 y A2).
+`src/asistente/sector.js` (tabla del sector, a mano, con fuente por número,
+incluida la paella) + `compararRatios()` (tono `dentro`/`por-encima`/
+`por-debajo`/`sin-dato` y delta %) + herramienta de solo lectura
+`comparar_con_sector`. Es banda de sanidad para lo NO medido (cumpleaños,
+producción, paella): no pisa un ratio ya medido con eventos reales aunque
+caiga fuera de la banda del sector, que es intencional y va comentado en el
+propio fichero de ese ratio. Sin `aplicar_ratio` ni aviso en el repaso de la
+noche — no hicieron falta, el "reajustar" ya vivía en el panel del
+calendario desde antes.
 
 ### A2 — Auditorías que proponen mejoras
 
@@ -118,13 +70,7 @@ probada (una prueba por regla); el modelo traduce. Un auditor que inventa es
 el primer auditor al que dejan de leer.
 
 **Tamaño:** 2 PRs (reglas + `ver_auditoria` / modo a pedido). **Depende de:**
-A1 (varias reglas necesitan la tabla del sector).
-
-### A3 — El control del asistente: se mantiene (no es mejora, es decisión)
-
-El modelo de permisos graduado (consultar / permiso / confianza) con la
-lista `NUNCA` se mantiene tal cual: es la razón por la que el asistente no
-destruye el trabajo del camión. Única corrección: B2 (abajo).
+nada ya (A1, del que dependían varias reglas, está hecho).
 
 ### A4 — Vista Marketing: el asistente como experto en marketing digital
 
@@ -238,9 +184,11 @@ fase 1, no el camino que la sustituye.
 
 ## B. Correctitud y profesionalización (lo que sale del análisis)
 
+**B1 (dependencias) ya está hecho** — `npm audit fix` + menores, 0
+vulnerabilidades, batería completa en verde.
+
 | # | Ítem | Por qué | Tamaño |
 |---|---|---|---|
-| B1 | **Dependencias: `npm audit fix`** (2 HIGH: `nanoid`, `postcss` — solo de build) + menores (vite 8.2.2, react 19.2.8, lucide 1.34, firebase 12.18.0) + batería completa | Un HIGH en la cadena que corre `npm ci` + build en CI es deuda aunque no toque la app; el fix es barato | Pequeño |
 | B2 | **`recordar`/`olvidar` en "Solo consultar"**: no llevan `escribe: true` y por tanto funcionan en el nivel read-only, contradiciendo la frase de sistema ("No puedes cambiar nada") | Es el antipatrón "el sistema contradice al nivel de permiso" que ya costó un bug (trampa nº2 de CONTEXTO) | Pequeño + prueba |
 | B3 | **Ambigüedad en la búsqueda de eventos**: `buscar_eventos` coge el primer candidato aunque haya dos "Boda García"; el conector de calendario sí obliga a desambiguar | Con dos candidatos, adivinar es jugársela con los datos de alguien | Pequeño + prueba |
 | B4 | **Comentario obsoleto** en la cabecera de `herramientas.js` ("Todas son de SOLO LECTURA") | Comentario = porqué; un comentario falso es peor que no tenerlo | 5 minutos |
@@ -255,7 +203,7 @@ fase 1, no el camino que la sustituye.
 |---|---|---|---|
 | C1 | **Coeficientes de niños** en comida, refrescos y equipamiento | Hoy solo el alcohol separa adultos (`alcoholPax`); el resto va sobre el total sin distinguir | Medio, con datos reales delante |
 | C2 | **Hielo: calibrar la merma de verdad** — extender el patrón de `calibracionBebida` al hielo (la "vuelta" ya soporta cantidad: `true` = todo, o número) y contrastar 1,35/1,2 con el sector | Los números salieron de una estimación, no de una medición; la mecánica ya existe para la bebida, es estirarla | Medio |
-| C3 | **Comida: calibrar raciones con datos reales** — mismo patrón que C2, aplicado a paella y demás cantidades de comida (frituras, bandejas). El marcador "Vuelve ✓" ya es genérico por ítem (`checklist-format.js`, no es solo de bebida), así que la parte que falta es la misma que en C2: agrupar por categoría de comida y sacar la mediana con ≥3 eventos | Hoy la paella y el resto van a ratio fijo (1 cada 30 pax), sin dato propio ni de sector detrás; en cuanto haya 3+ eventos con la vuelta marcada, el dato real manda sobre el ratio fijo — igual que ya pasa con la bebida | Medio, depende de A1 (paella) para la banda de sanidad mientras no hay histórico |
+| C3 | **Comida: calibrar raciones con datos reales** — mismo patrón que C2, aplicado a paella y demás cantidades de comida (frituras, bandejas). El marcador "Vuelve ✓" ya es genérico por ítem (`checklist-format.js`, no es solo de bebida), así que la parte que falta es la misma que en C2: agrupar por categoría de comida y sacar la mediana con ≥3 eventos | Hoy la paella y el resto van a ratio fijo (1 cada 30 pax), sin dato propio ni de sector detrás; en cuanto haya 3+ eventos con la vuelta marcada, el dato real manda sobre el ratio fijo — igual que ya pasa con la bebida | Medio. La banda de sanidad de la paella mientras no hay histórico ya la da A1 (hecho) |
 
 ## D. Futuro (mucho valor, mucho trabajo)
 
@@ -272,23 +220,23 @@ fase 1, no el camino que la sustituye.
 
 ## Orden recomendado
 
-1. **B1** — dependencias: pequeña, independiente, y el resto se apoya en una
-   toolchain sin HIGH.
-2. **A1** — sector (incluida la paella): alimenta a C2, C3 y A2.
-3. **C2** — hielo con sector + calibración propia.
-4. **C3** — comida (paella y demás) con sector + calibración propia, mismo
+**B1 y A1 ya están hechos** (dependencias, y sector con paella incluida) —
+el resto arranca desde aquí:
+
+1. **C2** — hielo con sector + calibración propia.
+2. **C3** — comida (paella y demás) con sector + calibración propia, mismo
    patrón que C2.
-5. **A2** — auditorías (reglas → `ver_auditoria` → modo a pedido), incluidas
+3. **A2** — auditorías (reglas → `ver_auditoria` → modo a pedido), incluidas
    las dos nuevas (catálogo con huecos, roturas sin revisar).
-6. **B2 + B3 + B4 + B7** — los pequeños del asistente y de la seguridad del
+4. **B2 + B3 + B4 + B7** — los pequeños del asistente y de la seguridad del
    repo (agrupables en una PR si se mantiene limpia).
-7. **C1** — niños: primero medir un evento real, luego el número.
-8. **A4 v1** — vista Marketing (analizador en el Worker + capturas de
+5. **C1** — niños: primero medir un evento real, luego el número.
+6. **A4 v1** — vista Marketing (analizador en el Worker + capturas de
    Instagram con visión + estrategia + modo maestro). Con A2 en pie, el
    plan de marketing es su primer cliente.
-9. **B5 · B6 · B8** — profesionalización sin prisa.
-10. **A4 v2/v3 y D\*** — redes con visión, publicar de verdad y el resto,
-    cuando toque.
+7. **B5 · B6 · B8** — profesionalización sin prisa.
+8. **A4 v2/v3 y D\*** — redes con visión, publicar de verdad y el resto,
+   cuando toque.
 
 ## No hacer (ratificado)
 
@@ -296,3 +244,8 @@ No partir `App.jsx`/`index.css`; ningún `useMemo` sin medición; sin
 librerías de animación; no Tinyflows; no partir el CSS; no tipar
 `App.jsx` de golpe; no tocar las tres guardias ni las identidades. Todo con
 su motivo en CONTEXTO, que sigue vigente.
+
+**El control graduado del asistente (consultar / permiso / confianza, con la
+lista `NUNCA`) se mantiene tal cual** — no es una mejora pendiente, es la
+razón por la que el asistente no destruye el trabajo del camión. Única
+corrección pendiente sobre esto: B2, arriba.
