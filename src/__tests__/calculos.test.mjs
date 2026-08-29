@@ -32,7 +32,7 @@ import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   esFactorValido, cuantosAjustados } from "../bebida.js";
 import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
   esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
-import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
+import { calibracionBebida, calibracionPersonal, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
@@ -1405,6 +1405,60 @@ console.log("\n══ Las mesas de los comensales ══");
   // Un evento sin vueltos, uno con el tipo cambiado a mano y uno vacío no revientan nada
   ok(Object.keys(calibracionBebida({ x: { evento: "boda", pax: 50 }, y: {}, z: { evento: "inventado", vueltos: {} } }, {})).length === 0,
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
+}
+
+// ─── CUÁNTA GENTE HIZO FALTA DE VERDAD (calibracionPersonal) ──────────────────
+{
+  console.log("\n══ El ratio de personal también se calibra con lo puesto a mano ══");
+
+  // Tres bodas de 140 pax con 10 camareros puestos a mano: 140/10 = 14 exacto en las
+  // tres, sin ambigüedad de redondeo.
+  const boda140con10 = { evento: "boda", pax: 140, numCamareros: 10 };
+
+  // Con menos de tres eventos no se pronuncia: dos son anécdota.
+  ok(Object.keys(calibracionPersonal({ a: boda140con10, b: boda140con10 })).length === 0,
+    "con dos eventos no se pronuncia");
+
+  const tres = { a: boda140con10, b: boda140con10, c: boda140con10 };
+  const cal = calibracionPersonal(tres);
+  ok(cal.boda && cal.boda.ratio === 14, `con tres eventos a 140/10, sugiere 1 cada 14 (${cal.boda && cal.boda.ratio})`);
+  ok(cal.boda.nEventos === 3, "y dice en cuántos eventos se ha medido");
+  ok(!cal.comunion && !cal.corporativo, "y de los tipos sin datos no dice nada");
+
+  // La mediana, no la media: un evento raro (un cliente que pidió el doble de gente)
+  // no se lleva por delante el ratio de todos los demás.
+  const conRaro = { a: boda140con10, b: boda140con10, c: boda140con10, d: { evento: "boda", pax: 140, numCamareros: 70 } };
+  ok(calibracionPersonal(conRaro).boda.ratio === 14, "un evento suelto no arrastra la mediana");
+
+  // Sin numCamareros puesto (0, o sin campo), el evento no cuenta como medida: es
+  // exactamente el mismo caso que "nadie ha tocado el automático".
+  const sinNumCamareros = { a: boda140con10, b: boda140con10, c: { evento: "boda", pax: 140 } };
+  ok(Object.keys(calibracionPersonal(sinNumCamareros)).length === 0,
+    "sin numCamareros puesto a mano, ese evento no es una medida");
+
+  // Un evento que ADEMÁS tiene paxPorCamarero puesto a mano no cuenta: ya es "aquí quiero
+  // un ratio distinto a propósito", no "el de serie se quedó corto".
+  const conRatioPropio = { a: boda140con10, b: boda140con10, c: { ...boda140con10, paxPorCamarero: 20 } };
+  ok(Object.keys(calibracionPersonal(conRatioPropio)).length === 0,
+    "un evento con su propio ratio puesto a mano no cuenta como medida del ratio de serie");
+
+  // Cada tipo de evento se mide por su cuenta.
+  const comunion140con10 = { evento: "comunion", pax: 140, numCamareros: 10 };
+  const dosTypos = { a: boda140con10, b: boda140con10, c: boda140con10, d: comunion140con10, e: comunion140con10, f: comunion140con10 };
+  const calDos = calibracionPersonal(dosTypos);
+  ok(calDos.boda.ratio === 14 && calDos.comunion.ratio === 14, "boda y comunión se miden cada una por su lado");
+
+  // Un ratio que saliera fuera de lo razonable (1-60, ver saneaRatios) no se sugiere:
+  // sería un dato mal metido, no una medida real.
+  const disparatado = { a: { evento: "boda", pax: 6000, numCamareros: 10 }, b: { evento: "boda", pax: 6000, numCamareros: 10 }, c: { evento: "boda", pax: 6000, numCamareros: 10 } };
+  ok(!calibracionPersonal(disparatado).boda, "un ratio fuera de 1-60 no se sugiere, aunque haya tres eventos");
+
+  // Eventos sin datos, de un tipo que no existe, o sin pax no revientan nada
+  ok(Object.keys(calibracionPersonal({
+    x: { evento: "boda", numCamareros: 10 },
+    y: {},
+    z: { evento: "inventado", pax: 100, numCamareros: 10 },
+  })).length === 0, "eventos sin pax, vacíos o de un tipo que no existe se ignoran sin reventar");
 }
 
 // ─── LOS MENÚS QUE HAY QUE HACER APARTE ───────────────────────────────────────
