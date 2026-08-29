@@ -7,17 +7,12 @@
 // tampoco tiene sentido que lo haga.
 //
 // Un factor es un multiplicador sobre el número de partida: 1 es "como está hoy",
-// 0,8 es "un 20% menos". Mismo rango que bebida.js y por el mismo motivo: fuera de
-// 0,3-2 no hay un ajuste razonado, hay un dedo resbalando.
+// 0,8 es "un 20% menos". Qué es un factor VÁLIDO es lo mismo que en bebida.js —
+// factorAjuste.js, para no escribir el rango 0,3-2 dos veces.
+import { FACTOR_NEUTRO, esFactorValido } from "./factorAjuste.js";
+export { FACTOR_NEUTRO, esFactorValido };
 
 export const CLAVES_CRISTALERIA = ["vino", "agua", "cava", "cubata"];
-export const FACTOR_NEUTRO = 1;
-
-const MIN_FACTOR = 0.3, MAX_FACTOR = 2;
-/** @param {unknown} n @returns {n is number} */
-export function esFactorValido(n) {
-  return typeof n === "number" && Number.isFinite(n) && n >= MIN_FACTOR && n <= MAX_FACTOR;
-}
 
 /**
  * Un mapa esparcido: solo lo tocado. Lo que no aparece vale FACTOR_NEUTRO.

@@ -1562,6 +1562,18 @@ brindis, y sigue dando 144 después de este cambio. Y que ajustar una clave (p. 
 cava) no toca las demás (vino sigue igual), tanto en el cálculo puro como en el
 aplicador con un segundo ajuste seguido.
 
+**Limpieza aparte, a petición del dueño ("código limpio, sin duplicidad").** Al
+escribir `cristaleria.js` copiando el patrón de `bebida.js`, `FACTOR_NEUTRO` y
+`esFactorValido` (el rango 0,3-2) se quedaron literalmente duplicados, palabra por
+palabra, en los dos ficheros. Sacados a `src/factorAjuste.js` (sin imports propios, así
+que no crea ningún ciclo con `bebida.js`, que a propósito no importa NADA de
+`calculos.js`). Los dos ficheros los reexportan, así que nadie que ya los importara de
+`bebida.js` o `cristaleria.js` tiene que cambiar nada. Nueva prueba que compara por
+identidad (`===`), no solo por comportamiento: si algún día alguien vuelve a copiar el
+rango en vez de importarlo, esta prueba lo caza aunque el número siga siendo 0,3-2 en
+los dos sitios por ahora. `test:rapido` en verde después (408 en `calculos.test.mjs`,
++1 por esta prueba; nada cambia en `asistente.test.mjs`, es un refactor interno).
+
 **Vajilla y cubertería (platos, cubiertos) — analizadas y aplazadas, no descartadas.**
 A diferencia de cristalería (una función central, `calcCristaleria`), su cálculo
 (`platosDoble`, `cubiertosDoble`) está escrito TRES veces dentro de
