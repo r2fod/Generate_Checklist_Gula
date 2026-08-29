@@ -13,6 +13,7 @@ import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carp
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { calcPaella } from "./paella.js";
+import { leerRatios } from "./personal.js";
 
 // Item "opcional": SIEMPRE ocupa su sitio en el array (nunca se quita del todo con un
 // spread condicional), aunque la condición sea falsa — con cantidad null en ese caso.
@@ -226,7 +227,15 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   //
   // La excepción son los almuerzos ligeros (1 cada 22 medido). Para eso está el ratio
   // a mano del formulario, que sigue mandando sobre esto.
-  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 10 : 9);
+  //
+  // Bug real, cazado al conectar el asistente: esto leía un 9/10 escrito aquí mismo,
+  // sin mirar el ratio que ya se podía ajustar desde el panel del calendario
+  // (leerRatios(), en personal.js) — cambiarlo ahí movía la previsión del calendario y
+  // lo que calculaba el asistente, pero NUNCA la checklist de verdad. leerRatios()
+  // siempre trae los 9/10/20 de fábrica si nadie ha tocado nada, así que esto no
+  // cambia ni un número de los que ya salían — solo hace que ajustar el ratio, por fin,
+  // llegue también aquí.
+  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (leerRatios()[evtKey] || (esCorporativo ? 10 : 9));
 
   // El agua, los refrescos y el hielo van sobre TODOS (los niños beben); el alcohol solo
   // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
@@ -472,8 +481,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const hayBarra = horasBarraTotal > 0;
   const totalPax = pax + ninos;
   const hayCongelador = tipoCongelador !== "No lleva";
-  // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
-  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
+  // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio
+  // (a mano en el formulario, o el ajustable en leerRatios() — mismo bug y mismo
+  // arreglo que en buildChecklistBoda, ver el comentario de allí).
+  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : (leerRatios().cumpleanos || 20);
 
   const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos" });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
@@ -667,8 +678,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   if (diasPax.length) { pax = Math.max(...diasPax); ninos = 0; }
   const totalPax = pax + ninos;
   const paxConsumo = diasPax.length ? diasPax.reduce((a, b) => a + b, 0) : totalPax;
-  // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio.
-  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
+  // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio (a mano en
+  // el formulario, o el ajustable en leerRatios() — mismo bug y mismo arreglo que en
+  // buildChecklistBoda, ver el comentario de allí).
+  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : (leerRatios().produccion || 20);
   // Producciones pequeñas (hasta 30 pax): 2 de sala/office y 1 de cocina. Estuvo en 1 y
   // 1 porque 2 y 2 parecía demasiado para un rodaje de 25 pax, pero al contar lo que se
   // puso de verdad salen 2 de sala en los dos casos medidos —un rodaje de 20 pax y una

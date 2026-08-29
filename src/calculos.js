@@ -13,6 +13,7 @@
 // esta flecha no tiene vuelta.
 import { RATIOS_BEBIDA, factoresDeTipo, esFactorValido, TIPOS_BEBIDA } from "./bebida.js";
 import { factorComidaVigente } from "./comida.js";
+import { leerFactoresCristaleria, factorCristaleria } from "./cristaleria.js";
 
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas: es el
 // buffer estándar del sector por roturas/pérdidas (los alquileres recomiendan pedir un
@@ -359,6 +360,9 @@ export function calcDestilados(pax, h) {
  * @returns {Record<string, { u: number, b: number, size: number } | null>}
  */
 export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
+  // Ajustable desde Ajustes/asistente (ver cristaleria.js): 1 si nadie lo ha tocado,
+  // así que sin ajustar da exactamente lo de siempre.
+  const f = leerFactoresCristaleria();
   // ─── CRISTALERÍA, AL EXTREMO ALTO DEL SECTOR ────────────────────────────────
   // Antes las copas de vino, agua y cava se multiplicaban por un factor de horas que
   // sumaba cóctel + copas, con tope 1,75. El razonamiento no se sostenía: durante la
@@ -384,10 +388,12 @@ export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, ll
   const copasBarraPorPax = horasCopas > 0 ? Math.min(VASOS_CUBATA_TOPE, 1 + horasCopas * 0.75) : 0;
   const mult = dobleCopa ? 2 : 1;
   // Margen de seguridad del 10% para cubrir roturas/pérdidas de cristalería durante el servicio
-  const vino = conMargen(pax * COPAS_VINO_POR_PAX * mult);
-  const agua = conMargen(pax * VASOS_AGUA_POR_PAX * mult) + extraAguaDesayuno;
-  const cubata = conMargen(pax * copasBarraPorPax);
-  const cavaCopas = conMargen(pax * (tieneBrindisCava ? COPAS_CAVA_CON_BRINDIS : COPAS_CAVA_POR_PAX));
+  const vino = conMargen(pax * COPAS_VINO_POR_PAX * mult * factorCristaleria(f, "vino"));
+  // extraAguaDesayuno va DESPUÉS del margen y del factor: son vasos de un servicio
+  // aparte (el desayuno), no cristalería del cóctel/copas que se esté ajustando aquí.
+  const agua = conMargen(pax * VASOS_AGUA_POR_PAX * mult * factorCristaleria(f, "agua")) + extraAguaDesayuno;
+  const cubata = conMargen(pax * copasBarraPorPax * factorCristaleria(f, "cubata"));
+  const cavaCopas = conMargen(pax * (tieneBrindisCava ? COPAS_CAVA_CON_BRINDIS : COPAS_CAVA_POR_PAX) * factorCristaleria(f, "cava"));
   const fmt = (/** @type {number} */ u, /** @type {number} */ size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
   return {
     agua: fmt(agua, BATEA.agua), cubata: fmt(cubata, BATEA.cubata),

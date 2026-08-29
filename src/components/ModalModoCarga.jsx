@@ -8,8 +8,10 @@ import { fmtCantidadCompleta, quitarItemsSinCantidad } from "../checklist-format
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
 import { leerPrecios, guardarPrecios, parsePreciosPegados } from "../precios.js";
 import PanelBebida from "./PanelBebida.jsx";
+
 import PanelHielo from "./PanelHielo.jsx";
 import PanelComida from "./PanelComida.jsx";
+import Ratios from "../calendario/Ratios.jsx";
 import Escaleta from "./Escaleta.jsx";
 
 // ─── MODO CARGA (check interactivo, sincronizado por el link del evento) ──────
@@ -19,7 +21,8 @@ import Escaleta from "./Escaleta.jsx";
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida }) {
+
+export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
@@ -434,6 +437,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 onCambiar={onCambiarBebida}
               />
             )}
+
             {/* Justo debajo: el hielo se mira en el mismo momento, con la misma vuelta. */}
             {onCambiarHielo && (
               <PanelHielo
@@ -448,6 +452,16 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 factores={factoresComida}
                 calibracion={calibracionComida}
                 onCambiar={onCambiarComida}
+              />
+            )}
+{/* Mismo panel que el calendario, mismo motivo que estar aquí: en cuanto hay
+                3 eventos con el camarero puesto a mano, aquí sale el ratio real y un
+                botón para usarlo (ver calibracionPersonal en calibracion.js). */}
+            {onCambiarRatios && (
+              <Ratios
+                ratios={ratiosPersonal}
+                calibracion={calibracionPersonal}
+                onCambiar={onCambiarRatios}
               />
             )}
             {filasPorCategoria.length === 0 ? (

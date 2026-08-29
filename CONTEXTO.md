@@ -44,15 +44,20 @@ arreglados y con su prueba:
    que también renombra cualquier chunk que referencie a uno ya renombrado —así se
    simula de verdad el encadenado de hashes—. Confirmado con y sin cobertura.
 
-**Lo que sigue pidiendo ojos humanos** (`CLAUDE.md` manda captura; ninguna prueba lo
-verifica a nivel de píxel):
+**Ojos humanos, ya hecho** (`CLAUDE.md` manda captura; ninguna prueba lo verifica a
+nivel de píxel, así que se comprobó con dos bancos puntuales — montados, mirados con
+Playwright y borrados antes de este commit, no se quedan en el repo):
 
-1. **Cerebro → El repaso de la noche, con aviso de documento cerca del MiB.** El JSX y
-   las clases CSS están comprobados (por código y por una prueba de estructura), pero
-   nadie ha visto la raya de color renderizada de verdad.
-2. **Modo carga, la bandeja y "añadir varios items"**: el barrido de 711 los abre y
-   comprueba que aparecen, pero un vistazo humano al respaldo perezoso (un instante la
-   primera vez) sigue sin hacerse.
+1. **Cerebro → El repaso de la noche, con aviso de documento cerca del MiB.** Montado
+   solo con `<Cerebro repaso={…}>` y tres avisos de mentira, uno por tono. Confirmado por
+   color computado, no solo por clase CSS: `es-falta` sale en rojo oscuro
+   (`rgb(153,27,27)`), `es-raro` en ámbar (`rgb(180,83,9)`), `es-acuerdate` en índigo
+   (`rgb(79,70,229)`) — los tres se distinguen bien de un vistazo.
+2. **Modo carga, la bandeja y "añadir varios items"**: contra `npm run dev` con la red
+   ralentizada a propósito (para poder cazar el frame), los tres respaldos perezosos
+   salen centrados con su texto (“Abriendo Modo carga…”, “Abriendo…”, y el de la bandeja
+   que no llegó a cazarse por ir de caché pero cargó bien) y los tres paneles se abren
+   sin fallos ni contenido a medias.
 3. **PanelHielo (C2 del plan):** panel nuevo del Modo carga. Reusa clase por clase la
    estructura del panel de bebida, pero nadie lo ha visto renderizado en un móvil.
 4. **PanelComida (C3 del plan):** panel nuevo del Modo carga (paella y bandejas por
@@ -67,6 +72,7 @@ verifica a nivel de píxel):
 8. **Clip y miniatura de captura (A4 v2a):** botón del clip en la línea de escribir
    (misma altura que el input) y la miniatura con su aspa sobre la línea.
 
+
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
 protegida con los dos checks obligatorios, y `worker/pegar.js` vuelto a pegar en
@@ -78,7 +84,8 @@ le falta que el equipo marque la vuelta en tres eventos para que el número salg
 
 ## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
 
-La rama `arena/01a038bc-…` lleva **trece commits por delante de `main`** (y D1
+La rama `arena/01a038bc-…` lleva **este trabajo por delante de `main`** (que desde el
+merge de hoy ya incluye #154: ratios/cristalería/autocalibración de personal; y D1
 añade el push: ver "Hecho"): el **C2 del
 plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
 paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
@@ -90,7 +97,7 @@ nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App d
 sesión no tiene permiso `workflows`, ver "Hecho"), el **A4 v1** (marketing: análisis
 de webs + estrategia), el **A4 v2a** (redes por captura y visión de Gemini) y el
 **A4 v2b** (estrategia de captación guardada en `indice/marketing`). Detalle y
-porqués en "Hecho". `test:rapido` en verde (tipos + 439 calculos + 597 asistente +
+porqués en "Hecho". `test:rapido` en verde (tipos + 459 calculos + 640 asistente +
 build + sincronización).
 
 **Antes de fusionar o desplegar, verificar:**
@@ -198,7 +205,7 @@ npm run reglas:deploy # firebase deploy --only firestore:rules
 npm run deploy        # predeploy = test; no publica en rojo
 ```
 
-**439 (cálculos) + 597 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
+**459 (cálculos) + 640 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
 Y aparte, `npm run reglas:emulador`: 28 comprobaciones de `firestore.rules` contra el
 motor real de Google (pide Java y el emulador; en el contenedor de trabajo original se
 saltaban — otra sesión, con Java y chromium disponibles, los ha lanzado los dos).
@@ -666,16 +673,17 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ### Lo que queda abierto del plan
 
-1. **Las capturas.** Se arreglaron dos cosas de interfaz (el aviso de documentos, que era
-   un `<li>` suelto, y sus tonos) y se hicieron tres pantallas perezosas. El barrido de
-   711 confirma que todo aparece donde debe, pero el ojo humano sobre el respaldo
-   perezoso y la raya de color del aviso de documento sigue sin hacerse (ver "Estado de
-   la rama" arriba).
-2. **El punto 2 del encargo (logística) sin empezar**: coeficientes de niños en comida,
-   refrescos y equipamiento; hielo en kg y en taxis con margen de derretimiento cuando no
-   hay congelador; y contrastar los ratios con lo que usa el sector. Se ha dejado aparte a
-   propósito: cambia cantidades que se cargan en un camión, así que va con los números
-   delante y una prueba por ratio, no de propina al final de otro nivel.
+1. ~~Las capturas.~~ — **hecho**. Se arreglaron dos cosas de interfaz (el aviso de
+   documentos, que era un `<li>` suelto, y sus tonos) y se hicieron tres pantallas
+   perezosas. El barrido de 711 confirma que todo aparece donde debe, y el ojo humano
+   sobre el respaldo perezoso y la raya de color del aviso de documento también quedó
+   comprobado (ver "Estado de la rama" arriba).
+2. **El punto 2 del encargo (logística), a medias**: contrastar los ratios con el sector
+   ya está (`sector.js` + `comparar_con_sector`, ver A1 en `PLAN_MEJORAS.md`). Quedan
+   coeficientes de niños en comida, refrescos y equipamiento, y calibrar hielo con un
+   evento real — se han dejado aparte a propósito: cambian cantidades que se cargan en un
+   camión, así que van con los números delante y una prueba por ratio, no de propina al
+   final de otro nivel.
 
 ### Descartado en este plan, y por qué
 
@@ -692,14 +700,17 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 ## Pendiente
 
 **1. Logística: los números que se cargan en el camión — en marcha**
-- **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
-  eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
-  separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
-- **Hielo: hecho** (ver "Hecho", C2 del plan). Falta lo que falta siempre: que el
-  equipo marque la vuelta del hielo en tres eventos para que el factor salga medido.
-- **Contrastar los ratios con lo que usa el sector**, para no cargar de más ni quedarse
-  corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
-  camión, no una constante cualquiera.
+- ~~Verificar los ratios con lo que usa el sector~~ — **hecho** (A1: `sector.js` +
+  `comparar_con_sector`). Es banda de sanidad para lo NO medido, no pisa lo ya medido.
+- **Coeficientes de niños (C1)** en comida, refrescos y equipamiento: sin empezar a
+  propósito — antes hay que medir un evento real. Hoy los niños ya cuentan para agua
+  y refresco (`alcoholPax` separa a los adultos), pero el resto va sobre el total.
+- **Hielo (C2): hecho** (calibración con lo que volvió, ver "Hecho"). Falta lo que
+  falta siempre: que el equipo marque la vuelta del hielo en tres eventos para que el
+  factor salga medido.
+- **Comida (C3): hecho** (calibración de paella y bandejas, ver "Hecho"). Mismo
+  pendiente: tres eventos con la vuelta marcada (en la paella, las que no salieron).
+
 
 **2. Del dueño, en la app** (necesita su sesión):
 - Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
@@ -728,6 +739,27 @@ sí está cableado al saludo. Falta decidir DÓNDE se enseña (el saludo ya junt
 captura que manda `CLAUDE.md` — por eso no se cablea a ciegas.
 
 ## Hecho (referencia, no acción)
+
+**Fusion de `main` (con #154: ratios de personal, cristalería y autocalibración) en la rama de sesión.**
+Dos sesiones trabajaron el plan desde la misma base (`c34be4c`), en zonas colindantes:
+esta rama (C2, C3, A2, A4, B*, D1) y #154 (factores de bebida/cristalería/ratios como
+herramientas, autocalibración de personal, dos bugs). El merge dejó las dos cosas vivas:
+- `calibracion.js` ahora tiene CUATRO calibraciones: bebida, hielo, comida y personal.
+- La cadena `onEscribir` tiene ambos conjuntos de aplicadores: `aplicarEnRatios` /
+  `aplicarEnBebida` / `aplicarEnCristaleria` (de #154) y `aplicarEnAjustes` (esta rama).
+  Cada uno escucha su propio `que`, y los de bebida caen en el MISMO guardado
+  (`handleCambiarBebida` → `guardarBebidaNube`): una sola puerta de persistencia.
+- **Duplicación conocida, documentada y con decisión pendiente**: dos herramientas
+  escriben un factor de bebida — `aplicar_factor_bebida` (de #154, el ajuste del panel)
+  y `aplicar_calibracion` con `area: "bebida"` (de esta rama, el factor que midió la
+  auditoría). Unificarlas en una sola herramienta es decisión del dueño; mientras,
+  `aplicar_calibracion` tiene ya la misma validación que la otra (área, tipo, clave y
+  factor acotado entre 0,3 y 2), que le faltaba.
+- `ModalModoCarga` monta los tres paneles nuevos juntos: PanelHielo, PanelComida y el de
+  ratios de personal (el del calendario, reutilizado donde siempre).
+- "Ojos humanos": la lista junta lo verificado en main (tonos del repaso, respaldos
+  perezosos) con los seis elementos nuevos de esta rama. Pendiente 1: A1 hecho, C1 sin
+  empezar (a propósito), C2/C3 hechos con su pendiente de los tres eventos.
 
 **D1 del plan — avisos en este teléfono (push) — montado.** El recordatorio al que
 le llega el día no espera a que alguien abra la app: llega al teléfono con la app
@@ -1697,6 +1729,278 @@ con el asistente cada día.
    timeouts raros; no era un fallo de verdad, así que se verificó por
    consulta directa al DOM en vez de perseguir la causa exacta del lío de
    Playwright.
+
+## Respuesta de `comparar_con_sector` más breve, y `PLAN_MEJORAS.md` auditado
+
+**Lo que se vio:** el dueño probó "¿cómo vamos de camareros comparado con el sector?" y
+la respuesta enumeraba los ocho ratios uno por uno con sus dos números cada uno, aunque
+casi todos estuvieran dentro de rango — larga de leer y más tokens de los que hacía
+falta para decir lo que de verdad importa (qué está fuera de rango).
+
+**Arreglado sin tocar la lógica**: `compararRatios()` y la herramienta siguen
+devolviendo el dato completo tal cual —los números SIEMPRE salen de la herramienta, eso
+no cambia—, pero la `description` de `comparar_con_sector` (`herramientas.js`) ahora le
+pide al modelo que sea breve: destacar primero lo que está fuera de rango o sin dato
+(con su número), y resumir en una frase lo que está dentro sin repetir cifra por cifra,
+salvo que pidan el detalle de todos. Es guía de cómo contarlo, no de qué contar — el
+mismo patrón que ya usaba el aviso "OJO: los ratios medidos con eventos reales..." de la
+misma descripción. No se prueba con un test unitario (es fraseo del modelo, no lógica),
+igual que esa otra nota ya existente tampoco lo estaba.
+
+**De paso, `PLAN_MEJORAS.md` auditado a fondo** (verificado en código, no de memoria,
+antes de tocar nada):
+- **A1 (sector) y B1 (dependencias) confirmados hechos al 100%** — recortado su diseño
+  extenso a una nota de una línea con lo que quedó construido, y todas las referencias
+  que dependían de ellos (A2, C3, "Orden recomendado") actualizadas a "ya está".
+- **A3 no era una tarea pendiente** (era una decisión: "el control graduado se
+  mantiene") — trasladada a "No hacer (ratificado)", que es donde vive ese tipo de nota.
+- **Confirmado en código que siguen sin empezar**: A2 (sin `oportunidad` en
+  `revision.js` ni `ver_auditoria`), A4 (sin `/__analizar` ni `analizar_web`), B2
+  (`recordar`/`olvidar` siguen sin `escribe: true`), B3, B4 (el comentario "Todas son de
+  SOLO LECTURA" en `herramientas.js` sigue ahí, y sigue siendo falso — quedó documentado
+  pero no se tocó, es tarea de B4 en sí), B5 (README raíz sigue siendo el boilerplate de
+  Vite), B6, B7, B8, C1, C2, C3 — ninguno se ha tocado, solo se confirmó que faltan.
+
+## El asistente ya puede cambiar ratios de personal y factores de bebida
+
+**Lo que se vio:** el dueño le pidió al asistente, en Charla, que quitara tres camareros
+de una boda. El asistente calculó bien el ahorro (`calcular_personal`) pero contestó que
+no podía aplicarlo: "eso solo se puede cambiar a mano en los ajustes de la app". El
+dueño preguntó por qué, si los niveles de permiso (consultar/con permiso/confianza)
+existen precisamente para dejarle escribir cuando se le da permiso.
+
+**Por qué pasaba:** no era un fallo de permisos, es que no existía NINGUNA herramienta
+que supiera cambiar un ratio — ni siquiera en "Confianza" había nada que ejecutar. El
+propio A1 ya lo dejaba anotado como opcional y sin construir ("Opcional: `aplicar_ratio`
+con `escribe: true`... no hicieron falta"): la infraestructura de guardado
+(`ponRatios`/`guardarRatiosNube` para personal, `ponFactores`/`guardarBebidaNube` para
+bebida) ya existía desde antes —la usa el panel del calendario— pero nunca se conectó a
+una herramienta del asistente.
+
+**Lo que se pidió primero, y por qué no**: el dueño preguntó si el asistente podía
+"modificar cualquier cosa de la app" con los permisos adecuados, ya que está "super
+integrado". Se le explicó por qué eso es mal camino y se acordó lo de abajo en su lugar
+— queda razonado en `PLAN_MEJORAS.md`, en "No hacer": una herramienta genérica no puede
+llevar puesta la validación de cada campo, y ensancharía sin darse cuenta la lista
+`NUNCA` (marcar cargado, borrar un evento...) que existe justo para que un fallo del
+modelo no destruya el trabajo de quien carga el camión.
+
+**Lo que se construyó, dos herramientas concretas, mismo patrón que `apuntar_tarea`:**
+
+1. **`aplicar_ratio`** (`herramientas.js`) — cambia comensales por camarero de un tipo de
+   evento. Valida que el tipo exista y que el número esté en 1-60 (reutilizando
+   `saneaRatios`, la misma puerta por la que entra un cambio a mano) ANTES de proponerlo,
+   así que `onEscribir` nunca recibe basura.
+2. **`aplicar_factor_bebida`** — cambia cuánto se bebe de vino/cerveza/cava/refresco en un
+   tipo de evento, como múltiplo (1 = de siempre), que es como ya lo guarda `bebida.js`.
+   Valida tipo, bebida y que el factor esté en 0,3-2 (`esFactorValido`, ya existente).
+
+**El aplicador, aparte de la herramienta** (mismo motivo que `escrituraCalendario.js`: la
+herramienta no tiene por qué saber cómo se persiste algo):
+
+- `src/asistente/escrituraRatios.js` — `aplicarEnRatios({ guardar })`. Manda el juego de
+  ratios ENTERO a `guardar`, no solo el que cambia: como `ponRatios` parte siempre de los
+  valores de fábrica, mandar solo uno habría reseteado a los demás si alguien los había
+  tocado antes. Se enganchó en `App.jsx` (con un `guardarRatiosAsistente` nuevo, que hace
+  lo mismo que ya hacía el panel de Ratios del calendario) y en `calendario/main.jsx`
+  (reutilizando literalmente la `cambiarRatios` que ya usa el panel — cero lógica nueva
+  ahí).
+- `src/asistente/escrituraBebida.js` — `aplicarEnBebida({ guardar })`. Los factores se
+  guardan esparcidos (bebida.js), así que aquí lo que hay que conservar es la fila del
+  TIPO de evento que se esté tocando (para que cambiar la cerveza no borre un ajuste de
+  vino hecho un minuto antes), no el juego entero. Solo enganchado en `App.jsx`
+  (reutilizando `handleCambiarBebida`, que ya existía): el calendario no tiene panel de
+  bebida, así que no había nada que reutilizar ahí.
+
+**Por qué no se tocó el hielo**: el dueño preguntó también por "los cálculos" en
+general. `KG_HIELO_POR_PAX` y `MERMA_SIN_CONGELADOR` (`calculos.js`) son constantes fijas
+en el código, sin el mecanismo de guardado esparcido que ya tienen personal y bebida —
+hacerlas ajustables es justo C2 en `PLAN_MEJORAS.md` ("depende de datos reales, no de un
+número puesto a mano"), y construirlo aquí de prisa habría sido saltarse esa calibración
+a propósito. Se dijo así de claro y se dejó para cuando toque C2.
+
+**Verificado:** `aplicar_en_ratios`/`aplicar_en_bebida` probados con un `guardar` de
+mentira (comprueba justo el caso que costaba pensar: un segundo ajuste del mismo tipo de
+evento no borra el primero). Las dos herramientas probadas con los tres niveles de
+permiso (en "Solo consultar" no dejan, en "Confianza" sí, y con `onEscribir` ausente —
+una pantalla que no lo ofrezca— lo dicen sin reventar). `test:rapido` en verde (515 en
+asistente.test.mjs, +2 sobre las 513 de antes). Sin captura: no hay UI nueva, la
+propuesta se enseña con la MISMA tarjeta de confirmación que ya usa `apuntar_tarea`, ya
+verificada visualmente en su día.
+
+Un efecto colateral bueno, no buscado: al cambiar `catalogoParaModelo(true)` para incluir
+estas dos (`datos: false`, sin dueño), una prueba antigua asumía que "sin datos" y "el
+catálogo recortado a nivel por defecto" eran la misma lista — dejó de serlo en cuanto
+existió una herramienta sin datos PERO que escribe (antes todas las que escribían
+llevaban `datos: true`). Corregida para comprobar la propiedad real: el catálogo
+recortado nunca lleva una herramienta con datos, se ponga el nivel que se ponga.
+
+## Cristalería, tercer ajuste del mismo tipo — y por qué vajilla/cubertería aún no
+
+Mismo hilo que el de arriba (ratios de personal y bebida): el dueño preguntó por poder
+ajustar también cristalería, platos y cubiertos. Se analizaron las tres, con el código
+delante, antes de tocar nada:
+
+**Cristalería — construida, mismo patrón.** Nuevo `src/cristaleria.js` (factores
+`vino`/`agua`/`cava`/`cubata`, 0,3-2, plano — SIN tipo de evento, porque
+`calcCristaleria` (`calculos.js`) tampoco distingue boda de comunión: añadirle esa
+distinción habría sido tocar algo que nadie pidió). Nueva herramienta
+`aplicar_factor_cristaleria` + su aplicador `escrituraCristaleria.js` + `indice/cristaleria`
+en la nube (cubierto ya por la regla genérica `match /indice/{doc}`, sin tocar
+`firestore.rules`). Enganchado solo en `App.jsx` — **sin panel manual todavía**: por
+ahora la única forma de tocarlo es pidiéndoselo al asistente, a diferencia de ratios y
+bebida que ya tenían su panel en el calendario antes de esto. Es una simplificación
+consciente, no un olvido — se puede añadir un panel el día que haga falta, sin tocar
+la parte del asistente.
+
+Verificado que con el factor en 1 (nadie lo ha tocado) `calcCristaleria` da EXACTAMENTE
+los mismos números de siempre — la prueba fija 144 copas de cava para 100 pax sin
+brindis, y sigue dando 144 después de este cambio. Y que ajustar una clave (p. ej.
+cava) no toca las demás (vino sigue igual), tanto en el cálculo puro como en el
+aplicador con un segundo ajuste seguido.
+
+**Limpieza aparte, a petición del dueño ("código limpio, sin duplicidad").** Al
+escribir `cristaleria.js` copiando el patrón de `bebida.js`, `FACTOR_NEUTRO` y
+`esFactorValido` (el rango 0,3-2) se quedaron literalmente duplicados, palabra por
+palabra, en los dos ficheros. Sacados a `src/factorAjuste.js` (sin imports propios, así
+que no crea ningún ciclo con `bebida.js`, que a propósito no importa NADA de
+`calculos.js`). Los dos ficheros los reexportan, así que nadie que ya los importara de
+`bebida.js` o `cristaleria.js` tiene que cambiar nada. Nueva prueba que compara por
+identidad (`===`), no solo por comportamiento: si algún día alguien vuelve a copiar el
+rango en vez de importarlo, esta prueba lo caza aunque el número siga siendo 0,3-2 en
+los dos sitios por ahora. `test:rapido` en verde después (408 en `calculos.test.mjs`,
++1 por esta prueba; nada cambia en `asistente.test.mjs`, es un refactor interno).
+
+**Vajilla y cubertería (platos, cubiertos) — analizadas y aplazadas, no descartadas.**
+A diferencia de cristalería (una función central, `calcCristaleria`), su cálculo
+(`platosDoble`, `cubiertosDoble`) está escrito TRES veces dentro de
+`checklist-generadores.js`, una copia por función de tipo de evento (boda, comunión,
+corporativo), sin ninguna función compartida a la que engancharle un factor. Meter el
+ajuste ahí habría significado o bien tocar tres sitios a la vez con el riesgo de que se
+desincronicen, o hacer un refactor de extraer la fórmula común primero — que es trabajo
+aparte, con su propia prueba de que no cambia ningún número existente, no algo para
+colar de paso en esta sesión. Queda anotado en `PLAN_MEJORAS.md` como el siguiente paso
+natural.
+
+**Lo de las 12h de "Cóctel / aperitivo" — descartado, y por qué.** El dueño preguntó si
+convenía subir ese tope (el deslizador va a `max="12"`, mientras que "Copas" ya llega a
+24h) y de paso si se podía dejar CONFIGURABLE en vez de fijo. Se recomendó no montar un
+ajuste nuevo para esto: es el límite de un único `<input type="range">`, sin dato ni
+lógica detrás, y crear un sitio de guardado y una pantalla para tocar un solo número
+sería más código que el propio problema. El dueño decidió dejarlo tal cual está (12h) —
+no hacía falta ni subirlo.
+
+## Bug real: el ratio de personal ajustable no llegaba a la checklist
+
+**Lo que se vio, buscando "qué más tiene ratios" a petición del dueño:** hay DOS
+fórmulas distintas para "cuántos camareros":
+
+1. `personalNecesario()`/`salaNecesaria()` (`personal.js`) — SÍ leía `leerRatios()`
+   desde siempre. La usan el calendario (previsión de personal) y `calcular_personal`
+   del asistente.
+2. `buildChecklist()` (`checklist-generadores.js`) — la que genera la checklist DE
+   VERDAD (las líneas "Camareros", "Delantales", "Bandeja camareros", "Litos") —
+   tenía su PROPIO 9/10/20 escrito directamente en el código, sin mirar `leerRatios()`
+   para nada.
+
+Consecuencia real: cambiar el ratio desde el panel del calendario —o desde
+`aplicar_ratio`, la herramienta nueva de esta sesión— movía la previsión del
+calendario y lo que contestaba el asistente, pero la checklist de un evento seguía
+cargando con el 9/10/20 de fábrica. Esto **no lo introdujo esta sesión**: el panel
+manual del calendario ya tenía este mismo problema desde antes; solo se destapó al
+conectar el asistente y ponerse a comprobar a fondo que el cambio llegaba a todas
+partes, que era justo lo que `aplicar_ratio` prometía en su propia descripción
+("vale para TODA la app desde ya") y no era verdad del todo.
+
+**Arreglado en `checklist-generadores.js`** (tres sitios, uno por generador que calcula
+camareros): ahora todos caen a `leerRatios()[tipo]` en vez del número fijo, cuando no
+hay un ratio puesto A MANO para ese evento en concreto (que sigue mandando por encima,
+sin cambios ahí). Sin riesgo de romper nada existente: `leerRatios()` siempre trae los
+9/10/20 de fábrica si nadie ha tocado el ajuste, así que el comportamiento por defecto
+es idéntico — solo cambia cuando el ratio SÍ se ha ajustado, que es exactamente el caso
+que estaba roto.
+
+Dos generadores (cumpleaños y producción) no reciben el tipo de evento como parámetro
+—`generadorDe()` lo descarta antes de llamarlos, porque cada uno solo se usa para su
+propio tipo— así que ahí se usa la clave fija (`leerRatios().cumpleanos`,
+`leerRatios().produccion`) en vez de una variable.
+
+**Verificado con una prueba que antes habría fallado en silencio**: se pone el ratio de
+boda a 15 y se comprueba que una boda de 135 pax pide 9 camareros (135÷15), no los 15
+de fábrica (135÷9) — y lo mismo para cumpleaños, que es la otra rama de código
+(hardcoded key, no `evtKey`). Antes de este arreglo, las dos pruebas habrían dado 15 y
+10 respectivamente PASE LO QUE PASE con el ratio, porque `buildChecklist` ni se
+enteraba de que existía `leerRatios()`. `test:rapido` en verde después: 411 (+3) en
+`calculos.test.mjs`, sin cambios en el resto.
+
+**De paso, un ratio más que no estaba en ningún inventario ni en `PLAN_MEJORAS.md`:**
+`BOTELLAS_AGUA_POR_PAX` (`calculos.js`), el agua embotellada de rodajes/producción —
+distinta de las copas de agua de cristalería. Sigue sin mecanismo de ajuste, anotado en
+el plan junto a hielo (C2) para cuando toque.
+
+## Segundo bug del mismo hilo: la pantalla de la checklist nunca cargaba el ratio de la nube
+
+Siguiendo el mismo hilo ("¿y qué más tiene ratios que se me haya escapado?"), un
+segundo agujero, más silencioso que el anterior: `App.jsx` (la pantalla de la
+checklist, `checklist/index.html`) **nunca llamaba a `cargarRatiosNube()` ni a
+`suscribirRatiosNube()`**. Esas dos funciones existían en `nube.js` desde que se
+construyó el panel de Ratios del calendario, pero solo las usaba
+`calendario/useCalendarioNube.js` — el calendario. La checklist arrancaba SIEMPRE con
+`leerRatios()` en los valores de fábrica (9/10/20), y solo se enteraba de un ratio
+ajustado por el equipo si, en esa misma sesión de navegador, alguien abría el
+calendario embebido (`CalendarioEnChecklist`) o el asistente aplicaba un cambio con
+`aplicar_ratio` — ambos caminos comparten el mismo estado de módulo de `personal.js`,
+así que "tocan" `leerRatios()` de rebote, pero nada lo cargaba por su cuenta al abrir
+la checklist sola.
+
+En la práctica el efecto era pequeño —basta con tocar cualquier campo del evento
+(pax, tipo…) para que `baseChecklist` recalculara con lo que hubiera llegado
+mientras tanto— pero era el mismo hueco que el bug anterior, en el sitio de al lado:
+el dato SÍ estaba en Firestore, y la pantalla que más lo necesita no iba a buscarlo.
+
+**Arreglado en `App.jsx`**: nuevo `useState`+`useEffect` para `ratiosPersonal`,
+calcado del que ya tenía `factoresBebida` (carga al montar + se suscribe, solo si hay
+sesión de equipo — `nubeActiva() && haySesionEquipo`, igual que todos los demás
+ajustes compartidos). `guardarRatiosAsistente` (la que usa `aplicar_ratio` del
+asistente) ahora también actualiza ese estado, para que un panel abierto se entere sin
+esperar a otro recálculo — y de paso se le añadió el `&& haySesionEquipo` que le
+faltaba en la condición de subida a la nube (los demás ajustes compartidos lo llevan
+todos; a este se le había quedado fuera al construirlo en la sesión anterior).
+
+## El ratio de personal también se calibra solo, como la bebida
+
+Pedido explícito: "¿y no recomiendas que se vaya reajustando las cosas que
+autocalcula... aparte de si se lo pides al asistente?" — y la idea de que
+`numCamareros` (el campo donde alguien pone a mano cuántos camareros hicieron falta
+de VERDAD en un evento, porque el automático no encajaba) ya es, sin que nadie lo
+pensara así, el mismo tipo de dato con el que se sacaron los ratios de partida — ver
+la cabecera de `personal.js`: "salen de contar el personal que se puso de verdad en
+19 eventos". `calibracionPersonal` (nueva, en `calibracion.js`) hace justo eso, pero
+actualizado con cada evento nuevo en vez de una vez y para siempre: por cada tipo de
+evento con ≥3 eventos guardados que tengan `numCamareros` puesto a mano, calcula
+`pax / numCamareros` de cada uno y toma la MEDIANA (un evento raro no descoloca el
+ratio de los demás, igual que en `calibracionBebida`).
+
+Un evento que ADEMÁS tenga `paxPorCamarero` puesto a mano para sí mismo se descarta:
+ese campo ya es "aquí quiero un ratio distinto a propósito", y mezclarlo con "el
+ratio de serie se quedó corto" ensuciaría la medida con una decisión ya tomada, no
+con un fallo del automático.
+
+**Se enseña donde ya se enseñaba la de bebida**: el Resumen del Modo carga, con el
+MISMO componente que ya tenía el calendario (`calendario/Ratios.jsx`), ahora con una
+prop `calibracion` opcional (por defecto vacía, así que el calendario en solitario —
+que no tiene el archivo de eventos guardados— no cambia nada). Mismo patrón visual
+que `PanelBebida.jsx`: en cuanto hay 3 eventos medidos, sale "1 cada 14 · 3 ev." con
+un botón para usarlo, y una vez puesto se queda como etiqueta ("✓ medido") en vez de
+invitar a pulsarlo otra vez. Sin duplicar el panel ni su CSS — ya existían los dos.
+
+Verificado con Playwright de verdad, en el navegador: tres bodas guardadas con
+`pax:140, numCamareros:10` (140÷10 = 14 exacto, sin ambigüedad de redondeo) hacen
+salir "1 cada 14 · 3 ev." en la fila de Boda; al pulsarlo el campo pasa a 14 y la
+cabecera dice "1 ajustado"; y con eso puesto, una boda de 135 pax pide 10 camareros
+en la checklist real (135÷14, antes 15 con el 9 de fábrica) — la cadena completa,
+del botón al número que se carga en el camión. 420 comprobaciones en
+`calculos.test.mjs` (+10), sin cambios en el resto.
 
 ## Decidido NO hacer (y por qué)
 

@@ -36,7 +36,11 @@ import {
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
+  cargarRatiosNube, guardarRatiosNube, suscribirRatiosNube,
+  cargarCristaleriaNube, guardarCristaleriaNube, suscribirCristaleriaNube,
 } from "./nube.js";
+import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
+import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
@@ -71,7 +75,8 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida, huecosDeCatalogo } from "./calibracion.js";
+import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida,
+  calibracionPersonal, huecosDeCatalogo } from "./calibracion.js";
 import { ponFactores, leerFactores, factoresCambiados, conFactor } from "./bebida.js";
 import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo } from "./calculos.js";
 import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados, conFactorComida } from "./comida.js";
@@ -84,6 +89,9 @@ import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistent
 import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
 import { aplicarEnChecklists } from "./asistente/escrituraChecklists.js";
 import { aplicarEnCalendario } from "./asistente/escrituraCalendario.js";
+import { aplicarEnRatios } from "./asistente/escrituraRatios.js";
+import { aplicarEnBebida } from "./asistente/escrituraBebida.js";
+import { aplicarEnCristaleria } from "./asistente/escrituraCristaleria.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -2004,6 +2012,45 @@ export default function App({ onCerrarSesion } = {}) {
       .catch(() => { /* sin conexión */ });
   }, [escribirEnCalendario]);
 
+  // Mismo patrón que factoresBebida (justo debajo): esta pantalla SÍ necesita estado de
+  // ratios de verdad, y no solo leerRatios() al vuelo, porque el panel de "gente por
+  // comensal" del Modo carga (ver Ratios.jsx / calibracionPersonal) tiene que enterarse
+  // cuando cambian, sea porque llegan de la nube o porque los toca el asistente.
+  //
+  // Bug real que arregla este efecto: sin él, la checklist arrancaba SIEMPRE con los
+  // ratios de fábrica (9/10/20) hasta que algo —el asistente, o abrir el calendario—
+  // los pusiera en memoria; el ajuste del equipo guardado en Firestore nunca llegaba
+  // aquí solo. En la práctica caducaba rápido porque baseChecklist recalcula en cuanto
+  // se toca cualquier campo del evento (pax, tipo…), pero un checklist generado sin
+  // tocar nada antes sí podía salir con el ratio equivocado.
+  const [ratiosPersonal, setRatiosPersonal] = useState(() => leerRatios());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setRatiosPersonal(ponRatios(remotos)); };
+    cargarRatiosNube().then(aplicar).catch(() => { /* sin conexión: los de fábrica */ });
+    const corta = suscribirRatiosNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  // Para el asistente (ver escrituraRatios.js) y para el panel manual de Ratios.jsx en
+  // el Modo carga: el mismo ponRatios que deja el valor puesto para TODA la app, más la
+  // subida a la nube (antes solo miraba nubeActiva(), sin haySesionEquipo — igual que
+  // los demás ajustes compartidos, para que el asistente no intente escribir en
+  // Firestore sin sesión de equipo) y ahora también el aviso al estado de este
+  // componente para que el panel se entere sin esperar a otro recálculo.
+  const guardarRatiosAsistente = React.useCallback((siguiente) => {
+    setRatiosPersonal(ponRatios(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarRatiosNube(ratiosCambiados(siguiente)).catch(() => { /* se reintenta al siguiente cambio */ });
+    }
+  }, [haySesionEquipo]);
+
+  // Lo que dicen los eventos con el número de camareros puesto a mano (ver
+  // calibracionPersonal en calibracion.js): se recalcula solo cuando cambia el archivo,
+  // que es lo único de lo que depende.
+  const personalMedido = useMemo(() => calibracionPersonal(eventosGuardados), [eventosGuardados]);
+
   const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo) return;
@@ -2106,6 +2153,26 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  // Mismo patrón que factoresBebida, para la cristalería (ver cristaleria.js). Sin
+  // panel manual todavía: hoy solo lo toca el asistente (aplicar_factor_cristaleria),
+  // pero vive aquí y no solo en memoria para que el equipo entero cargue lo mismo.
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) ponFactoresCristaleria(remotos); };
+    cargarCristaleriaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirCristaleriaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarCristaleria = (siguiente) => {
+    ponFactoresCristaleria(siguiente);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarCristaleriaNube(factoresCristaleriaCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
   const handleCambiarHielo = (siguiente) => {
     setFactoresHielo(ponFactoresHielo(siguiente));
     if (nubeActiva() && haySesionEquipo) {
@@ -2113,6 +2180,7 @@ export default function App({ onCerrarSesion } = {}) {
         .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
     }
   };
+
 
   // Lo mismo que la bebida y el hielo, para la comida (paella y bandejas): cuánto se
   // usó de verdad por tipo, con la convención "lo vuelto es lo no usado" (ver comida.js).
@@ -2975,12 +3043,16 @@ export default function App({ onCerrarSesion } = {}) {
           factoresBebida={factoresBebida}
           calibracionBebida={bebidaMedida}
           onCambiarBebida={handleCambiarBebida}
+
           factoresHielo={factoresHielo}
           calibracionHielo={hieloMedido}
           onCambiarHielo={handleCambiarHielo}
           factoresComida={factoresComida}
           calibracionComida={comidaMedida}
           onCambiarComida={handleCambiarComida}
+          ratiosPersonal={ratiosPersonal}
+          calibracionPersonal={personalMedido}
+          onCambiarRatios={guardarRatiosAsistente}
           checklist={checklist}
           preparados={preparados}
           marcasRevisar={marcasRevisar}
@@ -3184,6 +3256,10 @@ export default function App({ onCerrarSesion } = {}) {
                     aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
                     aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
                     aplicarEnCalendario({ apuntes: apuntesCalendario, guardar: guardarApunte, borrar: borrarApunte }),
+                    aplicarEnRatios({ guardar: guardarRatiosAsistente }),
+                    aplicarEnBebida({ guardar: handleCambiarBebida }),
+                    aplicarEnCristaleria({ guardar: handleCambiarCristaleria }),
+
                     // Un factor medido se aplica por la MISMA puerta que el botón del
                     // panel: mismo ponFactores, misma subida a la nube, mismo saneado.
                     aplicarEnAjustes({

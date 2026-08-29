@@ -13,8 +13,11 @@
 //   2. Solo, desde el histórico: lo que salió menos lo que volvió, dividido entre los
 //      comensales de ese evento (ver calibracion.js → calibracionBebida).
 //
-// Este fichero no importa nada a propósito: calculos.js lo usa, así que cualquier
-// import de vuelta sería un ciclo.
+// Este fichero no importa NADA DE calculos.js a propósito: calculos.js lo usa, así que
+// cualquier import de vuelta sería un ciclo. Sí importa de factorAjuste.js, que no
+// depende de ninguno de los dos (solo constantes puras), así que no hay ciclo posible.
+import { FACTOR_NEUTRO, esFactorValido } from "./factorAjuste.js";
+export { FACTOR_NEUTRO, esFactorValido };
 
 // Los ratios de partida, sacados de aquí para que haya UN solo sitio donde vive cada
 // número: calculos.js los usa para calcular y calibracion.js para convertir un consumo
@@ -53,15 +56,6 @@ export const CLAVES_BEBIDA = Object.keys(BEBIDAS);
 // "aquí se bebe un 40% menos". Se guarda ESPARCIDO —solo lo que alguien ha cambiado o
 // lo que se ha medido— para que una corrección de los ratios base en una versión nueva
 // siga llegando a todo lo que nadie ha tocado.
-export const FACTOR_NEUTRO = 1;
-
-// Fuera de 0,3–2 no hay un evento raro, hay un dedo resbalando: un 0,1 deja la boda sin
-// vino y un 5 pide cinco veces la bebida de un evento entero.
-const MIN_FACTOR = 0.3, MAX_FACTOR = 2;
-/** @param {unknown} n @returns {n is number} */
-export function esFactorValido(n) {
-  return typeof n === "number" && Number.isFinite(n) && n >= MIN_FACTOR && n <= MAX_FACTOR;
-}
 
 /**
  * Un mapa esparcido: tipo de evento → bebida → factor. Solo lo tocado.

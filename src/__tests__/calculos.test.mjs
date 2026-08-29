@@ -31,7 +31,10 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados }
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
-import { calibracionBebida, calibracionHielo, calibracionComida, catsDeEventoGuardado } from "../calibracion.js";
+import { calibracionBebida, calibracionHielo, calibracionComida, calibracionPersonal,
+  catsDeEventoGuardado } from "../calibracion.js";
+import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
+  esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
@@ -258,6 +261,37 @@ console.log("\n══ Cristalería ══");
     `y el brindis sube las de cava a 1,5 por cabeza (${normal.cava.u} → ${conBrindis.cava.u})`);
   ok(normal.chupito === null && calcCristaleria(100, 5, false, false, true).chupito !== null,
     "los vasos de chupito solo salen si hay entrante de chupito");
+}
+
+console.log("\n══ Factores de cristalería (cristaleria.js) ══");
+{
+  // No es que "se comporten igual" por casualidad: es LA MISMA función, compartida
+  // por factorAjuste.js. Si esto fallara, alguien habría vuelto a copiar el rango en
+  // vez de importarlo, y los dos podrían acabar diciendo cosas distintas sin que se
+  // notara hasta que alguien pusiera un 0,25 y colara por un lado y no por el otro.
+  ok(esFactorCristaleriaValido === esFactorValido,
+    "esFactorValido de cristalería y de bebida son la misma función, no una copia");
+  ok(esFactorCristaleriaValido(1) && !esFactorCristaleriaValido(0.1) && !esFactorCristaleriaValido(5),
+    "el rango válido es 0,3-2, igual que bebida");
+  ok(Object.keys(saneaFactoresCristaleria({ vino: 0.8, unicornio: 2 })).join() === "vino",
+    "una clave que no existe se descarta, no se cuela");
+  ok(factorCristaleria({}, "vino") === FACTOR_NEUTRO, "sin tocar nada, el factor es neutro (1)");
+
+  // El efecto real: con el factor a 1 (de partida) el número tiene que ser EXACTAMENTE
+  // el mismo de siempre — la prueba de arriba ya fija 144 copas de cava para 100 pax,
+  // sin brindis, 5h. Si esto cambiara, cualquiera que no haya tocado el ajuste vería
+  // su camión cambiar de un día para otro sin haber pedido nada.
+  const sinTocar = calcCristaleria(100, 5, false, false, false);
+  ok(sinTocar.cava.u === 144, "de partida, calcCristaleria da lo de siempre");
+
+  ponFactoresCristaleria({ cava: 0.5 });
+  const conFactorBajo = calcCristaleria(100, 5, false, false, false);
+  ok(conFactorBajo.cava.u < sinTocar.cava.u,
+    `con el factor de cava a la mitad, salen menos copas de cava (${sinTocar.cava.u} → ${conFactorBajo.cava.u})`);
+  ok(conFactorBajo.vino.u === sinTocar.vino.u,
+    "y el vino no se toca: cada clave de cristalería es su propio ajuste");
+
+  ponFactoresCristaleria({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n══ Champaneras ══");
@@ -613,6 +647,39 @@ console.log("\n══ Cuánta gente hace falta: contra lo que se puso de verdad 
   // Lo que NO está medido se dice, en vez de dar un número por bueno
   ok(personalNecesario("cumpleanos", 100).sinMedir && !personalNecesario("boda", 100).sinMedir,
     "cumpleaños y producción se marcan como no medidos: nadie ha comprobado su ratio");
+}
+
+console.log("\n══ El ratio ajustable llega de verdad a la checklist (bug real, cazado) ══");
+{
+  // personalNecesario() (arriba) SÍ leía leerRatios() desde siempre — la usan el
+  // calendario y calcular_personal del asistente. Pero buildChecklist(), la que genera
+  // la checklist DE VERDAD, tenía su propio 9/10/20 escrito en checklist-generadores.js
+  // sin mirar leerRatios() para nada: cambiar el ratio desde el panel del calendario (o
+  // desde el asistente con aplicar_ratio) movía la previsión, pero la checklist seguía
+  // cargando con el número de fábrica. Se cazó al conectar el asistente y comprobar a
+  // fondo que el cambio llegaba a todas partes.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return parseInt(String(it[1]), 10);
+    }
+    return null;
+  };
+
+  // Antes del arreglo esto daría SIEMPRE 15 (135/9), pasase lo que pasase con el ratio.
+  ponRatios({ boda: 15 });
+  ok(cantidadItem(buildChecklist("boda", 135, 2, 4, 0, {}), "Camareros") === 9,
+    "con el ratio de boda a 15 (a mano), la checklist pide 9 camareros para 135 pax, no los 15 de fábrica");
+  ponRatios({});
+  ok(cantidadItem(buildChecklist("boda", 135, 2, 4, 0, {}), "Camareros") === 15,
+    "y al quitar el ajuste, vuelve a los 15 de fábrica (135/9)");
+
+  // El mismo bug, en la otra rama de código (cumpleanos no recibe evtKey: usa una
+  // clave fija "cumpleanos", no el parámetro, así que es un arreglo aparte).
+  ponRatios({ cumpleanos: 10 });
+  ok(cantidadItem(buildChecklist("cumpleanos", 100, 0, 3, 0, {}), "Camareros") === 10,
+    "y lo mismo en cumpleaños: con el ratio a 10, pide 10 camareros para 100 pax");
+  ponRatios({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n══ Quién va a cada evento: horas e importe ══");
@@ -1347,6 +1414,7 @@ console.log("\n══ Las mesas de los comensales ══");
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
 }
 
+
 // ─── CUÁNTO HIELO SE USÓ DE VERDAD ────────────────────────────────────────────
 {
   console.log("\n── Calibración de hielo con lo que volvió ──");
@@ -1555,6 +1623,60 @@ console.log("\n══ Las mesas de los comensales ══");
     "y volver más de lo que salió tira el evento entero");
 
   ponFactoresComida({});
+}
+
+// ─── CUÁNTA GENTE HIZO FALTA DE VERDAD (calibracionPersonal) ──────────────────
+{
+  console.log("\n══ El ratio de personal también se calibra con lo puesto a mano ══");
+
+  // Tres bodas de 140 pax con 10 camareros puestos a mano: 140/10 = 14 exacto en las
+  // tres, sin ambigüedad de redondeo.
+  const boda140con10 = { evento: "boda", pax: 140, numCamareros: 10 };
+
+  // Con menos de tres eventos no se pronuncia: dos son anécdota.
+  ok(Object.keys(calibracionPersonal({ a: boda140con10, b: boda140con10 })).length === 0,
+    "con dos eventos no se pronuncia");
+
+  const tres = { a: boda140con10, b: boda140con10, c: boda140con10 };
+  const cal = calibracionPersonal(tres);
+  ok(cal.boda && cal.boda.ratio === 14, `con tres eventos a 140/10, sugiere 1 cada 14 (${cal.boda && cal.boda.ratio})`);
+  ok(cal.boda.nEventos === 3, "y dice en cuántos eventos se ha medido");
+  ok(!cal.comunion && !cal.corporativo, "y de los tipos sin datos no dice nada");
+
+  // La mediana, no la media: un evento raro (un cliente que pidió el doble de gente)
+  // no se lleva por delante el ratio de todos los demás.
+  const conRaro = { a: boda140con10, b: boda140con10, c: boda140con10, d: { evento: "boda", pax: 140, numCamareros: 70 } };
+  ok(calibracionPersonal(conRaro).boda.ratio === 14, "un evento suelto no arrastra la mediana");
+
+  // Sin numCamareros puesto (0, o sin campo), el evento no cuenta como medida: es
+  // exactamente el mismo caso que "nadie ha tocado el automático".
+  const sinNumCamareros = { a: boda140con10, b: boda140con10, c: { evento: "boda", pax: 140 } };
+  ok(Object.keys(calibracionPersonal(sinNumCamareros)).length === 0,
+    "sin numCamareros puesto a mano, ese evento no es una medida");
+
+  // Un evento que ADEMÁS tiene paxPorCamarero puesto a mano no cuenta: ya es "aquí quiero
+  // un ratio distinto a propósito", no "el de serie se quedó corto".
+  const conRatioPropio = { a: boda140con10, b: boda140con10, c: { ...boda140con10, paxPorCamarero: 20 } };
+  ok(Object.keys(calibracionPersonal(conRatioPropio)).length === 0,
+    "un evento con su propio ratio puesto a mano no cuenta como medida del ratio de serie");
+
+  // Cada tipo de evento se mide por su cuenta.
+  const comunion140con10 = { evento: "comunion", pax: 140, numCamareros: 10 };
+  const dosTypos = { a: boda140con10, b: boda140con10, c: boda140con10, d: comunion140con10, e: comunion140con10, f: comunion140con10 };
+  const calDos = calibracionPersonal(dosTypos);
+  ok(calDos.boda.ratio === 14 && calDos.comunion.ratio === 14, "boda y comunión se miden cada una por su lado");
+
+  // Un ratio que saliera fuera de lo razonable (1-60, ver saneaRatios) no se sugiere:
+  // sería un dato mal metido, no una medida real.
+  const disparatado = { a: { evento: "boda", pax: 6000, numCamareros: 10 }, b: { evento: "boda", pax: 6000, numCamareros: 10 }, c: { evento: "boda", pax: 6000, numCamareros: 10 } };
+  ok(!calibracionPersonal(disparatado).boda, "un ratio fuera de 1-60 no se sugiere, aunque haya tres eventos");
+
+  // Eventos sin datos, de un tipo que no existe, o sin pax no revientan nada
+  ok(Object.keys(calibracionPersonal({
+    x: { evento: "boda", numCamareros: 10 },
+    y: {},
+    z: { evento: "inventado", pax: 100, numCamareros: 10 },
+  })).length === 0, "eventos sin pax, vacíos o de un tipo que no existe se ignoran sin reventar");
 }
 
 // ─── LOS MENÚS QUE HAY QUE HACER APARTE ───────────────────────────────────────

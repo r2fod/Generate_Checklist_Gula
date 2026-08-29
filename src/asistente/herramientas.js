@@ -28,9 +28,11 @@ import { calcBebidas, calcHielo, KG_HIELO_POR_PAX } from "../calculos.js";
 import { buildChecklist } from "../checklist-generadores.js";
 import { escaletaDelEvento, resumenEscaleta } from "../escaleta.js";
 import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
-import { personalNecesario, leerRatios } from "../personal.js";
+import { personalNecesario, leerRatios, saneaRatios } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
-import { RATIOS_BEBIDA } from "../bebida.js";
+import { RATIOS_BEBIDA, TIPOS_BEBIDA, CLAVES_BEBIDA, esFactorValido, leerFactores, FACTOR_NEUTRO } from "../bebida.js";
+import { CLAVES_COMIDA } from "../comida.js";
+import { CLAVES_CRISTALERIA, esFactorValido as esFactorCristaleriaValido, leerFactoresCristaleria, factorCristaleria } from "../cristaleria.js";
 import { PERSONAS_POR_PAELLA } from "../paella.js";
 import { compararRatios } from "./sector.js";
 import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
@@ -331,7 +333,7 @@ export const HERRAMIENTAS = {
   comparar_con_sector: {
     datos: false,
     esquema: {
-      description: "Compara los ratios propios de la casa (camareros, vino, cerveza, cava, hielo, paella) contra bandas públicas del sector de catering/eventos, para saber si un número está dentro de lo normal, por encima o por debajo. OJO: los ratios medidos con eventos reales (camareros de boda/comunión, hielo, bebida) pueden estar fuera de la banda A PROPÓSITO — no es un fallo, es cómo se trabaja aquí, y ese motivo suele estar comentado en el propio fichero del ratio. Sirve sobre todo para lo que NADIE ha medido todavía (paella, cumpleaños, producción): ahí el sector es la única referencia que hay. Los números del sector son de fuentes públicas, sin validar contra el equipo — dilo si alguien pregunta por su fiabilidad.",
+      description: "Compara los ratios propios de la casa (camareros, vino, cerveza, cava, hielo, paella) contra bandas públicas del sector de catering/eventos, para saber si un número está dentro de lo normal, por encima o por debajo. OJO: los ratios medidos con eventos reales (camareros de boda/comunión, hielo, bebida) pueden estar fuera de la banda A PROPÓSITO — no es un fallo, es cómo se trabaja aquí, y ese motivo suele estar comentado en el propio fichero del ratio. Sirve sobre todo para lo que NADIE ha medido todavía (paella, cumpleaños, producción): ahí el sector es la única referencia que hay. Los números del sector son de fuentes públicas, sin validar contra el equipo — dilo si alguien pregunta por su fiabilidad. Al contestar sé breve: destaca primero lo que está por encima, por debajo o sin dato (con su número); lo que esté dentro de rango resúmelo en una frase sin repetir cifra por cifra, salvo que pidan el detalle de todos.",
       parameters: {
         type: "object",
         properties: {
@@ -355,6 +357,108 @@ export const HERRAMIENTAS = {
         .filter(r => !ratio || normaliza(r.nombre).includes(normaliza(ratio)) || normaliza(r.id).includes(normaliza(ratio)));
       if (!comparados.length) return { error: `No hay ningún ratio del sector que se parezca a "${ratio}".` };
       return { ratios: comparados };
+    },
+  },
+
+  // La otra mitad de comparar_con_sector: no solo decir si un ratio se sale de rango,
+  // también poder cambiarlo cuando el dueño lo pida. Escribe, así que pasa por
+  // ctx.onEscribir como todo lo demás — en "confianza" se aplica sola, en "con permiso"
+  // se enseña antes. El valor vale para TODA la app desde ya (checklist y calendario
+  // leen el mismo leerRatios()) y se guarda para el equipo entero, no solo este
+  // dispositivo — eso lo hace el aplicador (escrituraRatios.js), no esta herramienta.
+  aplicar_ratio: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuántos comensales lleva un camarero para un tipo de evento (boda, comunion, corporativo, cumpleanos o produccion). El nuevo número vale para TODA la app desde ya —la checklist provisiona delantales, bandejas y menús de personal a partir de esta cifra— y se guarda para el equipo entero, no solo para este dispositivo. Úsalo solo cuando te lo pidan a ti (\"ponlo a X\", \"ajústalo tú\"), nunca por iniciativa propia solo porque comparar_con_sector diga que os salís de la banda: eso puede ser intencional.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
+          paxPorCamarero: { type: "number", description: "Comensales por cada camarero, entre 1 y 60." },
+        },
+        required: ["tipo", "paxPorCamarero"],
+      },
+    },
+    corre: (ctx, { tipo = "", paxPorCamarero = 0 } = {}) => {
+      const actuales = leerRatios();
+      if (!Object.prototype.hasOwnProperty.call(actuales, tipo)) {
+        return { error: `"${tipo}" no es un tipo de evento con ratio de camareros. Los tipos son: ${Object.keys(actuales).join(", ")}.` };
+      }
+      const limpio = saneaRatios({ [tipo]: paxPorCamarero });
+      if (!limpio[tipo]) return { error: `${paxPorCamarero} no es un número válido de comensales por camarero (tiene que estar entre 1 y 60).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los ratios." };
+      return ctx.onEscribir({
+        que: "aplicar_ratio",
+        resumen: `Cambiar ${tipo}: ${actuales[tipo]} → ${limpio[tipo]} comensales por camarero (para toda la app)`,
+        datos: { tipo, paxPorCamarero: limpio[tipo] },
+      });
+    },
+  },
+
+  // La misma idea que aplicar_ratio, para el otro ajuste que ya vivía en el panel del
+  // calendario: cuánto se bebe de cada cosa por tipo de evento. Un factor y no una
+  // cantidad — 1 es "como siempre", 0,6 es "un 40% menos" — porque así es como ya lo
+  // guarda bebida.js (esparcido: lo que no se toca se queda en 1, sin necesidad de saber
+  // el litro exacto de partida).
+  aplicar_factor_bebida: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuánto se bebe de una bebida (vino, cerveza, cava o refresco) en un tipo de evento, como múltiplo de lo de siempre: 1 es \"como siempre\", 0.6 es \"un 40% menos\", 1.3 es \"un 30% más\". El nuevo factor vale para TODA la app desde ya y se guarda para el equipo entero, no solo para este dispositivo. Úsalo solo cuando te lo pidan a ti (\"pon el vino de las comuniones a...\", \"ajústalo tú\"), nunca por iniciativa propia.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
+          bebida: { type: "string", description: "vino, cerveza, cava o refresco." },
+          factor: { type: "number", description: "Múltiplo sobre lo de siempre, entre 0.3 y 2. 1 es sin cambios." },
+        },
+        required: ["tipo", "bebida", "factor"],
+      },
+    },
+    corre: (ctx, { tipo = "", bebida = "", factor = 0 } = {}) => {
+      if (!TIPOS_BEBIDA.includes(tipo)) return { error: `"${tipo}" no es un tipo de evento. Los tipos son: ${TIPOS_BEBIDA.join(", ")}.` };
+      if (!CLAVES_BEBIDA.includes(bebida)) return { error: `"${bebida}" no es una bebida que se calibre. Las bebidas son: ${CLAVES_BEBIDA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los factores de bebida." };
+      const filaActual = leerFactores()[tipo] || {};
+      const antes = filaActual[bebida] || FACTOR_NEUTRO;
+      return ctx.onEscribir({
+        que: "aplicar_factor_bebida",
+        resumen: `Cambiar ${bebida} en ${tipo}: ×${antes} → ×${limpio} (para toda la app)`,
+        datos: { tipo, bebida, factor: limpio },
+      });
+    },
+  },
+
+  // Mismo patrón, para la cristalería. Sin tipo de evento: calcCristaleria calcula
+  // igual para todos, así que el ajuste tampoco distingue boda de comunión.
+  aplicar_factor_cristaleria: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuánta cristalería se carga (copas de vino, agua, cava o cubata), como múltiplo de lo de siempre: 1 es \"como siempre\", 0.8 es \"un 20% menos\". Hoy la cristalería va fija al extremo alto del sector con un 10% de margen para roturas, sin dato propio detrás — este ajuste es para cuando el dueño ya sabe, por experiencia, que sobra o falta. Vale para TODA la app desde ya y se guarda para el equipo entero. Úsalo solo cuando te lo pidan a ti, nunca por iniciativa propia.",
+      parameters: {
+        type: "object",
+        properties: {
+          clave: { type: "string", description: "vino, agua, cava o cubata." },
+          factor: { type: "number", description: "Múltiplo sobre lo de siempre, entre 0.3 y 2. 1 es sin cambios." },
+        },
+        required: ["clave", "factor"],
+      },
+    },
+    corre: (ctx, { clave = "", factor = 0 } = {}) => {
+      if (!CLAVES_CRISTALERIA.includes(clave)) return { error: `"${clave}" no es cristalería que se ajuste así. Las claves son: ${CLAVES_CRISTALERIA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorCristaleriaValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los factores de cristalería." };
+      const antes = factorCristaleria(leerFactoresCristaleria(), clave);
+      return ctx.onEscribir({
+        que: "aplicar_factor_cristaleria",
+        resumen: `Cambiar cristalería (${clave}): ×${antes} → ×${limpio} (para toda la app)`,
+        datos: { clave, factor: limpio },
+      });
     },
   },
 
@@ -702,11 +806,20 @@ export const HERRAMIENTAS = {
       },
     },
     corre: (ctx, { area = "", tipo = "", clave = "", factor = 1 } = {}) => {
+      // La misma sanidad que aplicar_factor_bebida: una clave inventada no se guarda
+      // como factor fantasma que ningún cálculo lee, y un tipo inválido no crea filas.
+      if (area !== "bebida" && area !== "hielo" && area !== "comida")
+        return { error: `"${area}" no es un área: bebida, hielo o comida.` };
+      if (!TIPOS_BEBIDA.includes(tipo)) return { error: `"${tipo}" no es un tipo de evento. Los tipos son: ${TIPOS_BEBIDA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (area === "bebida" && !CLAVES_BEBIDA.includes(clave)) return { error: `"${clave}" no es una bebida que se calibre: ${CLAVES_BEBIDA.join(", ")}.` };
+      if (area === "comida" && !CLAVES_COMIDA.includes(clave)) return { error: `"${clave}" no es una comida que se calibre: ${CLAVES_COMIDA.join(", ")}.` };
       if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los ajustes." };
       return ctx.onEscribir({
         que: "aplicar_calibracion",
-        resumen: `Aplicar el factor ${factor} a ${clave || "hielo"} en ${tipo}`,
-        datos: { area, tipo, clave, factor: Number(factor) },
+        resumen: `Aplicar el factor ${limpio} a ${clave || "hielo"} en ${tipo}`,
+        datos: { area, tipo, clave, factor: limpio },
       });
     },
   },

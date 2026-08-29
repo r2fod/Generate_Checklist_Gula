@@ -11,7 +11,7 @@
 // No sabe nada de Firestore, igual que el resto del calendario: recibe los valores y
 // avisa de los cambios.
 import { useState } from "react";
-import { Users, ChevronDown, RotateCcw } from "lucide-react";
+import { Users, ChevronDown, RotateCcw, Check } from "lucide-react";
 import { PAX_POR_CAMARERO } from "../personal.js";
 import { TIPOS } from "./apuntes.js";
 
@@ -20,7 +20,13 @@ import { TIPOS } from "./apuntes.js";
 // escala con los comensales — depende del camión, que cuesta lo mismo cargarlo con 60
 // que con 140. Convertirlos en una tabla editable sería mucha pantalla para un número
 // que la hoja de costes daba clavado.
-export default function Ratios({ ratios, onCambiar }) {
+//
+// calibracion (opcional, ver calibracionPersonal en calibracion.js) es el mismo patrón
+// que el panel de bebida del Modo carga: en cuanto hay 3 eventos con numCamareros puesto
+// a mano para un tipo, aquí sale el ratio que de verdad ha hecho falta y un botón para
+// usarlo. Solo llega con datos desde la pantalla de la checklist —el calendario solo no
+// tiene el archivo de eventos guardados—, así que por defecto va vacío y no cambia nada.
+export default function Ratios({ ratios, onCambiar, calibracion = {} }) {
   const [abierto, setAbierto] = useState(false);
   const tipos = Object.keys(PAX_POR_CAMARERO);
   const tocados = tipos.filter(t => (ratios[t] ?? PAX_POR_CAMARERO[t]) !== PAX_POR_CAMARERO[t]);
@@ -53,6 +59,8 @@ export default function Ratios({ ratios, onCambiar }) {
             const valor = ratios[tipo] ?? PAX_POR_CAMARERO[tipo];
             const cambiado = valor !== PAX_POR_CAMARERO[tipo];
             const medido = tipo !== "cumpleanos" && tipo !== "produccion";
+            const medida = calibracion[tipo];
+            const yaEsLaMedida = medida && medida.ratio === valor;
             return (
               <div className={`cal-ratio${cambiado ? " es-cambiado" : ""}`} key={tipo}>
                 <span className="cal-ratio-nombre">
@@ -68,6 +76,24 @@ export default function Ratios({ ratios, onCambiar }) {
                     onChange={e => poner(tipo, e.target.value)}
                   />
                 </label>
+                {/* El número que sale de los eventos con el camarero puesto a mano, con
+                    cuántos lo sostienen. Igual que en bebida: un botón porque lo único
+                    que hay que hacer con él es usarlo. */}
+                {medida && !yaEsLaMedida && (
+                  <button
+                    type="button" className="cal-ratio-medido"
+                    title={`Medido en ${medida.nEventos} eventos con el número de camareros puesto a mano`}
+                    onClick={() => poner(tipo, medida.ratio)}
+                  >
+                    <Check size={12} aria-hidden="true" /> 1 cada {medida.ratio}
+                    <em> · {medida.nEventos} ev.</em>
+                  </button>
+                )}
+                {medida && yaEsLaMedida && (
+                  <span className="cal-ratio-medido es-puesto" title={`Medido en ${medida.nEventos} eventos`}>
+                    <Check size={12} aria-hidden="true" /> medido
+                  </span>
+                )}
                 {/* Volver al de partida sin tener que acordarse de cuál era */}
                 <button
                   type="button"
