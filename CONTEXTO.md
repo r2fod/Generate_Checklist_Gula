@@ -405,7 +405,11 @@ la oficina** y **añadir varios items** van con `React.lazy` + `Suspense`.
 
 | Trozo inicial de la checklist | Antes | Después |
 |---|---|---|
-| `checklist-*.js` | 168,4 kB (50,1 gzip) | **129,3 kB (39,3 gzip)** |
+| `checklist-*.js` | 168,4 kB (50,1 gzip) | 129,3 kB (39,3 gzip) |
+
+(Cifra ya superada: ver más abajo, "`App` perezosa" — con `App.jsx` también perezosa el
+trozo de entrada de la checklist bajó a 3,8 kB / 1,7 kB gzip. Esta tabla se queda como
+estaba, de referencia de aquel cambio.)
 
 Son 11 kB gzip menos que descargar, analizar y ejecutar antes de ver nada, y encima el
 JavaScript que se deja de ejecutar en el arranque es el que más pesa al pintar. Modo
@@ -429,6 +433,40 @@ vuelta se saltaba y la app se quedaba SIN suscripción.
 trozo más grande de todos — pero son **95 iconos distintos** de verdad usados, no un
 barril mal sacudido. Quitar peso ahí es quitar iconos, que es una decisión de diseño, no
 una optimización.
+
+### `App` perezosa: el login no tiene por qué cargar la checklist entera
+
+Auditando el proyecto entero a petición del dueño ("carga un poco lento"), medido con
+Playwright de verdad (no a ojo): la pantalla de acceso de la checklist —dos campos y un
+botón— se llevaba, antes de poder pintarse, **755 kB transferidos** y **293 ms hasta
+`DOMContentLoaded`**, porque `Acceso.jsx` importaba `App.jsx` (6.600 líneas: el
+asistente, objetivos, paella, los 95 iconos) con un `import` normal. `PuertaSesion.jsx`
+solo RENDERIZA `<Contenido>` después de saber si hay sesión, pero el import es estático:
+el empaquetador no sabe de condicionales en tiempo de ejecución, así que metía App en el
+mismo trozo que el propio formulario de login.
+
+Arreglado con lo mismo que ya usan Modo carga, la bandeja y "añadir varios" —
+`React.lazy` + `Suspense`—, pero un nivel más arriba: `App` ahora es
+`React.lazy(() => import("./App.jsx"))` en `Acceso.jsx`, y `PuertaSesion.jsx` envuelve
+las tres formas de `<Contenido>` en `Suspense` con el MISMO "Cargando…" que ya usaba
+mientras resolvía la sesión (mismas clases de `index.css`, siempre disponibles — no hace
+falta el truco de estilos en línea de `CargandoPanel`, porque esas clases no viven en el
+trozo perezoso). Con un `Contenido` que no es perezoso (el calendario, hoy) `Suspense` no
+cambia nada: no hay nada que esperar.
+
+Medido después: **513 kB** (-32 %), `DOMContentLoaded` **95 ms** (antes 293 ms), carga
+completa **738 ms** (antes 1259 ms). Verificado con Playwright que las dos rutas
+(formulario de login normal, y el enlace directo `?c=` que salta el login) siguen
+pintando exactamente igual — la segunda es la que ejercita `App` perezosa de verdad.
+`test:rapido` y lint en verde; la batería completa de navegador no pudo completarse esta
+vez por una caída del proceso en segundo plano ajena al cambio (dos intentos, sin ningún
+❌ ni traza — infraestructura, no una prueba fallida), así que la verificación de las dos
+rutas afectadas se apoyó en esos dos scripts de Playwright dirigidos en vez de en la
+batería entera.
+
+**El calendario tiene el mismo patrón, a mucha menor escala** (su `AppCalendario` son
+~80 líneas dentro del propio `calendario/main.jsx`, no separables sin partir el
+fichero) — no se tocó: el ahorro sería mucho menor y el riesgo de romper algo, mayor.
 
 ## Saber qué falló, sin espiar a nadie
 
