@@ -82,47 +82,6 @@ Cloudflare (confirmado con "Repasar los eventos ahora").
 "Pendiente", punto 2). La calibración del hielo ya está montada (ver "Hecho"); solo
 le falta que el equipo marque la vuelta en tres eventos para que el número salga solo.
 
-## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
-
-La rama `arena/01a038bc-…` lleva **este trabajo por delante de `main`** (que desde el
-merge de hoy ya incluye #154: ratios/cristalería/autocalibración de personal; y D1
-añade el push: ver "Hecho"): el **C2 del
-plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
-paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
-con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
-paquete **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no adivina,
-cabecera corregida y barrido de datos reales en la batería), **B5+B6** (README real y
-salud de proveedores desde Ajustes), **B8** (línea base de pintado en el CI
-nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App de la
-sesión no tiene permiso `workflows`, ver "Hecho"), el **A4 v1** (marketing: análisis
-de webs + estrategia), el **A4 v2a** (redes por captura y visión de Gemini) y el
-**A4 v2b** (estrategia de captación guardada en `indice/marketing`). Detalle y
-porqués en "Hecho". `test:rapido` en verde (tipos + 459 calculos + 640 asistente +
-build + sincronización).
-
-**Antes de fusionar o desplegar, verificar:**
-
-1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2, C3 y A2
-   solo ha corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de
-   Modo carga (PanelHielo, PanelComida) y el asistente.
-2. **Visto humano de PanelHielo, PanelComida y la sección "Oportunidades" de
-   Cerebro** (`CLAUDE.md` manda captura): 390/412 y escritorio, dos temas, con
-   `animations: "disabled"`. Los paneles reusan las clases `cal-ratios`/`cal-ratio`
-   del panel de bebida y la sección reusa `cer-aviso` (tono verde nuevo
-   `es-oportunidad`), pero nadie lo ha visto renderizado.
-3. **El factor de hielo o de comida sin datos no es un bug**: la mecánica está montada
-   y el número saldrá solo cuando el equipo marque la vuelta en 3 eventos (el hielo
-   puede ser en kilos; la paella, las que no salieron). Un 1 en el panel es "aún sin
-   medir", no "roto".
-4. **La convención de la comida**: lo vuelto es lo NO usado — en la paella, las que
-   no salieron; en las bandejas, las que no se usaron para pasar. PanelComida lo dice
-   en pantalla, pero conviene que el equipo lo lea antes de marcar vueltas de verdad.
-5. `worker/pegar.js` NO se ha tocado en C2/C3: el check de CI "regenerado" pasa de
-   largo, no hay nada que reencolar en Cloudflare.
-
-El resto del plan (A2, A4, C1…) sigue pendiente en `PLAN_MEJORAS.md`, en el orden
-escrito allí.
-
 ## Orden de lectura
 
 0. **El bloque de aquí arriba**, si vas a fusionar o publicar.
@@ -893,16 +852,17 @@ los que todavía no hay.
   existente + recordatorios): no hay infraestructura nueva.
 27 comprobaciones nuevas, `test:rapido` en verde.
 
-**B8 del plan — línea base de pintado en CI — listo, pendiente de aplicar por el
-dueño.** El trabajo de navegador de `test.yml` ya descargaba chromium y lo dejaba en
-`CHROMIUM_PATH`, pero `medir` nunca se ejecutaba ahí: el único sitio donde se medía
-era el portátil de quien corría la batería. Sin número de referencia no se detecta la
-regresión de pintado, y sin detección la regla de "no optimizar sin número" se queda
-a medio hacer. El cambio son tres líneas al final del trabajo `navegador`, pero la
-App de la sesión NO PUEDE subirlo: GitHub rechaza el push cuando una App sin
-permiso `workflows` toca `.github/workflows/` (el mismo motivo por el que los ymls
-vivieron en `ci/` y se movieron a mano). El dueño lo aplica desde la web de GitHub
-(`test.yml` → editar → después de la línea de `app.test.mjs`):
+**B8 del plan — línea base de pintado en CI — hecho.** El trabajo de navegador de
+`test.yml` ya descargaba chromium y lo dejaba en `CHROMIUM_PATH`, pero `medir`
+nunca se ejecutaba ahí: el único sitio donde se medía era el portátil de quien
+corría la batería. Sin número de referencia no se detecta la regresión de
+pintado, y sin detección la regla de "no optimizar sin número" se queda a medio
+hacer. Se daba por bloqueado (una sesión anterior asumió que la App no tenía
+permiso `workflows` para tocar `.github/workflows/`, el mismo motivo por el que
+los ymls vivieron en `ci/` y se movieron a mano) — pero el dueño comprobó los
+permisos de la instalación y sí lo tiene concedido; solo hacía falta probarlo.
+Una línea nueva al final del trabajo `navegador`, probada en local
+(`CHROMIUM_PATH=... npm run medir`, sale 0) antes de subirla:
 
 ```yaml
       # Línea base de pintado (B8 del plan): el número que convierte "¿va más lento
