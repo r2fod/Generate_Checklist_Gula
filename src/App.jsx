@@ -41,7 +41,7 @@ import {
 } from "./nube.js";
 import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
 import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
-import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
+import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
 // solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se

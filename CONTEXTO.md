@@ -2083,7 +2083,43 @@ al segundo muestran los nodos en posiciones distintas —animación real, no un 
 instantáneo—, sin errores de página en claro ni en oscuro. `test:rapido` y lint en
 verde.
 
-## Decidido NO hacer (y por qué)
+## Fallo real: la app reventaba al enviar el formulario de oficina, y el aviso de VAPID no lo habría enviado nunca
+
+Reportado por el dueño con captura: enviar el formulario de configuración de un evento
+tumbaba la checklist entera con `nombreDelEnvio is not defined` (la pantalla de "La app
+ha fallado"). Causa: `App.jsx` escucha los envíos nuevos (`suscribirEnvios`, para el
+aviso hablado y el aviso de WhatsApp) y llama a `nombreDelEnvio(e)` y `textoAvisoEnvio(e)`
+— pero esas dos funciones vivían como privadas de `ModalFormularioOficina.jsx`, sin
+exportar ni importar en `App.jsx`. `oxlint` no lo cazaba: `no-undef` no estaba activada
+(sin `env`/`globals`, se dispara en falso con `window`, `fetch`, `document`... de ahí que
+estuviera apagada), así que un identificador libre pasaba lint en verde y solo revienta
+en el navegador, con datos reales, en el momento peor.
+
+Arreglado sacando `nombreDelEnvio` y `textoAvisoEnvio` a `src/formulario/preguntas.js`
+—mismo sitio que `resumirEnvio`/`archivosDelEnvio`, incluso módulo puro que ya se
+prueba con `node`— e importándolas donde hacían falta de verdad: `App.jsx` y
+`ModalFormularioOficina.jsx`.
+
+**Con el mismo patrón se encontró un segundo fallo, más grave por dormido**: el Worker
+(`avisosDelDia`, `leerSuscripciones`, `leerTareas` — el cron de D1, avisos push) usaba
+`FIRESTORE`, `proyecto`, `campos` y `entrar`, las cuatro privadas de `repaso.js` y
+nunca importadas en `index.js`. Nadie lo había visto porque D1 lleva desde que se
+construyó esperando a que el dueño ponga el par VAPID en Cloudflare — el cron de avisos
+nunca ha llegado a correr de verdad todavía. El día que se configurara, habría fallado
+la primera noche, en silencio (un cron no tiene a quién enseñarle una pantalla roja).
+Arreglado exportando las cuatro de `repaso.js` e importándolas en `index.js`;
+`worker/pegar.js` regenerado (`npm run worker:build`) — el propio empaquetado lo
+confirma: antes renombraba a `FIRESTORE$1`/`entrar$1`/`campos$1`/`proyecto$1` para no
+chocar con los mismos nombres sueltos en `index.js`, ahora es una sola función
+compartida, como tenía que ser desde el principio.
+
+**Activado `no-undef` de verdad en `.oxlintrc.json`** (con `env: browser/node/es2021` y
+`__BUILD_ID__` en `globals`, el define de Vite): sin los globals de por medio disparaba
+en falso con todo lo del navegador (`window`, `fetch`, `document`, `setTimeout`…); con
+ellos puestos, cero falsos positivos y cazó los tres fallos de arriba de una sentada.
+Se queda encendida — es la red que habría evitado este commit entero.
+
+`test:rapido` y lint en verde (el lint, ahora con una regla más estricta que antes).
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
   nadie ve. Ahí vive todo el estado de la checklist.

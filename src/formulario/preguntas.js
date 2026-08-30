@@ -605,6 +605,29 @@ export function resumirRespuesta(p, r, tipo) {
   return extra.length ? `${op.texto} · ${extra.join(" · ")}` : op.texto;
 }
 
+// Cómo llamar a un envío en un aviso o en la bandeja: el evento al que ya está
+// asociado si lo tiene, si no el nombre que puso quien rellenó el formulario, y si
+// tampoco hay eso, un texto genérico — nunca vacío.
+export function nombreDelEnvio(e) {
+  return e.eventoDestino || (e.respuestas && e.respuestas.nombre) || "evento nuevo";
+}
+
+// El texto del aviso de WhatsApp cuando llega un envío nuevo o corregido: qué ha
+// cambiado, y un resumen corto de quién/cuándo para reconocerlo sin abrir la bandeja.
+export function textoAvisoEnvio(e) {
+  const r = e.respuestas || {};
+  const trozos = [];
+  if (r.fecha) trozos.push(fmtFechaCorta(r.fecha));
+  if (r.sitio) trozos.push(r.sitio);
+  const gente = [r.adultos && `${r.adultos} adultos`, r.ninos && `${r.ninos} niños`, r.staff && `${r.staff} staff`]
+    .filter(Boolean).join(" + ");
+  if (gente) trozos.push(gente);
+  const cabecera = e.corregido
+    ? `Han CAMBIADO los datos de "${nombreDelEnvio(e)}"`
+    : `Datos nuevos de "${nombreDelEnvio(e)}"`;
+  return `${cabecera}${trozos.length ? `\n${trozos.join(" · ")}` : ""}\nEstá en el formulario, sin aplicar todavía.`;
+}
+
 // El envío entero en palabras, para la bandeja: pregunta y respuesta, en el orden en
 // que se contestaron, marcando lo que se dejó sin contestar.
 export function resumirEnvio(respuestas = {}) {

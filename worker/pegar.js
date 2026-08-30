@@ -319,7 +319,7 @@ function revisarProximos(eventosGuardados = {}, diasVista = 30) {
 }
 //#endregion
 //#region worker/repaso.js
-const FIRESTORE$1 = "https://firestore.googleapis.com/v1";
+const FIRESTORE = "https://firestore.googleapis.com/v1";
 const PREFIJO_EVENTO = "evt_";
 const TECHO_DOCUMENTO = 1048576;
 const AVISA_DESDE = .75;
@@ -337,7 +337,7 @@ function avisoDePeso(nombre, bytes) {
 		comoSeArregla: nombre.includes("calendario") ? "Saca del calendario los apuntes de años cerrados (Traer/exportar guarda una copia antes)." : "Es el archivo antiguo y solo se lee: se puede vaciar cuando se confirme que todo está en indice/evt_*."
 	};
 }
-async function entrar$1(env) {
+async function entrar(env) {
 	const clave = String(env.FIREBASE_API_KEY || "").trim();
 	const correo = String(env.ROBOT_EMAIL || "").trim();
 	const pass = String(env.ROBOT_PASSWORD || "");
@@ -363,16 +363,16 @@ const valor = (v) => {
 	if ("doubleValue" in v) return v.doubleValue;
 	if ("booleanValue" in v) return v.booleanValue;
 };
-const campos$1 = (doc) => {
+const campos = (doc) => {
 	const salida = {};
 	Object.entries(doc && doc.fields || {}).forEach(([k, v]) => {
 		salida[k] = valor(v);
 	});
 	return salida;
 };
-const proyecto$1 = (env) => String(env.FIREBASE_PROJECT_ID || "").trim();
+const proyecto = (env) => String(env.FIREBASE_PROJECT_ID || "").trim();
 async function leerEventos(env, token) {
-	const base = `${FIRESTORE$1}/projects/${proyecto$1(env)}/databases/(default)/documents/indice`;
+	const base = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice`;
 	const mapa = {};
 	let pagina = "";
 	for (let vuelta = 0; vuelta < 20; vuelta++) {
@@ -382,7 +382,7 @@ async function leerEventos(env, token) {
 		if (!r.ok) throw new Error(`Firestore no deja leer los eventos (${d.error && d.error.message || r.status}).`);
 		(d.documents || []).forEach((doc) => {
 			if (!String(doc.name || "").split("/").pop().startsWith(PREFIJO_EVENTO)) return;
-			const c = campos$1(doc);
+			const c = campos(doc);
 			if (!c.nombre || !c.estado) return;
 			try {
 				mapa[c.nombre] = JSON.parse(c.estado);
@@ -394,14 +394,14 @@ async function leerEventos(env, token) {
 	return mapa;
 }
 async function pesoDe(env, token, ruta) {
-	const url = `${FIRESTORE$1}/projects/${proyecto$1(env)}/databases/(default)/documents/${ruta}`;
+	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/${ruta}`;
 	const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
 	if (!r.ok) return null;
 	const texto = await r.text();
 	return new TextEncoder().encode(texto).length;
 }
 async function guardarAvisos(env, token, contenido) {
-	const url = `${FIRESTORE$1}/projects/${proyecto$1(env)}/databases/(default)/documents/indice/avisos`;
+	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/avisos`;
 	const r = await fetch(url, {
 		method: "PATCH",
 		headers: {
@@ -419,8 +419,8 @@ async function guardarAvisos(env, token, contenido) {
 	}
 }
 async function repasar(env) {
-	if (!proyecto$1(env)) throw new Error("Falta FIREBASE_PROJECT_ID: sin él no se sabe qué base de datos mirar.");
-	const token = await entrar$1(env);
+	if (!proyecto(env)) throw new Error("Falta FIREBASE_PROJECT_ID: sin él no se sabe qué base de datos mirar.");
+	const token = await entrar(env);
 	const eventos = await leerEventos(env, token);
 	const revisados = revisarProximos(eventos, 30);
 	const pesos = [];
