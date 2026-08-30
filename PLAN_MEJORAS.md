@@ -300,6 +300,29 @@ igual el recordatorio de hoy.
 
 ## Lo que queda de verdad (todo lo de arriba, hecho o con su porqué de por qué no)
 
+0. **Reparto de lo que queda listo para hacer, entre dos IAs a la vez (para no pisarse):**
+   - **Esta sesión (Claude Code, ahora mismo) se queda con:**
+     - **Grafo de Cerebro, animado de verdad.** Hoy `Grafo.jsx` coloca los nodos con
+       una relajación de muelles+repulsión que corre UNA VEZ al montar y ya (ver más
+       arriba, "El Grafo, de verdad, con líneas") — falta que se mueva, no solo que
+       tenga líneas.
+     - **Voz del asistente, más natural.** #138 ya metió voz más natural (local +
+       Gemini) y personalidad audible en el saludo — falta comprobar si con eso basta
+       o si sigue sonando leída en algún punto y hace falta afinar más.
+   - **La otra IA se queda con todo lo demás listo para tocar, en concreto:**
+     - **Vajilla y cubertería (platos, cubiertos)**, siguiente paso natural de A1:
+       sacar `platosDoble`/`cubiertosDoble` de `checklist-generadores.js` (hoy
+       escritos por triplicado, uno por tipo de evento) a una función compartida
+       antes de poder darles un factor ajustable limpio — mismo motivo que ya
+       justificó extraer `personal.js`/`bebida.js` en su día.
+     - **Cablear `subconsciente.js`**: construido y probado, pero ninguna pantalla lo
+       llama — decidir dónde se enseña.
+     - El resto de los puntos 1-5 de aquí abajo que no sean puramente "esperar datos
+       reales" o "decisión del dueño".
+   - Si alguna de las dos IAs termina lo suyo y quiere seguir, que mire primero este
+     reparto antes de coger algo de la lista del otro, para no duplicar trabajo en dos
+     ramas a la vez.
+
 1. **Tuyas, para aplicar** (código ya listo, esperando acción fuera de un PR):
    - B8: las 3 líneas en `.github/workflows/test.yml` (permiso de workflows).
    - D1: par VAPID + `nodejs_compat` en el Worker de Cloudflare.
