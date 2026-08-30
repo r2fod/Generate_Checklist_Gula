@@ -1,0 +1,1 @@
+var e=e=>String(e||``).toLowerCase().normalize(`NFD`).replace(/[\u0300-\u036f]/g,``),t=(e,t=1/0)=>String(e||``).replace(/\s+/g,` `).trim().slice(0,t),n=(n,r=60)=>e(t(n)).replace(/[^a-z0-9ñ ]/g,``).replace(/\s+/g,`-`).slice(0,r),r=e=>String(Math.round(e*100)/100).replace(`.`,`,`),i=e=>Number(String(e).replace(`,`,`.`));export{e as a,t as i,i as n,r,n as t};

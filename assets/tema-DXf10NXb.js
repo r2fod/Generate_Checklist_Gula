@@ -1,0 +1,1 @@
+import{v as e}from"./firestore-BBE-XgJI.js";function t(e=new Date){let t=e.getHours();return t>=20||t<7}function n(){let t=e(`gula_tema`);return t===`claro`||t===`oscuro`||t===`auto`?t:`auto`}function r(e,n=new Date){return e===`claro`||e===`oscuro`?e:t(n)?`oscuro`:`claro`}function i(e=new Date){let t=r(n(),e);return document.documentElement.dataset.tema=t,t}export{n,r,i as t};
