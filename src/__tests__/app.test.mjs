@@ -4028,7 +4028,14 @@ async function main() {
         // Humano en medio, el "gasto" que apuntaba a la cuarta pasó a abrir Tareas sin
         // que saltara nada — la prueba seguía verde mirando otra pantalla.
         ["asistente humano", BANCO + "?asistente=1", ['.asis-pestana:has-text("Humano")']],
-        ["asistente cerebro", BANCO + "?asistente=1", ['.asis-pestana:has-text("Cerebro")']],
+        // Ajustes empieza abierto y SUSTITUYE la pestaña activa (asis-panel es-ajustes):
+        // hay que cerrarlo antes de que se vea Cerebro de verdad, si no el chip de Grafo
+        // ni siquiera está en la página y este paso no hace nada. El Grafo se anima con
+        // requestAnimationFrame al montarse (ver Grafo.jsx): se abre su chip el último
+        // para que el barrido pille la animación en marcha, no solo el resultado asentado.
+        ["asistente cerebro", BANCO + "?asistente=1",
+          ['.asis-icono[aria-label="Ajustes del asistente"]', '.asis-pestana:has-text("Cerebro")',
+            'button[role="tab"]:has-text("Grafo")']],
         ["asistente tareas", BANCO + "?asistente=1", ['.asis-pestana:has-text("Tareas")']],
         ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:has-text("Gasto")']],
       ];
@@ -4039,7 +4046,7 @@ async function main() {
         // Y los dos elegidores nuevos de la pestaña Humano: siete muñecos y cuatro tonos
         // son muchas casillas para una columna de 320px.
         ".asis-panel", ".asis-pestanas", ".hum", ".asis-proveedores", ".asis-gasto-cifras",
-        ".cer-objetivos", ".hum-ajustes", ".hum-elegir"];
+        ".cer-objetivos", ".hum-ajustes", ".hum-elegir", ".cer-grafo-svg-wrap"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];

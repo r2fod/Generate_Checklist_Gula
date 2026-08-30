@@ -2040,6 +2040,34 @@ en la checklist real (135÷14, antes 15 con el 9 de fábrica) — la cadena comp
 del botón al número que se carga en el camión. 420 comprobaciones en
 `calculos.test.mjs` (+10), sin cambios en el resto.
 
+## El Grafo de Cerebro, ahora animado de verdad
+
+Seguía siendo la relajación de muelles+repulsión que ya traía líneas de verdad (ver
+más arriba), pero corría las 200 vueltas de golpe, síncrona, antes de pintar: los
+nodos aparecían ya colocados, no se les veía buscar su sitio. Pedido explícito del
+dueño ("mejorar y animar el grafo").
+
+Arreglado repartiendo esas mismas 200 vueltas en fotogramas con
+`requestAnimationFrame` (4 vueltas por fotograma, ~50 fotogramas) en vez de un
+`useMemo` síncrono. Se apaga con `prefers-reduced-motion` (las 200 vueltas corren de
+golpe, como antes, sin ninguna animación de por medio) y el bucle se limpia al
+desmontar o si cambian los nodos a mitad de animación — con cuidado de que `sim`
+(las posiciones, en estado) y `bordes` (a qué índice apunta cada enlace, memoizado)
+nunca queden de formas distintas por un fotograma: si cambia la clave de los datos,
+las posiciones se resetean durante el propio render (el patrón de React para estado
+derivado de las props), no en un efecto que llegaría un fotograma tarde.
+
+La física pura (`estadoInicial`, `paso`, `bordesDe`) se sacó a `grafoFisica.js`,
+aparte de `Grafo.jsx` — mismo motivo que separa `personal.js` de su panel: sin JSX,
+se prueba con `node` de verdad. Seis comprobaciones nuevas en `calculos.test.mjs`,
+la que más importa: repartir las 200 vueltas en fotogramas de 4 da EXACTO el mismo
+resultado que correrlas de golpe — si algún día divergen es que se coló un salto de
+estado entre fotogramas, justo el bug que este refactor tenía que evitar. Verificado
+también con Playwright de verdad (no solo las pruebas puras): capturas a los 80ms y
+al segundo muestran los nodos en posiciones distintas —animación real, no un salto
+instantáneo—, sin errores de página en claro ni en oscuro. `test:rapido` y lint en
+verde.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
