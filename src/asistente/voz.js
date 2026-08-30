@@ -75,7 +75,10 @@ export function paraLeerEnVozAlta(texto) {
   return sinMarcas(texto)
     .replace(/⚠️|✅|❌|📅|📍|👥|🚚|🔧/g, "")
     .replace(/^·\s+/gm, "")
-    // Las horas se leen mal: "13:00" sale como "trece dos puntos cero cero".
+    // Las horas se leen mal: "13:00" sale como "trece dos puntos cero cero". En punto
+    // se dice sin minutos —"a las 13", que es como se dice de verdad, no "13 y 00"—;
+    // el resto sí lleva el "y" ("13 y 15").
+    .replace(/\b(\d{1,2}):00\b/g, "$1")
     .replace(/\b(\d{1,2}):(\d{2})\b/g, "$1 y $2")
     .replace(/\s+/g, " ")
     .trim();
