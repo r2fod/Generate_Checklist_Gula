@@ -22,7 +22,41 @@
 // instalan por separado— pero comparten dominio y assets, así que con una sola caché
 // basta. Lo único que cambia entre ellas es a qué documento se vuelve cuando no hay red,
 // y eso se decide mirando la dirección (ver suIndice).
-const VERSION = "gula-v4";
+// ─── AVISOS (PUSH): EL RECORDATORIO NO ESPERA A QUE ALGUIEN ABRA LA APP ───────
+// El Worker (D1b) empuja un recordatorio al que le llega el día; el navegador lo
+// descifra solo (cifrado Web Push) y aquí solo se muestra. El payload es
+// { titulo, cuerpo, url } —lo decide el Worker, no el teléfono—. Al tocarlo se
+// vuelve a la app (o a la ventana abierta, si la hay), como debe ser en un aviso
+// de "hoy toca X", que la respuesta es abrir y mirarlo.
+self.addEventListener("push", (e) => {
+  let datos = null;
+  try { datos = e.data ? e.data.json() : null; } catch (err) { datos = null; }
+  const titulo = (datos && datos.titulo) || "Gula";
+  const cuerpo = (datos && datos.cuerpo) || "";
+  const url = (datos && datos.url) || "./";
+  e.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: cuerpo,
+      icon: "./icono-192.png",
+      data: { url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || "./";
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ventanas) => {
+      for (const v of ventanas) {
+        if ("focus" in v) { v.focus(); if ("navigate" in v) v.navigate(url); return; }
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});
+
+const VERSION = "gula-v5";
 const CACHE = `${VERSION}`;
 
 // Lo que hay que guardar sí o sí para poder abrir sin cobertura. Los .js y .css llevan
