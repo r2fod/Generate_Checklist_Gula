@@ -16,7 +16,7 @@
 // separan al segundo cambio, y entonces uno avisa de cosas que el otro no.
 import { revisarProximos } from "../src/asistente/revision.js";
 
-const FIRESTORE = "https://firestore.googleapis.com/v1";
+export const FIRESTORE = "https://firestore.googleapis.com/v1";
 const PREFIJO_EVENTO = "evt_";
 
 // ─── EL TECHO DE UN DOCUMENTO ─────────────────────────────────────────────────
@@ -70,7 +70,7 @@ export const DIAS_VISTA = 30;
 // cuenta de Firebase propia —la del robot— cuyo usuario y contraseña son secretos del
 // Worker. Así las reglas de Firestore siguen pidiendo sesión (request.auth != null) y no
 // hay que tocarlas ni abrir nada.
-async function entrar(env) {
+export async function entrar(env) {
   const clave = String(env.FIREBASE_API_KEY || "").trim();
   const correo = String(env.ROBOT_EMAIL || "").trim();
   const pass = String(env.ROBOT_PASSWORD || "");
@@ -107,13 +107,13 @@ const valor = (v) => {
   return undefined;
 };
 
-const campos = (doc) => {
+export const campos = (doc) => {
   const salida = {};
   Object.entries((doc && doc.fields) || {}).forEach(([k, v]) => { salida[k] = valor(v); });
   return salida;
 };
 
-const proyecto = (env) => String(env.FIREBASE_PROJECT_ID || "").trim();
+export const proyecto = (env) => String(env.FIREBASE_PROJECT_ID || "").trim();
 
 // Los eventos guardados viven como un documento por evento dentro de "indice", con el
 // prefijo "evt_". Se pagina: con muchos eventos, Firestore no los devuelve todos de una.
