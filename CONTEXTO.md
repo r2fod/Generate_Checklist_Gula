@@ -2131,6 +2131,50 @@ Se queda encendida — es la red que habría evitado este commit entero.
   checklist (`btn`, `form-input`, `link-roto`, `envio-*`…). Partirlo rompe el diseño.
 - **Firebase**: ya carga con `import()` dinámico en los tres sitios. Nada que ganar.
 
+## Modo carga: las filas se reconciliaban todas al marcar una sola
+
+El dueño avisó: "en Modo carga, al hacer scroll, cuesta cargar la lista". Medido de
+verdad con Playwright antes de tocar nada (móvil emulado, CPU ×4 — el mismo que ya usa
+esta tabla — y con una boda de 120 pax, 111 items):
+
+- **El scroll en sí, con el dedo de verdad** (`Input.dispatchTouchEvent` por CDP, no
+  `mouse.wheel`, que activa el `:hover` de cada fila al pasar por encima — algo que un
+  dedo real en el móvil NUNCA dispara y que infla el jank medido con un coste que nadie
+  sufre) sale limpio: 56-57 fps, 1-2 fotogramas largos de ~170, con y sin un cronómetro
+  corriendo. No se ha podido reproducir aquí el jank de scroll que describe el dueño.
+- **Lo que SÍ era un fallo real, medido**: marcar una casilla tardaba 50-140ms en
+  repintar (CPU ×4) porque las 111 filas estaban en línea dentro de un `.map()`, sin
+  memoizar — cualquier marca reconciliaba la lista ENTERA. Comprobado con un contador
+  de renders de verdad: antes del arreglo no se pudo contar (no había frontera de
+  componente que contar), después del arreglo, un clic = 1 fila re-renderizada de 111.
+- Se descartaron con medición, no con intuición: `JSON.stringify` del estado completo
+  en cada render de `App.jsx` (existe, pero el estado son ~2 kB, cuesta <1ms), y
+  `backdrop-filter: blur(4px)` del overlay (con scroll continuo baja el fps un 15%
+  aprox., pero en un clic suelto no se nota).
+
+**Arreglado** (no porque resolviera lo del scroll —eso no se reprodujo—, sino porque el
+propio arreglo destapó un problema real de por sí): las dos filas (Prep./Salida y
+Vuelta) se sacaron a `FilaCargaPrep`/`FilaCargaVuelta`, con `React.memo`, recibiendo
+solo lo suyo (nunca los objetos `checkeados`/`vueltos`/`roturas` completos). Para que
+memo sirva de algo, los cinco manejadores que le llegan desde `App.jsx`
+(`onTogglePreparado`, `onToggleSale`, `onVuelve`, `onRoturas`, `onToggleNota`) pasan a
+`useCallback` — con una función nueva en cada tecla, memo no habría servido de nada,
+todas las filas habrían recibido una prop "distinta". El más delicado,
+`handleToggleCheckCarga`, leía `checkeados` de fuera; reescrito para calcular
+`marcando` DENTRO del propio `setCheckeados(prev => ...)`, sin depender de nada que
+cambie con cada marca. También memoizado `filasPorCategoria` (la cuenta del Resumen,
+con `parseFloat` y precio por item) y el filtro `quitarItemsSinCantidad`, que antes se
+recalculaban en CADA marca aunque no se estuviera viendo el Resumen.
+
+Verificado con Playwright: las tres pestañas (Prep./Salida/Vuelta) y el Resumen siguen
+pintando igual, cruzando el estado entre pestañas (lo marcado en Prep. sale con la
+pastilla "prep." en Salida), sin errores de página. `test:rapido` y lint en verde.
+
+Si el dueño sigue notando el scroll lento después de esto, lo más probable es que sea
+propio de su móvil concreto (más lento que el CPU ×4 simulado aquí) o algo de la
+sincronización en vivo con la nube, que este banco de pruebas bloquea a propósito —
+haría falta reproducirlo con su aparato delante, no adivinando más sin medir.
+
 ## Rendimiento real (4G, CPU ×4, gzip como sirve GitHub Pages)
 
 | App | Red | Primer pintado |

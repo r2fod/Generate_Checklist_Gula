@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
   Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X,
@@ -22,12 +22,152 @@ import Escaleta from "./Escaleta.jsx";
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
 
+// ─── LAS FILAS, APARTE Y MEMOIZADAS ────────────────────────────────────────────
+// Medido con Playwright (móvil simulado, CPU ×4): marcar una casilla tardaba entre
+// 50 y 140ms en repintar con una boda de 120 pax (111 items) — la lista entera se
+// reconciliaba en cada marca porque las filas iban en línea dentro del .map(), no
+// como componentes propios. Sacadas aparte y con React.memo, marcar una fila deja
+// intactas las otras 110: React ni las visita si sus props no han cambiado.
+//
+// Para que memo sirva de algo, cada fila recibe SOLO lo suyo (valores ya sacados del
+// objeto entero, no checkeados/vueltos/roturas completos) y los manejadores que le
+// llegan tienen que ser estables entre renders — por eso onTogglePreparado,
+// onToggleSale, onVuelve y onRoturas van con useCallback en App.jsx: una función
+// nueva en cada tecla habría dejado el memo en nada, todas las filas "cambiadas".
+const FilaCargaPrep = memo(function FilaCargaPrep({
+  dataKey, label, qty, sufijo, enPreparacion, marcado, otroMarcado, marcaRevisar, onToggle,
+}) {
+  return (
+    <div className={`carga-row ${marcado ? "is-marcado" : ""}`}
+         data-revisar={marcaRevisar ? dataKey : undefined}>
+      <label className="carga-row-principal">
+        <input type="checkbox" checked={marcado} onChange={() => onToggle && onToggle(dataKey)} />
+        <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
+        {otroMarcado && (
+          <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
+                title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
+            {enPreparacion ? <Truck size={11} /> : <ClipboardCheck size={11} />}
+            <span className="carga-marca-otra-texto">{enPreparacion ? "cargado" : "prep."}</span>
+          </span>
+        )}
+        {/* La cantidad cambió DESPUÉS de marcarlo: la marca se respeta (es trabajo
+            hecho) pero hay que volver a contarlo. */}
+        {marcaRevisar && (
+          <span className="carga-marca-otra is-revisar"
+                title="La cantidad ha cambiado desde que lo marcaste: conviene volver a contarlo">
+            <AlertTriangle size={11} />
+            <span className="carga-marca-otra-texto">revisar</span>
+          </span>
+        )}
+        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+      </label>
+    </div>
+  );
+});
+
+const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, onVuelve, onRoturas }) {
+  const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
+  const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
+  const marcado = valorVuelta !== undefined && valorVuelta !== "";
+  const vueltaTexto = valorVuelta === true ? String(cantidadCompleta || "") : (valorVuelta ?? "");
+  const vinoTodo = cantidadCompleta !== null
+    ? parseFloat(String(vueltaTexto).replace(",", ".")) === cantidadCompleta
+    : valorVuelta === true;
+  // Lo que salió menos lo que ha vuelto. Si de 100 copas vuelven 90, esas 10 no están:
+  // da igual si se rompieron o se quedaron por ahí, hay que reponerlas. Se ofrece con un
+  // toque en vez de rellenarlo solo, porque no siempre es una rotura: de 100 tercios
+  // vuelven 20 y los otros 80 están bebidos, no rotos. Ahí no se toca el botón y ya está.
+  const vueltaNum = parseFloat(String(vueltaTexto).replace(",", "."));
+  const faltan = (cantidadCompleta !== null && !isNaN(vueltaNum)) ? Math.max(0, cantidadCompleta - vueltaNum) : 0;
+  const sugerirRoturas = faltan > 0 && !roturaValor;
+  return (
+    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`}>
+      {/* La pastilla "todo" va en la línea del nombre, que es donde está la casilla de
+          marcar en Prep. y en Salida: es la misma acción y tiene que estar en el mismo
+          sitio. Debajo se apilaba, y entre eso y los dos campos cada item ocupaba cuatro
+          líneas — recorrer la vuelta de un rodaje era bajar el triple de lo necesario. */}
+      <div className="carga-row-principal carga-row-vuelta">
+        <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
+        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+        <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={vinoTodo}
+            onChange={e => onVuelve(dataKey, e.target.checked ? (cantidadCompleta !== null ? String(cantidadCompleta) : true) : "")}
+          />
+          <Check size={12} /> todo
+        </label>
+      </div>
+      {/* Y debajo, los dos números, alineados entre ellos */}
+      <div className="carga-vuelta-controles">
+        {/* Si la cantidad es un texto ("Todas") no hay número que contar: esa fila se
+            marca solo con la casilla, sin campo numérico. */}
+        {cantidadCompleta !== null && (
+          <div className="carga-roturas carga-vuelve-cantidad">
+            <span><Undo2 size={12} /> vuelve</span>
+            {/* No se puede devolver más de lo que salió. Sin tope se apuntaban cosas
+                como "cargadas 24, vuelven 27", que además salen gratis: el consumo se
+                queda en 0 y la merma no se cobra. Se recorta al vuelo a la cantidad
+                cargada, que es el único número que puede ser verdad. */}
+            <input
+              type="number"
+              min="0"
+              max={cantidadCompleta}
+              title={`Como mucho pueden volver las ${cantidadCompleta} que salieron`}
+              className="carga-roturas-input"
+              value={vueltaTexto}
+              placeholder="0"
+              onChange={e => {
+                const texto = e.target.value;
+                if (texto === "") return onVuelve(dataKey, "");
+                const n = Number(texto);
+                if (isNaN(n)) return;
+                onVuelve(dataKey, String(Math.min(Math.max(0, n), cantidadCompleta)));
+              }}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+        )}
+        <div className="carga-roturas">
+          <span><AlertTriangle size={12} /> roturas</span>
+          <input
+            type="number"
+            min="0"
+            className="carga-roturas-input"
+            value={roturaValor || ""}
+            placeholder="0"
+            onChange={e => onRoturas(dataKey, e.target.value)}
+            onClick={e => e.stopPropagation()}
+          />
+          {sugerirRoturas && (
+            <button
+              type="button"
+              className="carga-faltan"
+              title={`Han vuelto ${vueltaNum} de ${cantidadCompleta}: apuntar las ${faltan} que faltan como roturas`}
+              onClick={e => { e.stopPropagation(); onRoturas(dataKey, String(faltan)); }}
+            >faltan {faltan}</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
   // carga ni se devuelve, así que también se deja fuera de Modo carga.
-  const checklist = quitarItemsSinCantidad(checklistCompleta).filter(c => !/personal/i.test(c.nombre));
+  //
+  // Memoizado por checklistCompleta (que en App.jsx ya es un useMemo estable: no
+  // cambia al marcar una casilla, solo cuando cambia la checklist de verdad). Sin
+  // esto, cada fila memoizada (ver FilaCargaPrep/FilaCargaVuelta arriba) recibiría un
+  // objeto `qty` "nuevo" en cada marca aunque el dato fuera el mismo, y React.memo no
+  // serviría de nada.
+  const checklist = useMemo(
+    () => quitarItemsSinCantidad(checklistCompleta).filter(c => !/personal/i.test(c.nombre)),
+    [checklistCompleta],
+  );
   const [modo, setModo] = useState("salida"); // preparacion | salida | vuelta
   const [verResumen, setVerResumen] = useState(false);
   const [precios, setPrecios] = useState(() => leerPrecios());
@@ -190,7 +330,11 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   // se conoce si se ha registrado un valor en la pestaña Vuelta (número o, por datos
   // antiguos, el booleano de la versión previa: true = volvió todo).
   const fmtEur = (n) => `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`;
-  const filasPorCategoria = checklist.map(cat => {
+  // Memoizado: es la cuenta más cara de todo el panel (parseFloat + precio por cada
+  // item) y solo se ENSEÑA en la pestaña Resumen, pero sin esto se recalculaba en
+  // cada marca de Prep./Salida/Vuelta también — parte de los 50-140ms medidos por
+  // marca (ver la nota de arriba, en FilaCargaPrep).
+  const filasPorCategoria = useMemo(() => checklist.map(cat => {
     const filas = cat.items.map(([label, qty, , labelOriginal, , sufijo]) => {
       const key = `${cat.nombre}::${labelOriginal}`;
       const valor = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
@@ -225,7 +369,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
     });
     const subtotal = filas.reduce((acc, f) => acc + (f.costeTotal || 0), 0);
     return { nombre: cat.nombre, filas, subtotal };
-  }).filter(c => c.filas.length > 0);
+  }).filter(c => c.filas.length > 0), [checklist, vueltos, roturas, precios]);
   const granTotal = filasPorCategoria.reduce((acc, c) => acc + c.subtotal, 0);
   const porPax = meta.totalPax > 0 ? granTotal / meta.totalPax : null;
   // Cuántas líneas se están quedando fuera del coste por no tener precio. Es el dato que
@@ -611,137 +755,42 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 <span>{cat.nombre}</span>
               </div>
               <div className="carga-lista">
-                {cat.items.map(([label, qty, , labelOriginal, , sufijo], i) => {
-                  const key = `${cat.nombre}::${labelOriginal}`;
+                {cat.items.map(([label, qty, , labelOriginal, , sufijo]) => {
+                  const dataKey = `${cat.nombre}::${labelOriginal}`;
                   // Preparación y Salida son la misma fila con distinta marca. Cada una
                   // enseña en pequeño cómo va la otra: preparando ves lo que ya está en
                   // el camión, y cargando ves lo que venía preparado.
                   if (modo !== "vuelta") {
                     const enPreparacion = modo === "preparacion";
-                    const marcado = enPreparacion ? !!preparados[key] : !!checkeados[key];
-                    const otroMarcado = enPreparacion ? !!checkeados[key] : !!preparados[key];
+                    const marcado = enPreparacion ? !!preparados[dataKey] : !!checkeados[dataKey];
+                    const otroMarcado = enPreparacion ? !!checkeados[dataKey] : !!preparados[dataKey];
                     return (
-                      <div className={`carga-row ${marcado ? "is-marcado" : ""}`} key={i}
-                           data-revisar={marcado && marcasRevisar[key] ? key : undefined}>
-                        <label className="carga-row-principal">
-                          <input
-                            type="checkbox"
-                            checked={marcado}
-                            onChange={() => (enPreparacion ? onTogglePreparado && onTogglePreparado(key) : onToggleSale(key))}
-                          />
-                          <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
-                          {otroMarcado && (
-                            <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
-                                  title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
-                              {enPreparacion ? <Truck size={11} /> : <ClipboardCheck size={11} />}
-                              <span className="carga-marca-otra-texto">{enPreparacion ? "cargado" : "prep."}</span>
-                            </span>
-                          )}
-                          {/* La cantidad cambió DESPUÉS de marcarlo: la marca se respeta
-                              (es trabajo hecho) pero hay que volver a contarlo. */}
-                          {marcado && marcasRevisar[key] && (
-                            <span className="carga-marca-otra is-revisar"
-                                  title="La cantidad ha cambiado desde que lo marcaste: conviene volver a contarlo">
-                              <AlertTriangle size={11} />
-                              <span className="carga-marca-otra-texto">revisar</span>
-                            </span>
-                          )}
-                          <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
-                        </label>
-                      </div>
+                      <FilaCargaPrep
+                        key={dataKey}
+                        dataKey={dataKey}
+                        label={label}
+                        qty={qty}
+                        sufijo={sufijo}
+                        enPreparacion={enPreparacion}
+                        marcado={marcado}
+                        otroMarcado={otroMarcado}
+                        marcaRevisar={marcado && !!marcasRevisar[dataKey]}
+                        onToggle={enPreparacion ? onTogglePreparado : onToggleSale}
+                      />
                     );
                   }
-                  const valorVuelta = vueltos[key];
-                  const marcado = valorVuelta !== undefined && valorVuelta !== "";
-                  const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
-                  const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
-                  const vueltaTexto = valorVuelta === true
-                    ? String(cantidadCompleta || "")
-                    : (valorVuelta ?? "");
-                  const vinoTodo = cantidadCompleta !== null
-                    ? parseFloat(String(vueltaTexto).replace(",", ".")) === cantidadCompleta
-                    : valorVuelta === true;
-                  // Lo que salió menos lo que ha vuelto. Si de 100 copas vuelven 90, esas
-                  // 10 no están: da igual si se rompieron o se quedaron por ahí, hay que
-                  // reponerlas. Se ofrece con un toque en vez de rellenarlo solo, porque
-                  // no siempre es una rotura: de 100 tercios vuelven 20 y los otros 80
-                  // están bebidos, no rotos. Ahí no se toca el botón y ya está.
-                  const vueltaNum = parseFloat(String(vueltaTexto).replace(",", "."));
-                  const faltan = (cantidadCompleta !== null && !isNaN(vueltaNum))
-                    ? Math.max(0, cantidadCompleta - vueltaNum) : 0;
-                  const sugerirRoturas = faltan > 0 && !roturas[key];
                   return (
-                    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`} key={i}>
-                      {/* La pastilla "todo" va en la línea del nombre, que es donde está
-                          la casilla de marcar en Prep. y en Salida: es la misma acción y
-                          tiene que estar en el mismo sitio. Debajo se apilaba, y entre eso
-                          y los dos campos cada item ocupaba cuatro líneas — recorrer la
-                          vuelta de un rodaje era bajar el triple de lo necesario. */}
-                      <div className="carga-row-principal carga-row-vuelta">
-                        <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
-                        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
-                        <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            checked={vinoTodo}
-                            onChange={e => onVuelve(key, e.target.checked ? (cantidadCompleta !== null ? String(cantidadCompleta) : true) : "")}
-                          />
-                          <Check size={12} /> todo
-                        </label>
-                      </div>
-                      {/* Y debajo, los dos números, alineados entre ellos */}
-                      <div className="carga-vuelta-controles">
-                        {/* Si la cantidad es un texto ("Todas") no hay número que contar:
-                            esa fila se marca solo con la casilla, sin campo numérico. */}
-                        {cantidadCompleta !== null && (
-                          <div className="carga-roturas carga-vuelve-cantidad">
-                            <span><Undo2 size={12} /> vuelve</span>
-                            {/* No se puede devolver más de lo que salió. Sin tope se
-                                apuntaban cosas como "cargadas 24, vuelven 27", que
-                                además salen gratis: el consumo se queda en 0 y la merma
-                                no se cobra. Se recorta al vuelo a la cantidad cargada,
-                                que es el único número que puede ser verdad. */}
-                            <input
-                              type="number"
-                              min="0"
-                              max={cantidadCompleta}
-                              title={`Como mucho pueden volver las ${cantidadCompleta} que salieron`}
-                              className="carga-roturas-input"
-                              value={vueltaTexto}
-                              placeholder="0"
-                              onChange={e => {
-                                const texto = e.target.value;
-                                if (texto === "") return onVuelve(key, "");
-                                const n = Number(texto);
-                                if (isNaN(n)) return;
-                                onVuelve(key, String(Math.min(Math.max(0, n), cantidadCompleta)));
-                              }}
-                              onClick={e => e.stopPropagation()}
-                            />
-                          </div>
-                        )}
-                        <div className="carga-roturas">
-                          <span><AlertTriangle size={12} /> roturas</span>
-                          <input
-                            type="number"
-                            min="0"
-                            className="carga-roturas-input"
-                            value={roturas[key] || ""}
-                            placeholder="0"
-                            onChange={e => onRoturas(key, e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                          />
-                          {sugerirRoturas && (
-                            <button
-                              type="button"
-                              className="carga-faltan"
-                              title={`Han vuelto ${vueltaNum} de ${cantidadCompleta}: apuntar las ${faltan} que faltan como roturas`}
-                              onClick={e => { e.stopPropagation(); onRoturas(key, String(faltan)); }}
-                            >faltan {faltan}</button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <FilaCargaVuelta
+                      key={dataKey}
+                      dataKey={dataKey}
+                      label={label}
+                      qty={qty}
+                      sufijo={sufijo}
+                      valorVuelta={vueltos[dataKey]}
+                      roturaValor={roturas[dataKey]}
+                      onVuelve={onVuelve}
+                      onRoturas={onRoturas}
+                    />
                   );
                 })}
               </div>
