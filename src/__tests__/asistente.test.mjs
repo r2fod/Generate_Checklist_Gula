@@ -1154,12 +1154,20 @@ console.log("\n── Hablarle y que conteste ──");
 {
   // El texto de una respuesta lleva markdown y símbolos que leídos en voz alta suenan
   // absurdos. Y las horas son el caso peor: "13:00" se lee "trece dos puntos cero cero".
-  const leido = paraLeerEnVozAlta("**Boda X** a las 13:00\n- ⚠️ 2 celíacos\n- `sin gluten`");
+  const leido = paraLeerEnVozAlta("**Boda X** a las 13:30\n- ⚠️ 2 celíacos\n- `sin gluten`");
   ok(!leido.includes("*") && !leido.includes("`"), "no lee los asteriscos ni las comillas");
   ok(!leido.includes("⚠️"), "ni los símbolos");
-  ok(/13 y 00/.test(leido), `las horas se leen como horas → "${leido}"`);
+  ok(/13 y 30/.test(leido), `las horas con minutos llevan el "y" → "${leido}"`);
   ok(!/\n/.test(leido), "y va en una sola línea");
   ok(paraLeerEnVozAlta("") === "" && paraLeerEnVozAlta(null) === "", "sin texto no dice nada");
+
+  // Una hora EN PUNTO no se dice "13 y 00" —nadie habla así—, se dice "a las 13": el
+  // "y 00" es leer el reloj, no hablar. Real de la escaleta: "Salida a las 08:15,
+  // llegada a las 09:00" tiene los dos casos a la vez.
+  const conHoraEnPunto = paraLeerEnVozAlta("Salida a las 08:15, llegada a las 09:00.");
+  ok(conHoraEnPunto.includes("08 y 15"), `con minutos, lleva el "y" → "${conHoraEnPunto}"`);
+  ok(conHoraEnPunto.includes("las 09.") && !conHoraEnPunto.includes("09 y 00"),
+    `en punto, sin minutos → "${conHoraEnPunto}"`);
 
   // Fuera del navegador no existe ninguna de las dos, y comprobarlo no puede reventar:
   // este módulo lo importa el panel entero.

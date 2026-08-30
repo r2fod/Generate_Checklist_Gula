@@ -2040,6 +2040,21 @@ en la checklist real (135÷14, antes 15 con el 9 de fábrica) — la cadena comp
 del botón al número que se carga en el camión. 420 comprobaciones en
 `calculos.test.mjs` (+10), sin cambios en el resto.
 
+## La hora en punto sonaba a reloj, no a habla
+
+Pedido explícito del dueño ("que la voz del asistente suene natural, no leída"). La
+voz ya tenía mucho trabajo de antes (#138: elige la mejor voz local del navegador,
+Gemini como voz de nube cuando hay a dónde llamar, quita markdown/emojis/listas antes
+de leer) — comprobando con casos reales de la escaleta, quedaba un caso que sí sonaba
+a robot: una hora en punto se leía "13 y 00" (`paraLeerEnVozAlta`, `voz.js`), que no
+es como se dice de verdad — nadie dice "trece y cero cero", se dice "a las 13". Con
+minutos sí hace falta el "y" ("13 y 15"), pero en punto se dice el número solo.
+
+Arreglado con una sustitución más, antes de la que ya había: `HH:00` se queda en
+`HH`, todo lo demás sigue llevando el "y". Dos comprobaciones nuevas en
+`asistente.test.mjs` con la frase real de la escaleta que tiene los dos casos a la
+vez ("Salida a las 08:15, llegada a las 09:00"). `test:rapido` y lint en verde.
+
 ## Decidido NO hacer (y por qué)
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
