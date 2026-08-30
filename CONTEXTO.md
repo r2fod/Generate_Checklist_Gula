@@ -544,7 +544,7 @@ Colores en tokens `--pj-*`, con versión oscura (blanco sobre fondo oscuro deslu
 transparencia cada pieza solapada sumaba color y dejaba costura (cuello a través de la
 chaquetilla).
 
-### Doce trampas que no hay que repetir
+### Trece trampas que no hay que repetir
 
 1. **Barrera de datos.** Cada herramienta declara `datos: true/false`. A un proveedor
    que entrena con lo que recibe (OpenAI) solo se le ofrecen las de calcular, nunca las
@@ -611,6 +611,20 @@ chaquetilla).
     valor que esa API da DE VERDAD en el caso normal, no el que sea cómodo de escribir
     — si hay duda, se mira el spec o se prueba en un navegador real antes de escribir
     el `ok(...)`.
+
+13. **Un banco de pruebas con fechas "dentro de N días" se rompe en los últimos días de
+    cada mes.** `pruebas/calendario.html` monta el calendario con apuntes de mentira en
+    `dia(2)`...`dia(20)` (relativos a hoy), y `Calendario.jsx` abre por defecto el mes
+    de hoy. Si hoy está a menos de 20 días del fin de mes, casi todos esos apuntes caen
+    en el mes SIGUIENTE, y la vista por defecto se ve vacía — no un cálculo roto (`porDia`
+    y `saneaLista` funcionan perfectos en aislado, y en producción, con datos reales, el
+    día se ve bien), sino el banco enseñando un mes sin datos. Encontrado en la batería
+    completa de navegador (711) el 30 de agosto, a un día del cambio de mes — por eso no
+    lo había cazado nadie antes. Arreglado con una prop nueva y opcional en
+    `Calendario.jsx` (`mesInicial`, sin tocar el comportamiento de siempre cuando no se
+    pasa) que el banco fija al mes del día con más apuntes (`dia(9)`, el caso de tres
+    eventos el mismo día), así que la vista de partida enseña la demo entera pase lo
+    que pase el día que se ejecute la prueba.
 
 ### El proxy (Cloudflare Worker)
 

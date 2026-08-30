@@ -29,6 +29,17 @@ const HOY = new Date();
 // se habría enterado si la de verdad cambiara.
 const dia = (n) => aISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n));
 
+// El mes con el que se abre la vista Mes del banco: el del día 9 (el "caso que de
+// verdad importa" de más abajo, con tres eventos y media plantilla fuera). Los apuntes
+// son "dentro de N días" desde hoy, así que en los últimos días de cada mes casi todos
+// caen en el mes siguiente al de hoy — sin esto, la vista por defecto (el mes de hoy)
+// se abría casi vacía esos días, y no por ningún cálculo roto (ver Calendario.jsx,
+// prop mesInicial).
+const MES_DEMO = (() => {
+  const [anio, mes] = dia(9).split("-").map(Number);
+  return { anio, mes };
+})();
+
 const DEMO = [
   { fecha: dia(2), titulo: "Boda de prueba uno", tipo: "boda", pax: 120, sitio: "Finca de ejemplo", hora: "14:00" },
   { fecha: dia(9), titulo: "Comunión de prueba", tipo: "comunion", pax: 40, hora: "13:30" },
@@ -94,6 +105,10 @@ function Banco() {
     if (arrancaVacio) return [];
     return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : DEMO);
   });
+  // Solo con el DEMO fijo tiene sentido fijar el mes: vacío no tiene nada que enseñar,
+  // y "muchos" reparte sus apuntes a propósito por todo el año (medir.mjs), no en un
+  // mes concreto.
+  const mesInicial = (arrancaVacio || cuantos > 0) ? null : MES_DEMO;
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
   const [ratios, setRatios] = useState(() => leerRatios());
   // Con "?promover=1" se monta lo que hace la checklist al abrir el calendario: crea las
@@ -118,7 +133,7 @@ function Banco() {
           <Eye size={15} aria-hidden="true" />
           <span>Estás viendo el calendario en <b>solo lectura</b>. Los cambios los hace el equipo.</span>
         </div>
-        <Calendario apuntes={apuntes} equipo={equipo} soloVer />
+        <Calendario apuntes={apuntes} equipo={equipo} soloVer mesInicial={mesInicial} />
       </>
     )
     : (
@@ -141,7 +156,7 @@ function Banco() {
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
         <Ratios ratios={ratios} onCambiar={(r) => setRatios(ponRatios(r))} />
-        <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
+        <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} mesInicial={mesInicial} />
       </>
     );
 
