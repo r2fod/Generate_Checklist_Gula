@@ -259,17 +259,16 @@ fase 1, no el camino que la sustituye.
 **B1 (dependencias) ya está hecho** — `npm audit fix` + menores, 0
 vulnerabilidades, batería completa en verde.
 
-**B2, B3, B4, B5, B6 y B7 — hechos.** Frase de "solo consultar" que ya no
-contradice `recordar`/`olvidar` (permisos.js), `buscar_eventos` desambigua con
-dos candidatos, comentario de `herramientas.js` corregido, README real, salud de
-proveedores en Ajustes (`/__salud`), y el barrido anti-datos-reales corre en cada
-`test:rapido` (ver "Doce trampas" nº12: un fixture de test tiene que reflejar el
-valor real de la API externa, no uno cómodo — ese barrido no habría cazado eso,
-son cosas distintas). Ver CONTEXTO.md, "Hecho".
-
-| # | Ítem | Estado |
-|---|---|---|
-| B8 | **Línea base de pintado de React en CI** | Texto listo en CONTEXTO.md; falta que el dueño añada las 3 líneas a `.github/workflows/test.yml` (permiso de workflows que un PR normal no tiene) |
+**B2 a B8 — todos hechos.** Frase de "solo consultar" que ya no contradice
+`recordar`/`olvidar` (permisos.js), `buscar_eventos` desambigua con dos
+candidatos, comentario de `herramientas.js` corregido, README real, salud de
+proveedores en Ajustes (`/__salud`), el barrido anti-datos-reales corre en cada
+`test:rapido` (ver "Trece trampas" nº12: un fixture de test tiene que reflejar
+el valor real de la API externa, no uno cómodo — ese barrido no habría cazado
+eso, son cosas distintas), y B8 (línea base de pintado de React,
+`npm run medir` en el job `navegador` de `test.yml`) — se daba por bloqueado en
+permiso de workflows, pero la app SÍ lo tiene concedido; solo hacía falta
+probarlo. Ver CONTEXTO.md, "Hecho".
 
 ## C. Negocio — lo que sale en el camión
 

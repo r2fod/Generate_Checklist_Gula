@@ -111,3 +111,6 @@ jobs:
         run: echo "CHROMIUM_PATH=$(ls ~/.cache/ms-playwright/chromium-*/chrome-linux/chrome | head -1)" >> "$GITHUB_ENV"
       - run: npm run build
       - run: node src/__tests__/app.test.mjs
+      # Línea base de pintado (B8 del plan): el número que convierte "¿va más lento
+      # que antes?" en un hecho. Va aquí, no en cada push, porque necesita chromium.
+      - run: npm run medir
