@@ -1,3 +1,5 @@
+import webpush from "web-push";
+import { createECDH } from "node:crypto";
 //#region src/texto.js
 /** @param {unknown} t @returns {string} */
 const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -317,7 +319,7 @@ function revisarProximos(eventosGuardados = {}, diasVista = 30) {
 }
 //#endregion
 //#region worker/repaso.js
-const FIRESTORE = "https://firestore.googleapis.com/v1";
+const FIRESTORE$1 = "https://firestore.googleapis.com/v1";
 const PREFIJO_EVENTO = "evt_";
 const TECHO_DOCUMENTO = 1048576;
 const AVISA_DESDE = .75;
@@ -335,7 +337,7 @@ function avisoDePeso(nombre, bytes) {
 		comoSeArregla: nombre.includes("calendario") ? "Saca del calendario los apuntes de años cerrados (Traer/exportar guarda una copia antes)." : "Es el archivo antiguo y solo se lee: se puede vaciar cuando se confirme que todo está en indice/evt_*."
 	};
 }
-async function entrar(env) {
+async function entrar$1(env) {
 	const clave = String(env.FIREBASE_API_KEY || "").trim();
 	const correo = String(env.ROBOT_EMAIL || "").trim();
 	const pass = String(env.ROBOT_PASSWORD || "");
@@ -361,16 +363,16 @@ const valor = (v) => {
 	if ("doubleValue" in v) return v.doubleValue;
 	if ("booleanValue" in v) return v.booleanValue;
 };
-const campos = (doc) => {
+const campos$1 = (doc) => {
 	const salida = {};
 	Object.entries(doc && doc.fields || {}).forEach(([k, v]) => {
 		salida[k] = valor(v);
 	});
 	return salida;
 };
-const proyecto = (env) => String(env.FIREBASE_PROJECT_ID || "").trim();
+const proyecto$1 = (env) => String(env.FIREBASE_PROJECT_ID || "").trim();
 async function leerEventos(env, token) {
-	const base = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice`;
+	const base = `${FIRESTORE$1}/projects/${proyecto$1(env)}/databases/(default)/documents/indice`;
 	const mapa = {};
 	let pagina = "";
 	for (let vuelta = 0; vuelta < 20; vuelta++) {
@@ -380,7 +382,7 @@ async function leerEventos(env, token) {
 		if (!r.ok) throw new Error(`Firestore no deja leer los eventos (${d.error && d.error.message || r.status}).`);
 		(d.documents || []).forEach((doc) => {
 			if (!String(doc.name || "").split("/").pop().startsWith(PREFIJO_EVENTO)) return;
-			const c = campos(doc);
+			const c = campos$1(doc);
 			if (!c.nombre || !c.estado) return;
 			try {
 				mapa[c.nombre] = JSON.parse(c.estado);
@@ -392,14 +394,14 @@ async function leerEventos(env, token) {
 	return mapa;
 }
 async function pesoDe(env, token, ruta) {
-	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/${ruta}`;
+	const url = `${FIRESTORE$1}/projects/${proyecto$1(env)}/databases/(default)/documents/${ruta}`;
 	const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
 	if (!r.ok) return null;
 	const texto = await r.text();
 	return new TextEncoder().encode(texto).length;
 }
 async function guardarAvisos(env, token, contenido) {
-	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/avisos`;
+	const url = `${FIRESTORE$1}/projects/${proyecto$1(env)}/databases/(default)/documents/indice/avisos`;
 	const r = await fetch(url, {
 		method: "PATCH",
 		headers: {
@@ -417,8 +419,8 @@ async function guardarAvisos(env, token, contenido) {
 	}
 }
 async function repasar(env) {
-	if (!proyecto(env)) throw new Error("Falta FIREBASE_PROJECT_ID: sin él no se sabe qué base de datos mirar.");
-	const token = await entrar(env);
+	if (!proyecto$1(env)) throw new Error("Falta FIREBASE_PROJECT_ID: sin él no se sabe qué base de datos mirar.");
+	const token = await entrar$1(env);
 	const eventos = await leerEventos(env, token);
 	const revisados = revisarProximos(eventos, 30);
 	const pesos = [];
@@ -852,10 +854,282 @@ async function estado(env) {
 		coincide: huella === "353f1b0dd087" ? "✅ SÍ, es la clave correcta" : "❌ NO, la guardada es OTRA clave (¿la de Gemini?)"
 	};
 }
+async function salud(env) {
+	const pings = [];
+	for (const [nombre, p] of Object.entries(PROVEEDORES)) {
+		const falta = [p.clave, p.ademas].filter(Boolean).filter((k) => !env[k]);
+		if (falta.length) {
+			pings.push({
+				nombre,
+				estado: "sin configurar",
+				falta: falta.join(" y ")
+			});
+			continue;
+		}
+		try {
+			const r = await p.habla(env)({
+				mensajes: [{
+					rol: "usuario",
+					contenido: "Di solo: ok"
+				}],
+				sistema: "",
+				herramientas: []
+			});
+			pings.push({
+				nombre,
+				estado: "ok",
+				contesta: String(r.texto || "").slice(0, 40)
+			});
+		} catch (e) {
+			pings.push({
+				nombre,
+				estado: "error",
+				motivo: String(e && e.message ? e.message : e)
+			});
+		}
+	}
+	return { pings };
+}
+function ipv4Privada(a, b, c, d) {
+	return a === 127 || a === 0 || a === 10 || a === 192 && b === 168 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31;
+}
+function hostBloqueado(hostnameBruto) {
+	const h = String(hostnameBruto || "").toLowerCase();
+	if (h === "localhost" || h.endsWith(".localhost")) return true;
+	const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+	if (v4) return ipv4Privada(+v4[1], +v4[2], +v4[3], +v4[4]);
+	const v6 = h.replace(/^\[|\]$/g, "");
+	if (v6 === "::1" || v6 === "::") return true;
+	if (/^fe80:/.test(v6)) return true;
+	if (/^f[cd][0-9a-f]{2}:/.test(v6)) return true;
+	const mapeadaDecimal = v6.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+	if (mapeadaDecimal) return ipv4Privada(+mapeadaDecimal[1], +mapeadaDecimal[2], +mapeadaDecimal[3], +mapeadaDecimal[4]);
+	const mapeadaHex = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+	if (mapeadaHex) {
+		const alto = parseInt(mapeadaHex[1], 16), bajo = parseInt(mapeadaHex[2], 16);
+		return ipv4Privada(alto >> 8, alto & 255, bajo >> 8, bajo & 255);
+	}
+	return false;
+}
+/** @param {unknown} url @returns {{ ok: boolean, url?: string, motivo?: string }} */
+function urlAnalizable(url) {
+	try {
+		const u = new URL(String(url || ""));
+		if (u.protocol !== "http:" && u.protocol !== "https:") return {
+			ok: false,
+			motivo: "Solo se analizan direcciones http o https."
+		};
+		if (hostBloqueado(u.hostname)) return {
+			ok: false,
+			motivo: "Esa dirección no se analiza: es de red privada."
+		};
+		return {
+			ok: true,
+			url: u.toString()
+		};
+	} catch (e) {
+		return {
+			ok: false,
+			motivo: "Esa no parece una dirección completa (falta el https://)."
+		};
+	}
+}
+async function fetchValidando(urlInicial, opciones, maxSaltos = 5) {
+	let actual = urlInicial;
+	for (let salto = 0; salto <= maxSaltos; salto++) {
+		const r = await fetch(actual, {
+			...opciones,
+			redirect: "manual"
+		});
+		if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+			const chequeo = urlAnalizable(new URL(r.headers.get("location"), actual).toString());
+			if (!chequeo.ok) throw new Error(`Redirige a una dirección que no se analiza: ${chequeo.motivo}`);
+			actual = chequeo.url;
+			continue;
+		}
+		return r;
+	}
+	throw new Error("Demasiados redirects seguidos (más de 5): no se sigue.");
+}
+function extraerWeb(html, url) {
+	const texto = String(html);
+	const limpio = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+	const titulo = limpio(texto.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]).slice(0, 120);
+	const descripcion = limpio(texto.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["']/i)?.[1] || texto.match(/<meta[^>]+content=["']([\s\S]*?)["'][^>]+name=["']description["']/i)?.[1]);
+	const encabezados = (tag) => [...texto.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi"))].map((m) => limpio(m[1])).filter(Boolean);
+	const enlaces = [...texto.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map((m) => ({
+		href: String(m[1]),
+		texto: limpio(m[2])
+	})).filter((l) => l.texto).slice(0, 60);
+	const palabraCTA = /^(reserv|contact|presupuest|pedir|pedido|cotiz|solicita|informa|llamen|llama|escríben|escriben|visít|visita|booking|book|agenda|whatsapp|telegram|menu|menú)/i;
+	const ctas = enlaces.filter((l) => palabraCTA.test(l.texto) || palabraCTA.test(l.href.replace(/^https?:\/\//, "").split(/[?#]/)[0])).slice(0, 10).map((l) => ({
+		texto: l.texto.slice(0, 60),
+		href: l.href.slice(0, 120)
+	}));
+	const whatsapp = (enlaces.find((l) => /wa\.me|api\.whatsapp|whatsapp/i.test(l.href)) || {}).href || null;
+	return {
+		url,
+		titulo: titulo || "(sin título)",
+		descripcion: descripcion.slice(0, 300) || "(sin meta description)",
+		secciones: encabezados("h2").slice(0, 12),
+		tituloPrincipal: encabezados("h1").slice(0, 3),
+		movilAdaptado: /<meta[^>]+name=["']viewport["']/i.test(texto),
+		imagenesSinAlt: (texto.match(/<img(?![^>]*\balt=)[^>]*>/gi) || []).length,
+		nEnlaces: enlaces.length,
+		ctas,
+		whatsapp: whatsapp ? whatsapp.slice(0, 120) : null,
+		telefonos: (texto.match(/(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}/g) || []).slice(0, 5),
+		preciosVisibles: (texto.match(/[0-9]{1,5}(?:[.,][0-9]{1,2})?\s*€|€\s*[0-9]{1,5}(?:[.,][0-9]{1,2})?/g) || []).slice(0, 10)
+	};
+}
+const PROMPT_OJO = `Eres el ojo del asistente de una empresa de catering. Describe esta captura para una estrategia de captación de clientes: de quién es el perfil o la página, cuántos seguidores si se llega a leer, qué tipo de contenido hay (platos, eventos, equipo, clientes, detrás de cámaras), qué se repite y qué falta para que alguien te pida presupuesto (forma de contactarse, reseñas, precios orientativos, llamada a la acción). En frases cortas y al grano, en español, y sin inventar lo que no se ve: si algo no se distingue, dilo.`;
+async function visionGemini(pregunta, imagenBase64, mime, env) {
+	const claves = clavesGemini(env);
+	if (!claves.length) throw new Error("Sin GEMINI_API_KEY puesta no hay visión: la captura no tiene quién la mire.");
+	const modelo = env.GEMINI_MODEL || "gemini-3.6-flash";
+	const texto = pregunta ? `${PROMPT_OJO}\n\nLo que el usuario quiere saber de ella: ${pregunta}` : PROMPT_OJO;
+	let ultimoFallo;
+	for (const clave of claves) {
+		const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${clave}`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({ contents: [{
+				role: "user",
+				parts: [{ text: texto }, { inline_data: {
+					mime_type: mime || "image/jpeg",
+					data: imagenBase64
+				} }]
+			}] })
+		});
+		if (r.ok) {
+			const analisis = (((((await r.json()).candidates || [])[0] || {}).content || {}).parts || []).filter((p) => p.text).map((p) => p.text).join(" ").trim();
+			if (!analisis) throw new Error("Gemini no ha devuelto nada que leer de la imagen.");
+			return analisis;
+		}
+		ultimoFallo = /* @__PURE__ */ new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+		if (r.status !== 429) throw ultimoFallo;
+	}
+	throw ultimoFallo;
+}
 const disponiblesEn = (env) => Object.entries(PROVEEDORES).filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every((k) => env[k])).map(([nombre]) => nombre);
+function tareasParaPush(tareas = [], hoy) {
+	return (Array.isArray(tareas) ? tareas : []).filter((t) => t && t.fecha === hoy && !t.hecho).slice(0, 20);
+}
+function payloadDeRecordatorio(tarea) {
+	const cuerpo = tarea.evento ? `${tarea.texto} (${tarea.evento})` : tarea.texto;
+	return {
+		titulo: "Gula · recordatorio",
+		cuerpo: String(cuerpo).slice(0, 200),
+		url: "./checklist/"
+	};
+}
+function vapidClaves(env) {
+	const clave = String(env.VAPID_CLAVE || "").trim();
+	const asunto = String(env.VAPID_MAILTO || "").trim();
+	if (!clave) return { fallo: "Falta VAPID_CLAVE en el Worker: generad el par con npx web-push generate-vapid-keys y ponedlo en Settings → Variables." };
+	if (!/^mailto:/i.test(asunto)) return { fallo: "Falta VAPID_MAILTO (una dirección mailto:) en el Worker: es el 'de' del aviso, y Web Push lo pide." };
+	let publico;
+	try {
+		const bytes = Buffer.from(clave, "base64url");
+		if (bytes.length !== 32) throw new Error("tamaño");
+		const ecdh = createECDH("prime256v1");
+		ecdh.setPrivateKey(bytes);
+		publico = ecdh.getPublicKey().toString("base64url");
+	} catch (e) {
+		return { fallo: "VAPID_CLAVE no parece una clave privada VAPID válida (P-256 en base64url, 43 caracteres). Volved a copiarla entera de npx web-push generate-vapid-keys." };
+	}
+	return {
+		publico,
+		clave,
+		asunto
+	};
+}
+async function leerSuscripciones(env, token) {
+	const base = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice`;
+	const lista = [];
+	let pagina = "";
+	for (let vuelta = 0; vuelta < 20; vuelta++) {
+		const url = `${base}?pageSize=300${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ""}`;
+		const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+		const d = await r.json().catch(() => ({}));
+		if (!r.ok) throw new Error(`Firestore no deja leer las suscripciones (${d.error && d.error.message || r.status}).`);
+		(d.documents || []).forEach((doc) => {
+			if (!String(doc.name || "").split("/").pop().startsWith("push-")) return;
+			const c = campos(doc);
+			try {
+				const s = JSON.parse(c.suscripcion || "null");
+				if (s && s.endpoint && s.keys) lista.push(s);
+			} catch (e) {}
+		});
+		if (!d.nextPageToken) break;
+		pagina = d.nextPageToken;
+	}
+	return lista;
+}
+async function leerTareas(env, token) {
+	const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/tareas`;
+	const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+	if (!r.ok) return [];
+	const c = campos(await r.json().catch(() => ({})));
+	try {
+		return JSON.parse(c.tareas || "[]");
+	} catch (e) {
+		return [];
+	}
+}
+async function avisosDelDia(env) {
+	const token = await entrar(env);
+	const claves = vapidClaves(env);
+	if (claves.fallo) return {
+		enviados: 0,
+		fallos: [claves.fallo]
+	};
+	const hoy = hoyISO();
+	const paraHoy = tareasParaPush(await leerTareas(env, token), hoy);
+	if (!paraHoy.length) return {
+		enviados: 0,
+		fallos: []
+	};
+	const aparatos = await leerSuscripciones(env, token);
+	if (!aparatos.length) return {
+		enviados: 0,
+		fallos: []
+	};
+	let enviados = 0;
+	const fallos = [];
+	for (const tarea of paraHoy) {
+		const payload = JSON.stringify(payloadDeRecordatorio(tarea));
+		for (const sus of aparatos) try {
+			const det = webpush.generateRequestDetails(sus, payload, {
+				TTL: 60,
+				vapidDetails: {
+					subject: claves.asunto,
+					publicKey: claves.publico,
+					privateKey: claves.clave
+				}
+			});
+			const r = await fetch(det.endpoint, {
+				method: det.method,
+				headers: det.headers,
+				body: det.body
+			});
+			if (r.ok) enviados++;
+			else fallos.push(`${String(tarea.texto).slice(0, 30)} → HTTP ${r.status}`);
+		} catch (e) {
+			fallos.push(`${String(tarea.texto).slice(0, 30)} → ${e && e.message || "fallo sin detalle"}`);
+		}
+	}
+	if (fallos.length) console.warn(`Avisos: ${fallos.length} sin entregar: ${fallos.slice(0, 5).join(" | ")}`);
+	return {
+		enviados,
+		aparatos: aparatos.length,
+		fallos
+	};
+}
 var worker_default = {
 	async scheduled(evento, env, ctx) {
 		ctx.waitUntil(repasar(env).then((r) => console.log(`Repaso: ${r.eventos.length} eventos con avisos de ${r.mirados} mirados.`)).catch((e) => console.error(`El repaso ha fallado: ${e && e.message ? e.message : e}`)));
+		ctx.waitUntil(avisosDelDia(env).then((r) => console.log(`Avisos del día: ${r.enviados} avisos entregados${r.fallos && r.fallos.length ? `; ${r.fallos.length} sin entregar` : ""}.`)).catch((e) => console.error(`Los avisos del día han fallado: ${e && e.message ? e.message : e}`)));
 	},
 	async fetch(req, env) {
 		if (new URL(req.url).pathname === "/__estado") return new Response(JSON.stringify(await estado(env), null, 2), { headers: { "content-type": "application/json; charset=utf-8" } });
@@ -876,6 +1150,67 @@ var worker_default = {
 			} catch (e) {
 				return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
 			}
+		}
+		if (new URL(req.url).pathname === "/__salud") {
+			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			try {
+				return json(await salud(env), 200, origen);
+			} catch (e) {
+				return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+			}
+		}
+		if (new URL(req.url).pathname === "/__analizar") {
+			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			let cuerpo;
+			try {
+				cuerpo = JSON.parse(await req.text());
+			} catch (e) {
+				return json({ error: "Cuerpo ilegible" }, 400, origen);
+			}
+			const chequeo = urlAnalizable(cuerpo.url);
+			if (!chequeo.ok) return json({ error: chequeo.motivo }, 400, origen);
+			try {
+				const r = await fetchValidando(chequeo.url, {
+					signal: AbortSignal.timeout(8e3),
+					headers: { "user-agent": "Mozilla/5.0 (compatible; GulaChecklist/1.0)" }
+				});
+				if (!r.ok) return json({ error: `La web contestó ${r.status}: no se ha podido analizar.` }, 502, origen);
+				const html = await r.text();
+				if (html.length > 2e6) return json({ error: "La página pesa demasiado para analizarla (más de 2 MB)." }, 413, origen);
+				return json(extraerWeb(html, chequeo.url), 200, origen);
+			} catch (e) {
+				return json({ error: `No se ha podido llegar a la web: ${String(e && e.message ? e.message : e).slice(0, 120)}` }, 502, origen);
+			}
+		}
+		if (new URL(req.url).pathname === "/__vision") {
+			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			let cuerpo;
+			try {
+				cuerpo = JSON.parse(await req.text());
+			} catch (e) {
+				return json({ error: "Cuerpo ilegible" }, 400, origen);
+			}
+			const b64 = String(cuerpo.imagen || "").replace(/^data:image\/\w+;base64,/, "");
+			if (!b64) return json({ error: "No hay ninguna imagen que analizar." }, 400, origen);
+			if (b64.length > 8e6) return json({ error: "La imagen pesa demasiado (más de ~6 MB): hazla en una o dos pantallas." }, 413, origen);
+			try {
+				return json({ analisis: await visionGemini(String(cuerpo.pregunta || ""), b64, String(cuerpo.mime || "image/jpeg"), env) }, 200, origen);
+			} catch (e) {
+				return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
+			}
+		}
+		if (new URL(req.url).pathname === "/__vapid") {
+			const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+			if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+			const claves = vapidClaves(env);
+			if (claves.fallo) return json({ error: claves.fallo }, 501, origen);
+			return json({ vapidPublico: claves.publico }, 200, origen);
 		}
 		if (new URL(req.url).pathname === "/__voz") {
 			if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
@@ -935,4 +1270,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { clavesGemini, worker_default as default, vozElegida };
+export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, fetchValidando, payloadDeRecordatorio, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };

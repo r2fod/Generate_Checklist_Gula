@@ -17,12 +17,13 @@ import {
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
   calcHielo, KG_POR_TAXI, KG_POR_BOLSA,
+  ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo, factorHieloDe,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
-import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados,
+import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
 import { mesasComensales, lineasDeMesas, mesasParaVestir, tipoMesaValido, TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "../mesas.js";
@@ -30,9 +31,10 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados }
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
+import { calibracionBebida, calibracionHielo, calibracionComida, calibracionPersonal,
+  catsDeEventoGuardado } from "../calibracion.js";
 import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
   esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
-import { calibracionBebida, calibracionPersonal, catsDeEventoGuardado } from "../calibracion.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
@@ -42,7 +44,8 @@ import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlma
 import { aplicarTemaInicial } from "../tema.js";
 import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESOS, MAX_APUNTES } from "../diario.js";
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
-import { PERSONAS_POR_PAELLA } from "../paella.js";
+import { PERSONAS_POR_PAELLA, paellasPorPax, calcPaella } from "../paella.js";
+import { ponFactoresComida, leerFactoresComida, conFactorComida } from "../comida.js";
 import { SECTOR, compararRatios } from "../asistente/sector.js";
 import { CAMBIOS, ultimoCambio } from "../cambios.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -710,10 +713,10 @@ console.log("\n══ Quién va a cada evento: horas e importe ══");
     "y se avisa de cuántos van sin horario y sin importe");
 
   // Lo que falta por cubrir, contra lo que hace falta de verdad
-  const falta = loQueFalta(personalNecesario("boda", 135), gente);
+  const falta = personalQueFalta(personalNecesario("boda", 135), gente);
   ok(falta.sala === 14 && falta.cocina === 4 && falta.logistica === 2,
     `de una boda de 135 pax, con tres asignados faltan ${falta.sala} de sala y ${falta.logistica} de logística`);
-  ok(loQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
+  ok(personalQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
     "y si sobra gente de un rol, no sale un número negativo");
 }
 
@@ -1411,6 +1414,217 @@ console.log("\n══ Las mesas de los comensales ══");
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
 }
 
+
+// ─── CUÁNTO HIELO SE USÓ DE VERDAD ────────────────────────────────────────────
+{
+  console.log("\n── Calibración de hielo con lo que volvió ──");
+  ponFactoresHielo({});
+
+  // La línea "Hielo" tiene que existir DE VERDAD en una checklist. Si alguien la renombra
+  // en el generador, la calibración deja de encontrarla y se queda callada para siempre —
+  // un fallo que no da error, solo silencio. La misma trampa que las líneas de bebida.
+  const catsH = buildChecklist("boda", 100, 2, 4, 0, { mesVerano: true });
+  const etiquetasH = new Set(catsH.flatMap(c => c.items.filter(Boolean).map(it => it[0])));
+  ok(etiquetasH.has("Hielo"), "la línea de hielo existe en la checklist de verdad");
+
+  // El factor de hielo guarda las mismas reglas que el de bebida: esparcido, acotado, y
+  // poner el neutro lo quita en vez de congelar un 1.
+  const puestoH = conFactorHielo({}, "boda", 1.2);
+  ok(puestoH.boda === 1.2, "conFactorHielo pone el factor");
+  ok(Object.keys(conFactorHielo(puestoH, "boda", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  ok(Object.keys(ponFactoresHielo({ boda: 9, comunion: 1.1 })).length === 1
+      && leerFactoresHielo().comunion === 1.1,
+    "fuera de 0,3–2 se rechaza (un 9 es un dedo resbalando, no un evento)");
+  ok(factoresHieloCambiados({ boda: 0.8 }).boda === 0.8, "y lo sube a la nube limpio");
+  ok(factorHieloDe() === 1 && factorHieloDe("boda") === 1, "sin tocar, todo arranca en 1");
+  ponFactoresHielo({});
+
+  // calcHielo aplica el factor SOLO al tipo al que se le pasó, no a los demás:
+  // dos bodas de 100 pax no pueden cargar hielo distinto por quién las mire.
+  const kgNeutro = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "boda" }).kg;
+  ponFactoresHielo({ boda: 2 });
+  const kgFactor = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "boda" }).kg;
+  const kgOtroTipo = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "comunion" }).kg;
+  ok(kgFactor > kgNeutro, `con factor 2 el kilo sube (${kgNeutro} → ${kgFactor})`);
+  ok(kgOtroTipo === kgNeutro, "y no se lo lleva a otro tipo que nadie ha medido");
+  ponFactoresHielo({});
+
+  // Un evento con la vuelta del hielo apuntada: sale X, vuelve la mitad → se usó la mitad.
+  // La vuelta puede ser en kilos (no solo "true = todo"), y esa es la ventaja frente a
+  // una caja: el hielo se pesa.
+  const eventoH = { evento: "boda", pax: 100, ninos: 0, fechaEvento: "2026-07-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4,
+    mesVerano: true, tipoCongelador: "Mediana" };
+  const catsBodaH = catsDeEventoGuardado(eventoH);
+  const conVueltaHielo = (frac) => {
+    const vueltos = {};
+    catsBodaH.forEach(c => c.items.filter(Boolean).forEach(it => {
+      if (it[0] !== "Hielo") return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${it[0]}`] = String(Math.round(qty * frac));
+    }));
+    return { ...eventoH, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada: dos son una anécdota.
+  const dosH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5) };
+  ok(Object.keys(calibracionHielo(dosH, {})).length === 0, "con dos eventos no se pronuncia");
+
+  const tresH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) };
+  const calH = calibracionHielo(tresH, {});
+  ok(calH.boda && Math.abs(calH.boda.factor - 0.5) < 0.03,
+    `con tres, vuelve la mitad → factor ~0,5 (${calH.boda && calH.boda.factor})`);
+  ok(calH.boda && calH.boda.nEventos === 3, "y dice en cuántos eventos se ha medido");
+
+  // La mediana, no la media: un evento en el que no volvió nada no arrastra al resto.
+  const raroH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5), c: conVueltaHielo(0.5), d: conVueltaHielo(0) };
+  ok(Math.abs(calibracionHielo(raroH, {}).boda.factor - 0.5) < 0.03,
+    "un evento en el que no volvió nada no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+  // Si no, cada visita al panel bajaría el hielo otro tanto hasta dejarlo en nada.
+  ponFactoresHielo({ boda: 0.5 });
+  const yaAjustadoH = { a: conVueltaHielo(0), b: conVueltaHielo(0), c: conVueltaHielo(0) };
+  const segH = calibracionHielo(yaAjustadoH, { boda: 0.5 });
+  ok(segH.boda && Math.abs(segH.boda.factor - 0.5) < 0.03,
+    `con el factor ya puesto y consumo clavado, se queda en 0,5 (${segH.boda && segH.boda.factor})`);
+  ponFactoresHielo({});
+
+  // Sin la vuelta del hielo apuntada no dice nada: adivinar cuánta se usó es peor que
+  // callarse. Y "vuelven más kilos de los que salieron" es imposible y no se cuenta.
+  const sinVueltaH = { ...eventoH, vueltos: { "Bebidas frías::Cava": true } };
+  ok(Object.keys(calibracionHielo({ a: sinVueltaH, b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) }, {})).length === 0,
+    "un evento sin la vuelta del hielo se descarta y quedan dos");
+  const masQueSalió = {};
+  catsBodaH.forEach(c => c.items.filter(Boolean).forEach(it => {
+    if (it[0] === "Hielo") masQueSalió[`${c.nombre}::${it[0]}`] = "9999";
+  }));
+  ok(Object.keys(calibracionHielo({ a: { ...eventoH, vueltos: masQueSalió }, b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) }, {})).length === 0,
+    "y volver más de lo que salió tira el evento entero");
+
+  ponFactoresHielo({});
+}
+
+// ─── CUÁNTA COMIDA SE USÓ DE VERDAD (PAELLA Y BANDEJAS) ────────────────────────
+{
+  console.log("\n── Calibración de comida con lo que volvió ──");
+  ponFactoresComida({});
+
+  // Anti-silencio: las líneas que busca la calibración tienen que existir DE VERDAD
+  // en una checklist. La paella tiene etiqueta dinámica ("Paella <talla>"), así que va
+  // por matcher — y el matcher no puede pisar "Paletas de paella" ni "Descansadores".
+  const catsComida = buildChecklist("boda", 100, 2, 4, 0, { mesVerano: true, llevaPaella: true });
+  const etiquetasC = catsComida.flatMap(c => c.items.filter(Boolean).map(it => it[0]));
+  const lineasPaella = etiquetasC.filter(l => l.startsWith("Paella "));
+  ok(lineasPaella.length === 1 && lineasPaella[0] === "Paella grande",
+    "con 100 pax hay una línea de paella (grande) y el matcher la encuentra");
+  ok(etiquetasC.includes("Paletas de paella") && etiquetasC.includes("Descansadores de paella"),
+    "las líneas que comparten el nombre existen y el matcher no las cuenta");
+  ok(etiquetasC.includes("Bandejas de madera") && etiquetasC.includes("Bandejas de plata"),
+    "y las dos líneas de bandejas existen");
+
+  // El factor de comida guarda las mismas reglas que los demás: esparcido, acotado,
+  // y poner el neutro lo quita.
+  const puestoC = conFactorComida({}, "boda", "paella", 1.2);
+  ok(puestoC.boda.paella === 1.2, "conFactorComida pone el factor");
+  ok(Object.keys(conFactorComida(puestoC, "boda", "paella", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  ok(Object.keys(ponFactoresComida({ boda: { paella: 9, bandejas: 1.1 } })).length === 1
+      && leerFactoresComida().boda.bandejas === 1.1,
+    "fuera de 0,3–2 se rechaza (un 9 es un dedo resbalando, no un evento)");
+  ponFactoresComida({});
+
+  // calcPaella aplica el factor por tipo, y el número a mano manda sobre él.
+  const neutraC = paellasPorPax(100, "boda");
+  ponFactoresComida({ boda: { paella: 2 } });
+  const conFactorC = paellasPorPax(100, "boda");
+  const otroTipoC = paellasPorPax(100, "comunion");
+  ok(conFactorC > neutraC, `con factor 2 la cuenta de paella sube (${neutraC} → ${conFactorC})`);
+  ok(otroTipoC === neutraC, "y no se lo lleva a otro tipo que nadie ha medido");
+  ok(calcPaella(100, "Auto", 3, "boda").n === 3, "y el número a mano manda sobre el factor");
+  ponFactoresComida({});
+
+  // calcBandejas escala la cuenta por pax, NO los extras manuales: los extras son una
+  // decisión puntual de este evento, no el ratio.
+  const bandejasNeutras = calcBandejas(100, {});
+  ponFactoresComida({ boda: { bandejas: 2 } });
+  const bandejasFactor = calcBandejas(100, { tipo: "boda" });
+  const bandejasExtra = calcBandejas(100, { tipo: "boda", extraMadera: 5 });
+  ok(bandejasFactor.madera > bandejasNeutras.madera, "con factor 2 las bandejas de madera suben");
+  ok(bandejasExtra.madera - bandejasFactor.madera === 5, "y los extras manuales no se escalan");
+  ponFactoresComida({});
+
+  // Un evento con la vuelta marcada: salen 4 paellas, vuelven 2 SIN USAR → se usaron
+  // 2 de 4. La convención (la que el panel de comida dice en pantalla) es la que la
+  // bebida ya usa: lo vuelto es lo no usado.
+  const eventoC = { evento: "boda", pax: 100, ninos: 0, fechaEvento: "2026-07-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4,
+    mesVerano: true, tipoCongelador: "Mediana", llevaPaella: true };
+  const catsC = catsDeEventoGuardado(eventoC);
+  // La vuelta se construye contra la reconstrucción ACTUAL (refleja el factor
+  // vigente): en la prueba de convergencia eso importa de verdad.
+  const conVueltaComida = (fracPaella, fracBandeja, extra = {}) => {
+    const cats = catsDeEventoGuardado({ ...eventoC, ...extra });
+    const vueltos = {};
+    cats.forEach(c => c.items.filter(Boolean).forEach(it => {
+      const label = it[0];
+      const esPaella = label.startsWith("Paella ");
+      const esBandeja = label === "Bandejas de madera" || label === "Bandejas de plata";
+      if (!esPaella && !esBandeja) return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${label}`] = String(Math.round(qty * (esPaella ? fracPaella : fracBandeja)));
+    }));
+    return { ...eventoC, ...extra, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada (ni de la paella ni de las bandejas).
+  ok(Object.keys(calibracionComida({ a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "con dos eventos no se pronuncia");
+
+  const tresC = { a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) };
+  const calC = calibracionComida(tresC, {});
+  ok(calC.boda?.paella && Math.abs(calC.boda.paella.factor - 0.5) < 0.03,
+    `con tres y media vuelta de paellas, factor de paella ~0,5 (${calC.boda?.paella?.factor})`);
+  ok(calC.boda?.bandejas && Math.abs(calC.boda.bandejas.factor - 0.5) < 0.03,
+    `y las bandejas se calibran en paralelo (${calC.boda?.bandejas?.factor})`);
+  ok(calC.boda?.paella && calC.boda.paella.nEventos === 3, "y dice en cuántos eventos se ha medido");
+
+  // La mediana, no la media: un evento en el que no salió ninguna paella no arrastra.
+  const raroC = { a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5), d: conVueltaComida(0, 0.5) };
+  ok(Math.abs(calibracionComida(raroC, {}).boda.paella.factor - 0.5) < 0.03,
+    "un evento en el que no salió ninguna paella no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+  ponFactoresComida({ boda: { paella: 0.5 } });
+  const yaAjustadoC = { a: conVueltaComida(0, 0), b: conVueltaComida(0, 0), c: conVueltaComida(0, 0) };
+  const segC = calibracionComida(yaAjustadoC, { boda: { paella: 0.5 } });
+  ok(segC.boda?.paella && Math.abs(segC.boda.paella.factor - 0.5) < 0.03,
+    `con el factor ya puesto y todo usado, se queda en 0,5 (${segC.boda?.paella?.factor})`);
+  ponFactoresComida({});
+
+  // Las paellas a mano NO cuentan: ese número no es el ratio, y medirlo contra el
+  // ratio sesgaría el factor para siempre. Las bandejas del mismo evento sí.
+  const tresManual = { a: conVueltaComida(0.5, 0.5, { numPaellas: 3 }), b: conVueltaComida(0.5, 0.5, { numPaellas: 3 }), c: conVueltaComida(0.5, 0.5, { numPaellas: 3 }) };
+  const calManual = calibracionComida(tresManual, {});
+  ok(!calManual.boda?.paella, "tres eventos con paella a mano no calibran la paella");
+  ok(calManual.boda?.bandejas, "pero sí calibran las bandejas");
+
+  // Sin la vuelta marcada no dice nada, y "vuelven más de las que salieron" es
+  // imposible y tira el evento entero.
+  ok(Object.keys(calibracionComida({ a: { ...eventoC, vueltos: { "Bebidas frías::Cava": true } }, b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "un evento sin la vuelta marcada se descarta y con dos no se pronuncia");
+  const masQueSalióC = {};
+  catsC.forEach(c => c.items.filter(Boolean).forEach(it => {
+    const label = it[0];
+    if (label.startsWith("Paella ") || label === "Bandejas de madera" || label === "Bandejas de plata") masQueSalióC[`${c.nombre}::${label}`] = "9999";
+  }));
+  ok(Object.keys(calibracionComida({ a: { ...eventoC, vueltos: masQueSalióC }, b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "y volver más de lo que salió tira el evento entero");
+
+  ponFactoresComida({});
+}
+
 // ─── CUÁNTA GENTE HIZO FALTA DE VERDAD (calibracionPersonal) ──────────────────
 {
   console.log("\n══ El ratio de personal también se calibra con lo puesto a mano ══");
@@ -1730,6 +1944,30 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
     && /toISOString\(\)\.slice\(0, 10\)/.test(sinComentarios(readFileSync(f, "utf8"))));
   ok(copiasUTC.length === 0,
     `el día de hoy sale siempre de src/fecha.js, nunca de toISOString (copias: ${copiasUTC.join(", ") || "ninguna"})`);
+
+  // ─── Repo público: ningún dato real ────────────────────────────────────────
+  // Ya se colaron tres nombres reales una vez (ver CONTEXTO) y el catálogo de
+  // precios de compra vivió en el código, revelando márgenes en un repo público.
+  // El barrido automático es el único cierre que no depende de que alguien se
+  // acuerde. Lo que NO se barre y por qué: __tests__ (los fixtures son
+  // ficticios A PROPÓSITO y los patrones viven ahí para probar
+  // sinDatosPersonales); los € sueltos (hay ejemplos redondos en comentarios;
+  // el riesgo real era el catálogo, que se comprueba abajo); worker/pegar.js
+  // (generado; el CI lo compara byte a byte contra la fuente).
+  const telefono = /(^|[^\d])(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}([^\d]|$)/;
+  const correo = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
+  const correoFicticio = /@(ejemplo\.com|example\.\w+|gula\.local)\b|equipo@gula\.com/;
+  const datosReales = [];
+  ficheros.forEach(f => {
+    readFileSync(f, "utf8").split("\n").forEach((linea, i) => {
+      if (telefono.test(linea)) datosReales.push(`${f}:${i + 1} (teléfono)`);
+      if (correo.test(linea) && !correoFicticio.test(linea)) datosReales.push(`${f}:${i + 1} (correo)`);
+    });
+  });
+  ok(datosReales.length === 0,
+    `ningún teléfono ni correo real en src/ (barrido: ${datosReales.slice(0, 3).join("; ") || "limpio"})`);
+  ok(ficheros.every(f => !readFileSync(f, "utf8").includes("PRECIOS_BASE")),
+    "PRECIOS_BASE no existe en el código: los precios de compra viven en Firestore (ver \"Hecho\")");
 
   const copiasTema = ficheros.filter(f => f !== "src/tema.js"
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));

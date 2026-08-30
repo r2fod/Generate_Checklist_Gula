@@ -11,7 +11,8 @@
 // Los ratios de bebida y su factor por tipo de evento viven en bebida.js: aquí se
 // calcula con ellos, allí se decide cuáles son. Ese fichero no importa nada, así que
 // esta flecha no tiene vuelta.
-import { RATIOS_BEBIDA, factoresDeTipo } from "./bebida.js";
+import { RATIOS_BEBIDA, factoresDeTipo, esFactorValido, TIPOS_BEBIDA } from "./bebida.js";
+import { factorComidaVigente } from "./comida.js";
 import { leerFactoresCristaleria, factorCristaleria } from "./cristaleria.js";
 
 // Margen de seguridad del 10% SOLO sobre cristalería, vajilla y servilletas: es el
@@ -51,19 +52,90 @@ const FACTOR_SIN_BARRA = 0.6;
 // hielo se acaba a media barra.
 const MERMA_SIN_CONGELADOR = { verano: 1.35, invierno: 1.2 };
 
+// ─── EL FACTOR DE HIELO, POR TIPO DE EVENTO ───────────────────────────────────
+// La merma de arriba salió de una estimación, no de una medición (ver PLAN_MEJORAS
+// C2). El número honesto está en los eventos ya hechos: lo que salió en el camión
+// menos lo que volvió, por comensal — la misma cuenta que calibracion.js ya hace con
+// la bebida, porque la vuelta del hielo ya soporta cantidad (true = volvió todo, o
+// los kilos que volvieron). El ajuste vive aquí como multiplicador por tipo de
+// evento, con las mismas reglas que los factores de bebida: solo se guarda lo
+// tocado (esparcido), para que una corrección de los valores de partida en una
+// versión nueva siga llegando a todo lo que nadie ha tocado.
+//
+// Multiplica los kilos FINALES (después de temporada, barra y merma), no el ratio
+// base: así el factor absorbe a la vez "llevamos más hielo de lo que dice el
+// manual" y "la merma de 1,35 no es la nuestra", y converge igual que la bebida —
+// aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+/** @type {Record<string, number>} */
+let factoresHielo = {};
+
+/** @param {unknown} nuevos @returns {Record<string, number>} */
+export function ponFactoresHielo(nuevos) {
+  factoresHielo = saneaFactoresHielo(nuevos);
+  return leerFactoresHielo();
+}
+
+/** @returns {Record<string, number>} */
+export function leerFactoresHielo() {
+  return { ...factoresHielo };
+}
+
+// Lo que se sube a la nube: como ya se guarda esparcido, es la propia lista limpia.
+// Subir un 1 congelado taparía la corrección del valor de partida (mismo motivo que
+// en los factores de bebida).
+/** @param {Record<string, number>} [valores] @returns {Record<string, number>} */
+export function factoresHieloCambiados(valores = {}) { return saneaFactoresHielo(valores); }
+
+/** @param {unknown} brutos @returns {Record<string, number>} */
+function saneaFactoresHielo(brutos) {
+  /** @type {Record<string, number>} */
+  const limpio = {};
+  if (!brutos || typeof brutos !== "object") return limpio;
+  const datos = /** @type {Record<string, any>} */ (brutos);
+  // La lista de tipos es la de la calibración de bebida: son los cinco tipos de
+  // evento que la app calcula (el nombre es histórico, la lista es la lista).
+  TIPOS_BEBIDA.forEach(tipo => {
+    const n = Number(datos[tipo]);
+    // El mismo rango válido que en la bebida: fuera de 0,3–2 no hay un evento raro,
+    // hay un dedo resbalando.
+    if (esFactorValido(n)) limpio[tipo] = n;
+  });
+  return limpio;
+}
+
+// Un solo factor, con su 1 por defecto. Es la única forma de leerlo en el cálculo:
+// así da igual que el tipo no exista (un evento antiguo) o que nunca se haya tocado.
+/** @param {string} [tipo] @returns {number} */
+export function factorHieloDe(tipo = "") {
+  const f = Number(factoresHielo[tipo]);
+  return esFactorValido(f) ? f : 1;
+}
+
+// Inmutable: devuelve la lista nueva. Poner el neutro es QUITAR el factor, no
+// guardar un 1: guardarlo congelaría el ratio de partida el día que se corrija en
+// una versión nueva.
+/** @param {Record<string, number>|null|undefined} factores @param {string} tipo @param {number} valor @returns {Record<string, number>} */
+export function conFactorHielo(factores, tipo, valor) {
+  const siguiente = { ...(factores || {}) };
+  const n = Number(valor);
+  if (!esFactorValido(n) || n === 1) delete siguiente[tipo];
+  else siguiente[tipo] = n;
+  return siguiente;
+}
+
 // Devuelve las tres unidades porque las tres se usan: los kilos para pedirlo, las bolsas
 // para contarlo al cargar y los taxis para saber cuánto sitio ocupa en el camión.
 /**
  * @param {number} pax
- * @param {{ mesVerano?: boolean, horasBarra?: number, tieneCongelador?: boolean }} [opciones]
+ * @param {{ mesVerano?: boolean, horasBarra?: number, tieneCongelador?: boolean, tipo?: string }} [opciones]
  * @returns {{ kg: number, bolsas: number, taxis: number }}
  */
-export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongelador = false } = {}) {
+export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongelador = false, tipo = "" } = {}) {
   const n = Math.max(0, Math.round(pax) || 0);
   if (!n) return { kg: 0, bolsas: 0, taxis: 0 };
   const temporada = mesVerano ? "verano" : "invierno";
   const merma = tieneCongelador ? 1 : MERMA_SIN_CONGELADOR[temporada];
-  const kg = Math.ceil(n * KG_HIELO_POR_PAX[temporada] * (horasBarra > 0 ? 1 : FACTOR_SIN_BARRA) * merma);
+  const kg = Math.ceil(n * KG_HIELO_POR_PAX[temporada] * (horasBarra > 0 ? 1 : FACTOR_SIN_BARRA) * merma * factorHieloDe(tipo));
   return {
     kg,
     bolsas: Math.ceil(kg / KG_POR_BOLSA),
@@ -201,7 +273,7 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // hay barra y de si en el sitio hay congelador donde guardarlo (ver arriba). Antes era
   // "taxis = pax/30" y con congelador CERO, dando por hecho que se hacía in situ: una
   // finca con arca te deja guardarlo, no fabricarlo.
-  const hielo = calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador });
+  const hielo = calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador, tipo });
   const taxisHielo = hielo.taxis;
   // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
   // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas).
@@ -349,13 +421,17 @@ export function champaneras(pax) {
 //   · y encima suman las del tipo elegido para el servicio (madera, plata o mixto)
 /**
  * @param {number} pax
- * @param {{ soloBandeja?: boolean, tipoBandejas?: string, extraMadera?: number, extraPlata?: number }} [opciones]
+ * @param {{ soloBandeja?: boolean, tipoBandejas?: string, extraMadera?: number, extraPlata?: number, tipo?: string }} [opciones]
  * @returns {{ pasar: number, madera: number, plata: number }}
  */
-export function calcBandejas(pax, { soloBandeja = false, tipoBandejas = "Mixto", extraMadera = 0, extraPlata = 0 } = {}) {
-  const pasar = Math.max(2, Math.ceil(pax / 20)) + (soloBandeja ? Math.max(2, Math.ceil(pax / 30)) : 0);
-  const delTipo = (/** @type {string} */ suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil(pax / 20))
-    : (tipoBandejas === suyo ? Math.max(2, Math.ceil(pax / 10)) : 0);
+export function calcBandejas(pax, { soloBandeja = false, tipoBandejas = "Mixto", extraMadera = 0, extraPlata = 0, tipo = "" } = {}) {
+  // El factor de comida (ver comida.js) escala la cuenta por pax, NO los extras
+  // manuales: los extraMadera/extraPlata son una decisión puntual de este evento y no
+  // se cargan en el factor.
+  const f = factorComidaVigente(tipo, "bandejas");
+  const pasar = Math.max(2, Math.ceil((pax / 20) * f)) + (soloBandeja ? Math.max(2, Math.ceil((pax / 30) * f)) : 0);
+  const delTipo = (/** @type {string} */ suyo) => tipoBandejas === "Mixto" ? Math.max(2, Math.ceil((pax / 20) * f))
+    : (tipoBandejas === suyo ? Math.max(2, Math.ceil((pax / 10) * f)) : 0);
   return {
     pasar,
     madera: pasar + delTipo("Madera") + extraMadera,

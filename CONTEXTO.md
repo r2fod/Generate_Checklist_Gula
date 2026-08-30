@@ -58,14 +58,70 @@ Playwright y borrados antes de este commit, no se quedan en el repo):
    salen centrados con su texto (“Abriendo Modo carga…”, “Abriendo…”, y el de la bandeja
    que no llegó a cazarse por ir de caché pero cargó bien) y los tres paneles se abren
    sin fallos ni contenido a medias.
+3. **PanelHielo (C2 del plan):** panel nuevo del Modo carga. Reusa clase por clase la
+   estructura del panel de bebida, pero nadie lo ha visto renderizado en un móvil.
+4. **PanelComida (C3 del plan):** panel nuevo del Modo carga (paella y bandejas por
+   tipo, con la convención "lo vuelto es lo no usado" en la nota). Mismas clases que
+   el de bebida.
+5. **Sección "Oportunidades" de Cerebro (A2 del plan):** tarjetas con la raya verde
+   nueva `es-oportunidad`; solo se pinta con avisos (el caso normal no suena a aviso).
+6. **"Probar los proveedores" en Ajustes (B6):** botón y su lista de estados
+   (`.asis-salud`); el motivo de un fallo va tal cual detrás del nombre.
+7. **Botón de copiar en las burbujas del asistente (A4 v1):** aparece al pasar por la
+   burbuja (en móvil va siempre a medio opaco) y sale en verde al copiar.
+8. **Clip y miniatura de captura (A4 v2a):** botón del clip en la línea de escribir
+   (misma altura que el input) y la miniatura con su aspa sobre la línea.
+
 
 **c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
 mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
 protegida con los dos checks obligatorios, y `worker/pegar.js` vuelto a pegar en
 Cloudflare (confirmado con "Repasar los eventos ahora").
 
-**d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños y la
-calibración del hielo (ver "Pendiente", punto 2). Nadie ha tocado esos números todavía.
+**d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños (ver
+"Pendiente", punto 2). La calibración del hielo ya está montada (ver "Hecho"); solo
+le falta que el equipo marque la vuelta en tres eventos para que el número salga solo.
+
+## ⚠ Rama de sesión pendiente de verificar y fusionar (C2 + C3 + regla de tests)
+
+La rama `arena/01a038bc-…` lleva **este trabajo por delante de `main`** (que desde el
+merge de hoy ya incluye #154: ratios/cristalería/autocalibración de personal; y D1
+añade el push: ver "Hecho"): el **C2 del
+plan** (calibración del hielo con lo que volvió), el **C3** (calibración de la comida —
+paella y bandejas— con lo que volvió), la regla nueva de `CLAUDE.md` ("lo nuevo entra
+con sus tests unitarios"), el **A2** (auditoría de negocio que propone mejoras), el
+paquete **B2+B3+B4+B7** (frase de consultar precisa, búsqueda que no adivina,
+cabecera corregida y barrido de datos reales en la batería), **B5+B6** (README real y
+salud de proveedores desde Ajustes), **B8** (línea base de pintado en el CI
+nocturno — el cambio está listo, pendiente de aplicar por el dueño: la App de la
+sesión no tiene permiso `workflows`, ver "Hecho"), el **A4 v1** (marketing: análisis
+de webs + estrategia), el **A4 v2a** (redes por captura y visión de Gemini) y el
+**A4 v2b** (estrategia de captación guardada en `indice/marketing`). Detalle y
+porqués en "Hecho". `test:rapido` en verde (tipos + 459 calculos + 640 asistente +
+build + sincronización).
+
+**Antes de fusionar o desplegar, verificar:**
+
+1. **La batería completa de navegador** (`npm run test`, ~45 min): contra C2, C3 y A2
+   solo ha corrido `test:rapido`; `app.test.mjs` (711) es la que barre la pantalla de
+   Modo carga (PanelHielo, PanelComida) y el asistente.
+2. **Visto humano de PanelHielo, PanelComida y la sección "Oportunidades" de
+   Cerebro** (`CLAUDE.md` manda captura): 390/412 y escritorio, dos temas, con
+   `animations: "disabled"`. Los paneles reusan las clases `cal-ratios`/`cal-ratio`
+   del panel de bebida y la sección reusa `cer-aviso` (tono verde nuevo
+   `es-oportunidad`), pero nadie lo ha visto renderizado.
+3. **El factor de hielo o de comida sin datos no es un bug**: la mecánica está montada
+   y el número saldrá solo cuando el equipo marque la vuelta en 3 eventos (el hielo
+   puede ser en kilos; la paella, las que no salieron). Un 1 en el panel es "aún sin
+   medir", no "roto".
+4. **La convención de la comida**: lo vuelto es lo NO usado — en la paella, las que
+   no salieron; en las bandejas, las que no se usaron para pasar. PanelComida lo dice
+   en pantalla, pero conviene que el equipo lo lea antes de marcar vueltas de verdad.
+5. `worker/pegar.js` NO se ha tocado en C2/C3: el check de CI "regenerado" pasa de
+   largo, no hay nada que reencolar en Cloudflare.
+
+El resto del plan (A2, A4, C1…) sigue pendiente en `PLAN_MEJORAS.md`, en el orden
+escrito allí.
 
 ## Orden de lectura
 
@@ -133,7 +189,8 @@ Mira `src/asistente/` antes de escribir — el estilo es marcado y desentona rá
   copiarse.
 - **Los avisos dicen qué hacer**, no solo qué pasó (el motivo del proveedor va tal cual,
   ahorra abrir logs de Cloudflare).
-- Una prueba por fallo arreglado, con el porqué en su texto.
+- Una prueba por fallo arreglado **y por cada comportamiento nuevo** (regla ya en
+  CLAUDE.md), con el porqué en su texto.
 
 ## Comandos
 
@@ -148,7 +205,7 @@ npm run reglas:deploy # firebase deploy --only firestore:rules
 npm run deploy        # predeploy = test; no publica en rojo
 ```
 
-**387 (cálculos) + 420 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
+**459 (cálculos) + 640 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
 Y aparte, `npm run reglas:emulador`: 28 comprobaciones de `firestore.rules` contra el
 motor real de Google (pide Java y el emulador; en el contenedor de trabajo original se
 saltaban — otra sesión, con Java y chromium disponibles, los ha lanzado los dos).
@@ -438,11 +495,11 @@ formularios).
 | Fichero | Qué es |
 |---|---|
 | `cliente.js` | Bucle de herramientas + mensaje de sistema. Máx. 6 vueltas |
-| `herramientas.js` | 18 propias + conectores. Cada una declara `datos` y `escribe` |
-| `conectores/` | WhatsApp, correo, calendario, checklists — hueco por donde crece |
+| `herramientas.js` | 23 propias + conectores. Cada una declara `datos` y `escribe` |
+| `conectores/` | WhatsApp, correo, calendario, checklists, marketing — hueco por donde crece |
 | `permisos.js` | 3 niveles + lista `NUNCA` |
 | `memoria.js` / `arbol.js` | Cerebro: recuerdos con fuente, árbol tema/fuente/día |
-| `subconsciente.js` | Repaso al abrir. Determinista, 0 tokens, sin red |
+| `subconsciente.js` | Qué ha cambiado / cómo van los objetivos / qué toca hoy. Determinista, 0 tokens, sin red. **Construido y probado, pero SIN cablear a ninguna pantalla todavía** (ver "Pendiente") |
 | `objetivos.js` / `tareas.js` | Lo que importa / lo pendiente |
 | `enrutado.js` | Elige proveedor según la pregunta |
 | `gasto.js` | Tokens/euros por proveedor, mes, día. Tope |
@@ -487,7 +544,7 @@ Colores en tokens `--pj-*`, con versión oscura (blanco sobre fondo oscuro deslu
 transparencia cada pieza solapada sumaba color y dejaba costura (cuello a través de la
 chaquetilla).
 
-### Nueve trampas que no hay que repetir
+### Doce trampas que no hay que repetir
 
 1. **Barrera de datos.** Cada herramienta declara `datos: true/false`. A un proveedor
    que entrena con lo que recibe (OpenAI) solo se le ofrecen las de calcular, nunca las
@@ -528,6 +585,32 @@ chaquetilla).
    siempre (Gasto: 844px de panel para 296 de contenido → 426 en blanco parecían algo
    sin cargar). Charla y Humano sí van enteras a propósito (evitan saltos). Lo decide la
    clase `es-<pestaña>` del panel.
+
+10. **Validar la URL de partida no basta si la ruta sigue redirects.** `analizar_web`
+    (A4) comprobaba la dirección que pedía la persona, pero hacía `fetch(url,
+    { redirect: "follow" })`: una web pública (que pasa el filtro) puede contestar con
+    un 302 a `169.254.169.254` o a `localhost`, y el fetch lo sigue solo — el filtro de
+    arriba no sirve de nada. Cualquier ruta que fetchee una URL elegida por quien
+    pregunta tiene que revalidar CADA salto del redirect, no solo el primero
+    (`fetchValidando` en `worker/index.js`, con tope de saltos).
+
+11. **Un filtro de "red privada" en IPv4 no cubre IPv6 que mapea esa misma IPv4.**
+    `http://[::ffff:127.0.0.1]/` es el mismo loopback de siempre, pero un filtro que
+    solo mira prefijos IPv4 (`127.`, `10.`, `192.168.`...) lo deja pasar como "pública"
+    si no decodifica primero la IPv4 escondida dentro del IPv6 (`hostBloqueado` en
+    `worker/index.js`). Cazado auditando la rama arena antes de fusionar #155 —
+    `npm run test:rapido` en verde no lo veía.
+
+12. **Un test con un valor "cómodo" en vez del real de la plataforma cuela un bug
+    entero.** `suscripcionLista` (push.js) exigía que `expirationTime` fuera un
+    número, y su propia prueba usaba `expirationTime: 123`. El caso NORMAL de un
+    `PushSubscription` real (Chrome, Firefox, sin caducidad puesta) es
+    `expirationTime: null` — con lo cual "Activar avisos" fallaba siempre en la
+    práctica, aunque el navegador se hubiera suscrito bien. Cuando el fixture de un
+    test viene de una API externa (del navegador, de un SDK...), tiene que ser el
+    valor que esa API da DE VERDAD en el caso normal, no el que sea cómodo de escribir
+    — si hay duda, se mira el spec o se prueba en un navegador real antes de escribir
+    el `ok(...)`.
 
 ### El proxy (Cloudflare Worker)
 
@@ -607,7 +690,7 @@ el primero no tenía —el punto de logística— es la última fila, y es lo ú
 | **N4** | `firebase.json` + reglas contra el emulador de verdad | Hecho y comprobado contra el motor real (28/28) |
 | **N5** | Observabilidad sin PII, con `__BUILD_ID__` | Hecho: `src/diario.js`, estructurado y con la compilación |
 | **N6** | Tipado gradual (`checkJs`) en los módulos de cálculo | Hecho: 13 ficheros. Cazó tres fallos reales |
-| **—** | **Logística: niños, hielo y contraste con el sector** | **SIN EMPEZAR.** Es el punto 2 del encargo y toca cantidades que salen en el camión |
+| **—** | **Logística: niños, hielo y contraste con el sector** | **En marcha.** El contraste con el sector está montado (A1, ver "Hecho"); el hielo se calibra solo (C2, ver "Hecho"); queda lo de los niños, con datos reales delante |
 
 **Reglas que puso el dueño para todo el plan** (siguen vigentes): no partir `App.jsx` ni
 `index.css`, no cambiar el sistema de estado, no tocar las tres guardias ni la identidad
@@ -642,32 +725,272 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
 
 ## Pendiente
 
-**1. Logística: los números que se cargan en el camión — A MEDIAS**
-- ~~Contrastar los ratios con lo que usa el sector~~ — **hecho** (A1: `sector.js` +
-  `comparar_con_sector`, ver `PLAN_MEJORAS.md`). Es banda de sanidad para lo NO medido,
-  no pisa lo ya medido con datos propios.
-- **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
-  eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
-  separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
-  Sigue sin empezar: hace falta medir un evento real antes de tocar el número (C1 en
-  `PLAN_MEJORAS.md`).
-- **Hielo**: ya sale en kg, bolsas y taxis (1 taxi = 12 bolsas de 2 kg = 24 kg) y ya
-  aplica merma por derretimiento cuando no hay congelador (`MERMA_SIN_CONGELADOR`, 1,35
-  en verano y 1,2 en invierno). Falta **contrastar esos dos números con un evento real**:
-  salieron de una estimación, no de una medición (C2 en `PLAN_MEJORAS.md`).
+**1. Logística: los números que se cargan en el camión — en marcha**
+- ~~Verificar los ratios con lo que usa el sector~~ — **hecho** (A1: `sector.js` +
+  `comparar_con_sector`). Es banda de sanidad para lo NO medido, no pisa lo ya medido.
+- **Coeficientes de niños (C1)** en comida, refrescos y equipamiento: sin empezar a
+  propósito — antes hay que medir un evento real. Hoy los niños ya cuentan para agua
+  y refresco (`alcoholPax` separa a los adultos), pero el resto va sobre el total.
+- **Hielo (C2): hecho** (calibración con lo que volvió, ver "Hecho"). Falta lo que
+  falta siempre: que el equipo marque la vuelta del hielo en tres eventos para que el
+  factor salga medido.
+- **Comida (C3): hecho** (calibración de paella y bandejas, ver "Hecho"). Mismo
+  pendiente: tres eventos con la vuelta marcada (en la paella, las que no salieron).
+
 
 **2. Del dueño, en la app** (necesita su sesión):
 - Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
 - Ratios de cumpleaños/producción: panel existe, falta medir un evento real.
 - ~~Verificar los 53 precios en `indice/precios` desde otro dispositivo~~ — hecho,
   confirmado por el dueño: llegaron los 53.
+- **En el Worker, para que lleguen los avisos (D1)**: el par VAPID — `VAPID_CLAVE`
+  (Secret) y `VAPID_MAILTO` (una `mailto:`), más la flag `nodejs_compat` marcada a mano.
+  El par se genera con `npx web-push generate-vapid-keys`; el paso a paso, en
+  `worker/README.md`. Mientras no estén, el aviso no se pierde: al abrir la app sale el
+  recordatorio de hoy en su lista (`paraHoy`).
 
 **3. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
 ("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
 segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
 de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
 
+**4. Subconsciente sin cablear** (hallazgo de la auditoría del 2026-08-29).
+`subconsciente.js` está construido y probado —qué ha cambiado desde la última vez, cómo
+van los objetivos, qué toca hoy— pero **ninguna pantalla lo llama**: `parte()` no tiene
+importador, y `leerFoto`/`guardarFoto` (la foto anterior que `parte()` espera como
+`fotoAnterior`) no las usa nadie. La línea del mapa de módulos decía "repaso al abrir" y
+eso no era cierto; el que mira lo de este navegador al abrir es `avisosConfig.js`, que
+sí está cableado al saludo. Falta decidir DÓNDE se enseña (el saludo ya junta
+`avisosConfig` + repaso del Worker + recordatorios de hoy) y, con la decisión, la
+captura que manda `CLAUDE.md` — por eso no se cablea a ciegas.
+
 ## Hecho (referencia, no acción)
+
+**Fusion de `main` (con #154: ratios de personal, cristalería y autocalibración) en la rama de sesión.**
+Dos sesiones trabajaron el plan desde la misma base (`c34be4c`), en zonas colindantes:
+esta rama (C2, C3, A2, A4, B*, D1) y #154 (factores de bebida/cristalería/ratios como
+herramientas, autocalibración de personal, dos bugs). El merge dejó las dos cosas vivas:
+- `calibracion.js` ahora tiene CUATRO calibraciones: bebida, hielo, comida y personal.
+- La cadena `onEscribir` tiene ambos conjuntos de aplicadores: `aplicarEnRatios` /
+  `aplicarEnBebida` / `aplicarEnCristaleria` (de #154) y `aplicarEnAjustes` (esta rama).
+  Cada uno escucha su propio `que`, y los de bebida caen en el MISMO guardado
+  (`handleCambiarBebida` → `guardarBebidaNube`): una sola puerta de persistencia.
+- **Duplicación conocida, documentada y con decisión pendiente**: dos herramientas
+  escriben un factor de bebida — `aplicar_factor_bebida` (de #154, el ajuste del panel)
+  y `aplicar_calibracion` con `area: "bebida"` (de esta rama, el factor que midió la
+  auditoría). Unificarlas en una sola herramienta es decisión del dueño; mientras,
+  `aplicar_calibracion` tiene ya la misma validación que la otra (área, tipo, clave y
+  factor acotado entre 0,3 y 2), que le faltaba.
+- `ModalModoCarga` monta los tres paneles nuevos juntos: PanelHielo, PanelComida y el de
+  ratios de personal (el del calendario, reutilizado donde siempre).
+- "Ojos humanos": la lista junta lo verificado en main (tonos del repaso, respaldos
+  perezosos) con los seis elementos nuevos de esta rama. Pendiente 1: A1 hecho, C1 sin
+  empezar (a propósito), C2/C3 hechos con su pendiente de los tres eventos.
+
+**D1 del plan — avisos en este teléfono (push) — montado.** El recordatorio al que
+le llega el día no espera a que alguien abra la app: llega al teléfono con la app
+cerrada. Si el teléfono estaba apagado, no pasa nada grave: la app enseña el mismo
+recordatorio al abrirse (`paraHoy` de tareas.js), así que el aviso se retrasa, no
+se pierde.
+- **La parte de la app**: `asistente/push.js` (puro: el id del aparato —uno por
+  teléfono, estable, como el gasto—, la clave pública VAPID en bytes y la validación
+  de una suscripción; el almacén se recibe como parámetro, la excepción de siempre).
+  En Ajustes del asistente, "Activar avisos en este teléfono": permiso → suscripción
+  con la clave pública que da el Worker → suscripción subida al equipo en
+  `indice/push-<id>` (la regla de `indice/{doc}` ya la cubre con sesión: sin tocar
+  reglas, y el Worker la leerá igual que lee los eventos, por prefijo, como `evt_`).
+  Sin conexión, se queda en el teléfono y lo DICE.
+- **El service worker**: los manejadores `push` y `notificationclick` (el payload lo
+  decide el Worker; al tocarlo se vuelve a la checklist). `VERSION` a v5 para que
+  se active en los equipos.
+- **El Worker**: `web-push` (empaquetado por rolldown con el resto, como
+  `revision.js`). `VAPID_CLAVE` (Secret) y `VAPID_MAILTO` como variables del Worker
+  (ver `worker/README.md`; hay UNA casilla que hay que marcar a mano: la flag de
+  compatibilidad `nodejs_compat`, porque `web-push` usa `node:crypto`). La clave
+  pública se DERIVA de la privada (`vapidClaves`) y la app la pide en
+  `/__vapid`: nadie pega nada. La privada se exige de 32 bytes exactos: Node
+  rellenaría de ceros una copia truncada y "funcionaría" con una clave distinta a la
+  generada (al corregirla después, la pública derivada cambiaría y los teléfonos
+  tendrían que re-suscribirse), así que el fallo lo dice y apunta a `npx web-push
+  generate-vapid-keys`. Cada noche, en el cron que ya corre el repaso,
+  `avisosDelDia`: tareas con `fecha === hoy` y no hechas (no `<`: el aviso es para
+  su día, y no se reenvía cada día hasta que se haga) × cada teléfono suscrito, con
+  TTL de 60 s. Que un teléfono no reciba no tumba el resto.
+- Lo puro (`tareasParaPush`, `payloadDeRecordatorio`, `vapidClaves` y `push.js` de
+  la app) tiene pruebas; la orquestación de `avisosDelDia` se prueba en el propio
+  cron (mismo patrón que el repaso).
+
+**A4 v2b del plan — estrategia de captación en la nube — montado.** La estrategia
+(canales, contenido, puertas, fase) es un documento de equipo que el asistente diseña,
+actualiza y lee antes de proponer marketing, para no contradecir lo acordado en cada
+conversación.
+- Vive en `indice/marketing`, no en una colección nueva: es un ajuste de equipo como
+  precios o ratios, y la regla de `indice/{doc}` ya lo cubre — sin tocar reglas ni
+  emulador. Mismo `ajusteCompartido` que el resto: lo ve todo el equipo, llega solo.
+- `asistente/estrategia.js` puro: `saneaEstrategia` le pone forma a lo que propone el
+  modelo (los cuatro campos, largos con tope; sin forma, no se guarda) y
+  `estrategiaEnFrase` la cuenta en una frase.
+- Herramientas en el conector marketing: `ver_estrategia` (solo lectura; sin ella,
+  lo dice en vez de inventar) y `guardar_estrategia` (escribe: pasa por
+  `onEscribir`, con su tarjeta en "Con permiso" y su saneado por la puerta de la
+  app — la misma que el guardado a mano).
+- El Worker no está en esto: el documento es de Firestore y la app lo lee y escribe
+  directa, como los ratios. `pegar.js` no cambia.
+15 comprobaciones nuevas, `test:rapido` en verde.
+
+**A4 v2a del plan — redes por captura y visión de Gemini — montado.** (La otra
+mitad de v2 —la estrategia en la nube— es v2b, arriba.) Instagram y compañía
+no enseñan su contenido a un scraper anónimo (muro de login), así que lo que ve el
+asistente es lo que el usuario le fotografía.
+- Clip en la charla para adjuntar la captura: miniatura con su aspa, tope de 8 MB,
+  una por pregunta (se consume al enviar). La imagen viaja en el CONTEXTO (nunca en
+  la conversación que se manda): el modelo solo recibe texto.
+- `analizar_captura` (conector marketing, solo lectura): el Worker manda la imagen a
+  Gemini — y SOLO a Gemini: la captura puede mostrar clientes en las fotos, y la
+  barrera de datos no se salta por la puerta de atrás. Mismas claves que el chat, con
+  su rotación por cuota; el 404 de modelo retirado llega tal cual.
+- El sistema le dice al modelo, pregunta a pregunta, que hay captura adjunta y que
+  él no la ve (la ve la herramienta): sin esa nota intentaría describir lo que no ve.
+- `pegar.js` regenerado (el CI lo compara byte a byte).
+8 comprobaciones nuevas, `test:rapido` en verde.
+
+**A4 del plan — Marketing v1 (análisis de webs + estrategia) — montado.** El hueco
+por donde el asistente crece en la otra dirección: no los eventos que ya hay, sino
+los que todavía no hay.
+- Nuevo conector `marketing` con la herramienta `analizar_web` (solo lectura,
+  `datos: false` — lo que se extrae es una web pública, no datos de clientes): se
+  pide la dirección completa y el Worker la trae y devuelve la extracción
+  estructurada (título, descripción, secciones, botones de acción, WhatsApp,
+  teléfonos, precios visibles, imágenes sin alt, viewport móvil).
+- El Worker no trae lo que le digan tal cual: `urlAnalizable` rechaza lo que no es
+  http(s), localhost, loopback, redes privadas (10/192.168/172.16-31/169.254) y el
+  loopback ipv6 — esta ruta, abierta, sería un agujero para sondear redes desde
+  dentro. Tope de 8 s y 2 MB.
+- Las redes sociales son la v2, no la v1: Instagram y compañía no enseñan su
+  contenido a un scraper anónimo (muro de login); por ahí el camino es la captura
+  del móvil con visión.
+- El bucle del asistente aprendió a esperar herramientas asíncronas
+  (`Promise.resolve` en cliente.js; las de casa siguen síncronas y la que mira
+  fuera es la primera asíncrona).
+- El modo "un paso a la vez y esperar a que se confirme" está en el sistema; los
+  textos que prepara (post, guion, mensaje) se copian con un toque: botón en la
+  burbuja, y el portapapeles dentro del gesto de quien pulsa.
+- El plan de la estrategia sigue usando `apuntar_tarea` con fecha (mecanismo
+  existente + recordatorios): no hay infraestructura nueva.
+27 comprobaciones nuevas, `test:rapido` en verde.
+
+**B8 del plan — línea base de pintado en CI — listo, pendiente de aplicar por el
+dueño.** El trabajo de navegador de `test.yml` ya descargaba chromium y lo dejaba en
+`CHROMIUM_PATH`, pero `medir` nunca se ejecutaba ahí: el único sitio donde se medía
+era el portátil de quien corría la batería. Sin número de referencia no se detecta la
+regresión de pintado, y sin detección la regla de "no optimizar sin número" se queda
+a medio hacer. El cambio son tres líneas al final del trabajo `navegador`, pero la
+App de la sesión NO PUEDE subirlo: GitHub rechaza el push cuando una App sin
+permiso `workflows` toca `.github/workflows/` (el mismo motivo por el que los ymls
+vivieron en `ci/` y se movieron a mano). El dueño lo aplica desde la web de GitHub
+(`test.yml` → editar → después de la línea de `app.test.mjs`):
+
+```yaml
+      # Línea base de pintado (B8 del plan): el número que convierte "¿va más lento
+      # que antes?" en un hecho. Va aquí, no en cada push, porque necesita chromium.
+      - run: npm run medir
+```
+
+Aplicado, el log del trabajo nocturno muestra la rejilla con 250 apuntes, el cambio
+de mes y el abrir del asistente; lo que se compara es ese log contra el anterior.
+
+**B5+B6 del plan — README real y salud de proveedores — hechos.**
+- **B5**: `README.md` deja de ser el boilerplate de Vite y dice lo que es el repo
+  para quien llega (las tres apps, el asistente y dónde viven las claves, comandos,
+  nube, pruebas), apuntando a CONTEXTO.md y CLAUDE.md para el detalle.
+- **B6**: la salud de los proveedores se puede comprobar desde Ajustes del
+  asistente. Nuevo `salud()` exportado en `worker/index.js` + ruta `/__salud` (misma
+  sesión y mismo patrón que `/__repaso`): a cada proveedor configurado se le manda un
+  mensaje de DOS tokens y se ve si el modelo existe y la clave vale — el motivo llega
+  tal cual ("Gemini 404: … not found" dice por sí solo que el nombre del modelo ha
+  cambiado; es el fallo que ya ha costado dos veces enterarse a ciegas, con
+  gemini-2.5-flash y el TTS). Sin claves, dice qué falta en cada uno sin gastar ni un
+  token. A demanda (un botón), no en cada pregunta. Lo que NO se hizo: el smoke test
+  en CI — el Worker pide sesión de equipo y su URL no vive en el repo a propósito,
+  así que CI no puede llamarlo sin secretos; el botón del viernes es el mecanismo.
+  `worker/pegar.js` regenerado (CI lo compara byte a byte). 5 comprobaciones nuevas.
+
+**B2+B3+B4+B7 del plan — los pequeños — hechos.**
+- **B2**: la frase de "Solo consultar" es precisa ("No puedes cambiar nada **de la
+  app**"): su memoria (recordar/olvidar) está disponible en todos los niveles —no es
+  un dato de la app, es su propio estado, y el equipo la lee y la borra a mano en
+  Cerebro—. Antes, la frase a secas contradecía a las herramientas que sí tenía
+  (la trampa nº2, la que ya costó un bug).
+- **B3**: `buscaEvento` ya no adivina: dos candidatos empatados al top se listan y se
+  pide detalle ("Hay 2 que se parecen… dime cuál con más detalle"), el mismo criterio
+  y la misma frase que el conector de calendario; un nombre EXACTO se coge sin
+  preguntar. Vale para ver_evento, ver_checklist, ver_escaleta y revisar_evento.
+- **B4**: la cabecera de `herramientas.js` ya no dice "Todas son de SOLO LECTURA" —
+  dejó de ser cierto cuando llegaron las de escribir. Describe el sistema real
+  (escribe: true + permisos.js + la lista NUNCA).
+- **B7**: prueba nueva que barre `src/` en cada batería (salvo `__tests__`, donde los
+  patrones viven A PROPÓSITO como fixtures ficticios): un teléfono español real o un
+  correo que no sea de los ficticios conocidos fallan la suite, y se comprueba
+  directamente que `PRECIOS_BASE` no existe en el código (el catálogo de precios de
+  compra vive en Firestore). Lo que ya pasó una vez (tres nombres reales) y lo que
+  pasó otra (precios en un repo público) queda cerrado por la batería, no por la
+  memoria.
+
+**A2 del plan — auditoría de negocio que propone mejoras — montada.** Las reglas
+viven en `revision.js` (`oportunidadesNegocio`, puro, mismo motor que el repaso:
+no se ha montado un motor nuevo, que fue el motivo de descartar Tinyflows) con un
+tono nuevo, `oportunidad` —nada roto, pero se deja dinero o aprendizaje en la
+mesa; el CSS le da su raya verde—. Cuatro reglas: **medido y sin aplicar** (lee
+las calibraciones de C2/C3 y propone aplicar el factor con `aplicar_calibracion`,
+que escribe por la MISMA puerta que el botón del panel —`escrituraAjustes.js`,
+encadenada en App—), **roturas sin precio** (la fuga que se ve como "gratis"),
+**eventos pasados sin vuelta** (aprendizaje perdido, 30 días, 3 nombres) y
+**huecos del catálogo** (en `calibracion.js`, no en `revision.js`, porque
+reconstruye la checklist: no se mete el generador en el bundle del Worker). La
+app lo calcula al tenerlo todo en memoria y lo pasa al asistente (`ver_auditoria`,
+que en una pantalla sin datos dice que no hay auditoría, no "todo en orden") y a
+Cerebro (sección "Oportunidades", que no se pinta sin avisos). El sistema le
+dice al modelo cuando usarlo y que los datos de aplicación se copian, no se
+inventan. Decisión documentada: corre **al abrir la app, no en el repaso
+nocturno** — el dato que aporta valor (precios, medidas) es local, y una copia
+nocturna sería stale sin avisar de nada que el repaso no avise ya; si algún día
+el repaso lo necesita, las reglas son puras y ya están exportadas. 24
+comprobaciones nuevas, `test:rapido` en verde.
+
+**C3 del plan — calibración de la comida (paella y bandejas) con lo que volvió —
+montado.** La paella (1 cada 30 pax) y las bandejas (por tramos de pax) eran ratios
+fijos sin dato detrás; ahora se calibran contra los eventos reales con el mismo
+patrón que la bebida y el hielo: `calibracionComida()` en `calibracion.js` reutiliza
+`consumoDeBebida()` — que ahora acepta un matcher para etiquetas dinámicas ("Paella
+<talla>", sin pisar "Paletas de paella" ni "Descansadores de paella") — con la
+misma convención que la bebida, hecha explícita para el equipo: **lo vuelto es lo NO
+usado** (en la paella, las que no salieron; en las bandejas, las que no se usaron
+para pasar). Con ella "lo cargado − lo vuelto" es lo que de verdad se usó, y el
+factor converge. El factor vive en el nuevo `comida.js` (esparcido por tipo ×
+grupo, mismas reglas que la bebida) y se aplica en `paellasPorPax`/`calcPaella`
+(allí el número a mano manda) y en la cuenta por pax de `calcBandejas` (los extras
+manuales no se escalan). Se ve y se aplica en PanelComida del Modo carga (junto a
+los de bebida y hielo) y sube a `indice/comida` con el mismo `ajusteCompartido`
+(las reglas no se tocaron). Lo que NO cuenta: los eventos con paella a mano (ese
+número no es el ratio) se salta, y las frituras no se calibran (su número es manual
+por evento, no hay ratio base que calibrar). 21 comprobaciones nuevas, `test:rapido`
+en verde.
+
+**C2 del plan — calibración del hielo con lo que volvió — montado.** La merma por
+derretimiento (`MERMA_SIN_CONGELADOR`, 1,35/1,2) era una estimación; ahora se calibra
+contra los eventos reales con el MISMO patrón que la bebida: `calibracionHielo()` en
+`calibracion.js` reutiliza `consumoDeBebida()` tal cual (la línea "Hielo" ya soporta
+cantidad en "Vuelve": true = volvió todo, o los kilos que volvieron), mediana con 3+
+eventos, acotado 0,3–2, y converge (aplicar la sugerencia y volver a medir da 1). El
+factor vive en `calculos.js` (esparcido por tipo, como los de bebida) y multiplica los
+kilos FINALES —después de temporada, barra y merma— para que absorba a la vez "llevamos
+más hielo de lo que dice el manual" y "la merma no es la nuestra". Se ve y se aplica en
+el nuevo PanelHielo del Modo carga (junto al de bebida, donde se mira la vuelta), y
+sube a `indice/hielo` con el mismo `ajusteCompartido` que los demás ajustes (las reglas
+de `indice/{doc}` no se tocaron). `calcular_hielo` del asistente recibe `tipo` para dar
+el MISMO número que la checklist. La banda del sector (A1) sigue comparando el ratio
+base, no el factor: el factor es ajuste del equipo, la banda es referencia. 15
+comprobaciones nuevas, `test:rapido` en verde.
 
 **Migración de precios a Firestore — cerrada, los tres pasos.** `src/precios.js` tenía
 53 precios de compra en el código (repo público → revelaban márgenes). Subidos desde

@@ -8,10 +8,10 @@
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
 import { useState, useRef, useEffect } from "react";
-import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar } from "lucide-react";
+import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy, Paperclip, Bell, BellOff } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
-import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube } from "../nube.js";
+import { nubeActiva, cargarProxyNube, guardarProxyNube, suscribirProxyNube, cargarAvisosNube, suscribirAvisosNube, guardarSuscripcionNube, borrarSuscripcionNube } from "../nube.js";
 import Cerebro from "./Cerebro.jsx";
 import { leerCharlas, guardarCharla, borrarCharla, cuandoFue } from "./conversaciones.js";
 import { porEvento as tareasPorEvento, sinHacer, paraHoy as recordatoriosDeHoy } from "./tareas.js";
@@ -30,7 +30,8 @@ import Dialogo from "../components/Dialogo.jsx";
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
-import { leerTexto, guardarTexto } from "../almacen.js";
+import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
+import { idDeAparato, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "./push.js";
 import { apunta } from "../diario.js";
 
 const CLAVE_NIVEL = "gula_asistente_nivel";
@@ -188,6 +189,131 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
     }
   };
 
+  const [probando, setProbando] = useState(false);
+  const [avisoSalud, setAvisoSalud] = useState(null);
+  // Qué burbuja se acaba de copiar (índice del hilo, -1 = ninguna). El texto que el
+  // asistente prepara (post, guion, mensaje) se copia con un toque, en el gesto de
+  // quien pulsa: el portapapeles solo se puede escribir así, y aquí el gesto es el botón.
+  const [copiado, setCopiado] = useState(-1);
+  const copiarMensaje = async (i) => {
+    const m = hilo[i];
+    if (!m) return;
+    try {
+      await navigator.clipboard.writeText(sinMarcas(m.texto));
+      setCopiado(i);
+      setTimeout(() => setCopiado(x => (x === i ? -1 : x)), 1500);
+    } catch (e) { /* sin permiso del portapapeles: el botón se queda como estaba */ }
+  };
+  // Captura adjunta (marketing v2): el modelo NO la ve — la ve analizar_captura — y
+  // la imagen viaja en el contexto, nunca en la conversación que se manda. Una por
+  // pregunta: al enviar, se consume.
+  const [captura, setCaptura] = useState(null);
+  const [avisoCaptura, setAvisoCaptura] = useState(null);
+  const inputCaptura = useRef(null);
+  const elegirCaptura = (f) => {
+    if (!f) return;
+    if (!/^image\//.test(f.type || "")) { setAvisoCaptura("Esa no es una imagen: adjunta una captura (jpg o png)."); return; }
+    if (f.size > 8 * 1024 * 1024) { setAvisoCaptura("La imagen pesa demasiado (más de 8 MB): haz la captura en una o dos pantallas."); return; }
+    const lector = new FileReader();
+    lector.onload = () => { setAvisoCaptura(null); setCaptura({ dataUrl: String(lector.result), mime: f.type, nombre: f.name || "captura" }); };
+    lector.onerror = () => setAvisoCaptura("No he podido leer la imagen: prueba con otra captura.");
+    lector.readAsDataURL(f);
+  };
+  const quitarCaptura = () => { setCaptura(null); setAvisoCaptura(null); };
+  // Preguntar al Worker que pinge a cada proveedor: enterarse EL VIERNES de que el
+  // modelo existe y la clave vale, no el sábado. Cada ping es un mensaje de dos
+  // tokens (ver salud() en worker/index.js), y solo se hace al pulsar.
+  const probarProveedores = async () => {
+    setProbando(true);
+    setAvisoSalud(null);
+    try {
+      const token = await tokenDeSesion().catch(() => "");
+      const r = await fetch(`${url.replace(/\/+$/, "")}/__salud`, {
+        method: "POST",
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.error) { setAvisoSalud({ mal: true, texto: d.error || `Ha fallado (${r.status}).` }); return; }
+      setAvisoSalud({ pings: d.pings || [] });
+    } catch (e) {
+      setAvisoSalud({ mal: true, texto: `No se ha podido llegar al proxy: ${e.message}` });
+    } finally {
+      setProbando(false);
+    }
+  };
+
+  // ─── AVISOS EN ESTE TELÉFONO (PUSH) ──────────────────────────────────────────
+  // Un recordatorio al que le llega el día no puede esperar a que alguien abra la
+  // app: el Worker lo empuja aquí (ver worker/index.js). Esta pantalla solo decide
+  // si este teléfono los recibe: pide permiso, se suscribe con la clave pública del
+  // Worker y sube la suscripción al equipo (indice/push-<id>, ver nube.js). Por
+  // APARATO, como el gasto: el aviso lo recibe el teléfono.
+  const [pushEstado, setPushEstado] = useState(null);   // { activo, mal, texto }
+  const [activandoPush, setActivandoPush] = useState(false);
+  useEffect(() => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      setPushEstado({ activo: false, mal: false, texto: "Este navegador no da avisos." });
+      return;
+    }
+    if (Notification.permission === "denied") {
+      setPushEstado({ activo: false, mal: false, texto: "Los avisos están bloqueados en el navegador: hay que activarlos en la configuración del sitio." });
+      return;
+    }
+    const sus = leerJSON(CLAVE_SUSC, null);
+    setPushEstado({ activo: Notification.permission === "granted" && suscripcionLista(sus), mal: false, texto: "" });
+  }, []);
+  const activarPush = async () => {
+    setActivandoPush(true);
+    try {
+      if (!("Notification" in window) || !("PushManager" in window)) throw new Error("este navegador no da avisos");
+      const permiso = await Notification.requestPermission();
+      if (permiso !== "granted") throw new Error("el navegador no ha dado permiso para avisos");
+      if (!url) throw new Error("falta la dirección del proxy: sin ella, nadie sabe a quién avisar");
+      const token = await tokenDeSesion().catch(() => "");
+      const r = await fetch(`${url.replace(/\/+$/, "")}/__vapid`, {
+        headers: token ? { authorization: `Bearer ${token}` } : {},
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.vapidPublico) throw new Error(d.error || "el Worker no tiene los avisos configurados todavía (le falta VAPID_CLAVE)");
+      const registro = await navigator.serviceWorker.getRegistration();
+      if (!registro) throw new Error("no hay service worker registrado: recarga la página y vuelve a probar");
+      const sus = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: clavePúblicaABytes(d.vapidPublico),
+      });
+      const serializada = sus.toJSON ? sus.toJSON() : sus;
+      if (!suscripcionLista(serializada)) throw new Error("la suscripción no ha salido completa");
+      guardarJSON(CLAVE_SUSC, serializada);
+      try {
+        await guardarSuscripcionNube(idDeAparato(localStorage), serializada);
+      } catch (e) {
+        // Sin conexión o sin sesión: se queda en este teléfono y sube en la próxima
+        // vez que se active. El aviso, mientras, no llega; no se finge que sí.
+        setPushEstado({ activo: true, mal: false, texto: "Activado en este teléfono, pero no ha subido al equipo: con conexión y sesión, vuelve a activar para que el Worker la vea." });
+        setActivandoPush(false);
+        return;
+      }
+      setPushEstado({ activo: true, mal: false, texto: "" });
+    } catch (e) {
+      setPushEstado({ activo: false, mal: true, texto: `No se han podido activar los avisos: ${e.message}.` });
+    } finally {
+      setActivandoPush(false);
+    }
+  };
+  const desactivarPush = async () => {
+    setActivandoPush(true);
+    try {
+      const registro = await navigator.serviceWorker.getRegistration();
+      const sus = registro && (await registro.pushManager.getSubscription());
+      if (sus) await sus.unsubscribe();
+      borrarDelAlmacen(CLAVE_SUSC);
+      try { await borrarSuscripcionNube(idDeAparato(localStorage)); } catch (e) { /* sin conexión: se borrará la próxima vez */ }
+      setPushEstado({ activo: false, mal: false, texto: "" });
+    } finally {
+      setActivandoPush(false);
+    }
+  };
+
   const [texto, setTexto] = useState("");
   const [pensando, setPensando] = useState(false);
   const [enCurso, setEnCurso] = useState("");
@@ -270,7 +396,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const enviar = async (e, dictado = "") => {
     if (e) e.preventDefault();
     const pregunta = (dictado || texto).trim();
-    if (!pregunta || pensando) return;
+    if ((!pregunta && !captura) || pensando) return;
     // El tope se comprueba ANTES de mandar nada: preguntar y luego decir que no había
     // presupuesto sería haberlo gastado igual.
     if (proveedor !== "auto" && !esGratis(proveedor)) {
@@ -292,7 +418,11 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
         mensajes,
         // El repaso entra en el contexto para que "ver_repaso" lo lea: lo carga este
         // panel de Firestore, no la app, así que no viene en el contexto de fuera.
-        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir },
+        // token, urlProxy y captura para las herramientas que miran fuera
+        // (analizar_web, analizar_captura): la url y la imagen las manda la app, no
+        // el modelo, que las inventaría, y el token no sale del navegador (el
+        // contexto no viaja por la red).
+        contexto: { ...contexto, nivel, personalidad, repaso, onEscribir: escribir, token, urlProxy: url, captura: captura ? captura.dataUrl : "", capturaMime: captura ? captura.mime : "" },
         url, token,
         onPaso: (p) => setEnCurso(p.nombre),
         onUsoMemoria: contexto.onUsoMemoria,
@@ -549,6 +679,56 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               </div>
             )}
 
+            {/* ─── AVISOS EN ESTE TELÉFONO (PUSH) ──
+                El recordatorio al que le llega el día no espera a que alguien abra la
+                app: el Worker (ver worker/index.js) lo empuja a este teléfono. Aquí se
+                decide si este aparato los recibe. Por aparato, como el gasto: el aviso
+                lo recibe el teléfono, no la cuenta. */}
+            <div className="asis-repaso-lanzar">
+              <button type="button" className="btn btn-outline" disabled={activandoPush}
+                onClick={pushEstado?.activo ? desactivarPush : activarPush}>
+                {activandoPush
+                  ? <Loader2 size={14} className="asis-gira" aria-hidden="true" />
+                  : pushEstado?.activo ? <Bell size={14} aria-hidden="true" /> : <BellOff size={14} aria-hidden="true" />}
+                {activandoPush ? "Trabajando…" : pushEstado?.activo ? "Avisos activos: desactivar" : "Activar avisos en este teléfono"}
+              </button>
+              {pushEstado && pushEstado.texto && <p className={`asis-explica${pushEstado.mal ? " es-mal" : ""}`}>{pushEstado.texto}</p>}
+              <p className="asis-explica">
+                Cuando a un recordatorio con fecha le llega su día, el teléfono avisa aunque
+                la app esté cerrada. Solo este teléfono, y solo recordatorios con fecha.
+              </p>
+            </div>
+
+            {/* Los proveedores, probados de verdad: cada uno contesta a un mensaje de dos
+                tokens y se ve si el modelo existe y la clave vale. Para el viernes antes
+                del fin de semana con eventos, no para el sábado en plena carga. */}
+            {url && (
+              <div className="asis-repaso-lanzar">
+                <button type="button" className="btn btn-ghost" onClick={probarProveedores} disabled={probando}>
+                  {probando ? "Probando…" : "Probar los proveedores"}
+                </button>
+                {avisoSalud && (avisoSalud.mal
+                  ? <p className="asis-explica es-mal">{avisoSalud.texto}</p>
+                  : (
+                    <ul className="asis-salud">
+                      {avisoSalud.pings.map(p => (
+                        <li key={p.nombre} className={`asis-salud-ping${p.estado === "ok" ? " es-ok" : p.estado === "error" ? " es-error" : " es-sin"}`}>
+                          <strong>{p.nombre}</strong>
+                          {p.estado === "ok" && <> responde{p.contesta ? ` ("${p.contesta}")` : ""}</>}
+                          {p.estado === "sin configurar" && <> sin configurar (falta {p.falta})</>}
+                          {p.estado === "error" && <> — {p.motivo}</>}
+                        </li>
+                      ))}
+                    </ul>
+                  ))}
+                <p className="asis-explica">
+                  Le manda a cada proveedor un mensaje de dos tokens para comprobar que el
+                  modelo existe y la clave vale. Cada prueba gasta unos pocos tokens de la
+                  cuenta de cada proveedor.
+                </p>
+              </div>
+            )}
+
             {/* Cómo se monta la dirección del proxy (por qué la clave no vive en la app,
                 los pasos en worker/README.md) es cosa de quien instala el asistente, no
                 de quien lo usa cada día — no se enseña aquí, solo lo que cambia según el
@@ -731,6 +911,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             objetivos={contexto.objetivos || []}
             eventosGuardados={contexto.eventosGuardados || {}}
             repaso={repaso}
+            oportunidades={contexto.oportunidades}
             onOlvidar={onOlvidar}
             onPonerObjetivo={contexto.onPonerObjetivo}
             onCambiarEstadoObjetivo={contexto.onCambiarEstadoObjetivo}
@@ -767,7 +948,22 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               {/* Sin markdown: se le pide al modelo que no lo use, pero pedirlo no basta
                   —se olvida cada tantas respuestas y el que se olvida no avisa—, así que
                   se limpia aquí, que es el único sitio donde se puede garantizar. */}
-              <div className="asis-burbuja">{m.de === "el" ? sinMarcas(m.texto) : m.texto}</div>
+              <div className="asis-burbuja">
+                {m.de === "el" ? sinMarcas(m.texto) : m.texto}
+                {/* El texto que el asistente prepara (post, guion, mensaje) se copia
+                    tal cual: "listo para copiar" no vale si hay que seleccionarlo a mano. */}
+                {m.de === "el" && (
+                  <button
+                    type="button"
+                    className={`asis-copiar${copiado === i ? " es-copiado" : ""}`}
+                    title={copiado === i ? "Copiado" : "Copiar el texto"}
+                    aria-label={copiado === i ? "Copiado" : "Copiar el texto"}
+                    onClick={() => copiarMensaje(i)}
+                  >
+                    {copiado === i ? <Check size={11} aria-hidden="true" /> : <Copy size={11} aria-hidden="true" />}
+                  </button>
+                )}
+              </div>
               {/* De dónde sale lo que acaba de decir */}
               {(m.pasos && m.pasos.length > 0) || m.coste || (m.quien && disponibles.length > 1) ? (
                 <div className="asis-pasos">
@@ -868,13 +1064,36 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
 
         {!ajustes && !verHistorial && pestana === "charla" && (
         <form className="asis-escribir" onSubmit={enviar}>
+          {captura && (
+            <div className="asis-adjunto">
+              <img src={captura.dataUrl} alt="Captura adjunta" />
+              <span className="asis-adjunto-nombre">{captura.nombre}</span>
+              <button type="button" onClick={quitarCaptura} aria-label="Quitar la captura" title="Quitar la captura">
+                <X size={12} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          {avisoCaptura && <p className="asis-adjunto-aviso">{avisoCaptura}</p>}
+          <button
+            type="button" className="asis-clip"
+            onClick={() => inputCaptura.current && inputCaptura.current.click()}
+            disabled={pensando}
+            aria-label="Adjuntar una captura"
+            title="Adjuntar una captura (por ejemplo, tu Instagram o el de la competencia)"
+          >
+            <Paperclip size={15} aria-hidden="true" />
+          </button>
+          <input
+            ref={inputCaptura} type="file" accept="image/*" hidden
+            onChange={e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; elegirCaptura(f); }}
+          />
           <input
             className="form-input" type="text" value={texto} placeholder="Escribe tu pregunta"
             aria-label="Pregunta para el asistente"
             onChange={e => setTexto(e.target.value)}
             disabled={pensando}
           />
-          <button type="submit" className="btn" disabled={pensando || !texto.trim()} aria-label="Enviar">
+          <button type="submit" className="btn" disabled={pensando || (!texto.trim() && !captura)} aria-label="Enviar">
             <Send size={15} aria-hidden="true" />
           </button>
         </form>

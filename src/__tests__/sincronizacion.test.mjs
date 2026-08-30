@@ -692,15 +692,15 @@ console.log("\n══ La diferencia entre dos versiones de un envío ══");
 // buscarlas a tiempo.
 console.log("\n══ Lo obligatorio del formulario ══");
 {
-  const { loQueFalta, preguntasDe } = await import("../formulario/preguntas.js");
-  const vacio = loQueFalta({ tipo: "boda" }).map(f => f.id);
+  const { respuestasQueFaltan, preguntasDe } = await import("../formulario/preguntas.js");
+  const vacio = respuestasQueFaltan({ tipo: "boda" }).map(f => f.id);
   ok(vacio.includes("nombreYsitio") && vacio.includes("cuando"),
     `sin nombre ni día se avisa de las dos → ${JSON.stringify(vacio)}`);
-  ok(loQueFalta({ tipo: "boda", nombre: "Boda A", fecha: "2027-08-11" }).length === 0,
+  ok(respuestasQueFaltan({ tipo: "boda", nombre: "Boda A", fecha: "2027-08-11" }).length === 0,
     "con nombre y día no falta nada");
-  ok(loQueFalta({ tipo: "boda", nombre: "   ", fecha: "2027-08-11" }).length === 1,
+  ok(respuestasQueFaltan({ tipo: "boda", nombre: "   ", fecha: "2027-08-11" }).length === 1,
     "un nombre de solo espacios no cuenta como nombre");
-  ok(loQueFalta({ tipo: "produccion", nombre: "Rodaje", fecha: "2027-08-11" }).length === 0,
+  ok(respuestasQueFaltan({ tipo: "produccion", nombre: "Rodaje", fecha: "2027-08-11" }).length === 0,
     "y en un rodaje pide lo mismo, ni más ni menos");
 
   // Y esas dos preguntas ya no ofrecen "No lo sé": sería una salida a un callejón

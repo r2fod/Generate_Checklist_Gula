@@ -7571,14 +7571,18 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
   opacity: 0.85;
 }
 
-/* El botón de repasar ahora, en los ajustes del asistente. */
+/* El botón de repasar ahora, avisos y salud de proveedores, en los ajustes del
+   asistente: mismo patrón de columna (botón + texto que explica), reutilizado en
+   los tres. El .btn de por sí da 36px (9px de padding × 2 + el texto): por debajo
+   de los 40px de pulgar que pide el resto de la app — se cazó auditando #155 con
+   la batería de navegador completa, que test:rapido no corre. */
 .asis-repaso-lanzar {
   display: flex;
   flex-direction: column;
   gap: 6px;
   margin: 10px 0;
 }
-.asis-repaso-lanzar .btn { justify-content: center; gap: 6px; }
+.asis-repaso-lanzar .btn { justify-content: center; gap: 6px; min-height: 40px; }
 .asis-explica.es-mal, .asis-nota.es-mal { color: var(--error-texto); }
 
 .cer-repaso {
@@ -7621,9 +7625,52 @@ button.asis-paso.es-coste.es-abre.es-abierto { border-color: var(--accent); }
 .cer-aviso em { font-style: normal; color: var(--text-muted); }
 /* Los mismos tres tonos que usa revision.js, y la diferencia importa: "falta" impide
    calcular, "raro" huele mal, "acuérdate" hay que hacerlo fuera de la app. */
+/* El estado de cada proveedor al probarlos: el color del nombre dice el veredicto,
+   el motivo va tal cual detrás (un "Gemini 404: not found" se explica solo). */
+/* Copiar el texto de una respuesta del asistente (posts, guiones, mensajes): aparece
+   al pasar por la burbuja; en pantallas sin hover (móvil) va siempre algo visible. */
+.asis-copiar {
+  float: right; margin: 0 0 4px 8px; padding: 2px 4px; border: none;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  border-radius: 4px; opacity: 0; transition: opacity 0.15s, color 0.15s;
+}
+.asis-msg:hover .asis-copiar, .asis-copiar:focus-visible { opacity: 1; }
+.asis-copiar.es-copiado { opacity: 1; color: var(--green-qty); }
+@media (hover: none) { .asis-copiar { opacity: 0.55; } }
+
+/* Marketing v2: la captura adjunta. Miniatura con su aspa sobre la línea de
+   escribir; el modelo no la ve — la ve analizar_captura (Gemini es el ojo). */
+.asis-adjunto {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 8px;
+  padding: 3px 6px 3px 4px; max-width: 100%;
+  border: 1px solid var(--border-color); border-radius: 10px; background: var(--card-bg);
+}
+.asis-adjunto img { width: 30px; height: 30px; object-fit: cover; border-radius: 6px; flex: none; }
+.asis-adjunto-nombre { font-size: 0.72rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asis-adjunto button { flex: none; border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 3px; border-radius: 5px; transition: color 0.15s; }
+.asis-adjunto button:hover { color: var(--error-texto); }
+.asis-adjunto-aviso { margin: 0 0 8px; font-size: 0.75rem; color: var(--error-texto); }
+.asis-clip {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm); background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: color 0.15s, border-color 0.15s;
+}
+.asis-clip:hover { color: var(--accent); border-color: var(--accent); }
+.asis-clip[disabled] { opacity: 0.5; cursor: default; }
+
+.asis-salud { margin: 8px 0; padding-left: 18px; font-size: 0.85rem; line-height: 1.5; }
+.asis-salud-ping strong { margin-right: 2px; }
+.asis-salud-ping.es-ok strong { color: var(--green-qty); }
+.asis-salud-ping.es-error strong { color: var(--error-texto); }
+.asis-salud-ping.es-sin strong { color: var(--text-muted); }
+
 .cer-aviso.es-falta { border-left-color: var(--error-texto); }
 .cer-aviso.es-raro { border-left-color: var(--aviso-texto-suave); }
 .cer-aviso.es-acuerdate { border-left-color: var(--accent); }
+/* oportunidad: nada roto, pero se deja dinero o aprendizaje en la mesa — el verde es
+   "esto sale a cuenta", no "todo va bien" (eso no se pinta, ver Cerebro). */
+.cer-aviso.es-oportunidad { border-left-color: var(--green-qty); }
 
 .cer-objetivo {
   display: flex;

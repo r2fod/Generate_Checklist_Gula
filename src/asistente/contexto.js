@@ -29,10 +29,12 @@ export function contextoDelAsistente({
   memoria = [],
   objetivos = [],
   tareas = [],
+  estrategia = null,
   conectores = {},
   equipo = [],
   respuestasFormulario = null,
   progresoCarga = null,
+  oportunidades = null,
   onRecordar,
   onOlvidar,
   onUsoMemoria,
@@ -52,6 +54,7 @@ export function contextoDelAsistente({
     memoria,
     objetivos,
     tareas,
+    estrategia,
     conectores,
     equipo,
     respuestasFormulario,
@@ -80,6 +83,10 @@ export function contextoDelAsistente({
     // { cambios, aplicada } o null — ver actualizacion.js. Sin recorte: no lleva nada
     // sensible, son las mismas frases que ya se ven en el banner de arriba.
     avisoActualizacion,
+    // La auditoría de negocio, ya calculada (ver App.jsx). null en apps que no la
+    // calculan — y la herramienta lo dice, que no hay nada peor que un "todo en
+    // orden" contado desde una pantalla que no tiene los datos.
+    oportunidades,
   };
 }
 

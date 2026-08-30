@@ -2,6 +2,8 @@ import { estimarTiemposCarga, FASES_TIEMPO } from "./tiempos-carga.js";
 import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
 import { buildChecklist } from "./checklist-generadores.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "./bebida.js";
+import { COMIDAS, CLAVES_COMIDA } from "./comida.js";
+import { hoyISO, enDiasISO } from "./fecha.js";
 import { PAX_POR_CAMARERO, saneaRatios } from "./personal.js";
 
 // ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
@@ -96,7 +98,10 @@ export function checklistDeEventoGuardado(ev) {
 // que ya sabe la app —temporada, horas de barra, brindis, niños— sin repetir su cuenta.
 // Y al multiplicar por el factor vigente el ajuste converge: aplicar la sugerencia y
 // volver a medir da 1, no otra corrección encima.
-const MIN_EVENTOS_BEBIDA = 3;
+// Tres y no dos: dos eventos son una anécdota, y cambiar la carga de todo un tipo de
+// evento por dos casos es peor que no tocar nada. El mismo umbral rige lo que se mide
+// con la vuelta: bebida e hielo.
+const MIN_EVENTOS_MEDIR = 3;
 
 // Lo cargado y lo vuelto de un item, buscando la clave con el nombre de categoría tal
 // cual y también renombrado: la marca se guardó con el nombre que la categoría tenía en
@@ -111,10 +116,13 @@ function aNumero(x) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Lo que se consumió de una bebida en un evento guardado, y lo que se habría cargado.
-// Devuelve null si falta algún dato: una sola línea del grupo sin apuntar la vuelta ya
-// falsea el total (si no apuntas el tinto, el vino sale como si se hubiera bebido entero).
-function consumoDeBebida(ev, cats, labels) {
+// Lo que se consumió de un grupo en un evento guardado, y lo que se habría cargado.
+// "grupo" es la lista de etiquetas exactas (bebida) o un matcher (comida, para
+// etiquetas dinámicas como "Paella <talla>"). Devuelve null si falta algún dato: una
+// sola línea del grupo sin apuntar la vuelta ya falsea el total (si no apuntas el
+// tinto, el vino sale como si se hubiera bebido entero).
+function consumoDeBebida(ev, cats, grupo) {
+  const esDeGrupo = (label) => (typeof grupo === "function" ? grupo(label) : grupo.includes(label));
   const renom = ev.categoriasRenombradas || {};
   const vueltos = ev.vueltos || {};
   const overrides = ev.overridesManuales || {};
@@ -123,7 +131,7 @@ function consumoDeBebida(ev, cats, labels) {
     const mostrada = renom[cat.nombre] ?? cat.nombre;
     for (const it of cat.items) {
       const label = it[0];
-      if (!labels.includes(label)) continue;
+      if (!esDeGrupo(label)) continue;
       encontrados++;
       const override = marcaDe(overrides, cat.nombre, mostrada, label);
       const qty = aNumero(override !== undefined ? override : it[1]);
@@ -169,7 +177,7 @@ export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) 
   const salida = {};
   Object.entries(proporciones).forEach(([tipo, porBebida]) => {
     Object.entries(porBebida).forEach(([bebida, lista]) => {
-      if (lista.length < MIN_EVENTOS_BEBIDA) return;
+      if (lista.length < MIN_EVENTOS_MEDIR) return;
       const factor = redondeaFactor(mediana(lista) * factorDe(factoresActuales, tipo, bebida));
       if (!esFactorValido(factor)) return;
       if (!salida[tipo]) salida[tipo] = {};
@@ -179,9 +187,118 @@ export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) 
   return salida;
 }
 
+// ─── CUÁNTA COMIDA SE USÓ DE VERDAD ───────────────────────────────────────────
+// La misma cuenta que la bebida y el hielo: lo que salió menos lo que volvió SIN USAR.
+// La convención (que el panel de comida dice en pantalla) es la que la bebida ya usa,
+// hecha explícita para el equipo: en la paella, lo que vuelve es la que no salió; en
+// las bandejas, la que no se usó para pasar. Con ella "cargado − vuelto" es lo que de
+// verdad se usó, y el factor converge como el resto.
+//
+// NO cuentan los eventos con paella a mano (numPaellas > 0): ese número no es el
+// ratio, y medirlo contra el ratio sesgaría el factor para siempre. Las frituras no
+// están aquí: su número es manual por evento, no hay ratio base que calibrar.
+export function calibracionComida(eventosGuardados = {}, factoresActuales = {}) {
+  const proporciones = {};
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.evento || !ev.vueltos) return;
+    if (!TIPOS_BEBIDA.includes(ev.evento)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(ev); } catch (e) { return; }
+    if (!cats.length) return;
+    CLAVES_COMIDA.forEach(clave => {
+      if (clave === "paella" && (Number(ev.numPaellas) || 0) > 0) return;
+      const r = consumoDeBebida(ev, cats, COMIDAS[clave].esDeGrupo);
+      if (!r) return;
+      if (!proporciones[ev.evento]) proporciones[ev.evento] = {};
+      (proporciones[ev.evento][clave] ||= []).push(r.consumo / r.carga);
+    });
+  });
+  const salida = {};
+  Object.entries(proporciones).forEach(([tipo, porClave]) => {
+    Object.entries(porClave).forEach(([clave, lista]) => {
+      if (lista.length < MIN_EVENTOS_MEDIR) return;
+      const factor = redondeaFactor(mediana(lista) * Number(factorDe(factoresActuales, tipo, clave)));
+      if (!esFactorValido(factor)) return;
+      if (!salida[tipo]) salida[tipo] = {};
+      salida[tipo][clave] = { factor, nEventos: lista.length };
+    });
+  });
+  return salida;
+}
+
 // Dos decimales: la precisión de "se bebió un 83%" es la que hay, y un 0,8271 en una
 // casilla del panel solo da sensación de exactitud donde no la hay.
 const redondeaFactor = (n) => Math.round(n * 100) / 100;
+
+// ─── CUÁNTO HIELO SE USÓ DE VERDAD ────────────────────────────────────────────
+// La misma cuenta que la bebida, con otro item: la línea "Hielo" ya soporta cantidad en
+// "Vuelve" (true = volvió todo, o los kilos que volvieron), así que no hace falta marcar
+// nada nuevo. Se compara contra la checklist reconstruida —lo que la app cargaría HOY
+// para ese evento, con su temporada, su barra, su merma y su factor vigente— y no
+// contra el ratio pelado: por lo mismo que en la bebida, así queda fuera todo lo que la
+// app ya sabe, y el factor converge (aplicar la sugerencia y volver a medir da 1).
+const ITEM_HIELO = "Hielo";
+export function calibracionHielo(eventosGuardados = {}, factoresActuales = {}) {
+  const proporciones = {};
+  Object.values(eventosGuardados).forEach(ev => {
+    if (!ev || !ev.evento || !ev.vueltos) return;
+    if (!TIPOS_BEBIDA.includes(ev.evento)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(ev); } catch (e) { return; }
+    if (!cats.length) return;
+    const r = consumoDeBebida(ev, cats, [ITEM_HIELO]);
+    if (!r) return;
+    (proporciones[ev.evento] ||= []).push(r.consumo / r.carga);
+  });
+  const salida = {};
+  Object.entries(proporciones).forEach(([tipo, lista]) => {
+    if (lista.length < MIN_EVENTOS_MEDIR) return;
+    const factor = redondeaFactor(mediana(lista) * Number(factoresActuales[tipo] || 1));
+    if (!esFactorValido(factor)) return;
+    salida[tipo] = { factor, nEventos: lista.length };
+  });
+  return salida;
+}
+
+// ─── HUECOS DEL CATÁLOGO ──────────────────────────────────────────────────────
+// El Resumen solo cobra lo que tiene precio. Un item sin precio no es "gratis", es
+// "no cobrado": el total se queda corto en silencio. Esto mira los eventos que están
+// por cargar y cuenta cuántas líneas van a quedar fuera del coste.
+//
+// Vive aquí (no en revision.js) porque necesita reconstruir la checklist, y quien
+// importa el generador es este fichero: meterlo en revision.js engordaría el Worker
+// con una cuenta que solo se hace en la app.
+//
+// La comprobación va por la etiqueta base: si se renombró a mano y solo el nombre
+// nuevo tiene precio, cuenta como sin precio — aproximación a la baja, y el aviso
+// sigue siendo cierto: alguien tiene que mirarlo. Umbrales (10 líneas, 5 sin precio)
+// para no convertir un eventillo en noticia.
+export function huecosDeCatalogo(eventosGuardados = {}, precios = {}) {
+  const desde = hoyISO();
+  const hasta = enDiasISO(30);
+  const salidas = [];
+  Object.entries(eventosGuardados).forEach(([nombre, e]) => {
+    if (!e || !e.evento) return;
+    if (!((e.fechaEvento || "") >= desde && (e.fechaEvento || "") <= hasta)) return;
+    let cats;
+    try { cats = catsDeEventoGuardado(e); } catch (err) { return; }
+    let total = 0, sinPrecio = 0;
+    const ejemplos = [];
+    cats.forEach(c => c.items.filter(Boolean).forEach(it => {
+      const qty = aNumero(it[1]);
+      if (qty === null || qty <= 0) return;
+      total++;
+      if (precios[it[0]] === undefined) {
+        sinPrecio++;
+        if (ejemplos.length < 3) ejemplos.push(it[0]);
+      }
+    }));
+    if (total >= 10 && sinPrecio >= 5) {
+      salidas.push({ nombre, fecha: e.fechaEvento || "", total, sinPrecio, ejemplos });
+    }
+  });
+  return salidas.sort((a, b) => b.sinPrecio - a.sinPrecio).slice(0, 3);
+}
 
 // Las categorías con sus cantidades, tal y como saldrían hoy. checklistDeEventoGuardado
 // se queda solo con las etiquetas; la calibración necesita también los números.

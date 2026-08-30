@@ -20,6 +20,9 @@
 
 import { repasar, DIAS_VISTA } from "./repaso.js";
 import { CLAVES_VOZ_GEMINI } from "../src/asistente/vozGemini.js";
+import { hoyISO } from "../src/fecha.js";
+import webpush from "web-push";
+import { createECDH } from "node:crypto";
 
 const CORS = (origen) => ({
   "Access-Control-Allow-Origin": origen,
@@ -431,6 +434,198 @@ async function estado(env) {
   };
 }
 
+// ─── SALUD DE LOS PROVEEDORES ─────────────────────────────────────────────────
+// Google retiró gemini-2.5-flash "para cuentas nuevas" sin avisar, y el Worker
+// contestó un 404 que no decía nada por qué: el nombre del modelo había caducado.
+// La forma de enterarse es PREGUNTAR antes del sábado, no después: cada proveedor
+// configurado contesta a un mensaje de dos tokens y se ve si el modelo existe y la
+// clave vale. A demanda (alguien pulsa el botón de Ajustes), no en cada pregunta —
+// cada ping cuesta unos pocos tokens.
+//
+// Exportada para probarla en la batería: la parte de fetch se queda lo más fina
+// posible, y lo que sí se comprueba a fondo es lo que pasa cuando hay o no claves.
+export async function salud(env) {
+  const pings = [];
+  for (const [nombre, p] of Object.entries(PROVEEDORES)) {
+    const falta = [p.clave, p.ademas].filter(Boolean).filter(k => !env[k]);
+    if (falta.length) {
+      pings.push({ nombre, estado: "sin configurar", falta: falta.join(" y ") });
+      continue;
+    }
+    try {
+      const r = await p.habla(env)({
+        mensajes: [{ rol: "usuario", contenido: "Di solo: ok" }],
+        sistema: "",
+        herramientas: [],
+      });
+      pings.push({ nombre, estado: "ok", contesta: String(r.texto || "").slice(0, 40) });
+    } catch (e) {
+      // El motivo tal cual: "Gemini 404: … not found" dice por sí solo que el modelo
+      // ha cambiado, y un 401 que la clave no vale. Interpretarlo es peor que
+      // enseñarlo, que es lo que ha costado enterarse de las otras dos veces.
+      pings.push({ nombre, estado: "error", motivo: String(e && e.message ? e.message : e) });
+    }
+  }
+  return { pings };
+}
+
+// ─── ANALIZAR WEBS ─────────────────────────────────────────────────────────────
+// A4 del plan (v1): la herramienta analizar_web pide una dirección y el Worker la
+// trae y la reduce a lo que cuenta para captar clientes. Dos cosas la gobiernan:
+//
+//   · La dirección la elige la persona, así que se valida el destino antes de
+//     fetchear: nunca se mira red privada ni localhost. Esta ruta, abierta, sería
+//     un agujero para sondear redes desde dentro.
+//   · Sin dependencias (el Worker se pega tal cual, sin nada que instalar): la
+//     extracción va a regex, y extrae lo que importa, no el DOM entero.
+//
+// Redes sociales no por aquí (v2): Instagram y compañía no enseñan su contenido a
+// un scraper anónimo (muro de login), y lo que sirve allí es la captura del móvil
+// con visión, que es otro camino.
+//
+// Cuatro octetos contra los rangos privados/reservados de IPv4 — se comparan como
+// números, no como texto, porque el mismo rango se puede colar disfrazado de IPv6
+// (ver hostBloqueado). "0.x" también cae aquí: es la dirección "esta misma máquina".
+function ipv4Privada(a, b, c, d) {
+  return a === 127 || a === 0 || a === 10
+    || (a === 192 && b === 168)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31);
+}
+
+// El hostname que da new URL() ya viene normalizado (decimal/octal/hex de un IPv4
+// se convierten a la forma con puntos), así que el único disfraz que sobrevive es
+// meter el IPv4 DENTRO de un IPv6 ("IPv4-mapeada": ::ffff:127.0.0.1, o su misma
+// forma en hexadecimal, ::ffff:7f00:1). Sin esta comprobación, [::ffff:127.0.0.1]
+// pasaba como dirección "pública" siendo el mismo loopback de siempre.
+function hostBloqueado(hostnameBruto) {
+  const h = String(hostnameBruto || "").toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) return ipv4Privada(+v4[1], +v4[2], +v4[3], +v4[4]);
+  const v6 = h.replace(/^\[|\]$/g, "");
+  if (v6 === "::1" || v6 === "::") return true;              // loopback / sin especificar
+  if (/^fe80:/.test(v6)) return true;                         // link-local
+  if (/^f[cd][0-9a-f]{2}:/.test(v6)) return true;              // ULA, fc00::/7
+  const mapeadaDecimal = v6.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (mapeadaDecimal) return ipv4Privada(+mapeadaDecimal[1], +mapeadaDecimal[2], +mapeadaDecimal[3], +mapeadaDecimal[4]);
+  const mapeadaHex = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mapeadaHex) {
+    const alto = parseInt(mapeadaHex[1], 16), bajo = parseInt(mapeadaHex[2], 16);
+    return ipv4Privada(alto >> 8, alto & 0xff, bajo >> 8, bajo & 0xff);
+  }
+  return false;
+}
+
+/** @param {unknown} url @returns {{ ok: boolean, url?: string, motivo?: string }} */
+export function urlAnalizable(url) {
+  try {
+    const u = new URL(String(url || ""));
+    if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, motivo: "Solo se analizan direcciones http o https." };
+    if (hostBloqueado(u.hostname)) return { ok: false, motivo: "Esa dirección no se analiza: es de red privada." };
+    return { ok: true, url: u.toString() };
+  } catch (e) {
+    return { ok: false, motivo: "Esa no parece una dirección completa (falta el https://)." };
+  }
+}
+
+// La comprobación de arriba solo vale para la URL de PARTIDA: una web pública puede
+// contestar con un redirect a una privada (169.254.169.254, localhost...) y fetch()
+// lo seguiría solo, coladero completo del filtro. Aquí se sigue A MANO, comprobando
+// CADA salto igual que el primero, hasta un tope — una cadena de redirects infinita
+// no puede colgar la petición.
+export async function fetchValidando(urlInicial, opciones, maxSaltos = 5) {
+  let actual = urlInicial;
+  for (let salto = 0; salto <= maxSaltos; salto++) {
+    const r = await fetch(actual, { ...opciones, redirect: "manual" });
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+      const destino = new URL(r.headers.get("location"), actual).toString();
+      const chequeo = urlAnalizable(destino);
+      if (!chequeo.ok) throw new Error(`Redirige a una dirección que no se analiza: ${chequeo.motivo}`);
+      actual = chequeo.url;
+      continue;
+    }
+    return r;
+  }
+  throw new Error("Demasiados redirects seguidos (más de 5): no se sigue.");
+}
+
+// Lo que cuenta para captar clientes, y no el DOM entero. Todo con tope: el
+// resultado viaja al modelo, y una página de 400 h2 no va a la conversación.
+export function extraerWeb(html, url) {
+  const texto = String(html);
+  const limpio = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const titulo = limpio(texto.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]).slice(0, 120);
+  const descripcion = limpio(
+    texto.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["']/i)?.[1]
+    || texto.match(/<meta[^>]+content=["']([\s\S]*?)["'][^>]+name=["']description["']/i)?.[1]);
+  const encabezados = (tag) => [...texto.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi"))]
+    .map(m => limpio(m[1])).filter(Boolean);
+  const enlaces = [...texto.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map(m => ({ href: String(m[1]), texto: limpio(m[2]) }))
+    .filter(l => l.texto)
+    .slice(0, 60);
+  // Lo que dice "hazlo ya": un enlace con verbo de acción en el texto o en la
+  // dirección (wa.me, /contacto, /reservar...). Sin esto, "¿pueden pedirme
+  // presupuesto desde la web?" se contesta a ciegas.
+  const palabraCTA = /^(reserv|contact|presupuest|pedir|pedido|cotiz|solicita|informa|llamen|llama|escríben|escriben|visít|visita|booking|book|agenda|whatsapp|telegram|menu|menú)/i;
+  const ctas = enlaces
+    .filter(l => palabraCTA.test(l.texto) || palabraCTA.test(l.href.replace(/^https?:\/\//, "").split(/[?#]/)[0]))
+    .slice(0, 10)
+    .map(l => ({ texto: l.texto.slice(0, 60), href: l.href.slice(0, 120) }));
+  const whatsapp = (enlaces.find(l => /wa\.me|api\.whatsapp|whatsapp/i.test(l.href)) || {}).href || null;
+  return {
+    url,
+    titulo: titulo || "(sin título)",
+    descripcion: descripcion.slice(0, 300) || "(sin meta description)",
+    secciones: encabezados("h2").slice(0, 12),
+    tituloPrincipal: encabezados("h1").slice(0, 3),
+    movilAdaptado: /<meta[^>]+name=["']viewport["']/i.test(texto),
+    imagenesSinAlt: (texto.match(/<img(?![^>]*\balt=)[^>]*>/gi) || []).length,
+    nEnlaces: enlaces.length,
+    ctas,
+    whatsapp: whatsapp ? whatsapp.slice(0, 120) : null,
+    telefonos: (texto.match(/(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}/g) || []).slice(0, 5),
+    preciosVisibles: (texto.match(/[0-9]{1,5}(?:[.,][0-9]{1,2})?\s*€|€\s*[0-9]{1,5}(?:[.,][0-9]{1,2})?/g) || []).slice(0, 10),
+  };
+}
+
+// ─── LA CAPTURA: OJO DE GEMINI ────────────────────────────────────────────────
+// El asistente no ve: Gemini ve por él. Y SOLO Gemini ve: la captura es de un
+// perfil propio, que puede mostrar clientes en las fotos, y OpenAI entrena con
+// lo que recibe — la barrera de datos (ver cliente.js) no se salta por la
+// puerta de atrás, aunque la captura no sea "datos de clientes" de formulario.
+// Mismas claves de siempre, con la rotación por cuota incluida.
+const PROMPT_OJO = `Eres el ojo del asistente de una empresa de catering. Describe esta captura para una estrategia de captación de clientes: de quién es el perfil o la página, cuántos seguidores si se llega a leer, qué tipo de contenido hay (platos, eventos, equipo, clientes, detrás de cámaras), qué se repite y qué falta para que alguien te pida presupuesto (forma de contactarse, reseñas, precios orientativos, llamada a la acción). En frases cortas y al grano, en español, y sin inventar lo que no se ve: si algo no se distingue, dilo.`;
+
+export async function visionGemini(pregunta, imagenBase64, mime, env) {
+  const claves = clavesGemini(env);
+  if (!claves.length) throw new Error("Sin GEMINI_API_KEY puesta no hay visión: la captura no tiene quién la mire.");
+  const modelo = env.GEMINI_MODEL || "gemini-3.6-flash";
+  const texto = pregunta ? `${PROMPT_OJO}\n\nLo que el usuario quiere saber de ella: ${pregunta}` : PROMPT_OJO;
+  let ultimoFallo;
+  for (const clave of claves) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${clave}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: texto }, { inline_data: { mime_type: mime || "image/jpeg", data: imagenBase64 } }] }],
+      }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+      const analisis = partes.filter(p => p.text).map(p => p.text).join(" ").trim();
+      if (!analisis) throw new Error("Gemini no ha devuelto nada que leer de la imagen.");
+      return analisis;
+    }
+    ultimoFallo = new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    // Como en el chat: solo la cuota merece cambiar de clave.
+    if (r.status !== 429) throw ultimoFallo;
+  }
+  throw ultimoFallo;
+}
+
 // Qué proveedores están de verdad utilizables con lo que hay configurado. La app lo
 // necesita para poder elegir sola: sin esto tendría que adivinar, y adivinar mal
 // significa mandar la pregunta a un proveedor sin clave y comerse el error.
@@ -438,6 +633,139 @@ const disponiblesEn = (env) =>
   Object.entries(PROVEEDORES)
     .filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every(k => env[k]))
     .map(([nombre]) => nombre);
+
+// ─── LOS AVISOS DEL DÍA (PUSH): EL RECORDATORIO LLEGA AL TELÉFONO ─────────────
+// El cron de cada noche (el mismo que el repaso) empuja los recordatorios a los que
+// les llega el día a cada teléfono suscrito en indice/push-<id> (ver push.js en la
+// app). Sin modelo y sin tokens: es un aviso con título y cuerpo, y el teléfono lo
+// muestra con la app cerrada. Si el teléfono estaba apagado, no pasa nada grave: la
+// app enseña el mismo recordatorio al abrirse (paraHoy en tareas.js), así que el
+// aviso se retrasa, no se pierde.
+//
+// Las claves son VAPID (el estándar de Web Push): la PRIVADA vive aquí como secreto
+// del Worker (VAPID_CLAVE), el asunto (VAPID_MAILTO, un mailto: de dónde viene el
+// aviso) también, y la PÚBLICA se DERIVA de la privada — la app no pega nada, la pide
+// en /__vapid. Para generar el par: npx web-push generate-vapid-keys.
+//
+// web-push usa node:crypto, así que el Worker necesita la compatibilidad Node.js
+// (nodejs_compat) activada en la configuración de Cloudflare: es la única casilla
+// que hay que marcar a mano (ver worker/README.md).
+// Qué toca HOY: fecha === hoy, no < — el recordatorio es para su día y el cron corre
+// una vez al día; con < se reenviaría cada día hasta que se hiciera. Y sin fecha no es
+// recordatorio, es tarea suelta: no toca.
+export function tareasParaPush(tareas = [], hoy) {
+  return (Array.isArray(tareas) ? tareas : [])
+    .filter(t => t && t.fecha === hoy && !t.hecho)
+    .slice(0, 20);   // si el equipo apunta 200 recordatorios para el mismo día, el problema es del día, no 200 notificaciones
+}
+
+// Lo que ve el teléfono. Corto: una notificación es una campana, no un documento. La
+// url lleva a la checklist, donde el recordatorio espera en su lista.
+export function payloadDeRecordatorio(tarea) {
+  const cuerpo = tarea.evento ? `${tarea.texto} (${tarea.evento})` : tarea.texto;
+  return { titulo: "Gula · recordatorio", cuerpo: String(cuerpo).slice(0, 200), url: "./checklist/" };
+}
+
+// Las claves VAPID. Si faltan, el fallo DICE qué falta y con qué se arregla: un Worker
+// sin claves no puede adivinar que le falta una clave.
+export function vapidClaves(env) {
+  const clave = String(env.VAPID_CLAVE || "").trim();
+  const asunto = String(env.VAPID_MAILTO || "").trim();
+  if (!clave) return { fallo: "Falta VAPID_CLAVE en el Worker: generad el par con npx web-push generate-vapid-keys y ponedlo en Settings → Variables." };
+  if (!/^mailto:/i.test(asunto)) return { fallo: "Falta VAPID_MAILTO (una dirección mailto:) en el Worker: es el 'de' del aviso, y Web Push lo pide." };
+  // La pública se deriva de la privada (P-256): así solo se pega una clave y la app
+  // pide la pública en /__vapid. Si la privada no es un P-256 válido, el fallo lo dice.
+  let publico;
+  try {
+    const bytes = Buffer.from(clave, "base64url");
+    // La privada VAPID es un escalar de 256 bits: 32 bytes exactos. Node NO lo
+    // rechaza si es más corta (la rellena de ceros y "funciona"), pero con una
+    // clave DISTINTA a la generada: al corregir la copia truncada después, la
+    // pública derivada cambiaría y los teléfonos tendrían que re-suscribirse.
+    // Mejor rechazarla ya, con la dirección de la solución.
+    if (bytes.length !== 32) throw new Error("tamaño");
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(bytes);
+    publico = ecdh.getPublicKey().toString("base64url");
+  } catch (e) {
+    return { fallo: "VAPID_CLAVE no parece una clave privada VAPID válida (P-256 en base64url, 43 caracteres). Volved a copiarla entera de npx web-push generate-vapid-keys." };
+  }
+  return { publico, clave, asunto };
+}
+
+// Las suscripciones del equipo: los documentos de indice/ con prefijo push-, igual que
+// los eventos se leen con evt_ (mismo paginado que leerEventos en repaso.js).
+async function leerSuscripciones(env, token) {
+  const base = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice`;
+  const lista = [];
+  let pagina = "";
+  for (let vuelta = 0; vuelta < 20; vuelta++) {
+    const url = `${base}?pageSize=300${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ""}`;
+    const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Firestore no deja leer las suscripciones (${(d.error && d.error.message) || r.status}).`);
+    (d.documents || []).forEach(doc => {
+      const id = String(doc.name || "").split("/").pop();
+      if (!id.startsWith("push-")) return;
+      const c = campos(doc);
+      try {
+        const s = JSON.parse(c.suscripcion || "null");
+        if (s && s.endpoint && s.keys) lista.push(s);
+      } catch (e) { /* un documento roto no es un push: se salta y se sigue */ }
+    });
+    if (!d.nextPageToken) break;
+    pagina = d.nextPageToken;
+  }
+  return lista;
+}
+
+// Las tareas apuntadas por el equipo: un único documento (indice/tareas, el mismo que
+// escribe la app). Que no exista todavía no es un fallo: es que nadie ha apuntado nada.
+async function leerTareas(env, token) {
+  const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/tareas`;
+  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!r.ok) return [];
+  const c = campos(await r.json().catch(() => ({})));
+  try { return JSON.parse(c.tareas || "[]"); } catch (e) { return []; }
+}
+
+// Lo que corre el cron: cada recordatorio que toca hoy × cada teléfono suscrito, un
+// aviso. Que un teléfono no reciba (apagado, sin datos) no tumba el resto: se anota y
+// se sigue. TTL corto a propósito: es un aviso de esta mañana, no un correo que espera.
+export async function avisosDelDia(env) {
+  const token = await entrar(env);
+  const claves = vapidClaves(env);
+  if (claves.fallo) return { enviados: 0, fallos: [claves.fallo] };
+  const hoy = hoyISO();
+  const paraHoy = tareasParaPush(await leerTareas(env, token), hoy);
+  if (!paraHoy.length) return { enviados: 0, fallos: [] };
+  const aparatos = await leerSuscripciones(env, token);
+  if (!aparatos.length) return { enviados: 0, fallos: [] };
+  let enviados = 0;
+  const fallos = [];
+  for (const tarea of paraHoy) {
+    const payload = JSON.stringify(payloadDeRecordatorio(tarea));
+    for (const sus of aparatos) {
+      try {
+        // generateRequestDetails hace la criptografía VAPID + RFC 8291 (web-push,
+        // probada) y devuelve la petición lista; el envío va por fetch, que es lo
+        // nativo de Workers (web-push's sendNotification usa node:https, que en
+        // Workers está limitado).
+        const det = webpush.generateRequestDetails(sus, payload, {
+          TTL: 60,
+          vapidDetails: { subject: claves.asunto, publicKey: claves.publico, privateKey: claves.clave },
+        });
+        const r = await fetch(det.endpoint, { method: det.method, headers: det.headers, body: det.body });
+        if (r.ok) enviados++;
+        else fallos.push(`${String(tarea.texto).slice(0, 30)} → HTTP ${r.status}`);
+      } catch (e) {
+        fallos.push(`${String(tarea.texto).slice(0, 30)} → ${(e && e.message) || "fallo sin detalle"}`);
+      }
+    }
+  }
+  if (fallos.length) console.warn(`Avisos: ${fallos.length} sin entregar: ${fallos.slice(0, 5).join(" | ")}`);
+  return { enviados, aparatos: aparatos.length, fallos };
+}
 
 export default {
   // ─── EL REPASO DE LA NOCHE ──────────────────────────────────────────────────
@@ -452,6 +780,14 @@ export default {
       repasar(env)
         .then(r => console.log(`Repaso: ${r.eventos.length} eventos con avisos de ${r.mirados} mirados.`))
         .catch(e => console.error(`El repaso ha fallado: ${e && e.message ? e.message : e}`)),
+    );
+    // Los recordatorios a los que les llega el día, a los teléfonos suscritos. Fallar
+    // aquí no tumba el repaso: son dos waitUntils separados, como corresponde a dos
+    // trabajos distintos.
+    ctx.waitUntil(
+      avisosDelDia(env)
+        .then(r => console.log(`Avisos del día: ${r.enviados} avisos entregados${r.fallos && r.fallos.length ? `; ${r.fallos.length} sin entregar` : ""}.`))
+        .catch(e => console.error(`Los avisos del día han fallado: ${e && e.message ? e.message : e}`)),
     );
   },
 
@@ -485,6 +821,80 @@ export default {
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
       }
+    }
+
+    // ─── PROBAR LOS PROVEEDORES ──────────────────────────────────────────────
+    // Misma sesión que el resto, mismo patrón que /__repaso (y por las mismas
+    // razones: el navegador manda un OPTIONS antes, y la respuesta va por json()
+    // con sus cabeceras). Sirve para comprobar EL VIERNES que el modelo existe y
+    // la clave vale, no el sábado en plena carga del camión.
+    if (new URL(req.url).pathname === "/__salud") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      try {
+        return json(await salud(env), 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+      }
+    }
+
+    // ─── ANALIZAR UNA WEB ──────────────────────────────────────────────────
+    // Misma sesión que el resto. El cuerpo lleva la url; la respuesta es la
+    // extracción estructurada (extraerWeb). No toca Firestore: lo que se mira
+    // es la web, no la app.
+    if (new URL(req.url).pathname === "/__analizar") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      let cuerpo;
+      try { cuerpo = JSON.parse(await req.text()); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+      const chequeo = urlAnalizable(cuerpo.url);
+      if (!chequeo.ok) return json({ error: chequeo.motivo }, 400, origen);
+      try {
+        const r = await fetchValidando(chequeo.url, {
+          signal: AbortSignal.timeout(8000),
+          headers: { "user-agent": "Mozilla/5.0 (compatible; GulaChecklist/1.0)" },
+        });
+        if (!r.ok) return json({ error: `La web contestó ${r.status}: no se ha podido analizar.` }, 502, origen);
+        const html = await r.text();
+        if (html.length > 2000000) return json({ error: "La página pesa demasiado para analizarla (más de 2 MB)." }, 413, origen);
+        return json(extraerWeb(html, chequeo.url), 200, origen);
+      } catch (e) {
+        return json({ error: `No se ha podido llegar a la web: ${String(e && e.message ? e.message : e).slice(0, 120)}` }, 502, origen);
+      }
+    }
+
+    // ─── LA CAPTURA: OJO DE GEMINI ──────────────────────────────────────────
+    // Misma sesión que el resto. La imagen viaja en base64 en el cuerpo y solo
+    // va a Gemini (ver visionGemini: la barrera de datos no se salta por la
+    // puerta de atrás).
+    if (new URL(req.url).pathname === "/__vision") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      let cuerpo;
+      try { cuerpo = JSON.parse(await req.text()); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+      const b64 = String(cuerpo.imagen || "").replace(/^data:image\/\w+;base64,/, "");
+      if (!b64) return json({ error: "No hay ninguna imagen que analizar." }, 400, origen);
+      if (b64.length > 8000000) return json({ error: "La imagen pesa demasiado (más de ~6 MB): hazla en una o dos pantallas." }, 413, origen);
+      try {
+        return json({ analisis: await visionGemini(String(cuerpo.pregunta || ""), b64, String(cuerpo.mime || "image/jpeg"), env) }, 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
+      }
+    }
+
+    // ─── LA CLAVE PÚBLICA DE LOS AVISOS ──────────────────────────────────────
+    // La app la pide para suscribirse (ver push.js). No es un secreto —es la mitad
+    // pública del par VAPID— pero la pide con sesión como todo lo demás: no es de
+    // cualquiera. Si faltan las claves, el fallo dice con qué se arregla.
+    if (new URL(req.url).pathname === "/__vapid") {
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      const claves = vapidClaves(env);
+      if (claves.fallo) return json({ error: claves.fallo }, 501, origen);
+      return json({ vapidPublico: claves.publico }, 200, origen);
     }
 
     // ─── LA VOZ NATURAL ───────────────────────────────────────────────────────

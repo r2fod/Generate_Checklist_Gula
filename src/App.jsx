@@ -30,6 +30,9 @@ import {
   resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
+  cargarHieloNube, guardarHieloNube, suscribirHieloNube,
+  cargarComidaNube, guardarComidaNube, suscribirComidaNube,
+  cargarEstrategiaNube, guardarEstrategiaNube, suscribirEstrategiaNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
@@ -72,8 +75,14 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion, calibracionBebida, calibracionPersonal } from "./calibracion.js";
-import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
+import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida,
+  calibracionPersonal, huecosDeCatalogo } from "./calibracion.js";
+import { ponFactores, leerFactores, factoresCambiados, conFactor } from "./bebida.js";
+import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo } from "./calculos.js";
+import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados, conFactorComida } from "./comida.js";
+import { saneaEstrategia } from "./asistente/estrategia.js";
+import { oportunidadesNegocio } from "./asistente/revision.js";
+import { aplicarEnAjustes } from "./asistente/escrituraAjustes.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
@@ -2052,6 +2061,18 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { vivo = false; corta(); };
   }, [haySesionEquipo]);
 
+  // Lo mismo que la bebida, para el hielo: el factor por tipo de evento que calibra la
+  // merma (una estimación) contra lo que de verdad volvió. Mismo equipo, misma regla.
+  const [factoresHielo, setFactoresHielo] = useState(() => leerFactoresHielo());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresHielo(ponFactoresHielo(remotos)); };
+    cargarHieloNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirHieloNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
   // El cerebro del asistente no se ve en la checklist: espera al rato muerto.
   useSuscripcionDiferida(nubeActiva() && haySesionEquipo, {
     cargar: cargarMemoriaNube,
@@ -2152,6 +2173,56 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  const handleCambiarHielo = (siguiente) => {
+    setFactoresHielo(ponFactoresHielo(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarHieloNube(factoresHieloCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+
+  // Lo mismo que la bebida y el hielo, para la comida (paella y bandejas): cuánto se
+  // usó de verdad por tipo, con la convención "lo vuelto es lo no usado" (ver comida.js).
+  const [factoresComida, setFactoresComida] = useState(() => leerFactoresComida());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresComida(ponFactoresComida(remotos)); };
+    cargarComidaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirComidaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarComida = (siguiente) => {
+    setFactoresComida(ponFactoresComida(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarComidaNube(factoresComidaCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+  // La estrategia de captación: documento de equipo (no por aparato), lo lee y lo
+  // actualiza el asistente. Sin conexión o sin sesión, null: el asistente lo dice.
+  const [estrategia, setEstrategia] = useState(null);
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remota) => { if (vivo) setEstrategia(remota || null); };
+    cargarEstrategiaNube().then(aplicar).catch(() => { /* sin conexión: sin estrategia */ });
+    const corta = suscribirEstrategiaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+  const handleCambiarEstrategia = (nueva) => {
+    const sana = saneaEstrategia(nueva);
+    if (!sana) return { error: "Esa no tiene forma de estrategia: faltan canales, contenido, puertas o fase." };
+    setEstrategia(sana);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarEstrategiaNube(sana).catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+    return { guardada: true, actualizada: sana.actualizada };
+  };
+
   // Lo que dice el histórico: de cada evento con la vuelta apuntada sale cuánto se bebió
   // de verdad. Se recalcula solo cuando cambia el archivo o los factores, que es caro
   // —reconstruye la checklist de cada evento guardado— y no cambia por escribir un pax.
@@ -2159,6 +2230,41 @@ export default function App({ onCerrarSesion } = {}) {
     () => calibracionBebida(eventosGuardados, factoresBebida),
     [eventosGuardados, factoresBebida],
   );
+
+  // Lo mismo que la bebida, con la vuelta del hielo: cuánto se usó de verdad por tipo.
+  const hieloMedido = useMemo(
+    () => calibracionHielo(eventosGuardados, factoresHielo),
+    [eventosGuardados, factoresHielo],
+  );
+
+  // Paella y bandejas con la vuelta marcada: el dato real manda sobre el ratio fijo.
+  const comidaMedida = useMemo(
+    () => calibracionComida(eventosGuardados, factoresComida),
+    [eventosGuardados, factoresComida],
+  );
+
+  // La auditoría de negocio: lo que los datos ya saben y todavía no se ha hecho
+  // (medidas sin aplicar, roturas sin precio, eventos sin vuelta, huecos del
+  // catálogo). Se calcula aquí porque la app es quien lo tiene todo en memoria —
+  // precios, factores y medidas — y se la pasa al asistente y a Cerebro. Los
+  // huecos del catálogo van aparte porque reconstruyen la checklist (calibracion.js
+  // es quien importa el generador; revision.js no, para no engordar el Worker).
+  const oportunidades = useMemo(() => {
+    const precios = leerPrecios();
+    return [
+      ...oportunidadesNegocio({
+        eventosGuardados, precios,
+        calibracionBebida: bebidaMedida, calibracionHielo: hieloMedido, calibracionComida: comidaMedida,
+        factoresBebida, factoresHielo, factoresComida,
+      }),
+      ...huecosDeCatalogo(eventosGuardados, precios).map(h => ({
+        tono: "oportunidad",
+        texto: `En "${h.nombre}" (${h.fecha}), ${h.sinPrecio} de ${h.total} líneas no tienen precio (${h.ejemplos.join(", ")}${h.sinPrecio > 3 ? "…" : ""}): el Resumen va a quedarse corto.`,
+        comoSeArregla: "Ponlos en Modo carga → Resumen → precios.",
+        propuesta: null,
+      })),
+    ];
+  }, [eventosGuardados, factoresBebida, factoresHielo, factoresComida, bebidaMedida, hieloMedido, comidaMedida, preciosAlDia]);
 
   // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
   // no el catálogo entero: si no, el día que se corrija un precio de partida en una
@@ -2937,6 +3043,13 @@ export default function App({ onCerrarSesion } = {}) {
           factoresBebida={factoresBebida}
           calibracionBebida={bebidaMedida}
           onCambiarBebida={handleCambiarBebida}
+
+          factoresHielo={factoresHielo}
+          calibracionHielo={hieloMedido}
+          onCambiarHielo={handleCambiarHielo}
+          factoresComida={factoresComida}
+          calibracionComida={comidaMedida}
+          onCambiarComida={handleCambiarComida}
           ratiosPersonal={ratiosPersonal}
           calibracionPersonal={personalMedido}
           onCambiarRatios={guardarRatiosAsistente}
@@ -3119,6 +3232,9 @@ export default function App({ onCerrarSesion } = {}) {
                   memoria,
                   objetivos,
                   tareas,
+                  // La estrategia de captación, si la hay: para proponer marketing sin
+                  // contradecir lo acordado (ver asistente/estrategia.js).
+                  estrategia,
                   // Mismos números que la ficha del Resumen (totalConceptos/itemsCargados/
                   // itemsPreparados/itemsVueltos): así el asistente puede contestar "cuánto
                   // llevo cargado" con lo que hay de verdad en pantalla, no un recuento
@@ -3143,6 +3259,24 @@ export default function App({ onCerrarSesion } = {}) {
                     aplicarEnRatios({ guardar: guardarRatiosAsistente }),
                     aplicarEnBebida({ guardar: handleCambiarBebida }),
                     aplicarEnCristaleria({ guardar: handleCambiarCristaleria }),
+
+                    // Un factor medido se aplica por la MISMA puerta que el botón del
+                    // panel: mismo ponFactores, misma subida a la nube, mismo saneado.
+                    aplicarEnAjustes({
+                      aplicarBebida: (tipo, clave, factor) => {
+                        handleCambiarBebida(conFactor(factoresBebida, tipo, clave, factor));
+                        return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
+                      },
+                      aplicarHielo: (tipo, factor) => {
+                        handleCambiarHielo(conFactorHielo(factoresHielo, tipo, factor));
+                        return { aplicado: `factor ${factor} para el hielo en ${tipo}` };
+                      },
+                      aplicarComida: (tipo, clave, factor) => {
+                        handleCambiarComida(conFactorComida(factoresComida, tipo, clave, factor));
+                        return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
+                      },
+                      aplicarEstrategia: (datos) => handleCambiarEstrategia(datos),
+                    }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),
@@ -3158,6 +3292,10 @@ export default function App({ onCerrarSesion } = {}) {
                   avisoActualizacion: actualizacionAplicada
                     ? { cambios: actualizacionAplicada, aplicada: true }
                     : (versionNueva && cambiosNuevaVersion.length ? { cambios: cambiosNuevaVersion, aplicada: false } : null),
+                  // Lo que los datos ya saben y no se ha hecho. Solo la checklist lo
+                  // calcula (es quien tiene precios y medidas); el calendario no pasa
+                  // nada y ver_auditoria le dice la verdad en vez de inventar.
+                  oportunidades,
                 })}
               />
             )}
@@ -4157,11 +4295,11 @@ export default function App({ onCerrarSesion } = {}) {
                       className="form-input"
                       value={numPaellas || ""}
                       min="1"
-                      placeholder={String(calcPaella(pax, tipoPaella, 0).n)}
+                      placeholder={String(calcPaella(pax, tipoPaella, 0, evento).n)}
                       onChange={e => setNumPaellas(Math.max(0, parseInt(e.target.value) || 0))}
                     />
                     <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                      En blanco salen {calcPaella(pax, tipoPaella, 0).n} por la gente
+                      En blanco salen {calcPaella(pax, tipoPaella, 0, evento).n} por la gente
                     </span>
                   </div>
                 </>

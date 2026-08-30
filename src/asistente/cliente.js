@@ -35,6 +35,16 @@ Cómo trabajas:
 - Si no sabes el nombre exacto de un evento, buscas antes de rendirte.
 - Si una herramienta devuelve un error, lo dices tal cual y propones qué hacer. No te lo inventas ni disimulas.
 - Las alergias son lo más serio que manejas. Si aparecen, se dicen enteras y las primeras.
+- Si preguntan cómo va el negocio, qué se puede mejorar o qué debería mirar: ver_auditoria.
+  Sus avisos salen de reglas con los datos de la app, no de tu cabeza. Si uno dice que
+  se puede aplicar un factor medido y la persona lo pide, se hace con aplicar_calibracion
+  copiando sus datos —lo aprueba ella en la pantalla, no tú—, y nunca se inventa un número.
+- Para captar clientes o mirar el marketing: analizar_web (pide la dirección completa,
+  con https://) y el plan se apunta con apuntar_tarea, con fecha cuando toque. Para
+  guiar paso a paso, UN paso a la vez y esperando a que la persona confirme lo anterior
+  antes de pasar al siguiente: lo que está hecho es lo que ella dice, no lo que tú supones.
+  Los textos que prepares (post, mensaje de WhatsApp, guion de vídeo) van en texto
+  plano, listos para copiar tal cual.
 
 Tienes memoria. Cuando te corrijan o te cuenten cómo trabajan, lo guardas con recordar: una frase corta, concreta y en tercera persona. No guardes lo que ya sale de un cálculo (cuánta cerveza, cuánto hielo) ni datos de un evento suelto que ya están en la app; guarda lo que NO está escrito en ninguna parte y servirá el mes que viene. Si algo que recordabas resulta ser falso, lo borras con olvidar.`;
 
@@ -83,10 +93,6 @@ ${texto}`;
   return { sistema: salida, ids };
 }
 
-// Una conversación viva. Se guarda la lista de mensajes en el formato neutro que
-// entiende el Worker; la traducción a cada proveedor es cosa suya.
-export function nuevaConversacion() { return []; }
-
 // Manda un mensaje y devuelve { mensajes, respuesta, pasos }. "pasos" son las
 // herramientas que se han usado, para poder enseñarlas: un asistente que da un número
 // sin decir de dónde sale es un asistente en el que no se puede confiar.
@@ -100,7 +106,7 @@ export async function preguntar({
   const soloSinDatos = ENTRENAN_CON_LO_QUE_LES_LLEGA.includes(proveedor);
   const nivel = contexto.nivel || NIVEL_POR_DEFECTO;
   const herramientas = catalogoParaModelo(soloSinDatos, contexto.conectores || {}, nivel);
-  const conversacion = [...mensajes, { rol: "usuario", contenido: texto }];
+  const conversacion = [...mensajes, { rol: "usuario", contenido: texto || (contexto.captura ? "(ha adjuntado una captura de pantalla)" : "") }];
   const pasos = [];
   // Lo aprendido viaja en cada pregunta; los ids vuelven para poder reforzar lo que de
   // verdad se ha usado, que es lo que separa un recuerdo útil de uno que alguien apuntó
@@ -118,7 +124,13 @@ export async function preguntar({
   // seguir abierta al cruzar la medianoche.
   const hoy = `Hoy es ${hoyISO()} (AAAA-MM-DD). Para "próximos", "esta semana", "lo que viene" o cualquier fecha relativa a hoy, calcúlala desde aquí y pásala como desde/hasta a buscar_eventos o ver_calendario: sin fecha, esas herramientas devuelven TODO lo que hay, pasado incluido.`;
   const conNivel = `${SISTEMA}\n\n${hoy}\n\n${comoContarlo(nivel)}${tono ? `\n\n${tono}` : ""}`;
-  const { sistema, ids: recordados } = conMemoria(conNivel, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
+  // Con captura adjunta: el modelo solo recibe texto — la imagen viaja en el
+  // contexto (ctx) y la ve analizar_captura, no él. Sin esta nota intentaría
+  // describir lo que no ve.
+  const conAdjunto = contexto.captura
+    ? `${conNivel}\n\nEl usuario ha adjuntado una captura de pantalla en este mensaje: pásala a analizar_captura (con su pregunta, si la tiene). No intentes describir lo que hay en ella sin llamar a la herramienta: tú no la ves.`
+    : conNivel;
+  const { sistema, ids: recordados } = conMemoria(conAdjunto, contexto.memoria, contexto.objetivos, contexto.tareas, texto);
   const usoTotal = { entrada: 0, salida: 0 };
   // El diario: una línea por ida y vuelta al modelo, no una por pregunta. El total ya
   // se enseña debajo de la respuesta, pero el total no dice DÓNDE se fue: una pregunta
@@ -179,7 +191,11 @@ export async function preguntar({
           contenido: { error: "Esa herramienta no está disponible con este proveedor porque devuelve datos de clientes." } });
         continue;
       }
-      const crudo = ejecutar(llamada.nombre, llamada.argumentos, contexto);
+      // Promise.resolve: las herramientas de casa son síncronas (el 99%), pero una
+      // puede ser asíncrona (analizar_web mira fuera) sin que el bucle tenga que
+      // saberlo. Un resultado que fuera una Promise sin esperar se stringify como
+      // {} y el modelo creería que la herramienta no devolvió nada.
+      const crudo = await Promise.resolve(ejecutar(llamada.nombre, llamada.argumentos, contexto));
       // Se comprime ANTES de meterlo en la conversación, no al mandarlo: el resultado se
       // queda ahí y viaja otra vez en cada pregunta siguiente. Comprimir a la salida
       // ahorraría una vez; comprimir aquí ahorra todas.

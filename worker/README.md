@@ -92,6 +92,34 @@ Cambiar de modelo es cambiar estas tres variables. No hay que tocar la app.
    (`https://asistente-gula.TUCUENTA.workers.dev`) y pégala en el ajuste del asistente
    dentro de la app.
 
+## Los avisos en el teléfono (push)
+
+Cuando un teléfono del equipo se suscribe desde Ajustes del asistente ("Activar avisos
+en este teléfono"), el cron de cada mañana —el mismo que corre el repaso de la noche—
+le manda por push cada recordatorio que toca ese día. Para poder CIFRAR el aviso, el
+Worker necesita un par de claves VAPID (el estándar de Web Push):
+
+1. **Generar el par** — en cualquier terminal: `npx web-push generate-vapid-keys`.
+   Contesta con dos cadenas, la pública y la privada. La app NO pega ninguna: la pública
+   se deriva de la privada dentro del Worker y se la pide en `/__vapid`. Solo se pega
+   la PRIVADA, y vive en el Worker: si el repo se queda, las claves no.
+
+2. **Dos variables más** en el Worker (*Settings* → *Variables and Secrets*):
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `VAPID_CLAVE` | Secret | La clave PRIVADA del paso 1, tal cual |
+   | `VAPID_MAILTO` | Text | El "de" del aviso: una dirección `mailto:` (por ejemplo `mailto:hola@tunegocio.es`). Web Push lo exige y el teléfono la enseña |
+
+3. **UNA casilla que hay que marcar a mano** — en el Worker: *Settings* →
+   *Compatibility flags* → activar la compatibilidad con Node.js (`nodejs_compat`).
+   `web-push` usa `node:crypto`, y sin esa flag el Worker arranca bien pero falla al
+   enviar el primer aviso.
+
+Sin el par puesto, nada se rompe: el Worker lo DICE en `/__vapid` y el repaso lo apunta
+(`avisosDelDia` contesta el motivo en vez de fallar), y el aviso no se pierde de todos
+modos — al abrir la app, el recordatorio de hoy sale en su lista (`paraHoy`).
+
 ## Lo que protege
 
 - **Sesión obligatoria.** El Worker comprueba contra Firebase que quien pregunta tiene
