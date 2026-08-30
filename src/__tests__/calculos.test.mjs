@@ -48,6 +48,7 @@ import { PERSONAS_POR_PAELLA, paellasPorPax, calcPaella } from "../paella.js";
 import { ponFactoresComida, leerFactoresComida, conFactorComida } from "../comida.js";
 import { SECTOR, compararRatios } from "../asistente/sector.js";
 import { CAMBIOS, ultimoCambio } from "../cambios.js";
+import { ANCHO, ALTO, ITERACIONES, estadoInicial, paso, bordesDe } from "../asistente/grafoFisica.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
 let pasan = 0;
@@ -2211,6 +2212,62 @@ console.log("\n══ Las pantallas gordas llegan tarde, pero con red debajo ═
   // sola en el primer rato muerto en vez de esperar al dedo sobre el botón.
   ok(/alSobrarTiempo\(traerModoCarga/.test(app),
     "Modo carga se precarga en el rato muerto: en el almacén no se espera a la red");
+}
+
+console.log("\n══ La física del grafo de Cerebro (grafoFisica.js) ══");
+{
+  const nodos = [
+    { id: "a", tipo: "finca", nombre: "Finca X", peso: 3 },
+    { id: "b", tipo: "aviso", nombre: "Sin enchufe", peso: 1 },
+    { id: "c", tipo: "tipo-evento", nombre: "Comunión", peso: 5 },
+    { id: "d", tipo: "aviso", nombre: "3 de cocina", peso: 1 },
+  ];
+  const enlaces = [
+    { de: "a", a: "b", por: "finca-aviso" },
+    { de: "c", a: "d", por: "tipo-aviso" },
+    // Uno que apunta a un nodo que no está en la lista: bordesDe tiene que
+    // descartarlo, no reventar con un índice undefined.
+    { de: "a", a: "fantasma", por: "roto" },
+  ];
+
+  const bordes = bordesDe(nodos, enlaces);
+  ok(bordes.length === 2, `bordesDe descarta el enlace a un nodo que no existe (${bordes.length} de 3)`);
+  ok(bordes.every(([i, j]) => nodos[i] && nodos[j]),
+    "y los índices que deja apuntan de verdad a nodos de la lista");
+
+  const dentroDeLaCaja = (sim) => sim.every(n =>
+    Number.isFinite(n.x) && Number.isFinite(n.y) &&
+    n.x >= 14 && n.x <= ANCHO - 14 && n.y >= 14 && n.y <= ALTO - 14);
+
+  const inicial = estadoInicial(nodos);
+  ok(dentroDeLaCaja(inicial), "estadoInicial reparte los nodos dentro del viewBox, sin NaN");
+
+  // De golpe (lo que corre con prefers-reduced-motion): las 200 vueltas seguidas.
+  const deGolpe = estadoInicial(nodos);
+  for (let i = 0; i < ITERACIONES; i++) paso(deGolpe, bordes);
+  ok(dentroDeLaCaja(deGolpe), "tras las 200 vueltas de golpe, nadie se sale del viewBox ni da NaN");
+
+  // Repartido en fotogramas (lo que corre normalmente): mismos nodos, mismos bordes,
+  // pero la relajación llamada 4 en 4 como hace la animación. Tiene que llegar EXACTO
+  // al mismo sitio que de golpe — la animación reparte el trabajo en el tiempo, no
+  // cambia la física. Si algún día divergen, es que se ha colado un salto de estado
+  // entre fotogramas (justo el bug que este refactor tenía que evitar).
+  const porFotogramas = estadoInicial(nodos);
+  let hecho = 0;
+  while (hecho < ITERACIONES) {
+    for (let i = 0; i < 4 && hecho < ITERACIONES; i++, hecho++) paso(porFotogramas, bordes);
+  }
+  const iguales = deGolpe.every((n, i) =>
+    Math.abs(n.x - porFotogramas[i].x) < 1e-9 && Math.abs(n.y - porFotogramas[i].y) < 1e-9);
+  ok(iguales, "repartir las 200 vueltas en fotogramas de 4 da EXACTO el mismo resultado que de golpe");
+
+  // Un nodo sin ningún enlace (el aviso "b" no conecta con nadie salvo por su propio
+  // borde con "a") también tiene que acabar dentro de la caja: es el caso que el
+  // término CENTRO existe para cubrir.
+  const suelto = [{ id: "solo", tipo: "aviso", nombre: "Nadie me conecta", peso: 1 }];
+  const simSuelto = estadoInicial(suelto);
+  for (let i = 0; i < ITERACIONES; i++) paso(simSuelto, []);
+  ok(dentroDeLaCaja(simSuelto), "un nodo sin ningún enlace también queda atraído al centro, no se escapa");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
