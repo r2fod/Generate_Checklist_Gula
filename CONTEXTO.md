@@ -2229,6 +2229,31 @@ propósito); se corrigieron sembrando `origenSillas` explícito donde el propio 
 la prueba deja claro que lo que se comprueba es el comportamiento del alquiler, no el
 valor por defecto. `test:rapido` y la batería completa de navegador (716/716) en verde.
 
+## "Con permiso": comprobado que aprobar una propuesta la aplica de verdad
+
+El dueño pidió comprobar que cuando el asistente propone una acción y se le da permiso,
+la aplica de verdad y no es un falso positivo (que diga "Hecho" sin haber tocado nada).
+
+Trazado el código: `resolver()`, en `Asistente.jsx`, llama a `contexto.onEscribir(p)` al
+aprobar y mira de verdad lo que devuelve (`r.error`, `r.nada`) antes de decir "Hecho" —
+no lo da por sentado. Y `onEscribir` en `App.jsx` es `encadenar(aplicarEnTareas(...),
+aplicarEnChecklists(...), ...)`: los MISMOS aplicadores que usa el botón manual del
+panel, no un camino aparte. Hasta aquí, todo correcto por lectura.
+
+Pero no se podía COMPROBAR de verdad: el asistente pide sesión de equipo para salir en
+`App.jsx`, así que ni esta batería ni ninguna otra llegaba nunca a probar su escritura
+real — nadie había ejecutado el flujo completo (proponer → aprobar → ver el cambio) en
+un navegador de verdad. Arreglado cableando, SOLO en el banco de pruebas sin login
+(`pruebas/calendario.html?asistente=1`), el mismo `onEscribir` que usa `App.jsx`
+(`aplicarEnTareas` + `encadenar`, no reimplementados) sobre una lista de mentira. El
+Worker se sustituye por dos respuestas fijas (pide `apuntar_tarea`, luego cierra en
+texto), sin necesitar ninguna clave de verdad.
+
+Verificado en un navegador real, paso a paso: antes de aprobar, la tarea NO está en
+Tareas; se aprueba con "Hacerlo"; el chat dice "Hecho: ..."; y AHORA SÍ está en Tareas,
+con la misma función que usa el botón manual. No hay falso positivo. Añadido como
+prueba permanente de la batería, para que quede cubierto de aquí en adelante.
+
 ## Rendimiento real (4G, CPU ×4, gzip como sirve GitHub Pages)
 
 | App | Red | Primer pintado |
