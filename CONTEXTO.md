@@ -2201,6 +2201,34 @@ Queda pendiente, del mismo encargo: opinión sobre si el asistente debería ser 
 proactivo, por qué a veces tarda en contestar, y comprobar que confirmar una acción
 propuesta la ejecuta de verdad (no un falso positivo).
 
+## Sillas sin proveedor por defecto
+
+El dueño avisó con una captura: un evento traía "Sillas (Dealde)" cuando tocaba
+Carvillo. No era un fallo de dictado ni del asistente: `origenSillas` nacía en
+"Dealde" por defecto en `App.jsx` (el `useState` inicial) y en los tres generadores de
+checklist (`checklist-generadores.js`, boda/comunión/producción) — un evento recién
+creado desde el calendario (sin pasar por el formulario ni tocarlo a mano) ya "elegía"
+ese proveedor solo.
+
+El dueño decidió que NO haya proveedor por defecto: el campo nace vacío hasta que
+alguien lo elige a propósito, mismo criterio que ya aplica `preguntas.js` con las
+respuestas del formulario (no tocar lo que no se ha contestado). Cambiado el `useState`
+de `App.jsx` a `?? ""` y los tres parámetros por defecto de los generadores a `""`. De
+paso se arregló `esAlquilerSillas`/`labelSillas`: antes trataba CUALQUIER valor que no
+fuera exactamente "Nuestras" como alquiler (`origenSillas !== "Nuestras"`), lo que con
+una cadena vacía habría sacado una línea rota, "Sillas (alquiler )". Ahora, sacado a un
+helper compartido (`sillasAlquiler()`), solo cuenta como alquiler "Dealde"/"Carvillo" de
+verdad — igual que ya comprobaban `App.jsx` (al sincronizar la recogida) y
+`alquileres.js` —, y un origen sin elegir sale como "Sillas (proveedor sin elegir)", sin
+inventarse ningún nombre ni crear su recogida.
+
+Varias pruebas de la batería de navegador daban por hecho el "Dealde de fábrica" (un
+barrido genérico de selectores que necesita un botón activo del que partir, y dos
+pruebas de recogidas automáticas que creaban un evento nuevo sin fijar el proveedor a
+propósito); se corrigieron sembrando `origenSillas` explícito donde el propio nombre de
+la prueba deja claro que lo que se comprueba es el comportamiento del alquiler, no el
+valor por defecto. `test:rapido` y la batería completa de navegador (716/716) en verde.
+
 ## Rendimiento real (4G, CPU ×4, gzip como sirve GitHub Pages)
 
 | App | Red | Primer pintado |
