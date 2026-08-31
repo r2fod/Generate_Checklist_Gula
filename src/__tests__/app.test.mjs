@@ -4100,6 +4100,78 @@ async function main() {
       }
     }
 
+    // ── "CON PERMISO": APROBAR UNA PROPUESTA LA APLICA DE VERDAD ────────────────
+    // El asistente pide sesión de equipo para salir en App.jsx de verdad, así que su
+    // escritura real (onEscribir, cableado con aplicarEnTareas/encadenar) tampoco
+    // llegaba nunca a esta batería — nadie comprobaba que "Hacerlo" cambia el estado
+    // real de la app y no es solo la burbuja del chat diciendo "Hecho" de mentira. Se
+    // cablea aquí, en este banco, el mismo onEscribir de mentira (misma
+    // aplicarEnTareas/encadenar que usa App.jsx, no una reimplementada) para poder
+    // probarlo sin login. El Worker se sustituye por dos respuestas fijas: una que pide
+    // apuntar_tarea, otra que cierra en texto — así no hace falta clave de ningún
+    // proveedor.
+    console.log('\n── "Con permiso": aprobar una propuesta la aplica de verdad ──');
+    {
+      const c = await navegador.newContext({ viewport: { width: 1024, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const WORKER = "https://worker-de-prueba.invalido/chat";
+      let vuelta = 0;
+      await c.route(`${WORKER}*`, async route => {
+        vuelta++;
+        if (vuelta === 1) {
+          await route.fulfill({
+            status: 200, contentType: "application/json",
+            body: JSON.stringify({
+              texto: "", proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 120, salida: 30 },
+              llamadas: [{ id: "call1", nombre: "apuntar_tarea", argumentos: { texto: "Comprar velas de sobremesa" } }],
+            }),
+          });
+        } else {
+          await route.fulfill({
+            status: 200, contentType: "application/json",
+            body: JSON.stringify({ texto: "Te lo dejo propuesto en pantalla para que lo confirmes.", proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 90, salida: 20 }, llamadas: [] }),
+          });
+        }
+      });
+      await c.addInitScript(w => {
+        localStorage.setItem("gula_asistente_url", w);
+        localStorage.setItem("gula_asistente_nivel", "permiso");
+      }, WORKER);
+      const p = await nuevaPagina(c);
+      await p.goto(BANCO + "?asistente=1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1500);
+
+      await p.locator('.asis-escribir input[type="text"]').fill("Apunta que hay que comprar velas de sobremesa");
+      await p.locator('.asis-escribir button[type="submit"]').click();
+      await p.waitForTimeout(1500);
+
+      const pendiente = await p.locator(".asis-pendiente-texto").innerText().catch(() => "");
+      ok(/Apuntar/i.test(pendiente) && /velas/i.test(pendiente),
+        `propone sin aplicar todavía → "${pendiente}"`);
+
+      await p.locator('.asis-pestana:has-text("Tareas")').click();
+      await p.waitForTimeout(400);
+      const antesDeAprobar = await p.locator(".asis-recuerdo-texto").allInnerTexts();
+      ok(!antesDeAprobar.some(t => /velas/i.test(t)),
+        `antes de aprobar, no está en Tareas de verdad → ${JSON.stringify(antesDeAprobar)}`);
+
+      await p.locator('.asis-pestana:has-text("Charla")').click();
+      await p.waitForTimeout(300);
+      await p.locator(".asis-si").click();
+      await p.waitForTimeout(1000);
+
+      const textoHilo = await p.locator(".asis-hilo").first().innerText().catch(() => "");
+      ok(/Hecho:.*velas/i.test(textoHilo), `el chat dice "Hecho: ..." → "${textoHilo.slice(-200)}"`);
+
+      await p.locator('.asis-pestana:has-text("Tareas")').click();
+      await p.waitForTimeout(500);
+      const despuesDeAprobar = await p.locator(".asis-recuerdo-texto").allInnerTexts();
+      ok(despuesDeAprobar.some(t => /velas/i.test(t)),
+        `y AHORA sí está en Tareas de verdad, no es un falso positivo → ${JSON.stringify(despuesDeAprobar)}`);
+
+      await c.close();
+    }
+
     // ── AJUSTAR LA GENTE POR COMENSAL ──
     // El número del que sale la cifra de sala, y con ella los delantales, las bandejas y
     // los menús de personal. Se comprueba que ajustarlo se nota de verdad en la vista de
