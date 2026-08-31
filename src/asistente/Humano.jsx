@@ -240,13 +240,17 @@ function useGestos(activo) {
   return gesto;
 }
 
-export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, vozGemini = "", personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "", onMinimizar }) {
+export default function Humano({ cual = COMPANERO_POR_DEFECTO, estado = "quieto", haciendo = "", ultimaRespuesta = "", onPregunta, vozActiva, onCambiarVoz, vozGemini = "", personalidad = PERSONALIDAD_POR_DEFECTO, onCambiarCompanero, onCambiarPersonalidad, urlProxy = "", onMinimizar, refVozDicha }) {
   const [oyendo, setOyendo] = useState(false);
   const [dictado, setDictado] = useState("");
   const [aviso, setAviso] = useState("");
   const [hablando, setHablando] = useState(false);
   const mando = useRef(null);
-  const yaLeido = useRef("");
+  // Si no se pasa desde fuera, uno local: sirve igual dentro de UN montaje, solo que sin
+  // sobrevivir a que este componente se desmonte (ver el comentario de vozDichaRef en
+  // Asistente.jsx, que es quien de verdad lo necesita y por eso lo pasa).
+  const yaLeidoLocal = useRef("");
+  const yaLeido = refVozDicha || yaLeidoLocal;
 
   // Leer la respuesta en cuanto llega, si la voz está encendida. Se guarda cuál se ha
   // leído para no repetirla al volver a esta pestaña.

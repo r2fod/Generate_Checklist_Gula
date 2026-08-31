@@ -324,6 +324,19 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [diarioAbierto, setDiarioAbierto] = useState(-1);
   const [mensajes, setMensajes] = useState(() => (charlas[0] ? charlas[0].mensajes : []));  // lo que se manda (con las llamadas)
   const finRef = useRef(null);
+  // Qué respuesta ya se ha dicho en voz alta (o se ha decidido no decir), para la pestaña
+  // Humano. Vive AQUÍ y no dentro de Humano.jsx a propósito: esa pestaña se desmonta cada
+  // vez que se cambia a otra dentro del propio panel (es un ternario, más abajo), así que
+  // un ref suyo no sobrevive a "cambiar de pestaña y volver" ni, sobre todo, a "cerrar el
+  // asistente y volver a abrirlo" — y CLAVE_PESTANA deja la pestaña Humano guardada de una
+  // vez a la siguiente. Sin esto, cada apertura del asistente con esa pestaña activa (o
+  // cada vuelta a ella) hacía que se leyera en voz alta la última respuesta de una charla
+  // YA guardada, aunque fuera de hace días y el usuario no hubiera pedido nada: se oía
+  // sola. Se siembra con esa última respuesta SOLO si hay una charla restaurada (hilo no
+  // vacío al montar) — así queda marcada como "ya dicha" y no se repite. Si el hilo está
+  // vacío no se siembra: el saludo con avisos pendientes, si lo hay, debe poder sonar la
+  // primera vez — esa parte SÍ es proactiva a propósito (ver saludoPendientes, más abajo).
+  const vozDichaRef = useRef(hilo.length ? ([...hilo].reverse().find(m => m.de === "el")?.texto || "") : "");
 
   useEffect(() => { if (finRef.current) finRef.current.scrollIntoView({ block: "end" }); }, [hilo, pensando]);
 
@@ -544,7 +557,13 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
             {charlas.map(c => (
               <div className={`asis-charla${c.id === charlaId ? " es-abierta" : ""}`} key={c.id}>
                 <button type="button" className="asis-charla-abrir"
-                  onClick={() => { setHilo(c.hilo); setMensajes(c.mensajes); setCharlaId(c.id); setVerHistorial(false); setPestana("charla"); }}>
+                  onClick={() => {
+                    setHilo(c.hilo); setMensajes(c.mensajes); setCharlaId(c.id); setVerHistorial(false); setPestana("charla");
+                    // Se siembra como "ya dicha" igual que al montar: es una charla vieja
+                    // que se está releyendo, no una respuesta nueva — si luego se pasa a
+                    // la pestaña Humano no debe leerse sola.
+                    vozDichaRef.current = [...c.hilo].reverse().find(m => m.de === "el")?.texto || "";
+                  }}>
                   <span>{c.titulo}</span>
                   <em>{cuandoFue(c.cuando)}</em>
                 </button>
@@ -804,6 +823,9 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               // sale "ultimaRespuesta"; lee lo que le llegue, así que no hace falta
               // tocar nada allí.
               ultimaRespuesta={hilo.length ? ([...hilo].reverse().find(m => m.de === "el")?.texto || "") : (saludo || "")}
+              // El ref que recuerda qué se dijo ya, para que sobreviva a que Humano se
+              // desmonte y remonte (ver el comentario junto a vozDichaRef, arriba).
+              refVozDicha={vozDichaRef}
               vozActiva={vozActiva}
               onCambiarVoz={(v) => { setVozActiva(v); guardar(CLAVE_VOZ, v ? "1" : "0"); }}
               vozGemini={vozGemini}

@@ -2175,6 +2175,32 @@ propio de su móvil concreto (más lento que el CPU ×4 simulado aquí) o algo d
 sincronización en vivo con la nube, que este banco de pruebas bloquea a propósito —
 haría falta reproducirlo con su aparato delante, no adivinando más sin medir.
 
+## El asistente se escuchaba solo al abrir la pestaña Humano
+
+El dueño pidió revisar si la voz del asistente podía sonar sin que se le pidiera.
+Encontrado: `Humano.jsx` guardaba "ya leído" en un `ref` LOCAL suyo, pero ese componente
+se desmonta cada vez que se cambia de pestaña dentro del panel (es un ternario en
+`Asistente.jsx`) y también cada vez que se cierra y se vuelve a abrir el panel entero
+(`BotonAsistente.jsx` lo monta y desmonta con `abierto`). Y `CLAVE_PESTANA` deja la
+última pestaña guardada de una vez a la siguiente. Combinado: si la última pestaña
+abierta fue "Humano", CADA apertura del asistente —o cada vuelta a esa pestaña— releía
+en voz alta la última respuesta de una charla ya guardada, aunque fuera de días atrás y
+sin que el dueño hubiera pedido nada. Con la voz encendida por defecto, se oía sola.
+
+Arreglado subiendo ese "ya se dijo" a un `ref` en `Asistente.jsx` (que no se desmonta
+mientras el panel sigue abierto), sembrado al montar SOLO con la última respuesta de una
+charla restaurada — nunca con el saludo proactivo (avisos/recordatorios pendientes), que
+sigue pudiendo sonar la primera vez a propósito. Se siembra también al cargar una charla
+vieja desde el Historial, mismo motivo. Verificado con un navegador de verdad (mock de
+`speechSynthesis.speak`, sin tocar la batería principal): abrir con una charla vieja
+guardada no dice nada; volver a la pestaña Humano tampoco repite; y con el hilo vacío y
+un recordatorio pendiente, el saludo SÍ suena — la corrección no apagó la parte
+proactiva, solo la repetición de lo viejo.
+
+Queda pendiente, del mismo encargo: opinión sobre si el asistente debería ser más
+proactivo, por qué a veces tarda en contestar, y comprobar que confirmar una acción
+propuesta la ejecuta de verdad (no un falso positivo).
+
 ## Sillas sin proveedor por defecto
 
 El dueño avisó con una captura: un evento traía "Sillas (Dealde)" cuando tocaba
