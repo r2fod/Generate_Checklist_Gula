@@ -25,6 +25,20 @@ function opt(condicion, tupla) {
   return condicion ? tupla : [tupla[0], null, ...tupla.slice(2)];
 }
 
+// El nombre y la etiqueta ALQUILER de la línea de sillas. Solo "Dealde" y "Carvillo" son
+// alquiler de verdad — "Nuestras" y "No llevan" no lo son, y así hay que tratar también
+// un origen sin elegir todavía (cadena vacía, un evento recién creado desde el
+// calendario): antes de esto un origen vacío heredaba el nombre de un proveedor de
+// mentira ("Sillas (alquiler )"), porque el único caso aparte era "Nuestras". Mismo
+// criterio que ya usan App.jsx (esAlquiler, al sincronizar la recogida) y alquileres.js.
+function sillasAlquiler(origenSillas, incluyeCojines = false) {
+  if (origenSillas === "Nuestras") return { label: "Sillas (nuestras)", esAlquiler: false };
+  if (origenSillas === "Dealde" || origenSillas === "Carvillo") {
+    return { label: `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`, esAlquiler: true };
+  }
+  return { label: "Sillas (proveedor sin elegir)", esAlquiler: false };
+}
+
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
 
 // Las mesas de trabajo: las de cocina. Dicho por quien las monta, son de 4 a 6 según el
@@ -182,7 +196,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoNevera = "Mediana", tipoCongelador = "Mediana", tipoPaella, numPaellas = 0, origenSillas = "Dealde",
+    tipoNevera = "Mediana", tipoCongelador = "Mediana", tipoPaella, numPaellas = 0, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
@@ -196,9 +210,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // aparte que se pueda pedir por separado), así que se anota en el propio nombre
   // en vez de generar una línea "Cojines para sillas" suelta.
   const incluyeCojines = (origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda";
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`;
-  // Las nuestras no son alquiler, así que no llevan el tag ni generan recogida
-  const esAlquilerSillas = origenSillas !== "Nuestras";
+  // Las nuestras (y un origen aún sin elegir) no son alquiler, así que no llevan el tag
+  // ni generan recogida — ver sillasAlquiler(), arriba.
+  const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas, incluyeCojines);
 
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -470,12 +484,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
   } = opts;
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
-  const esAlquilerSillas = origenSillas !== "Nuestras";
+  const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -660,13 +673,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
     soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
     llevaCarpas = true, llevaGenerador = true, mesVerano = true,
   } = opts;
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
-  const esAlquilerSillas = origenSillas !== "Nuestras";
+  const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
   // Producción de varios días con pax distinto por día (ej. 12+17+12): el equipo

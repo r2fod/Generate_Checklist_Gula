@@ -557,7 +557,13 @@ export default function App({ onCerrarSesion } = {}) {
   const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
-  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras | No llevan
+  // Sin proveedor por defecto a propósito: un evento recién creado desde el calendario no
+  // ha decidido nada de esto todavía, y darle "Dealde" de fábrica colaba ese proveedor en
+  // la checklist (y en su recogida) sin que nadie lo hubiera elegido. Con "" no sale
+  // ningún botón marcado en el selector (SegmentedControl no resalta nada que no
+  // coincida con ninguna opción) y checklist-generadores.js lo llama "sin elegir" en vez
+  // de inventarse un proveedor.
+  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? ""); // "" (sin elegir) | Dealde | Carvillo | Nuestras | No llevan
   // De qué tipo son las mesas donde SE SIENTA la gente. Las de cocina no se eligen: son
   // siempre rectangulares de 1,80, que es sobre lo que se prepara el servicio.
   // Las redondas no son nuestras, van de alquiler.
