@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useDeferredValue } from "react";
+import React, { useState, useMemo, useEffect, useDeferredValue, useCallback } from "react";
 
 import {
   Heart, Church, Cake, Briefcase, Clapperboard,
@@ -41,7 +41,7 @@ import {
 } from "./nube.js";
 import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
 import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
-import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
+import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
 // solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se
@@ -557,7 +557,13 @@ export default function App({ onCerrarSesion } = {}) {
   const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
-  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras | No llevan
+  // Sin proveedor por defecto a propósito: un evento recién creado desde el calendario no
+  // ha decidido nada de esto todavía, y darle "Dealde" de fábrica colaba ese proveedor en
+  // la checklist (y en su recogida) sin que nadie lo hubiera elegido. Con "" no sale
+  // ningún botón marcado en el selector (SegmentedControl no resalta nada que no
+  // coincida con ninguna opción) y checklist-generadores.js lo llama "sin elegir" en vez
+  // de inventarse un proveedor.
+  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? ""); // "" (sin elegir) | Dealde | Carvillo | Nuestras | No llevan
   // De qué tipo son las mesas donde SE SIENTA la gente. Las de cocina no se eligen: son
   // siempre rectangulares de 1,80, que es sobre lo que se prepara el servicio.
   // Las redondas no son nuestras, van de alquiler.
@@ -2624,26 +2630,41 @@ export default function App({ onCerrarSesion } = {}) {
     });
   };
   // Tocar la casilla es haberlo revisado: se le quita el aviso de "la cantidad cambió"
-  const revisado = (key) => setMarcasRevisar(prev => {
+  //
+  // Con useCallback y sin depender de nada que cambie con cada marca (todo lo de dentro
+  // es setState funcional, sin leer estado de fuera): es lo que hace falta para que las
+  // filas de Modo carga (memoizadas, ver ModalModoCarga.jsx) puedan saltarse un
+  // re-render cuando NO son ellas las que han cambiado. Con una función nueva en cada
+  // pulsación —lo normal sin useCallback— React.memo no sirve de nada: todas las filas
+  // reciben una prop "distinta" aunque el contenido sea el mismo. Medido con Playwright
+  // en Modo carga con 111 items: marcar una casilla tardaba 50-140ms en repintar
+  // (CPU ×4) porque la lista ENTERA se reconciliaba en cada marca.
+  const revisado = useCallback((key) => setMarcasRevisar(prev => {
     if (!prev[key]) return prev;
     const next = { ...prev };
     delete next[key];
     return next;
-  });
-  const handleTogglePreparado = (key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); };
+  }), []);
+  const handleTogglePreparado = useCallback((key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); }, [revisado]);
   // Si algo sale en el camión es porque estaba preparado: marcarlo en Salida lo da
   // por preparado también. Antes las dos listas podían contradecirse —"cargado" pero
   // "sin preparar"— y quien miraba la de preparación volvía a buscar por el almacén
   // algo que ya iba dentro del camión.
   // Al revés NO: desmarcar la salida (se baja algo del camión) no deshace el trabajo
   // de haberlo preparado, que sigue hecho.
-  const handleToggleCheckCarga = (key) => {
+  //
+  // "marcando" se calcula DENTRO del updater de setCheckeados, no leyendo `checkeados`
+  // de fuera: así la función no depende de checkeados y useCallback la deja estable de
+  // verdad (ver la nota en `revisado`, arriba, de por qué importa para Modo carga).
+  const handleToggleCheckCarga = useCallback((key) => {
     revisado(key);
-    const marcando = !checkeados[key];
-    if (marcando) setPreparados(prev => (prev[key] ? prev : { ...prev, [key]: true }));
-    setCheckeados(prev => ({ ...prev, [key]: marcando }));
-  };
-  const handleToggleNotaCarga = (texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] }));
+    setCheckeados(prev => {
+      const marcando = !prev[key];
+      if (marcando) setPreparados(p => (p[key] ? p : { ...p, [key]: true }));
+      return { ...prev, [key]: marcando };
+    });
+  }, [revisado]);
+  const handleToggleNotaCarga = useCallback((texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] })), []);
   // Cronómetro de carga/descarga: arrancar acumula desde ahora, pausar suma el tramo
   // corrido al acumulado, reiniciar lo pone a cero. Se guarda/sincroniza con el evento.
   const handleCronoStart = (fase) => setCronos(prev => {
@@ -2661,18 +2682,18 @@ export default function App({ onCerrarSesion } = {}) {
   // A diferencia de roturas, "0" en vuelve es un dato real (confirmado: no ha vuelto
   // nada), distinto de "todavía no se ha revisado" (sin entrada) — solo se borra la
   // clave si se deja el campo vacío del todo.
-  const handleVuelveCarga = (key, valor) => setVueltos(prev => {
+  const handleVuelveCarga = useCallback((key, valor) => setVueltos(prev => {
     const next = { ...prev };
     if (valor === "") delete next[key];
     else next[key] = valor;
     return next;
-  });
-  const handleRoturasCarga = (key, valor) => setRoturas(prev => {
+  }), []);
+  const handleRoturasCarga = useCallback((key, valor) => setRoturas(prev => {
     const next = { ...prev };
     if (!valor || valor === "0") delete next[key];
     else next[key] = valor;
     return next;
-  });
+  }), []);
 
   // Quita de la lista un item calculado (los manuales se borran de itemsManuales)
   // Items quitados con la ✕, agrupados por categoría. Antes solo se podían recuperar con

@@ -405,7 +405,11 @@ la oficina** y **añadir varios items** van con `React.lazy` + `Suspense`.
 
 | Trozo inicial de la checklist | Antes | Después |
 |---|---|---|
-| `checklist-*.js` | 168,4 kB (50,1 gzip) | **129,3 kB (39,3 gzip)** |
+| `checklist-*.js` | 168,4 kB (50,1 gzip) | 129,3 kB (39,3 gzip) |
+
+(Cifra ya superada: ver más abajo, "`App` perezosa" — con `App.jsx` también perezosa el
+trozo de entrada de la checklist bajó a 3,8 kB / 1,7 kB gzip. Esta tabla se queda como
+estaba, de referencia de aquel cambio.)
 
 Son 11 kB gzip menos que descargar, analizar y ejecutar antes de ver nada, y encima el
 JavaScript que se deja de ejecutar en el arranque es el que más pesa al pintar. Modo
@@ -429,6 +433,40 @@ vuelta se saltaba y la app se quedaba SIN suscripción.
 trozo más grande de todos — pero son **95 iconos distintos** de verdad usados, no un
 barril mal sacudido. Quitar peso ahí es quitar iconos, que es una decisión de diseño, no
 una optimización.
+
+### `App` perezosa: el login no tiene por qué cargar la checklist entera
+
+Auditando el proyecto entero a petición del dueño ("carga un poco lento"), medido con
+Playwright de verdad (no a ojo): la pantalla de acceso de la checklist —dos campos y un
+botón— se llevaba, antes de poder pintarse, **755 kB transferidos** y **293 ms hasta
+`DOMContentLoaded`**, porque `Acceso.jsx` importaba `App.jsx` (6.600 líneas: el
+asistente, objetivos, paella, los 95 iconos) con un `import` normal. `PuertaSesion.jsx`
+solo RENDERIZA `<Contenido>` después de saber si hay sesión, pero el import es estático:
+el empaquetador no sabe de condicionales en tiempo de ejecución, así que metía App en el
+mismo trozo que el propio formulario de login.
+
+Arreglado con lo mismo que ya usan Modo carga, la bandeja y "añadir varios" —
+`React.lazy` + `Suspense`—, pero un nivel más arriba: `App` ahora es
+`React.lazy(() => import("./App.jsx"))` en `Acceso.jsx`, y `PuertaSesion.jsx` envuelve
+las tres formas de `<Contenido>` en `Suspense` con el MISMO "Cargando…" que ya usaba
+mientras resolvía la sesión (mismas clases de `index.css`, siempre disponibles — no hace
+falta el truco de estilos en línea de `CargandoPanel`, porque esas clases no viven en el
+trozo perezoso). Con un `Contenido` que no es perezoso (el calendario, hoy) `Suspense` no
+cambia nada: no hay nada que esperar.
+
+Medido después: **513 kB** (-32 %), `DOMContentLoaded` **95 ms** (antes 293 ms), carga
+completa **738 ms** (antes 1259 ms). Verificado con Playwright que las dos rutas
+(formulario de login normal, y el enlace directo `?c=` que salta el login) siguen
+pintando exactamente igual — la segunda es la que ejercita `App` perezosa de verdad.
+`test:rapido` y lint en verde; la batería completa de navegador no pudo completarse esta
+vez por una caída del proceso en segundo plano ajena al cambio (dos intentos, sin ningún
+❌ ni traza — infraestructura, no una prueba fallida), así que la verificación de las dos
+rutas afectadas se apoyó en esos dos scripts de Playwright dirigidos en vez de en la
+batería entera.
+
+**El calendario tiene el mismo patrón, a mucha menor escala** (su `AppCalendario` son
+~80 líneas dentro del propio `calendario/main.jsx`, no separables sin partir el
+fichero) — no se tocó: el ahorro sería mucho menor y el riesgo de romper algo, mayor.
 
 ## Saber qué falló, sin espiar a nadie
 
@@ -2028,7 +2066,86 @@ en la checklist real (135÷14, antes 15 con el 9 de fábrica) — la cadena comp
 del botón al número que se carga en el camión. 420 comprobaciones en
 `calculos.test.mjs` (+10), sin cambios en el resto.
 
-## Decidido NO hacer (y por qué)
+## La hora en punto sonaba a reloj, no a habla
+
+Pedido explícito del dueño ("que la voz del asistente suene natural, no leída"). La
+voz ya tenía mucho trabajo de antes (#138: elige la mejor voz local del navegador,
+Gemini como voz de nube cuando hay a dónde llamar, quita markdown/emojis/listas antes
+de leer) — comprobando con casos reales de la escaleta, quedaba un caso que sí sonaba
+a robot: una hora en punto se leía "13 y 00" (`paraLeerEnVozAlta`, `voz.js`), que no
+es como se dice de verdad — nadie dice "trece y cero cero", se dice "a las 13". Con
+minutos sí hace falta el "y" ("13 y 15"), pero en punto se dice el número solo.
+
+Arreglado con una sustitución más, antes de la que ya había: `HH:00` se queda en
+`HH`, todo lo demás sigue llevando el "y". Dos comprobaciones nuevas en
+`asistente.test.mjs` con la frase real de la escaleta que tiene los dos casos a la
+vez ("Salida a las 08:15, llegada a las 09:00"). `test:rapido` y lint en verde.
+
+## El Grafo de Cerebro, ahora animado de verdad
+
+Seguía siendo la relajación de muelles+repulsión que ya traía líneas de verdad (ver
+más arriba), pero corría las 200 vueltas de golpe, síncrona, antes de pintar: los
+nodos aparecían ya colocados, no se les veía buscar su sitio. Pedido explícito del
+dueño ("mejorar y animar el grafo").
+
+Arreglado repartiendo esas mismas 200 vueltas en fotogramas con
+`requestAnimationFrame` (4 vueltas por fotograma, ~50 fotogramas) en vez de un
+`useMemo` síncrono. Se apaga con `prefers-reduced-motion` (las 200 vueltas corren de
+golpe, como antes, sin ninguna animación de por medio) y el bucle se limpia al
+desmontar o si cambian los nodos a mitad de animación — con cuidado de que `sim`
+(las posiciones, en estado) y `bordes` (a qué índice apunta cada enlace, memoizado)
+nunca queden de formas distintas por un fotograma: si cambia la clave de los datos,
+las posiciones se resetean durante el propio render (el patrón de React para estado
+derivado de las props), no en un efecto que llegaría un fotograma tarde.
+
+La física pura (`estadoInicial`, `paso`, `bordesDe`) se sacó a `grafoFisica.js`,
+aparte de `Grafo.jsx` — mismo motivo que separa `personal.js` de su panel: sin JSX,
+se prueba con `node` de verdad. Seis comprobaciones nuevas en `calculos.test.mjs`,
+la que más importa: repartir las 200 vueltas en fotogramas de 4 da EXACTO el mismo
+resultado que correrlas de golpe — si algún día divergen es que se coló un salto de
+estado entre fotogramas, justo el bug que este refactor tenía que evitar. Verificado
+también con Playwright de verdad (no solo las pruebas puras): capturas a los 80ms y
+al segundo muestran los nodos en posiciones distintas —animación real, no un salto
+instantáneo—, sin errores de página en claro ni en oscuro. `test:rapido` y lint en
+verde.
+
+## Fallo real: la app reventaba al enviar el formulario de oficina, y el aviso de VAPID no lo habría enviado nunca
+
+Reportado por el dueño con captura: enviar el formulario de configuración de un evento
+tumbaba la checklist entera con `nombreDelEnvio is not defined` (la pantalla de "La app
+ha fallado"). Causa: `App.jsx` escucha los envíos nuevos (`suscribirEnvios`, para el
+aviso hablado y el aviso de WhatsApp) y llama a `nombreDelEnvio(e)` y `textoAvisoEnvio(e)`
+— pero esas dos funciones vivían como privadas de `ModalFormularioOficina.jsx`, sin
+exportar ni importar en `App.jsx`. `oxlint` no lo cazaba: `no-undef` no estaba activada
+(sin `env`/`globals`, se dispara en falso con `window`, `fetch`, `document`... de ahí que
+estuviera apagada), así que un identificador libre pasaba lint en verde y solo revienta
+en el navegador, con datos reales, en el momento peor.
+
+Arreglado sacando `nombreDelEnvio` y `textoAvisoEnvio` a `src/formulario/preguntas.js`
+—mismo sitio que `resumirEnvio`/`archivosDelEnvio`, incluso módulo puro que ya se
+prueba con `node`— e importándolas donde hacían falta de verdad: `App.jsx` y
+`ModalFormularioOficina.jsx`.
+
+**Con el mismo patrón se encontró un segundo fallo, más grave por dormido**: el Worker
+(`avisosDelDia`, `leerSuscripciones`, `leerTareas` — el cron de D1, avisos push) usaba
+`FIRESTORE`, `proyecto`, `campos` y `entrar`, las cuatro privadas de `repaso.js` y
+nunca importadas en `index.js`. Nadie lo había visto porque D1 lleva desde que se
+construyó esperando a que el dueño ponga el par VAPID en Cloudflare — el cron de avisos
+nunca ha llegado a correr de verdad todavía. El día que se configurara, habría fallado
+la primera noche, en silencio (un cron no tiene a quién enseñarle una pantalla roja).
+Arreglado exportando las cuatro de `repaso.js` e importándolas en `index.js`;
+`worker/pegar.js` regenerado (`npm run worker:build`) — el propio empaquetado lo
+confirma: antes renombraba a `FIRESTORE$1`/`entrar$1`/`campos$1`/`proyecto$1` para no
+chocar con los mismos nombres sueltos en `index.js`, ahora es una sola función
+compartida, como tenía que ser desde el principio.
+
+**Activado `no-undef` de verdad en `.oxlintrc.json`** (con `env: browser/node/es2021` y
+`__BUILD_ID__` en `globals`, el define de Vite): sin los globals de por medio disparaba
+en falso con todo lo del navegador (`window`, `fetch`, `document`, `setTimeout`…); con
+ellos puestos, cero falsos positivos y cazó los tres fallos de arriba de una sentada.
+Se queda encendida — es la red que habría evitado este commit entero.
+
+`test:rapido` y lint en verde (el lint, ahora con una regla más estricta que antes).
 
 - **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
   nadie ve. Ahí vive todo el estado de la checklist.
@@ -2039,6 +2156,129 @@ del botón al número que se carga en el camión. 420 comprobaciones en
 - **Partir el CSS**: 18 kB comprimidos, clases del tramo final compartidas con la
   checklist (`btn`, `form-input`, `link-roto`, `envio-*`…). Partirlo rompe el diseño.
 - **Firebase**: ya carga con `import()` dinámico en los tres sitios. Nada que ganar.
+
+## Modo carga: las filas se reconciliaban todas al marcar una sola
+
+El dueño avisó: "en Modo carga, al hacer scroll, cuesta cargar la lista". Medido de
+verdad con Playwright antes de tocar nada (móvil emulado, CPU ×4 — el mismo que ya usa
+esta tabla — y con una boda de 120 pax, 111 items):
+
+- **El scroll en sí, con el dedo de verdad** (`Input.dispatchTouchEvent` por CDP, no
+  `mouse.wheel`, que activa el `:hover` de cada fila al pasar por encima — algo que un
+  dedo real en el móvil NUNCA dispara y que infla el jank medido con un coste que nadie
+  sufre) sale limpio: 56-57 fps, 1-2 fotogramas largos de ~170, con y sin un cronómetro
+  corriendo. No se ha podido reproducir aquí el jank de scroll que describe el dueño.
+- **Lo que SÍ era un fallo real, medido**: marcar una casilla tardaba 50-140ms en
+  repintar (CPU ×4) porque las 111 filas estaban en línea dentro de un `.map()`, sin
+  memoizar — cualquier marca reconciliaba la lista ENTERA. Comprobado con un contador
+  de renders de verdad: antes del arreglo no se pudo contar (no había frontera de
+  componente que contar), después del arreglo, un clic = 1 fila re-renderizada de 111.
+- Se descartaron con medición, no con intuición: `JSON.stringify` del estado completo
+  en cada render de `App.jsx` (existe, pero el estado son ~2 kB, cuesta <1ms), y
+  `backdrop-filter: blur(4px)` del overlay (con scroll continuo baja el fps un 15%
+  aprox., pero en un clic suelto no se nota).
+
+**Arreglado** (no porque resolviera lo del scroll —eso no se reprodujo—, sino porque el
+propio arreglo destapó un problema real de por sí): las dos filas (Prep./Salida y
+Vuelta) se sacaron a `FilaCargaPrep`/`FilaCargaVuelta`, con `React.memo`, recibiendo
+solo lo suyo (nunca los objetos `checkeados`/`vueltos`/`roturas` completos). Para que
+memo sirva de algo, los cinco manejadores que le llegan desde `App.jsx`
+(`onTogglePreparado`, `onToggleSale`, `onVuelve`, `onRoturas`, `onToggleNota`) pasan a
+`useCallback` — con una función nueva en cada tecla, memo no habría servido de nada,
+todas las filas habrían recibido una prop "distinta". El más delicado,
+`handleToggleCheckCarga`, leía `checkeados` de fuera; reescrito para calcular
+`marcando` DENTRO del propio `setCheckeados(prev => ...)`, sin depender de nada que
+cambie con cada marca. También memoizado `filasPorCategoria` (la cuenta del Resumen,
+con `parseFloat` y precio por item) y el filtro `quitarItemsSinCantidad`, que antes se
+recalculaban en CADA marca aunque no se estuviera viendo el Resumen.
+
+Verificado con Playwright: las tres pestañas (Prep./Salida/Vuelta) y el Resumen siguen
+pintando igual, cruzando el estado entre pestañas (lo marcado en Prep. sale con la
+pastilla "prep." en Salida), sin errores de página. `test:rapido` y lint en verde.
+
+Si el dueño sigue notando el scroll lento después de esto, lo más probable es que sea
+propio de su móvil concreto (más lento que el CPU ×4 simulado aquí) o algo de la
+sincronización en vivo con la nube, que este banco de pruebas bloquea a propósito —
+haría falta reproducirlo con su aparato delante, no adivinando más sin medir.
+
+## El asistente se escuchaba solo al abrir la pestaña Humano
+
+El dueño pidió revisar si la voz del asistente podía sonar sin que se le pidiera.
+Encontrado: `Humano.jsx` guardaba "ya leído" en un `ref` LOCAL suyo, pero ese componente
+se desmonta cada vez que se cambia de pestaña dentro del panel (es un ternario en
+`Asistente.jsx`) y también cada vez que se cierra y se vuelve a abrir el panel entero
+(`BotonAsistente.jsx` lo monta y desmonta con `abierto`). Y `CLAVE_PESTANA` deja la
+última pestaña guardada de una vez a la siguiente. Combinado: si la última pestaña
+abierta fue "Humano", CADA apertura del asistente —o cada vuelta a esa pestaña— releía
+en voz alta la última respuesta de una charla ya guardada, aunque fuera de días atrás y
+sin que el dueño hubiera pedido nada. Con la voz encendida por defecto, se oía sola.
+
+Arreglado subiendo ese "ya se dijo" a un `ref` en `Asistente.jsx` (que no se desmonta
+mientras el panel sigue abierto), sembrado al montar SOLO con la última respuesta de una
+charla restaurada — nunca con el saludo proactivo (avisos/recordatorios pendientes), que
+sigue pudiendo sonar la primera vez a propósito. Se siembra también al cargar una charla
+vieja desde el Historial, mismo motivo. Verificado con un navegador de verdad (mock de
+`speechSynthesis.speak`, sin tocar la batería principal): abrir con una charla vieja
+guardada no dice nada; volver a la pestaña Humano tampoco repite; y con el hilo vacío y
+un recordatorio pendiente, el saludo SÍ suena — la corrección no apagó la parte
+proactiva, solo la repetición de lo viejo.
+
+Queda pendiente, del mismo encargo: opinión sobre si el asistente debería ser más
+proactivo, por qué a veces tarda en contestar, y comprobar que confirmar una acción
+propuesta la ejecuta de verdad (no un falso positivo).
+
+## Sillas sin proveedor por defecto
+
+El dueño avisó con una captura: un evento traía "Sillas (Dealde)" cuando tocaba
+Carvillo. No era un fallo de dictado ni del asistente: `origenSillas` nacía en
+"Dealde" por defecto en `App.jsx` (el `useState` inicial) y en los tres generadores de
+checklist (`checklist-generadores.js`, boda/comunión/producción) — un evento recién
+creado desde el calendario (sin pasar por el formulario ni tocarlo a mano) ya "elegía"
+ese proveedor solo.
+
+El dueño decidió que NO haya proveedor por defecto: el campo nace vacío hasta que
+alguien lo elige a propósito, mismo criterio que ya aplica `preguntas.js` con las
+respuestas del formulario (no tocar lo que no se ha contestado). Cambiado el `useState`
+de `App.jsx` a `?? ""` y los tres parámetros por defecto de los generadores a `""`. De
+paso se arregló `esAlquilerSillas`/`labelSillas`: antes trataba CUALQUIER valor que no
+fuera exactamente "Nuestras" como alquiler (`origenSillas !== "Nuestras"`), lo que con
+una cadena vacía habría sacado una línea rota, "Sillas (alquiler )". Ahora, sacado a un
+helper compartido (`sillasAlquiler()`), solo cuenta como alquiler "Dealde"/"Carvillo" de
+verdad — igual que ya comprobaban `App.jsx` (al sincronizar la recogida) y
+`alquileres.js` —, y un origen sin elegir sale como "Sillas (proveedor sin elegir)", sin
+inventarse ningún nombre ni crear su recogida.
+
+Varias pruebas de la batería de navegador daban por hecho el "Dealde de fábrica" (un
+barrido genérico de selectores que necesita un botón activo del que partir, y dos
+pruebas de recogidas automáticas que creaban un evento nuevo sin fijar el proveedor a
+propósito); se corrigieron sembrando `origenSillas` explícito donde el propio nombre de
+la prueba deja claro que lo que se comprueba es el comportamiento del alquiler, no el
+valor por defecto. `test:rapido` y la batería completa de navegador (716/716) en verde.
+
+## "Con permiso": comprobado que aprobar una propuesta la aplica de verdad
+
+El dueño pidió comprobar que cuando el asistente propone una acción y se le da permiso,
+la aplica de verdad y no es un falso positivo (que diga "Hecho" sin haber tocado nada).
+
+Trazado el código: `resolver()`, en `Asistente.jsx`, llama a `contexto.onEscribir(p)` al
+aprobar y mira de verdad lo que devuelve (`r.error`, `r.nada`) antes de decir "Hecho" —
+no lo da por sentado. Y `onEscribir` en `App.jsx` es `encadenar(aplicarEnTareas(...),
+aplicarEnChecklists(...), ...)`: los MISMOS aplicadores que usa el botón manual del
+panel, no un camino aparte. Hasta aquí, todo correcto por lectura.
+
+Pero no se podía COMPROBAR de verdad: el asistente pide sesión de equipo para salir en
+`App.jsx`, así que ni esta batería ni ninguna otra llegaba nunca a probar su escritura
+real — nadie había ejecutado el flujo completo (proponer → aprobar → ver el cambio) en
+un navegador de verdad. Arreglado cableando, SOLO en el banco de pruebas sin login
+(`pruebas/calendario.html?asistente=1`), el mismo `onEscribir` que usa `App.jsx`
+(`aplicarEnTareas` + `encadenar`, no reimplementados) sobre una lista de mentira. El
+Worker se sustituye por dos respuestas fijas (pide `apuntar_tarea`, luego cierra en
+texto), sin necesitar ninguna clave de verdad.
+
+Verificado en un navegador real, paso a paso: antes de aprobar, la tarea NO está en
+Tareas; se aprueba con "Hacerlo"; el chat dice "Hecho: ..."; y AHORA SÍ está en Tareas,
+con la misma función que usa el botón manual. No hay falso positivo. Añadido como
+prueba permanente de la batería, para que quede cubierto de aquí en adelante.
 
 ## Rendimiento real (4G, CPU ×4, gzip como sirve GitHub Pages)
 

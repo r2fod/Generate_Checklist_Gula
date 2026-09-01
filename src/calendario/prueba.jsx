@@ -23,11 +23,23 @@ import { leerRatios, ponRatios } from "../personal.js";
 // completa: al menos su colocación queda probada a todos los anchos.
 import Asistente from "../asistente/Asistente.jsx";
 import BotonAsistente from "../asistente/BotonAsistente.jsx";
+import { aplicarEnTareas, encadenar } from "../asistente/escrituraTareas.js";
 
 const HOY = new Date();
 // aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no
 // se habría enterado si la de verdad cambiara.
 const dia = (n) => aISO(new Date(HOY.getFullYear(), HOY.getMonth(), HOY.getDate() + n));
+
+// El mes con el que se abre la vista Mes del banco: el del día 9 (el "caso que de
+// verdad importa" de más abajo, con tres eventos y media plantilla fuera). Los apuntes
+// son "dentro de N días" desde hoy, así que en los últimos días de cada mes casi todos
+// caen en el mes siguiente al de hoy — sin esto, la vista por defecto (el mes de hoy)
+// se abría casi vacía esos días, y no por ningún cálculo roto (ver Calendario.jsx,
+// prop mesInicial).
+const MES_DEMO = (() => {
+  const [anio, mes] = dia(9).split("-").map(Number);
+  return { anio, mes };
+})();
 
 const DEMO = [
   { fecha: dia(2), titulo: "Boda de prueba uno", tipo: "boda", pax: 120, sitio: "Finca de ejemplo", hora: "14:00" },
@@ -94,6 +106,10 @@ function Banco() {
     if (arrancaVacio) return [];
     return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : DEMO);
   });
+  // Solo con el DEMO fijo tiene sentido fijar el mes: vacío no tiene nada que enseñar,
+  // y "muchos" reparte sus apuntes a propósito por todo el año (medir.mjs), no en un
+  // mes concreto.
+  const mesInicial = (arrancaVacio || cuantos > 0) ? null : MES_DEMO;
   const [equipo, setEquipo] = useState(() => saneaEquipo(EQUIPO_DEMO));
   const [ratios, setRatios] = useState(() => leerRatios());
   // Con "?promover=1" se monta lo que hace la checklist al abrir el calendario: crea las
@@ -111,6 +127,15 @@ function Banco() {
   const guardar = (a) => setApuntes(p => saneaLista([...p.filter(x => x.id !== a.id), a]));
   const borrar = (id) => setApuntes(p => p.filter(x => x.id !== id));
 
+  // Solo para "?asistente=1": el asistente de verdad escribe en App.jsx a través de
+  // onEscribir (ver encadenar(aplicarEnTareas(...), ...) ahí), pero eso pide sesión de
+  // equipo y por eso este banco no llegaba a probarlo — ni con "Con permiso" ni con
+  // "Confianza" había manera de comprobar que aprobar una propuesta la aplica DE
+  // VERDAD, sin auth de por medio. Aquí se cablea la MISMA función (aplicarEnTareas +
+  // encadenar, no una reimplementada) sobre una lista de mentira: así queda un sitio
+  // donde probarlo con Playwright sin necesitar Firebase.
+  const [tareasDemo, setTareasDemo] = useState([]);
+
   const dentro = soloVer
     ? (
       <>
@@ -118,7 +143,7 @@ function Banco() {
           <Eye size={15} aria-hidden="true" />
           <span>Estás viendo el calendario en <b>solo lectura</b>. Los cambios los hace el equipo.</span>
         </div>
-        <Calendario apuntes={apuntes} equipo={equipo} soloVer />
+        <Calendario apuntes={apuntes} equipo={equipo} soloVer mesInicial={mesInicial} />
       </>
     )
     : (
@@ -141,7 +166,7 @@ function Banco() {
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
         <Ratios ratios={ratios} onCambiar={(r) => setRatios(ponRatios(r))} />
-        <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} />
+        <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} mesInicial={mesInicial} />
       </>
     );
 
@@ -164,7 +189,11 @@ function Banco() {
           apuntes: saneaLista(DEMO),
           // Un recordatorio ya cumplido, con fecha de hoy: es lo único que este banco no
           // tenía forma de enseñar (paraHoy() en tareas.js) sin datos de mentira propios.
-          tareas: [{ id: "demo-recordatorio", texto: "Pedir el hielo para la boda de mañana", fecha: dia(0), hecho: false, creado: Date.now() }],
+          tareas: [
+            { id: "demo-recordatorio", texto: "Pedir el hielo para la boda de mañana", fecha: dia(0), hecho: false, creado: Date.now() },
+            ...tareasDemo,
+          ],
+          onEscribir: encadenar(aplicarEnTareas({ tareas: tareasDemo, guardar: setTareasDemo })),
         }}
       />
     );

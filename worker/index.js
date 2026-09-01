@@ -18,7 +18,7 @@
 // Va sin dependencias y en un fichero a propósito: así se pega tal cual en el panel de
 // Cloudflare sin instalar nada. Ver worker/README.md.
 
-import { repasar, DIAS_VISTA } from "./repaso.js";
+import { repasar, DIAS_VISTA, FIRESTORE, proyecto, campos, entrar } from "./repaso.js";
 import { CLAVES_VOZ_GEMINI } from "../src/asistente/vozGemini.js";
 import { hoyISO } from "../src/fecha.js";
 import webpush from "web-push";

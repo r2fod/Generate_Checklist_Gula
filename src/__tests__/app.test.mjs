@@ -1144,7 +1144,11 @@ async function main() {
   console.log("\n── Los selectores cambian la checklist ──");
   const escapa = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   for (const tipo of TIPOS) {
-    await page.goto(url({ evento: tipo, pax: 100, ninos: 10 }), { waitUntil: "domcontentloaded" });
+    // origenSillas puesto a propósito: sin proveedor por defecto (ver "Sillas sin
+    // proveedor por defecto", más abajo) ningún botón del selector sale activo, y este
+    // barrido necesita un "activo" real del que partir para poder volver a él tras
+    // probar cada opción.
+    await page.goto(url({ evento: tipo, pax: 100, ninos: 10, origenSillas: "Dealde" }), { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1900);
     const grupos = await page.locator(".segment-group").evaluateAll(gs => gs.map(g => ({
       label: (g.querySelector(".segment-label") || {}).textContent || "",
@@ -2407,6 +2411,10 @@ async function main() {
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const estado = {
       evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: dia(1),
+      // Puesto a propósito: las sillas ya no llevan proveedor por defecto (ver "Sillas
+      // sin proveedor por defecto"), y aquí se quiere probar precisamente que un
+      // alquiler de sillas trae su recogida sola.
+      origenSillas: "Dealde",
       recogidas, compras: [{ concepto: "Aguas", cantidad: "5 cajas", fecha: dia(0) }],
     };
     await c.addInitScript(e => {
@@ -2430,9 +2438,10 @@ async function main() {
   };
 
   // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución.
-  // Ojo: en la lista sale también la recogida de las sillas, que ahora se crea sola
-  // porque son de alquiler de serie. Es correcto que esté, así que las comprobaciones
-  // van sobre el generador por su nombre en vez de contar cuántos avisos hay.
+  // Ojo: en la lista sale también la recogida de las sillas (el estado de arriba las
+  // pone de alquiler a propósito), que se crea sola en cuanto el alquiler está puesto.
+  // Es correcto que esté, así que las comprobaciones van sobre el generador por su
+  // nombre en vez de contar cuántos avisos hay.
   const a1 = await abrirConAvisos([{ concepto: "Recoger generador", fecha: dia(0), fechaDevolucion: dia(2) }]);
   let t = await chips(a1.p);
   ok(t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
@@ -2513,7 +2522,9 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" };
+    // origenSillas puesto a propósito (ya no hay proveedor por defecto): este bloque
+    // prueba justo que un alquiler sale destacado arriba en la hoja.
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano", origenSillas: "Dealde" };
 
     await p.goto(url(evento) + "&solo=1&vista=1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
@@ -3206,10 +3217,11 @@ async function main() {
     ok(await p.locator(".item-row").filter({ hasText: "Armario caliente de Dealde" }).count() === 1,
       "el nombre corregido de un item de alquiler se queda puesto");
 
-    // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo aparecía si
-    // alguien tocaba el selector con el dedo. Un evento nuevo —o uno que llega del
-    // formulario de la oficina con las sillas ya puestas— se quedaba con sillas de
-    // alquiler y sin recogida: nadie sabía cuándo ir a por ellas ni cuándo devolverlas.
+    // Las sillas NO tienen proveedor por defecto (antes salían con "Dealde" de fábrica
+    // en cuanto se creaba el evento, sin que nadie lo hubiera pedido, y su recogida se
+    // colaba con ellas). En cuanto SÍ se elige uno de los dos alquileres —a mano o
+    // porque llega puesto de fuera, del formulario de la oficina— su recogida aparece
+    // sola: eso es lo que hay que seguir garantizando.
     {
       const c2 = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
       for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
@@ -3220,13 +3232,22 @@ async function main() {
           fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),
         })));
 
-      // Un evento nuevo, sin tocar nada: las sillas vienen de Dealde de serie
+      // Un evento nuevo, sin tocar nada: sin proveedor elegido no se inventa ninguna
+      // recogida ni ningún nombre de proveedor de mentira en la checklist.
       await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin tocar nada", fechaEvento: "2027-08-11" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "sin elegir proveedor de sillas, no se inventa ninguna recogida");
+
+      // Pero con el proveedor ya puesto (como llega de un formulario ya contestado, o
+      // de un evento guardado), su recogida sí aparece sola
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda con Dealde puesto", fechaEvento: "2027-08-11", origenSillas: "Dealde" }),
         { waitUntil: "domcontentloaded" });
       await p2.waitForTimeout(2400);
       const conSillas = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
       ok(conSillas.length === 1,
-        `sin tocar el selector, las sillas de alquiler ya traen su recogida → ${JSON.stringify((await tarj()).map(x => x.concepto))}`);
+        `con el proveedor ya puesto, las sillas de alquiler traen su recogida → ${JSON.stringify((await tarj()).map(x => x.concepto))}`);
       ok(conSillas[0].fechas[0] === "2027-08-10" && conSillas[0].fechas[1] === "2027-08-12",
         `con el día de ir y el de devolver sacados de la fecha del evento → ${JSON.stringify(conSillas[0].fechas)}`);
 
@@ -3248,7 +3269,9 @@ async function main() {
       // Sin fecha de evento tampoco: una recogida sin día no responde a "¿cuándo hay
       // que ir?", que es para lo único que existe, y encima saldría contada como
       // pendiente en el resumen. Al poner la fecha, aparece con sus dos días.
-      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin fecha" }), { waitUntil: "domcontentloaded" });
+      // origenSillas puesto a propósito (ya no hay proveedor por defecto): lo que se
+      // prueba aquí es la fecha, no si el alquiler está elegido.
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin fecha", origenSillas: "Dealde" }), { waitUntil: "domcontentloaded" });
       await p2.waitForTimeout(2400);
       ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
         "sin fecha de evento no se crea todavía: no sabría qué día decir");
@@ -4028,7 +4051,14 @@ async function main() {
         // Humano en medio, el "gasto" que apuntaba a la cuarta pasó a abrir Tareas sin
         // que saltara nada — la prueba seguía verde mirando otra pantalla.
         ["asistente humano", BANCO + "?asistente=1", ['.asis-pestana:has-text("Humano")']],
-        ["asistente cerebro", BANCO + "?asistente=1", ['.asis-pestana:has-text("Cerebro")']],
+        // Ajustes empieza abierto y SUSTITUYE la pestaña activa (asis-panel es-ajustes):
+        // hay que cerrarlo antes de que se vea Cerebro de verdad, si no el chip de Grafo
+        // ni siquiera está en la página y este paso no hace nada. El Grafo se anima con
+        // requestAnimationFrame al montarse (ver Grafo.jsx): se abre su chip el último
+        // para que el barrido pille la animación en marcha, no solo el resultado asentado.
+        ["asistente cerebro", BANCO + "?asistente=1",
+          ['.asis-icono[aria-label="Ajustes del asistente"]', '.asis-pestana:has-text("Cerebro")',
+            'button[role="tab"]:has-text("Grafo")']],
         ["asistente tareas", BANCO + "?asistente=1", ['.asis-pestana:has-text("Tareas")']],
         ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:has-text("Gasto")']],
       ];
@@ -4039,7 +4069,7 @@ async function main() {
         // Y los dos elegidores nuevos de la pestaña Humano: siete muñecos y cuatro tonos
         // son muchas casillas para una columna de 320px.
         ".asis-panel", ".asis-pestanas", ".hum", ".asis-proveedores", ".asis-gasto-cifras",
-        ".cer-objetivos", ".hum-ajustes", ".hum-elegir"];
+        ".cer-objetivos", ".hum-ajustes", ".hum-elegir", ".cer-grafo-svg-wrap"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];
@@ -4068,6 +4098,78 @@ async function main() {
         ok(malos.length === 0,
           `${tema}: todo lo nuevo cabe en los ${ANCHOS.length} anchos${malos.length ? ` → ${malos.slice(0, 4).join(" | ")}${malos.length > 4 ? ` (y ${malos.length - 4} más)` : ""}` : ""}`);
       }
+    }
+
+    // ── "CON PERMISO": APROBAR UNA PROPUESTA LA APLICA DE VERDAD ────────────────
+    // El asistente pide sesión de equipo para salir en App.jsx de verdad, así que su
+    // escritura real (onEscribir, cableado con aplicarEnTareas/encadenar) tampoco
+    // llegaba nunca a esta batería — nadie comprobaba que "Hacerlo" cambia el estado
+    // real de la app y no es solo la burbuja del chat diciendo "Hecho" de mentira. Se
+    // cablea aquí, en este banco, el mismo onEscribir de mentira (misma
+    // aplicarEnTareas/encadenar que usa App.jsx, no una reimplementada) para poder
+    // probarlo sin login. El Worker se sustituye por dos respuestas fijas: una que pide
+    // apuntar_tarea, otra que cierra en texto — así no hace falta clave de ningún
+    // proveedor.
+    console.log('\n── "Con permiso": aprobar una propuesta la aplica de verdad ──');
+    {
+      const c = await navegador.newContext({ viewport: { width: 1024, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const WORKER = "https://worker-de-prueba.invalido/chat";
+      let vuelta = 0;
+      await c.route(`${WORKER}*`, async route => {
+        vuelta++;
+        if (vuelta === 1) {
+          await route.fulfill({
+            status: 200, contentType: "application/json",
+            body: JSON.stringify({
+              texto: "", proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 120, salida: 30 },
+              llamadas: [{ id: "call1", nombre: "apuntar_tarea", argumentos: { texto: "Comprar velas de sobremesa" } }],
+            }),
+          });
+        } else {
+          await route.fulfill({
+            status: 200, contentType: "application/json",
+            body: JSON.stringify({ texto: "Te lo dejo propuesto en pantalla para que lo confirmes.", proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 90, salida: 20 }, llamadas: [] }),
+          });
+        }
+      });
+      await c.addInitScript(w => {
+        localStorage.setItem("gula_asistente_url", w);
+        localStorage.setItem("gula_asistente_nivel", "permiso");
+      }, WORKER);
+      const p = await nuevaPagina(c);
+      await p.goto(BANCO + "?asistente=1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1500);
+
+      await p.locator('.asis-escribir input[type="text"]').fill("Apunta que hay que comprar velas de sobremesa");
+      await p.locator('.asis-escribir button[type="submit"]').click();
+      await p.waitForTimeout(1500);
+
+      const pendiente = await p.locator(".asis-pendiente-texto").innerText().catch(() => "");
+      ok(/Apuntar/i.test(pendiente) && /velas/i.test(pendiente),
+        `propone sin aplicar todavía → "${pendiente}"`);
+
+      await p.locator('.asis-pestana:has-text("Tareas")').click();
+      await p.waitForTimeout(400);
+      const antesDeAprobar = await p.locator(".asis-recuerdo-texto").allInnerTexts();
+      ok(!antesDeAprobar.some(t => /velas/i.test(t)),
+        `antes de aprobar, no está en Tareas de verdad → ${JSON.stringify(antesDeAprobar)}`);
+
+      await p.locator('.asis-pestana:has-text("Charla")').click();
+      await p.waitForTimeout(300);
+      await p.locator(".asis-si").click();
+      await p.waitForTimeout(1000);
+
+      const textoHilo = await p.locator(".asis-hilo").first().innerText().catch(() => "");
+      ok(/Hecho:.*velas/i.test(textoHilo), `el chat dice "Hecho: ..." → "${textoHilo.slice(-200)}"`);
+
+      await p.locator('.asis-pestana:has-text("Tareas")').click();
+      await p.waitForTimeout(500);
+      const despuesDeAprobar = await p.locator(".asis-recuerdo-texto").allInnerTexts();
+      ok(despuesDeAprobar.some(t => /velas/i.test(t)),
+        `y AHORA sí está en Tareas de verdad, no es un falso positivo → ${JSON.stringify(despuesDeAprobar)}`);
+
+      await c.close();
     }
 
     // ── AJUSTAR LA GENTE POR COMENSAL ──

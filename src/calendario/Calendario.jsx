@@ -44,10 +44,18 @@ export default function Calendario({
   onAbrirEvento,
   soloVer = false,
   soloAnadir = false,
+  // Con qué mes se abre la vista Mes. Por defecto el de hoy, que es lo que quiere
+  // cualquier persona de verdad abriendo el calendario. Existe SOLO para el banco de
+  // pruebas (ver prueba.jsx): sus apuntes de mentira son "dentro de N días" a partir de
+  // hoy, así que en los últimos días de cada mes caían casi todos en el mes siguiente y
+  // la vista por defecto (el de hoy) se veía vacía — no un fallo de cálculo, un banco de
+  // pruebas enseñando el mes que no tocaba.
+  mesInicial = null,
 }) {
   const hoy = hoyISO();
   const [vista, setVista] = useState("mes");
   const [cursor, setCursor] = useState(() => {
+    if (mesInicial && Number.isFinite(mesInicial.anio) && Number.isFinite(mesInicial.mes)) return mesInicial;
     const f = new Date();
     return { anio: f.getFullYear(), mes: f.getMonth() + 1 };
   });
