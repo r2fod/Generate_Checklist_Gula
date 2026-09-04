@@ -2489,14 +2489,22 @@ un Firestore en memoria con las mismas reglas.
 
 Los cinco PR que había abiertos (#169, #170, #171, #172, #174 — todos descritos arriba)
 ya están fusionados en `main`, con el visto bueno explícito del dueño ("fusionalo para
-verlo"). El despliegue automático (workflow `Publicar`, dispara con cada push a `main`,
-tarda ~45 min porque corre la batería completa de navegador antes de publicar) estaba
-EN MARCHA en el momento de escribir esto — comprobar en GitHub Actions
-(`.github/workflows/deploy.yml`, job "Subir dist/ a gh-pages") si ya terminó y si
-`gh-pages` tiene el commit de la fusión de #174 antes de dar nada por publicado.
-Reinstalar el acceso directo NO hace falta esta vez: basta con recargar la app con
-conexión (puede pedir una segunda recarga) para que el service worker nuevo tome el
-relevo — ver la sección de arriba sobre el fallo del service worker.
+verlo"), **y el despliegue a producción ya se confirmó publicado** (commit `b734764`,
+`gh-pages` al día, service worker en `gula-v6`). Reinstalar el acceso directo NO hace
+falta: basta con recargar la app con conexión (puede pedir una segunda recarga).
+
+**Dos PR más, abiertos y verificados (`tipos` + `test:rapido` en verde), esperando
+fusionarse — bloqueados solo por el límite de peticiones de la API de GitHub de esta
+sesión, no por nada del código:**
+- **#176** — condensa este mismo `CONTEXTO.md` (de 2.509 a 462 líneas, ver el propio PR
+  para el porqué).
+- **#177** — iguala la distancia entre el pictograma y el logotipo "gula" en los tres
+  iconos (14px en checklist, 38px en calendario, 6px en formulario — el dueño lo cazó
+  con una captura de los tres accesos directos instalados). Sube `sw.js` a `gula-v7`.
+  Rama `arreglar-distancia-gula-en-iconos`, creada ANTES de que #176 se fusionara, así
+  que se fusiona ella misma con `main` en cuanto #176 entre — mismo patrón de conflicto
+  en `CONTEXTO.md` que ya se ha resuelto varias veces hoy (quedarse con las dos
+  secciones, sin perder ninguna).
 
 **Pendiente del dueño, no de código** — del contenido de #171 (motores gratis nuevos):
 pegar `worker/pegar.js` regenerado en el panel de Cloudflare y añadir como *Secret* la
