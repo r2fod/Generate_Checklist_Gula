@@ -65,7 +65,7 @@ self.addEventListener("notificationclick", (e) => {
 // número, y quien ya tenía la app instalada (o solo visitada una vez) se quedó viendo
 // el icono antiguo por mucho que borrara el acceso directo y lo reinstalara, porque el
 // acceso directo no toca la caché del origen — solo se limpia bajando este número.
-const VERSION = "gula-v6";
+const VERSION = "gula-v7";
 const CACHE = `${VERSION}`;
 
 // Lo que hay que guardar sí o sí para poder abrir sin cobertura. Los .js y .css llevan
