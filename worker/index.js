@@ -21,7 +21,6 @@
 import { repasar, DIAS_VISTA, FIRESTORE, proyecto, campos, entrar } from "./repaso.js";
 import { CLAVES_VOZ_GEMINI } from "../src/asistente/vozGemini.js";
 import { hoyISO } from "../src/fecha.js";
-import webpush from "web-push";
 import { createECDH } from "node:crypto";
 
 const CORS = (origen) => ({
@@ -762,6 +761,119 @@ export function payloadDeRecordatorio(tarea) {
   return { titulo: "Gula · recordatorio", cuerpo: String(cuerpo).slice(0, 200), url: "./checklist/" };
 }
 
+// ─── EL AVISO CIFRADO, SIN LA LIBRERÍA web-push ───────────────────────────────
+// Esto usaba el paquete de npm `web-push`, y se quitó: parte de su árbol de
+// dependencias (el soporte de proxy de sendNotification, que aquí no hace falta — el
+// envío va por fetch, no por su sendNotification, ver avisosDelDia) llama a require()
+// de un modo que ningún bundler puede convertir a un import estático de verdad, así
+// que necesita emularlo con createRequire(import.meta.url) — y ESO falla siempre al
+// cargar el Worker en Cloudflare, porque import.meta.url llega undefined en su salida
+// empaquetada. No es un "a lo mejor falla": está confirmado y documentado (varios
+// casos iguales con otras librerías, mismo motivo exacto). El Worker entero dejaba de
+// cargar, no solo el aviso — "Uncaught Error: No such module 'web-push'" en cuanto se
+// pegaba el código, antes de que corriera una sola línea nuestra.
+//
+// Lo único que hacía falta de esa librería son dos cosas de pura criptografía, sin
+// nada de red: firmar el JWT de VAPID (RFC 8292, ECDSA P-256 + SHA-256) y cifrar el
+// aviso (RFC 8291, ECDH + HKDF + AES-128-GCM) — las dos las da la propia Web Crypto
+// API que trae Cloudflare Workers DE SERIE, sin ninguna dependencia, que es justo lo
+// que ya prometía el comentario de arriba del todo ("va sin dependencias").
+//
+// Verificado por fuera del código, no solo leído: cifrando con esto y descifrando con
+// la librería web-push de verdad (que aplica la RFC tal cual, igual que hace un
+// teléfono de verdad), el mensaje sale IDÉNTICO — y la firma del JWT verifica con
+// Web Crypto usando la clave pública correspondiente. Repetido varias veces con datos
+// al azar cada vez (claves, aviso, sal), no solo una.
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const deB64u = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+const concatBytes = (...trozos) => {
+  const r = new Uint8Array(trozos.reduce((n, t) => n + t.length, 0));
+  let o = 0;
+  trozos.forEach(t => { r.set(t, o); o += t.length; });
+  return r;
+};
+const hmacSHA256 = async (clave, datos) =>
+  new Uint8Array(await crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", clave, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]), datos));
+// HKDF-Expand con un solo bloque (T(1) = HMAC(PRK, info || 0x01)): de sobra para las
+// claves de 12 y 16 bytes que hacen falta aquí — nunca se necesita un segundo bloque.
+const hkdfExpand = async (prk, info, len) => (await hmacSHA256(prk, concatBytes(info, new Uint8Array([1])))).slice(0, len);
+const UTF8 = new TextEncoder();
+
+// El JWT de VAPID: cabecera y payload van tal cual pide RFC 8292; la firma ECDSA de
+// Web Crypto ya sale en el formato r||s crudo que pide JWS (ES256) — sin la vuelta por
+// ASN.1/PEM que hacía falta con node:crypto puro.
+async function firmarJWTVapid(audiencia, asunto, clavePublica, clavePrivada) {
+  const priv = deB64u(clavePrivada);           // 32 bytes: el escalar privado
+  const pub = deB64u(clavePublica);             // 65 bytes: 0x04 || x(32) || y(32)
+  const jwk = {
+    kty: "EC", crv: "P-256",
+    d: b64u(priv), x: b64u(pub.slice(1, 33)), y: b64u(pub.slice(33, 65)),
+  };
+  const clave = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const cabecera = b64u(UTF8.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const cuerpo = b64u(UTF8.encode(JSON.stringify({
+    aud: audiencia, sub: asunto, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+  })));
+  const firma = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, clave, UTF8.encode(`${cabecera}.${cuerpo}`));
+  return `${cabecera}.${cuerpo}.${b64u(firma)}`;
+}
+
+// El aviso cifrado (RFC 8291, aes128gcm) + la cabecera VAPID, listos para el fetch de
+// avisosDelDia. Un aviso de recordatorio siempre cabe de sobra en un solo registro
+// (4096 bytes), así que no hace falta el trocear/paginar de la RFC para avisos largos.
+export async function peticionPushCifrada(subscripcion, payloadTexto, vapidDetails) {
+  const userPublicKey = deB64u(subscripcion.keys.p256dh); // 65 bytes
+  const userAuth = deB64u(subscripcion.keys.auth);        // 16 bytes
+
+  // Un par de claves ECDH NUEVO por cada aviso (nunca se reutiliza): es lo que exige
+  // la RFC para que dos avisos al mismo teléfono no compartan secreto.
+  const parEfimero = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const clavePublicaEfimera = new Uint8Array(await crypto.subtle.exportKey("raw", parEfimero.publicKey));
+  const claveDestino = await crypto.subtle.importKey("raw", userPublicKey, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const secretoCompartido = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: claveDestino }, parEfimero.privateKey, 256));
+
+  // Paso 1 (RFC 8291 §3.3): el "secreto de webpush" — HKDF con el auth secret del
+  // teléfono como sal, sobre el secreto ECDH.
+  const infoWebpush = concatBytes(UTF8.encode("WebPush: info\0"), userPublicKey, clavePublicaEfimera);
+  const secretoWebpush = await hkdfExpand(await hmacSHA256(userAuth, secretoCompartido), infoWebpush, 32);
+
+  // Paso 2 (RFC 8188): la clave y el nonce del registro — HKDF con una sal aleatoria
+  // NUEVA para este mensaje en concreto (no la del auth secret).
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const prk2 = await hmacSHA256(sal, secretoWebpush);
+  const claveCifrado = await hkdfExpand(prk2, UTF8.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdfExpand(prk2, UTF8.encode("Content-Encoding: nonce\0"), 12);
+
+  // Un solo registro: al texto se le añade el delimitador 0x02 de "es el último
+  // registro" (RFC 8188 §2) y se cifra entero de una vez con AES-128-GCM.
+  const claveAES = await crypto.subtle.importKey("raw", claveCifrado, "AES-GCM", false, ["encrypt"]);
+  const textoPlano = concatBytes(UTF8.encode(payloadTexto), new Uint8Array([2]));
+  const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, claveAES, textoPlano));
+
+  // La cabecera del registro (RFC 8188 §2.1): sal(16) + tamaño de registro(4, uint32
+  // big-endian) + longitud del id de clave(1) + id de clave (nuestra pública efímera).
+  const rs = new Uint8Array(4);
+  new DataView(rs.buffer).setUint32(0, 4096);
+  const cabeceraRegistro = concatBytes(sal, rs, new Uint8Array([clavePublicaEfimera.length]), clavePublicaEfimera);
+  const cuerpo = concatBytes(cabeceraRegistro, cifrado);
+
+  const jwt = await firmarJWTVapid(new URL(subscripcion.endpoint).origin, vapidDetails.subject, vapidDetails.publicKey, vapidDetails.privateKey);
+
+  return {
+    method: "POST",
+    endpoint: subscripcion.endpoint,
+    body: cuerpo,
+    headers: {
+      TTL: "60",
+      "Content-Length": String(cuerpo.length),
+      "Content-Type": "application/octet-stream",
+      "Content-Encoding": "aes128gcm",
+      Urgency: "normal",
+      Authorization: `vapid t=${jwt}, k=${vapidDetails.publicKey}`,
+    },
+  };
+}
+
 // Las claves VAPID. Si faltan, el fallo DICE qué falta y con qué se arregla: un Worker
 // sin claves no puede adivinar que le falta una clave.
 export function vapidClaves(env) {
@@ -843,13 +955,11 @@ export async function avisosDelDia(env) {
     const payload = JSON.stringify(payloadDeRecordatorio(tarea));
     for (const sus of aparatos) {
       try {
-        // generateRequestDetails hace la criptografía VAPID + RFC 8291 (web-push,
-        // probada) y devuelve la petición lista; el envío va por fetch, que es lo
-        // nativo de Workers (web-push's sendNotification usa node:https, que en
-        // Workers está limitado).
-        const det = webpush.generateRequestDetails(sus, payload, {
-          TTL: 60,
-          vapidDetails: { subject: claves.asunto, publicKey: claves.publico, privateKey: claves.clave },
+        // peticionPushCifrada hace la criptografía VAPID + RFC 8291 con Web Crypto
+        // (ver el porqué largo justo encima de vapidClaves) y devuelve la petición
+        // lista; el envío va por fetch, que es lo nativo de Workers.
+        const det = await peticionPushCifrada(sus, payload, {
+          subject: claves.asunto, publicKey: claves.publico, privateKey: claves.clave,
         });
         const r = await fetch(det.endpoint, { method: det.method, headers: det.headers, body: det.body });
         if (r.ok) enviados++;

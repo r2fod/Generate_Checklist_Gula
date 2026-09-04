@@ -37,7 +37,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida, salud, urlAnalizable, fetchValidando, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, fetchValidando, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves, peticionPushCifrada } from "../../worker/index.js";
 import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
 import { idDeAparato, CLAVE_ID, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "../asistente/push.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
@@ -2251,6 +2251,54 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     "y con una copia TRUNCADA, lo dice en vez de aceptarla: Node la rellenaría de ceros y 'funcionaría' con una clave distinta a la generada (al corregirla después, los teléfonos tendrían que re-suscribirse)");
   ok(vapidClaves({ VAPID_CLAVE: par.privateKey, VAPID_MAILTO: "gula@ejemplo.com" }).fallo,
     "y sin el mailto: en el asunto, lo pide en vez de intentarlo a ciegas");
+
+  // El aviso cifrado, sin la librería: worker/index.js dejó de usar el paquete
+  // web-push (su árbol de dependencias no se puede empaquetar para un Worker, ver el
+  // porqué largo en el comentario de peticionPushCifrada) y reimplementa las dos
+  // piezas que hacían falta —firmar el JWT de VAPID y cifrar el aviso— con la propia
+  // Web Crypto API. Aquí se comprueba contra la librería DE VERDAD: el abonado (un par
+  // ECDH + un secreto de auth, como los que manda un navegador de verdad al
+  // suscribirse) descifra con http_ece —la misma pieza que usa web-push por dentro—
+  // lo que ha cifrado peticionPushCifrada, y tiene que salir el payload EXACTO.
+  {
+    const crypto = await import("node:crypto");
+    const ece = (await import("http_ece"));
+    const abonado = crypto.createECDH("prime256v1");
+    abonado.generateKeys();
+    const authSecretRaw = crypto.randomBytes(16);
+    const subscripcion = {
+      endpoint: "https://fcm.googleapis.com/fcm/send/prueba123",
+      keys: { p256dh: abonado.getPublicKey("base64url"), auth: authSecretRaw.toString("base64url") },
+    };
+    const payload = JSON.stringify({ titulo: "Gula · recordatorio", cuerpo: "Prueba de cifrado" });
+    const det = await peticionPushCifrada(subscripcion, payload, {
+      subject: "mailto:hola@gula-catering.es", publicKey: par.publicKey, privateKey: par.privateKey,
+    });
+    ok(det.method === "POST" && det.endpoint === subscripcion.endpoint, "la petición va a POST y al endpoint del abonado");
+    ok(det.headers["Content-Encoding"] === "aes128gcm" && det.headers["Content-Length"] === String(det.body.length),
+      "las cabeceras dicen la codificación de verdad y el tamaño de verdad del cuerpo");
+    const claro = ece.decrypt(Buffer.from(det.body), { version: "aes128gcm", privateKey: abonado, authSecret: authSecretRaw });
+    ok(claro.toString("utf8") === payload,
+      "descifrado con http_ece (la pieza de verdad que usa un navegador), el aviso sale IDÉNTICO al que se mandó a cifrar");
+
+    // El JWT de VAPID: cabecera "vapid t=<jwt>, k=<pública>", firma ECDSA que verifica
+    // con la clave pública del par — es justo lo que un servidor de push comprueba
+    // antes de aceptar el aviso.
+    const m = det.headers.Authorization.match(/^vapid t=([^,]+), k=(.+)$/);
+    ok(m && m[2] === par.publicKey, "la cabecera lleva la pública del par tal cual, sin tocar");
+    const [cabecera64, cuerpo64, firma64] = m[1].split(".");
+    const pubBytes = Buffer.from(par.publicKey, "base64url");
+    const jwk = { kty: "EC", crv: "P-256", x: pubBytes.slice(1, 33).toString("base64url"), y: pubBytes.slice(33, 65).toString("base64url") };
+    const claveVerif = await crypto.webcrypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+    const firmaValida = await crypto.webcrypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" }, claveVerif,
+      Buffer.from(firma64, "base64url"), Buffer.from(`${cabecera64}.${cuerpo64}`),
+    );
+    ok(firmaValida, "la firma ECDSA del JWT verifica con la clave pública del par: no está mal formada ni firmada con otra clave");
+    const claims = JSON.parse(Buffer.from(cuerpo64, "base64url").toString("utf8"));
+    ok(claims.sub === "mailto:hola@gula-catering.es" && claims.aud === "https://fcm.googleapis.com",
+      `el JWT lleva el asunto y la audiencia correctos (el origen del endpoint, no el endpoint entero) → ${JSON.stringify(claims)}`);
+  }
 }
 
 console.log("\n──────────────────────────────────────────────────────────");
