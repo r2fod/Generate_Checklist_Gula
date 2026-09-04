@@ -683,6 +683,35 @@ console.log("\n══ El ratio ajustable llega de verdad a la checklist (bug rea
   ponRatios({});   // se dejan como estaban para el resto de la batería
 }
 
+console.log("\n══ Las tronas siguen al número de niños ══");
+{
+  // El dueño reportó tronas desactualizadas al corregir el número de niños desde el
+  // formulario. No se reprodujo: buildChecklist() recibe `ninos` como parámetro propio
+  // (no algo que haya que "recalcular" aparte) y "Tronas" sale directamente de él en
+  // los tres builders (checklist-generadores.js). Confirmado también con Playwright de
+  // verdad, en los dos caminos posibles — un arranque fresco con el ninos nuevo (lo que
+  // hace la app tras aplicar un envío: guarda el estado y recarga entera) y cambiar el
+  // campo Niños en caliente sin recargar — Tronas se actualiza sola en los dos, sin
+  // pulsar "Recalcular cantidades". Se deja esta prueba para que, si el fallo vuelve a
+  // aparecer, sea por otra vía (por ejemplo un valor puesto a mano que pisa el cálculo
+  // a propósito) y no por esto.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return it[1];
+    }
+    return undefined;
+  };
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 5, {}), "Tronas") === "5",
+    "con 5 niños, la checklist de boda pide 5 tronas");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 10, {}), "Tronas") === "10",
+    "y con 10, pide 10 — sin nada guardado de antes que pueda quedarse atrás");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 0, {}), "Tronas") === "—",
+    "y sin niños, no se piden tronas");
+  ok(cantidadItem(buildChecklist("cumpleanos", 60, 0, 0, 8, {}), "Tronas") === "8",
+    "y en cumpleaños igual: 8 niños, 8 tronas");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,
