@@ -2474,31 +2474,29 @@ un Firestore en memoria con las mismas reglas.
 
 ## Qué queda pendiente ahora mismo (2026-09-04)
 
-Cuatro PR abiertos, todos en draft, todos verificados (`tipos` + `test:rapido` + al
-menos uno con la batería completa de navegador) y esperando SOLO al dueño — fusionarlos
-o pedir cambios:
+Los cinco PR que había abiertos (#169, #170, #171, #172, #174 — todos descritos arriba)
+ya están fusionados en `main`, con el visto bueno explícito del dueño ("fusionalo para
+verlo"). El despliegue automático (workflow `Publicar`, dispara con cada push a `main`,
+tarda ~45 min porque corre la batería completa de navegador antes de publicar) estaba
+EN MARCHA en el momento de escribir esto — comprobar en GitHub Actions
+(`.github/workflows/deploy.yml`, job "Subir dist/ a gh-pages") si ya terminó y si
+`gh-pages` tiene el commit de la fusión de #174 antes de dar nada por publicado.
+Reinstalar el acceso directo NO hace falta esta vez: basta con recargar la app con
+conexión (puede pedir una segunda recarga) para que el service worker nuevo tome el
+relevo — ver la sección de arriba sobre el fallo del service worker.
 
-- **#169** — notas duplicadas al reenviar el formulario + dos personas guardando a la
-  vez se pisaban (`arreglos-notas-y-sincronizacion`).
-- **#170** — meta `mobile-web-app-capable` deprecada (`arreglo-meta-mobile-web-app-capable`).
-- **#171** — Groq/Cerebras/Z.AI/Mistral/OpenRouter/NVIDIA/Cloudflare Workers AI en la
-  cascada del asistente (`asistente-mas-proveedores-gratis`). **Necesita que el dueño
-  pegue el `pegar.js` de #172 primero o después** — sin eso el Worker no carga en
-  absoluto, con o sin proveedores nuevos.
-- **#172** — el fallo del Worker que no cargaba (arriba). Es el más urgente de los
-  cuatro: sin él, ningún `pegar.js` de este repo se puede desplegar.
+**Pendiente del dueño, no de código** — del contenido de #171 (motores gratis nuevos):
+pegar `worker/pegar.js` regenerado en el panel de Cloudflare y añadir como *Secret* la
+clave de cada proveedor que quiera usar (no hace falta cuenta en los siete, solo en los
+que se vayan a usar) — tabla completa en `worker/README.md`.
 
 Sueltos, ninguno con PR todavía:
 
-- **Iconos de checklist/formulario/calendario**: preview ya mandada (azul marino,
-  morado, verde azulado, cada uno con su icono y el logotipo real recortado del PNG
-  existente) — esperando el visto bueno del dueño antes de tocar los `manifest.
-  webmanifest` y el `theme-color` de cada app.
 - **Mejoras del formulario** (cubertería/cristalería exacta por mesa, apartado de
   buffets, comentario por paso, ir al resumen en cualquier momento, el bug de las
   tronas al añadir niños): el dueño pidió EXPLÍCITAMENTE que antes de programar nada se
   planteen las preguntas exactas y se le enseñe una preview para depurar — no arrancar
-  directo al código.
+  directo al código. No empezado.
 - **Revisión visual a fondo** ("hay cosas que no están bien adaptadas"): no empezada.
   Los 9 anchos × 2 temas de la batería solo cazan desbordamiento, no lo apretado/mal
   alineado — hace falta mirar capturas reales pantalla por pantalla.
