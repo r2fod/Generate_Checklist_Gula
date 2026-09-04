@@ -430,6 +430,13 @@ está en el historial de git y en las pruebas que los cubren):
 - **`aplicar_calibracion` y `aplicar_factor_bebida` escriben el mismo dato por dos
   herramientas distintas** (una de #154, otra de esta rama) — duplicación conocida,
   documentada, decisión de unificar pendiente del dueño.
+- **El logotipo "gula" quedaba a distinta distancia del pictograma en cada icono** —
+  14px en checklist, 38px en calendario, 6px en formulario: cada pictograma se dibujó a
+  su propio tamaño sin mirar dónde caía el logotipo (fijo en `y=404` en los tres SVG
+  fuente). Arreglado envolviendo cada pictograma en su propio `translate` para igualar
+  el hueco a 14px en los tres, variantes maskable incluidas. `sw.js` sube a `gula-v7`
+  (mismo fichero sin hash de siempre: sin subir `VERSION` el navegador seguiría
+  sirviendo los iconos viejos en caché).
 
 ## Qué queda pendiente ahora mismo (2026-09-04)
 
