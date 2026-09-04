@@ -41,7 +41,7 @@ import {
 } from "./nube.js";
 import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
 import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
-import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio } from "./formulario/preguntas.js";
+import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio, notasFusionadas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
 // solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se
@@ -928,20 +928,11 @@ export default function App({ onCerrarSesion } = {}) {
     nuestrosGuardadosRef.current = [...nuestrosGuardadosRef.current.slice(-9), ts];
   };
 
-  // Cada cambio local se sube a la nube con un pequeño retardo (evita subir por cada tecla)
-  useEffect(() => {
-    if (!nubeActiva() || !eventoNubeId) return;
-    const t = setTimeout(() => {
-      ultimoGuardadoNubeRef.current = estadoActualJSON;
-      guardarEventoNube(eventoNubeId, getEstadoActual())
-        .then((ts) => { apuntarGuardadoPropio(ts); setErrorNube(null); })
-        .catch(avisarFalloNube);
-    }, 1200);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estadoActualJSON, eventoNubeId]);
-
-  // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página
+  // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página.
+  // Va ANTES del guardado (justo debajo) porque ahora el guardado también los usa: si
+  // la fusión en el servidor trae un campo que este aparato no tenía (otra persona lo
+  // cambió mientras tanto), se aplica aquí mismo, con el mismo setter que usa el aviso
+  // de "cambios remotos".
   const SETTERS_SYNC = {
     sinConfigurar: setSinConfigurar,
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
@@ -971,6 +962,38 @@ export default function App({ onCerrarSesion } = {}) {
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
   settersSyncRef.current = SETTERS_SYNC;
+
+  // Cada cambio local se sube a la nube con un pequeño retardo (evita subir por cada
+  // tecla). Se manda el estado local Y el último que se sabe que tenía el servidor
+  // (`ultimoGuardadoNubeRef`): guardarEventoNube solo escribe encima los campos que
+  // hayan cambiado entre esos dos, así que un campo que este aparato no ha tocado
+  // nunca pisa lo que haya puesto otra persona (ver el porqué largo en nube.js).
+  useEffect(() => {
+    if (!nubeActiva() || !eventoNubeId) return;
+    const t = setTimeout(() => {
+      const local = getEstadoActual();
+      const baseline = ultimoGuardadoNubeRef.current ? JSON.parse(ultimoGuardadoNubeRef.current) : null;
+      guardarEventoNube(eventoNubeId, local, baseline)
+        .then(({ actualizado, fusion }) => {
+          ultimoGuardadoNubeRef.current = JSON.stringify(fusion);
+          apuntarGuardadoPropio(actualizado);
+          setErrorNube(null);
+          // La fusión puede traer un campo que este aparato no tenía —alguien lo
+          // cambió mientras el guardado estaba en camino—: se aplica aquí mismo, sin
+          // esperar al eco por la suscripción (ese eco, al ser nuestro, no se vuelve a
+          // aplicar más abajo — ver "es mío, no hay nada que aplicar").
+          Object.entries(fusion).forEach(([k, v]) => {
+            if (k === "nombreEvento" && !v && local.nombreEvento) return;
+            if (JSON.stringify(local[k]) !== JSON.stringify(v) && settersSyncRef.current[k]) {
+              settersSyncRef.current[k](v);
+            }
+          });
+        })
+        .catch(avisarFalloNube);
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoActualJSON, eventoNubeId]);
 
   // Escucha los guardados de otras personas en este evento: cuando llega uno que
   // no es nuestro se aplica AL INSTANTE (sin recargar) y se muestra un aviso con
@@ -1223,7 +1246,7 @@ export default function App({ onCerrarSesion } = {}) {
         avisarCompartir("Copiado, pero el evento aún NO ha subido ⚠", 9000, 1);
       }, ESPERA_SUBIDA_LINK);
       guardarEventoNube(id, estado)
-        .then((ts) => { apuntarGuardadoPropio(ts); resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
+        .then(({ actualizado }) => { apuntarGuardadoPropio(actualizado); resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
         .catch((e) => {
           resuelto = true;
           clearTimeout(aTiempo);
@@ -1852,16 +1875,9 @@ export default function App({ onCerrarSesion } = {}) {
         // El aviso existe para que nadie cargue un camión con los valores de fábrica;
         // una vez llegan los datos de la oficina, seguir avisando sería ruido.
         const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false };
-        // Las notas se SUMAN, no se sustituyen: las del evento suelen ser tuyas (a quién
-        // llamar, qué recoger) y las del formulario vienen del cliente. Perder unas por
-        // las otras es justo lo que no puede pasar.
-        const notasAntes = (base.notasEvento || "").trim();
-        const notasNuevas = (cambios.notasEvento || "").trim();
-        if (notasAntes && notasNuevas && !notasAntes.includes(notasNuevas)) {
-          estado.notasEvento = `${notasAntes}\n${notasNuevas}`;
-        } else if (notasAntes && !notasNuevas) {
-          estado.notasEvento = base.notasEvento;
-        }
+        // Las notas se SUMAN, no se sustituyen (ver notasFusionadas en preguntas.js,
+        // que explica por qué se compara línea a línea y no el bloque entero).
+        estado.notasEvento = notasFusionadas(base.notasEvento, cambios.notasEvento);
         // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
         // si no, la app cargaría el material y nadie iría a buscarlo.
         estado.recogidas = recogidasConAlquileres(estado);
