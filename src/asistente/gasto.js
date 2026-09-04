@@ -22,6 +22,17 @@ export const PRECIOS = {
   claude:     { entrada: 4.6,  salida: 23,   nombre: "Claude" },
   openai:     { entrada: 0.14, salida: 0.55, nombre: "OpenAI" },
   compatible: { entrada: 1,    salida: 4,    nombre: "Otro" },
+  // Los siete de abajo son gratis en la capa que usa esta app (ver worker/index.js): si
+  // algún día alguno pasa a cobrar, se cambia aquí, igual que el resto.
+  groq:       { entrada: 0,    salida: 0,    nombre: "Groq" },
+  cerebras:   { entrada: 0,    salida: 0,    nombre: "Cerebras" },
+  zai:        { entrada: 0,    salida: 0,    nombre: "Z.AI" },
+  mistral:    { entrada: 0,    salida: 0,    nombre: "Mistral" },
+  openrouter: { entrada: 0,    salida: 0,    nombre: "OpenRouter" },
+  nvidia:     { entrada: 0,    salida: 0,    nombre: "NVIDIA" },
+  // Gratis mientras no se salga del cupo diario compartido de Neuronas (10.000/día,
+  // repartido entre TODOS los modelos que se usen en la cuenta, no uno por modelo).
+  cloudflare: { entrada: 0,    salida: 0,    nombre: "Cloudflare" },
 };
 
 const CLAVE = "gula_asistente_gasto";

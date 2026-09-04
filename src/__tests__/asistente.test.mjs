@@ -626,6 +626,22 @@ console.log("\n── Quién contesta cada pregunta ──");
   ok(candidatos("lo que sea", tres).every(p => tres.includes(p)), "nunca sale uno de fuera de la lista");
   ok(ORDEN[0] === "gemini", "el orden de partida empieza por lo gratis");
 
+  // Los motores gratis nuevos: Groq, Cerebras y Z.AI no entrenan con lo que reciben en
+  // NINGÚN plan, así que pueden ver datos de clientes igual que Gemini o Claude.
+  // Mistral, OpenRouter y NVIDIA sí pueden acabar entrenando con la capa gratis, así que
+  // van con OpenAI: fuera en cuanto la pregunta lleva datos.
+  const gratisNuevos = ["gemini", "groq", "cerebras", "zai", "cloudflare", "mistral", "openrouter", "nvidia"];
+  ["groq", "cerebras", "zai", "cloudflare"].forEach(p =>
+    ok(candidatos("que eventos tengo en septiembre", gratisNuevos).includes(p),
+      `${p} no entrena con nada: puede ver datos de clientes`));
+  ["mistral", "openrouter", "nvidia"].forEach(p =>
+    ok(!candidatos("que eventos tengo en septiembre", gratisNuevos).includes(p),
+      `${p} sí puede entrenar en su capa gratis: fuera con datos de clientes`));
+  ok(candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("mistral") &&
+    candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("openrouter") &&
+    candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("nvidia"),
+    "pero para una cuenta suelta, sin datos, los tres sí pueden");
+
   // El respaldo: qué merece reintentar con otro y qué no
   ["429 Too Many Requests", "quota exceeded", "RESOURCE_HAS_BEEN_EXHAUSTED", "503 unavailable", "overloaded"]
     .forEach(m => ok(mereceOtroIntento(m), `"${m.slice(0, 28)}" merece probar con otro`));
@@ -1943,7 +1959,7 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   let llamadas = 0;
   globalThis.fetch = async () => { llamadas++; throw new Error("no debería llamar a nadie"); };
   const sinNada = await salud({});
-  ok(sinNada.pings.length === 4 && sinNada.pings.every(p => p.estado === "sin configurar"),
+  ok(sinNada.pings.length === 11 && sinNada.pings.every(p => p.estado === "sin configurar"),
     "sin claves, dice qué falta en cada proveedor sin gastar ni un token");
   ok(llamadas === 0, "y de verdad no llamó a nadie");
 
