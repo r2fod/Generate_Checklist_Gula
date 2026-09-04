@@ -2262,6 +2262,31 @@ prueba permanente de la batería, para que quede cubierto de aquí en adelante.
 | Calendario | 150 kB | 0,66 s |
 | Formulario | 101 kB | 0,65 s |
 
+## Fallo real: el Worker entero no cargaba (web-push no se puede empaquetar)
+
+Al pegar `worker/pegar.js` en Cloudflare: "Uncaught Error: No such module 'web-push'"
+— el Worker ENTERO dejaba de cargar, no solo el aviso por push. Confirmado con fuentes:
+parte del árbol de `web-push` (el soporte de proxy de `sendNotification`, que este
+Worker no usa — el envío va por `fetch` nativo) llama a `require()` de un modo que
+ningún bundler puede convertir a un import estático, así que necesita emular
+`require()` con `createRequire(import.meta.url)` — y eso falla SIEMPRE en Cloudflare
+Workers porque `import.meta.url` llega `undefined` en su salida empaquetada. Probado
+`--platform node` (empaqueta `web-push` entero pero necesita el mismo `createRequire`:
+cambia un fallo garantizado por otro) y un `import()` perezoso dentro de
+`avisosDelDia` (con un solo fichero de salida, rolldown solo puede inlinearlo, y el
+`createRequire` sigue corriendo EAGER al cargar el Worker, no diferido) — ninguno vale.
+
+Arreglado quitando la dependencia entera. Lo único que hacía falta de `web-push` son
+dos piezas de criptografía pura (RFC 8291 y RFC 8292, sin nada de red), y las dos las
+da la propia Web Crypto API que trae Cloudflare Workers de serie — justo lo que ya
+prometía el comentario de cabecera del fichero ("va sin dependencias"). Reescritas a
+mano (`peticionPushCifrada` + `firmarJWTVapid` en `worker/index.js`), verificadas por
+fuera del código: cifrando con la reimplementación y descifrando con `web-push`/
+`http_ece` de verdad, el mensaje sale idéntico byte a byte, y la firma ECDSA del JWT
+verifica con Web Crypto. `web-push` pasa a devDependency (solo para generar claves a
+mano y para esta prueba); `http_ece` se declara explícita en vez de depender de que
+llegue transitivamente.
+
 ## Cómo probar lo que está tras el login
 
 `pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:
@@ -2270,7 +2295,40 @@ prueba permanente de la batería, para que quede cubierto de aquí en adelante.
 Lo de `App.jsx` se prueba **simulando el arranque** en `sincronizacion.test.mjs`, contra
 un Firestore en memoria con las mismas reglas.
 
-## Recomendación actual
+## Qué queda pendiente ahora mismo (2026-09-04)
 
-**Parar de añadir y usarlo una semana.** Lo nuevo está probado contra datos inventados,
-no contra un septiembre con tres bodas el mismo día.
+Cuatro PR abiertos, todos en draft, todos verificados (`tipos` + `test:rapido` + al
+menos uno con la batería completa de navegador) y esperando SOLO al dueño — fusionarlos
+o pedir cambios:
+
+- **#169** — notas duplicadas al reenviar el formulario + dos personas guardando a la
+  vez se pisaban (`arreglos-notas-y-sincronizacion`).
+- **#170** — meta `mobile-web-app-capable` deprecada (`arreglo-meta-mobile-web-app-capable`).
+- **#171** — Groq/Cerebras/Z.AI/Mistral/OpenRouter/NVIDIA/Cloudflare Workers AI en la
+  cascada del asistente (`asistente-mas-proveedores-gratis`). **Necesita que el dueño
+  pegue el `pegar.js` de #172 primero o después** — sin eso el Worker no carga en
+  absoluto, con o sin proveedores nuevos.
+- **#172** — el fallo del Worker que no cargaba (arriba). Es el más urgente de los
+  cuatro: sin él, ningún `pegar.js` de este repo se puede desplegar.
+
+Sueltos, ninguno con PR todavía:
+
+- **Iconos de checklist/formulario/calendario**: preview ya mandada (azul marino,
+  morado, verde azulado, cada uno con su icono y el logotipo real recortado del PNG
+  existente) — esperando el visto bueno del dueño antes de tocar los `manifest.
+  webmanifest` y el `theme-color` de cada app.
+- **Mejoras del formulario** (cubertería/cristalería exacta por mesa, apartado de
+  buffets, comentario por paso, ir al resumen en cualquier momento, el bug de las
+  tronas al añadir niños): el dueño pidió EXPLÍCITAMENTE que antes de programar nada se
+  planteen las preguntas exactas y se le enseñe una preview para depurar — no arrancar
+  directo al código.
+- **Revisión visual a fondo** ("hay cosas que no están bien adaptadas"): no empezada.
+  Los 9 anchos × 2 temas de la batería solo cazan desbordamiento, no lo apretado/mal
+  alineado — hace falta mirar capturas reales pantalla por pantalla.
+- **Limpiar notas duplicadas en eventos YA creados** (antes del fix de #169): bloqueado
+  en que el dueño exporte el backup/restore de la app — sin acceso a producción, no se
+  puede mirar ni arreglar por otra vía. Sin romper nada: solo el campo de notas, solo
+  quitar duplicados exactos, mostrar el diff antes de devolver nada.
+
+**Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
+septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.
