@@ -108,6 +108,55 @@ ok(Object.keys(sinSesion.local).length===1, 'lo local NO se pierde aunque la nub
 ok(sinSesion.errores.length>0, `y el error se detecta para poder avisar: ${JSON.stringify(sinSesion.errores)}`);
 setSesion(true);
 
+// ── El evento compartido: dos personas guardando casi a la vez ───────────────
+// El bug real: dos móviles con la checklist del mismo evento abierta. Antes,
+// guardarEventoNube sobrescribía el documento ENTERO con el estado local de quien
+// guardara último, así que el segundo guardado borraba lo que el primero acababa
+// de escribir aunque tocaran campos distintos. La solución: una transacción que
+// solo escribe encima los campos que de verdad cambiaron respecto a la base común
+// (`baseline`), campo a campo — no el documento entero.
+console.log('\n══ El evento compartido: dos personas guardando casi a la vez ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const id = 'evt_compartido';
+  const base = { pax: 100, checkeados: ['mesas'], notasEvento: 'Sin gluten mesa 4' };
+
+  const primero = await N.guardarEventoNube(id, base);
+  ok(primero && primero.actualizado > 0, 'el primer guardado (sin baseline) crea el documento');
+
+  // Dispositivo A marca un ítem nuevo, dispositivo B cambia el pax — ambos partiendo
+  // de la MISMA base (`primero.fusion`), sin saber del otro.
+  const baseline = primero.fusion;
+  const localA = { ...baseline, checkeados: ['mesas', 'sillas'] };
+  const localB = { ...baseline, pax: 120 };
+
+  const rA = await N.guardarEventoNube(id, localA, baseline);
+  ok(JSON.stringify(rA.fusion.checkeados) === JSON.stringify(['mesas', 'sillas']) && rA.fusion.pax === 100,
+    'A guarda su check nuevo sin tocar el pax, que sigue en 100');
+
+  const rB = await N.guardarEventoNube(id, localB, baseline);
+  ok(rB.fusion.pax === 120 && JSON.stringify(rB.fusion.checkeados) === JSON.stringify(['mesas', 'sillas']),
+    'B guarda su pax nuevo Y CONSERVA el check de A, que B ni sabía que existía');
+
+  const final = JSON.parse(almacen.get(`eventos/${id}`).estado);
+  ok(final.pax === 120 && JSON.stringify(final.checkeados) === JSON.stringify(['mesas', 'sillas']),
+    `en el documento final no se ha perdido nada de ninguno de los dos: ${JSON.stringify(final)}`);
+
+  // Sin baseline (p. ej. el primer guardado de una sesión que no llegó a cargar
+  // nada antes): se compara contra lo que ya hay en el servidor, no se pierde.
+  const sinBaseline = await N.guardarEventoNube(id, { ...final, notasEvento: 'Sin gluten mesa 4 y mesa 7' });
+  ok(sinBaseline.fusion.pax === 120 && sinBaseline.fusion.notasEvento === 'Sin gluten mesa 4 y mesa 7',
+    'sin baseline explícito, se compara contra el servidor y tampoco se pierde nada');
+
+  // Conflicto de verdad: los DOS tocan el mismo campo desde la misma base. Aquí sí
+  // gana el último en escribir, pero SOLO en ese campo — el resto sigue a salvo.
+  const baseline2 = sinBaseline.fusion;
+  await N.guardarEventoNube(id, { ...baseline2, pax: 150 }, baseline2);
+  const rConflicto = await N.guardarEventoNube(id, { ...baseline2, pax: 200 }, baseline2);
+  ok(rConflicto.fusion.pax === 200 && JSON.stringify(rConflicto.fusion.checkeados) === JSON.stringify(['mesas', 'sillas']),
+    'mismo campo, misma base: gana el último en escribir, pero solo ahí — lo demás no se toca');
+}
+
 console.log('\n══ El calendario se muda a su carpeta propia ══');
 {
   almacen.clear(); limpiarPrevios(); setSesion(true);
@@ -785,6 +834,33 @@ console.log("\n══ Compras que trae el envío ══");
     "las compras se leen en una línea en la bandeja");
   ok(filas.find(f => f.id === "notas").respuesta === "Alergia al marisco",
     "y no se mezclan con las notas del evento");
+}
+
+// ── Notas del evento: se suman línea a línea, no se duplican ─────────────────
+// El bug real: al reenviar un formulario corregido, la oficina no borra lo que ya
+// había escrito, así que "nuevas" llega con una copia completa de "antes" dentro,
+// más lo añadido. Comparar el bloque entero nunca detectaba esa inclusión (el texto
+// viejo, más corto, no puede "contener" al nuevo, más largo) y todo se concatenaba
+// otra vez → notas duplicadas → filas duplicadas en "Recordatorios del evento".
+console.log("\n══ Notas del evento: se suman línea a línea, no se duplican ══");
+{
+  const { notasFusionadas } = await import("../formulario/preguntas.js");
+  const antes = "Alergia al marisco\nLlamar antes de las 10h";
+  const reenviadas = "Alergia al marisco\nLlamar antes de las 10h\nTraer 2 tronas extra";
+  ok(notasFusionadas(antes, reenviadas) === "Alergia al marisco\nLlamar antes de las 10h\nTraer 2 tronas extra",
+    "el reenvío con lo de siempre repetido no duplica nada, solo suma lo nuevo");
+
+  ok(notasFusionadas("Alergia al marisco", "Sin gluten en la mesa 4") === "Alergia al marisco\nSin gluten en la mesa 4",
+    "notas nuevas de verdad se añaden al final, sin tocar lo que ya había");
+
+  const fusionadas = notasFusionadas(antes, reenviadas);
+  ok(notasFusionadas(fusionadas, reenviadas) === fusionadas,
+    "aplicar el mismo envío dos veces no cambia nada la segunda vez (idempotente)");
+
+  ok(notasFusionadas("", "Primeras notas") === "Primeras notas", "sin notas antes, se queda solo lo nuevo");
+  ok(notasFusionadas("Notas de siempre", "") === "Notas de siempre", "sin nada nuevo, se queda lo de antes");
+  ok(notasFusionadas("Alergia al marisco", "ALERGIA AL MARISCO") === "Alergia al marisco",
+    "la comparación ignora mayúsculas: no duplica por un cambio de caja");
 }
 
 // ── El armario caliente también es alquiler ───────────────────────────────────
