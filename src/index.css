@@ -6295,8 +6295,9 @@ hr {
 .asis-auto:hover { color: var(--text-main); border-color: var(--text-muted); }
 .asis-auto.es-activa { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Los tres proveedores, en tres columnas iguales. Con las notas cortas caben en un
-   móvil de 320px sin partirse. */
+/* Los proveedores disponibles, en tres columnas iguales — con tres o con once: el grid
+   crece solo en filas nuevas, no hace falta tocar nada al añadir uno más. Con las notas
+   cortas caben en un móvil de 320px sin partirse. */
 .asis-proveedores {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
