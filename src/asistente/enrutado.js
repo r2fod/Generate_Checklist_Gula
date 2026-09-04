@@ -26,11 +26,21 @@
 import { sinTildes } from "../texto.js";
 
 // El orden por defecto: primero lo gratis, luego lo bueno, luego lo limitado.
-export const ORDEN = ["gemini", "claude", "openai", "compatible"];
+export const ORDEN = ["gemini", "groq", "cerebras", "zai", "cloudflare", "claude", "openai", "mistral", "openrouter", "nvidia", "compatible"];
 
 // Los que NO pueden ver datos de clientes. Es la misma regla que ya aplica el catálogo
 // de herramientas; aquí se usa para no mandarles ni la pregunta.
-export const SIN_DATOS_DE_CLIENTES = ["openai"];
+//
+// openai: sus tokens gratuitos se pagan compartiendo lo que recibe para entrenar.
+// mistral: igual, pero solo en su capa gratis — se puede desactivar a mano en su panel,
+// pero por defecto entrena, así que aquí se asume que no se ha tocado ese ajuste.
+// openrouter: OpenRouter en sí no entrena, pero muchos de sus modelos GRATIS exigen
+// activar "training y logging" para poder usarlos — el que entrena es el proveedor de
+// detrás del modelo, no OpenRouter, pero el efecto es el mismo.
+// nvidia: su política de privacidad dice que graba y usa lo que entra y sale para
+// mejorar sus modelos, con aviso explícito de no subir nada confidencial — aunque sus
+// términos de servicio digan lo contrario.
+export const SIN_DATOS_DE_CLIENTES = ["openai", "mistral", "openrouter", "nvidia"];
 
 // Palabras que dicen que la pregunta va sobre EL NEGOCIO y no sobre una cuenta suelta.
 // No hace falta afinarlo: equivocarse hacia "lleva datos" no rompe nada —solo usa un
@@ -99,7 +109,7 @@ export function porQue(texto, elegido, disponibles = []) {
   if (preguntaPideCabeza(texto) && (elegido === "claude" || elegido === "compatible")) {
     return "pide comparar o recomendar";
   }
-  if (preguntaLlevaDatos(texto) && SIN_DATOS_DE_CLIENTES.includes("openai") && disponibles.includes("openai")) {
+  if (preguntaLlevaDatos(texto) && disponibles.some(p => SIN_DATOS_DE_CLIENTES.includes(p))) {
     return "lleva datos de clientes";
   }
   return "";

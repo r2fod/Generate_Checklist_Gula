@@ -2262,6 +2262,73 @@ prueba permanente de la batería, para que quede cubierto de aquí en adelante.
 | Calendario | 150 kB | 0,66 s |
 | Formulario | 101 kB | 0,65 s |
 
+## Siete motores gratis más en la cascada del asistente
+
+El dueño tiene claves gratuitas de varios proveedores y quería que el asistente las
+usara, conmutando solo. Ya existía el mecanismo entero — `src/asistente/enrutado.js`
+elige proveedor según lo que esté configurado, lo que pide la pregunta y lo que cuesta,
+y si el elegido falla (429, saturado, timeout) prueba el siguiente — así que esto es
+solo AÑADIR FILAS al registro de `worker/index.js` (`PROVEEDORES`), no construir nada
+nuevo. Los siete hablan el mismo dialecto que OpenAI (`dialectoOpenAI`, ya existía y
+está pensado para esto: "el proveedor compatible y el de OpenAI son este mismo código
+con otra dirección") — Groq, Cerebras, Z.AI, Mistral, OpenRouter, NVIDIA, y Cloudflare
+(Workers AI) por su endpoint compatible con OpenAI.
+
+Sobre Cloudflare en concreto: este mismo Worker YA vive en Cloudflare, así que existe
+una forma de usar su IA sin ninguna clave (un "binding" nativo, `env.AI.run(...)`, se
+activa desde el panel sin secretos). No se ha implementado así — la forma exacta de la
+respuesta de esa llamada nativa CON herramientas no se ha podido comprobar contra una
+cuenta real, y acertar a ciegas ahí significa que una llamada a herramienta se pierda
+en silencio. Se usa en cambio su endpoint compatible con OpenAI (mismo código ya
+probado que los otros seis), a cambio de sí necesitar un secreto: un token de API con
+permiso "Workers AI: Read" — nunca la Global API Key de la cuenta, que da acceso a todo.
+
+Antes de tocar código se investigó, con fuentes, si cada uno entrena con lo que recibe
+en su capa gratis — la misma pregunta que ya decidía si OpenAI entraba o no en
+`SIN_DATOS_DE_CLIENTES`:
+
+- **Groq, Cerebras, Z.AI** — no entrenan, en ningún plan (Groq: política de cuenta
+  entera, no solo la capa gratis; Cerebras: sin retención, borrado inmediato; Z.AI: se
+  procesa en el momento, no se guarda). Entran en la cascada normal, pueden ver datos
+  de eventos igual que Gemini o Claude.
+- **Mistral** — su capa gratis "Experiment" SÍ entrena por defecto; hay que
+  desactivarlo a mano en su panel (Ajustes → Privacidad).
+- **OpenRouter** — la empresa en sí no entrena, pero muchos de sus modelos GRATIS
+  exigen activar "training y logging" para poder usarlos: el que entrena es el
+  proveedor de detrás del modelo concreto, no OpenRouter.
+- **NVIDIA NIM** — sus términos de servicio dicen que no, pero su política de
+  privacidad dice que SÍ graba y usa lo que entra y sale para mejorar sus modelos, con
+  aviso explícito de "no subas nada confidencial".
+- **Cloudflare Workers AI** — no entrena, lo dice su política de privacidad: "no
+  entrena sus modelos con tus datos ni tus conversaciones". Entra en la cascada normal.
+
+Mistral, OpenRouter y NVIDIA van a `SIN_DATOS_DE_CLIENTES` junto a OpenAI: sirven para
+preguntas sueltas (cálculos, ratios), nunca para las que llevan nombres, fechas o
+sitios de un evento. De paso se arregló un fallo pequeño en `porQue()`: la frase "lleva
+datos de clientes" solo se disparaba si OpenAI en concreto estaba configurado, no si
+CUALQUIERA de los proveedores de la lista de exclusión lo estaba — con solo Mistral
+configurado (sin OpenAI), la exclusión funcionaba pero la explicación no salía.
+
+También se enganchó `PRECIOS` (`src/asistente/gasto.js`): sin una fila ahí, el gasto de
+un proveedor ni se registra ni sale con nombre bonito en el panel — se queda callado,
+no roto, pero el dueño no lo vería en ningún sitio de la app. Los siete van a 0€, que es
+lo que cuestan hoy (Cloudflare con un matiz: su cupo gratis es un pozo compartido de
+10.000 "Neuronas" al día entre TODOS los modelos de la cuenta, no uno por modelo).
+
+Nada de esto necesita tocar el árbol de decisión de `candidatos()`/`elige()`: al ser
+datos (`ORDEN`, `SIN_DATOS_DE_CLIENTES`, `PRECIOS`), añadir un proveedor es añadir una
+fila en cada uno, no cambiar lógica. Verificado con `npm run tipos`, `test:rapido`
+completo, la batería de navegador y una prueba nueva en `asistente.test.mjs` que
+comprueba, uno por uno, que los siete quedan en el lado que toca de
+`SIN_DATOS_DE_CLIENTES`.
+
+**Pendiente del dueño**: pegar `worker/pegar.js` regenerado en el panel de Cloudflare y
+añadir como *Secret* la clave de cada proveedor que quiera usar (no todos hacen falta,
+solo los que tenga cuenta) — ver la tabla nueva en `worker/README.md`. Para seis de los
+siete no hace falta ninguna clave de Cloudflare, es el mismo panel de siempre sin API de
+por medio; el séptimo (Cloudflare Workers AI) sí necesita un token de Cloudflare, pero
+uno acotado a "Workers AI: Read" — nunca la Global API Key de la cuenta.
+
 ## Cómo probar lo que está tras el login
 
 `pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:

@@ -807,6 +807,63 @@ const PROVEEDORES = {
 			clave: env.COMPATIBLE_API_KEY,
 			modelo: env.COMPATIBLE_MODEL || ""
 		})
+	},
+	groq: {
+		clave: "GROQ_API_KEY",
+		habla: (env) => dialectoOpenAI({
+			base: "https://api.groq.com/openai/v1",
+			clave: env.GROQ_API_KEY,
+			modelo: env.GROQ_MODEL || "llama-3.3-70b-versatile"
+		})
+	},
+	cerebras: {
+		clave: "CEREBRAS_API_KEY",
+		habla: (env) => dialectoOpenAI({
+			base: "https://api.cerebras.ai/v1",
+			clave: env.CEREBRAS_API_KEY,
+			modelo: env.CEREBRAS_MODEL || "llama-3.3-70b"
+		})
+	},
+	zai: {
+		clave: "ZAI_API_KEY",
+		habla: (env) => dialectoOpenAI({
+			base: "https://api.z.ai/api/paas/v4",
+			clave: env.ZAI_API_KEY,
+			modelo: env.ZAI_MODEL || "glm-4.5-flash"
+		})
+	},
+	mistral: {
+		clave: "MISTRAL_API_KEY",
+		habla: (env) => dialectoOpenAI({
+			base: "https://api.mistral.ai/v1",
+			clave: env.MISTRAL_API_KEY,
+			modelo: env.MISTRAL_MODEL || "mistral-small-latest"
+		})
+	},
+	openrouter: {
+		clave: "OPENROUTER_API_KEY",
+		habla: (env) => dialectoOpenAI({
+			base: "https://openrouter.ai/api/v1",
+			clave: env.OPENROUTER_API_KEY,
+			modelo: env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free"
+		})
+	},
+	nvidia: {
+		clave: "NVIDIA_API_KEY",
+		habla: (env) => dialectoOpenAI({
+			base: "https://integrate.api.nvidia.com/v1",
+			clave: env.NVIDIA_API_KEY,
+			modelo: env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct"
+		})
+	},
+	cloudflare: {
+		clave: "CLOUDFLARE_API_TOKEN",
+		ademas: "CLOUDFLARE_ACCOUNT_ID",
+		habla: (env) => dialectoOpenAI({
+			base: `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
+			clave: env.CLOUDFLARE_API_TOKEN,
+			modelo: env.CLOUDFLARE_MODEL || "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+		})
 	}
 };
 async function estado(env) {
@@ -817,7 +874,15 @@ async function estado(env) {
 		"FIREBASE_API_KEY",
 		"ANTHROPIC_API_KEY",
 		"OPENAI_API_KEY",
-		"COMPATIBLE_API_KEY"
+		"COMPATIBLE_API_KEY",
+		"GROQ_API_KEY",
+		"CEREBRAS_API_KEY",
+		"ZAI_API_KEY",
+		"MISTRAL_API_KEY",
+		"OPENROUTER_API_KEY",
+		"NVIDIA_API_KEY",
+		"CLOUDFLARE_API_TOKEN",
+		"CLOUDFLARE_ACCOUNT_ID"
 	];
 	const puestas = {};
 	claves.forEach((k) => {

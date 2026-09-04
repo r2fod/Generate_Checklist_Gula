@@ -369,6 +369,97 @@ const PROVEEDORES = {
       modelo: env.COMPATIBLE_MODEL || "",
     }),
   },
+  // Motores gratis con nombre propio: la dirección va fija en el código (es pública, no
+  // hay nada que guardar) y solo hace falta pegar la clave para que entren en la
+  // cascada. Los modelos por defecto son los de su capa gratuita hoy; como cualquier
+  // catálogo, cambian sin avisar — el mismo arreglo que ya vale para GEMINI_MODEL: se
+  // pisa con la variable *_MODEL correspondiente sin tocar el código.
+  //
+  // Groq y Cerebras no entrenan con lo que reciben en NINGÚN plan (ni el gratis); Z.AI
+  // dice lo mismo de su API. Los tres pueden ver datos de clientes igual que Gemini o
+  // Claude. Mistral, OpenRouter y NVIDIA SÍ pueden acabar entrenando con lo que llega en
+  // su capa gratis (Mistral por defecto salvo que se desactive a mano en su panel;
+  // OpenRouter porque muchos modelos gratis lo exigen para poder usarlos; NVIDIA porque
+  // su política de privacidad lo dice, aunque sus términos digan lo contrario) — por eso
+  // están también en SIN_DATOS_DE_CLIENTES, en src/asistente/enrutado.js, igual que
+  // OpenAI: siguen sirviendo para preguntas sueltas, nunca para las que llevan nombres,
+  // fechas o sitios de un evento.
+  groq: {
+    clave: "GROQ_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.groq.com/openai/v1",
+      clave: env.GROQ_API_KEY,
+      modelo: env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    }),
+  },
+  cerebras: {
+    clave: "CEREBRAS_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.cerebras.ai/v1",
+      clave: env.CEREBRAS_API_KEY,
+      modelo: env.CEREBRAS_MODEL || "llama-3.3-70b",
+    }),
+  },
+  zai: {
+    clave: "ZAI_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.z.ai/api/paas/v4",
+      clave: env.ZAI_API_KEY,
+      modelo: env.ZAI_MODEL || "glm-4.5-flash",
+    }),
+  },
+  mistral: {
+    clave: "MISTRAL_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.mistral.ai/v1",
+      clave: env.MISTRAL_API_KEY,
+      modelo: env.MISTRAL_MODEL || "mistral-small-latest",
+    }),
+  },
+  openrouter: {
+    clave: "OPENROUTER_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://openrouter.ai/api/v1",
+      clave: env.OPENROUTER_API_KEY,
+      modelo: env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
+    }),
+  },
+  nvidia: {
+    clave: "NVIDIA_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://integrate.api.nvidia.com/v1",
+      clave: env.NVIDIA_API_KEY,
+      modelo: env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
+    }),
+  },
+  // Cloudflare tiene su propio motor (Workers AI) y este Worker YA vive en Cloudflare,
+  // así que hay una forma de usarlo sin ninguna clave: un "binding" nativo (Settings →
+  // Bindings → Add → Workers AI, con el nombre "AI") y `env.AI.run(...)` en vez de un
+  // fetch. No se ha hecho así — la forma de la respuesta de esa llamada nativa con
+  // herramientas no se ha podido probar contra una cuenta real, y adivinarla mal
+  // significa que las llamadas a herramientas se pierdan en silencio. Se usa en cambio
+  // su endpoint compatible con OpenAI, que es el MISMO camino que ya prueban los otros
+  // seis proveedores de aquí arriba — con eso sí hace falta un secreto, pero es la
+  // clave que YA se sabe que funciona.
+  //
+  // El secreto es un TOKEN de API con permiso "Workers AI: Read" (Perfil → API Tokens →
+  // Create Token), NO la Global API Key de la cuenta: esa da acceso a todo (DNS,
+  // facturación, otros Workers...) y aquí solo hace falta poder llamar al modelo.
+  //
+  // No entrena con lo que recibe (lo dice su política de privacidad: "Cloudflare no
+  // entrena sus modelos con tus datos ni tus conversaciones"), así que puede ver datos
+  // de clientes igual que Gemini o Claude.
+  cloudflare: {
+    clave: "CLOUDFLARE_API_TOKEN",
+    // Sin el ID de cuenta no hay a qué cuenta llamar, así que este también pide dos
+    // cosas — mismo motivo que "compatible", arriba.
+    ademas: "CLOUDFLARE_ACCOUNT_ID",
+    habla: (env) => dialectoOpenAI({
+      base: `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
+      clave: env.CLOUDFLARE_API_TOKEN,
+      modelo: env.CLOUDFLARE_MODEL || "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    }),
+  },
 };
 
 
@@ -382,7 +473,12 @@ const PROVEEDORES = {
 // contesta. No enseña ninguna clave —solo cuántos caracteres tiene y qué dice Google—,
 // así que se puede abrir desde el navegador sin miedo.
 async function estado(env) {
-  const claves = ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "FIREBASE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY"];
+  const claves = [
+    "GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "FIREBASE_API_KEY",
+    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY",
+    "GROQ_API_KEY", "CEREBRAS_API_KEY", "ZAI_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY",
+    "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID",
+  ];
   const puestas = {};
   claves.forEach(k => {
     const v = String(env[k] || "");
