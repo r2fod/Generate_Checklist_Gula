@@ -1,4 +1,3 @@
-import webpush from "web-push";
 import { createECDH } from "node:crypto";
 //#region src/texto.js
 /** @param {unknown} t @returns {string} */
@@ -1023,6 +1022,99 @@ function payloadDeRecordatorio(tarea) {
 		url: "./checklist/"
 	};
 }
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const deB64u = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+const concatBytes = (...trozos) => {
+	const r = new Uint8Array(trozos.reduce((n, t) => n + t.length, 0));
+	let o = 0;
+	trozos.forEach((t) => {
+		r.set(t, o);
+		o += t.length;
+	});
+	return r;
+};
+const hmacSHA256 = async (clave, datos) => new Uint8Array(await crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", clave, {
+	name: "HMAC",
+	hash: "SHA-256"
+}, false, ["sign"]), datos));
+const hkdfExpand = async (prk, info, len) => (await hmacSHA256(prk, concatBytes(info, new Uint8Array([1])))).slice(0, len);
+const UTF8 = new TextEncoder();
+async function firmarJWTVapid(audiencia, asunto, clavePublica, clavePrivada) {
+	const priv = deB64u(clavePrivada);
+	const pub = deB64u(clavePublica);
+	const jwk = {
+		kty: "EC",
+		crv: "P-256",
+		d: b64u(priv),
+		x: b64u(pub.slice(1, 33)),
+		y: b64u(pub.slice(33, 65))
+	};
+	const clave = await crypto.subtle.importKey("jwk", jwk, {
+		name: "ECDSA",
+		namedCurve: "P-256"
+	}, false, ["sign"]);
+	const cabecera = b64u(UTF8.encode(JSON.stringify({
+		typ: "JWT",
+		alg: "ES256"
+	})));
+	const cuerpo = b64u(UTF8.encode(JSON.stringify({
+		aud: audiencia,
+		sub: asunto,
+		exp: Math.floor(Date.now() / 1e3) + 43200
+	})));
+	const firma = await crypto.subtle.sign({
+		name: "ECDSA",
+		hash: "SHA-256"
+	}, clave, UTF8.encode(`${cabecera}.${cuerpo}`));
+	return `${cabecera}.${cuerpo}.${b64u(firma)}`;
+}
+async function peticionPushCifrada(subscripcion, payloadTexto, vapidDetails) {
+	const userPublicKey = deB64u(subscripcion.keys.p256dh);
+	const userAuth = deB64u(subscripcion.keys.auth);
+	const parEfimero = await crypto.subtle.generateKey({
+		name: "ECDH",
+		namedCurve: "P-256"
+	}, true, ["deriveBits"]);
+	const clavePublicaEfimera = new Uint8Array(await crypto.subtle.exportKey("raw", parEfimero.publicKey));
+	const claveDestino = await crypto.subtle.importKey("raw", userPublicKey, {
+		name: "ECDH",
+		namedCurve: "P-256"
+	}, false, []);
+	const secretoCompartido = new Uint8Array(await crypto.subtle.deriveBits({
+		name: "ECDH",
+		public: claveDestino
+	}, parEfimero.privateKey, 256));
+	const infoWebpush = concatBytes(UTF8.encode("WebPush: info\0"), userPublicKey, clavePublicaEfimera);
+	const secretoWebpush = await hkdfExpand(await hmacSHA256(userAuth, secretoCompartido), infoWebpush, 32);
+	const sal = crypto.getRandomValues(/* @__PURE__ */ new Uint8Array(16));
+	const prk2 = await hmacSHA256(sal, secretoWebpush);
+	const claveCifrado = await hkdfExpand(prk2, UTF8.encode("Content-Encoding: aes128gcm\0"), 16);
+	const nonce = await hkdfExpand(prk2, UTF8.encode("Content-Encoding: nonce\0"), 12);
+	const claveAES = await crypto.subtle.importKey("raw", claveCifrado, "AES-GCM", false, ["encrypt"]);
+	const textoPlano = concatBytes(UTF8.encode(payloadTexto), new Uint8Array([2]));
+	const cifrado = new Uint8Array(await crypto.subtle.encrypt({
+		name: "AES-GCM",
+		iv: nonce
+	}, claveAES, textoPlano));
+	const rs = /* @__PURE__ */ new Uint8Array(4);
+	new DataView(rs.buffer).setUint32(0, 4096);
+	const cabeceraRegistro = concatBytes(sal, rs, new Uint8Array([clavePublicaEfimera.length]), clavePublicaEfimera);
+	const cuerpo = concatBytes(cabeceraRegistro, cifrado);
+	const jwt = await firmarJWTVapid(new URL(subscripcion.endpoint).origin, vapidDetails.subject, vapidDetails.publicKey, vapidDetails.privateKey);
+	return {
+		method: "POST",
+		endpoint: subscripcion.endpoint,
+		body: cuerpo,
+		headers: {
+			TTL: "60",
+			"Content-Length": String(cuerpo.length),
+			"Content-Type": "application/octet-stream",
+			"Content-Encoding": "aes128gcm",
+			Urgency: "normal",
+			Authorization: `vapid t=${jwt}, k=${vapidDetails.publicKey}`
+		}
+	};
+}
 function vapidClaves(env) {
 	const clave = String(env.VAPID_CLAVE || "").trim();
 	const asunto = String(env.VAPID_MAILTO || "").trim();
@@ -1100,13 +1192,10 @@ async function avisosDelDia(env) {
 	for (const tarea of paraHoy) {
 		const payload = JSON.stringify(payloadDeRecordatorio(tarea));
 		for (const sus of aparatos) try {
-			const det = webpush.generateRequestDetails(sus, payload, {
-				TTL: 60,
-				vapidDetails: {
-					subject: claves.asunto,
-					publicKey: claves.publico,
-					privateKey: claves.clave
-				}
+			const det = await peticionPushCifrada(sus, payload, {
+				subject: claves.asunto,
+				publicKey: claves.publico,
+				privateKey: claves.clave
 			});
 			const r = await fetch(det.endpoint, {
 				method: det.method,
@@ -1270,4 +1359,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, fetchValidando, payloadDeRecordatorio, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };
+export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, fetchValidando, payloadDeRecordatorio, peticionPushCifrada, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };
