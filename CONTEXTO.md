@@ -2439,6 +2439,31 @@ queda con el icono viejo hasta que se borre el acceso directo y se vuelva a inst
 ni iOS ni Android releen el icono de una PWA ya instalada solo porque cambie el
 manifest en el servidor.
 
+## El aviso de arriba no bastaba: el service worker también se quedaba con el icono viejo
+
+El dueño borró el acceso directo y lo volvió a instalar (el aviso de más arriba), y el
+icono seguía siendo el de antes. La causa no era el móvil: `public/sw.js` (un solo
+service worker, en la raíz, que cubre las tres apps) sirve todo lo que no sea el
+documento con "caché primero" — pensado para los `.js`/`.css` de la compilación, que sí
+llevan un hash en el nombre y por tanto son válidos para siempre. Los iconos y los
+`manifest.webmanifest` NO llevan hash: el PR #173 cambió su CONTENIDO manteniendo el
+mismo nombre de fichero, pero como no tocó `sw.js`, el navegador nunca detectó que el
+service worker tenía algo nuevo que instalar — así que ni releyó `ESENCIALES` ni tiró la
+caché vieja, y siguió sirviendo el `icono-192.png` de antes desde la caché del origen.
+Borrar el acceso directo no toca esa caché en absoluto: solo afecta al icono que guarda
+el sistema operativo, no al service worker.
+
+Arreglado subiendo `VERSION` en `sw.js` (`gula-v5` → `gula-v6`): eso SÍ cambia los bytes
+del propio fichero, así que el navegador lo detecta, lo reinstala, vuelve a pedir
+`ESENCIALES` a la red (con `cache:"reload"`, saltándose la caché HTTP normal) y borra la
+caché vieja al activarse. Con esto no hace falta ni reinstalar el acceso directo — basta
+con recargar la app una vez con conexión para que el service worker nuevo tome el
+relevo (puede tardar hasta la SEGUNDA recarga: la primera instala el nuevo, la segunda
+ya lo usa, es cómo funciona `skipWaiting`/`clients.claim` con una pestaña ya abierta).
+Comentario añadido en el propio `sw.js`, junto a `VERSION`, para que la próxima vez que
+se cambie el CONTENIDO de un fichero sin hash (icono, manifest, favicon) no se repita:
+hay que subir este número aunque `sw.js` en sí no tenga nada que ver con ese cambio.
+
 ## Cómo probar lo que está tras el login
 
 `pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:

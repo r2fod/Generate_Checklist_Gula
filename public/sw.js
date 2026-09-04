@@ -56,7 +56,16 @@ self.addEventListener("notificationclick", (e) => {
   );
 });
 
-const VERSION = "gula-v5";
+// Subir este número cada vez que cambie el CONTENIDO de un fichero que no lleva hash en
+// el nombre (los iconos, los manifest.webmanifest, favicon.svg...) aunque el propio
+// sw.js no toque esos ficheros. El navegador solo relee este fichero (y por tanto solo
+// vuelve a pedir ESENCIALES) cuando estos BYTES cambian; si no, sigue sirviendo de la
+// caché vieja el `icono-192.png` de siempre aunque el servidor ya tenga otro con el
+// mismo nombre — pasó de verdad: se cambiaron los tres iconos (#173) sin tocar este
+// número, y quien ya tenía la app instalada (o solo visitada una vez) se quedó viendo
+// el icono antiguo por mucho que borrara el acceso directo y lo reinstalara, porque el
+// acceso directo no toca la caché del origen — solo se limpia bajando este número.
+const VERSION = "gula-v6";
 const CACHE = `${VERSION}`;
 
 // Lo que hay que guardar sí o sí para poder abrir sin cobertura. Los .js y .css llevan
