@@ -784,6 +784,34 @@ async function main() {
     }
   }
 
+  // ── En Vuelta, la pastilla "todo" no puede aplastar el nombre ──────────────
+  // A 320px la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de 80px
+  // de los 264 de la fila: hasta "Regletas" se partía a media palabra
+  // ("Regleta" / "s"), aunque overflow-wrap: anywhere hacía exactamente lo que tiene
+  // que hacer con ese poco sitio. El nombre no necesitaba partirse, necesitaba sitio
+  // — la pastilla es la que tiene que caer a su propia línea cuando no cabe.
+  // Se comprueba el ANCHO del contenedor del nombre, no si el texto envuelve: contar
+  // líneas con getClientRects() salió inconsistente entre la captura y la medición en
+  // este entorno (posible carrera de layout con la fuente del sistema), mientras que
+  // el ancho de la caja es geometría de CSS pura y no tiene ese problema.
+  console.log("\n── Vuelta a 320px: el nombre tiene sitio de sobra ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1200);
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(900);
+    const anchoNombre = await p.evaluate(() =>
+      document.querySelector(".carga-row-vuelta .carga-nombre").getBoundingClientRect().width);
+    ok(anchoNombre >= 100,
+      `a 320px el nombre tiene al menos 100px (no los ~74px que dejaba la pastilla) → ${Math.round(anchoNombre)}px`);
+    await c.close();
+  }
+
   // ── El botón "Recalcular cantidades" ────────────────────────────────────────
   // Compara el cálculo de AHORA con la foto que se guardó (valoresCalculados) y ofrece,
   // una por una, mantener lo que hay o coger lo nuevo. Es el botón que salva a los

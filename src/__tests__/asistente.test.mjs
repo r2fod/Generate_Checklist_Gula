@@ -13,7 +13,8 @@ import { recordar, olvidar, refuerza, poda, parecido, paraElContexto, porTemas, 
 import { conectores, conectoresActivos, conHerramientasDeConectores, registrarConector } from "../asistente/conectores.js";
 import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
-import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
+import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN, SIN_DATOS_DE_CLIENTES } from "../asistente/enrutado.js";
+import { proveedoresElegibles, NOMBRE_PROVEEDOR, notaDe } from "../asistente/proveedoresUI.js";
 import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
 import { avisosConfig, saludoPendientes } from "../asistente/avisosConfig.js";
 import { marcarActualizando, confirmaSiActualizado } from "../asistente/actualizacion.js";
@@ -2299,6 +2300,35 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     ok(claims.sub === "mailto:hola@gula-catering.es" && claims.aud === "https://fcm.googleapis.com",
       `el JWT lleva el asunto y la audiencia correctos (el origen del endpoint, no el endpoint entero) → ${JSON.stringify(claims)}`);
   }
+}
+
+// ─── LOS PROVEEDORES QUE SE PUEDEN ELEGIR A MANO ──────────────────────────────
+// Antes la lista de Ajustes era fija (Gemini/Claude/OpenAI): los siete proveedores
+// gratis nuevos de la cascada automática (Groq, Cerebras, Z.AI, Cloudflare, Mistral,
+// OpenRouter, NVIDIA) no tenían forma de elegirse uno a uno, aunque estuvieran
+// configurados. Ahora se ofrecen los que el Worker diga que tienen clave puesta.
+{
+  console.log("\n── Proveedores elegibles a mano en Ajustes ──");
+
+  ok(proveedoresElegibles([]).map(p => p.id).join(",") === "gemini",
+    "sin saber qué hay configurado (antes de la primera respuesta) se asume Gemini, no una pantalla vacía");
+
+  const todos = proveedoresElegibles(ORDEN);
+  ok(todos.length === ORDEN.length && todos.every((p, i) => p.id === ORDEN[i]),
+    "con todo configurado, salen los once en el MISMO orden que usa el enrutado automático");
+
+  const soloDos = proveedoresElegibles(["claude", "groq"]);
+  ok(soloDos.map(p => p.id).join(",") === "groq,claude",
+    "con solo dos configurados, salen esos dos y en el orden de la cascada (groq antes que claude), no el orden en que llegaron");
+
+  ok(ORDEN.every(id => NOMBRE_PROVEEDOR[id]),
+    "todos los proveedores del enrutado tienen nombre para pantalla (nadie se queda con el id en crudo)");
+
+  ok(notaDe("gemini") === "gratis" && notaDe("groq") === "gratis" && notaDe("claude") === "de pago"
+    && notaDe("compatible") === "tu proveedor",
+    "la nota de cada uno dice lo que es: gratis, de pago, o el hueco abierto");
+  ok(SIN_DATOS_DE_CLIENTES.every(id => notaDe(id) === "sin clientes"),
+    "y los que no pueden ver datos de clientes lo dicen en su nota, para que se sepa antes de elegirlos a mano");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

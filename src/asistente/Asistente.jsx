@@ -25,6 +25,7 @@ import { queHacerConLaUrl } from "./proxy.js";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
 import { VOCES_GEMINI, vozGeminiValida } from "./vozGemini.js";
 import { avisosConfig, saludoPendientes } from "./avisosConfig.js";
+import { proveedoresElegibles } from "./proveedoresUI.js";
 import Dialogo from "../components/Dialogo.jsx";
 
 const CLAVE_URL = "gula_asistente_url";
@@ -52,18 +53,11 @@ const PESTANAS_VALIDAS = ["charla", "humano", "cerebro", "tareas", "gasto"];
 const leer = (k, x = "") => leerTexto(k, x) || x;
 const guardar = guardarTexto;
 
-// El Worker admite además un proveedor "compatible" (OpenRouter, Groq, DeepSeek…). No
-// sale aquí a propósito: con uno configurado no hay nada que elegir, y cuatro botones
-// para tres opciones reales es una pantalla más llena sin ser más útil. El día que se
-// use, se añade una línea.
-// Automático NO es un proveedor: es un modo. Estaba en la misma rejilla que los tres y
+// Automático NO es un proveedor: es un modo. Estaba en la misma rejilla que los demás y
 // se veía: su nota es larga, ensanchaba su columna y la rejilla salía descuadrada. Va
 // arriba y a lo ancho, que además es lo que es —o elige él, o eliges tú uno de estos.
-const PROVEEDORES = [
-  { id: "gemini", nombre: "Gemini", nota: "gratis" },
-  { id: "claude", nombre: "Claude", nota: "de pago" },
-  { id: "openai", nombre: "OpenAI", nota: "sin clientes" },
-];
+// La lista de abajo (nombres, notas, y solo los que hay configurados) vive en
+// proveedoresUI.js, aparte de React para poder probarla sin navegador.
 
 export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const [pestana, setPestanaCruda] = useState(() => {
@@ -611,7 +605,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               <em>elige según la pregunta</em>
             </button>
             <div className="asis-proveedores">
-              {PROVEEDORES.map(p => (
+              {proveedoresElegibles(disponibles).map(p => (
                 <button
                   key={p.id} type="button"
                   className={`bebida-chip${proveedor === p.id ? " es-activa" : ""}`}

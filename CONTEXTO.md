@@ -437,33 +437,67 @@ está en el historial de git y en las pruebas que los cubren):
   el hueco a 14px en los tres, variantes maskable incluidas. `sw.js` sube a `gula-v7`
   (mismo fichero sin hash de siempre: sin subir `VERSION` el navegador seguiría
   sirviendo los iconos viejos en caché).
+- **Modo carga · Vuelta a 320px partía nombres a media palabra** ("Regleta"/"s") — la
+  pastilla "vino todo" (~105px fijos) le dejaba al nombre menos de 80px de los 264 de la
+  fila. `overflow-wrap: anywhere` hacía lo que tenía que hacer con ese poco sitio; el
+  fallo era el sitio, no la regla. Arreglado con `min-width: 110px` en
+  `.carga-row-vuelta .carga-nombre`: ahora es la pastilla la que cae a su propia línea
+  cuando no cabe.
+- **El calendario arrancaba SIEMPRE en claro** — `aplicarTemaInicial()` se llama en el
+  arranque de la checklist y del formulario, pero se quedó fuera cuando el calendario se
+  separó en su propia carpeta/app. Ni el automático por horario (oscuro de noche, justo
+  cuando más se usa para logística) ni "oscuro" puesto a mano llegaban nunca ahí.
+  Arreglado en `calendario/main.jsx` y en su banco de pruebas (que tenía el mismo hueco:
+  por eso las capturas "oscuro" salían idénticas a las "claro").
+- **Solo Gemini/Claude/OpenAI se podían elegir a mano en Ajustes del asistente** — los
+  siete proveedores gratis de la cascada automática (Groq, Cerebras, Z.AI, Cloudflare,
+  Mistral, OpenRouter, NVIDIA) no tenían botón, aunque estuvieran configurados: solo
+  entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
+  puesta (`proveedoresUI.js`), mismo orden que la cascada.
 
-## Qué queda pendiente ahora mismo (2026-09-04)
+## Qué queda pendiente ahora mismo (2026-09-05)
 
-Los cinco PR que había abiertos (#169, #170, #171, #172, #174) ya están fusionados en
-`main`, con el visto bueno explícito del dueño ("fusionalo para verlo"), y **el
-despliegue a producción ya se confirmó publicado** (commit `b734764`, `gh-pages` al día,
-service worker en `gula-v6`). Reinstalar el acceso directo NO hace falta esta vez: basta
-con recargar la app con conexión (puede pedir una segunda recarga).
+Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo, igualar
+el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
+despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
+tanda de fusiones.
+
+**Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
+caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
+eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
+repetidas (9). Limpiado con backup previo del documento completo y verificación de que
+ningún otro campo cambió. El resto de eventos ya tenía las notas limpias.
 
 **Pendiente del dueño, no de código** — del contenido de #171 (motores gratis nuevos):
 pegar `worker/pegar.js` regenerado en el panel de Cloudflare y añadir como *Secret* la
 clave de cada proveedor que quiera usar — tabla completa en `worker/README.md`.
 
-Sueltos, ninguno con PR todavía:
+**Dos piezas grandes, planificadas, sin código todavía** (el dueño pidió explícitamente
+"plan bien estructurado" para las dos — nada se arranca sin mostrarle antes una preview,
+mismo criterio que ya pedía para el formulario):
 
-- **Mejoras del formulario** (cubertería/cristalería exacta por mesa, apartado de
-  buffets, comentario por paso, ir al resumen en cualquier momento, el bug de las
-  tronas al añadir niños): el dueño pidió EXPLÍCITAMENTE que antes de programar nada se
-  planteen las preguntas exactas y se le enseñe una preview para depurar — no arrancar
-  directo al código. No empezado.
-- **Revisión visual a fondo** ("hay cosas que no están bien adaptadas"): no empezada.
-  Los 9 anchos × 2 temas de la batería solo cazan desbordamiento, no lo apretado/mal
-  alineado — hace falta mirar capturas reales pantalla por pantalla.
-- **Limpiar notas duplicadas en eventos YA creados** (antes del fix de #169): bloqueado
-  en que el dueño exporte el backup/restore de la app — sin acceso a producción, no se
-  puede mirar ni arreglar por otra vía. Sin romper nada: solo el campo de notas, solo
-  quitar duplicados exactos, mostrar el diff antes de devolver nada.
+1. **Cocina: escandallo → lista de la compra ("mise en place") + Presupuesto y margen
+   por evento.** Plan aprobado (ver el propio plan de la sesión). Orden decidido:
+   presupuesto/margen primero (reutiliza el motor de coste que YA existe en Resumen de
+   Modo Carga para comida/bebida, y `totalLogistica()` para logística — solo faltan
+   tarifas de sala/cocina y el presupuesto en sí), Cocina/escandallo después (parte de
+   cero: recetario, menú del evento, nada reutilizable todavía). Fase 3, el asistente,
+   al final. Piloto: el evento real "Aryan Campana" (ya limpio de notas duplicadas),
+   para probar con datos de verdad antes de generalizar.
+2. **Mejoras del formulario — plan por escribir.** Además de lo ya preguntado
+   (cubertería/cristalería exacta por mesa, apartado de buffets, comentario por paso, ir
+   al resumen en cualquier momento, el bug de las tronas al añadir niños — sin
+   confirmar: no se encontró en cómo se guarda el número, sospecha de que no se
+   recalculan solas al corregir el formulario), el dueño añadió: si hace falta llevar
+   carpas, parabanes, y si el café lo piden los clientes o es solo para el personal
+   (para calcular tazas/platos según eso). **Ojo**: las producciones (rodajes) funcionan
+   distinto al resto de tipos de evento — cualquier pregunta nueva tiene que revisar
+   `soloEn` en `preguntas.js` para no colarse donde no toca.
+
+**Revisión visual a fondo**: primera pasada hecha (checklist, calendario, la bienvenida
+del formulario) con los dos fallos de arriba. Queda el formulario paso a paso, las
+pestañas Año/Equipo del calendario, y los anchos intermedios de la batería que no se
+capturaron a mano.
 
 **Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
 septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.

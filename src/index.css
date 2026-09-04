@@ -3918,6 +3918,15 @@ hr {
     padding-bottom: 6px;
   }
 
+  /* Sin esto, la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de
+     80px de los 264 de la fila: hasta "Regletas" se partía a media palabra
+     ("Regleta" / "s"), aunque overflow-wrap: anywhere hace exactamente lo que tiene
+     que hacer con ese poco sitio. El nombre no necesitaba partirse, necesitaba sitio:
+     con este mínimo, la pastilla es la que cae a su propia línea cuando no cabe. */
+  .carga-row-vuelta .carga-nombre {
+    min-width: 110px;
+  }
+
   /* En móvil los dos números pegan al borde: 46px de sangría se comen el ancho que
      necesitan para caber en la misma fila. */
   .carga-vuelta-controles {
@@ -6286,8 +6295,9 @@ hr {
 .asis-auto:hover { color: var(--text-main); border-color: var(--text-muted); }
 .asis-auto.es-activa { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Los tres proveedores, en tres columnas iguales. Con las notas cortas caben en un
-   móvil de 320px sin partirse. */
+/* Los proveedores disponibles, en tres columnas iguales — con tres o con once: el grid
+   crece solo en filas nuevas, no hace falta tocar nada al añadir uno más. Con las notas
+   cortas caben en un móvil de 320px sin partirse. */
 .asis-proveedores {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
