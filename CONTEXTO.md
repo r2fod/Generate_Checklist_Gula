@@ -2464,6 +2464,19 @@ Comentario añadido en el propio `sw.js`, junto a `VERSION`, para que la próxim
 se cambie el CONTENIDO de un fichero sin hash (icono, manifest, favicon) no se repita:
 hay que subir este número aunque `sw.js` en sí no tenga nada que ver con ese cambio.
 
+## El logotipo "gula" quedaba a distinta distancia del dibujo en cada icono
+
+El dueño mandó una captura de los tres accesos directos instalados: el hueco entre el
+pictograma y el logotipo "gula" no era el mismo en los tres — 14px en checklist, 38px en
+calendario, solo 6px en formulario (medido en la rejilla de 512×512 de cada SVG fuente),
+porque cada pictograma se dibujó a su propio tamaño sin mirar dónde caía el logotipo, que
+está fijo en `y=404` en los tres. Arreglado envolviendo cada pictogram en un
+`<g transform="translate(0 …)">` (calendario +24, formulario −8, checklist sin cambio) para
+que los tres terminen con el mismo hueco de 14px antes del logotipo — mismo criterio en
+las variantes maskable, que comparten las mismas coordenadas bajo su propio `scale(0.72)`.
+`VERSION` en `sw.js` sube otra vez (`gula-v6` → `gula-v7`): son los mismos ficheros sin
+hash de siempre (ver la sección de arriba).
+
 ## Cómo probar lo que está tras el login
 
 `pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:
