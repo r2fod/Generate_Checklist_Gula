@@ -291,10 +291,21 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   // evento. Cuando están todas hechas el bloque se colapsa a "completado". Se puede
   // silenciar del todo con el botón de campana.
   const notasTexto = (meta.notasEvento || "").trim();
+  // Sin duplicados: dos líneas con el mismo texto compartirían la misma casilla de
+  // todos modos (notasCheck se guarda por texto, no por posición), así que mostrar
+  // las dos es pura redundancia — y si las notas llegan con algo repetido (por
+  // ejemplo, de un formulario reenviado antes de este arreglo), aquí no se ve doble.
+  const vistos = new Set();
   const notasItems = notasTexto
     .split(/[\n;]+/)
     .map(s => s.replace(/^[\s•·*✓\-–]+/, "").trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter(t => {
+      const clave = t.toLowerCase();
+      if (vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    });
   const notasHechas = notasItems.filter(t => notasCheck[t]).length;
   const notasCompletas = notasItems.length > 0 && notasHechas === notasItems.length;
   const [notaSilenciada, setNotaSilenciada] = useState(false);

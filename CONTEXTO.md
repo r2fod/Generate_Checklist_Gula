@@ -2262,6 +2262,57 @@ prueba permanente de la batería, para que quede cubierto de aquí en adelante.
 | Calendario | 150 kB | 0,66 s |
 | Formulario | 101 kB | 0,65 s |
 
+## Dos fallos reales reportados en producción: notas duplicadas y "se pisan" al ser dos
+
+El dueño reportó dos cosas por separado:
+
+1. **Captura de Modo carga**: al reenviar un formulario ya aplicado (cambiando algo),
+   "Recordatorios del evento" salía con las notas duplicadas.
+2. **"Cuando abren 2 personas la checklist... uno machaca lo que hace el otro."**
+
+**1) Notas duplicadas** — el bug estaba en cómo se fusionaban las notas al aplicar un
+envío. La oficina, al corregir el formulario, normalmente no borra lo que ya había
+escrito: lo deja tal cual y añade algo detrás. Eso deja "nuevas" con una copia completa
+de "antes" dentro, más lo añadido. La comparación de ANTES comparaba el bloque entero
+(`!notasAntes.includes(notasNuevas)`): el texto viejo, más corto, nunca puede "incluir"
+al nuevo, más largo con la copia dentro — así que se concatenaba OTRA VEZ (viejo, viejo,
+y lo nuevo). Y como `ModalModoCarga.jsx` convierte cada línea de las notas en un
+recordatorio con su propio check, ese texto duplicado salía como filas duplicadas.
+Arreglado con `notasFusionadas()` (`formulario/preguntas.js`): compara LÍNEA A LÍNEA, no
+el bloque entero, y solo añade las líneas de verdad nuevas. De paso, `ModalModoCarga.jsx`
+filtra duplicados exactos (case-insensitive) al construir la lista de recordatorios, para
+que las notas YA duplicadas en eventos existentes tampoco se vean dobles en pantalla
+(el texto guardado en la nube sigue duplicado hasta que se edite a mano — esto es
+defensivo, solo en cómo se muestra).
+
+**2) Dos personas se pisan** — `guardarEventoNube()` era un `setDoc` liso: subía SIEMPRE
+el estado local ENTERO, aunque solo se hubiera tocado un campo. Con dos móviles cargando
+el mismo camión a la vez: A marca una casilla: B, casi a la vez, guarda un cambio en
+OTRO campo (pax, una nota) antes de enterarse por el aviso en tiempo real de la marca de
+A — el guardado de B sube su copia entera, que todavía no sabe nada de la casilla de A,
+y la casilla marcada de A desaparece sin que B haya tocado Modo carga en ningún momento.
+Arreglado pasando a una transacción de Firestore (`fs.runTransaction`): se lee lo que HAY
+en el servidor en ESE instante y se le aplican encima SOLO los campos que este aparato ha
+cambiado de verdad desde la última vez que sincronizó (comparado contra un `baseline`, no
+contra el propio estado — sin baseline no hay forma de distinguir "esto lo he cambiado
+yo" de "esto lo ha cambiado el servidor desde la última vez que miré"). El resto de
+campos se quedan con lo que YA tenía el servidor, así que un cambio ajeno a un campo
+distinto nunca se pierde. `guardarEventoNube()` devuelve ahora `{ actualizado, fusion }`
+en vez de solo la marca de tiempo; `App.jsx` aplica los campos que vengan en `fusion` y
+que este aparato no tuviera (alguien cambió algo mientras el guardado estaba en camino)
+con los mismos setters que usa el aviso de "cambios remotos", sin esperar al eco por la
+suscripción.
+
+Dos incidentes accidentales durante el desarrollo, sin relación con el código en sí:
+work-in-progress perdido dos veces por un `git reset --hard origin/main` sin comprobar
+antes `git status` (los cambios nunca habían llegado a un commit) — reconstruido a mano
+desde cero comparando contra el reporte original, esta vez sí sobre una rama propia desde
+el principio. Verificado con `notasFusionadas` (6 casos, incluida la reproducción exacta
+del bug e idempotencia) y con `guardarEventoNube`/`cargarEventoNube` contra el simulado
+de Firestore de `firestore-simulado.mjs` (dos aparatos con la misma base editando campos
+distintos, sin baseline, y conflicto de verdad en el mismo campo). `test:rapido` y la
+batería completa de navegador en verde.
+
 ## Cómo probar lo que está tras el login
 
 `pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:

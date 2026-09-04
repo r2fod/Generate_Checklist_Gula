@@ -864,6 +864,29 @@ export function respuestasQueFaltan(respuestas = {}) {
     .filter(x => !!x.aviso);
 }
 
+// Las notas del evento, al aplicar un envío: se SUMAN, no se sustituyen — las que ya
+// hubiera suelen ser tuyas (a quién llamar, qué recoger) y las del formulario vienen
+// del cliente. Perder unas por las otras es justo lo que no puede pasar.
+//
+// Se compara LÍNEA A LÍNEA, no el bloque entero: la oficina, al corregir el
+// formulario, normalmente no borra lo que ya había escrito — lo deja tal cual y añade
+// algo detrás. Eso deja "nuevas" con una copia completa de "antes" dentro, más lo
+// añadido. Comparando el bloque entero el texto viejo, más corto, nunca puede
+// "incluir" al nuevo, más largo con la copia dentro — así que se concatenaba OTRA VEZ:
+// viejo, viejo, y lo nuevo. Y como ModalModoCarga.jsx convierte cada línea de las
+// notas en un recordatorio con su propio check ("Recordatorios del evento"), ese
+// texto duplicado salía como filas duplicadas en Modo carga.
+export function notasFusionadas(antes, nuevas) {
+  const a = String(antes || "").trim();
+  const n = String(nuevas || "").trim();
+  if (!a) return n;
+  if (!n) return a;
+  const lineasAntes = a.split("\n").map(l => l.trim()).filter(Boolean);
+  const lineasNuevas = n.split("\n").map(l => l.trim()).filter(Boolean)
+    .filter(l => !lineasAntes.some(x => x.toLowerCase() === l.toLowerCase()));
+  return lineasNuevas.length ? `${a}\n${lineasNuevas.join("\n")}` : a;
+}
+
 // Lo que hay que comprar, en líneas, tal como las guarda la app en Compras. Va aparte
 // de aRespuestasDeLaApp por lo mismo que las recogidas: son líneas que se SUMAN a lo
 // que el evento ya tuviera, no un campo que lo sustituye.
