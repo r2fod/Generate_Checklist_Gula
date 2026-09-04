@@ -2329,6 +2329,40 @@ siete no hace falta ninguna clave de Cloudflare, es el mismo panel de siempre si
 por medio; el séptimo (Cloudflare Workers AI) sí necesita un token de Cloudflare, pero
 uno acotado a "Workers AI: Read" — nunca la Global API Key de la cuenta.
 
+## Los tres iconos de instalación eran el mismo icono
+
+El dueño mandó una captura del móvil: los tres accesos directos instalados (Checklist,
+Formulario, Calendario) salían con el icono IDÉNTICO — el logotipo "gula" en negro
+sobre blanco, sin más, distinguibles solo por el texto diminuto debajo del icono. Los
+tres manifests apuntaban a los MISMOS `icono-192.png`/`icono-512.png`/
+`icono-maskable-512.png` (compartidos en `public/`) y al mismo `theme_color`
+(`#1f314d`).
+
+Arreglado con un icono propio POR APP, cada uno en la carpeta de su propio manifest
+(`public/checklist/`, `public/formulario/`, `public/calendario/`), con su propio
+`theme_color`, y todos con el logotipo "gula" de verdad (recortado del PNG existente,
+no retipeado en una fuente cualquiera — el dueño pidió explícitamente la misma
+tipografía que ya tenía):
+
+- **Checklist** — `#1f314d` (el navy que ya tenía la app), portapapeles con checks.
+- **Formulario** — `#7e14ff` (el morado de marca de Gula), hoja con lápiz.
+- **Calendario** — `#0f7a5c` (verde azulado), calendario con un día marcado.
+
+Un fallo de diseño se coló en la primera pasada y se corrigió antes de aplicarlo: el
+icono "normal" (no maskable) llevaba sus PROPIAS esquinas redondeadas dibujadas dentro
+del PNG. iOS y Android también redondean por su cuenta cualquier icono que no sea
+maskable — con las dos rondas de redondeo montadas una sobre otra, el resultado era un
+icono pequeño flotando dentro de un marco más grande del mismo color, como si el
+icono estuviera "metido dentro de otro" (el dueño lo cazó con una captura real del
+móvil). Arreglado dejando el icono "normal" a sangre completa (sin `rx` propio) — el
+maskable ya iba bien desde el principio, con su margen de seguridad y sin redondeo
+propio.
+
+**Aviso a quien instale esto de nuevas**: un móvil con la checklist YA instalada se
+queda con el icono viejo hasta que se borre el acceso directo y se vuelva a instalar —
+ni iOS ni Android releen el icono de una PWA ya instalada solo porque cambie el
+manifest en el servidor.
+
 ## Cómo probar lo que está tras el login
 
 `pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:
