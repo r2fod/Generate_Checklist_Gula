@@ -2476,14 +2476,16 @@ un Firestore en memoria con las mismas reglas.
 
 Los cinco PR que había abiertos (#169, #170, #171, #172, #174 — todos descritos arriba)
 ya están fusionados en `main`, con el visto bueno explícito del dueño ("fusionalo para
-verlo"). El despliegue automático (workflow `Publicar`, dispara con cada push a `main`,
-tarda ~45 min porque corre la batería completa de navegador antes de publicar) estaba
-EN MARCHA en el momento de escribir esto — comprobar en GitHub Actions
-(`.github/workflows/deploy.yml`, job "Subir dist/ a gh-pages") si ya terminó y si
-`gh-pages` tiene el commit de la fusión de #174 antes de dar nada por publicado.
-Reinstalar el acceso directo NO hace falta esta vez: basta con recargar la app con
-conexión (puede pedir una segunda recarga) para que el service worker nuevo tome el
-relevo — ver la sección de arriba sobre el fallo del service worker.
+verlo"). **Comprobado (2026-09-04, sesión siguiente): ya publicado.** El run del
+workflow `Publicar` para la fusión de #174 terminó en verde y `gh-pages` tiene el commit
+`Publica b734764...` (el de esa fusión) — confirmado consultando GitHub Actions y el
+historial de la rama `gh-pages` directamente, no solo asumido. El PR #175 (este mismo
+commit de `CONTEXTO.md`, sin cambios de código) disparó otra vuelta de `Publicar` que
+tarda igual ~45 min por correr la batería completa, pero no bloquea nada: no hay código
+nuevo que publicar. Reinstalar el acceso directo NO hace falta esta vez: basta con
+recargar la app con conexión (puede pedir una segunda recarga) para que el service
+worker nuevo tome el relevo — ver la sección de arriba sobre el fallo del service
+worker.
 
 **Pendiente del dueño, no de código** — del contenido de #171 (motores gratis nuevos):
 pegar `worker/pegar.js` regenerado en el panel de Cloudflare y añadir como *Secret* la
