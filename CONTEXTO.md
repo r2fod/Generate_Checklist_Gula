@@ -2472,6 +2472,80 @@ hay que subir este número aunque `sw.js` en sí no tenga nada que ver con ese c
 Lo de `App.jsx` se prueba **simulando el arranque** en `sincronizacion.test.mjs`, contra
 un Firestore en memoria con las mismas reglas.
 
+## Revisión visual a fondo: primera pasada, dos fallos reales (2026-09-04)
+
+El dueño eligió esta tarea de las tres sueltas de abajo. Sin acceso a producción
+(Firebase real), se montaron las tres apps LOCALMENTE (`npm run dev`) con los mismos
+atajos que ya usa la batería —nada nuevo, solo reutilizado a mano con Playwright—:
+
+- **Checklist**: `checklist/index.html?c=<estado-JSON>` (`PuertaSesion.jsx` se salta el
+  login si hay `?c=` o `?evento=`; el estado entero viaja en la URL, sin tocar
+  Firestore). Fixture: el mismo `EVENTO_COMPLETO` de `app.test.mjs`.
+- **Formulario**: `formulario/index.html?enviar=<código-cualquiera>` — el código no se
+  valida contra la nube para RENDERIZAR, solo para mandar.
+- **Calendario**: `pruebas/calendario.html` (el banco dedicado, ya documentado arriba),
+  con sus querystrings (`?vacio=1`, `?solover=1`, `?pantalla=1`, `?promover=1`).
+
+Capturas con Playwright en 3 anchos representativos (320 · 768 · 1920, no los nueve
+completos: los 9×2 ya los cubre la batería para desbordamiento) y los dos temas,
+`animations: "disabled"`, bloqueando los hosts de Firebase con `route().abort()` para no
+tocar producción. La checklist (`config`) se capturó en tres tiras (arriba/medio/abajo)
+en vez de una imagen de 22.000px — ilegible al escalar. Los modales (vista previa, Modo
+carga) se capturaron solo el viewport: son `position: fixed` con su propio scroll
+interno, y un `fullPage` los captura mal (mide la altura de la lista de ABAJO, no la del
+modal). Todo revisado a ojo, no solo con las pruebas automáticas (que cazan
+desbordamiento, no "apretado/mal alineado" — ver "Cómo se revisa lo visual" arriba).
+
+**Dos fallos reales encontrados y arreglados, cada uno con su prueba:**
+
+1. **En Modo carga · Vuelta, a 320px, la pastilla "vino todo" (~105px fijos) le dejaba
+   al nombre del item menos de 80px de los 264 de la fila: hasta "Regletas" se partía a
+   media palabra ("Regleta" / "s").** `overflow-wrap: anywhere` en
+   `.carga-nombre-texto` es intencional (comentario en `index.css`: mejor partir que
+   truncar, cargando un camión hace falta el nombre entero) — el fallo no era esa regla,
+   era que el nombre no tenía sitio de sobra por culpa de un vecino ancho. Arreglado con
+   un `min-width: 110px` en `.carga-row-vuelta .carga-nombre` (dentro del
+   `@media (max-width: 480px)` que ya existía ahí): ahora, cuando no cabe todo, es la
+   pastilla la que cae a su propia línea, no el nombre el que se aplasta. Verificado a
+   mano quitando y devolviendo el `min-width` (con capturas reales, no solo medido:
+   contar líneas con `getClientRects()` salió *inconsistente* entre lo que se veía en la
+   captura y lo que medía el mismo script unas líneas después — posible carrera de
+   layout con la fuente del sistema en este contenedor —, así que la prueba nueva en
+   `app.test.mjs` comprueba el ANCHO de la caja del nombre, que es geometría de CSS pura
+   y no tiene ese problema).
+2. **El calendario arrancaba SIEMPRE en claro, sin importar la hora ni la preferencia
+   guardada.** `aplicarTemaInicial()` se llama en el arranque de la checklist
+   (`src/main.jsx`) y del formulario (`src/formulario/main.jsx`) desde el reparto N2,
+   pero se quedó fuera cuando el calendario se separó en su propia carpeta/app — nadie
+   añadió la llamada ahí. Ni el automático por horario (oscuro de noche, que es
+   justamente cuando más se usa el calendario para logística) ni "oscuro" puesto a mano
+   desde la checklist (mismo origen, mismo `localStorage`) llegaban nunca al calendario.
+   Arreglado en `src/calendario/main.jsx` (y en el banco `src/calendario/prueba.jsx`,
+   que tenía el mismo hueco y por eso las capturas "oscuro" salían idénticas a las
+   "claro" — así se cazó). Prueba nueva en `calculos.test.mjs` que comprueba los TRES
+   arranques a la vez, para que una cuarta app que se añada algún día no repita el mismo
+   olvido.
+
+**No se tocaron los 15 `newContext()` del bloque "EL CALENDARIO" de `app.test.mjs`**
+(no fijan `gula_tema`, así que ahora sí dependen de la hora real del contenedor de CI en
+vez de estar siempre en claro): se comprobó que NINGUNA aserción de ese bloque depende
+de color, y la mayoría del resto del fichero (73 de 79 `newContext()`) ya dependía de la
+misma manera de la hora real — no es una inconsistencia nueva, es el patrón que ya había.
+
+**Lo que se miró y salió limpio** (sin cambios): la checklist entera (cabecera, tarjetas
+resumen, categorías, vista previa, Modo carga en sus cuatro pestañas, Resumen) en los
+tres anchos y los dos temas; el calendario (mes, vacío, solo lectura, pantalla completa,
+aviso de creadas) en los tres anchos; la pantalla de bienvenida del formulario.
+
+**Lo que queda de esta tarea, sin mirar todavía**: el formulario paso a paso (solo se
+miró la bienvenida — cada pregunta, el repaso final, las pantallas condicionales por
+tipo de evento, no se recorrieron); las pestañas Año y Equipo del calendario; los
+paneles del asistente (Cerebro, Objetivos, Ajustes…) fuera de lo que ya se comprobó en
+la sesión anterior (ver "Ojos humanos, ya hecho" arriba del todo); y los anchos
+intermedios de la batería (390, 412, 480, 1024, 1280) que no se capturaron a mano —
+confiando en que el barrido automático de desbordamiento ya los cubre para lo que él
+cubre.
+
 ## Qué queda pendiente ahora mismo (2026-09-04)
 
 Los cinco PR que había abiertos (#169, #170, #171, #172, #174 — todos descritos arriba)
@@ -2499,9 +2573,11 @@ Sueltos, ninguno con PR todavía:
   tronas al añadir niños): el dueño pidió EXPLÍCITAMENTE que antes de programar nada se
   planteen las preguntas exactas y se le enseñe una preview para depurar — no arrancar
   directo al código. No empezado.
-- **Revisión visual a fondo** ("hay cosas que no están bien adaptadas"): no empezada.
-  Los 9 anchos × 2 temas de la batería solo cazan desbordamiento, no lo apretado/mal
-  alineado — hace falta mirar capturas reales pantalla por pantalla.
+- **Revisión visual a fondo** ("hay cosas que no están bien adaptadas"): **en marcha**,
+  primera pasada hecha (checklist, calendario y la bienvenida del formulario; ver
+  "Revisión visual a fondo" más abajo) — dos fallos reales encontrados y arreglados.
+  Queda el formulario paso a paso, las pestañas Año/Equipo del calendario y los anchos
+  intermedios que no se capturaron a mano.
 - **Limpiar notas duplicadas en eventos YA creados** (antes del fix de #169): bloqueado
   en que el dueño exporte el backup/restore de la app — sin acceso a producción, no se
   puede mirar ni arreglar por otra vía. Sin romper nada: solo el campo de notas, solo

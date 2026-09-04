@@ -9,6 +9,7 @@
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Eye, Check, X } from "lucide-react";
+import { aplicarTemaInicial } from "../tema.js";
 import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
@@ -24,6 +25,10 @@ import { leerRatios, ponRatios } from "../personal.js";
 import Asistente from "../asistente/Asistente.jsx";
 import BotonAsistente from "../asistente/BotonAsistente.jsx";
 import { aplicarEnTareas, encadenar } from "../asistente/escrituraTareas.js";
+
+// Mismo arranque que el calendario de verdad (ver main.jsx): sin esto el banco no podía
+// enseñar el tema oscuro aunque la batería lo pusiera en localStorage antes de cargar.
+aplicarTemaInicial();
 
 const HOY = new Date();
 // aISO y no una copia a mano: eran la misma cuenta escrita dos veces, y la de aquí no

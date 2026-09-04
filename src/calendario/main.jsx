@@ -12,6 +12,7 @@ import { createRoot } from "react-dom/client";
 import { Eye } from "lucide-react";
 import RedDeSeguridad from "../RedDeSeguridad.jsx";
 import PuertaSesion from "../PuertaSesion.jsx";
+import { aplicarTemaInicial } from "../tema.js";
 import "../index.css";
 import "./calendario.css";
 import Calendario from "./Calendario.jsx";
@@ -26,6 +27,14 @@ import { encadenar } from "../asistente/escrituraTareas.js";
 import useCalendarioNube from "./useCalendarioNube.js";
 import Traer from "./Traer.jsx";
 import { enlaceDeLaUrl } from "./enlace.js";
+
+// Sin esto el calendario arrancaba SIEMPRE en claro: aplicarTemaInicial() se llamaba en
+// el arranque de la checklist y del formulario (mismo origen, mismo localStorage), pero
+// se quedó fuera cuando el calendario se separó en su propia carpeta/app. Ni el
+// automático por horario (oscuro de noche) ni "oscuro" puesto a mano desde la checklist
+// llegaban aquí — se ponía en el <html> ANTES de montar React para evitar el fogonazo
+// de blanco, igual que en los otros dos arranques.
+aplicarTemaInicial();
 
 // Se lee UNA vez, al arrancar, y no en cada render: es la dirección con la que se ha
 // entrado y no cambia. Además así el objeto es el mismo siempre y el hook no reengancha

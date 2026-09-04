@@ -3918,6 +3918,15 @@ hr {
     padding-bottom: 6px;
   }
 
+  /* Sin esto, la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de
+     80px de los 264 de la fila: hasta "Regletas" se partía a media palabra
+     ("Regleta" / "s"), aunque overflow-wrap: anywhere hace exactamente lo que tiene
+     que hacer con ese poco sitio. El nombre no necesitaba partirse, necesitaba sitio:
+     con este mínimo, la pastilla es la que cae a su propia línea cuando no cabe. */
+  .carga-row-vuelta .carga-nombre {
+    min-width: 110px;
+  }
+
   /* En móvil los dos números pegan al borde: 46px de sangría se comen el ancho que
      necesitan para caber en la misma fila. */
   .carga-vuelta-controles {

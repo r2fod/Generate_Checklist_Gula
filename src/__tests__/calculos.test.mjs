@@ -1974,6 +1974,16 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));
   ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);
 
+  // El calendario arrancaba SIEMPRE en claro: aplicarTemaInicial() se llamaba en el
+  // arranque de la checklist y del formulario, pero se quedó fuera cuando el calendario
+  // se separó en su propia carpeta/app (ni el automático por horario ni "oscuro" puesto
+  // a mano desde otra app llegaban ahí). Se comprueba en LOS TRES arranques a la vez
+  // para que una cuarta app que se añada algún día no repita el mismo olvido.
+  const arranquesSinTema = ["src/main.jsx", "src/formulario/main.jsx", "src/calendario/main.jsx"]
+    .filter(f => !/aplicarTemaInicial\(\)/.test(readFileSync(f, "utf8")));
+  ok(arranquesSinTema.length === 0,
+    `los tres arranques llaman a aplicarTemaInicial() (sin llamarla: ${arranquesSinTema.join(", ") || "ninguno"})`);
+
   // pruebas/medir.mjs lanzaba su Vite con `npx vite`, y `.kill()` solo mata a npx: el
   // Vite de verdad se quedaba huérfano y con el puerto ocupado para la siguiente vez.
   // Encima usaba el mismo puerto que `app.test.mjs`, así que ese huérfano tumbaba el
