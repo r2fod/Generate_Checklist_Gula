@@ -219,7 +219,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
-    llevaCarpas = false,
+    llevaCarpas = false, llevaParabanes = false, numParabanes,
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
@@ -320,6 +320,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       : String(numCarpas)]),
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
+    // Sin fórmula propia: el número lo pone quien ha visto el sitio.
+    opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
@@ -518,7 +520,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
-    llevaCarpas = false,
+    llevaCarpas = false, llevaParabanes = false, numParabanes,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -568,6 +570,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
       : String(numCarpasCumple)]),
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpasCumple)]),
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpasCumple)]),
+    opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
@@ -715,7 +718,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
-    llevaCarpas = true, llevaGenerador = true, mesVerano = true,
+    llevaCarpas = true, llevaGenerador = true, mesVerano = true, llevaParabanes = false, numParabanes,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -823,6 +826,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // Las pesas son las que hay: se cargan todas y se reparten entre las carpas más
     // expuestas al viento, no van por carpa
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
+    // Sin fórmula propia: el número lo pone quien ha visto el sitio.
+    opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
     ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que

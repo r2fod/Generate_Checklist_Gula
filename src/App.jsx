@@ -229,6 +229,7 @@ const ETIQUETAS_CAMPO = {
   cafeParaInvitados: "Café para invitados",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
   llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
+  llevaParabanes: "Parabanes", numParabanes: "Nº de parabanes",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -540,6 +541,11 @@ export default function App({ onCerrarSesion } = {}) {
   // Cuántas carpas hacen falta. 0 = las que salgan de la cuenta por pax; cualquier
   // otro número manda sobre ella (lo pone quien ha visto el sitio, o el formulario).
   const [numCarpas, setNumCarpas] = useState(estadoInicial.numCarpas ?? 0);
+  // Parabanes: mobiliario de exterior nuevo, sin fórmula propia por pax (a diferencia
+  // de las carpas) — la cantidad la pone quien ha visto el sitio. Excepción en los
+  // cinco tipos de evento, así que empieza apagado siempre.
+  const [llevaParabanes, setLlevaParabanes] = useState(estadoInicial.llevaParabanes ?? false);
+  const [numParabanes, setNumParabanes] = useState(estadoInicial.numParabanes ?? 0);
   // Color de los manteles. Vacío = el de siempre según el tipo de evento, para que un
   // evento guardado antes de existir esta opción cargue exactamente lo mismo.
   const [colorManteles, setColorManteles] = useState(estadoInicial.colorManteles ?? "");
@@ -852,7 +858,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava, colorManteles, porcentajeBeige,
+    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, llevaParabanes, numParabanes, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -956,6 +962,7 @@ export default function App({ onCerrarSesion } = {}) {
     cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
+    llevaParabanes: setLlevaParabanes, numParabanes: setNumParabanes,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
@@ -2471,8 +2478,8 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2489,7 +2496,7 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
-    llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
+    llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre, tipoMesa,
@@ -4524,6 +4531,27 @@ export default function App({ onCerrarSesion } = {}) {
                     Tenemos {CARPAS_EN_ALMACEN}: hay que alquilar {carpasPorAlquilar(numCarpas || carpasRecomendadas(paxCarpas))} a Support On Set
                   </span>
                 )}
+              </div>
+            )}
+            {/* Mobiliario de exterior, junto a las carpas. Sin fórmula propia (no hay
+                un "uno cada X pax" fiable): la cantidad la pone quien ha visto el
+                sitio, "—" hasta entonces, igual que otros items manuales de la app. */}
+            <SegmentedControl
+              label="Parabanes"
+              value={llevaParabanes ? "Llevan" : "No llevan"}
+              onChange={v => setLlevaParabanes(v === "Llevan")}
+              options={["Llevan", "No llevan"]}
+            />
+            {llevaParabanes && (
+              <div className="form-group">
+                <span className="form-label">Nº DE PARABANES</span>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="0"
+                  value={numParabanes || ""}
+                  onChange={e => setNumParabanes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                />
               </div>
             )}
           </div>

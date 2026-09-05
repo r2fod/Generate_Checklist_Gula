@@ -118,6 +118,17 @@ export const PREGUNTAS = [
     ],
   },
   {
+    // Mobiliario de exterior nuevo, sin nada que reutilizar y sin fórmula propia por
+    // pax (a diferencia de las carpas, aquí no hay un "uno cada X" fiable): la
+    // cantidad la pone quien ha visto el sitio, así que sin número se deja en blanco
+    // en la checklist en vez de inventar una.
+    id: "parabanes", tipo: "opciones", texto: "¿Hacen falta parabanes?",
+    opciones: [
+      { valor: "no", texto: "No hacen falta" },
+      { valor: "si", texto: "Sí", conNumero: "¿Cuántos?", campoNumero: "numParabanes" },
+    ],
+  },
+  {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
     // día): lo que cambia es el envase, y eso lo sabe quien lo ha presupuestado.
     id: "aguaPequena", tipo: "opciones", texto: "Las aguas pequeñas, ¿de qué son?",
@@ -709,6 +720,12 @@ export function aRespuestasDeLaApp(r = {}) {
       // hace falta preguntarlo aparte, se sabe con el número.
       estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
     }
+  }
+
+  // Parabanes: sin fórmula propia, el número (si lo hay) manda tal cual.
+  if (puesto(r.parabanes)) {
+    estado.llevaParabanes = r.parabanes === "si";
+    if (r.numParabanes > 0) estado.numParabanes = r.numParabanes;
   }
 
   if (tipo === "produccion") {

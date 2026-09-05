@@ -797,6 +797,28 @@ console.log("\n══ Carpas para todos los tipos de evento (antes solo producci
   ok(item(cumple, "Carpas")[1] !== null, "y en cumpleaños igual");
 }
 
+console.log("\n══ Parabanes: mobiliario nuevo, sin fórmula propia ══");
+{
+  // Sin fórmula por pax (a diferencia de las carpas): sin número puesto, la fila
+  // queda en "—" para que lo rellene quien ha visto el sitio, no un cero inventado.
+  const catMobiliario = (cats) => cats.find(c => c.nombre.startsWith("Mobiliario"));
+  const item = (cats, label) => catMobiliario(cats).items.find(x => x[0] === label);
+
+  const sinDecir = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(sinDecir, "Parabanes")[1] === null, "sin decir nada, no piden parabanes");
+
+  const sinNumero = buildChecklist("boda", 100, 2, 4, 0, { llevaParabanes: true });
+  ok(item(sinNumero, "Parabanes")[1] === "—", "con parabanes pero sin número, se deja en blanco (—)");
+
+  const conNumero = buildChecklist("boda", 100, 2, 4, 0, { llevaParabanes: true, numParabanes: 4 });
+  ok(item(conNumero, "Parabanes")[1] === "4", "y con número, ese manda");
+
+  ok(item(buildChecklist("cumpleanos", 60, 0, 0, 8, { llevaParabanes: true }), "Parabanes")[1] === "—",
+    "en cumpleaños igual");
+  ok(item(buildChecklist("produccion", 40, 0, 0, 0, { llevaParabanes: true, numParabanes: 2 }), "Parabanes")[1] === "2",
+    "y en producción también, con su propio número");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,

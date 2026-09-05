@@ -690,6 +690,17 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(bodaConCarpas.llevaCarpas === true && bodaConCarpas.numCarpas === 3,
     "una boda que contesta carpas también las guarda");
 
+  // Parabanes: mismo patrón que carpas pero sin cuenta propia — el número, si lo hay,
+  // se guarda tal cual.
+  const conParabanes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, parabanes: "si", numParabanes: 3 });
+  ok(conParabanes.llevaParabanes === true && conParabanes.numParabanes === 3,
+    "contestar que sí, con número, guarda los dos campos");
+  const sinNumeroParabanes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, parabanes: "si" });
+  ok(sinNumeroParabanes.llevaParabanes === true && sinNumeroParabanes.numParabanes === undefined,
+    "sí pero sin número: se queda sin número, no se inventa uno");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaParabanes === undefined,
+    "sin contestar, no se toca");
+
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),
