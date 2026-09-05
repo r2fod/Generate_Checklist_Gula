@@ -503,5 +503,62 @@ del formulario) con los dos fallos de arriba. Queda el formulario paso a paso, l
 pestañas Año/Equipo del calendario, y los anchos intermedios de la batería que no se
 capturaron a mano.
 
+**PR #180, en curso, SIN fusionar a propósito** — el dueño pidió depurar el formulario
+en una ronda de revisión antes de volver a producción, en vez de fusionar commit a
+commit como el resto. Lo probó en el móvil recién publicado y salieron tres cosas:
+
+- **El campo numérico no dejaba borrar para escribir otro número** (`onChange` hacía
+  `Math.max(1, parseInt(v,10) || 1)`: vaciar el campo da `NaN`, y `NaN || 1` fuerza el 1
+  en cada pulsación de borrado). Arreglado en las dos rutas donde se repetía (opción
+  única y `marcar`): vacío pasa tal cual mientras se escribe, el mínimo se aplica solo
+  al salir del campo si se queda vacío. Con prueba que usa `Control+A`+`Delete`, no
+  `.fill()` (que sustituye el valor de golpe y no pasa por `onChange` como un dedo real).
+- **El comentario libre por pregunta salía hasta donde no aporta nada**: tipo de evento
+  (primera pregunta, pura clasificación), nombre/sitio (ya son texto libre, un
+  comentario ahí es una tercera caja redundante) y fecha/hora (un día es un día). Ahora
+  se oculta en esas tres con `SIN_COMENTARIO` (por `tipo` de pregunta) + un id suelto
+  para "tipo".
+- **"Mobiliario extra de alquiler" era un sí/no suelto sin decir qué es ni a quién se le
+  alquila** (proveedor fijo a Event Style en `alquileres.js`). Ahora es su propia
+  pregunta (como flores/minutas): qué mobiliario, a qué proveedor (vacío = Event Style,
+  que sigue mandando por defecto) y la hoja del alquiler adjunta. Se añadió también
+  "¿Algo más presupuestado como alquiler?" como cajón de sastre (vajilla especial,
+  decoración, sonido...) con el mismo qué+proveedor+adjunto, que solo va a
+  `notasEvento` — no crea una recogida automática, es la excepción que no tiene su
+  propia pregunta. Los adjuntos de las dos (`archivosAlquiler`) se acumulan en el
+  evento sin sustituirse al reenviar el formulario (tope de 8, por el límite de 1 MiB
+  por documento de Firestore); se listan en la bandeja (`archivosDelEnvio`) y en la
+  pantalla de Alquileres, con botón de quitar.
+- **Gap encontrado al mirarlo**: `tipo: "marcar"` (casillas múltiples) no soporta
+  `conCampos`/`conArchivo`, solo `conNumero` — por eso mobiliario/otro-alquiler son
+  preguntas `opciones` propias en vez de una casilla más dentro de "extras", mismo
+  patrón que ya usaban flores/minutas.
+
+`npm run test` en verde (735 comprobaciones navegador + el resto de baterías, sin
+errores de JS) antes de cada commit. **Sigue en borrador**: falta que el dueño lo vea y
+dé el visto bueno antes de fusionar a `main`.
+
+**Encontrado de paso, revisando Modo Carga y el formulario a fondo (sin tocar
+todavía)**:
+
+- El interruptor de Ajustes del asistente que solo ofrece los proveedores que el Worker
+  dice tener configurados (`proveedoresUI.js`, de una sesión anterior) no es un fallo:
+  antes de la primera pregunta de la sesión no se sabe qué hay configurado, así que se
+  asume solo Gemini. Groq/Claude/Cerebras/etc. ya están implementados en el Worker —
+  para verse en Ajustes hace falta además tener su clave puesta como *Secret* en
+  Cloudflare (`worker/README.md`), que es infraestructura del dueño, no código.
+- **Sufijo con número derivado que no se recalcula al editar a mano**: Hielo
+  (`checklist-generadores.js:495,691`, "kg · N taxis") y Carpas (`:319`, "faltan N, hay
+  que alquilarlas") calculan su sufijo UNA VEZ al generar la checklist; editar la
+  cantidad a mano solo cambia el número de delante, el sufijo se queda con el texto
+  viejo. Pendiente: que `conSufijo` (`checklist-format.js`) acepte también una función
+  y se recalcule con el número editado.
+- **"Mesas calientes"** solo existe en producción (`:868`, automático por pax); en el
+  resto de tipos de evento no se pregunta ni aparece nunca. Pendiente: pregunta sí/no en
+  el formulario, reusando la misma fórmula ya existente.
+- **"Gastros"** en boda/comunión/corporativo (`:379`) es "—" (se apunta a mano, sin
+  número). Pendiente: mínimo 4 por defecto, con pregunta en el formulario para que la
+  oficina pueda dar una cantidad distinta.
+
 **Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
 septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.

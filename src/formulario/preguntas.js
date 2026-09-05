@@ -302,10 +302,32 @@ export const PREGUNTAS = [
       // se añade otra pantalla a un formulario que ya tiene quince
       { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
       { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
-      { valor: "mobiliario", texto: "Mobiliario extra de alquiler", soloEn: CON_BARRA },
+      // El mobiliario de alquiler tiene su propia pregunta (mobiliarioAlquiler): aquí
+      // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
     ],
+  },
+  {
+    // Antes era una casilla suelta dentro de "extras": marcaba sí/no pero no dejaba
+    // decir qué mobiliario es, y el proveedor estaba fijo a Event Style en el motor
+    // de alquileres (alquileres.js). Con pantalla propia (como flores/minutas) se
+    // puede decir qué es, a quién se le alquila si no es Event Style, y adjuntar la
+    // hoja del alquiler para tener registro.
+    id: "mobiliarioAlquiler", tipo: "opciones", texto: "¿Lleva mobiliario extra de alquiler?",
+    nota: "Mesas altas, sofás, barra... Si no dices proveedor, se alquila a Event Style, como siempre.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Que", etiqueta: "¿Qué mobiliario?", ejemplo: "Mesas altas, sofás, barra..." },
+          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila? (vacío = Event Style)", ejemplo: "Event Style" },
+        ],
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
+      },
+    ],
+    soloEn: CON_BARRA,
   },
   // ── Lo que se sale de lo normal ────────────────────────────────────────────
   // Platos, platos de postre, cubiertos y bandejas mixtas van SIEMPRE salvo que se diga
@@ -566,6 +588,26 @@ export const PREGUNTAS = [
     noSe: false,
   },
   {
+    // Cajón de sastre para alquileres sueltos que no tengan ya su propia pregunta
+    // (sillas, armario caliente, mobiliario, carpas...): vajilla especial,
+    // decoración, sonido... Mismo patrón que el mobiliario —qué, a quién, y la hoja
+    // del alquiler si hace falta tener registro— para no inventar una pregunta nueva
+    // por cada cosa suelta que pueda presupuestarse.
+    id: "otroAlquiler", tipo: "opciones", texto: "¿Algo más presupuestado como alquiler?",
+    nota: "Vajilla especial, decoración, sonido... lo que no tenga ya su propia pregunta arriba.",
+    opciones: [
+      { valor: "no", texto: "No hay nada más" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Que", etiqueta: "¿Qué es?", ejemplo: "Vajilla especial, altavoces..." },
+          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila?", ejemplo: "Nombre del proveedor" },
+        ],
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
+      },
+    ],
+  },
+  {
     id: "notas", tipo: "texto-largo", texto: "¿Algo más que haya que tener en cuenta?",
     campo: "notas",
     // Aquí acaba todo lo que no tiene pregunta propia. Se dicen ejemplos de verdad
@@ -715,6 +757,12 @@ export function aRespuestasDeLaApp(r = {}) {
   const alergias = (r.alergias || "").trim();
   const excepcionesMesa = (r.excepcionesMesa || "").trim();
   const buffets = (r.buffets || "").trim();
+  // Qué es cada alquiler, para quien monta el evento: el proveedor y el sí/no van al
+  // estado (abajo, con el resto de lo que se contesta siempre igual); esto es solo
+  // la descripción libre, que no tiene otro sitio donde vivir.
+  const mobiliarioQue = (r.mobiliarioAlquilerQue || "").trim();
+  const otroQue = (r.otroAlquilerQue || "").trim();
+  const otroProveedor = (r.otroAlquilerProveedor || "").trim();
   const otras = (r.notas || "").trim();
   // Comentario libre por pregunta (id + "_comentario", puesto desde ComentarioPregunta
   // en Formulario.jsx): cada uno se anexa como una línea propia, con el texto de la
@@ -729,6 +777,8 @@ export function aRespuestasDeLaApp(r = {}) {
     alergias ? `⚠️ ALERGIAS: ${alergias}` : "",
     excepcionesMesa ? `🍽️ EXCEPCIONES DE MESA: ${excepcionesMesa}` : "",
     buffets ? `🥐 BUFFETS: ${buffets}` : "",
+    mobiliarioQue ? `🪑 MOBILIARIO ALQUILADO: ${mobiliarioQue}${(r.mobiliarioAlquilerProveedor || "").trim() ? ` (${r.mobiliarioAlquilerProveedor.trim()})` : ""}` : "",
+    otroQue ? `🔑 OTRO ALQUILER: ${otroQue}${otroProveedor ? ` (${otroProveedor})` : ""}` : "",
     otras, ...comentarios,
   ].filter(Boolean).join("\n");
   pon("notasEvento", juntas);
@@ -749,6 +799,23 @@ export function aRespuestasDeLaApp(r = {}) {
       estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
     }
   }
+
+  // Mobiliario y otros alquileres: el proveedor manda sobre el fijo de siempre
+  // (Event Style) cuando se dice uno; la hoja adjunta, si la hay, se junta con las
+  // de otros envíos al aplicar (ver App.jsx, que es quien conoce el evento entero y
+  // decide cuáles ya estaban).
+  const archivosAlquiler = [];
+  if (puesto(r.mobiliarioAlquiler)) {
+    estado.llevaMobiliarioAlquiler = r.mobiliarioAlquiler === "si";
+    if ((r.mobiliarioAlquilerProveedor || "").trim()) estado.proveedorMobiliarioAlquiler = r.mobiliarioAlquilerProveedor.trim();
+    if (r.mobiliarioAlquilerArchivo && r.mobiliarioAlquilerArchivo.datos) {
+      archivosAlquiler.push({ ...r.mobiliarioAlquilerArchivo, origen: "mobiliarioAlquiler", etiqueta: mobiliarioQue || "Mobiliario extra" });
+    }
+  }
+  if (r.otroAlquilerArchivo && r.otroAlquilerArchivo.datos) {
+    archivosAlquiler.push({ ...r.otroAlquilerArchivo, origen: "otroAlquiler", etiqueta: otroQue || "Otro alquiler" });
+  }
+  if (archivosAlquiler.length) estado.archivosAlquiler = archivosAlquiler;
 
   // Parabanes: sin fórmula propia, el número (si lo hay) manda tal cual.
   if (puesto(r.parabanes)) {
@@ -799,7 +866,6 @@ export function aRespuestasDeLaApp(r = {}) {
     if (Array.isArray(r.extras)) {
       estado.tieneBrindisCava = marcado("extras", "brindis");
       estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";
-      estado.llevaMobiliarioAlquiler = marcado("extras", "mobiliario");
       estado.hayDesayuno = marcado("extras", "desayuno");
       estado.tamanoBarril = marcado("extras", "barril50") ? "50L"
         : marcado("extras", "barril30") ? "30L" : "No lleva";
@@ -914,6 +980,8 @@ export function archivosDelEnvio(r = {}) {
   return [
     { id: "imprimirMenuArchivo", etiqueta: "Menú para imprimir" },
     { id: "etiquetasArchivo", etiqueta: "Imagen de etiquetas" },
+    { id: "mobiliarioAlquilerArchivo", etiqueta: "Hoja de alquiler (mobiliario)" },
+    { id: "otroAlquilerArchivo", etiqueta: "Hoja de alquiler (otro)" },
   ]
     .map(x => ({ ...x, archivo: r[x.id] }))
     .filter(x => x.archivo && x.archivo.datos);

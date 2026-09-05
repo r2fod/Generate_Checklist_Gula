@@ -5562,6 +5562,9 @@ hr {
   text-decoration: underline; cursor: pointer; font-size: 0.82rem;
   padding: 10px 6px; min-height: 40px; flex-shrink: 0;
 }
+/* Lista de documentos de alquiler guardados en el evento (App.jsx, no formulario) */
+.form-archivo-lista { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.form-archivo-lista .form-archivo-puesto { flex-wrap: wrap; }
 
 /* Lo que ya se ha mandado desde este móvil, para volver a ello y cambiarlo */
 .form-mio { border-style: dashed; }
