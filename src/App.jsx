@@ -226,8 +226,10 @@ const ETIQUETAS_CAMPO = {
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
+  cafeParaInvitados: "Café para invitados",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
   llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
+  llevaParabanes: "Parabanes", numParabanes: "Nº de parabanes",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -523,9 +525,12 @@ export default function App({ onCerrarSesion } = {}) {
   const [numChillOut, setNumChillOut]           = useState(estadoInicial.numChillOut ?? 1);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(estadoInicial.fuerzaTextilTela ?? false);
   const [llevaPalomitera, setLlevaPalomitera]       = useState(estadoInicial.llevaPalomitera ?? false);
-  // En producciones casi siempre van carpas y generador, así que empiezan activados:
-  // el interruptor está para los sitios que ya tienen sombra o luz propia.
-  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? true);
+  // En producciones casi siempre van carpas (sitio al aire libre de por sí), así que
+  // ahí empiezan activadas — el interruptor está para los sitios que ya tienen sombra
+  // propia. En el resto de eventos es la excepción (fincas con nave o interior), así
+  // que empiezan apagadas: nadie que abra una boda de antes de esta pregunta se
+  // encuentra carpas que no pidió.
+  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? ((estadoInicial.evento ?? "boda") === "produccion"));
   const [llevaGenerador, setLlevaGenerador]         = useState(estadoInicial.llevaGenerador ?? true);
   // Mobiliario de alquiler (Event Style): mesas altas, sofás, muebles de barra... No es
   // material nuestro, así que además de salir en la carga hay que ir a por él y devolverlo.
@@ -536,12 +541,20 @@ export default function App({ onCerrarSesion } = {}) {
   // Cuántas carpas hacen falta. 0 = las que salgan de la cuenta por pax; cualquier
   // otro número manda sobre ella (lo pone quien ha visto el sitio, o el formulario).
   const [numCarpas, setNumCarpas] = useState(estadoInicial.numCarpas ?? 0);
+  // Parabanes: mobiliario de exterior nuevo, sin fórmula propia por pax (a diferencia
+  // de las carpas) — la cantidad la pone quien ha visto el sitio. Excepción en los
+  // cinco tipos de evento, así que empieza apagado siempre.
+  const [llevaParabanes, setLlevaParabanes] = useState(estadoInicial.llevaParabanes ?? false);
+  const [numParabanes, setNumParabanes] = useState(estadoInicial.numParabanes ?? 0);
   // Color de los manteles. Vacío = el de siempre según el tipo de evento, para que un
   // evento guardado antes de existir esta opción cargue exactamente lo mismo.
   const [colorManteles, setColorManteles] = useState(estadoInicial.colorManteles ?? "");
   const [porcentajeBeige, setPorcentajeBeige] = useState(estadoInicial.porcentajeBeige ?? 50);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
+  // Por defecto SÍ es para invitados (como se calculaba siempre antes de esta
+  // pregunta): un evento guardado antes de existir esto carga exactamente lo mismo.
+  const [cafeParaInvitados, setCafeParaInvitados]   = useState(estadoInicial.cafeParaInvitados ?? true);
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
   const [extraBandejasPlata, setExtraBandejasPlata]   = useState(estadoInicial.extraBandejasPlata ?? 0);
   const [llevaJamonero, setLlevaJamonero]             = useState(estadoInicial.llevaJamonero ?? false);
@@ -844,8 +857,8 @@ export default function App({ onCerrarSesion } = {}) {
     llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava, colorManteles, porcentajeBeige,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, llevaParabanes, numParabanes, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -946,8 +959,10 @@ export default function App({ onCerrarSesion } = {}) {
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
+    cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
+    llevaParabanes: setLlevaParabanes, numParabanes: setNumParabanes,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
@@ -1172,6 +1187,13 @@ export default function App({ onCerrarSesion } = {}) {
   const handleCambiarTipoEvento = (tipo) => {
     setEvento(tipo);
     if (tipo === "produccion") {
+      // Un rodaje es casi siempre al aire libre: si nadie las ha tocado, las carpas
+      // empiezan activadas al entrar en producción, igual que el generador — el
+      // interruptor sigue estando para el sitio puntual que ya tiene sombra propia.
+      // Fuera de producción empiezan apagadas (estado inicial de llevaCarpas), así que
+      // sin este empujón un evento que arrancó boda y cambia a rodaje se quedaría sin
+      // ellas aunque siempre las llevara.
+      if (!llevaCarpas) setLlevaCarpas(true);
       if (llevaGenerador) sincronizaAlquiler("generador", true, conceptoAlquiler("generador"));
       // En un rodaje no se alquila mobiliario: si venía marcado, se apaga con su recogida
       if (llevaMobiliarioAlquiler) {
@@ -2456,8 +2478,8 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2474,8 +2496,8 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
-    llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
-    tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
+    llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
+    tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre, tipoMesa,
     diasProduccion, paxPorCamarero, logisticaEquipo,
@@ -4284,6 +4306,7 @@ export default function App({ onCerrarSesion } = {}) {
                 ? [[llevaAguasPequenas, setLlevaAguasPequenas, "Aguas pequeñas", "botellas individuales 33cl"]]
                 : []),
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
+              [cafeParaInvitados,    setCafeParaInvitados,    "Café para invitados",      "desmárcalo si el café es solo para el personal"],
               ...(evento !== "boda"
                 ? [[fuerzaTextilTela, setFuerzaTextilTela, "Servilletas de tela", "añade tela y reduce las de papel grandes"]]
                 : []),
@@ -4451,10 +4474,11 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="equip-aviso">Con "Solo bandeja" la comida va toda en bandeja, así que los platos no se cargan aunque aquí tengan estilo elegido.</div>
             )}
             <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
-            {/* Carpas y generador son equipo estándar de rodaje, no un extra que se
-                añade: van aquí con el resto del equipamiento y las cantidades se
-                calculan solas. El "No llevan" es para el sitio puntual que ya tiene
-                sombra o luz propia. */}
+            {/* Carpas es equipo estándar de rodaje (van con el resto del equipamiento,
+                cantidades solas); en el resto de eventos es la excepción — fincas con
+                nave o interior — así que ahí empieza apagado. El "No llevan" es para
+                el sitio puntual que ya tiene sombra propia, en cualquiera de los dos
+                casos. El generador, en cambio, sigue siendo solo de producción. */}
             {/* El generador está en ALQUILERES: siempre viene de SOS. Las carpas son
                 nuestras (8 en almacén), así que su interruptor se queda aquí; si hacen
                 falta más, se marcan como alquiler en ese bloque. */}
@@ -4466,25 +4490,23 @@ export default function App({ onCerrarSesion } = {}) {
                 options={["Plástico", "Cartón", "Sin decir"]}
               />
             )}
-            {evento === "produccion" && (
-              <SegmentedControl
-                label="Carpas"
-                value={llevaCarpas ? "Llevan" : "No llevan"}
-                onChange={v => {
-                  setLlevaCarpas(v === "Llevan");
-                  // Sin carpas no hay carpas que alquilar: se apaga también su recogida
-                  if (v !== "Llevan" && alquilaCarpas) {
-                    setAlquilaCarpas(false);
-                    sincronizaAlquiler("carpas", false);
-                  }
-                }}
-                options={["Llevan", "No llevan"]}
-              />
-            )}
+            <SegmentedControl
+              label="Carpas"
+              value={llevaCarpas ? "Llevan" : "No llevan"}
+              onChange={v => {
+                setLlevaCarpas(v === "Llevan");
+                // Sin carpas no hay carpas que alquilar: se apaga también su recogida
+                if (v !== "Llevan" && alquilaCarpas) {
+                  setAlquilaCarpas(false);
+                  sincronizaAlquiler("carpas", false);
+                }
+              }}
+              options={["Llevan", "No llevan"]}
+            />
             {/* Cuántas. Vacío = las que salen de la cuenta por pax; un número manda
                 sobre ella, porque el sitio lo ha visto una persona y la cuenta no.
                 Si pasa de las 8 del almacén, se dice aquí mismo cuántas alquilar. */}
-            {evento === "produccion" && llevaCarpas && (
+            {llevaCarpas && (
               <div className="form-group">
                 <span className="form-label">Nº DE CARPAS</span>
                 <input
@@ -4509,6 +4531,27 @@ export default function App({ onCerrarSesion } = {}) {
                     Tenemos {CARPAS_EN_ALMACEN}: hay que alquilar {carpasPorAlquilar(numCarpas || carpasRecomendadas(paxCarpas))} a Support On Set
                   </span>
                 )}
+              </div>
+            )}
+            {/* Mobiliario de exterior, junto a las carpas. Sin fórmula propia (no hay
+                un "uno cada X pax" fiable): la cantidad la pone quien ha visto el
+                sitio, "—" hasta entonces, igual que otros items manuales de la app. */}
+            <SegmentedControl
+              label="Parabanes"
+              value={llevaParabanes ? "Llevan" : "No llevan"}
+              onChange={v => setLlevaParabanes(v === "Llevan")}
+              options={["Llevan", "No llevan"]}
+            />
+            {llevaParabanes && (
+              <div className="form-group">
+                <span className="form-label">Nº DE PARABANES</span>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="0"
+                  value={numParabanes || ""}
+                  onChange={e => setNumParabanes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                />
               </div>
             )}
           </div>

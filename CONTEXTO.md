@@ -484,15 +484,19 @@ mismo criterio que ya pedía para el formulario):
    cero: recetario, menú del evento, nada reutilizable todavía). Fase 3, el asistente,
    al final. Piloto: el evento real "Aryan Campana" (ya limpio de notas duplicadas),
    para probar con datos de verdad antes de generalizar.
-2. **Mejoras del formulario — plan por escribir.** Además de lo ya preguntado
-   (cubertería/cristalería exacta por mesa, apartado de buffets, comentario por paso, ir
-   al resumen en cualquier momento, el bug de las tronas al añadir niños — sin
-   confirmar: no se encontró en cómo se guarda el número, sospecha de que no se
-   recalculan solas al corregir el formulario), el dueño añadió: si hace falta llevar
-   carpas, parabanes, y si el café lo piden los clientes o es solo para el personal
-   (para calcular tazas/platos según eso). **Ojo**: las producciones (rodajes) funcionan
-   distinto al resto de tipos de evento — cualquier pregunta nueva tiene que revisar
-   `soloEn` en `preguntas.js` para no colarse donde no toca.
+2. **Mejoras del formulario — HECHO, las seis.** Bug de las tronas: investigado a fondo
+   (reproducción real con Playwright por los dos caminos posibles) y no se reprodujo —
+   `Tronas` sale directo de `ninos` en los tres builders y ya estaba en las dependencias
+   del `useMemo`; se deja una prueba de guarda por si reaparece por otra vía. El resto,
+   implementado y con test: botón "ir al resumen" en cualquier pregunta; comentario libre
+   y colapsable por pregunta (a `notasEvento`, sin duplicar al reenviar); pregunta de
+   café (invitados/solo personal — `calcCafe` en `checklist-generadores.js`, con reserva
+   modesta para el personal cuando los invitados no toman); carpas ampliadas a los cinco
+   tipos de evento (cálculo compartido `calcCarpas()` en `carpas.js`, antes solo vivía en
+   producción); parabanes (mobiliario nuevo, sin fórmula por pax); excepciones de mesa y
+   buffets (texto libre a las notas, sin tocar el cálculo agregado todavía). Las
+   producciones se verificaron aparte en cada paso: mismo resultado antes/después de
+   compartir la lógica con el resto de tipos.
 
 **Revisión visual a fondo**: primera pasada hecha (checklist, calendario, la bienvenida
 del formulario) con los dos fallos de arriba. Queda el formulario paso a paso, las

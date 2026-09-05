@@ -1787,6 +1787,75 @@ async function main() {
     ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
       "sin desbordamiento en el móvil");
 
+    // "Ir al resumen" desde cualquier pregunta, y el comentario libre por pregunta:
+    // arranque limpio para no arrastrar el estado del recorrido de arriba.
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(500);
+    await p.locator(".form-input").first().fill("Boda de Resumen");
+    await p.locator(".form-input").nth(1).fill("Finca de prueba");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(500);
+    ok(/Qué día/i.test(await p.locator(".form-titulo").innerText()), "llega a la pregunta del día");
+
+    // La cabecera de cualquier pregunta lleva los dos botones: resumen e inicio.
+    ok(await p.locator(".form-cabecera-acciones button").count() === 2,
+      "la cabecera lleva el botón de ir al resumen junto al de inicio");
+    await p.locator(".form-btn-resumen").click();
+    await p.waitForTimeout(500);
+    ok(/Está todo bien/i.test(await p.locator(".form-titulo").innerText()),
+      "el botón de resumen salta directo al repaso, sin contestar el resto");
+    ok(/Falta algo/i.test(await p.locator(".form-btn-principal").innerText()),
+      "y como falta el día, el repaso lo dice en vez de dejar enviar");
+    const filasRepaso = await p.locator(".form-repaso-fila").allInnerTexts();
+    ok(filasRepaso.some(t => /Boda de Resumen/.test(t)),
+      "lo ya contestado sigue ahí: no se pierde nada al saltar al resumen");
+
+    // El comentario libre por pregunta: arranque limpio otra vez, para no depender
+    // de por dónde deja "Atrás" tras saltar al repaso (ese vuelve a la ÚLTIMA
+    // pregunta, no a esta — es el mismo comportamiento que ya usa reabrir un envío).
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(500);
+    await p.locator(".form-input").first().fill("Boda del Comentario");
+    await p.locator(".form-input").nth(1).fill("Finca de prueba");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(500);
+    await p.locator('input[type="date"]').first().fill("2027-08-11");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(500);
+    ok(/Cuánta gente/i.test(await p.locator(".form-titulo").innerText()), "llega a la pregunta de cuánta gente");
+
+    // Colapsado hasta que se pulsa, y lo escrito sigue ahí al volver a la MISMA
+    // pregunta (aunque de por medio se haya pasado por la siguiente).
+    ok(await p.locator(".form-comentario-textarea").count() === 0,
+      "el comentario empieza colapsado, no es lo primero que se ve");
+    await p.locator(".form-comentario-abrir").click();
+    await p.waitForTimeout(200);
+    await p.locator(".form-comentario-textarea").fill("20 son mayores de 70 años");
+    await p.waitForTimeout(200);
+    const tituloConGente = await p.locator(".form-titulo").innerText();
+    const nose = p.locator(".form-btn-nose");
+    if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(400);
+    ok((await p.locator(".form-titulo").innerText()) !== tituloConGente, "avanza a la siguiente pregunta");
+    await p.locator(".form-btn-atras").click();
+    await p.waitForTimeout(400);
+    ok((await p.locator(".form-titulo").innerText()) === tituloConGente,
+      "\"Atrás\", de una en una, vuelve a la MISMA pregunta de antes");
+    ok(await p.locator(".form-comentario-textarea").count() === 1,
+      "el comentario sale ya abierto solo, sin tener que pulsar otra vez");
+    ok((await p.locator(".form-comentario-textarea").inputValue()) === "20 son mayores de 70 años",
+      "y con lo escrito antes, no en blanco");
+
     // Las carpas: se propone un número sacado de la gente y se puede cambiar. Si pasa
     // de las 8 del almacén, tiene que decirlo AHÍ, no descubrirse el día del rodaje.
     const preguntaDe = async (texto) => {

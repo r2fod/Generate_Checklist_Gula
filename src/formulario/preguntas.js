@@ -91,12 +91,16 @@ export const PREGUNTAS = [
     // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
     // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
     // número que sale de la gente, que se puede cambiar: quien rellena esto no tiene
-    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos.
+    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos. Antes solo
+    // se preguntaba en producción (sitio al aire libre por defecto); en el resto es la
+    // excepción (finca con nave o interior), pero cuando hace falta es la misma cuenta
+    // — paxDeLaGente ya sabe qué pax usar según el tipo (día grande en rodajes, los
+    // adultos en el resto), así que no hace falta reinventar nada aquí.
     id: "carpas", tipo: "opciones", texto: "¿Hacen falta carpas?",
     nota: (r) => {
-      const pax = paxDelDiaGrande(r.dias);
+      const pax = paxDeLaGente(r);
       if (!pax) return `Tenemos ${CARPAS_EN_ALMACEN} en el almacén; de las que falten se avisa para alquilarlas.`;
-      return `Con ${pax} personas el día de más gente salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
+      return `Con ${pax} personas salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
     },
     opciones: [
       { valor: "no", texto: "No hacen falta" },
@@ -104,15 +108,25 @@ export const PREGUNTAS = [
         valor: "si", texto: "Sí",
         conNumero: "¿Cuántas?",
         campoNumero: "numCarpas",
-        sugerido: (r) => carpasRecomendadas(paxDelDiaGrande(r.dias)),
+        sugerido: (r) => carpasRecomendadas(paxDeLaGente(r)),
         // Lo que pase de las del almacén hay que alquilarlo, y eso se dice aquí en vez
-        // de descubrirlo el día del rodaje
+        // de descubrirlo el día del evento
         avisoNumero: (n) => (carpasPorAlquilar(n) > 0
           ? `Tenemos ${CARPAS_EN_ALMACEN}: hay que alquilar ${carpasPorAlquilar(n)} a Support On Set, con su recogida.`
           : `Caben en el almacén (tenemos ${CARPAS_EN_ALMACEN}), no hay que alquilar ninguna.`),
       },
     ],
-    soloEn: ["produccion"],
+  },
+  {
+    // Mobiliario de exterior nuevo, sin nada que reutilizar y sin fórmula propia por
+    // pax (a diferencia de las carpas, aquí no hay un "uno cada X" fiable): la
+    // cantidad la pone quien ha visto el sitio, así que sin número se deja en blanco
+    // en la checklist en vez de inventar una.
+    id: "parabanes", tipo: "opciones", texto: "¿Hacen falta parabanes?",
+    opciones: [
+      { valor: "no", texto: "No hacen falta" },
+      { valor: "si", texto: "Sí", conNumero: "¿Cuántos?", campoNumero: "numParabanes" },
+    ],
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
@@ -258,6 +272,20 @@ export const PREGUNTAS = [
       { valor: "Grande", texto: "Grande" },
       { valor: "Ambos", texto: "Los dos" },
       { valor: "No lleva", texto: "No lleva" },
+    ],
+  },
+
+  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
+  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
+  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
+  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
+  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
+  // a los invitados.
+  {
+    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
+    opciones: [
+      { valor: "invitados", texto: "Para los invitados" },
+      { valor: "personal", texto: "Solo para el personal" },
     ],
   },
 
@@ -517,6 +545,27 @@ export const PREGUNTAS = [
     noSe: false,
   },
   {
+    // "Por mesa" no significa un editor mesa a mesa (dispararía la complejidad para
+    // lo que es la excepción, no la norma): una pregunta de excepciones que viaja a
+    // las notas del evento, igual que las alergias, sin tocar el cálculo agregado
+    // por pax que ya existe — lo complementa, no lo sustituye.
+    id: "excepcionesMesa", tipo: "texto-largo", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
+    campo: "excepcionesMesa",
+    nota: "Cubiertos de pescado extra, cristalería aparte, menú infantil en una mesa concreta... Si no hay ninguna excepción, se deja en blanco.",
+    ejemplo: "Ej: cubiertos de pescado en la mesa 4, cristalería aparte en la 7...",
+    noSe: false,
+  },
+  {
+    // Sin marcado múltiple con fórmula propia (todavía no hay un "una carpa/menaje
+    // cada X buffets" fiable): de momento va a las notas, igual que las excepciones
+    // de mesa, para que la oficina no lo pierda de vista al montar el evento.
+    id: "buffets", tipo: "texto-largo", texto: "¿Lleva buffet(s) aparte del servicio principal?",
+    campo: "buffets",
+    nota: "Cuáles (quesos, dulce, ibéricos, fruta...) y cuántas mesas cada uno. Si no lleva, se deja en blanco.",
+    ejemplo: "Ej: buffet de quesos (2 mesas), mesa dulce (1 mesa)",
+    noSe: false,
+  },
+  {
     id: "notas", tipo: "texto-largo", texto: "¿Algo más que haya que tener en cuenta?",
     campo: "notas",
     // Aquí acaba todo lo que no tiene pregunta propia. Se dicen ejemplos de verdad
@@ -664,21 +713,51 @@ export function aRespuestasDeLaApp(r = {}) {
   // es por donde le llegan a quien está en el sitio. Y van arriba porque una alergia
   // leída después de servir no sirve de nada.
   const alergias = (r.alergias || "").trim();
+  const excepcionesMesa = (r.excepcionesMesa || "").trim();
+  const buffets = (r.buffets || "").trim();
   const otras = (r.notas || "").trim();
-  const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras].filter(Boolean).join("\n");
+  // Comentario libre por pregunta (id + "_comentario", puesto desde ComentarioPregunta
+  // en Formulario.jsx): cada uno se anexa como una línea propia, con el texto de la
+  // pregunta delante para no perder de vista a qué aclara. notasFusionadas (en
+  // App.jsx, al aplicar el envío) ya compara línea a línea, así que reenviar el
+  // formulario sin cambiar un comentario no lo duplica.
+  const comentarios = preguntasDe(tipo, r)
+    .map(p => ({ texto: p.texto, valor: (r[`${p.id}_comentario`] || "").trim() }))
+    .filter(x => x.valor)
+    .map(x => `· ${x.texto} ${x.valor}`);
+  const juntas = [
+    alergias ? `⚠️ ALERGIAS: ${alergias}` : "",
+    excepcionesMesa ? `🍽️ EXCEPCIONES DE MESA: ${excepcionesMesa}` : "",
+    buffets ? `🥐 BUFFETS: ${buffets}` : "",
+    otras, ...comentarios,
+  ].filter(Boolean).join("\n");
   pon("notasEvento", juntas);
+
+  // Café para invitados por defecto (estadoInicial.cafeParaInvitados ?? true en
+  // calcCafe): así ningún evento guardado antes de esta pregunta cambia de cantidad.
+  if (puesto(r.cafe)) estado.cafeParaInvitados = r.cafe !== "personal";
+
+  // Carpas: antes solo se preguntaba en producción (siempre al aire libre); ahora se
+  // pregunta en todos los tipos, así que sale del bloque de producción y va aquí, con
+  // el resto de lo que se contesta siempre igual.
+  if (puesto(r.carpas)) {
+    estado.llevaCarpas = r.carpas === "si";
+    if (r.numCarpas > 0) {
+      estado.numCarpas = r.numCarpas;
+      // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
+      // hace falta preguntarlo aparte, se sabe con el número.
+      estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
+    }
+  }
+
+  // Parabanes: sin fórmula propia, el número (si lo hay) manda tal cual.
+  if (puesto(r.parabanes)) {
+    estado.llevaParabanes = r.parabanes === "si";
+    if (r.numParabanes > 0) estado.numParabanes = r.numParabanes;
+  }
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
-    if (puesto(r.carpas)) {
-      estado.llevaCarpas = r.carpas === "si";
-      if (r.numCarpas > 0) {
-        estado.numCarpas = r.numCarpas;
-        // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
-        // hace falta preguntarlo aparte, se sabe con el número.
-        estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
-      }
-    }
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
     if (puesto(r.aguaPequena)) estado.tipoAguaPequena = r.aguaPequena;
     // Las sillas de un rodaje se preguntan igual que en el resto. Antes se forzaban a

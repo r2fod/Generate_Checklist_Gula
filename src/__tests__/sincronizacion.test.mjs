@@ -485,8 +485,12 @@ console.log("\n══ Cómo se lee un envío en la bandeja ══");
     `lo contestado se lee entero → "${de("gente").respuesta}"`);
   ok(de("cuando").respuesta.includes("12:30") && de("cuando").respuesta.includes("a 02:00"),
     `la hora de fin se enseña aunque no configure nada → "${de("cuando").respuesta}"`);
-  ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "carpas"),
-    "y de una boda no se enseñan las preguntas de rodaje");
+  ok(!filas.some(f => f.id === "dias"),
+    "y de una boda no se enseña la de los días, que es solo de rodaje");
+  // Las carpas SÍ se preguntan en una boda (dejó de ser solo de producción): es la
+  // excepción, no la norma, pero cuando hace falta se pregunta igual.
+  ok(filas.some(f => f.id === "carpas"),
+    "pero las carpas sí, aunque sea la excepción en una boda");
 }
 
 // ── Aplicar un envío no puede pisar lo que ya había ───────────────────────────
@@ -678,6 +682,24 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   const ninguna = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], carpas: "no" });
   ok(ninguna.llevaCarpas === false && ninguna.numCarpas === undefined,
     "y si no hacen falta, no se lleva ninguna");
+
+  // Las carpas dejaron de ser solo de producción: la misma pregunta, contestada en
+  // una boda, tiene que volcarse igual (antes vivía dentro del "if produccion" y no
+  // se leía nunca fuera de ahí).
+  const bodaConCarpas = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, carpas: "si", numCarpas: 3 });
+  ok(bodaConCarpas.llevaCarpas === true && bodaConCarpas.numCarpas === 3,
+    "una boda que contesta carpas también las guarda");
+
+  // Parabanes: mismo patrón que carpas pero sin cuenta propia — el número, si lo hay,
+  // se guarda tal cual.
+  const conParabanes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, parabanes: "si", numParabanes: 3 });
+  ok(conParabanes.llevaParabanes === true && conParabanes.numParabanes === 3,
+    "contestar que sí, con número, guarda los dos campos");
+  const sinNumeroParabanes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, parabanes: "si" });
+  ok(sinNumeroParabanes.llevaParabanes === true && sinNumeroParabanes.numParabanes === undefined,
+    "sí pero sin número: se queda sin número, no se inventa uno");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaParabanes === undefined,
+    "sin contestar, no se toca");
 
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
@@ -1077,6 +1099,74 @@ console.log("\n══ Tarta y alergias ══");
     "las alergias se preguntan en todos los tipos de evento");
   ok(ids("boda").includes("tarta") && ids("cumpleanos").includes("tarta") && !ids("produccion").includes("tarta"),
     "y la tarta en todos menos en un rodaje");
+}
+
+// Excepciones de mesa y buffets: texto libre a las notas del evento, mismo mecanismo
+// que alergias — no tocan el cálculo agregado por pax, lo complementan.
+console.log("\n══ Excepciones de mesa y buffets ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  const con = aRespuestasDeLaApp({ ...base, alergias: "1 vegano", excepcionesMesa: "cristalería aparte mesa 7", buffets: "quesos (2 mesas)" });
+  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: cristalería aparte mesa 7\n🥐 BUFFETS: quesos (2 mesas)",
+    `alergias, excepciones y buffets, cada uno en su línea → ${JSON.stringify(con.notasEvento)}`);
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: "  " }).notasEvento === undefined,
+    "en blanco no deja una línea vacía");
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin contestar ninguna de las tres, las notas del evento no se tocan");
+}
+
+// Comentario libre por pregunta (ComentarioPregunta en Formulario.jsx, campo
+// "<id>_comentario"): se anexa a las notas del evento con el texto de la pregunta
+// delante, detrás de alergias y de las notas generales — mismo mecanismo que ya
+// usan esas dos, así que notasFusionadas (al aplicar el envío) también dedup lo
+// que aquí se escriba si se reenvía sin tocarlo.
+console.log("\n══ Comentario libre por pregunta ══");
+{
+  const { aRespuestasDeLaApp, notasFusionadas } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin ningún comentario puesto, las notas del evento no se tocan");
+  const uno = aRespuestasDeLaApp({ ...base, gente_comentario: "20 son niños de menos de 5 años" });
+  ok(/¿Cuánta gente\? 20 son niños de menos de 5 años/.test(uno.notasEvento),
+    `el comentario lleva delante el texto de SU pregunta → ${JSON.stringify(uno.notasEvento)}`);
+
+  // Junto con alergias y notas: alergias primero, notas generales después, los
+  // comentarios por pregunta al final — ningún orden se pisa entre sí.
+  const todo = aRespuestasDeLaApp({
+    ...base, alergias: "1 celíaco", notas: "Llamar antes de llegar",
+    gente_comentario: "Confirmar niños la semana antes",
+  });
+  ok(todo.notasEvento === "⚠️ ALERGIAS: 1 celíaco\nLlamar antes de llegar\n· ¿Cuánta gente? Confirmar niños la semana antes",
+    `alergias, notas y comentario cada uno en su línea → ${JSON.stringify(todo.notasEvento)}`);
+
+  ok(aRespuestasDeLaApp({ ...base, gente_comentario: "   " }).notasEvento === undefined,
+    "un comentario en blanco no deja una línea vacía");
+
+  // Reenviar el formulario sin cambiar el comentario no lo duplica en el evento: es
+  // el mismo notasFusionadas que ya evita duplicar alergias y notas (línea a línea,
+  // sin distinguir mayúsculas).
+  const primeraVez = aRespuestasDeLaApp({ ...base, gente_comentario: "Confirmar niños" }).notasEvento;
+  const fusionadas = notasFusionadas(primeraVez, primeraVez);
+  ok(fusionadas === primeraVez,
+    "reenviar sin tocar el comentario no lo duplica en las notas del evento");
+}
+
+// El café se pedía siempre para los invitados, sin preguntar: cafeParaInvitados
+// (calcCafe, en checklist-generadores.js) apaga esa parte cuando la oficina dice que
+// es solo para el personal, sin tocar el café aparte del propio equipo.
+console.log("\n══ El café, ¿para quién? ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).cafeParaInvitados === undefined,
+    "sin contestar, no se toca: el evento se queda con el valor por defecto (true)");
+  ok(aRespuestasDeLaApp({ ...base, cafe: "invitados" }).cafeParaInvitados === true,
+    "\"Para los invitados\" pone cafeParaInvitados a true");
+  ok(aRespuestasDeLaApp({ ...base, cafe: "personal" }).cafeParaInvitados === false,
+    "\"Solo para el personal\" lo pone a false");
 }
 
 // ── Lo que se sale de lo normal ──────────────────────────────────────────────

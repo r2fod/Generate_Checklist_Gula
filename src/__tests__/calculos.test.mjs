@@ -683,6 +683,142 @@ console.log("\n══ El ratio ajustable llega de verdad a la checklist (bug rea
   ponRatios({});   // se dejan como estaban para el resto de la batería
 }
 
+console.log("\n══ Las tronas siguen al número de niños ══");
+{
+  // El dueño reportó tronas desactualizadas al corregir el número de niños desde el
+  // formulario. No se reprodujo: buildChecklist() recibe `ninos` como parámetro propio
+  // (no algo que haya que "recalcular" aparte) y "Tronas" sale directamente de él en
+  // los tres builders (checklist-generadores.js). Confirmado también con Playwright de
+  // verdad, en los dos caminos posibles — un arranque fresco con el ninos nuevo (lo que
+  // hace la app tras aplicar un envío: guarda el estado y recarga entera) y cambiar el
+  // campo Niños en caliente sin recargar — Tronas se actualiza sola en los dos, sin
+  // pulsar "Recalcular cantidades". Se deja esta prueba para que, si el fallo vuelve a
+  // aparecer, sea por otra vía (por ejemplo un valor puesto a mano que pisa el cálculo
+  // a propósito) y no por esto.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return it[1];
+    }
+    return undefined;
+  };
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 5, {}), "Tronas") === "5",
+    "con 5 niños, la checklist de boda pide 5 tronas");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 10, {}), "Tronas") === "10",
+    "y con 10, pide 10 — sin nada guardado de antes que pueda quedarse atrás");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 0, {}), "Tronas") === "—",
+    "y sin niños, no se piden tronas");
+  ok(cantidadItem(buildChecklist("cumpleanos", 60, 0, 0, 8, {}), "Tronas") === "8",
+    "y en cumpleaños igual: 8 niños, 8 tronas");
+}
+
+console.log("\n══ El café, para invitados o solo para el personal ══");
+{
+  // El café se pedía SIEMPRE para los invitados, sin preguntar: cafeParaInvitados
+  // (por defecto true, para no cambiar ni un evento guardado antes de esta pregunta)
+  // apaga solo la parte que se sirve a los invitados — el café del personal (aparte,
+  // en Servicio y limpieza) no depende de esto, tenga la cafetera de invitados o no.
+  const catCafe = (cats) => cats.find(c => c.nombre === "Café");
+  const vasosPersonal = (cats) => cats.find(c => c.nombre === "Servicio y limpieza")
+    .items.find(x => x[0] === "Vasos de cartón café mini (personal)")[1];
+
+  const conInvitados = buildChecklist("boda", 100, 2, 4, 0, { cafeParaInvitados: true });
+  ok(catCafe(conInvitados).items.some(x => x[0] === "Cafetera Nespresso"),
+    "con café para invitados, sale la cafetera de servicio de siempre");
+  ok(catCafe(conInvitados).items.some(x => /Tazas café/.test(x[0])),
+    "y las tazas para los invitados");
+
+  // Sin invitados, el personal se queda sin la cafetera de la que "tomar prestado":
+  // hace falta una propia, aunque modesta (nada de tazas ni platos, eso sí es de
+  // invitados) — con cápsulas contadas por personal, no por pax del evento.
+  const soloPersonal = buildChecklist("boda", 100, 2, 4, 0, { cafeParaInvitados: false });
+  ok(!catCafe(soloPersonal).items.some(x => /Tazas café|Platos de café|Infusiones|Jarras de leche/.test(x[0])),
+    "sin invitados no se piden tazas, platos, infusiones ni jarras — eso es de invitados");
+  ok(catCafe(soloPersonal).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
+    "pero si el personal sí toma café, se lleva su propia cafetera");
+  ok(JSON.stringify(vasosPersonal(conInvitados)) === JSON.stringify(vasosPersonal(soloPersonal)),
+    "y los vasos de cartón del personal no cambian: son aparte, no dependen de esto");
+
+  const sinContestar = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(catCafe(sinContestar).items.length === catCafe(conInvitados).items.length,
+    "sin contestar la pregunta, un evento de siempre pide café de invitados igual que antes");
+
+  // En producción, la cafetera de mantenimiento del equipo (todo el día encendida)
+  // no es para invitados: se añade pase lo que pase, aunque el resto se apague.
+  const prodConInvitados = catCafe(buildChecklist("produccion", 40, 0, 0, 0, { cafeParaInvitados: true }));
+  const prodSinInvitados = catCafe(buildChecklist("produccion", 40, 0, 0, 0, { cafeParaInvitados: false }));
+  const tieneMantenimiento = (cat) => cat.items.some(x => /mantenimiento/.test(x[0]));
+  ok(tieneMantenimiento(prodConInvitados) && tieneMantenimiento(prodSinInvitados),
+    "en producción, la cafetera de mantenimiento no depende de si el café es para invitados");
+  ok(prodSinInvitados.items.length === 1,
+    "y sin invitados, en un rodaje solo queda esa línea de mantenimiento");
+}
+
+console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
+{
+  // Antes las carpas solo existían en producción (siempre al aire libre). En el resto
+  // es la excepción, no la norma —fincas con nave o interior— así que sin contestar
+  // nada no aparecen (opt() deja la fila con cantidad null, como el resto de items
+  // condicionales de esta app: no se borra la fila, se apaga la cantidad).
+  const catMobiliario = (cats) => cats.find(c => c.nombre.startsWith("Mobiliario"));
+  const item = (cats, label) => catMobiliario(cats).items.find(x => x[0] === label);
+
+  const sinCarpas = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(sinCarpas, "Carpas")[1] === null,
+    "sin decir nada, una boda no pide carpas (es la excepción, no la norma)");
+
+  const conCarpas = buildChecklist("boda", 100, 2, 4, 0, { llevaCarpas: true });
+  ok(item(conCarpas, "Carpas")[1] !== null, "con llevaCarpas, una boda SÍ las pide");
+
+  // La cuenta es la MISMA función compartida (calcCarpas, en carpas.js) que usa
+  // producción: mismo pax, mismo resultado, para no arriesgar la única lógica que ya
+  // funcionaba al extraerla del generador de producción.
+  const prod = buildChecklist("produccion", 100, 0, 0, 0, {});
+  ok(JSON.stringify(item(conCarpas, "Carpas")[1]) === JSON.stringify(item(prod, "Carpas")[1]),
+    `boda y producción con el mismo pax piden las mismas carpas → ${JSON.stringify(item(conCarpas, "Carpas")[1])}`);
+  ok(item(conCarpas, "Paredes de carpas")[1] === item(prod, "Paredes de carpas")[1]
+    && item(conCarpas, "Pesas (15kg)")[1] === item(prod, "Pesas (15kg)")[1],
+    "y las mismas paredes y pesas");
+
+  // Producción sigue funcionando exactamente igual que antes de compartir la cuenta
+  // con boda/cumpleaños: sin decir nada, sigue llevando carpas (era su valor de
+  // siempre) con el número de fábrica.
+  ok(item(prod, "Carpas")[1].u === 8 && item(prod, "Paredes de carpas")[1] === "24" && item(prod, "Pesas (15kg)")[1] === "6",
+    `producción, sin tocar nada, sigue pidiendo lo mismo de siempre (100 pax → 8 carpas/24 paredes/6 pesas) → ${JSON.stringify(item(prod, "Carpas")[1])}`);
+
+  // Un número puesto a mano (formulario o a mano en la app) manda sobre la
+  // recomendación, en cualquiera de los dos tipos.
+  const numeroAMano = buildChecklist("boda", 30, 2, 4, 0, { llevaCarpas: true, numCarpas: 2 });
+  ok(item(numeroAMano, "Carpas")[1] === "2",
+    "un número puesto a mano manda sobre la recomendación, también fuera de producción");
+
+  // Cumpleaños también lo tiene (categoría "Mobiliario", no "Mobiliario, sala y decoración")
+  const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { llevaCarpas: true });
+  ok(item(cumple, "Carpas")[1] !== null, "y en cumpleaños igual");
+}
+
+console.log("\n══ Parabanes: mobiliario nuevo, sin fórmula propia ══");
+{
+  // Sin fórmula por pax (a diferencia de las carpas): sin número puesto, la fila
+  // queda en "—" para que lo rellene quien ha visto el sitio, no un cero inventado.
+  const catMobiliario = (cats) => cats.find(c => c.nombre.startsWith("Mobiliario"));
+  const item = (cats, label) => catMobiliario(cats).items.find(x => x[0] === label);
+
+  const sinDecir = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(sinDecir, "Parabanes")[1] === null, "sin decir nada, no piden parabanes");
+
+  const sinNumero = buildChecklist("boda", 100, 2, 4, 0, { llevaParabanes: true });
+  ok(item(sinNumero, "Parabanes")[1] === "—", "con parabanes pero sin número, se deja en blanco (—)");
+
+  const conNumero = buildChecklist("boda", 100, 2, 4, 0, { llevaParabanes: true, numParabanes: 4 });
+  ok(item(conNumero, "Parabanes")[1] === "4", "y con número, ese manda");
+
+  ok(item(buildChecklist("cumpleanos", 60, 0, 0, 8, { llevaParabanes: true }), "Parabanes")[1] === "—",
+    "en cumpleaños igual");
+  ok(item(buildChecklist("produccion", 40, 0, 0, 0, { llevaParabanes: true, numParabanes: 2 }), "Parabanes")[1] === "2",
+    "y en producción también, con su propio número");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,
