@@ -751,7 +751,16 @@ export default function Formulario({ codigo }) {
                       <input
                         type="number" min="1" className="form-input form-input-corto"
                         value={valor}
-                        onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        onChange={e => {
+                          // Vacío es un paso de paso, no un valor: forzar aquí mismo un
+                          // mínimo de 1 hacía que borrar el "1" para escribir "15" saltara
+                          // sola de vuelta a "1" antes de dejar teclear el resto.
+                          const v = e.target.value;
+                          if (v === "") { pon(campo, ""); return; }
+                          const n = parseInt(v, 10);
+                          if (!Number.isNaN(n)) pon(campo, Math.max(1, n));
+                        }}
+                        onBlur={() => { if (respuestas[campo] === "") pon(campo, sugerido); }}
                       />
                     </div>
                     {o.avisoNumero && <p className="form-nota form-nota-aviso">{o.avisoNumero(valor)}</p>}
@@ -803,7 +812,15 @@ export default function Formulario({ codigo }) {
                     <input
                       type="number" min="1" className="form-input form-input-corto"
                       value={respuestas[campo] ?? ""}
-                      onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      onChange={e => {
+                        // Mismo arreglo que en las de elegir: vacío es un paso de paso
+                        // mientras se escribe, no un valor que haya que corregir ya.
+                        const v = e.target.value;
+                        if (v === "") { pon(campo, ""); return; }
+                        const n = parseInt(v, 10);
+                        if (!Number.isNaN(n)) pon(campo, Math.max(1, n));
+                      }}
+                      onBlur={() => { if (respuestas[campo] === "") pon(campo, 1); }}
                     />
                   </div>
                 );
