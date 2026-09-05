@@ -524,9 +524,12 @@ export default function App({ onCerrarSesion } = {}) {
   const [numChillOut, setNumChillOut]           = useState(estadoInicial.numChillOut ?? 1);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(estadoInicial.fuerzaTextilTela ?? false);
   const [llevaPalomitera, setLlevaPalomitera]       = useState(estadoInicial.llevaPalomitera ?? false);
-  // En producciones casi siempre van carpas y generador, así que empiezan activados:
-  // el interruptor está para los sitios que ya tienen sombra o luz propia.
-  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? true);
+  // En producciones casi siempre van carpas (sitio al aire libre de por sí), así que
+  // ahí empiezan activadas — el interruptor está para los sitios que ya tienen sombra
+  // propia. En el resto de eventos es la excepción (fincas con nave o interior), así
+  // que empiezan apagadas: nadie que abra una boda de antes de esta pregunta se
+  // encuentra carpas que no pidió.
+  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? ((estadoInicial.evento ?? "boda") === "produccion"));
   const [llevaGenerador, setLlevaGenerador]         = useState(estadoInicial.llevaGenerador ?? true);
   // Mobiliario de alquiler (Event Style): mesas altas, sofás, muebles de barra... No es
   // material nuestro, así que además de salir en la carga hay que ir a por él y devolverlo.
@@ -1177,6 +1180,13 @@ export default function App({ onCerrarSesion } = {}) {
   const handleCambiarTipoEvento = (tipo) => {
     setEvento(tipo);
     if (tipo === "produccion") {
+      // Un rodaje es casi siempre al aire libre: si nadie las ha tocado, las carpas
+      // empiezan activadas al entrar en producción, igual que el generador — el
+      // interruptor sigue estando para el sitio puntual que ya tiene sombra propia.
+      // Fuera de producción empiezan apagadas (estado inicial de llevaCarpas), así que
+      // sin este empujón un evento que arrancó boda y cambia a rodaje se quedaría sin
+      // ellas aunque siempre las llevara.
+      if (!llevaCarpas) setLlevaCarpas(true);
       if (llevaGenerador) sincronizaAlquiler("generador", true, conceptoAlquiler("generador"));
       // En un rodaje no se alquila mobiliario: si venía marcado, se apaga con su recogida
       if (llevaMobiliarioAlquiler) {
@@ -4457,10 +4467,11 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="equip-aviso">Con "Solo bandeja" la comida va toda en bandeja, así que los platos no se cargan aunque aquí tengan estilo elegido.</div>
             )}
             <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
-            {/* Carpas y generador son equipo estándar de rodaje, no un extra que se
-                añade: van aquí con el resto del equipamiento y las cantidades se
-                calculan solas. El "No llevan" es para el sitio puntual que ya tiene
-                sombra o luz propia. */}
+            {/* Carpas es equipo estándar de rodaje (van con el resto del equipamiento,
+                cantidades solas); en el resto de eventos es la excepción — fincas con
+                nave o interior — así que ahí empieza apagado. El "No llevan" es para
+                el sitio puntual que ya tiene sombra propia, en cualquiera de los dos
+                casos. El generador, en cambio, sigue siendo solo de producción. */}
             {/* El generador está en ALQUILERES: siempre viene de SOS. Las carpas son
                 nuestras (8 en almacén), así que su interruptor se queda aquí; si hacen
                 falta más, se marcan como alquiler en ese bloque. */}
@@ -4472,25 +4483,23 @@ export default function App({ onCerrarSesion } = {}) {
                 options={["Plástico", "Cartón", "Sin decir"]}
               />
             )}
-            {evento === "produccion" && (
-              <SegmentedControl
-                label="Carpas"
-                value={llevaCarpas ? "Llevan" : "No llevan"}
-                onChange={v => {
-                  setLlevaCarpas(v === "Llevan");
-                  // Sin carpas no hay carpas que alquilar: se apaga también su recogida
-                  if (v !== "Llevan" && alquilaCarpas) {
-                    setAlquilaCarpas(false);
-                    sincronizaAlquiler("carpas", false);
-                  }
-                }}
-                options={["Llevan", "No llevan"]}
-              />
-            )}
+            <SegmentedControl
+              label="Carpas"
+              value={llevaCarpas ? "Llevan" : "No llevan"}
+              onChange={v => {
+                setLlevaCarpas(v === "Llevan");
+                // Sin carpas no hay carpas que alquilar: se apaga también su recogida
+                if (v !== "Llevan" && alquilaCarpas) {
+                  setAlquilaCarpas(false);
+                  sincronizaAlquiler("carpas", false);
+                }
+              }}
+              options={["Llevan", "No llevan"]}
+            />
             {/* Cuántas. Vacío = las que salen de la cuenta por pax; un número manda
                 sobre ella, porque el sitio lo ha visto una persona y la cuenta no.
                 Si pasa de las 8 del almacén, se dice aquí mismo cuántas alquilar. */}
-            {evento === "produccion" && llevaCarpas && (
+            {llevaCarpas && (
               <div className="form-group">
                 <span className="form-label">Nº DE CARPAS</span>
                 <input

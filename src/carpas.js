@@ -31,3 +31,27 @@ export function paxDelDiaGrande(dias = []) {
     .map(d => parseInt(String(d), 10) || 0)
     .reduce((mx, n) => (n > mx ? n : mx), 0);
 }
+
+// Tres paredes por carpa (tres caras cerradas y una abierta para entrar); las pesas
+// son las que hay en almacén y se cargan todas, repartidas entre las más expuestas
+// al viento — no van por carpa.
+const PAREDES_POR_CARPA = 3;
+const PESAS_EN_ALMACEN = 6;
+
+// Cuántas carpas cargar de verdad, con sus paredes y pesas — compartida por los tres
+// generadores (antes solo vivía en buildChecklistProduccion). Recibe el PAX YA
+// RESUELTO: quien llama decide qué pax cuenta (paxDelDiaGrande en producción, el pax
+// normal en el resto) — esta función no elige por su cuenta, para no mezclar las dos
+// lógicas. numCarpasManual, si viene puesto (a mano o desde el formulario), manda
+// sobre la recomendación.
+/** @param {number} [pax] @param {number} [numCarpasManual] */
+export function calcCarpas(pax = 0, numCarpasManual = 0) {
+  const carpasIdeal = numCarpasManual > 0 ? numCarpasManual : carpasRecomendadas(pax);
+  const numCarpas = Math.min(carpasIdeal, CARPAS_EN_ALMACEN);
+  return {
+    numCarpas,
+    faltanCarpas: carpasPorAlquilar(carpasIdeal),
+    paredes: numCarpas * PAREDES_POR_CARPA,
+    pesas: PESAS_EN_ALMACEN,
+  };
+}

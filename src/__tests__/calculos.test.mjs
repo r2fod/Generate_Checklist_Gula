@@ -754,6 +754,49 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "y sin invitados, en un rodaje solo queda esa línea de mantenimiento");
 }
 
+console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
+{
+  // Antes las carpas solo existían en producción (siempre al aire libre). En el resto
+  // es la excepción, no la norma —fincas con nave o interior— así que sin contestar
+  // nada no aparecen (opt() deja la fila con cantidad null, como el resto de items
+  // condicionales de esta app: no se borra la fila, se apaga la cantidad).
+  const catMobiliario = (cats) => cats.find(c => c.nombre.startsWith("Mobiliario"));
+  const item = (cats, label) => catMobiliario(cats).items.find(x => x[0] === label);
+
+  const sinCarpas = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(sinCarpas, "Carpas")[1] === null,
+    "sin decir nada, una boda no pide carpas (es la excepción, no la norma)");
+
+  const conCarpas = buildChecklist("boda", 100, 2, 4, 0, { llevaCarpas: true });
+  ok(item(conCarpas, "Carpas")[1] !== null, "con llevaCarpas, una boda SÍ las pide");
+
+  // La cuenta es la MISMA función compartida (calcCarpas, en carpas.js) que usa
+  // producción: mismo pax, mismo resultado, para no arriesgar la única lógica que ya
+  // funcionaba al extraerla del generador de producción.
+  const prod = buildChecklist("produccion", 100, 0, 0, 0, {});
+  ok(JSON.stringify(item(conCarpas, "Carpas")[1]) === JSON.stringify(item(prod, "Carpas")[1]),
+    `boda y producción con el mismo pax piden las mismas carpas → ${JSON.stringify(item(conCarpas, "Carpas")[1])}`);
+  ok(item(conCarpas, "Paredes de carpas")[1] === item(prod, "Paredes de carpas")[1]
+    && item(conCarpas, "Pesas (15kg)")[1] === item(prod, "Pesas (15kg)")[1],
+    "y las mismas paredes y pesas");
+
+  // Producción sigue funcionando exactamente igual que antes de compartir la cuenta
+  // con boda/cumpleaños: sin decir nada, sigue llevando carpas (era su valor de
+  // siempre) con el número de fábrica.
+  ok(item(prod, "Carpas")[1].u === 8 && item(prod, "Paredes de carpas")[1] === "24" && item(prod, "Pesas (15kg)")[1] === "6",
+    `producción, sin tocar nada, sigue pidiendo lo mismo de siempre (100 pax → 8 carpas/24 paredes/6 pesas) → ${JSON.stringify(item(prod, "Carpas")[1])}`);
+
+  // Un número puesto a mano (formulario o a mano en la app) manda sobre la
+  // recomendación, en cualquiera de los dos tipos.
+  const numeroAMano = buildChecklist("boda", 30, 2, 4, 0, { llevaCarpas: true, numCarpas: 2 });
+  ok(item(numeroAMano, "Carpas")[1] === "2",
+    "un número puesto a mano manda sobre la recomendación, también fuera de producción");
+
+  // Cumpleaños también lo tiene (categoría "Mobiliario", no "Mobiliario, sala y decoración")
+  const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { llevaCarpas: true });
+  ok(item(cumple, "Carpas")[1] !== null, "y en cumpleaños igual");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,

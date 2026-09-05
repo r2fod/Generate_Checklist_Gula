@@ -9,7 +9,7 @@ import {
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
 import { conSufijo } from "./checklist-format.js";
-import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
+import { calcCarpas, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { calcPaella } from "./paella.js";
@@ -219,6 +219,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
+    llevaCarpas = false,
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
@@ -306,8 +307,19 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: evtKey });
   // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
   const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
+  // Carpas: antes solo existían en producción (sitios siempre al aire libre). Aquí son
+  // la excepción, no la norma (fincas con nave/interior), de ahí que lleguen apagadas
+  // por defecto — mismo cálculo compartido que producción (carpas.js), con el pax
+  // normal del evento en vez de paxDelDiaGrande.
+  const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } =
+    llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    opt(llevaCarpas, ["Carpas", faltanCarpas > 0
+      ? conSufijo(numCarpas, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpas}, hay que alquilarlas`)
+      : String(numCarpas)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
+    opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
@@ -506,6 +518,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
+    llevaCarpas = false,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -545,9 +558,16 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
   ]});
 
+  const { numCarpas: numCarpasCumple, faltanCarpas: faltanCarpasCumple,
+    paredes: paredesCarpasCumple, pesas: pesasCarpasCumple } = llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   cats.push({ nombre: "Mobiliario", items: [
     // Igual que un banquete: las de cocina más las de la gente que se sienta
     ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    opt(llevaCarpas, ["Carpas", faltanCarpasCumple > 0
+      ? conSufijo(numCarpasCumple, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpasCumple}, hay que alquilarlas`)
+      : String(numCarpasCumple)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpasCumple)]),
+    opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpasCumple)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
@@ -762,14 +782,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cuántas hacen falta: la cuenta de siempre a partir del pax, salvo que alguien haya
   // dicho un número (desde el formulario o a mano), que manda sobre el cálculo — el
   // sitio lo ha visto una persona y la cuenta no.
-  const carpasIdeal = opts.numCarpas > 0 ? opts.numCarpas : carpasRecomendadas(pax);
   // Lo que hay en almacén: no se puede cargar más de lo que se tiene. La cantidad que
   // sale es la que se coge del almacén, y si hacen falta más se avisa al lado para
-  // poder alquilar la diferencia a tiempo.
-  const PESAS_EN_ALMACEN = 6;
-  const numCarpas = Math.min(carpasIdeal, CARPAS_EN_ALMACEN);
-  const faltanCarpas = carpasPorAlquilar(carpasIdeal);
-  const PAREDES_POR_CARPA = 3;
+  // poder alquilar la diferencia a tiempo. Misma cuenta compartida que boda/cumpleaños
+  // (carpas.js), aquí con el pax del día grande (ya resuelto arriba).
+  const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } = calcCarpas(pax, opts.numCarpas);
   const numChafers = Math.max(2, Math.ceil(pax / 40));
   // Las mesas de 1,8m van todas en un único total: las del BUFFET (4 en rodajes
   // normales, 5 en los grandes) + 1 para el camión + las de la gente que se sienta a
@@ -802,10 +819,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
       ? conSufijo(numCarpas, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpas}, hay que alquilarlas`)
       : String(numCarpas)]),
-    opt(llevaCarpas, ["Paredes de carpas", String(numCarpas * PAREDES_POR_CARPA)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
     // Las pesas son las que hay: se cargan todas y se reparten entre las carpas más
     // expuestas al viento, no van por carpa
-    opt(llevaCarpas, ["Pesas (15kg)", String(PESAS_EN_ALMACEN)]),
+    opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
     ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que

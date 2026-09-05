@@ -91,12 +91,16 @@ export const PREGUNTAS = [
     // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
     // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
     // número que sale de la gente, que se puede cambiar: quien rellena esto no tiene
-    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos.
+    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos. Antes solo
+    // se preguntaba en producción (sitio al aire libre por defecto); en el resto es la
+    // excepción (finca con nave o interior), pero cuando hace falta es la misma cuenta
+    // — paxDeLaGente ya sabe qué pax usar según el tipo (día grande en rodajes, los
+    // adultos en el resto), así que no hace falta reinventar nada aquí.
     id: "carpas", tipo: "opciones", texto: "¿Hacen falta carpas?",
     nota: (r) => {
-      const pax = paxDelDiaGrande(r.dias);
+      const pax = paxDeLaGente(r);
       if (!pax) return `Tenemos ${CARPAS_EN_ALMACEN} en el almacén; de las que falten se avisa para alquilarlas.`;
-      return `Con ${pax} personas el día de más gente salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
+      return `Con ${pax} personas salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
     },
     opciones: [
       { valor: "no", texto: "No hacen falta" },
@@ -104,15 +108,14 @@ export const PREGUNTAS = [
         valor: "si", texto: "Sí",
         conNumero: "¿Cuántas?",
         campoNumero: "numCarpas",
-        sugerido: (r) => carpasRecomendadas(paxDelDiaGrande(r.dias)),
+        sugerido: (r) => carpasRecomendadas(paxDeLaGente(r)),
         // Lo que pase de las del almacén hay que alquilarlo, y eso se dice aquí en vez
-        // de descubrirlo el día del rodaje
+        // de descubrirlo el día del evento
         avisoNumero: (n) => (carpasPorAlquilar(n) > 0
           ? `Tenemos ${CARPAS_EN_ALMACEN}: hay que alquilar ${carpasPorAlquilar(n)} a Support On Set, con su recogida.`
           : `Caben en el almacén (tenemos ${CARPAS_EN_ALMACEN}), no hay que alquilar ninguna.`),
       },
     ],
-    soloEn: ["produccion"],
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
@@ -695,17 +698,21 @@ export function aRespuestasDeLaApp(r = {}) {
   // calcCafe): así ningún evento guardado antes de esta pregunta cambia de cantidad.
   if (puesto(r.cafe)) estado.cafeParaInvitados = r.cafe !== "personal";
 
+  // Carpas: antes solo se preguntaba en producción (siempre al aire libre); ahora se
+  // pregunta en todos los tipos, así que sale del bloque de producción y va aquí, con
+  // el resto de lo que se contesta siempre igual.
+  if (puesto(r.carpas)) {
+    estado.llevaCarpas = r.carpas === "si";
+    if (r.numCarpas > 0) {
+      estado.numCarpas = r.numCarpas;
+      // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
+      // hace falta preguntarlo aparte, se sabe con el número.
+      estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
+    }
+  }
+
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
-    if (puesto(r.carpas)) {
-      estado.llevaCarpas = r.carpas === "si";
-      if (r.numCarpas > 0) {
-        estado.numCarpas = r.numCarpas;
-        // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
-        // hace falta preguntarlo aparte, se sabe con el número.
-        estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
-      }
-    }
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
     if (puesto(r.aguaPequena)) estado.tipoAguaPequena = r.aguaPequena;
     // Las sillas de un rodaje se preguntan igual que en el resto. Antes se forzaban a

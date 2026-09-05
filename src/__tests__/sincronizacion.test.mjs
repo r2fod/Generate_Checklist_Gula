@@ -485,8 +485,12 @@ console.log("\n══ Cómo se lee un envío en la bandeja ══");
     `lo contestado se lee entero → "${de("gente").respuesta}"`);
   ok(de("cuando").respuesta.includes("12:30") && de("cuando").respuesta.includes("a 02:00"),
     `la hora de fin se enseña aunque no configure nada → "${de("cuando").respuesta}"`);
-  ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "carpas"),
-    "y de una boda no se enseñan las preguntas de rodaje");
+  ok(!filas.some(f => f.id === "dias"),
+    "y de una boda no se enseña la de los días, que es solo de rodaje");
+  // Las carpas SÍ se preguntan en una boda (dejó de ser solo de producción): es la
+  // excepción, no la norma, pero cuando hace falta se pregunta igual.
+  ok(filas.some(f => f.id === "carpas"),
+    "pero las carpas sí, aunque sea la excepción en una boda");
 }
 
 // ── Aplicar un envío no puede pisar lo que ya había ───────────────────────────
@@ -678,6 +682,13 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   const ninguna = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], carpas: "no" });
   ok(ninguna.llevaCarpas === false && ninguna.numCarpas === undefined,
     "y si no hacen falta, no se lleva ninguna");
+
+  // Las carpas dejaron de ser solo de producción: la misma pregunta, contestada en
+  // una boda, tiene que volcarse igual (antes vivía dentro del "if produccion" y no
+  // se leía nunca fuera de ahí).
+  const bodaConCarpas = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, carpas: "si", numCarpas: 3 });
+  ok(bodaConCarpas.llevaCarpas === true && bodaConCarpas.numCarpas === 3,
+    "una boda que contesta carpas también las guarda");
 
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
