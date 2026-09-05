@@ -81,6 +81,50 @@ function IconoInicio() {
   );
 }
 
+// El bloc con el visto de "ir al resumen": son quince pantallas y hasta ahora solo se
+// llegaba al repaso contestando todas seguidas. Con esto se salta desde cualquier
+// pregunta sin perder lo ya contestado (el repaso ya sabe pintar "sin contestar" lo
+// que falte, igual que con "No lo sé").
+function IconoResumen() {
+  return (
+    <svg className="icono-resumen" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"
+         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z" />
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path className="icono-resumen-visto" d="m8.5 13 2.3 2.3L15.5 11" />
+    </svg>
+  );
+}
+
+// Comentario libre por pregunta: colapsado si no hay nada escrito, para no llenar
+// las quince pantallas de cajas de texto que casi nadie va a usar. Si ya había algo
+// —se ha vuelto atrás, o se está corrigiendo un envío— sale abierto de una: si no,
+// parecería que lo escrito se ha perdido. El padre lo remonta al cambiar de pregunta
+// (misma key que el resto de ".form-campos"), así que "abierto" arranca de cero en
+// cada una sin tener que reiniciarlo a mano.
+function ComentarioPregunta({ valor, onChange }) {
+  const [abierto, setAbierto] = useState(!!valor);
+  if (!abierto) {
+    return (
+      <button type="button" className="form-comentario-abrir" onClick={() => setAbierto(true)}>
+        + ¿Algo más que aclarar aquí?
+      </button>
+    );
+  }
+  return (
+    <label className="form-comentario">
+      ¿Algo más que aclarar aquí?
+      <textarea
+        className="form-input form-textarea form-comentario-textarea"
+        rows={2}
+        value={valor}
+        onChange={e => onChange(e.target.value)}
+        autoFocus
+      />
+    </label>
+  );
+}
+
 // "hace 10 min", "ayer": para saber de un vistazo si eso que mandaste es de hoy
 function fmtCuando(ms) {
   if (!ms) return "hace un rato";
@@ -533,7 +577,7 @@ export default function Formulario({ codigo }) {
         <FondoIconos pregunta="repaso" />
         <div className="form-cabecera">
           <LogoGula />
-          <button className="form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
+          <button className="form-btn-cabecera form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
             <IconoInicio />
           </button>
         </div>
@@ -628,13 +672,20 @@ export default function Formulario({ codigo }) {
       <FondoIconos pregunta={p.id} />
       <div className="form-cabecera">
         <LogoGula pequeno />
-        {/* Volver al inicio de un toque. Son quince pantallas: sin esto, para mirar la
-            lista de eventos o lo que ya se había mandado había que darle a Atrás una
-            vez por pregunta. No borra nada — lo contestado sigue ahí y en el inicio
-            sale un botón para seguir por donde se iba. */}
-        <button className="form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
-          <IconoInicio />
-        </button>
+        <div className="form-cabecera-acciones">
+          {/* Ir al resumen sin contestar el resto: para cuando ya se sabe lo que falta
+              o se quiere revisar algo puesto antes sin avanzar pregunta a pregunta. */}
+          <button className="form-btn-cabecera form-btn-resumen" onClick={() => setPaso(999)} title="Ir al resumen" aria-label="Ir al resumen">
+            <IconoResumen />
+          </button>
+          {/* Volver al inicio de un toque. Son quince pantallas: sin esto, para mirar la
+              lista de eventos o lo que ya se había mandado había que darle a Atrás una
+              vez por pregunta. No borra nada — lo contestado sigue ahí y en el inicio
+              sale un botón para seguir por donde se iba. */}
+          <button className="form-btn-cabecera form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
+            <IconoInicio />
+          </button>
+        </div>
       </div>
       <div className="form-progreso"><div style={{ width: `${avance}%` }} /></div>
       {/* De qué evento se está hablando. Son quince pantallas seguidas y sin esto es
@@ -849,6 +900,15 @@ export default function Formulario({ codigo }) {
             placeholder={p.ejemplo || "Peticiones del cliente, contacto en el sitio..."}
             value={respuestas[p.campo || "notas"] ?? ""}
             onChange={e => pon(p.campo || "notas", e.target.value)}
+          />
+        )}
+
+        {/* Ya son texto libre de por sí: una segunda caja de comentario aquí sería
+            redundante con la que ya se ve arriba. */}
+        {p.tipo !== "texto-largo" && (
+          <ComentarioPregunta
+            valor={respuestas[`${p.id}_comentario`] || ""}
+            onChange={v => pon(`${p.id}_comentario`, v)}
           />
         )}
       </div>

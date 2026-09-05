@@ -1079,6 +1079,43 @@ console.log("\n══ Tarta y alergias ══");
     "y la tarta en todos menos en un rodaje");
 }
 
+// Comentario libre por pregunta (ComentarioPregunta en Formulario.jsx, campo
+// "<id>_comentario"): se anexa a las notas del evento con el texto de la pregunta
+// delante, detrás de alergias y de las notas generales — mismo mecanismo que ya
+// usan esas dos, así que notasFusionadas (al aplicar el envío) también dedup lo
+// que aquí se escriba si se reenvía sin tocarlo.
+console.log("\n══ Comentario libre por pregunta ══");
+{
+  const { aRespuestasDeLaApp, notasFusionadas } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin ningún comentario puesto, las notas del evento no se tocan");
+  const uno = aRespuestasDeLaApp({ ...base, gente_comentario: "20 son niños de menos de 5 años" });
+  ok(/¿Cuánta gente\? 20 son niños de menos de 5 años/.test(uno.notasEvento),
+    `el comentario lleva delante el texto de SU pregunta → ${JSON.stringify(uno.notasEvento)}`);
+
+  // Junto con alergias y notas: alergias primero, notas generales después, los
+  // comentarios por pregunta al final — ningún orden se pisa entre sí.
+  const todo = aRespuestasDeLaApp({
+    ...base, alergias: "1 celíaco", notas: "Llamar antes de llegar",
+    gente_comentario: "Confirmar niños la semana antes",
+  });
+  ok(todo.notasEvento === "⚠️ ALERGIAS: 1 celíaco\nLlamar antes de llegar\n· ¿Cuánta gente? Confirmar niños la semana antes",
+    `alergias, notas y comentario cada uno en su línea → ${JSON.stringify(todo.notasEvento)}`);
+
+  ok(aRespuestasDeLaApp({ ...base, gente_comentario: "   " }).notasEvento === undefined,
+    "un comentario en blanco no deja una línea vacía");
+
+  // Reenviar el formulario sin cambiar el comentario no lo duplica en el evento: es
+  // el mismo notasFusionadas que ya evita duplicar alergias y notas (línea a línea,
+  // sin distinguir mayúsculas).
+  const primeraVez = aRespuestasDeLaApp({ ...base, gente_comentario: "Confirmar niños" }).notasEvento;
+  const fusionadas = notasFusionadas(primeraVez, primeraVez);
+  ok(fusionadas === primeraVez,
+    "reenviar sin tocar el comentario no lo duplica en las notas del evento");
+}
+
 // ── Lo que se sale de lo normal ──────────────────────────────────────────────
 // El formulario no preguntaba por los platos, los platos de postre, los cubiertos, las
 // bandejas ni la plancha de gas. Un evento creado desde aquí se quedaba con los valores

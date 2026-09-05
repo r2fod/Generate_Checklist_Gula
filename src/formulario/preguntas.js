@@ -665,7 +665,16 @@ export function aRespuestasDeLaApp(r = {}) {
   // leída después de servir no sirve de nada.
   const alergias = (r.alergias || "").trim();
   const otras = (r.notas || "").trim();
-  const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras].filter(Boolean).join("\n");
+  // Comentario libre por pregunta (id + "_comentario", puesto desde ComentarioPregunta
+  // en Formulario.jsx): cada uno se anexa como una línea propia, con el texto de la
+  // pregunta delante para no perder de vista a qué aclara. notasFusionadas (en
+  // App.jsx, al aplicar el envío) ya compara línea a línea, así que reenviar el
+  // formulario sin cambiar un comentario no lo duplica.
+  const comentarios = preguntasDe(tipo, r)
+    .map(p => ({ texto: p.texto, valor: (r[`${p.id}_comentario`] || "").trim() }))
+    .filter(x => x.valor)
+    .map(x => `· ${x.texto} ${x.valor}`);
+  const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras, ...comentarios].filter(Boolean).join("\n");
   pon("notasEvento", juntas);
 
   if (tipo === "produccion") {

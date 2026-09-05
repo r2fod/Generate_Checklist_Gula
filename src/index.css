@@ -5302,6 +5302,30 @@ hr {
 .form-input-corto { max-width: 160px; }
 .form-textarea { min-height: 110px; resize: vertical; font-family: inherit; }
 
+/* Comentario libre por pregunta: enlace discreto que abre una caja pequeña. Alineado
+   a la izquierda y sin fondo para no competir con las opciones de la pregunta, que
+   son lo que de verdad hay que contestar. */
+.form-comentario-abrir {
+  align-self: flex-start;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.form-comentario-abrir:hover { color: var(--accent); }
+.form-comentario {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.form-comentario-textarea { min-height: 60px; font-size: 0.92rem; }
+
 .form-subcampo {
   display: flex;
   align-items: center;
@@ -5671,10 +5695,22 @@ hr {
 }
 .form-cabecera .form-logo { margin-bottom: 0; }
 
+/* Agrupa "ir al resumen" y "volver al inicio" como un solo bloque a la derecha: con
+   space-between en .form-cabecera, un tercer hijo suelto se habría ido al centro. */
+.form-cabecera-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
 /* Discreto a propósito: se usa poco y no puede competir con "Siguiente". Pero con
-   altura de dedo, que se pulsa de pie y con prisa. */
+   altura de dedo, que se pulsa de pie y con prisa. Clase de forma compartida por
+   los dos botones de la cabecera (inicio y resumen) — el nombre no lleva "inicio"
+   porque ya no es solo suyo; .form-btn-inicio/.form-btn-resumen quedan solo como
+   marca de cada botón (para los tests y para enganchar su icono). */
 /* Redondo y del tamaño de un dedo: es un icono, no una etiqueta. */
-.form-btn-inicio {
+.form-btn-cabecera {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -5689,8 +5725,8 @@ hr {
   cursor: pointer;
   transition: var(--transition-smooth);
 }
-.form-btn-inicio:hover { border-color: var(--accent); color: var(--accent); }
-.form-btn-inicio:active { transform: scale(0.94); }
+.form-btn-cabecera:hover { border-color: var(--accent); color: var(--accent); }
+.form-btn-cabecera:active { transform: scale(0.94); }
 
 /* El tejado se levanta un pelín y la puerta se abre: se ve que es un botón sin que
    nada dé saltos mientras alguien está rellenando el formulario. */
@@ -5698,14 +5734,23 @@ hr {
   transition: transform 0.25s ease;
   transform-origin: center;
 }
-.form-btn-inicio:hover .icono-inicio-tejado { transform: translateY(-1.5px); }
-.form-btn-inicio:hover .icono-inicio-puerta { transform: scaleX(0.72); transform-origin: 9.5px 21px; }
+.form-btn-cabecera:hover .icono-inicio-tejado { transform: translateY(-1.5px); }
+.form-btn-cabecera:hover .icono-inicio-puerta { transform: scaleX(0.72); transform-origin: 9.5px 21px; }
+
+/* El visto se marca un poco más grueso al pasar por encima, como diciendo "aquí está
+   lo que ya llevas contestado". */
+.icono-resumen-visto {
+  transition: stroke-width 0.25s ease;
+}
+.form-btn-cabecera:hover .icono-resumen-visto { stroke-width: 3; }
 
 @media (prefers-reduced-motion: reduce) {
-  .form-btn-inicio:active { transform: none; }
+  .form-btn-cabecera:active { transform: none; }
   .icono-inicio-tejado, .icono-inicio-puerta { transition: none; }
-  .form-btn-inicio:hover .icono-inicio-tejado,
-  .form-btn-inicio:hover .icono-inicio-puerta { transform: none; }
+  .form-btn-cabecera:hover .icono-inicio-tejado,
+  .form-btn-cabecera:hover .icono-inicio-puerta { transform: none; }
+  .icono-resumen-visto { transition: none; }
+  .form-btn-cabecera:hover .icono-resumen-visto { stroke-width: 2; }
 }
 
 /* Volver a lo que estabas rellenando: va el primero de la pantalla porque, si has
