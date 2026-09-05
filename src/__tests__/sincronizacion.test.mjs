@@ -1116,6 +1116,22 @@ console.log("\n══ Comentario libre por pregunta ══");
     "reenviar sin tocar el comentario no lo duplica en las notas del evento");
 }
 
+// El café se pedía siempre para los invitados, sin preguntar: cafeParaInvitados
+// (calcCafe, en checklist-generadores.js) apaga esa parte cuando la oficina dice que
+// es solo para el personal, sin tocar el café aparte del propio equipo.
+console.log("\n══ El café, ¿para quién? ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).cafeParaInvitados === undefined,
+    "sin contestar, no se toca: el evento se queda con el valor por defecto (true)");
+  ok(aRespuestasDeLaApp({ ...base, cafe: "invitados" }).cafeParaInvitados === true,
+    "\"Para los invitados\" pone cafeParaInvitados a true");
+  ok(aRespuestasDeLaApp({ ...base, cafe: "personal" }).cafeParaInvitados === false,
+    "\"Solo para el personal\" lo pone a false");
+}
+
 // ── Lo que se sale de lo normal ──────────────────────────────────────────────
 // El formulario no preguntaba por los platos, los platos de postre, los cubiertos, las
 // bandejas ni la plancha de gas. Un evento creado desde aquí se quedaba con los valores

@@ -103,8 +103,16 @@ function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20, minimoSala 
 // el ratio se pasa desde fuera en vez de salir del interruptor de desayuno.
 const CAPSULAS_POR_PAX_PRODUCCION = 5.5;
 
-function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false, ratioCapsulas = null) {
+function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false, ratioCapsulas = null, paraInvitados = true, numPersonal = 0) {
   const items = [];
+  // Sin invitados de por medio (formulario: "el café es solo para el personal") no se
+  // pide nada de lo de invitados — ni tazas, ni platos, ni las cápsulas de sobra que
+  // antes "tomaba prestadas" el personal de la máquina de invitados. Los vasos de
+  // cartón del personal siguen siendo aparte y no dependen de este flag (calcPersonal,
+  // en Servicio y limpieza) — lo único que cambia es si además hay máquina y cápsulas
+  // para hacer ese café. En producción no hace falta nada de esto: ya lleva su propia
+  // cafetera de mantenimiento sin depender de calcCafe (ver buildChecklistProduccion).
+  if (paraInvitados) {
   // paxConsumo ≠ totalPax solo en producciones de varios días: lo que se gasta
   // (cápsulas, café, infusiones, azúcar, leches) se calcula sobre la suma de pax
   // de todos los días; lo reutilizable (tazas, platos, jarras) sobre el día mayor.
@@ -137,6 +145,17 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(paxConsumo / (hayDesayuno ? 8 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / (hayDesayuno ? 20 : 40))))],
   );
+  } else if (numPersonal > 0) {
+    // El personal curra horas largas y sigue queriendo su café aunque los invitados
+    // no lo pidan: sin la máquina de invitados de la que "tomar prestado", hace falta
+    // una propia, aunque sea modesta. ~2 cápsulas por persona cubren un par de rondas
+    // durante el turno — muchas menos que las de invitados (2,2-3,2/pax), porque aquí
+    // no hay sobremesa ni tarta, solo cortar el cansancio.
+    items.push(
+      ["Cafetera Nespresso (para el personal)", "1"],
+      ["Cápsulas café (para el personal)", conSufijo(Math.max(2, Math.ceil(numPersonal * 2)), `para ${numPersonal} personas`)],
+    );
+  }
   return { nombre: "Café", items };
 }
 
@@ -192,7 +211,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaMobiliarioAlquiler,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados = true, llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -425,7 +444,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Hojas de fichaje", "1"],
   ]});
 
-  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
+  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno, totalPax, false, null, cafeParaInvitados, personal.n));
 
   // El barril de cerveza (30L/50L) descuenta esos litros de los tercios necesarios en
   // vez de sustituirlos del todo: puede haber tercios + barril (el barril cubre parte
@@ -478,7 +497,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
-    tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera,
+    tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera, cafeParaInvitados = true,
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
@@ -622,9 +641,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Pinzas largas", "2"], ["Copas metálicas", "—"], ["Conchas", "—"],
   ]});
 
-  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
-
   const personal = calcPersonal(pax, opts.numCamareros, opts.numStaff, divisorCam);
+  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno, totalPax, false, null, cafeParaInvitados, personal.n));
+
   // Faltaban el vino, la cerveza y el cava: se cargaban las copas de vino y de cava pero
   // no había nada que servir en ellas. Se calculan igual que en la boda: si hay barril,
   // los litros que da se descuentan de los tercios en vez de sumarse.
@@ -668,7 +687,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 // Eventos corporativos / producciones — fiel a "Checklist de Carga – Producciones"
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
+    llevaPaella, tieneFrituras, numFrituras, tipoCafetera, cafeParaInvitados = true, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos, numPlanchasGas = 1,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
     soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
@@ -937,7 +956,9 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el
   // día para el equipo (café continuo), además de la de servicio que calcula calcCafe.
-  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true, CAPSULAS_POR_PAX_PRODUCCION);
+  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true, CAPSULAS_POR_PAX_PRODUCCION, cafeParaInvitados);
+  // La de mantenimiento es del equipo, no de los invitados: se añade pase lo que pase,
+  // aunque el flag de arriba haya dejado sin items lo que sí es para invitados.
   cafeProduccion.items.push(["Cafetera de mantenimiento (rodaje, siempre encendida)", "1"]);
   cats.push(cafeProduccion);
 

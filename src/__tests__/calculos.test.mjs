@@ -712,6 +712,48 @@ console.log("\n══ Las tronas siguen al número de niños ══");
     "y en cumpleaños igual: 8 niños, 8 tronas");
 }
 
+console.log("\n══ El café, para invitados o solo para el personal ══");
+{
+  // El café se pedía SIEMPRE para los invitados, sin preguntar: cafeParaInvitados
+  // (por defecto true, para no cambiar ni un evento guardado antes de esta pregunta)
+  // apaga solo la parte que se sirve a los invitados — el café del personal (aparte,
+  // en Servicio y limpieza) no depende de esto, tenga la cafetera de invitados o no.
+  const catCafe = (cats) => cats.find(c => c.nombre === "Café");
+  const vasosPersonal = (cats) => cats.find(c => c.nombre === "Servicio y limpieza")
+    .items.find(x => x[0] === "Vasos de cartón café mini (personal)")[1];
+
+  const conInvitados = buildChecklist("boda", 100, 2, 4, 0, { cafeParaInvitados: true });
+  ok(catCafe(conInvitados).items.some(x => x[0] === "Cafetera Nespresso"),
+    "con café para invitados, sale la cafetera de servicio de siempre");
+  ok(catCafe(conInvitados).items.some(x => /Tazas café/.test(x[0])),
+    "y las tazas para los invitados");
+
+  // Sin invitados, el personal se queda sin la cafetera de la que "tomar prestado":
+  // hace falta una propia, aunque modesta (nada de tazas ni platos, eso sí es de
+  // invitados) — con cápsulas contadas por personal, no por pax del evento.
+  const soloPersonal = buildChecklist("boda", 100, 2, 4, 0, { cafeParaInvitados: false });
+  ok(!catCafe(soloPersonal).items.some(x => /Tazas café|Platos de café|Infusiones|Jarras de leche/.test(x[0])),
+    "sin invitados no se piden tazas, platos, infusiones ni jarras — eso es de invitados");
+  ok(catCafe(soloPersonal).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
+    "pero si el personal sí toma café, se lleva su propia cafetera");
+  ok(JSON.stringify(vasosPersonal(conInvitados)) === JSON.stringify(vasosPersonal(soloPersonal)),
+    "y los vasos de cartón del personal no cambian: son aparte, no dependen de esto");
+
+  const sinContestar = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(catCafe(sinContestar).items.length === catCafe(conInvitados).items.length,
+    "sin contestar la pregunta, un evento de siempre pide café de invitados igual que antes");
+
+  // En producción, la cafetera de mantenimiento del equipo (todo el día encendida)
+  // no es para invitados: se añade pase lo que pase, aunque el resto se apague.
+  const prodConInvitados = catCafe(buildChecklist("produccion", 40, 0, 0, 0, { cafeParaInvitados: true }));
+  const prodSinInvitados = catCafe(buildChecklist("produccion", 40, 0, 0, 0, { cafeParaInvitados: false }));
+  const tieneMantenimiento = (cat) => cat.items.some(x => /mantenimiento/.test(x[0]));
+  ok(tieneMantenimiento(prodConInvitados) && tieneMantenimiento(prodSinInvitados),
+    "en producción, la cafetera de mantenimiento no depende de si el café es para invitados");
+  ok(prodSinInvitados.items.length === 1,
+    "y sin invitados, en un rodaje solo queda esa línea de mantenimiento");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,

@@ -261,6 +261,20 @@ export const PREGUNTAS = [
     ],
   },
 
+  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
+  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
+  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
+  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
+  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
+  // a los invitados.
+  {
+    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
+    opciones: [
+      { valor: "invitados", texto: "Para los invitados" },
+      { valor: "personal", texto: "Solo para el personal" },
+    ],
+  },
+
   // ── Lo que se haya presupuestado ───────────────────────────────────────────
   {
     id: "extras", tipo: "marcar", texto: "¿Está presupuestado algo de esto?",
@@ -676,6 +690,10 @@ export function aRespuestasDeLaApp(r = {}) {
     .map(x => `· ${x.texto} ${x.valor}`);
   const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras, ...comentarios].filter(Boolean).join("\n");
   pon("notasEvento", juntas);
+
+  // Café para invitados por defecto (estadoInicial.cafeParaInvitados ?? true en
+  // calcCafe): así ningún evento guardado antes de esta pregunta cambia de cantidad.
+  if (puesto(r.cafe)) estado.cafeParaInvitados = r.cafe !== "personal";
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
