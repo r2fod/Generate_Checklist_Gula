@@ -1101,6 +1101,21 @@ console.log("\n══ Tarta y alergias ══");
     "y la tarta en todos menos en un rodaje");
 }
 
+// Excepciones de mesa y buffets: texto libre a las notas del evento, mismo mecanismo
+// que alergias — no tocan el cálculo agregado por pax, lo complementan.
+console.log("\n══ Excepciones de mesa y buffets ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  const con = aRespuestasDeLaApp({ ...base, alergias: "1 vegano", excepcionesMesa: "cristalería aparte mesa 7", buffets: "quesos (2 mesas)" });
+  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: cristalería aparte mesa 7\n🥐 BUFFETS: quesos (2 mesas)",
+    `alergias, excepciones y buffets, cada uno en su línea → ${JSON.stringify(con.notasEvento)}`);
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: "  " }).notasEvento === undefined,
+    "en blanco no deja una línea vacía");
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin contestar ninguna de las tres, las notas del evento no se tocan");
+}
+
 // Comentario libre por pregunta (ComentarioPregunta en Formulario.jsx, campo
 // "<id>_comentario"): se anexa a las notas del evento con el texto de la pregunta
 // delante, detrás de alergias y de las notas generales — mismo mecanismo que ya

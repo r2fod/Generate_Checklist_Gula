@@ -545,6 +545,27 @@ export const PREGUNTAS = [
     noSe: false,
   },
   {
+    // "Por mesa" no significa un editor mesa a mesa (dispararía la complejidad para
+    // lo que es la excepción, no la norma): una pregunta de excepciones que viaja a
+    // las notas del evento, igual que las alergias, sin tocar el cálculo agregado
+    // por pax que ya existe — lo complementa, no lo sustituye.
+    id: "excepcionesMesa", tipo: "texto-largo", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
+    campo: "excepcionesMesa",
+    nota: "Cubiertos de pescado extra, cristalería aparte, menú infantil en una mesa concreta... Si no hay ninguna excepción, se deja en blanco.",
+    ejemplo: "Ej: cubiertos de pescado en la mesa 4, cristalería aparte en la 7...",
+    noSe: false,
+  },
+  {
+    // Sin marcado múltiple con fórmula propia (todavía no hay un "una carpa/menaje
+    // cada X buffets" fiable): de momento va a las notas, igual que las excepciones
+    // de mesa, para que la oficina no lo pierda de vista al montar el evento.
+    id: "buffets", tipo: "texto-largo", texto: "¿Lleva buffet(s) aparte del servicio principal?",
+    campo: "buffets",
+    nota: "Cuáles (quesos, dulce, ibéricos, fruta...) y cuántas mesas cada uno. Si no lleva, se deja en blanco.",
+    ejemplo: "Ej: buffet de quesos (2 mesas), mesa dulce (1 mesa)",
+    noSe: false,
+  },
+  {
     id: "notas", tipo: "texto-largo", texto: "¿Algo más que haya que tener en cuenta?",
     campo: "notas",
     // Aquí acaba todo lo que no tiene pregunta propia. Se dicen ejemplos de verdad
@@ -692,6 +713,8 @@ export function aRespuestasDeLaApp(r = {}) {
   // es por donde le llegan a quien está en el sitio. Y van arriba porque una alergia
   // leída después de servir no sirve de nada.
   const alergias = (r.alergias || "").trim();
+  const excepcionesMesa = (r.excepcionesMesa || "").trim();
+  const buffets = (r.buffets || "").trim();
   const otras = (r.notas || "").trim();
   // Comentario libre por pregunta (id + "_comentario", puesto desde ComentarioPregunta
   // en Formulario.jsx): cada uno se anexa como una línea propia, con el texto de la
@@ -702,7 +725,12 @@ export function aRespuestasDeLaApp(r = {}) {
     .map(p => ({ texto: p.texto, valor: (r[`${p.id}_comentario`] || "").trim() }))
     .filter(x => x.valor)
     .map(x => `· ${x.texto} ${x.valor}`);
-  const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras, ...comentarios].filter(Boolean).join("\n");
+  const juntas = [
+    alergias ? `⚠️ ALERGIAS: ${alergias}` : "",
+    excepcionesMesa ? `🍽️ EXCEPCIONES DE MESA: ${excepcionesMesa}` : "",
+    buffets ? `🥐 BUFFETS: ${buffets}` : "",
+    otras, ...comentarios,
+  ].filter(Boolean).join("\n");
   pon("notasEvento", juntas);
 
   // Café para invitados por defecto (estadoInicial.cafeParaInvitados ?? true en
