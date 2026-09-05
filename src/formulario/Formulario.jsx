@@ -17,6 +17,13 @@ import { leerJSON, guardarJSON, borrar } from "../almacen.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+// Dónde NO tiene sentido el comentario libre: elegir el tipo de evento, escribir el
+// nombre/sitio (ya son texto libre, un comentario ahí sería una tercera caja
+// redundante) y la fecha/hora (un día es un día, no hay nada que aclarar). Se queda
+// en el resto —cantidades, opciones, marcados— donde de verdad puede aportar una
+// excepción o un porqué.
+const SIN_COMENTARIO = new Set(["texto-largo", "textos", "cuando"]);
+
 // La hora, con dos desplegables en vez del <input type="time">. El selector de reloj
 // de Android es un diálogo del sistema: con la letra grande se recorta el botón de
 // "Establecer" y no hay CSS que lo arregle, porque no es nuestro. Dos <select> los
@@ -751,7 +758,16 @@ export default function Formulario({ codigo }) {
                       <input
                         type="number" min="1" className="form-input form-input-corto"
                         value={valor}
-                        onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        onChange={e => {
+                          // Vacío es un paso de paso, no un valor: forzar aquí mismo un
+                          // mínimo de 1 hacía que borrar el "1" para escribir "15" saltara
+                          // sola de vuelta a "1" antes de dejar teclear el resto.
+                          const v = e.target.value;
+                          if (v === "") { pon(campo, ""); return; }
+                          const n = parseInt(v, 10);
+                          if (!Number.isNaN(n)) pon(campo, Math.max(1, n));
+                        }}
+                        onBlur={() => { if (respuestas[campo] === "") pon(campo, sugerido); }}
                       />
                     </div>
                     {o.avisoNumero && <p className="form-nota form-nota-aviso">{o.avisoNumero(valor)}</p>}
@@ -803,7 +819,15 @@ export default function Formulario({ codigo }) {
                     <input
                       type="number" min="1" className="form-input form-input-corto"
                       value={respuestas[campo] ?? ""}
-                      onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      onChange={e => {
+                        // Mismo arreglo que en las de elegir: vacío es un paso de paso
+                        // mientras se escribe, no un valor que haya que corregir ya.
+                        const v = e.target.value;
+                        if (v === "") { pon(campo, ""); return; }
+                        const n = parseInt(v, 10);
+                        if (!Number.isNaN(n)) pon(campo, Math.max(1, n));
+                      }}
+                      onBlur={() => { if (respuestas[campo] === "") pon(campo, 1); }}
                     />
                   </div>
                 );
@@ -903,9 +927,10 @@ export default function Formulario({ codigo }) {
           />
         )}
 
-        {/* Ya son texto libre de por sí: una segunda caja de comentario aquí sería
-            redundante con la que ya se ve arriba. */}
-        {p.tipo !== "texto-largo" && (
+        {/* Ni en las de texto libre (sería una caja redundante), ni al elegir el tipo
+            de evento (id "tipo": es la primera pregunta, pura clasificación, nada que
+            aclarar todavía) ni en la fecha/hora. */}
+        {!SIN_COMENTARIO.has(p.tipo) && p.id !== "tipo" && (
           <ComentarioPregunta
             valor={respuestas[`${p.id}_comentario`] || ""}
             onChange={v => pon(`${p.id}_comentario`, v)}
