@@ -455,7 +455,7 @@ está en el historial de git y en las pruebas que los cubren):
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
 
-## Qué queda pendiente ahora mismo (2026-09-05)
+## Qué queda pendiente ahora mismo (2026-09-06)
 
 Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo, igualar
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
@@ -503,9 +503,12 @@ del formulario) con los dos fallos de arriba. Queda el formulario paso a paso, l
 pestañas Año/Equipo del calendario, y los anchos intermedios de la batería que no se
 capturaron a mano.
 
-**PR #180, en curso, SIN fusionar a propósito** — el dueño pidió depurar el formulario
-en una ronda de revisión antes de volver a producción, en vez de fusionar commit a
-commit como el resto. Lo probó en el móvil recién publicado y salieron tres cosas:
+**PR #180, FUSIONADO Y DESPLEGADO** — el dueño pidió depurar el formulario en una
+ronda de revisión antes de volver a producción, en vez de fusionar commit a commit
+como el resto. Lo probó en el móvil recién publicado y salieron tres cosas; tras
+confirmar que la batería completa pasaba también contra el commit exacto ya en
+producción (para descartar que algo se hubiera roto entretanto), dio el visto bueno,
+se fusionó (`abb87eb`) y el despliegue (run #69 de "Publicar") terminó en verde:
 
 - **El campo numérico no dejaba borrar para escribir otro número** (`onChange` hacía
   `Math.max(1, parseInt(v,10) || 1)`: vaciar el campo da `NaN`, y `NaN || 1` fuerza el 1
@@ -535,10 +538,10 @@ commit como el resto. Lo probó en el móvil recién publicado y salieron tres c
   patrón que ya usaban flores/minutas.
 
 `npm run test` en verde (735 comprobaciones navegador + el resto de baterías, sin
-errores de JS) antes de cada commit. **Sigue en borrador**: falta que el dueño lo vea y
-dé el visto bueno antes de fusionar a `main`.
+errores de JS) antes de cada commit.
 
-**Bug real, cazado por el dueño en producción — HECHO**: en Modo carga → Vuelta,
+**Bug real, cazado por el dueño en producción — HECHO, va en el mismo PR #180**: en
+Modo carga → Vuelta,
 apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero, lo normal) sugería
 marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N → apuntar como rotura"
 (`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER material que no
