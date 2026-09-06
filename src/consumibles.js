@@ -22,14 +22,24 @@ const HERRAMIENTAS_EN_CATEGORIA_CONSUMIBLE = [
 // Sueltos fungibles dentro de categorías que por lo demás son material reutilizable
 // (Café, Paella y fuego, Electricidad, Limpieza, Mantelería): el resto de la categoría
 // es vajilla o herramienta de verdad, pero estos se gastan igual que una bebida.
+//
+// OJO con el combustible: el carbón/la leña/las pastillas de encender no tienen envase
+// que vuelva —se queman enteros—, pero una bombona de gas o una garrafa de gasolina SÍ
+// son el envase, no el contenido: se gasta el gas de dentro, no la bombona, y esa
+// bombona (vacía) es justo lo que se espera que vuelva con el equipo. Por eso NO están
+// aquí — si un día falta una bombona entera, eso sigue siendo una pérdida de verdad.
 const ITEMS_CONSUMIBLES = [
   /^Cápsulas café/, /^Café molido/, /^Infusiones/, /^Azucarillos/, /^Leches variadas/,
-  /^Carbón$/, /^Leña$/, /^Pastillas de encender/, /^Bombonas llenas/, /^Garrafa gasolina/,
+  /^Carbón$/, /^Leña$/, /^Pastillas de encender/,
   /^Cinta aislante/, /^Bridas/, /^Imperdibles/,
   /^Fairy/, /^Estropajo/, /^Papel plata/, /^Film/, /^Papel Chemine/, /^Bolsas de basura/,
   // Servilletas de PAPEL: las de tela vuelven y se lavan, esas sí son reutilizables.
   /^Servilletas (grandes|cocktail)/,
   /^Vasos de (cartón|plástico)/, // de usar y tirar (café, refrescos) — no las de barra
+  // Los de barra libre SÍ son de plástico de usar y tirar (van en bolsas de 80, se
+  // reparten y se quedan por el suelo) — a diferencia de "vasos de cubata" o los de
+  // cristal, que son barware de verdad.
+  /^Vasos de chupito de plástico/,
   /^Bandejas de cartón blancas/, /^Blondas$/, /^Platitos de cartón/, /^Envase bocadillos/,
   /^Palitos (brocheta|café)/, /^Cacao$/, /^Canela$/, /^Leche condensada/,
   /^Bolsas grandes de papel/,

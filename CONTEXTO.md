@@ -540,23 +540,50 @@ se fusionó (`abb87eb`) y el despliegue (run #69 de "Publicar") terminó en verd
 `npm run test` en verde (735 comprobaciones navegador + el resto de baterías, sin
 errores de JS) antes de cada commit.
 
-**Bug real, cazado por el dueño en producción — HECHO, va en el mismo PR #180**: en
-Modo carga → Vuelta,
-apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero, lo normal) sugería
-marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N → apuntar como rotura"
-(`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER material que no
-volviera, sin distinguir lo que se gasta (bebida, hielo, comida, combustible,
-desechables) de lo que de verdad puede romperse o perderse (cristalería, vajilla,
-mobiliario, herramientas). Se repasó el catálogo entero de los tres generadores y se
-creó `src/consumibles.js` (`esConsumible(categoria, label)`, por categoría entera —
-Bebidas/Alcoholes/Desechables— más una lista corta de sueltos dentro de categorías
-reutilizables — cápsulas de café, carbón, jabón, servilletas de papel, bridas...— y sus
-excepciones inversas — el tirador de cerveza, el calentador de agua, la cafetera, no se
-gastan aunque vivan en esa categoría). Por defecto (nada en la lista) sigue sin ser
-consumible, que es el comportamiento de siempre: la sugerencia de rotura no
-desaparece por error en lo que sí puede romperse. De paso, "Menús especiales" (recuento
-de alergias) salió también de Modo carga: es informativo, no material que se cargue o
-vuelva, igual que ya pasaba con "Personal".
+**Bug real, cazado por el dueño en producción — HECHO, fusionado en el PR #180**: en
+Modo carga → Vuelta, apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero,
+lo normal) sugería marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N →
+apuntar como rotura" (`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER
+material que no volviera, sin distinguir lo que se gasta (bebida, hielo, comida,
+combustible, desechables) de lo que de verdad puede romperse o perderse (cristalería,
+vajilla, mobiliario, herramientas). Se repasó el catálogo entero de los tres
+generadores y se creó `src/consumibles.js` (`esConsumible(categoria, label)`, por
+categoría entera — Bebidas/Alcoholes/Desechables— más una lista corta de sueltos
+dentro de categorías reutilizables — cápsulas de café, carbón, jabón, servilletas de
+papel, bridas...— y sus excepciones inversas — el tirador de cerveza, el calentador de
+agua, la cafetera, no se gastan aunque vivan en esa categoría). Por defecto (nada en
+la lista) sigue sin ser consumible, que es el comportamiento de siempre: la sugerencia
+de rotura no desaparece por error en lo que sí puede romperse. De paso, "Menús
+especiales" (recuento de alergias) salió también de Modo carga: es informativo, no
+material que se cargue o vuelva, igual que ya pasaba con "Personal".
+
+**Segunda vuelta sobre lo mismo, pedida explícitamente ("revisa a fondo")** — dos
+afinamientos más, sin PR todavía:
+
+- **El envase no es el contenido**: "Bombonas llenas" y "Garrafa gasolina" estaban en
+  `consumibles.js` como fungibles, pero eso mezclaba dos cosas — se gasta el GAS de
+  dentro, no la bombona; la bombona (vacía) es justo lo que se espera que vuelva con
+  el equipo, y si no vuelve sigue siendo una pérdida de verdad (a diferencia de
+  carbón/leña/pastillas de encender, que no tienen envase que devolver: se queman
+  enteros). Sacadas de la lista. De paso, "Vasos de chupito de plástico (barra
+  libre)" —de usar y tirar, a diferencia del resto de barware— entra como fungible.
+- **"Marcar todo como vuelto" ponía la cantidad COMPLETA en todo**, hielo y bebidas
+  incluidos — justo lo contrario de lo normal para eso, obligando a corregir a mano
+  casi todas las líneas de golpe. Ahora lo fungible se marca por defecto como "no ha
+  vuelto nada" (que es su caso normal) y lo reutilizable sigue marcándose como
+  "volvió completo".
+
+**Encontrado revisando el calendario ("Aryan Campana" sin personal visible) — de
+diseño, pendiente de decidir con el dueño antes de tocar código**: la pantalla
+"Equipo" (`VistaEquipo`, `Calendario.jsx:498-516`) es la ÚNICA de toda la app que
+enseña/edita `apunte.personal` ("HORARIO PERSONAL EN EVENTO": nombre, rol, horario,
+importe) — y solo enseña los próximos `DIAS_ANTICIPACION` (14) días; el editor
+genérico de un apunte (`EditorApunte`, alcanzable también para eventos pasados desde
+la vista Año) no tiene ese apartado en absoluto. El personal de un evento YA PASADO
+es invisible en toda la app, sin ningún aviso. **Esto bloquea directamente el plan de
+Presupuesto/margen** (ver más abajo): ese horario con horas e importe es justo el
+dato de coste de sala/cocina que ese plan necesita, y el piloto elegido ("Aryan
+Campana") es un evento pasado.
 
 **Encontrado de paso, revisando Modo Carga y el formulario a fondo (sin tocar
 todavía)**:

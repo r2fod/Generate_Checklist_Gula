@@ -183,10 +183,17 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   // una cantidad en texto (ej. "Copas metálicas · Todas") se marcan con true, que la
   // app ya entiende como "volvió entero". Antes se quedaban fuera del "marcar todo"
   // y encima no tenían casilla propia: no había forma de darlas por vueltas.
+  //
+  // Lo que se gasta (bebida, hielo, comida...) por defecto NO vuelve nada, que es lo
+  // normal — dar por vuelta la cantidad COMPLETA de hielo o de vino obligaría a corregir
+  // a mano casi todas las líneas de la lista, justo lo contrario de lo que este botón
+  // quiere ahorrar. La cristalería/vajilla/mobiliario sigue dando por vuelto el total,
+  // que es su caso normal.
   const itemsMarcables = checklist.flatMap(c => c.items
     .map(([, q, , lo]) => {
       const n = parseFloat(String(q && q.u ? q.u : q).replace(",", "."));
-      return { key: `${c.nombre}::${lo}`, valor: isNaN(n) ? true : String(n) };
+      const valorVuelto = isNaN(n) ? true : String(n);
+      return { key: `${c.nombre}::${lo}`, valor: esConsumible(c.nombre, lo) ? "0" : valorVuelto };
     }));
   const todoVuelto = itemsMarcables.length > 0 && itemsMarcables.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
   const contarSi = (cumple) => checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => cumple(`${c.nombre}::${lo}`)).length, 0);
@@ -760,7 +767,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
             <button
               className={`btn btn-outline carga-todo-vuelto ${todoVuelto ? "is-desmarcar" : ""}`}
               onClick={() => itemsMarcables.forEach(it => onVuelve(it.key, todoVuelto ? "" : it.valor))}
-              title={todoVuelto ? "Quita la marca de vuelto de todos los items" : "Marca todos los items como que volvieron completos (luego ajustas los que falten y las roturas)"}
+              title={todoVuelto ? "Quita la marca de vuelto de todos los items" : "Da por hecha la vuelta: lo reutilizable (cristalería, vajilla, mobiliario...) como que volvió completo, lo que se gasta (bebida, hielo, comida...) como que no ha vuelto nada, que es lo normal en cada caso. Luego ajustas las excepciones y las roturas."}
             >{todoVuelto ? <><X size={15} /> Desmarcar todo</> : <><Check size={15} /> Marcar todo como vuelto</>}</button>
           )}
           {checklist.map(cat => (

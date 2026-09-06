@@ -2447,6 +2447,14 @@ console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
   ok(esConsumible("Paella y fuego", "Carbón") === true, "el carbón se quema");
   ok(esConsumible("Paella y fuego", "Paella grande") === false,
     "la paellera no se quema: si no vuelve, es una rotura o una pérdida");
+  // El envase no es el contenido: el gas se gasta, pero la bombona (vacía) es la que se
+  // espera que vuelva con el equipo — si falta la bombona entera, sigue siendo pérdida.
+  ok(esConsumible("Electricidad y otros", "Garrafa gasolina (llena)") === false,
+    "la garrafa vuelve vacía, no es ella la que se gasta, es lo de dentro");
+  ok(esConsumible("Paella y fuego", "Bombonas llenas") === false,
+    "mismo caso que la garrafa: la bombona vuelve, el gas de dentro no");
+  ok(esConsumible("Cristalería", "Vasos de chupito de plástico (barra libre)") === true,
+    "estos sí son de usar y tirar (van en bolsas de 80), a diferencia del resto de barware");
   ok(esConsumible("Servicio y limpieza", "Fairy") === true, "el jabón se gasta");
   ok(esConsumible("Servicio y limpieza", "Escoba") === false,
     "la escoba es una herramienta, no algo que se gasta con el uso de una noche");
