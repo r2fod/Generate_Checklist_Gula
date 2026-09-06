@@ -38,6 +38,7 @@ import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { buildChecklist } from "../checklist-generadores.js";
+import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
 import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
@@ -2414,6 +2415,55 @@ console.log("\n══ La física del grafo de Cerebro (grafoFisica.js) ══");
   const simSuelto = estadoInicial(suelto);
   for (let i = 0; i < ITERACIONES; i++) paso(simSuelto, []);
   ok(dentroDeLaCaja(simSuelto), "un nodo sin ningún enlace también queda atraído al centro, no se escapa");
+}
+
+// Bug real, cazado por el dueño en producción: en Modo carga → Vuelta, apuntar "0" en
+// lo que ha vuelto de Hielo (fundido/gastado entero, lo normal) sugería marcarlo como
+// rotura ("faltan 70"). El hielo no se rompe, se consume — igual que toda bebida,
+// comida, combustible o desechable.
+console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
+{
+  ok(esConsumible("Bebidas frías", "Hielo") === true, "el hielo se consume, no se rompe");
+  ok(esConsumible("Bebidas", "Vino tinto") === true, "una bebida entera también");
+  ok(esConsumible("Bebidas frías", "Barril de cerveza (30L)") === true,
+    "aunque el nombre lleve el tamaño metido dentro (categoría entera consumible)");
+  ok(esConsumible("Alcoholes y licores", "Ginebra (Seagrams/Tanqueray)") === true,
+    "los licores también: si no vuelven es porque se han servido");
+  ok(esConsumible("Desechables y Bebidas", "Vasos de cartón (L/M/S)") === true,
+    "los desechables de producción, por definición");
+
+  // Herramientas de verdad que se cuelan dentro de una categoría consumible: esas SÍ
+  // pueden romperse o perderse, no se beben ni se comen.
+  ok(esConsumible("Bebidas frías", "Tirador de cerveza") === false,
+    "el tirador de cerveza no se bebe: es la herramienta, no la bebida");
+  ok(esConsumible("Desechables y Bebidas", "Calentador de agua") === false,
+    "el calentador tampoco: es un aparato, no algo que se reparte y se gasta");
+
+  // Sueltos consumibles dentro de categorías por lo demás reutilizables
+  ok(esConsumible("Café", "Cápsulas café (estándar/descafeinado)") === true,
+    "las cápsulas se gastan aunque la cafetera (misma categoría) no");
+  ok(esConsumible("Café", "Cafetera Nespresso") === false,
+    "la cafetera en sí sí es reutilizable: si falta, es una pérdida de verdad");
+  ok(esConsumible("Paella y fuego", "Carbón") === true, "el carbón se quema");
+  ok(esConsumible("Paella y fuego", "Paella grande") === false,
+    "la paellera no se quema: si no vuelve, es una rotura o una pérdida");
+  ok(esConsumible("Servicio y limpieza", "Fairy") === true, "el jabón se gasta");
+  ok(esConsumible("Servicio y limpieza", "Escoba") === false,
+    "la escoba es una herramienta, no algo que se gasta con el uso de una noche");
+  ok(esConsumible("Mantelería y textiles", "Servilletas grandes") === true,
+    "servilletas de PAPEL: se tiran, no vuelven");
+  ok(esConsumible("Mantelería y textiles", "Servilletas de tela") === false,
+    "las de TELA sí vuelven y se lavan: no son lo mismo que las de papel");
+  ok(esConsumible("Electricidad y camión", "Bridas") === true, "las bridas se cortan al usarlas");
+  ok(esConsumible("Electricidad y camión", "Walkies") === false,
+    "los walkies son equipo, no algo que se gaste con un uso");
+
+  // Lo que no es ni una cosa ni la otra (vajilla, cristalería, mobiliario): por
+  // defecto NO es consumible, que es lo seguro — si algo no vuelve, se sigue pudiendo
+  // apuntar como rotura, que es justo el comportamiento de siempre para estas.
+  ok(esConsumible("Cristalería", "Copas de vino") === false, "la cristalería, de toda la vida, se rompe");
+  ok(esConsumible("Vajilla", "Platos trinchero (Blanco liso)") === false, "la vajilla también");
+  ok(esConsumible("Mobiliario, sala y decoración", "Mesa alta") === false, "y el mobiliario");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

@@ -538,6 +538,23 @@ commit como el resto. Lo probó en el móvil recién publicado y salieron tres c
 errores de JS) antes de cada commit. **Sigue en borrador**: falta que el dueño lo vea y
 dé el visto bueno antes de fusionar a `main`.
 
+**Bug real, cazado por el dueño en producción — HECHO**: en Modo carga → Vuelta,
+apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero, lo normal) sugería
+marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N → apuntar como rotura"
+(`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER material que no
+volviera, sin distinguir lo que se gasta (bebida, hielo, comida, combustible,
+desechables) de lo que de verdad puede romperse o perderse (cristalería, vajilla,
+mobiliario, herramientas). Se repasó el catálogo entero de los tres generadores y se
+creó `src/consumibles.js` (`esConsumible(categoria, label)`, por categoría entera —
+Bebidas/Alcoholes/Desechables— más una lista corta de sueltos dentro de categorías
+reutilizables — cápsulas de café, carbón, jabón, servilletas de papel, bridas...— y sus
+excepciones inversas — el tirador de cerveza, el calentador de agua, la cafetera, no se
+gastan aunque vivan en esa categoría). Por defecto (nada en la lista) sigue sin ser
+consumible, que es el comportamiento de siempre: la sugerencia de rotura no
+desaparece por error en lo que sí puede romperse. De paso, "Menús especiales" (recuento
+de alergias) salió también de Modo carga: es informativo, no material que se cargue o
+vuelva, igual que ya pasaba con "Personal".
+
 **Encontrado de paso, revisando Modo Carga y el formulario a fondo (sin tocar
 todavía)**:
 
