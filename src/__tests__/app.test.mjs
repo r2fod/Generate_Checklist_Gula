@@ -1904,6 +1904,30 @@ async function main() {
     ok(/alquilar 3/i.test(await p.locator(".form-nota-aviso").innerText()),
       `si se piden 11 dice cuántas hay que alquilar → "${await p.locator(".form-nota-aviso").innerText()}"`);
 
+    // Bug real, cazado por el dueño en producción: borrar el número para escribir
+    // uno distinto (no con .fill(), que sustituye el valor de golpe sin pasar por
+    // onChange como hace un dedo de verdad) volvía a poner un 1 solo, tecla a tecla,
+    // sin dejar terminar de escribir el número bueno.
+    await numero.click();
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.waitForTimeout(150);
+    ok((await numero.inputValue()) === "", "borrar el número entero lo deja vacío, no en 1");
+    await p.keyboard.type("7");
+    await p.waitForTimeout(150);
+    ok((await numero.inputValue()) === "7",
+      `y se puede escribir el nuevo número sin que salte solo a otra cosa → "${await numero.inputValue()}"`);
+    // Vacío y sin tocar nada más: al salir del campo recupera algo válido, no se
+    // queda en blanco para siempre.
+    await numero.click();
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.waitForTimeout(150);
+    await p.locator(".form-titulo").click();
+    await p.waitForTimeout(200);
+    ok(Number(await numero.inputValue()) > 0,
+      `dejarlo vacío y salir del campo recupera un número válido, no queda en blanco → "${await numero.inputValue()}"`);
+
     // El borrador sobrevive a cerrar el navegador a media pregunta
     await p.evaluate(() => localStorage.clear());
     await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });

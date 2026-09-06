@@ -437,6 +437,17 @@ console.log("\n══ Alquileres → recogidas, sin pantalla ══");
   ok(recogidasConAlquileres({ evento: "produccion", llevaCarpas: true }).length === 0,
     "las carpas del almacén no crean recogida: solo las alquiladas");
 
+  // Mobiliario: si se dice proveedor, manda sobre el fijo de siempre (Event Style)
+  const conProveedorPropio = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-08-11",
+    llevaMobiliarioAlquiler: true, proveedorMobiliarioAlquiler: "Decoraciones Ruiz",
+  });
+  ok(conceptos(conProveedorPropio)[0] === "Mobiliario (Decoraciones Ruiz)",
+    `sin proveedor propio se queda en Event Style, con él manda el nuevo → ${JSON.stringify(conceptos(conProveedorPropio))}`);
+  const sinProveedorPropio = recogidasConAlquileres({ evento: "boda", llevaMobiliarioAlquiler: true });
+  ok(conceptos(sinProveedorPropio)[0] === "Mobiliario (Event Style)",
+    "sin decir proveedor, sigue siendo Event Style de toda la vida");
+
   // Lo escrito a mano no se toca NUNCA, y lo ya recogido tampoco se borra
   const conManual = recogidasConAlquileres({
     evento: "boda", fechaEvento: "2027-08-11", origenSillas: "Dealde",
@@ -1114,6 +1125,60 @@ console.log("\n══ Excepciones de mesa y buffets ══");
     "en blanco no deja una línea vacía");
   ok(aRespuestasDeLaApp(base).notasEvento === undefined,
     "sin contestar ninguna de las tres, las notas del evento no se tocan");
+}
+
+// Mobiliario de alquiler (qué + proveedor propio) y "otros alquileres" (cajón de
+// sastre): el sí/no y el proveedor del mobiliario van al estado como el resto de
+// interruptores; el qué de cada uno va a las notas, igual que alergias/excepciones.
+console.log("\n══ Mobiliario y otros alquileres ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).llevaMobiliarioAlquiler === undefined,
+    "sin contestar, no se toca el valor por defecto del evento");
+  ok(aRespuestasDeLaApp({ ...base, mobiliarioAlquiler: "no" }).llevaMobiliarioAlquiler === false,
+    "decir que no lleva se guarda igual que decir que sí");
+
+  const con = aRespuestasDeLaApp({
+    ...base, mobiliarioAlquiler: "si",
+    mobiliarioAlquilerQue: "Mesas altas y sofás", mobiliarioAlquilerProveedor: "Decoraciones Ruiz",
+  });
+  ok(con.llevaMobiliarioAlquiler === true && con.proveedorMobiliarioAlquiler === "Decoraciones Ruiz",
+    "sí lleva, con su proveedor propio");
+  ok(con.notasEvento === "🪑 MOBILIARIO ALQUILADO: Mesas altas y sofás (Decoraciones Ruiz)",
+    `el qué y el proveedor van juntos a las notas → ${JSON.stringify(con.notasEvento)}`);
+
+  const sinProveedor = aRespuestasDeLaApp({ ...base, mobiliarioAlquiler: "si", mobiliarioAlquilerQue: "Barra" });
+  ok(sinProveedor.proveedorMobiliarioAlquiler === undefined,
+    "sin decir proveedor, el estado no se toca: manda el fijo de siempre (Event Style)");
+  ok(sinProveedor.notasEvento === "🪑 MOBILIARIO ALQUILADO: Barra",
+    "sin proveedor, la nota no lleva paréntesis vacío");
+
+  const otro = aRespuestasDeLaApp({
+    ...base, otroAlquilerQue: "Vajilla especial", otroAlquilerProveedor: "Menaje Sur",
+  });
+  ok(otro.notasEvento === "🔑 OTRO ALQUILER: Vajilla especial (Menaje Sur)",
+    `el cajón de sastre también junta qué y proveedor → ${JSON.stringify(otro.notasEvento)}`);
+
+  ok(aRespuestasDeLaApp({ ...base, otroAlquilerQue: "  " }).notasEvento === undefined,
+    "el cajón de sastre en blanco no deja una línea vacía");
+
+  // Las hojas de alquiler adjuntadas se acumulan en archivosAlquiler, cada una con su
+  // origen y su etiqueta (para saber cuál es cuál en la lista de la app)
+  const archivo = { nombre: "hoja.pdf", tipo: "application/pdf", datos: "data:application/pdf;base64,AA==", peso: 100 };
+  const conArchivos = aRespuestasDeLaApp({
+    ...base, mobiliarioAlquiler: "si", mobiliarioAlquilerQue: "Mesas altas", mobiliarioAlquilerArchivo: archivo,
+    otroAlquilerQue: "Vajilla", otroAlquilerArchivo: { ...archivo, nombre: "otra.pdf" },
+  });
+  ok(conArchivos.archivosAlquiler.length === 2,
+    `los dos adjuntos viajan juntos → ${JSON.stringify(conArchivos.archivosAlquiler.map(a => a.nombre))}`);
+  ok(conArchivos.archivosAlquiler[0].origen === "mobiliarioAlquiler" && conArchivos.archivosAlquiler[0].etiqueta === "Mesas altas",
+    "el primero lleva su origen y su descripción como etiqueta");
+  ok(conArchivos.archivosAlquiler[1].origen === "otroAlquiler",
+    "y el segundo el suyo");
+  ok(aRespuestasDeLaApp(base).archivosAlquiler === undefined,
+    "sin adjuntar nada, no se crea la lista");
 }
 
 // Comentario libre por pregunta (ComentarioPregunta en Formulario.jsx, campo

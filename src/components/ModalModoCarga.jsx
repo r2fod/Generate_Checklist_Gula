@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
 import { fmtCantidadCompleta, quitarItemsSinCantidad } from "../checklist-format.js";
+import { esConsumible } from "../consumibles.js";
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
 import { leerPrecios, guardarPrecios, parsePreciosPegados } from "../precios.js";
 import PanelBebida from "./PanelBebida.jsx";
@@ -65,7 +66,7 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
   );
 });
 
-const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, onVuelve, onRoturas }) {
+const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, consumible, onVuelve, onRoturas }) {
   const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
   const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
   const marcado = valorVuelta !== undefined && valorVuelta !== "";
@@ -79,7 +80,9 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
   // vuelven 20 y los otros 80 están bebidos, no rotos. Ahí no se toca el botón y ya está.
   const vueltaNum = parseFloat(String(vueltaTexto).replace(",", "."));
   const faltan = (cantidadCompleta !== null && !isNaN(vueltaNum)) ? Math.max(0, cantidadCompleta - vueltaNum) : 0;
-  const sugerirRoturas = faltan > 0 && !roturaValor;
+  // En lo que se gasta (bebida, comida, combustible, desechable) que no vuelva nada es
+  // lo normal, no una rotura: no se sugiere marcarlo como tal (ver consumibles.js).
+  const sugerirRoturas = faltan > 0 && !roturaValor && !consumible;
   return (
     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`}>
       {/* La pastilla "todo" va en la línea del nombre, que es donde está la casilla de
@@ -156,8 +159,9 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
 export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
-  // La categoría "Personal" (camareros/logística/cocina) es solo informativa: no se
-  // carga ni se devuelve, así que también se deja fuera de Modo carga.
+  // Las categorías "Personal" (camareros/logística/cocina) y "Menús especiales" (cuántos
+  // celíacos/veganos hay) son informativas: no son material que se cargue, se marque
+  // como salido ni vuelva de un camión, así que se dejan fuera de Modo carga.
   //
   // Memoizado por checklistCompleta (que en App.jsx ya es un useMemo estable: no
   // cambia al marcar una casilla, solo cuando cambia la checklist de verdad). Sin
@@ -165,7 +169,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   // objeto `qty` "nuevo" en cada marca aunque el dato fuera el mismo, y React.memo no
   // serviría de nada.
   const checklist = useMemo(
-    () => quitarItemsSinCantidad(checklistCompleta).filter(c => !/personal/i.test(c.nombre)),
+    () => quitarItemsSinCantidad(checklistCompleta).filter(c => !/personal|menús especiales/i.test(c.nombre)),
     [checklistCompleta],
   );
   const [modo, setModo] = useState("salida"); // preparacion | salida | vuelta
@@ -799,6 +803,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                       sufijo={sufijo}
                       valorVuelta={vueltos[dataKey]}
                       roturaValor={roturas[dataKey]}
+                      consumible={esConsumible(cat.nombre, labelOriginal)}
                       onVuelve={onVuelve}
                       onRoturas={onRoturas}
                     />

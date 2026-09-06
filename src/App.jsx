@@ -228,7 +228,9 @@ const ETIQUETAS_CAMPO = {
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
   cafeParaInvitados: "Café para invitados",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
-  llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
+  llevaMobiliarioAlquiler: "Mobiliario de alquiler", proveedorMobiliarioAlquiler: "Proveedor del mobiliario",
+  archivosAlquiler: "Documentos de alquiler",
+  alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
   llevaParabanes: "Parabanes", numParabanes: "Nº de parabanes",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
@@ -535,6 +537,11 @@ export default function App({ onCerrarSesion } = {}) {
   // Mobiliario de alquiler (Event Style): mesas altas, sofás, muebles de barra... No es
   // material nuestro, así que además de salir en la carga hay que ir a por él y devolverlo.
   const [llevaMobiliarioAlquiler, setLlevaMobiliarioAlquiler] = useState(estadoInicial.llevaMobiliarioAlquiler ?? false);
+  // Si no se dice proveedor, conceptoAlquiler() usa el fijo de siempre (Event Style).
+  const [proveedorMobiliarioAlquiler, setProveedorMobiliarioAlquiler] = useState(estadoInicial.proveedorMobiliarioAlquiler ?? "");
+  // Hojas de alquiler adjuntadas desde el formulario (Dealde, Event Style...), para tener
+  // registro. Se acumulan; handleAplicarEnvio() decide cuáles son nuevas al llegar un envío.
+  const [archivosAlquiler, setArchivosAlquiler] = useState(estadoInicial.archivosAlquiler ?? []);
   // Carpas de alquiler (SOS): las 8 del almacén cubren casi todo, pero cuando el cálculo
   // pide más hay que alquilar las que falten. Solo en producciones.
   const [alquilaCarpas, setAlquilaCarpas] = useState(estadoInicial.alquilaCarpas ?? false);
@@ -858,7 +865,8 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, llevaParabanes, numParabanes, tieneBrindisCava, colorManteles, porcentajeBeige,
+    llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
+    alquilaCarpas, numCarpas, llevaParabanes, numParabanes, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -961,7 +969,9 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
     cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
-    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
+    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, proveedorMobiliarioAlquiler: setProveedorMobiliarioAlquiler,
+    archivosAlquiler: setArchivosAlquiler,
+    alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
     llevaParabanes: setLlevaParabanes, numParabanes: setNumParabanes,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
@@ -1178,6 +1188,18 @@ export default function App({ onCerrarSesion } = {}) {
     sincronizaAlquiler("sillas", esAlquiler, conceptoAlquiler("sillas", origenSillas), /silla/i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origenSillas, fechaEvento]);
+
+  // Si cambia el proveedor del mobiliario de alquiler, se refresca el nombre de su
+  // recogida ya creada — el interruptor de arriba es quien decide si existe o no,
+  // esto solo mantiene el texto a juego con quién lo presta de verdad.
+  const proveedorMobiliarioVistoRef = React.useRef(proveedorMobiliarioAlquiler);
+  useEffect(() => {
+    if (proveedorMobiliarioVistoRef.current === proveedorMobiliarioAlquiler) return;
+    proveedorMobiliarioVistoRef.current = proveedorMobiliarioAlquiler;
+    if (!llevaMobiliarioAlquiler) return;
+    sincronizaAlquiler("mobiliario", true, conceptoAlquiler("mobiliario", proveedorMobiliarioAlquiler));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proveedorMobiliarioAlquiler]);
 
   // El generador de las producciones viene marcado de serie (siempre se lleva uno), así
   // que su recogida se crea al elegir el tipo de evento, que es cuando entra en juego —
@@ -1918,6 +1940,15 @@ export default function App({ onCerrarSesion } = {}) {
           if (estado.compras.some(x => (x.concepto || "").trim().toLowerCase() === c.concepto.toLowerCase())) return;
           estado.compras = [...estado.compras, c];
         });
+        // Las hojas de alquiler (Dealde, Event Style...) se ACUMULAN, no se sustituyen:
+        // el spread de arriba ya puso las del envío nuevo, aquí se le suman las que ya
+        // hubiera guardadas. Se limita a las últimas TOPE_ARCHIVOS_ALQUILER para no
+        // acercarse al límite de 1 MiB por documento de Firestore.
+        const TOPE_ARCHIVOS_ALQUILER = 8;
+        const archivosAntes = Array.isArray(base.archivosAlquiler) ? base.archivosAlquiler : [];
+        const archivosNuevos = Array.isArray(cambios.archivosAlquiler) ? cambios.archivosAlquiler : [];
+        const yaEstaba = a => archivosAntes.some(x => x.origen === a.origen && x.nombre === a.nombre && x.peso === a.peso);
+        estado.archivosAlquiler = [...archivosAntes, ...archivosNuevos.filter(a => !yaEstaba(a))].slice(-TOPE_ARCHIVOS_ALQUILER);
         const siguiente = { ...guardados, [nombre]: estado };
         guardarEventos(siguiente);
         // No se borra: queda guardado como revisado, con a qué evento fue a parar
@@ -4056,17 +4087,28 @@ export default function App({ onCerrarSesion } = {}) {
                   se ofrece. Los chill out son nuestros y se configuran en Extras: esos no
                   hay que devolverlos. */}
               {evento !== "produccion" && (
-                <label className="checkbox-label-normal">
-                  <input
-                    type="checkbox"
-                    checked={llevaMobiliarioAlquiler}
-                    onChange={e => {
-                      setLlevaMobiliarioAlquiler(e.target.checked);
-                      sincronizaAlquiler("mobiliario", e.target.checked, conceptoAlquiler("mobiliario"));
-                    }}
-                  />
-                  <span className="checkbox-texto">Mobiliario extra <span className="checkbox-sub">· Event Style, lo que no es nuestro</span></span>
-                </label>
+                <>
+                  <label className="checkbox-label-normal">
+                    <input
+                      type="checkbox"
+                      checked={llevaMobiliarioAlquiler}
+                      onChange={e => {
+                        setLlevaMobiliarioAlquiler(e.target.checked);
+                        sincronizaAlquiler("mobiliario", e.target.checked, conceptoAlquiler("mobiliario", proveedorMobiliarioAlquiler));
+                      }}
+                    />
+                    <span className="checkbox-texto">Mobiliario extra <span className="checkbox-sub">· Event Style si no se dice otro proveedor</span></span>
+                  </label>
+                  {llevaMobiliarioAlquiler && (
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Proveedor (vacío = Event Style)"
+                      value={proveedorMobiliarioAlquiler}
+                      onChange={e => setProveedorMobiliarioAlquiler(e.target.value)}
+                    />
+                  )}
+                </>
               )}
               {/* Las 8 carpas del almacén cubren casi todo; cuando el cálculo pide más hay
                   que alquilar las que falten, y esas también se van a buscar y se devuelven. */}
@@ -4086,6 +4128,29 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
             {!fechaEvento && recogidas.some(r => r.auto) && (
               <p className="alquileres-aviso">Pon la fecha del evento y las de recogida y devolución se rellenan solas.</p>
+            )}
+            {archivosAlquiler.length > 0 && (
+              <div className="form-archivo-lista">
+                <span className="form-label">DOCUMENTOS DE ALQUILER (subidos desde el formulario)</span>
+                {archivosAlquiler.map((a, i) => (
+                  <div className="form-archivo-puesto" key={i}>
+                    {/^image\//.test(a.tipo)
+                      ? <img src={a.datos} alt="" className="form-archivo-miniatura" />
+                      : <span className="form-archivo-icono">PDF</span>}
+                    <span className="form-archivo-nombre">
+                      {a.etiqueta || a.nombre}
+                      <em>{a.nombre}</em>
+                    </span>
+                    <a href={a.datos} download={a.nombre} className="form-btn-atras">Descargar</a>
+                    <button
+                      className="form-archivo-quitar"
+                      onClick={() => setArchivosAlquiler(prev => prev.filter((_, idx) => idx !== i))}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="logistica-block">

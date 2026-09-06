@@ -42,7 +42,7 @@ function alquileresDe(estado = {}) {
     sillas: (sillas === "Dealde" || sillas === "Carvillo") ? conceptoAlquiler("sillas", sillas) : null,
     armarioCaliente: estado.llevaArmarioCaliente ? conceptoAlquiler("armarioCaliente") : null,
     // Mobiliario de Event Style no se lleva a rodajes; generador y carpas son solo de rodaje
-    mobiliario: (!esProduccion && estado.llevaMobiliarioAlquiler) ? conceptoAlquiler("mobiliario") : null,
+    mobiliario: (!esProduccion && estado.llevaMobiliarioAlquiler) ? conceptoAlquiler("mobiliario", estado.proveedorMobiliarioAlquiler) : null,
     generador: (esProduccion && estado.llevaGenerador) ? conceptoAlquiler("generador") : null,
     carpas: (esProduccion && estado.llevaCarpas && estado.alquilaCarpas) ? conceptoAlquiler("carpas") : null,
   };
