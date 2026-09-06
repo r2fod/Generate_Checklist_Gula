@@ -310,7 +310,21 @@ export function catsDeEventoGuardado(ev) {
     tipoHorno: (ev.tipoHorno || "").toLowerCase(),
     numLogisticaEquipo: (ev.logisticaEquipo || []).filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   };
-  return buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
+  const cats = buildChecklist(ev.evento, ev.pax || 0, ev.barraCoctel ? (ev.horasCoctel || 0) : 0, ev.barraCopas ? (ev.horasCopas || 0) : 0, ev.ninos || 0, opts);
+  // El sufijo de algún item (hielo, carpas) es una función, no un texto fijo — se
+  // recalcula con el número editado en App.jsx (que aplica overridesManuales). Aquí no
+  // hay overrides que aplicar, así que se resuelve con el propio número del item —
+  // sin esto, quien lea esta checklist (el asistente, la calibración) vería la función
+  // sin llamar en vez del texto.
+  return cats.map(c => ({
+    ...c,
+    items: c.items.map(it => {
+      const qty = it[1];
+      return (qty && typeof qty === "object" && typeof qty.sufijo === "function")
+        ? [it[0], { ...qty, sufijo: qty.sufijo(qty.u) }, ...it.slice(2)]
+        : it;
+    }),
+  }));
 }
 
 // ─── CUÁNTA GENTE HIZO FALTA DE VERDAD ────────────────────────────────────────

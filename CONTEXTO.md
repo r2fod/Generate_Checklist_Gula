@@ -8,6 +8,13 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 - **Estado del plan de mejoras (N1–N6, A–D) → `PLAN_MEJORAS.md`.** No se repite aquí: ese
   archivo lleva su propia tabla de hecho/pendiente por ítem, con su porqué y su tamaño, y
   apunta de vuelta aquí (`Ver CONTEXTO.md, "..."`) para el detalle técnico de cada uno.
+- **Los tres planes grandes, sin código todavía → `PLAN_PRESUPUESTO.md`,
+  `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`.** En ese orden (cada uno reutiliza del
+  anterior). Presupuesto ya tiene su diseño fijado por la hoja de cálculo real que
+  usa hoy el negocio (capturas del dueño, no reproducidas aquí por ser el repo
+  público): cuatro partidas —Personal, Comida, Bebida, Otros— con líneas sueltas
+  concepto+total, y un balance final Presupuesto/Gastos/Margen. Ver el propio
+  fichero para el detalle.
 
 ## Orden de lectura
 
@@ -540,26 +547,60 @@ se fusionó (`abb87eb`) y el despliegue (run #69 de "Publicar") terminó en verd
 `npm run test` en verde (735 comprobaciones navegador + el resto de baterías, sin
 errores de JS) antes de cada commit.
 
-**Bug real, cazado por el dueño en producción — HECHO, va en el mismo PR #180**: en
-Modo carga → Vuelta,
-apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero, lo normal) sugería
-marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N → apuntar como rotura"
-(`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER material que no
-volviera, sin distinguir lo que se gasta (bebida, hielo, comida, combustible,
-desechables) de lo que de verdad puede romperse o perderse (cristalería, vajilla,
-mobiliario, herramientas). Se repasó el catálogo entero de los tres generadores y se
-creó `src/consumibles.js` (`esConsumible(categoria, label)`, por categoría entera —
-Bebidas/Alcoholes/Desechables— más una lista corta de sueltos dentro de categorías
-reutilizables — cápsulas de café, carbón, jabón, servilletas de papel, bridas...— y sus
-excepciones inversas — el tirador de cerveza, el calentador de agua, la cafetera, no se
-gastan aunque vivan en esa categoría). Por defecto (nada en la lista) sigue sin ser
-consumible, que es el comportamiento de siempre: la sugerencia de rotura no
-desaparece por error en lo que sí puede romperse. De paso, "Menús especiales" (recuento
-de alergias) salió también de Modo carga: es informativo, no material que se cargue o
-vuelva, igual que ya pasaba con "Personal".
+**Bug real, cazado por el dueño en producción — HECHO, fusionado en el PR #180**: en
+Modo carga → Vuelta, apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero,
+lo normal) sugería marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N →
+apuntar como rotura" (`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER
+material que no volviera, sin distinguir lo que se gasta (bebida, hielo, comida,
+combustible, desechables) de lo que de verdad puede romperse o perderse (cristalería,
+vajilla, mobiliario, herramientas). Se repasó el catálogo entero de los tres
+generadores y se creó `src/consumibles.js` (`esConsumible(categoria, label)`, por
+categoría entera — Bebidas/Alcoholes/Desechables— más una lista corta de sueltos
+dentro de categorías reutilizables — cápsulas de café, carbón, jabón, servilletas de
+papel, bridas...— y sus excepciones inversas — el tirador de cerveza, el calentador de
+agua, la cafetera, no se gastan aunque vivan en esa categoría). Por defecto (nada en
+la lista) sigue sin ser consumible, que es el comportamiento de siempre: la sugerencia
+de rotura no desaparece por error en lo que sí puede romperse. De paso, "Menús
+especiales" (recuento de alergias) salió también de Modo carga: es informativo, no
+material que se cargue o vuelva, igual que ya pasaba con "Personal".
 
-**Encontrado de paso, revisando Modo Carga y el formulario a fondo (sin tocar
-todavía)**:
+**Segunda vuelta sobre lo mismo, pedida explícitamente ("revisa a fondo")** — dos
+afinamientos más, sin PR todavía:
+
+- **El envase no es el contenido**: "Bombonas llenas" y "Garrafa gasolina" estaban en
+  `consumibles.js` como fungibles, pero eso mezclaba dos cosas — se gasta el GAS de
+  dentro, no la bombona; la bombona (vacía) es justo lo que se espera que vuelva con
+  el equipo, y si no vuelve sigue siendo una pérdida de verdad (a diferencia de
+  carbón/leña/pastillas de encender, que no tienen envase que devolver: se queman
+  enteros). Sacadas de la lista. De paso, "Vasos de chupito de plástico (barra
+  libre)" —de usar y tirar, a diferencia del resto de barware— entra como fungible.
+- **"Marcar todo como vuelto" ponía la cantidad COMPLETA en todo**, hielo y bebidas
+  incluidos — justo lo contrario de lo normal para eso, obligando a corregir a mano
+  casi todas las líneas de golpe. Ahora lo fungible se marca por defecto como "no ha
+  vuelto nada" (que es su caso normal) y lo reutilizable sigue marcándose como
+  "volvió completo".
+- **Sin el chip "faltan N", lo fungible se quedaba sin ninguna confirmación visual**
+  de que la app se había enterado del consumo (apuntar la vuelta de una bebida y no
+  ver nada más no dejaba claro que hubiera pasado algo). Ahora sale un texto neutro
+  ("N gastados", `.carga-consumido`) que confirma el consumo sin invitar a marcarlo
+  como rotura, que ahí no pinta nada.
+
+**Calendario: personal de un evento pasado — HECHO**. La pantalla "Equipo"
+(`VistaEquipo`, `Calendario.jsx`) era la ÚNICA de toda la app que enseñaba/editaba
+`apunte.personal` ("HORARIO PERSONAL EN EVENTO": nombre, rol, horario, importe) — y
+solo mira los próximos `DIAS_ANTICIPACION` (14) días; el editor genérico de un apunte
+(`EditorApunte`, alcanzable también para eventos pasados desde la vista Año) no tenía
+ese apartado en absoluto. El personal de un evento ya cerrado (como "Aryan Campana",
+el piloto del plan de Presupuesto/margen) era invisible en toda la app. Arreglado
+reutilizando el mismo componente `Asignados` dentro de `EditorApunte` —funciona para
+cualquier fecha, pasado incluido—, guardado junto al resto del apunte (no aparte,
+para que "Cancelar" siga descartando todo el borrador de una vez). De paso, una
+barrita de progreso visible sin desplegar (cuánto de la plantilla necesaria está
+cubierta, `.cal-asignados-barra`) — pedido explícitamente ("que sea más visual").
+Con test de extremo a extremo: crear con fecha de hace 40 días → añadir gente →
+guardar → reabrir desde Año → sigue ahí.
+
+**Encontrado de paso, revisando Modo Carga y el formulario a fondo — LOS TRES, HECHOS**:
 
 - El interruptor de Ajustes del asistente que solo ofrece los proveedores que el Worker
   dice tener configurados (`proveedoresUI.js`, de una sesión anterior) no es un fallo:
@@ -567,18 +608,42 @@ todavía)**:
   asume solo Gemini. Groq/Claude/Cerebras/etc. ya están implementados en el Worker —
   para verse en Ajustes hace falta además tener su clave puesta como *Secret* en
   Cloudflare (`worker/README.md`), que es infraestructura del dueño, no código.
-- **Sufijo con número derivado que no se recalcula al editar a mano**: Hielo
-  (`checklist-generadores.js:495,691`, "kg · N taxis") y Carpas (`:319`, "faltan N, hay
-  que alquilarlas") calculan su sufijo UNA VEZ al generar la checklist; editar la
-  cantidad a mano solo cambia el número de delante, el sufijo se queda con el texto
-  viejo. Pendiente: que `conSufijo` (`checklist-format.js`) acepte también una función
-  y se recalcule con el número editado.
-- **"Mesas calientes"** solo existe en producción (`:868`, automático por pax); en el
-  resto de tipos de evento no se pregunta ni aparece nunca. Pendiente: pregunta sí/no en
-  el formulario, reusando la misma fórmula ya existente.
-- **"Gastros"** en boda/comunión/corporativo (`:379`) es "—" (se apunta a mano, sin
-  número). Pendiente: mínimo 4 por defecto, con pregunta en el formulario para que la
-  oficina pueda dar una cantidad distinta.
+- **Sufijo con número derivado que no se recalculaba al editar a mano — HECHO**: Hielo
+  y Carpas calculaban su sufijo UNA VEZ al generar la checklist; editar la cantidad a
+  mano solo cambiaba el número de delante, el sufijo se quedaba con el texto viejo.
+  `conSufijo` (`checklist-format.js`) ahora también acepta una función en vez de un
+  texto fijo; se resuelve en un solo sitio (el `useMemo` de `checklist` en `App.jsx`,
+  justo donde la cantidad ya lleva aplicado el override manual), que es lo que
+  alimenta tanto Modo Carga como la exportación a Word. Encontrado de paso: el camino
+  del asistente (`catsDeEventoGuardado()` en `calibracion.js`) lee la checklist RAW sin
+  pasar por ese `useMemo` — sin el mismo arreglo ahí, `listar_checklist` habría
+  enseñado una función de JavaScript en vez del texto para cualquier evento con hielo o
+  carpas por alquilar. Arreglado aparte, resolviendo con el propio número del item.
+- **"Mesas calientes" — HECHO**: antes solo existía en producción (automático por
+  pax); ahora hay pregunta sí/no en el formulario para el resto de tipos, reusando la
+  misma fórmula ya existente (`calcMesasCalientes()`, extraída a `calculos.js` para
+  que los tres builders compartan la cuenta).
+- **"Gastros" — HECHO**: en boda/comunión/corporativo salía "—" (se apuntaba a mano).
+  Ahora sale con un mínimo de serie (`GASTROS_MINIMO`, 4) y una pregunta para subirlo
+  si el menú lleva más. Cumpleaños no lo usa (todo en bandejas) y producción sigue con
+  su propia cuenta (2 por chafer) — ninguno de los dos se tocó.
+
+**Regresión real, cazada por la propia batería antes de fusionar**: `preguntas.js`
+(la app del FORMULARIO) importaba `GASTROS_MINIMO` desde `checklist-generadores.js`
+(el motor de cálculo ENTERO de la checklist, con todas sus dependencias) solo para no
+repetir un número. Vite convirtió ese fichero en un chunk compartido entre las dos
+apps — cambia el mapa de bundles y rompió el test de versión-nueva del service worker
+y el recorrido del formulario (timing). Arreglado duplicando la constante como un
+número local en `preguntas.js` (con comentario explicando el porqué): las tres apps
+son builds separados a propósito (`vite.config.js`), y una constante suelta nunca
+justifica cruzar esa frontera. De paso, el tope del bucle de "recorrer el formulario
+contestando No lo sé" en `app.test.mjs` vivía pegado al número exacto de preguntas de
+una boda (32) — con dos preguntas más pasó a 34 y lo superó. Subido a 45, con margen
+de verdad en vez de ir pegado a la cifra exacta.
+
+**Tres planes grandes, sin código todavía, guardados por si se retoman** —
+ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
+"Orden de lectura").
 
 **Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
 septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.

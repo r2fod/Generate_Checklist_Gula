@@ -1766,9 +1766,10 @@ async function main() {
     };
 
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
-    // puede dejar el formulario atascado en ninguna pregunta
+    // puede dejar el formulario atascado en ninguna pregunta. Mismo margen que el
+    // otro recorrido de más abajo (45, no pegado al número real de preguntas).
     let vueltas = 0;
-    while (vueltas++ < 32) {
+    while (vueltas++ < 45) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -1942,9 +1943,12 @@ async function main() {
     await p.waitForTimeout(400);
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
-    // en vez de fallar y decir por qué.
+    // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
+    // encima del número de preguntas de una boda (34 hoy, `preguntasDe("boda", {})`),
+    // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
+    // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;
-    while (vueltasBorrador++ < 32) {
+    while (vueltasBorrador++ < 45) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -1952,7 +1956,7 @@ async function main() {
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
-    ok(vueltasBorrador < 32, "el recorrido llega al repaso sin quedarse atascado");
+    ok(vueltasBorrador < 45, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
@@ -2862,6 +2866,37 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo que se gasta no sugiere rotura, pero sí confirma el consumo ──────────
+  // Bug real, cazado por el dueño en producción: apuntar la vuelta de una bebida y no
+  // ver nada más (ni "faltan", que no pinta nada ahí, ni ninguna otra confirmación) no
+  // dejaba claro que la app se hubiera enterado del consumo.
+  console.log("\n── Lo que se gasta, en la vuelta ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }) + "&solo=1&carga=1",
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".segment-btn", { hasText: "Vuelta" }).click();
+    await p.waitForTimeout(700);
+
+    const fila = p.locator(".carga-row").filter({ hasText: "Vino tinto" }).first();
+    const textoCantidad = await fila.locator(".carga-cantidad").innerText();
+    const salieron = Number((textoCantidad.match(/de\s+([\d.,]+)/) || [])[1]?.replace(/[.,]/g, "") || 0);
+    ok(salieron > 0, `de partida salen ${salieron} botellas de vino tinto`);
+
+    await fila.locator(".carga-vuelve-cantidad input").fill(String(salieron - 4));
+    await p.waitForTimeout(700);
+    ok(await fila.locator(".carga-faltan").count() === 0,
+      "una bebida no sugiere rotura: no es una rotura, es lo normal");
+    ok(/4 gastados/.test(await fila.locator(".carga-consumido").innerText()),
+      "pero sí confirma que se ha contado el consumo, para que no parezca que no ha pasado nada");
+    ok(await fila.locator(".carga-roturas-input").last().inputValue() === "",
+      "y no se rellena sola la casilla de roturas: eso sigue siendo una decisión de quien descarga");
+    await c.close();
+  }
+
   // ── Escribir una cantidad no puede ir por detrás de los dedos ──────────────
   // Cada tecla escribía en el estado del evento entero: reconstruir 150 filas,
   // guardar y programar la subida. Unos 100ms por pulsación, que escribiendo rápido
@@ -3016,6 +3051,51 @@ async function main() {
     const agua = await infoDe("Agua 1,5L");
     ok(agua.length > 0 && !/^=/.test(agua),
       `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+
+    await c.close();
+  }
+
+  // ── El sufijo que depende del número de delante (hielo, carpas) ────────────
+  // "Hielo" guarda cuántos taxis hacen falta y "Carpas" cuántas quedan por alquilar,
+  // los dos calculados a partir del número de la izquierda cuando se generó la
+  // checklist. Editar ese número a mano no los recalculaba: el texto se quedaba
+  // pegado al de cuando se abrió el evento, así que subir el hielo a mano seguía
+  // diciendo los taxis de antes.
+  console.log("\n── El sufijo que depende del número de delante ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, llevaCarpas: true }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // Por nombre exacto: "Hielo" es substring de "Pinzas de hielo", y con el texto de
+    // toda la fila (cantidad y botones incluidos) un simple hasText los confundiría.
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
+    const sufijoDe = async (nombre) => {
+      const i = filaExacta(nombre).locator(".item-batea-info");
+      return await i.count() ? (await i.innerText()).trim() : "";
+    };
+
+    await filaExacta("Hielo").locator(".item-qty-input").fill("48");
+    await p.waitForTimeout(900);
+    ok(/2 taxis/.test(await sufijoDe("Hielo")),
+      `48 kg de hielo (24kg por taxi) → 2 taxis (${await sufijoDe("Hielo")})`);
+    await filaExacta("Hielo").locator(".item-qty-input").fill("100");
+    await p.waitForTimeout(900);
+    ok(/5 taxis/.test(await sufijoDe("Hielo")),
+      `y al subir a 100kg pasan a ser 5: no se quedan pegados los de cuando se generó (${await sufijoDe("Hielo")})`);
+
+    // 100 pax piden 11 carpas (carpasRecomendadas): caben 8 en almacén, faltan 3 por alquilar
+    const inicial = await sufijoDe("Carpas");
+    ok(/de 8 en almacén/.test(inicial) && /faltan 3/.test(inicial),
+      `arrancan con las 8 del almacén y avisan de las 3 que faltan (${inicial})`);
+    await filaExacta("Carpas").locator(".item-qty-input").fill("5");
+    await p.waitForTimeout(900);
+    ok(/faltan 6, hay que alquilarlas/.test(await sufijoDe("Carpas")),
+      `cargar solo 5 de las 8 recalcula cuántas faltan por alquilar, no se queda en 3 (${await sufijoDe("Carpas")})`);
 
     await c.close();
   }
@@ -4098,6 +4178,68 @@ async function main() {
         });
         return fuera === 0;
       }), "y ningún campo de la fila se sale de ella");
+      await c.close();
+    }
+
+    // ── El personal de un evento YA PASADO, desde el editor genérico ──
+    // Bug real: la Vista de equipo (arriba) es la ÚNICA pantalla de toda la app que
+    // enseñaba/editaba quién va a un evento, y solo mira los próximos DIAS_ANTICIPACION
+    // días — pasado o muy lejos en el futuro, se salta. El editor genérico de un apunte
+    // (el que sí se abre para cualquier fecha, incluida "pasado" en el panel del día)
+    // no llevaba ese apartado en absoluto: el personal de un evento ya cerrado era
+    // invisible en TODA la app, justo cuando hace falta para calcular lo que costó.
+    console.log("\n══ Personal de un evento pasado, desde el editor de apunte ══");
+    {
+      const c = await navegador.newContext({ viewport: { width: 500, height: 1000 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`personal evento pasado: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+
+      const hoy = new Date();
+      const pasada = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 40);
+      const isoPasada = `${pasada.getFullYear()}-${String(pasada.getMonth() + 1).padStart(2, "0")}-${String(pasada.getDate()).padStart(2, "0")}`;
+      const TITULO = "Boda ya cerrada (prueba)";
+
+      await p.locator(".cal-nuevo").click();
+      await p.waitForSelector(".cal-editor");
+      await p.locator(".cal-editor select").first().selectOption("boda");
+      await p.locator(".cal-editor input").nth(0).fill(TITULO);
+      await p.locator('.cal-editor input[type="date"]').first().fill(isoPasada);
+      await p.locator('.cal-editor input[type="number"]').first().fill("120");
+      await p.waitForTimeout(300);
+
+      ok(await p.locator(".cal-asignados-cab").count() === 1,
+        "el editor de apunte SÍ tiene apartado de personal, con una fecha de hace 40 días");
+
+      await p.locator(".cal-asignados-cab").click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      await p.locator(".cal-asignados-anadir .btn").first().click();
+      await p.locator(".cal-asignado-nombre").first().fill("Marta");
+      await p.waitForTimeout(300);
+      ok(/Asignados 1 de/.test((await p.locator(".cal-asignados-cab").innerText()).replace(/\s+/g, " ")),
+        "y se puede añadir gente igual que en la Vista de equipo");
+
+      await p.locator(".cal-editor button", { hasText: "Guardar" }).click();
+      await p.waitForTimeout(400);
+
+      // Se reabre desde CERO —Año → el mes de hace 40 días → el día → Editar— para
+      // comprobar que lo guardado de verdad se quedó, no solo que se veía en pantalla.
+      await p.locator(".cal-vistas .segment-btn", { hasText: "Año" }).click();
+      await p.waitForTimeout(300);
+      await p.locator(".cal-mini").nth(pasada.getMonth()).click();
+      await p.waitForTimeout(300);
+      await p.locator(`[aria-label^="${pasada.getDate()}: "]`).first().click();
+      await p.waitForSelector(".cal-dia-panel");
+      await p.locator(".cal-dia-item", { hasText: TITULO }).locator("button", { hasText: "Editar" }).click();
+      await p.waitForSelector(".cal-editor");
+
+      ok(/Asignados 1 de/.test((await p.locator(".cal-asignados-cab").innerText()).replace(/\s+/g, " ")),
+        "al reabrir el apunte pasado, el personal guardado sigue ahí");
+      await p.locator(".cal-asignados-cab").click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      ok(await p.locator(".cal-asignado-nombre").first().inputValue() === "Marta",
+        "con el nombre de verdad, no solo el número");
       await c.close();
     }
 

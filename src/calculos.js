@@ -139,9 +139,22 @@ export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongela
   return {
     kg,
     bolsas: Math.ceil(kg / KG_POR_BOLSA),
-    taxis: Math.max(1, Math.ceil(kg / KG_POR_TAXI)),
+    taxis: taxisDeHielo(kg),
   };
 }
+
+// Aparte para poder recalcularla cuando alguien edita el kg a mano en la checklist
+// (ver checklist-generadores.js): antes el "· N taxis" del sufijo se quedaba con el
+// número de cuando se generó, aunque se cambiara el kg de delante.
+/** @param {number} kg @returns {number} */
+export function taxisDeHielo(kg) { return Math.max(1, Math.ceil(kg / KG_POR_TAXI)); }
+
+// Mesas calientes: 1 por cada ~40 pax, para mantener el pase caliente hasta que se
+// sirve. Antes solo existía en producción (rodajes largos, siempre hacen falta) y no
+// se preguntaba en el formulario; se comparte aquí para no repetir la fórmula al
+// llevarla también a boda/comunión/corporativo/cumpleaños.
+/** @param {number} pax @returns {number} */
+export function calcMesasCalientes(pax) { return Math.max(1, Math.ceil((pax || 0) / 40)); }
 
 // Cuántas copas/vasos caben en cada batea, por tipo
 export const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };

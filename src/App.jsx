@@ -73,7 +73,7 @@ import { alSobrarTiempo } from "./precarga.js";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
 import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
-import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
+import { buildChecklist, enlaceMapa, GASTROS_MINIMO } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
 import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida,
   calibracionPersonal, huecosDeCatalogo } from "./calibracion.js";
@@ -221,7 +221,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -492,6 +492,14 @@ export default function App({ onCerrarSesion } = {}) {
   // no trae ya un estilo guardado.
   const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState(estadoInicial.estiloPlatoPostre ?? (estadoInicial.evento === "produccion" ? "Negro/gris" : "Blanco"));
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
+  // En producción siempre llevaba mesas calientes, sin preguntar (rodajes largos, el
+  // pase se mantiene caliente todo el día); en el resto no existían ni se ofrecían.
+  // Mismo criterio que llevaCarpas: el "casi siempre sí" de producción no lo pierde
+  // ningún evento ya guardado antes de esto.
+  const [llevaMesasCalientes, setLlevaMesasCalientes] = useState(estadoInicial.llevaMesasCalientes ?? ((estadoInicial.evento ?? "boda") === "produccion"));
+  // 0 = el mínimo de serie (GASTROS_MINIMO en checklist-generadores.js); un número
+  // manda sobre esa cuenta, igual que numPaellas.
+  const [numGastros, setNumGastros] = useState(estadoInicial.numGastros ?? 0);
   // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
   const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
   // Cada plancha lleva SU bombona: antes la plancha era un sí/no y sumaba una sola, así
@@ -861,7 +869,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
+    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
@@ -962,7 +970,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2508,7 +2516,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = useMemo(() => ({
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -2525,8 +2533,8 @@ export default function App({ onCerrarSesion } = {}) {
     notasEvento,
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
-    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
-    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
+    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
@@ -2599,11 +2607,18 @@ export default function App({ onCerrarSesion } = {}) {
           const esAlquilerFijo = extra === true;
           const key = `${cat.nombre}::${label}`;
           // qty puede venir como { u, sufijo } (conSufijo): se separa el número editable
-          // del texto fijo del envase, que se conserva aparte aunque se edite el número
+          // del texto fijo del envase, que se conserva aparte aunque se edite el número.
+          // El sufijo casi siempre es un texto fijo (packs, cajas...), pero en un par de
+          // casos (hielo, carpas) tiene un número propio DERIVADO del de delante — "kg ·
+          // N taxis", "faltan N, hay que alquilarlas" — que antes se quedaba con el texto
+          // de cuando se generó la checklist: editar el número de delante no lo tocaba.
+          // Ahí conSufijo() recibe una función en vez de un texto, y se llama aquí con el
+          // número YA resuelto (con el override aplicado si lo hay).
           const esObjetoConSufijo = qty && typeof qty === "object";
           const valorBase = esObjetoConSufijo ? qty.u : qty;
-          const sufijo = esObjetoConSufijo ? qty.sufijo : undefined;
+          const sufijoBruto = esObjetoConSufijo ? qty.sufijo : undefined;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
+          const sufijo = typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto;
           return [nombresManuales[key] ?? label, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo];
         });
     });
@@ -4082,6 +4097,35 @@ export default function App({ onCerrarSesion } = {}) {
                 />
                 <span className="checkbox-texto">Armario caliente <span className="checkbox-sub">· Dealde</span></span>
               </label>
+              {/* En producción se cargan solas, sin preguntar (rodajes largos, el pase se
+                  mantiene caliente todo el día): no tiene sentido ofrecer aquí lo que ya
+                  se añade automáticamente. */}
+              {evento !== "produccion" && (
+                <label className="checkbox-label-normal">
+                  <input
+                    type="checkbox"
+                    checked={llevaMesasCalientes}
+                    onChange={e => setLlevaMesasCalientes(e.target.checked)}
+                  />
+                  <span className="checkbox-texto">Mesas calientes</span>
+                </label>
+              )}
+              {/* Gastros: cumpleaños no los usa (todo en bandejas) y producción los calcula
+                  solo (2 por chafer), así que aquí solo se ofrece en el resto. En blanco
+                  sale el mínimo de serie (GASTROS_MINIMO). */}
+              {evento !== "cumpleanos" && evento !== "produccion" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº de gastros</span>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={numGastros || ""}
+                    min="1"
+                    placeholder={String(GASTROS_MINIMO)}
+                    onChange={e => setNumGastros(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                </div>
+              )}
               {/* Mobiliario EXTRA, el que no tenemos: se alquila a Event Style cuando el
                   cliente pide más de lo nuestro. En un rodaje no se lleva, así que ahí no
                   se ofrece. Los chill out son nuestros y se configuran en Extras: esos no

@@ -16,7 +16,7 @@ import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras,
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
-  calcHielo, KG_POR_TAXI, KG_POR_BOLSA,
+  calcHielo, KG_POR_TAXI, KG_POR_BOLSA, taxisDeHielo, calcMesasCalientes,
   ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo, factorHieloDe,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
@@ -37,7 +37,7 @@ import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
   esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
-import { buildChecklist } from "../checklist-generadores.js";
+import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
@@ -818,6 +818,54 @@ console.log("\n══ Parabanes: mobiliario nuevo, sin fórmula propia ══");
     "en cumpleaños igual");
   ok(item(buildChecklist("produccion", 40, 0, 0, 0, { llevaParabanes: true, numParabanes: 2 }), "Parabanes")[1] === "2",
     "y en producción también, con su propio número");
+}
+
+console.log("\n══ Mesas calientes: antes solo en producción, sin preguntar ══");
+{
+  // En producción se cargaban solas (rodajes largos, el pase se mantiene caliente
+  // todo el día); en el resto no existían ni se ofrecían, aunque en un banquete largo
+  // hacen la misma falta.
+  const item = (cats, cat, label) => cats.find(c => c.nombre === cat).items.find(x => x[0] === label);
+
+  const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinContestar, "Cocina", "Mesas calientes") === undefined,
+    "sin contestar, una boda no lleva mesas calientes (no existía la pregunta)");
+
+  const conMesasCalientes = buildChecklist("boda", 90, 2, 4, 0, { llevaMesasCalientes: true });
+  ok(item(conMesasCalientes, "Cocina", "Mesas calientes")[1] === String(calcMesasCalientes(90)),
+    `con la pregunta contestada, sale 1 por cada ~40 pax (90 → ${calcMesasCalientes(90)})`);
+
+  // Cumpleaños igual, en su categoría propia
+  const cumple = buildChecklist("cumpleanos", 90, 0, 3, 8, { llevaMesasCalientes: true });
+  ok(item(cumple, "Cocina y Electro", "Mesas calientes")[1] === String(calcMesasCalientes(90)),
+    "y en cumpleaños, misma cuenta");
+
+  // Producción no cambia: sigue con su línea fija de siempre, sin depender de esta
+  // pregunta (no la usa, la carga siempre)
+  const prod = buildChecklist("produccion", 90, 0, 0, 0, {});
+  ok(item(prod, "Cocina y sala", "Mesas calientes")[1] === String(calcMesasCalientes(90)),
+    "producción las sigue llevando siempre, sin preguntar nada");
+}
+
+console.log("\n══ Gastros: un mínimo de serie en vez de dejarlo en blanco ══");
+{
+  // Antes se dejaba en "—" para que cocina lo apuntara a mano. Cumpleaños no usa
+  // gastros (todo en bandejas) y producción los calcula solos (2 por chafer): esto
+  // solo toca la línea de boda/comunión/corporativo.
+  const item = (cats, cat, label) => cats.find(c => c.nombre === cat).items.find(x => x[0] === label);
+
+  const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinContestar, "Cocina", "Gastros")[1] === String(GASTROS_MINIMO),
+    `sin contestar, sale el mínimo de serie (${GASTROS_MINIMO}), no en blanco`);
+
+  const conNumero = buildChecklist("boda", 90, 2, 4, 0, { numGastros: 8 });
+  ok(item(conNumero, "Cocina", "Gastros")[1] === "8", "y un número puesto a mano manda sobre el mínimo");
+
+  // Lo que ya funcionaba, intacto: producción sigue con su propia cuenta (2 por chafer)
+  const prod = buildChecklist("produccion", 40, 0, 0, 0, {});
+  const numChafersEsperado = Math.max(2, Math.ceil(40 / 40));
+  ok(item(prod, "Menaje y Utensilios", "Gastros")[1] === String(numChafersEsperado * 2),
+    `producción sigue con su propia cuenta (2 por chafer), sin tocar (${item(prod, "Menaje y Utensilios", "Gastros")[1]})`);
 }
 
 console.log("\n══ Quién va a cada evento: horas e importe ══");
@@ -2447,6 +2495,14 @@ console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
   ok(esConsumible("Paella y fuego", "Carbón") === true, "el carbón se quema");
   ok(esConsumible("Paella y fuego", "Paella grande") === false,
     "la paellera no se quema: si no vuelve, es una rotura o una pérdida");
+  // El envase no es el contenido: el gas se gasta, pero la bombona (vacía) es la que se
+  // espera que vuelva con el equipo — si falta la bombona entera, sigue siendo pérdida.
+  ok(esConsumible("Electricidad y otros", "Garrafa gasolina (llena)") === false,
+    "la garrafa vuelve vacía, no es ella la que se gasta, es lo de dentro");
+  ok(esConsumible("Paella y fuego", "Bombonas llenas") === false,
+    "mismo caso que la garrafa: la bombona vuelve, el gas de dentro no");
+  ok(esConsumible("Cristalería", "Vasos de chupito de plástico (barra libre)") === true,
+    "estos sí son de usar y tirar (van en bolsas de 80), a diferencia del resto de barware");
   ok(esConsumible("Servicio y limpieza", "Fairy") === true, "el jabón se gasta");
   ok(esConsumible("Servicio y limpieza", "Escoba") === false,
     "la escoba es una herramienta, no algo que se gasta con el uso de una noche");
@@ -2464,6 +2520,20 @@ console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
   ok(esConsumible("Cristalería", "Copas de vino") === false, "la cristalería, de toda la vida, se rompe");
   ok(esConsumible("Vajilla", "Platos trinchero (Blanco liso)") === false, "la vajilla también");
   ok(esConsumible("Mobiliario, sala y decoración", "Mesa alta") === false, "y el mobiliario");
+}
+
+console.log("\n══ Mesas calientes y taxis de hielo, como funciones sueltas ══");
+{
+  // Extraídas de dentro de sus builders para que las tres checklists (boda, cumpleaños,
+  // producción) usen la misma cuenta en vez de repetirla — y aquí se prueban sin montar
+  // ningún builder.
+  ok(calcMesasCalientes(40) === 1 && calcMesasCalientes(41) === 2,
+    `1 mesa caliente por cada ~40 pax: 40 → 1, 41 → 2 (${calcMesasCalientes(40)}, ${calcMesasCalientes(41)})`);
+  ok(calcMesasCalientes(0) === 1, "sin pax puesto, el mínimo es 1, no 0");
+
+  ok(taxisDeHielo(24) === 1 && taxisDeHielo(25) === 2,
+    `24kg entran en 1 taxi, 25kg ya piden 2 (${taxisDeHielo(24)}, ${taxisDeHielo(25)})`);
+  ok(taxisDeHielo(0) === 1, "sin kg, el mínimo sigue siendo 1 taxi, no 0");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

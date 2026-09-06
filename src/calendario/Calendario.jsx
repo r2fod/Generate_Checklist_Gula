@@ -163,6 +163,7 @@ export default function Calendario({
       {editando && (
         <EditorApunte
           apunte={editando}
+          equipo={equipo}
           onCerrar={() => setEditando(null)}
           onGuardar={(a) => { onGuardar && onGuardar(a); setEditando(null); }}
           onBorrar={onBorrar && editando.id ? () => { onBorrar(editando.id); setEditando(null); } : null}
@@ -415,10 +416,17 @@ function ChoquesAviso({ choques: lista, apuntes, equipo, onIr }) {
 // Lo mínimo: qué día, qué es y cómo se llama. El resto es opcional a propósito — la
 // gracia del calendario es poder apuntar "boda Marina" en cuanto te dan la fecha, sin
 // saber todavía ni el pax ni el sitio.
-function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
+function EditorApunte({ apunte, equipo, onCerrar, onGuardar, onBorrar }) {
   const [f, setF] = useState(apunte);
   const pon = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }));
   const listo = saneaApunte({ ...f, pax: Number(f.pax) || undefined });
+  const turnos = turnosDe({ hora: f.hora });
+  // Quién va a este evento (Asignados, más abajo) no depende de la fecha: a diferencia
+  // de la Vista de equipo (que solo mira los próximos 14 días, para planificar quién
+  // falta por buscar), aquí se puede apuntar o revisar el personal de CUALQUIER apunte,
+  // pasado incluido — que es justo lo que hacía falta para ver quién trabajó un evento
+  // ya cerrado (el dato que pide el presupuesto/margen: horas e importe por persona).
+  const necesario = personalNecesario(f.tipo, Number(f.pax) || 0);
 
   return (
     <div className="cal-editor-fondo" onClick={onCerrar}>
@@ -469,14 +477,22 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
                 <span>Hora del banquete <em>(para los turnos)</em></span>
                 <input type="time" value={f.hora} onChange={pon("hora")} />
               </label>
-              {turnosDe({ hora: f.hora })
+              {turnos
                 ? <span className="cal-turnos-pista">
-                    Sala entra a las <strong>{turnosDe({ hora: f.hora }).sala}</strong>
-                    {turnosDe({ hora: f.hora }).salaVispera ? " (víspera)" : ""}
-                    {" · logística a las "}<strong>{turnosDe({ hora: f.hora }).logistica}</strong>
+                    Sala entra a las <strong>{turnos.sala}</strong>
+                    {turnos.salaVispera ? " (víspera)" : ""}
+                    {" · logística a las "}<strong>{turnos.logistica}</strong>
                   </span>
                 : <span className="cal-turnos-pista es-vacia">Sin hora no se pueden proponer turnos.</span>}
             </div>
+
+            <Asignados
+              apunte={f}
+              equipo={equipo}
+              necesario={necesario}
+              turnos={turnos}
+              onCambiar={(personal) => setF(x => ({ ...x, personal }))}
+            />
           </>
         )}
 
@@ -667,13 +683,26 @@ function Asignados({ apunte, equipo, necesario, turnos, onCambiar }) {
   return (
     <div className="cal-asignados">
       <button type="button" className="cal-asignados-cab" aria-expanded={abierto} onClick={() => setAbierto(v => !v)}>
-        <span>
-          {r.total > 0
-            ? <>Asignados <b>{r.total}</b> de <b>{necesario.total}</b></>
-            : <>Sin nadie asignado <b>({necesario.total} por cubrir)</b></>}
+        <span className="cal-asignados-cab-fila">
+          <span>
+            {r.total > 0
+              ? <>Asignados <b>{r.total}</b> de <b>{necesario.total}</b></>
+              : <>Sin nadie asignado <b>({necesario.total} por cubrir)</b></>}
+          </span>
+          {faltanTotal > 0 && <span className="cal-asignados-falta">faltan {faltanTotal}</span>}
+          <ChevronDown size={15} aria-hidden="true" className={`cal-asignados-flecha${abierto ? " es-abierta" : ""}`} />
         </span>
-        {faltanTotal > 0 && <span className="cal-asignados-falta">faltan {faltanTotal}</span>}
-        <ChevronDown size={15} aria-hidden="true" className={`cal-asignados-flecha${abierto ? " es-abierta" : ""}`} />
+        {/* De un vistazo, sin desplegar: cuánto de la plantilla necesaria ya está
+            cubierta. Se ve incluso cerrado, que es como se abre este panel la mayoría
+            de las veces — para mirar, no para tocar. */}
+        {necesario.total > 0 && (
+          <span className="cal-asignados-barra" aria-hidden="true">
+            <span
+              className={`cal-asignados-barra-relleno${r.total >= necesario.total ? " es-completo" : ""}`}
+              style={{ width: `${Math.min(100, Math.round((r.total / necesario.total) * 100))}%` }}
+            />
+          </span>
+        )}
       </button>
 
       {abierto && (
