@@ -2862,6 +2862,37 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo que se gasta no sugiere rotura, pero sí confirma el consumo ──────────
+  // Bug real, cazado por el dueño en producción: apuntar la vuelta de una bebida y no
+  // ver nada más (ni "faltan", que no pinta nada ahí, ni ninguna otra confirmación) no
+  // dejaba claro que la app se hubiera enterado del consumo.
+  console.log("\n── Lo que se gasta, en la vuelta ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }) + "&solo=1&carga=1",
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".segment-btn", { hasText: "Vuelta" }).click();
+    await p.waitForTimeout(700);
+
+    const fila = p.locator(".carga-row").filter({ hasText: "Vino tinto" }).first();
+    const textoCantidad = await fila.locator(".carga-cantidad").innerText();
+    const salieron = Number((textoCantidad.match(/de\s+([\d.,]+)/) || [])[1]?.replace(/[.,]/g, "") || 0);
+    ok(salieron > 0, `de partida salen ${salieron} botellas de vino tinto`);
+
+    await fila.locator(".carga-vuelve-cantidad input").fill(String(salieron - 4));
+    await p.waitForTimeout(700);
+    ok(await fila.locator(".carga-faltan").count() === 0,
+      "una bebida no sugiere rotura: no es una rotura, es lo normal");
+    ok(/4 gastados/.test(await fila.locator(".carga-consumido").innerText()),
+      "pero sí confirma que se ha contado el consumo, para que no parezca que no ha pasado nada");
+    ok(await fila.locator(".carga-roturas-input").last().inputValue() === "",
+      "y no se rellena sola la casilla de roturas: eso sigue siendo una decisión de quien descarga");
+    await c.close();
+  }
+
   // ── Escribir una cantidad no puede ir por detrás de los dedos ──────────────
   // Cada tecla escribía en el estado del evento entero: reconstruir 150 filas,
   // guardar y programar la subida. Unos 100ms por pulsación, que escribiendo rápido

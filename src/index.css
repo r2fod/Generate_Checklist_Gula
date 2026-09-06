@@ -3126,6 +3126,18 @@ hr {
 @media (hover: none), (max-width: 767px) {
   .carga-faltan { min-height: 40px; padding: 4px 12px; }
 }
+/* Mismo hueco que .carga-faltan, pero para lo que se gasta (bebida, hielo...): no es
+   una rotura que sugerir, solo confirmar que sí se ha contado el consumo. Sin borde de
+   aviso ni cursor de botón, para no leerse como una acción pendiente. */
+.carga-consumido {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
 
 .preview-notes {
   background: var(--card-bg);

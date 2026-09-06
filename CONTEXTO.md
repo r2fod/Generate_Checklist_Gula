@@ -572,6 +572,11 @@ afinamientos más, sin PR todavía:
   casi todas las líneas de golpe. Ahora lo fungible se marca por defecto como "no ha
   vuelto nada" (que es su caso normal) y lo reutilizable sigue marcándose como
   "volvió completo".
+- **Sin el chip "faltan N", lo fungible se quedaba sin ninguna confirmación visual**
+  de que la app se había enterado del consumo (apuntar la vuelta de una bebida y no
+  ver nada más no dejaba claro que hubiera pasado algo). Ahora sale un texto neutro
+  ("N gastados", `.carga-consumido`) que confirma el consumo sin invitar a marcarlo
+  como rotura, que ahí no pinta nada.
 
 **Encontrado revisando el calendario ("Aryan Campana" sin personal visible) — de
 diseño, pendiente de decidir con el dueño antes de tocar código**: la pantalla

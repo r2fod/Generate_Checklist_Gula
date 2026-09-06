@@ -150,6 +150,14 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
               onClick={e => { e.stopPropagation(); onRoturas(dataKey, String(faltan)); }}
             >faltan {faltan}</button>
           )}
+          {/* Lo que se gasta no sugiere rotura, pero apuntar "vuelve" y no ver nada más
+              no deja claro que la app se haya enterado del consumo — se confirma sin
+              invitar a tocar el botón de roturas, que aquí no pinta nada. */}
+          {!sugerirRoturas && consumible && faltan > 0 && (
+            <span className="carga-consumido" title={`Han vuelto ${vueltaNum} de ${cantidadCompleta}: se cuentan ${faltan} como gastados`}>
+              {faltan} gastados
+            </span>
+          )}
         </div>
       </div>
     </div>
