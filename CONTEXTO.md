@@ -578,17 +578,20 @@ afinamientos más, sin PR todavía:
   ("N gastados", `.carga-consumido`) que confirma el consumo sin invitar a marcarlo
   como rotura, que ahí no pinta nada.
 
-**Encontrado revisando el calendario ("Aryan Campana" sin personal visible) — de
-diseño, pendiente de decidir con el dueño antes de tocar código**: la pantalla
-"Equipo" (`VistaEquipo`, `Calendario.jsx:498-516`) es la ÚNICA de toda la app que
-enseña/edita `apunte.personal` ("HORARIO PERSONAL EN EVENTO": nombre, rol, horario,
-importe) — y solo enseña los próximos `DIAS_ANTICIPACION` (14) días; el editor
-genérico de un apunte (`EditorApunte`, alcanzable también para eventos pasados desde
-la vista Año) no tiene ese apartado en absoluto. El personal de un evento YA PASADO
-es invisible en toda la app, sin ningún aviso. **Esto bloquea directamente el plan de
-Presupuesto/margen** (ver más abajo): ese horario con horas e importe es justo el
-dato de coste de sala/cocina que ese plan necesita, y el piloto elegido ("Aryan
-Campana") es un evento pasado.
+**Calendario: personal de un evento pasado — HECHO**. La pantalla "Equipo"
+(`VistaEquipo`, `Calendario.jsx`) era la ÚNICA de toda la app que enseñaba/editaba
+`apunte.personal` ("HORARIO PERSONAL EN EVENTO": nombre, rol, horario, importe) — y
+solo mira los próximos `DIAS_ANTICIPACION` (14) días; el editor genérico de un apunte
+(`EditorApunte`, alcanzable también para eventos pasados desde la vista Año) no tenía
+ese apartado en absoluto. El personal de un evento ya cerrado (como "Aryan Campana",
+el piloto del plan de Presupuesto/margen) era invisible en toda la app. Arreglado
+reutilizando el mismo componente `Asignados` dentro de `EditorApunte` —funciona para
+cualquier fecha, pasado incluido—, guardado junto al resto del apunte (no aparte,
+para que "Cancelar" siga descartando todo el borrador de una vez). De paso, una
+barrita de progreso visible sin desplegar (cuánto de la plantilla necesaria está
+cubierta, `.cal-asignados-barra`) — pedido explícitamente ("que sea más visual").
+Con test de extremo a extremo: crear con fecha de hace 40 días → añadir gente →
+guardar → reabrir desde Año → sigue ahí.
 
 **Encontrado de paso, revisando Modo Carga y el formulario a fondo (sin tocar
 todavía)**:

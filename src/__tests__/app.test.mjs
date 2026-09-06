@@ -4132,6 +4132,68 @@ async function main() {
       await c.close();
     }
 
+    // ── El personal de un evento YA PASADO, desde el editor genérico ──
+    // Bug real: la Vista de equipo (arriba) es la ÚNICA pantalla de toda la app que
+    // enseñaba/editaba quién va a un evento, y solo mira los próximos DIAS_ANTICIPACION
+    // días — pasado o muy lejos en el futuro, se salta. El editor genérico de un apunte
+    // (el que sí se abre para cualquier fecha, incluida "pasado" en el panel del día)
+    // no llevaba ese apartado en absoluto: el personal de un evento ya cerrado era
+    // invisible en TODA la app, justo cuando hace falta para calcular lo que costó.
+    console.log("\n══ Personal de un evento pasado, desde el editor de apunte ══");
+    {
+      const c = await navegador.newContext({ viewport: { width: 500, height: 1000 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`personal evento pasado: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+
+      const hoy = new Date();
+      const pasada = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 40);
+      const isoPasada = `${pasada.getFullYear()}-${String(pasada.getMonth() + 1).padStart(2, "0")}-${String(pasada.getDate()).padStart(2, "0")}`;
+      const TITULO = "Boda ya cerrada (prueba)";
+
+      await p.locator(".cal-nuevo").click();
+      await p.waitForSelector(".cal-editor");
+      await p.locator(".cal-editor select").first().selectOption("boda");
+      await p.locator(".cal-editor input").nth(0).fill(TITULO);
+      await p.locator('.cal-editor input[type="date"]').first().fill(isoPasada);
+      await p.locator('.cal-editor input[type="number"]').first().fill("120");
+      await p.waitForTimeout(300);
+
+      ok(await p.locator(".cal-asignados-cab").count() === 1,
+        "el editor de apunte SÍ tiene apartado de personal, con una fecha de hace 40 días");
+
+      await p.locator(".cal-asignados-cab").click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      await p.locator(".cal-asignados-anadir .btn").first().click();
+      await p.locator(".cal-asignado-nombre").first().fill("Marta");
+      await p.waitForTimeout(300);
+      ok(/Asignados 1 de/.test((await p.locator(".cal-asignados-cab").innerText()).replace(/\s+/g, " ")),
+        "y se puede añadir gente igual que en la Vista de equipo");
+
+      await p.locator(".cal-editor button", { hasText: "Guardar" }).click();
+      await p.waitForTimeout(400);
+
+      // Se reabre desde CERO —Año → el mes de hace 40 días → el día → Editar— para
+      // comprobar que lo guardado de verdad se quedó, no solo que se veía en pantalla.
+      await p.locator(".cal-vistas .segment-btn", { hasText: "Año" }).click();
+      await p.waitForTimeout(300);
+      await p.locator(".cal-mini").nth(pasada.getMonth()).click();
+      await p.waitForTimeout(300);
+      await p.locator(`[aria-label^="${pasada.getDate()}: "]`).first().click();
+      await p.waitForSelector(".cal-dia-panel");
+      await p.locator(".cal-dia-item", { hasText: TITULO }).locator("button", { hasText: "Editar" }).click();
+      await p.waitForSelector(".cal-editor");
+
+      ok(/Asignados 1 de/.test((await p.locator(".cal-asignados-cab").innerText()).replace(/\s+/g, " ")),
+        "al reabrir el apunte pasado, el personal guardado sigue ahí");
+      await p.locator(".cal-asignados-cab").click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      ok(await p.locator(".cal-asignado-nombre").first().inputValue() === "Marta",
+        "con el nombre de verdad, no solo el número");
+      await c.close();
+    }
+
     // ── "FALTA CONFIGURAR ESTE EVENTO" ──
     // Una checklist creada por el calendario se ve EXACTAMENTE igual que una terminada:
     // mismo aspecto, mismos valores por defecto. Quien la abra puede leer el pax de
