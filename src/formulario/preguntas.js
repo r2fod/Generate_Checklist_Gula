@@ -44,6 +44,10 @@ export const TIPOS_EVENTO = [
 
 const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 
+// Mismo valor que GASTROS_MINIMO en checklist-generadores.js — ver el porqué de la
+// duplicación en la pregunta "cuantosGastros", más abajo.
+const GASTROS_MINIMO = 4;
+
 export const PREGUNTAS = [
   // ── Tronco común ───────────────────────────────────────────────────────────
   {
@@ -368,6 +372,43 @@ export const PREGUNTAS = [
       { valor: "no", texto: "No lleva" },
     ],
     soloEn: CON_BARRA,
+  },
+  {
+    // En producción ya se cargan solas (automáticas por pax, sin preguntar): son
+    // rodajes largos donde el pase siempre se mantiene caliente. En el resto de
+    // eventos no se cargaba ninguna, ni se preguntaba: se echaban en falta en el
+    // servicio y no había forma de que el formulario avisara.
+    id: "mesasCalientes", tipo: "opciones", texto: "¿Lleva mesas calientes?",
+    nota: "Para mantener el pase caliente hasta que se sirve. 1 por cada ~40 pax.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // Antes se dejaba en blanco para que cocina lo apuntara a mano; ahora sale con un
+    // mínimo de serie y aquí se puede subir si el menú lleva más. Cumpleaños no usa
+    // gastros (todo va en bandejas) y producción los calcula solo, por chafer.
+    //
+    // El número (4) se repite a mano en vez de importarse de GASTROS_MINIMO
+    // (checklist-generadores.js): ese fichero es el motor de cálculo entero de la
+    // checklist, con sus propias dependencias pesadas, y el formulario es una app
+    // aparte (otra carpeta, otro manifest de PWA) — importar de ahí aunque sea solo
+    // una constante mete el motor entero en el bundle del formulario. Si el mínimo
+    // cambia, se cambia en los dos sitios.
+    id: "cuantosGastros", tipo: "opciones", texto: "¿Cuántos gastros hacen falta?",
+    nota: `Lo de siempre son ${GASTROS_MINIMO}. Se puede subir si el menú lleva más.`,
+    opciones: [
+      { valor: "auto", texto: `Los de siempre (${GASTROS_MINIMO})` },
+      {
+        valor: "otros", texto: "Otro número",
+        conNumero: "¿Cuántos?",
+        campoNumero: "numGastros",
+        sugerido: () => GASTROS_MINIMO,
+      },
+    ],
+    soloEn: ["boda", "comunion", "corporativo"],
   },
   {
     id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
@@ -861,6 +902,10 @@ export function aRespuestasDeLaApp(r = {}) {
     // "finca" = no las llevamos nosotros; el resto es literalmente el valor que usa la
     // app (Dealde / Carvillo / Nuestras), y solo los dos primeros crean recogida
     if (puesto(r.armarioCaliente)) estado.llevaArmarioCaliente = r.armarioCaliente === "si";
+    if (puesto(r.mesasCalientes)) estado.llevaMesasCalientes = r.mesasCalientes === "si";
+    if (puesto(r.cuantosGastros)) {
+      estado.numGastros = r.cuantosGastros === "otros" && r.numGastros > 0 ? r.numGastros : 0;
+    }
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
     if (Array.isArray(r.extras)) {

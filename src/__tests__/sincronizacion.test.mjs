@@ -712,6 +712,24 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaParabanes === undefined,
     "sin contestar, no se toca");
 
+  // Mesas calientes: antes se cargaban solas en producción y en el resto ni existían
+  // ni se preguntaban.
+  const conMesasCalientes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, mesasCalientes: "si" });
+  ok(conMesasCalientes.llevaMesasCalientes === true, "contestar que sí lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, mesasCalientes: "no" }).llevaMesasCalientes === false,
+    "y que no, también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaMesasCalientes === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+
+  // Gastros: "auto" no manda ningún número (se queda con el mínimo de serie que pone
+  // el builder), "otros" con número sí manda.
+  const gastrosAuto = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cuantosGastros: "auto" });
+  ok(gastrosAuto.numGastros === 0, `"los de siempre" no fuerza ningún número (${gastrosAuto.numGastros})`);
+  const gastrosOtros = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cuantosGastros: "otros", numGastros: 6 });
+  ok(gastrosOtros.numGastros === 6, "otro número sí se guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).numGastros === undefined,
+    "sin contestar, no se toca");
+
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),

@@ -1766,9 +1766,10 @@ async function main() {
     };
 
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
-    // puede dejar el formulario atascado en ninguna pregunta
+    // puede dejar el formulario atascado en ninguna pregunta. Mismo margen que el
+    // otro recorrido de más abajo (45, no pegado al número real de preguntas).
     let vueltas = 0;
-    while (vueltas++ < 32) {
+    while (vueltas++ < 45) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -1942,9 +1943,12 @@ async function main() {
     await p.waitForTimeout(400);
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
-    // en vez de fallar y decir por qué.
+    // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
+    // encima del número de preguntas de una boda (34 hoy, `preguntasDe("boda", {})`),
+    // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
+    // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;
-    while (vueltasBorrador++ < 32) {
+    while (vueltasBorrador++ < 45) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -1952,7 +1956,7 @@ async function main() {
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
-    ok(vueltasBorrador < 32, "el recorrido llega al repaso sin quedarse atascado");
+    ok(vueltasBorrador < 45, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
@@ -3047,6 +3051,51 @@ async function main() {
     const agua = await infoDe("Agua 1,5L");
     ok(agua.length > 0 && !/^=/.test(agua),
       `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+
+    await c.close();
+  }
+
+  // ── El sufijo que depende del número de delante (hielo, carpas) ────────────
+  // "Hielo" guarda cuántos taxis hacen falta y "Carpas" cuántas quedan por alquilar,
+  // los dos calculados a partir del número de la izquierda cuando se generó la
+  // checklist. Editar ese número a mano no los recalculaba: el texto se quedaba
+  // pegado al de cuando se abrió el evento, así que subir el hielo a mano seguía
+  // diciendo los taxis de antes.
+  console.log("\n── El sufijo que depende del número de delante ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, llevaCarpas: true }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // Por nombre exacto: "Hielo" es substring de "Pinzas de hielo", y con el texto de
+    // toda la fila (cantidad y botones incluidos) un simple hasText los confundiría.
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
+    const sufijoDe = async (nombre) => {
+      const i = filaExacta(nombre).locator(".item-batea-info");
+      return await i.count() ? (await i.innerText()).trim() : "";
+    };
+
+    await filaExacta("Hielo").locator(".item-qty-input").fill("48");
+    await p.waitForTimeout(900);
+    ok(/2 taxis/.test(await sufijoDe("Hielo")),
+      `48 kg de hielo (24kg por taxi) → 2 taxis (${await sufijoDe("Hielo")})`);
+    await filaExacta("Hielo").locator(".item-qty-input").fill("100");
+    await p.waitForTimeout(900);
+    ok(/5 taxis/.test(await sufijoDe("Hielo")),
+      `y al subir a 100kg pasan a ser 5: no se quedan pegados los de cuando se generó (${await sufijoDe("Hielo")})`);
+
+    // 100 pax piden 11 carpas (carpasRecomendadas): caben 8 en almacén, faltan 3 por alquilar
+    const inicial = await sufijoDe("Carpas");
+    ok(/de 8 en almacén/.test(inicial) && /faltan 3/.test(inicial),
+      `arrancan con las 8 del almacén y avisan de las 3 que faltan (${inicial})`);
+    await filaExacta("Carpas").locator(".item-qty-input").fill("5");
+    await p.waitForTimeout(900);
+    ok(/faltan 6, hay que alquilarlas/.test(await sufijoDe("Carpas")),
+      `cargar solo 5 de las 8 recalcula cuántas faltan por alquilar, no se queda en 3 (${await sufijoDe("Carpas")})`);
 
     await c.close();
   }

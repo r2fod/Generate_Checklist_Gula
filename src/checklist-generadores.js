@@ -4,7 +4,7 @@
 // resultado — por eso vive aparte de App.jsx y se puede probar sin montar nada.
 import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
-  terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen,
+  terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen, taxisDeHielo, calcMesasCalientes,
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
@@ -14,6 +14,11 @@ import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { calcPaella } from "./paella.js";
 import { leerRatios } from "./personal.js";
+
+// Antes "Gastros" se dejaba en blanco ("—") para que cocina apuntara la cantidad a
+// mano; con un mínimo de serie ya sale algo cargado desde el principio, y la pregunta
+// del formulario permite subirlo si el menú lleva más.
+export const GASTROS_MINIMO = 4;
 
 // Item "opcional": SIEMPRE ocupa su sitio en el array (nunca se quita del todo con un
 // spread condicional), aunque la condición sea falsa — con cantidad null en ese caso.
@@ -37,6 +42,23 @@ function sillasAlquiler(origenSillas, incluyeCojines = false) {
     return { label: `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`, esAlquiler: true };
   }
   return { label: "Sillas (proveedor sin elegir)", esAlquiler: false };
+}
+
+// El sufijo de "Carpas" cuando hace falta alquilar de más ("faltan N, hay que
+// alquilarlas"): antes era un texto fijo, calculado una vez al generar la checklist,
+// que se quedaba igual aunque se editara el número de carpas a mano en Modo carga.
+// Se guarda como FUNCIÓN (ver conSufijo/App.jsx, que la llama con el número YA
+// resuelto, con el override aplicado si lo hay) para que "faltan N" se recalcule.
+// Cuando faltanCarpas > 0, calcCarpas() ha topado numCarpas en CARPAS_EN_ALMACEN
+// (usa Math.min), así que el total que hacía falta de verdad es ese tope más lo que
+// faltaba — de ahí sale cuánto falta si se carga un número distinto.
+function sufijoCarpas(faltanCarpas) {
+  return (numCargado) => {
+    const faltanAhora = Math.max(0, CARPAS_EN_ALMACEN + faltanCarpas - numCargado);
+    return faltanAhora > 0
+      ? `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanAhora}, hay que alquilarlas`
+      : `de ${CARPAS_EN_ALMACEN} en almacén`;
+  };
 }
 
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
@@ -207,7 +229,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ = "", tipoHorno = "",
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
-    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    numGastros = 0,
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
@@ -316,7 +339,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
-      ? conSufijo(numCarpas, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpas}, hay que alquilarlas`)
+      ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
       : String(numCarpas)]),
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
@@ -376,12 +399,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   const cocinaItems = [];
-  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha (cocina)", "—"]);
+  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", String(numGastros > 0 ? numGastros : GASTROS_MINIMO)], ["Plancha (cocina)", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
+  if (llevaMesasCalientes) cocinaItems.push(["Mesas calientes", String(calcMesasCalientes(pax))]);
   cats.push({ nombre: "Cocina", items: cocinaItems });
 
   cats.push({ nombre: "Menaje y utensilios", items: [
@@ -492,7 +516,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
-    ["Hielo", conSufijo(bebidas.hieloKg, `kg · ${bebidas.taxisHielo} taxis`)],
+    // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
+    // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
+    // el número de cuando se generó, ver App.jsx donde se resuelve).
+    ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)],
     opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
@@ -515,7 +542,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
-    llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
@@ -566,7 +593,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     // Igual que un banquete: las de cocina más las de la gente que se sienta
     ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpasCumple > 0
-      ? conSufijo(numCarpasCumple, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpasCumple}, hay que alquilarlas`)
+      ? conSufijo(numCarpasCumple, sufijoCarpas(faltanCarpasCumple))
       : String(numCarpasCumple)]),
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpasCumple)]),
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpasCumple)]),
@@ -608,6 +635,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
+  if (llevaMesasCalientes) cocinaItems.push(["Mesas calientes", String(calcMesasCalientes(pax))]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   cats.push({ nombre: "Cocina y Electro", items: cocinaItems });
 
@@ -688,7 +716,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
-    ["Hielo", conSufijo(bebidas.hieloKg, `kg · ${bebidas.taxisHielo} taxis`)],
+    // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
+    // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
+    // el número de cuando se generó, ver App.jsx donde se resuelve).
+    ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)],
   ]});
 
   if (destilados) cats.push(categoriaAlcoholes(destilados));
@@ -820,7 +851,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // estaban incluidas o no. Tres paredes por carpa (tres caras cerradas y una
     // abierta para entrar) y dos pesas por carpa.
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
-      ? conSufijo(numCarpas, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpas}, hay que alquilarlas`)
+      ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
       : String(numCarpas)]),
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
     // Las pesas son las que hay: se cargan todas y se reparten entre las carpas más
@@ -865,7 +896,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // hacía nada.
     opt(tipoHorno === "pequeño" || tipoHorno === "ambos", ["Horno pequeño", "1"]),
     opt(tipoHorno === "grande" || tipoHorno === "ambos", ["Horno grande", "1"]),
-    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
+    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(calcMesasCalientes(pax))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
     // "Butano" fuera: era la misma bombona que ya sale contada en "Paella y fuego"
     // (una por paella, una por sartén de fritura y una por plancha de gas), así que

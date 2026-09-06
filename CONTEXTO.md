@@ -8,6 +8,13 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 - **Estado del plan de mejoras (N1–N6, A–D) → `PLAN_MEJORAS.md`.** No se repite aquí: ese
   archivo lleva su propia tabla de hecho/pendiente por ítem, con su porqué y su tamaño, y
   apunta de vuelta aquí (`Ver CONTEXTO.md, "..."`) para el detalle técnico de cada uno.
+- **Los tres planes grandes, sin código todavía → `PLAN_PRESUPUESTO.md`,
+  `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`.** En ese orden (cada uno reutiliza del
+  anterior). Presupuesto ya tiene su diseño fijado por la hoja de cálculo real que
+  usa hoy el negocio (capturas del dueño, no reproducidas aquí por ser el repo
+  público): cuatro partidas —Personal, Comida, Bebida, Otros— con líneas sueltas
+  concepto+total, y un balance final Presupuesto/Gastos/Margen. Ver el propio
+  fichero para el detalle.
 
 ## Orden de lectura
 
@@ -593,8 +600,7 @@ cubierta, `.cal-asignados-barra`) — pedido explícitamente ("que sea más visu
 Con test de extremo a extremo: crear con fecha de hace 40 días → añadir gente →
 guardar → reabrir desde Año → sigue ahí.
 
-**Encontrado de paso, revisando Modo Carga y el formulario a fondo (sin tocar
-todavía)**:
+**Encontrado de paso, revisando Modo Carga y el formulario a fondo — LOS TRES, HECHOS**:
 
 - El interruptor de Ajustes del asistente que solo ofrece los proveedores que el Worker
   dice tener configurados (`proveedoresUI.js`, de una sesión anterior) no es un fallo:
@@ -602,18 +608,42 @@ todavía)**:
   asume solo Gemini. Groq/Claude/Cerebras/etc. ya están implementados en el Worker —
   para verse en Ajustes hace falta además tener su clave puesta como *Secret* en
   Cloudflare (`worker/README.md`), que es infraestructura del dueño, no código.
-- **Sufijo con número derivado que no se recalcula al editar a mano**: Hielo
-  (`checklist-generadores.js:495,691`, "kg · N taxis") y Carpas (`:319`, "faltan N, hay
-  que alquilarlas") calculan su sufijo UNA VEZ al generar la checklist; editar la
-  cantidad a mano solo cambia el número de delante, el sufijo se queda con el texto
-  viejo. Pendiente: que `conSufijo` (`checklist-format.js`) acepte también una función
-  y se recalcule con el número editado.
-- **"Mesas calientes"** solo existe en producción (`:868`, automático por pax); en el
-  resto de tipos de evento no se pregunta ni aparece nunca. Pendiente: pregunta sí/no en
-  el formulario, reusando la misma fórmula ya existente.
-- **"Gastros"** en boda/comunión/corporativo (`:379`) es "—" (se apunta a mano, sin
-  número). Pendiente: mínimo 4 por defecto, con pregunta en el formulario para que la
-  oficina pueda dar una cantidad distinta.
+- **Sufijo con número derivado que no se recalculaba al editar a mano — HECHO**: Hielo
+  y Carpas calculaban su sufijo UNA VEZ al generar la checklist; editar la cantidad a
+  mano solo cambiaba el número de delante, el sufijo se quedaba con el texto viejo.
+  `conSufijo` (`checklist-format.js`) ahora también acepta una función en vez de un
+  texto fijo; se resuelve en un solo sitio (el `useMemo` de `checklist` en `App.jsx`,
+  justo donde la cantidad ya lleva aplicado el override manual), que es lo que
+  alimenta tanto Modo Carga como la exportación a Word. Encontrado de paso: el camino
+  del asistente (`catsDeEventoGuardado()` en `calibracion.js`) lee la checklist RAW sin
+  pasar por ese `useMemo` — sin el mismo arreglo ahí, `listar_checklist` habría
+  enseñado una función de JavaScript en vez del texto para cualquier evento con hielo o
+  carpas por alquilar. Arreglado aparte, resolviendo con el propio número del item.
+- **"Mesas calientes" — HECHO**: antes solo existía en producción (automático por
+  pax); ahora hay pregunta sí/no en el formulario para el resto de tipos, reusando la
+  misma fórmula ya existente (`calcMesasCalientes()`, extraída a `calculos.js` para
+  que los tres builders compartan la cuenta).
+- **"Gastros" — HECHO**: en boda/comunión/corporativo salía "—" (se apuntaba a mano).
+  Ahora sale con un mínimo de serie (`GASTROS_MINIMO`, 4) y una pregunta para subirlo
+  si el menú lleva más. Cumpleaños no lo usa (todo en bandejas) y producción sigue con
+  su propia cuenta (2 por chafer) — ninguno de los dos se tocó.
+
+**Regresión real, cazada por la propia batería antes de fusionar**: `preguntas.js`
+(la app del FORMULARIO) importaba `GASTROS_MINIMO` desde `checklist-generadores.js`
+(el motor de cálculo ENTERO de la checklist, con todas sus dependencias) solo para no
+repetir un número. Vite convirtió ese fichero en un chunk compartido entre las dos
+apps — cambia el mapa de bundles y rompió el test de versión-nueva del service worker
+y el recorrido del formulario (timing). Arreglado duplicando la constante como un
+número local en `preguntas.js` (con comentario explicando el porqué): las tres apps
+son builds separados a propósito (`vite.config.js`), y una constante suelta nunca
+justifica cruzar esa frontera. De paso, el tope del bucle de "recorrer el formulario
+contestando No lo sé" en `app.test.mjs` vivía pegado al número exacto de preguntas de
+una boda (32) — con dos preguntas más pasó a 34 y lo superó. Subido a 45, con margen
+de verdad en vez de ir pegado a la cifra exacta.
+
+**Tres planes grandes, sin código todavía, guardados por si se retoman** —
+ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
+"Orden de lectura").
 
 **Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
 septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.
