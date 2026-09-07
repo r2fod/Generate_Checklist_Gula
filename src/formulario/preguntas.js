@@ -288,6 +288,12 @@ export const PREGUNTAS = [
     opciones: [
       { valor: 3, texto: "Un plato cada 3 personas" },
       { valor: 4, texto: "Un plato cada 4 personas" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cada cuántas personas?",
+        campoNumero: "entrantePersonasOtras",
+        sugerido: () => 3,
+      },
     ],
     soloEn: CON_BARRA,
     si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
@@ -924,7 +930,10 @@ export function aRespuestasDeLaApp(r = {}) {
         // Cada cuántas personas va un plato, y cuántos entrantes distintos hay (lo
         // normal es 1, pero hay menús con 2). Si no lo contestan, manda el valor de
         // siempre de la app.
-        if (puesto(r.entrantePersonas)) estado.personasPorPlatoEntrante = r.entrantePersonas;
+        if (puesto(r.entrantePersonas)) {
+          estado.personasPorPlatoEntrante = r.entrantePersonas === "otras"
+            ? r.entrantePersonasOtras : r.entrantePersonas;
+        }
         if (r.compartirNumero > 0) estado.numEntrantesCompartir = r.compartirNumero;
       }
     }

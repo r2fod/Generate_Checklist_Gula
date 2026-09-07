@@ -512,6 +512,10 @@ tanda de fusiones.
   orden de iconos no coincidía con `TIPOS_EVENTO` (Cake y Briefcase estaban
   cambiados), invisible mientras solo era fondo pero que se notaría de golpe en
   un botón. Verificado con capturas en claro y oscuro.
+- **"El entrante para compartir, ¿cada cuántas?" ya no se queda solo en 3 o 4 —
+  HECHO**: tercera opción "Otro número" con su propio `conNumero`, mismo patrón
+  que "¿Cuántas paellas?". El número va a `entrantePersonasOtras` y
+  `aRespuestasDeLaApp()` lo usa en vez del valor fijo cuando se elige "otras".
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
