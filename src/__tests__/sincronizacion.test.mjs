@@ -870,6 +870,13 @@ console.log("\n══ Color de los manteles ══");
   const sinDecir = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Otro", estiloPlatoCual: "  " });
   ok(sinDecir.estiloPlatoPrincipal === undefined,
     "si eligen \"Otro\" y no escriben nada, no se pisa el plato que tuviera la app");
+
+  // El de postre no se queda solo en blanco/verde/negro: azul y naranja son colores
+  // reales que se piden (antes había que escribirlos siempre a mano en "Otro")
+  const azul = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Azul" });
+  ok(azul.estiloPlatoPostre === "Azul", "el plato de postre azul llega tal cual, sin pasar por \"Otro\"");
+  const naranja = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Naranja" });
+  ok(naranja.estiloPlatoPostre === "Naranja", "y el naranja igual");
 }
 
 // ── Lo que hay que comprar ────────────────────────────────────────────────────

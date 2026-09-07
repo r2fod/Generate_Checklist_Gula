@@ -559,6 +559,8 @@ export const PREGUNTAS = [
     id: "estiloPlatoPostre", tipo: "opciones", texto: "¿Y el plato de postre?",
     opciones: [
       { valor: "Blanco", texto: "Blanco" },
+      { valor: "Azul", texto: "Azul" },
+      { valor: "Naranja", texto: "Naranja" },
       { valor: "Verde", texto: "Verde" },
       { valor: "Negro/gris", texto: "Negro o gris" },
       {

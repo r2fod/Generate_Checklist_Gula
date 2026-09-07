@@ -65,7 +65,12 @@ self.addEventListener("notificationclick", (e) => {
 // número, y quien ya tenía la app instalada (o solo visitada una vez) se quedó viendo
 // el icono antiguo por mucho que borrara el acceso directo y lo reinstalara, porque el
 // acceso directo no toca la caché del origen — solo se limpia bajando este número.
-const VERSION = "gula-v7";
+// v7 -> v8: el contenido de los iconos no ha cambiado desde el último arreglo de
+// distancia (#173/v7) — comprobado píxel a píxel, los tres llevan el mismo hueco. Se
+// sube igualmente porque un dueño con la app instalada desde antes de v7 seguía viendo
+// el icono viejo tras desinstalar y reinstalar el acceso directo (que no toca esta
+// caché): esto fuerza un purgado más para quien se haya quedado atascado en esa versión.
+const VERSION = "gula-v8";
 const CACHE = `${VERSION}`;
 
 // Lo que hay que guardar sí o sí para poder abrir sin cobertura. Los .js y .css llevan

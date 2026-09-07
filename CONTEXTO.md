@@ -555,6 +555,23 @@ tiene su nombre ("gildas", "rincón de gin-tonics"...) y sus propias mesas,
 sumadas al total de `numMesasBuffet` igual que el resto. La nota del evento sale
 como "gildas (1), rincón de gin-tonics (2)" en vez de un número suelto.
 
+**Plato de postre: azul y naranja — HECHO**: pedido explícito, colores reales
+que antes solo se podían meter a mano en "Otro". Dos opciones más en
+`estiloPlatoPostre`, mismo mecanismo que las demás.
+
+**Iconos del formulario, también animados en primer plano — HECHO**: el icono
+del título y el de cada opción entran con un "pop" (escala + giro leve,
+`form-icono-entra`, 0.4s), con un pelín de escalonado entre opciones para que
+no salten todas a la vez. Respeta `prefers-reduced-motion`. El fondo flotante
+ya estaba animado; esto era lo que faltaba en primer plano.
+
+**Service worker: gula-v7 → gula-v8, sin cambiar iconos**: un dueño con la app
+instalada desde antes del arreglo de distancia (#173/v7) seguía viendo el
+icono viejo tras desinstalar y reinstalar el acceso directo. Medido píxel a
+píxel: los tres iconos (192, 512, maskable) ya tenían el mismo hueco — el
+problema era la caché del origen, que un acceso directo no toca. Subir la
+versión fuerza un purgado más para quien se haya quedado atascado.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

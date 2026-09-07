@@ -5221,6 +5221,7 @@ hr {
   .form-fondo-icono { animation: none; }
   .form-fondo { animation: none; }
   .form-entra { animation: none; }
+  .form-titulo-icono, .form-opcion-icono { animation: none; }
 }
 
 .form-progreso {
@@ -5249,6 +5250,15 @@ hr {
   flex-shrink: 0;
   color: var(--accent);
   margin-top: 2px;
+  animation: form-icono-entra 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Un pequeño "pop" al aparecer, con un giro leve — nada que dure ni que se repita,
+   así que no hay coste de rendimiento sostenido, solo un instante al cambiar de
+   pregunta (misma key que el resto de ".form-entra", así que se remonta con ella). */
+@keyframes form-icono-entra {
+  from { opacity: 0; transform: scale(0.4) rotate(-20deg); }
+  to { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 
 .form-nota {
@@ -5296,8 +5306,18 @@ hr {
   flex-shrink: 0;
   color: var(--accent);
   opacity: 0.7;
+  animation: form-icono-entra 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 0.05s;
 }
 .form-opcion.es-elegida .form-opcion-icono { opacity: 1; }
+/* Un pelín escalonado entre opciones, para que no salten todas a la vez de golpe.
+   Acotado a los hijos directos de .form-campos: son las filas de opciones, una por
+   cada <div key={o.valor}> en Formulario.jsx — no cualquier div de la página. */
+.form-campos > div:nth-child(2) > .form-opcion .form-opcion-icono { animation-delay: 0.09s; }
+.form-campos > div:nth-child(3) > .form-opcion .form-opcion-icono { animation-delay: 0.13s; }
+.form-campos > div:nth-child(4) > .form-opcion .form-opcion-icono { animation-delay: 0.17s; }
+.form-campos > div:nth-child(5) > .form-opcion .form-opcion-icono { animation-delay: 0.21s; }
+.form-campos > div:nth-child(6) > .form-opcion .form-opcion-icono { animation-delay: 0.25s; }
 .form-opcion:hover { border-color: var(--accent); }
 .form-opcion.es-elegida {
   border-color: var(--accent);
