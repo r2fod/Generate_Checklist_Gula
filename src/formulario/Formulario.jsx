@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
-import FondoIconos from "./FondoIconos.jsx";
+import FondoIconos, { iconoDePregunta, iconoDeOpcion } from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
 import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, silenciar } from "./instalar.js";
@@ -651,6 +651,7 @@ export default function Formulario({ codigo }) {
 
   // ── Una pregunta ───────────────────────────────────────────────────────────
   const p = preguntas[paso];
+  const IconoTitulo = iconoDePregunta(p.id);
   // "No lo sé" borra lo que hubiera puesto (es una respuesta, no un a medias), pero
   // si había algo escrito se ofrece deshacerlo: se pulsa sin querer más de lo que
   // parece, y volver a escribir 120 adultos molesta.
@@ -707,7 +708,10 @@ export default function Formulario({ codigo }) {
       {/* La clave por pregunta hace que cada pantalla entre con su animación en vez
           de cambiar el texto de golpe: se nota que has pasado de pregunta. */}
       <div className="form-entra" key={p.id}>
-        <h1 className="form-titulo" tabIndex={-1} ref={tituloRef}>{p.texto}</h1>
+        <h1 className="form-titulo" tabIndex={-1} ref={tituloRef}>
+          <IconoTitulo className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} />
+          {p.texto}
+        </h1>
         {p.nota && <p className="form-nota">{typeof p.nota === "function" ? p.nota(respuestas) : p.nota}</p>}
       </div>
       {aviso && <p className="form-error" role="alert">{aviso}</p>}
@@ -723,12 +727,13 @@ export default function Formulario({ codigo }) {
       )}
 
       <div className="form-campos form-entra form-entra-tarde" key={`campos-${p.id}`}>
-        {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => {
+        {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map((o, i) => {
           const elegida = respuestas[p.id] === o.valor;
           // Las opciones que arrastran algo detrás (cuántos entrantes, a quién se le
           // piden las flores, el archivo del menú) no pasan solas de pantalla: hay que
           // dejar contestarlo antes.
           const arrastraAlgo = !!(o.conNumero || o.conCampos || o.conArchivo);
+          const IconoOpcion = iconoDeOpcion(p.id, i);
           return (
             <div key={o.valor}>
               <button
@@ -744,7 +749,10 @@ export default function Formulario({ codigo }) {
                   }
                   if (!arrastraAlgo) setTimeout(siguiente, 120);
                 }}
-              >{o.texto}</button>
+              >
+                <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                {o.texto}
+              </button>
               {elegida && o.conNumero && (() => {
                 // El campo se puede llamar como quiera la pregunta (numCarpas); si no,
                 // se apaña con el valor de la opción, como se ha hecho siempre.
@@ -797,15 +805,19 @@ export default function Formulario({ codigo }) {
           );
         })}
 
-        {p.tipo === "marcar" && opcionesDe(p, tipo).map(o => {
+        {p.tipo === "marcar" && opcionesDe(p, tipo).map((o, i) => {
           const marcadas = respuestas[p.id] || [];
           const puesta = marcadas.includes(o.valor);
+          const IconoOpcion = iconoDeOpcion(p.id, i);
           return (
             <div key={o.valor}>
               <button
                 className={`form-opcion ${puesta ? "es-elegida" : ""}`}
                 onClick={() => pon(p.id, puesta ? marcadas.filter(v => v !== o.valor) : [...marcadas, o.valor])}
-              >{o.texto}</button>
+              >
+                <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                {o.texto}
+              </button>
               {/* El número se guarda donde diga la pregunta (campoNumero), como en las de
                   elegir. Antes esta rama lo escribía siempre en "<valor>Numero" y se
                   saltaba el campoNumero: los barriles decían guardarse en numBarriles,

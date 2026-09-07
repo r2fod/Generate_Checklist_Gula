@@ -503,6 +503,15 @@ tanda de fusiones.
   existía y ya es CSS puro y respeta `prefers-reduced-motion` — no hizo falta
   construir nada nuevo, solo completar el mapa. Verificado con capturas en
   `npm run dev`.
+- **Iconos en primer plano (título y opciones) — HECHO**: el mismo juego de
+  iconos por pregunta de `FondoIconos.jsx` se reutiliza ahora también delante:
+  `iconoDePregunta()` pone uno fijo junto al `<h1>` de cada pregunta, y
+  `iconoDeOpcion()` uno por cada botón de opción/casilla (rotando el juego si
+  hay más opciones que iconos) — nada nuevo que mantener, un solo mapa de datos
+  para fondo y primer plano. De paso se corrigió un desajuste: en `tipo` el
+  orden de iconos no coincidía con `TIPOS_EVENTO` (Cake y Briefcase estaban
+  cambiados), invisible mientras solo era fondo pero que se notaría de golpe en
+  un botón. Verificado con capturas en claro y oscuro.
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16

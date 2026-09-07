@@ -19,7 +19,10 @@ import {
 // Qué flota en cada pregunta. Si una pregunta no está aquí, se usa el juego de
 // siempre: es un fondo, no puede fallar nada por no tener su icono.
 const ICONOS_POR_PREGUNTA = {
-  tipo: [Heart, Church, Cake, Briefcase, Clapperboard],
+  // En el mismo orden que TIPOS_EVENTO (boda, comunión, empresa, cumpleaños,
+  // producción): este juego también se usa de icono fijo por opción en el
+  // título/botones, no solo para el fondo, así que el orden aquí SÍ importa.
+  tipo: [Heart, Church, Briefcase, Cake, Clapperboard],
   nombreYsitio: [MapPin, Tent, Heart],
   cuando: [CalendarDays, Clock, Sun],
   gente: [Users, Utensils, Armchair],
@@ -69,6 +72,18 @@ const ICONOS_POR_PREGUNTA = {
   fin: [Heart, Cake, Martini],
 };
 const POR_DEFECTO = [Utensils, GlassWater, ChefHat];
+
+// El mismo juego de iconos por pregunta sirve también en primer plano: uno fijo
+// junto al título, y uno por cada opción (repitiendo el juego si hay más
+// opciones que iconos) — así el formulario queda coherente sin mantener un
+// segundo mapa aparte.
+export function iconoDePregunta(idPregunta) {
+  return (ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO)[0];
+}
+export function iconoDeOpcion(idPregunta, indice) {
+  const juego = ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO;
+  return juego[indice % juego.length];
+}
 
 // Sitios fijos (en %), tamaños y ritmos. Van a mano y no al azar para que el fondo
 // quede repartido y no se amontone en una esquina, y para que sea siempre igual.
