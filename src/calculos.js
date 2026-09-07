@@ -204,10 +204,10 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
  * @param {boolean} tieneCongelador
  * @param {boolean} [tieneBrindisCava]
  * @param {number} [horasCopas]
- * @param {{ alcoholPax?: number, tipo?: string }} [opciones] alcoholPax = solo adultos
+ * @param {{ alcoholPax?: number, tipo?: string, llevaHielo?: boolean }} [opciones] alcoholPax = solo adultos
  * @returns {Record<string, any>}
  */
-export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax, tipo = "" } = {}) {
+export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax, tipo = "", llevaHielo = true } = {}) {
   const factor = factoresDeTipo(tipo);
   // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
   // la de la comida— y eso antes se resolvía llamando aquí con un 2 fijo cuando no
@@ -285,8 +285,10 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // El hielo sale de calcHielo: kilos, bolsas y taxis, y depende de la temporada, de si
   // hay barra y de si en el sitio hay congelador donde guardarlo (ver arriba). Antes era
   // "taxis = pax/30" y con congelador CERO, dando por hecho que se hacía in situ: una
-  // finca con arca te deja guardarlo, no fabricarlo.
-  const hielo = calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador, tipo });
+  // finca con arca te deja guardarlo, no fabricarlo. Si el cliente dice que no hace
+  // falta (lo pone el sitio, o no lo necesitan), no se calcula nada: no tiene sentido
+  // pedir hielo, bolsas ni taxis para algo que no se va a llevar.
+  const hielo = llevaHielo ? calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador, tipo }) : { kg: 0, bolsas: 0, taxis: 0 };
   const taxisHielo = hielo.taxis;
   // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
   // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas).

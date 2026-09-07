@@ -332,6 +332,16 @@ export const PREGUNTAS = [
     ],
   },
   {
+    // Antes el hielo se cargaba siempre, sin preguntar: en un sitio que ya lo da o
+    // en un evento que no lo necesita, sobraban kilos, bolsas y taxis enteros.
+    id: "hielo", tipo: "opciones", texto: "¿Llevamos hielo?",
+    nota: "Si el sitio ya lo da, o no hace falta, di que no: así no se carga ni un taxi de más.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No hace falta" },
+    ],
+  },
+  {
     id: "horno", tipo: "opciones", texto: "¿Qué horno hace falta?",
     opciones: [
       { valor: "Pequeño", texto: "Pequeño" },
@@ -1020,6 +1030,7 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.horno)) estado.tipoHorno = r.horno;
   if (puesto(r.nevera)) estado.tipoNevera = r.nevera;
   if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
+  if (puesto(r.hielo)) estado.llevaHielo = r.hielo === "si";
   if (Array.isArray(r.menu)) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");

@@ -239,7 +239,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
     personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoNevera = "Mediana", tipoCongelador = "Mediana", tipoPaella, numPaellas = 0, origenSillas = "",
+    tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaHielo = true, tipoPaella, numPaellas = 0, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
@@ -299,7 +299,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // El agua, los refrescos y el hielo van sobre TODOS (los niños beben); el alcohol solo
   // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
   // faltaba agua y refresco para veinticinco personas.
-  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey });
+  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey, llevaHielo });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
@@ -525,7 +525,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
     // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
     // el número de cuando se generó, ver App.jsx donde se resuelve).
-    ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)],
+    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)]),
     opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
@@ -550,7 +550,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "",
+    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaHielo = true, llevaTarta = true, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
     llevaCarpas = false, llevaParabanes = false, numParabanes,
@@ -567,7 +567,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // arreglo que en buildChecklistBoda, ver el comentario de allí).
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : (leerRatios().cumpleanos || 20);
 
-  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos" });
+  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos", llevaHielo });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
@@ -727,7 +727,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
     // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
     // el número de cuando se generó, ver App.jsx donde se resuelve).
-    ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)],
+    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)]),
   ]});
 
   if (destilados) cats.push(categoriaAlcoholes(destilados));
@@ -758,7 +758,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
     llevaCarpas = true, llevaGenerador = true, mesVerano = true, llevaParabanes = false, numParabanes,
-    numMesasBuffet = 0,
+    numMesasBuffet = 0, llevaHielo = true,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -1018,7 +1018,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
     ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
-    ["Hielo", conSufijo(Math.max(2, Math.ceil(paxConsumo / 30)), "taxis")],
+    opt(llevaHielo, ["Hielo", conSufijo(Math.max(2, Math.ceil(paxConsumo / 30)), "taxis")]),
   ]});
 
   // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el

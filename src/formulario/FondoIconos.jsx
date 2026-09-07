@@ -44,6 +44,7 @@ const ICONOS_POR_PREGUNTA = {
   cafe: [Coffee, CupSoda],
   nevera: [Refrigerator, Snowflake],
   congelador: [Snowflake, Refrigerator],
+  hielo: [Snowflake, GlassWater],
   horno: [Flame, ChefHat, CookingPot],
   armarioCaliente: [Flame, Package],
   mesasCalientes: [Flame, Utensils],

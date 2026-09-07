@@ -738,6 +738,14 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).numGastros === undefined,
     "sin contestar, no se toca");
 
+  // Hielo: antes se cargaba siempre, sin preguntar
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, hielo: "si" }).llevaHielo === true,
+    "contestar que sí lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, hielo: "no" }).llevaHielo === false,
+    "y que no hace falta, también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaHielo === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),
