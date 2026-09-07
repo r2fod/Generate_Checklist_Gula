@@ -484,11 +484,15 @@ export default function Formulario({ codigo }) {
   if (paso === -1) {
     const lista = (proximos || []).filter(e =>
       !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()));
+    const IconoElegir = iconoDePregunta("elegir");
     return (
       <div className="form-pantalla">
         <FondoIconos pregunta="elegir" />
         <LogoGula grande />
-        <h1 className="form-titulo">¿De qué evento son los datos?</h1>
+        <h1 className="form-titulo">
+          <IconoElegir className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} />
+          ¿De qué evento son los datos?
+        </h1>
         {/* Si se ha venido al inicio a media pregunta, lo primero es poder volver:
             las respuestas siguen ahí y sin esto habría que recorrerlas otra vez. */}
         {pasoGuardado !== null && (
@@ -501,21 +505,29 @@ export default function Formulario({ codigo }) {
           <p className="form-nota">No hay eventos próximos guardados. Sigue y lo creamos nuevo.</p>
         )}
         <div className="form-lista-eventos">
-          {lista.map(e => (
-            <button
-              key={e.nombre}
-              className="form-evento"
-              onClick={() => {
-                setEventoDestino(e.nombre);
-                setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
-                setPasoGuardado(null);
-                setPaso(0);
-              }}
-            >
-              <span className="form-evento-nombre">{e.nombre}</span>
-              <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
-            </button>
-          ))}
+          {lista.map(e => {
+            // El mismo icono que ya distingue el tipo en la pregunta "tipo": boda,
+            // comunión, empresa... así se reconoce de un vistazo sin leer el nombre.
+            const IconoEvento = iconoDeOpcion("tipo", Math.max(0, TIPOS_EVENTO.findIndex(t => t.valor === e.tipo)));
+            return (
+              <button
+                key={e.nombre}
+                className="form-evento form-evento-con-icono"
+                onClick={() => {
+                  setEventoDestino(e.nombre);
+                  setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
+                  setPasoGuardado(null);
+                  setPaso(0);
+                }}
+              >
+                <IconoEvento className="form-evento-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                <span className="form-evento-texto">
+                  <span className="form-evento-nombre">{e.nombre}</span>
+                  <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
         {(proximos || []).length > 4 && (
           <input
