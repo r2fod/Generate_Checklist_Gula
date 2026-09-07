@@ -31,6 +31,7 @@ import Dialogo from "../components/Dialogo.jsx";
 const CLAVE_URL = "gula_asistente_url";
 const CLAVE_PROVEEDOR = "gula_asistente_proveedor";
 const CLAVE_COMPANERO = "gula_asistente_companero";
+const CLAVE_DISPONIBLES = "gula_asistente_disponibles";
 import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
 import { idDeAparato, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "./push.js";
 import { apunta } from "../diario.js";
@@ -67,9 +68,10 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const setPestana = (p) => { setPestanaCruda(p); guardar(CLAVE_PESTANA, p); };
   const [url, setUrl] = useState(() => leer(CLAVE_URL));
   const [proveedor, setProveedor] = useState(() => leer(CLAVE_PROVEEDOR, "auto") || "auto");
-  // Lo que el Worker dice que tiene configurado. Hasta la primera respuesta no se sabe,
-  // y se supone Gemini —que es el que se monta por defecto— en vez de no dejar preguntar.
-  const [disponibles, setDisponibles] = useState([]);
+  // Lo que el Worker dice que tiene configurado. Se guarda igual que la URL o el
+  // proveedor elegido: si no, cada vez que se reabre el Asistente se perdía la lista
+  // real y volvía a verse solo Gemini hasta la siguiente pregunta.
+  const [disponibles, setDisponibles] = useState(() => leerJSON(CLAVE_DISPONIBLES, []));
   // Quien tuviera guardado uno de los viejos —eran objetos con cara, ya no existen—
   // cae en el de por defecto en vez de quedarse sin muñeco.
   const [companero, setCompanero] = useState(() => companeroValido(leer(CLAVE_COMPANERO, COMPANERO_POR_DEFECTO)));
@@ -445,7 +447,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       if (r.uso) setGasto(apuntar(r.proveedor, r.uso));
       // La lista de configurados llega con cada respuesta: así el enrutado de la
       // siguiente pregunta ya sabe con qué cuenta, sin una petición aparte.
-      if (r.disponibles) setDisponibles(r.disponibles);
+      if (r.disponibles) { setDisponibles(r.disponibles); guardarJSON(CLAVE_DISPONIBLES, r.disponibles); }
       setHilo(h => {
         const siguiente = [...h, {
           de: "el", texto: r.respuesta, pasos: r.pasos, quien: r.proveedor, motivo: r.motivo,

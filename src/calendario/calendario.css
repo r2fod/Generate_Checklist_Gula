@@ -1484,7 +1484,13 @@ button.cal-turnos.es-vacia {
 
 @media (min-width: 560px) {
   .cal-asignado {
-    grid-template-columns: minmax(0, 1fr) 104px auto 32px;
+    /* "horario" con auto se comía todo el ancho que le hiciera falta ANTES de que
+       nombre (1fr) viera un solo píxel: con el modal a su ancho normal (~490px de
+       fila), rol(104) + horario sin tope(~342) + quitar(32) ya sumaban más que la
+       fila entera, y nombre se quedaba a 0 — un campo invisible, no encogido. Con
+       min-content, horario se ofrece encogido (lo que ya sabe hacer, envolviendo
+       sus campos en dos líneas) y nombre tiene un suelo de verdad. */
+    grid-template-columns: minmax(140px, 1fr) 104px minmax(0, min-content) 32px;
     grid-template-areas: "nombre rol horario quitar";
   }
 }
