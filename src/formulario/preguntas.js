@@ -48,8 +48,17 @@ const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 // duplicación en la pregunta "cuantosGastros", más abajo.
 const GASTROS_MINIMO = 4;
 
+// El orden de aquí abajo es solo el recorrido del formulario — se agrupa por tema
+// (el sitio, la barra, la cocina...) para no saltar de un tema a otro y volver más
+// tarde. NINGÚN otro fichero depende de este orden: aRespuestasDeLaApp() lee cada
+// respuesta por su id, y Formulario.jsx navega el array con preguntas[paso] y
+// findIndex(id), nunca con una posición fija. Reordenar aquí es seguro para la
+// checklist — lo único que hay que respetar son las dependencias `si:` (una
+// pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
+// tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
+// entrante, estiloPlatoPostre después de estiloPlato).
 export const PREGUNTAS = [
-  // ── Tronco común ───────────────────────────────────────────────────────────
+  // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
     id: "tipo", tipo: "opciones", texto: "¿Qué tipo de evento es?",
     opciones: TIPOS_EVENTO, noSe: false,
@@ -84,13 +93,13 @@ export const PREGUNTAS = [
     ],
     soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
   },
-
-  // ── Producción ─────────────────────────────────────────────────────────────
   {
     id: "dias", tipo: "dias", texto: "¿Cuántos días y cuánta gente cada día?",
     nota: "El equipo se calcula para el día de más gente y la comida para la suma de todos.",
     soloEn: ["produccion"],
   },
+
+  // ── El sitio y su mobiliario de exterior ──────────────────────────────────
   {
     // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
     // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
@@ -133,6 +142,56 @@ export const PREGUNTAS = [
     ],
   },
   {
+    id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
+    nota: "Se pide a Support On Set, con su recogida y su devolución.",
+    opciones: [{ valor: "si", texto: "Sí" }, { valor: "no", texto: "No hace falta" }],
+    soloEn: ["produccion"],
+  },
+  {
+    id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
+    // Cuántas no se pregunta: salen del pax. A quién se alquilan sí, porque cada
+    // proveedor es una recogida distinta y es lo único que la app no puede deducir.
+    //
+    // En un rodaje TAMBIÉN se pregunta. Antes se daba por supuesto que eran nuestras y
+    // ni se preguntaba: el formulario forzaba "Nuestras" al aplicar el envío, así que
+    // si en la app habías puesto un alquiler te lo borraba, y con él su recogida.
+    nota: "Si las alquilamos, se crea sola su recogida y su devolución.",
+    opciones: [
+      { valor: "finca", texto: "Las pone el sitio" },
+      { valor: "Dealde", texto: "Las alquilamos a Dealde" },
+      { valor: "Carvillo", texto: "Las alquilamos a Carvillo" },
+      { valor: "Nuestras", texto: "Llevamos las nuestras" },
+    ],
+    soloEn: [...CON_BARRA, "produccion"],
+  },
+  {
+    id: "tipoMesa", tipo: "opciones", texto: "¿De qué son las mesas donde come la gente?",
+    // Cuántas no se pregunta: salen del pax. De qué tipo sí, porque las redondas no son
+    // nuestras y cada alquiler es una recogida — y porque entran más comensales por
+    // mesa, así que el número cambia.
+    //
+    // Las de cocina y las de las barras van aparte y son siempre nuestras rectangulares
+    // de 1,80: eso no se pregunta porque no cambia nunca.
+    nota: "Las redondas son de alquiler: se crea sola su recogida y su devolución. Las de cocina y barras van aparte, siempre de 1,8m.",
+    opciones: [
+      { valor: "Rectangular 1,8m", texto: "Las nuestras, rectangulares de 1,8m" },
+      { valor: "Redonda 1,5m", texto: "Redondas de 1,5m (alquiler)" },
+      { valor: "Redonda 1,8m", texto: "Redondas de 1,8m (alquiler)" },
+      { valor: "Redonda 2m", texto: "Redondas de 2m (alquiler)" },
+    ],
+    soloEn: [...CON_BARRA, "produccion"],
+  },
+
+  // ── Barra y bebida ─────────────────────────────────────────────────────────
+  {
+    id: "coctel", tipo: "horas", texto: "¿Hay cóctel o aperitivo? ¿Cuántas horas?",
+    soloEn: CON_BARRA,
+  },
+  {
+    id: "copas", tipo: "horas", texto: "¿Hay barra libre de copas? ¿Cuántas horas?",
+    soloEn: CON_BARRA,
+  },
+  {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
     // día): lo que cambia es el envase, y eso lo sabe quien lo ha presupuestado.
     id: "aguaPequena", tipo: "opciones", texto: "Las aguas pequeñas, ¿de qué son?",
@@ -143,24 +202,8 @@ export const PREGUNTAS = [
     ],
     soloEn: ["produccion"],
   },
-  {
-    id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
-    nota: "Se pide a Support On Set, con su recogida y su devolución.",
-    opciones: [{ valor: "si", texto: "Sí" }, { valor: "no", texto: "No hace falta" }],
-    soloEn: ["produccion"],
-  },
 
-  // ── Barra ──────────────────────────────────────────────────────────────────
-  {
-    id: "coctel", tipo: "horas", texto: "¿Hay cóctel o aperitivo? ¿Cuántas horas?",
-    soloEn: CON_BARRA,
-  },
-  {
-    id: "copas", tipo: "horas", texto: "¿Hay barra libre de copas? ¿Cuántas horas?",
-    soloEn: CON_BARRA,
-  },
-
-  // ── Cómo se come ───────────────────────────────────────────────────────────
+  // ── Cómo se come y el menú ─────────────────────────────────────────────────
   {
     id: "servicio", tipo: "opciones", texto: "¿Cómo se come?",
     nota: "Si es todo en bandeja no se cargan platos de ningún tipo, solo bandejas y cubiertos.",
@@ -170,8 +213,6 @@ export const PREGUNTAS = [
     ],
     soloEn: CON_BARRA,
   },
-
-  // ── Menú ───────────────────────────────────────────────────────────────────
   {
     id: "menu", tipo: "marcar", texto: "¿Qué lleva el menú?",
     opciones: [
@@ -251,6 +292,21 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
     si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
   },
+  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
+  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
+  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
+  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
+  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
+  // a los invitados.
+  {
+    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
+    opciones: [
+      { valor: "invitados", texto: "Para los invitados" },
+      { valor: "personal", texto: "Solo para el personal" },
+    ],
+  },
+
+  // ── Cocina y equipamiento ──────────────────────────────────────────────────
   {
     // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
     // poner tal cual sin traducir nada por el camino.
@@ -277,90 +333,6 @@ export const PREGUNTAS = [
       { valor: "Ambos", texto: "Los dos" },
       { valor: "No lleva", texto: "No lleva" },
     ],
-  },
-
-  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
-  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
-  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
-  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
-  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
-  // a los invitados.
-  {
-    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
-    opciones: [
-      { valor: "invitados", texto: "Para los invitados" },
-      { valor: "personal", texto: "Solo para el personal" },
-    ],
-  },
-
-  // ── Lo que se haya presupuestado ───────────────────────────────────────────
-  {
-    id: "extras", tipo: "marcar", texto: "¿Está presupuestado algo de esto?",
-    opciones: [
-      { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
-      { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
-      // Cuántos barriles: hasta ahora se daba por hecho que era uno
-      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
-      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
-      // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
-      // se añade otra pantalla a un formulario que ya tiene quince
-      { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
-      { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
-      // El mobiliario de alquiler tiene su propia pregunta (mobiliarioAlquiler): aquí
-      // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
-      { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
-      { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
-    ],
-  },
-  {
-    // Antes era una casilla suelta dentro de "extras": marcaba sí/no pero no dejaba
-    // decir qué mobiliario es, y el proveedor estaba fijo a Event Style en el motor
-    // de alquileres (alquileres.js). Con pantalla propia (como flores/minutas) se
-    // puede decir qué es, a quién se le alquila si no es Event Style, y adjuntar la
-    // hoja del alquiler para tener registro.
-    id: "mobiliarioAlquiler", tipo: "opciones", texto: "¿Lleva mobiliario extra de alquiler?",
-    nota: "Mesas altas, sofás, barra... Si no dices proveedor, se alquila a Event Style, como siempre.",
-    opciones: [
-      { valor: "no", texto: "No lleva" },
-      {
-        valor: "si", texto: "Sí",
-        conCampos: [
-          { sufijo: "Que", etiqueta: "¿Qué mobiliario?", ejemplo: "Mesas altas, sofás, barra..." },
-          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila? (vacío = Event Style)", ejemplo: "Event Style" },
-        ],
-        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
-      },
-    ],
-    soloEn: CON_BARRA,
-  },
-  // ── Lo que se sale de lo normal ────────────────────────────────────────────
-  // Platos, platos de postre, cubiertos y bandejas mixtas van SIEMPRE salvo que se diga
-  // lo contrario, y la plancha de gas no va salvo que se diga que sí. El formulario no
-  // preguntaba por nada de esto, así que un evento creado desde aquí se quedaba con esos
-  // valores sin que nadie los hubiera confirmado — y no había forma de decir que esta
-  // boda concreta va sin cubiertos, o con bandejas solo de plata.
-  //
-  // Va en UNA pantalla de casillas y no en cuatro preguntas a propósito: la respuesta es
-  // "lo de siempre" en casi todos los eventos, y el formulario ya son más de veinte
-  // pantallas para una boda. Cuatro preguntas más cuya respuesta no cambia nunca es la
-  // mejor forma de que se empiece a contestar sin leer.
-  {
-    id: "distinto", tipo: "marcar", texto: "¿Algo distinto de lo normal?",
-    nota: "Sin marcar nada va lo de siempre: platos, platos de postre, cubiertos y bandejas de los dos tipos.",
-    opciones: [
-      { valor: "sinPlatos", texto: "No llevamos platos" },
-      { valor: "sinPlatosPostre", texto: "No llevamos platos de postre" },
-      { valor: "sinCubiertos", texto: "No llevamos cubiertos" },
-      // La plancha solo en banquetes: un rodaje no la lee, y enseñar una casilla que no
-      // hace nada es peor que no enseñarla.
-      { valor: "planchaGas", texto: "Lleva plancha de gas", conNumero: "¿Cuántas?", campoNumero: "numPlanchasGas", soloEn: CON_BARRA },
-      // Las bandejas no son un sí/no sino una elección de tres. Marcando una va esa;
-      // sin marcar ninguna —o marcando las dos, que es llevar de los dos tipos— quedan
-      // mixtas, que es lo de siempre. Así entra aquí en vez de gastar otra pantalla.
-      { valor: "bandejasMadera", texto: "Bandejas solo de madera" },
-      { valor: "bandejasPlata", texto: "Bandejas solo de plata" },
-    ],
-    // En todos los tipos: un rodaje también carga platos, cubiertos y bandejas.
   },
   {
     // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
@@ -410,40 +382,96 @@ export const PREGUNTAS = [
     ],
     soloEn: ["boda", "comunion", "corporativo"],
   },
+
+  // ── Lo que se haya presupuestado ───────────────────────────────────────────
   {
-    id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
-    // Cuántas no se pregunta: salen del pax. A quién se alquilan sí, porque cada
-    // proveedor es una recogida distinta y es lo único que la app no puede deducir.
-    //
-    // En un rodaje TAMBIÉN se pregunta. Antes se daba por supuesto que eran nuestras y
-    // ni se preguntaba: el formulario forzaba "Nuestras" al aplicar el envío, así que
-    // si en la app habías puesto un alquiler te lo borraba, y con él su recogida.
-    nota: "Si las alquilamos, se crea sola su recogida y su devolución.",
+    id: "extras", tipo: "marcar", texto: "¿Está presupuestado algo de esto?",
     opciones: [
-      { valor: "finca", texto: "Las pone el sitio" },
-      { valor: "Dealde", texto: "Las alquilamos a Dealde" },
-      { valor: "Carvillo", texto: "Las alquilamos a Carvillo" },
-      { valor: "Nuestras", texto: "Llevamos las nuestras" },
+      { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
+      { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
+      // Cuántos barriles: hasta ahora se daba por hecho que era uno
+      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
+      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
+      // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
+      // se añade otra pantalla a un formulario que ya tiene quince
+      { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
+      { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
+      // El mobiliario de alquiler tiene su propia pregunta (mobiliarioAlquiler): aquí
+      // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
+      { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
+      { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
     ],
-    soloEn: [...CON_BARRA, "produccion"],
+  },
+  {
+    // Antes era una casilla suelta dentro de "extras": marcaba sí/no pero no dejaba
+    // decir qué mobiliario es, y el proveedor estaba fijo a Event Style en el motor
+    // de alquileres (alquileres.js). Con pantalla propia (como flores/minutas) se
+    // puede decir qué es, a quién se le alquila si no es Event Style, y adjuntar la
+    // hoja del alquiler para tener registro.
+    id: "mobiliarioAlquiler", tipo: "opciones", texto: "¿Lleva mobiliario extra de alquiler?",
+    nota: "Mesas altas, sofás, barra... Si no dices proveedor, se alquila a Event Style, como siempre.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Que", etiqueta: "¿Qué mobiliario?", ejemplo: "Mesas altas, sofás, barra..." },
+          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila? (vacío = Event Style)", ejemplo: "Event Style" },
+        ],
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
+      },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // Cajón de sastre para alquileres sueltos que no tengan ya su propia pregunta
+    // (sillas, armario caliente, mobiliario, carpas...): vajilla especial,
+    // decoración, sonido... Mismo patrón que el mobiliario —qué, a quién, y la hoja
+    // del alquiler si hace falta tener registro— para no inventar una pregunta nueva
+    // por cada cosa suelta que pueda presupuestarse.
+    id: "otroAlquiler", tipo: "opciones", texto: "¿Algo más presupuestado como alquiler?",
+    nota: "Vajilla especial, decoración, sonido... lo que no tenga ya su propia pregunta arriba.",
+    opciones: [
+      { valor: "no", texto: "No hay nada más" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Que", etiqueta: "¿Qué es?", ejemplo: "Vajilla especial, altavoces..." },
+          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila?", ejemplo: "Nombre del proveedor" },
+        ],
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
+      },
+    ],
   },
 
+  // ── Lo que se sale de lo normal ────────────────────────────────────────────
+  // Platos, platos de postre, cubiertos y bandejas mixtas van SIEMPRE salvo que se diga
+  // lo contrario, y la plancha de gas no va salvo que se diga que sí. El formulario no
+  // preguntaba por nada de esto, así que un evento creado desde aquí se quedaba con esos
+  // valores sin que nadie los hubiera confirmado — y no había forma de decir que esta
+  // boda concreta va sin cubiertos, o con bandejas solo de plata.
+  //
+  // Va en UNA pantalla de casillas y no en cuatro preguntas a propósito: la respuesta es
+  // "lo de siempre" en casi todos los eventos, y el formulario ya son más de veinte
+  // pantallas para una boda. Cuatro preguntas más cuya respuesta no cambia nunca es la
+  // mejor forma de que se empiece a contestar sin leer.
   {
-    id: "tipoMesa", tipo: "opciones", texto: "¿De qué son las mesas donde come la gente?",
-    // Cuántas no se pregunta: salen del pax. De qué tipo sí, porque las redondas no son
-    // nuestras y cada alquiler es una recogida — y porque entran más comensales por
-    // mesa, así que el número cambia.
-    //
-    // Las de cocina y las de las barras van aparte y son siempre nuestras rectangulares
-    // de 1,80: eso no se pregunta porque no cambia nunca.
-    nota: "Las redondas son de alquiler: se crea sola su recogida y su devolución. Las de cocina y barras van aparte, siempre de 1,8m.",
+    id: "distinto", tipo: "marcar", texto: "¿Algo distinto de lo normal?",
+    nota: "Sin marcar nada va lo de siempre: platos, platos de postre, cubiertos y bandejas de los dos tipos.",
     opciones: [
-      { valor: "Rectangular 1,8m", texto: "Las nuestras, rectangulares de 1,8m" },
-      { valor: "Redonda 1,5m", texto: "Redondas de 1,5m (alquiler)" },
-      { valor: "Redonda 1,8m", texto: "Redondas de 1,8m (alquiler)" },
-      { valor: "Redonda 2m", texto: "Redondas de 2m (alquiler)" },
+      { valor: "sinPlatos", texto: "No llevamos platos" },
+      { valor: "sinPlatosPostre", texto: "No llevamos platos de postre" },
+      { valor: "sinCubiertos", texto: "No llevamos cubiertos" },
+      // La plancha solo en banquetes: un rodaje no la lee, y enseñar una casilla que no
+      // hace nada es peor que no enseñarla.
+      { valor: "planchaGas", texto: "Lleva plancha de gas", conNumero: "¿Cuántas?", campoNumero: "numPlanchasGas", soloEn: CON_BARRA },
+      // Las bandejas no son un sí/no sino una elección de tres. Marcando una va esa;
+      // sin marcar ninguna —o marcando las dos, que es llevar de los dos tipos— quedan
+      // mixtas, que es lo de siempre. Así entra aquí en vez de gastar otra pantalla.
+      { valor: "bandejasMadera", texto: "Bandejas solo de madera" },
+      { valor: "bandejasPlata", texto: "Bandejas solo de plata" },
     ],
-    soloEn: [...CON_BARRA, "produccion"],
+    // En todos los tipos: un rodaje también carga platos, cubiertos y bandejas.
   },
 
   // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
@@ -474,7 +502,7 @@ export const PREGUNTAS = [
     soloEn: ["produccion"],
   },
 
-  // ── Mantelería y platos ────────────────────────────────────────────────────
+  // ── Mantelería y vajilla ───────────────────────────────────────────────────
   // Cuántos manteles lo calcula la app por las mesas: aquí solo se elige de cuáles.
   {
     id: "manteles", tipo: "opciones", texto: "¿De qué color los manteles?",
@@ -519,7 +547,6 @@ export const PREGUNTAS = [
     ],
     soloEn: CON_BARRA,
   },
-
   {
     // Solo si han dicho el plato principal: si no lo saben, tampoco van a saber el de
     // postre, y sería una pantalla de más.
@@ -585,6 +612,7 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
 
+  // ── Cierre ─────────────────────────────────────────────────────────────────
   {
     // Lo que hay que comprar (hielo, hielo seco, algo del súper) no es material de
     // almacén: alguien tiene que pasar a comprarlo. Va a Compras, que ya tiene su
@@ -594,8 +622,6 @@ export const PREGUNTAS = [
     campo: "comprar",
     ejemplo: "20 sacos de hielo\nHielo seco",
   },
-
-  // ── Cierre ─────────────────────────────────────────────────────────────────
   {
     // Las alergias iban dentro del cajón de "algo que tener en cuenta", entre la
     // petición del cliente y con quién hablar al llegar. Ahí se leen en diagonal y se
@@ -619,33 +645,21 @@ export const PREGUNTAS = [
     noSe: false,
   },
   {
-    // Sin marcado múltiple con fórmula propia (todavía no hay un "una carpa/menaje
-    // cada X buffets" fiable): de momento va a las notas, igual que las excepciones
-    // de mesa, para que la oficina no lo pierda de vista al montar el evento.
-    id: "buffets", tipo: "texto-largo", texto: "¿Lleva buffet(s) aparte del servicio principal?",
-    campo: "buffets",
-    nota: "Cuáles (quesos, dulce, ibéricos, fruta...) y cuántas mesas cada uno. Si no lleva, se deja en blanco.",
-    ejemplo: "Ej: buffet de quesos (2 mesas), mesa dulce (1 mesa)",
-    noSe: false,
-  },
-  {
-    // Cajón de sastre para alquileres sueltos que no tengan ya su propia pregunta
-    // (sillas, armario caliente, mobiliario, carpas...): vajilla especial,
-    // decoración, sonido... Mismo patrón que el mobiliario —qué, a quién, y la hoja
-    // del alquiler si hace falta tener registro— para no inventar una pregunta nueva
-    // por cada cosa suelta que pueda presupuestarse.
-    id: "otroAlquiler", tipo: "opciones", texto: "¿Algo más presupuestado como alquiler?",
-    nota: "Vajilla especial, decoración, sonido... lo que no tenga ya su propia pregunta arriba.",
+    // Antes era texto libre a las notas, sin mover ni un número de la checklist:
+    // decir "buffet de quesos" no cargaba ninguna mesa. Ahora es marcado múltiple
+    // con su número de mesas cada uno (mismo patrón que chillout/barril30/barril50
+    // dentro de "extras"), y ese total sí llega a la checklist como Mesas de
+    // buffet. "Otro" no lleva descripción propia: para eso está el comentario
+    // libre de la propia pregunta (+ ¿algo más que aclarar aquí?).
+    id: "buffets", tipo: "marcar", texto: "¿Lleva buffet(s) aparte del servicio principal?",
+    nota: "Cada uno con sus mesas — una por defecto, se puede subir.",
     opciones: [
-      { valor: "no", texto: "No hay nada más" },
-      {
-        valor: "si", texto: "Sí",
-        conCampos: [
-          { sufijo: "Que", etiqueta: "¿Qué es?", ejemplo: "Vajilla especial, altavoces..." },
-          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila?", ejemplo: "Nombre del proveedor" },
-        ],
-        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
-      },
+      { valor: "quesos", texto: "Buffet de quesos", conNumero: "¿Cuántas mesas?" },
+      { valor: "dulce", texto: "Mesa dulce / candy bar", conNumero: "¿Cuántas mesas?" },
+      { valor: "ibericos", texto: "Ibéricos", conNumero: "¿Cuántas mesas?" },
+      { valor: "croquetas", texto: "Croquetas / frito", conNumero: "¿Cuántas mesas?" },
+      { valor: "fruta", texto: "Fruta", conNumero: "¿Cuántas mesas?" },
+      { valor: "otro", texto: "Otro", conNumero: "¿Cuántas mesas?" },
     ],
   },
   {
@@ -797,7 +811,14 @@ export function aRespuestasDeLaApp(r = {}) {
   // leída después de servir no sirve de nada.
   const alergias = (r.alergias || "").trim();
   const excepcionesMesa = (r.excepcionesMesa || "").trim();
-  const buffets = (r.buffets || "").trim();
+  // "Buffets" pasó de texto libre a marcado múltiple (con mesas por buffet), pero la
+  // línea de notas se ve igual que antes — se reconstruye con resumirRespuesta(),
+  // que ya sabe formatear una pregunta "marcar" como "Buffet de quesos (2), ...".
+  // El detalle de "Otro" (qué es) va aparte, en su comentario libre de pregunta,
+  // como cualquier otra aclaración — no hace falta tratarlo distinto aquí.
+  const buffets = Array.isArray(r.buffets) && r.buffets.length
+    ? resumirRespuesta(PREGUNTAS.find(p => p.id === "buffets"), r, tipo)
+    : "";
   // Qué es cada alquiler, para quien monta el evento: el proveedor y el sí/no van al
   // estado (abajo, con el resto de lo que se contesta siempre igual); esto es solo
   // la descripción libre, que no tiene otro sitio donde vivir.
@@ -862,6 +883,14 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.parabanes)) {
     estado.llevaParabanes = r.parabanes === "si";
     if (r.numParabanes > 0) estado.numParabanes = r.numParabanes;
+  }
+
+  // Buffets: la suma de las mesas de cada uno marcado (1 por defecto si no se puso
+  // número, mismo mínimo que ya aplica el propio campo en Formulario.jsx). En los
+  // tres tipos de evento, no solo en producción: buildChecklistBoda/Cumpleanos no
+  // tenían ninguna línea de mesa de buffet hasta ahora.
+  if (Array.isArray(r.buffets) && r.buffets.length) {
+    estado.numMesasBuffet = r.buffets.reduce((acc, v) => acc + (Number(r[`${v}Numero`]) || 1), 0);
   }
 
   if (tipo === "produccion") {

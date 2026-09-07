@@ -462,12 +462,46 @@ está en el historial de git y en las pruebas que los cubren):
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
 
-## Qué queda pendiente ahora mismo (2026-09-06)
+## Qué queda pendiente ahora mismo (2026-09-07)
 
 Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo, igualar
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
 despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
 tanda de fusiones.
+
+**Formulario: buffets configuran mesas de verdad, y reorden por bloques — HECHO
+(PR #184, tras #182/#183 ya fusionados)**:
+
+- **Buffets**: era texto libre a notas, sin mover ni un número de la checklist.
+  Ahora es marcado múltiple (quesos, dulce/candy bar, ibéricos, croquetas, fruta,
+  otro) con su nº de mesas cada uno; el total (`numMesasBuffet`) llega a la
+  checklist como línea nueva "Mesas de buffet" en boda/cumpleaños (que antes no
+  existía en absoluto) y en producción sube el mínimo de siempre por pax sin
+  bajarlo nunca. La línea de notas se sigue viendo igual que antes
+  (`resumirRespuesta()` la reconstruye).
+- **Reorden del formulario**: las ~44 preguntas de `PREGUNTAS`
+  (`src/formulario/preguntas.js`) se agruparon en 11 bloques temáticos
+  contiguos — antes cocina/equipamiento y mobiliario de exterior estaban partidos
+  en dos sitios distintos de la lista. Confirmado antes de tocar nada que el orden
+  es 100% independiente de cómo llega el dato a la checklist
+  (`aRespuestasDeLaApp()` lee por `id`, `Formulario.jsx` navega el array sin
+  ningún índice fijo) — solo hace falta respetar las dependencias `si:`
+  (tamanoPaella/cuantasPaellas tras menu, entrantePersonas tras entrante,
+  estiloPlatoPostre tras estiloPlato), que se mantienen.
+- Auditoría completa de integración formulario↔checklist a petición del dueño
+  ("que se auto-configure"): comparados los 92 campos que la app puede configurar
+  contra lo que ya rellena el formulario. Todo lo que falta está excluido a
+  propósito (personal, tarifas, logística — decisiones que la oficina no puede
+  saber) o ya se auto-deriva de un dato ya recogido (la temporada verano/invierno
+  sale sola de la fecha). El dueño confirmó que no hace falta subir de nivel nada
+  más por ahora.
+- **Pendiente, pedido explícitamente**: rellenar `FondoIconos.jsx`
+  (`ICONOS_POR_PREGUNTA`) para las ~26 preguntas nuevas que hoy caen en el icono
+  genérico por defecto (carpas, parabanes, buffets, alergias...), y quitar las dos
+  entradas muertas (`sombra`, `carpasAlquiler`, preguntas que ya no existen). La
+  animación en sí (iconos flotando de fondo, cambian con la pregunta) ya existe y
+  ya es CSS puro y respeta `prefers-reduced-motion` — no hace falta construir nada
+  nuevo, solo completar el mapa.
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16

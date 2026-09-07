@@ -1130,19 +1130,39 @@ console.log("\n══ Tarta y alergias ══");
     "y la tarta en todos menos en un rodaje");
 }
 
-// Excepciones de mesa y buffets: texto libre a las notas del evento, mismo mecanismo
-// que alergias — no tocan el cálculo agregado por pax, lo complementan.
+// Excepciones de mesa: texto libre a las notas del evento, mismo mecanismo que
+// alergias — no toca el cálculo agregado por pax, lo complementa. Buffets, en
+// cambio, SÍ mueve un número real de la checklist (ver el siguiente bloque) — pero
+// la línea de notas se sigue viendo igual que cuando era texto libre.
 console.log("\n══ Excepciones de mesa y buffets ══");
 {
   const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
   const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
-  const con = aRespuestasDeLaApp({ ...base, alergias: "1 vegano", excepcionesMesa: "cristalería aparte mesa 7", buffets: "quesos (2 mesas)" });
-  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: cristalería aparte mesa 7\n🥐 BUFFETS: quesos (2 mesas)",
+  const con = aRespuestasDeLaApp({ ...base, alergias: "1 vegano", excepcionesMesa: "cristalería aparte mesa 7", buffets: ["quesos"], quesosNumero: 2 });
+  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: cristalería aparte mesa 7\n🥐 BUFFETS: Buffet de quesos (2)",
     `alergias, excepciones y buffets, cada uno en su línea → ${JSON.stringify(con.notasEvento)}`);
   ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: "  " }).notasEvento === undefined,
     "en blanco no deja una línea vacía");
   ok(aRespuestasDeLaApp(base).notasEvento === undefined,
     "sin contestar ninguna de las tres, las notas del evento no se tocan");
+}
+
+// Buffets: antes era texto libre sin efecto en la checklist ("buffet de quesos" no
+// cargaba ninguna mesa); ahora es marcado múltiple con su número de mesas cada uno
+// (mismo patrón que chillout/barril30 en "extras"), y ese total sí llega a la
+// checklist como numMesasBuffet.
+console.log("\n══ Buffets: las mesas sí llegan a la checklist ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["quesos"] }).numMesasBuffet === 1,
+    "marcar un buffet sin poner número cuenta como 1 mesa, no 0");
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["quesos", "dulce"], quesosNumero: 2, dulceNumero: 1 }).numMesasBuffet === 3,
+    "dos buffets con su propio número se suman (2 + 1 = 3)");
+  ok(aRespuestasDeLaApp({ ...base, buffets: [] }).numMesasBuffet === undefined,
+    "marcar la pantalla sin marcar ningún buffet no pone un 0 de más: no se toca");
+  ok(aRespuestasDeLaApp(base).numMesasBuffet === undefined,
+    "sin contestar, no se toca");
 }
 
 // Mobiliario de alquiler (qué + proveedor propio) y "otros alquileres" (cajón de

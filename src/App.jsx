@@ -221,7 +221,7 @@ const ETIQUETAS_CAMPO = {
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros",
+  llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros", numMesasBuffet: "Nº de mesas de buffet",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -500,6 +500,10 @@ export default function App({ onCerrarSesion } = {}) {
   // 0 = el mínimo de serie (GASTROS_MINIMO en checklist-generadores.js); un número
   // manda sobre esa cuenta, igual que numPaellas.
   const [numGastros, setNumGastros] = useState(estadoInicial.numGastros ?? 0);
+  // 0 = sin buffets contestados en el formulario (no aparece la línea en la
+  // checklist); un número manda y en producción sube el mínimo de siempre por pax,
+  // nunca lo baja (ver checklist-generadores.js).
+  const [numMesasBuffet, setNumMesasBuffet] = useState(estadoInicial.numMesasBuffet ?? 0);
   // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
   const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
   // Cada plancha lleva SU bombona: antes la plancha era un sí/no y sumaba una sola, así
@@ -869,7 +873,7 @@ export default function App({ onCerrarSesion } = {}) {
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros,
+    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
@@ -970,7 +974,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros, numMesasBuffet: setNumMesasBuffet,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2516,7 +2520,7 @@ export default function App({ onCerrarSesion } = {}) {
   const opts = useMemo(() => ({
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -2534,7 +2538,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
-    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, llevaPalomitera, llevaJarrasCristal,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
@@ -4126,6 +4130,20 @@ export default function App({ onCerrarSesion } = {}) {
                   />
                 </div>
               )}
+              {/* Mesas de buffet: la suma de lo contestado en el formulario (quesos, dulce...).
+                  En blanco no sale ninguna línea, salvo en producción, que sigue con su mínimo
+                  de siempre por pax aunque esto esté a 0. */}
+              <div className="form-group controls-mini">
+                <span className="form-label">Nº de mesas de buffet</span>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={numMesasBuffet || ""}
+                  min="0"
+                  placeholder="0"
+                  onChange={e => setNumMesasBuffet(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+              </div>
               {/* Mobiliario EXTRA, el que no tenemos: se alquila a Event Style cuando el
                   cliente pide más de lo nuestro. En un rodaje no se lleva, así que ahí no
                   se ofrece. Los chill out son nuestros y se configuran en Extras: esos no

@@ -243,6 +243,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
     llevaCarpas = false, llevaParabanes = false, numParabanes,
+    numMesasBuffet = 0,
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
@@ -345,6 +346,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
     // Sin fórmula propia: el número lo pone quien ha visto el sitio.
     opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
+    // Suma de las mesas de cada buffet marcado en el formulario (quesos, dulce...),
+    // no una constante — antes esta línea no existía en absoluto para boda/cumpleaños.
+    opt(numMesasBuffet > 0, ["Mesas de buffet", String(numMesasBuffet)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
@@ -548,6 +552,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
     llevaCarpas = false, llevaParabanes = false, numParabanes,
+    numMesasBuffet = 0,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -598,6 +603,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpasCumple)]),
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpasCumple)]),
     opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
+    opt(numMesasBuffet > 0, ["Mesas de buffet", String(numMesasBuffet)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
@@ -750,6 +756,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
     llevaCarpas = true, llevaGenerador = true, mesVerano = true, llevaParabanes = false, numParabanes,
+    numMesasBuffet = 0,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -829,7 +836,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Antes la base salía de una tabla por pax (7/11/13, plantada en 13 por encima de 100)
   // y las de comer no se contaban: un rodaje de 25 personas cargaba 16 mesas sin que
   // ninguna fuera para sentarse. Ahora es al revés y cuadra con lo que se monta.
-  const MESAS_BUFFET = pax <= 100 ? 4 : 5;
+  //
+  // Si el formulario contestó qué buffets hay (quesos, dulce...) con sus mesas, ese
+  // número puede subir la base por pax, nunca bajarla: un rodaje sigue garantizando
+  // el mínimo de siempre aunque nadie haya contestado el detalle.
+  const MESAS_BUFFET = Math.max(pax <= 100 ? 4 : 5, numMesasBuffet);
   const MESA_CAMION = 1;
 
   // En rodajes siempre aparece gente que no estaba en la lista (técnicos, productora,
