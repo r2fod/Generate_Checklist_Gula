@@ -568,6 +568,14 @@ console.log("\n══ Entrante de chupito Y para compartir ══");
   const filasSin = resumirEnvio({ tipo: "boda", entrante: ["chupito"] });
   ok(filasCon.some(f => f.id === "entrantePersonas") && !filasSin.some(f => f.id === "entrantePersonas"),
     "y lo de cada cuántas personas solo se pregunta si hay entrante para compartir");
+
+  // No hace falta quedarse en 3 o 4: se puede poner cualquier número
+  const otroNumero = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["compartir"],
+    entrantePersonas: "otras", entrantePersonasOtras: 7,
+  });
+  ok(otroNumero.personasPorPlatoEntrante === 7,
+    `"Otro número" manda su propia cifra, no solo 3 o 4 → cada ${otroNumero.personasPorPlatoEntrante}`);
 }
 
 // ── El staff se pregunta con los adultos y los niños ──────────────────────────
