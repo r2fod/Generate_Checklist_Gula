@@ -193,10 +193,10 @@ export const PREGUNTAS = [
       const pax = paxDeLaGente(r);
       return pax
         ? `Con ${pax} personas saldría ${tallaPorPax(pax)}. Solo hay que tocarlo si cocina quiere otra.`
-        : "Si no lo sabes, se pone la que salga por la gente.";
+        : "Si no lo sabes, se pone la que salga según la gente.";
     },
     opciones: [
-      { valor: "Auto", texto: "La que salga por la gente" },
+      { valor: "Auto", texto: "La que salga según la gente" },
       { valor: "Pequeña", texto: "Pequeña" },
       { valor: "Mediana", texto: "Mediana" },
       { valor: "Grande", texto: "Grande" },
@@ -216,7 +216,7 @@ export const PREGUNTAS = [
         : "Cada paella lleva su paleta, su trípode y su bombona.";
     },
     opciones: [
-      { valor: "auto", texto: "Las que salgan por la gente" },
+      { valor: "auto", texto: "Las que salgan según la gente" },
       {
         valor: "otras", texto: "Otro número",
         conNumero: "¿Cuántas?",
@@ -968,7 +968,7 @@ export function aRespuestasDeLaApp(r = {}) {
     estado.llevaJamonero = marcado("menu", "jamonero");
     if (tipo !== "produccion") estado.dobleServicio = marcado("menu", "dosPlatos");
   }
-  // Talla y número de paellas. "Auto" y "las que salgan por la gente" son respuestas de
+  // Talla y número de paellas. "Auto" y "las que salgan según la gente" son respuestas de
   // verdad: dicen "déjalo como lo calcula la app", y por eso se escriben (Auto y 0) en
   // vez de no tocar nada — si el evento traía una talla puesta a mano y ahora dicen que
   // vale la de siempre, hay que quitarla.
