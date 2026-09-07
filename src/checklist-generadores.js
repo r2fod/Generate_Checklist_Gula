@@ -5,6 +5,7 @@
 import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
   terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen, taxisDeHielo, calcMesasCalientes,
+  alturasBuffet,
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
@@ -364,7 +365,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esCorporativo, ["Porta-nombres / acreditaciones", "—"]),
     opt(esCorporativo, ["Atril + micrófono", "—"]),
     opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
-    ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
+    ["Cajas de madera para alturas", alturasBuffet(numMesasBuffet) > 0 ? String(alturasBuffet(numMesasBuffet)) : "—"],
+    ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
     opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas, evtKey).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
@@ -856,7 +858,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA), esAlquilerSillas]),
     // En un rodaje se separa mucho más residuo que en un banquete: van 3 de reciclaje
     ["Cubo basura reciclaje", "3"], ["Cubo basura cocina", "1"],
-    ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
+    ["Cajas de madera para alturas", alturasBuffet(numMesasBuffet) > 0 ? String(alturasBuffet(numMesasBuffet)) : "—"],
+    ["Marcos para menú", "—"],
     // Carpas, paredes y pesas en tres líneas: antes ponía "Carpas con paredes y pesas"
     // y más abajo otra línea de paredes, así que no se sabía si las de la primera
     // estaban incluidas o no. Tres paredes por carpa (tres caras cerradas y una

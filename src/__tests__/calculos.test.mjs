@@ -902,6 +902,23 @@ console.log("\n══ Mesas de buffet: de texto libre a un número real en la ch
   const prodPorEncima = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 20 });
   ok(Number(item(prodPorEncima, "Mobiliario", "Mesas de 1,8m")) > Number(item(prodSinTocar, "Mobiliario", "Mesas de 1,8m")),
     "y con más buffets de los que caben en el mínimo, sí sube");
+
+  // Cajas de madera para alturas: iba fija a "—" pasara lo que pasara. En el almacén
+  // hay 4 de madera y 2 de plástico (6 en total), así que con buffet nunca puede pedir
+  // más de eso; sin buffet se queda igual que siempre.
+  ok(item(sinContestar, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "—",
+    "sin buffet, las cajas de alturas se quedan en \"—\" como siempre");
+  ok(item(conBuffet, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "3",
+    "con 3 mesas de buffet, pide 3 cajas");
+  const unBuffet = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 1 });
+  ok(item(unBuffet, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "2",
+    "con solo 1 mesa, no baja de 2 (hace falta al menos una altura de verdad)");
+  const buffetEnorme = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 20 });
+  ok(item(buffetEnorme, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "6",
+    "y no pasa de 6, que es todo lo que hay en el almacén (4 madera + 2 plástico)");
+  const prodConBuffet = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 3 });
+  ok(item(prodConBuffet, "Mobiliario", "Cajas de madera para alturas") === "3",
+    "y en producción, misma cuenta");
 }
 
 console.log("\n══ Quién va a cada evento: horas e importe ══");

@@ -572,6 +572,13 @@ píxel: los tres iconos (192, 512, maskable) ya tenían el mismo hueco — el
 problema era la caché del origen, que un acceso directo no toca. Subir la
 versión fuerza un purgado más para quien se haya quedado atascado.
 
+**Cajas de madera para alturas del buffet: de "—" fijo a un número real —
+HECHO**: iba siempre a ojo, hubiera buffet o no. Ahora con buffet calcula de
+verdad (`alturasBuffet()` en `calculos.js`): mínimo 2, y nunca más de 6 —
+en el almacén hay 4 de madera y 2 de plástico, así que no puede pedir más de
+lo que hay. Sin buffet se queda en "—" como siempre. En boda/comunión/
+corporativo y en producción (cumpleaños no tenía esta línea).
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
