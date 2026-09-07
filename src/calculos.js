@@ -424,6 +424,17 @@ export function champaneras(pax) {
   return Math.max(2, Math.ceil(pax / 50) + 1);
 }
 
+// Cajas de madera para alturas del buffet: van fijas a "—" (a ojo) desde siempre, haya
+// buffet o no. El dueño pidió una cantidad de verdad cuando SÍ hay buffet: en el almacén
+// hay 4 de madera y 2 de plástico (6 en total), así que nunca puede pedirse más de eso.
+// Con buffet, mínimo 2 (para poder dar alguna altura); sin buffet, se queda "sin dato"
+// (0), que es justo el "—" de siempre.
+/** @param {number} numMesasBuffet @returns {number} */
+export function alturasBuffet(numMesasBuffet) {
+  if (!(numMesasBuffet > 0)) return 0;
+  return Math.min(6, Math.max(2, numMesasBuffet));
+}
+
 // ─── BANDEJAS ─────────────────────────────────────────────────────────────────
 // Cuántas bandejas van, por gente y por el tipo elegido. Estaba escrita TRES veces,
 // idéntica carácter por carácter, en los tres generadores: tres copias de la misma
