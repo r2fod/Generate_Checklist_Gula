@@ -4181,6 +4181,32 @@ async function main() {
       await c.close();
     }
 
+    // Bug real: en ancho de escritorio (>=560px, una sola fila) "horario" reclamaba
+    // todo su ancho SIN encoger antes de que "nombre" (1fr) viera un solo píxel —
+    // con el modal a su ancho normal, rol+horario+quitar ya sumaban más que la fila
+    // entera, y el campo del nombre se quedaba invisible (0px), no encogido.
+    console.log("\n══ El nombre de quien trabaja no desaparece en desktop ══");
+    {
+      const c = await navegador.newContext({ viewport: { width: 900, height: 1000 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`nombre asignado desktop: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+      await p.locator(".segment-btn", { hasText: "Equipo" }).click();
+      await p.waitForSelector(".cal-jornada");
+      await p.locator(".cal-asignados-cab").first().click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      await p.locator(".cal-asignados-anadir .btn").first().click();
+      await p.waitForTimeout(200);
+
+      const ancho = await p.locator(".cal-asignado-nombre").first().evaluate(e => e.getBoundingClientRect().width);
+      ok(ancho > 100, `el campo del nombre tiene un ancho de verdad en desktop, no 16px → ${ancho}px`);
+      await p.locator(".cal-asignado-nombre").first().fill("Fulanita");
+      ok(await p.locator(".cal-asignado-nombre").first().inputValue() === "Fulanita",
+        "y se puede escribir en él con normalidad");
+      await c.close();
+    }
+
     // ── El personal de un evento YA PASADO, desde el editor genérico ──
     // Bug real: la Vista de equipo (arriba) es la ÚNICA pantalla de toda la app que
     // enseñaba/editaba quién va a un evento, y solo mira los próximos DIAS_ANTICIPACION
@@ -4432,6 +4458,50 @@ async function main() {
       ok(despuesDeAprobar.some(t => /velas/i.test(t)),
         `y AHORA sí está en Tareas de verdad, no es un falso positivo → ${JSON.stringify(despuesDeAprobar)}`);
 
+      await c.close();
+    }
+
+    // ── LA LISTA DE PROVEEDORES SOBREVIVE A CERRAR Y VOLVER A ABRIR ─────────────
+    // Bug real: "disponibles" (lo que el Worker dice que tiene configurado) solo
+    // vivía en estado de React, sin guardarse en ningún sitio — a diferencia de la
+    // URL del proxy o el proveedor elegido a mano, que sí se guardan. Cada vez que
+    // se recargaba la página se perdía la lista real y el selector volvía a
+    // enseñar solo Gemini hasta la siguiente pregunta.
+    console.log("\n── La lista de proveedores no se resetea al recargar ──");
+    {
+      const c = await navegador.newContext({ viewport: { width: 1024, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const WORKER = "https://worker-de-prueba-2.invalido/chat";
+      await c.route(`${WORKER}*`, r => r.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({
+          texto: "Hola.", proveedor: "gemini",
+          disponibles: ["gemini", "groq", "claude"], uso: { entrada: 10, salida: 5 }, llamadas: [],
+        }),
+      }));
+      await c.addInitScript(w => {
+        localStorage.setItem("gula_asistente_url", w);
+        localStorage.setItem("gula_asistente_nivel", "permiso");
+      }, WORKER);
+      const p = await nuevaPagina(c);
+      await p.goto(BANCO + "?asistente=1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1000);
+
+      await p.locator('.asis-escribir input[type="text"]').fill("Hola");
+      await p.locator('.asis-escribir button[type="submit"]').click();
+      await p.waitForTimeout(1000);
+
+      await p.locator('.asis-icono[aria-label="Ajustes del asistente"]').click();
+      ok(await p.locator(".asis-proveedores .bebida-chip").count() === 3,
+        "tras preguntar, el selector ya enseña los tres proveedores configurados");
+
+      // Se recarga la página entera (misma URL, con ?asistente=1: se reabre solo)
+      // sin volver a preguntar nada
+      await p.reload({ waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(800);
+      await p.locator('.asis-icono[aria-label="Ajustes del asistente"]').click();
+      ok(await p.locator(".asis-proveedores .bebida-chip").count() === 3,
+        "y tras recargar sin preguntar nada, la lista sigue siendo la de verdad, no solo Gemini");
       await c.close();
     }
 

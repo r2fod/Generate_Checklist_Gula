@@ -517,6 +517,22 @@ tanda de fusiones.
   que "¿Cuántas paellas?". El número va a `entrantePersonasOtras` y
   `aRespuestasDeLaApp()` lo usa en vez del valor fijo cuando se elige "otras".
 
+**Dos bugs reales encontrados por captura de pantalla del dueño — HECHO**:
+- **Calendario, campo "Nombre" de quien trabaja invisible en desktop**:
+  `.cal-asignado` (grid, `calendario.css`) daba a "horario" una columna `auto`
+  sin tope, que se comía todo su ancho de contenido ANTES de que "nombre" (1fr)
+  viera un solo píxel — con el modal a su ancho normal (~490px de fila),
+  rol+horario+quitar ya sumaban más que la fila entera, y el campo del nombre
+  se quedaba en 0px. Arreglado dándole a "horario" `minmax(0, min-content)`
+  (se ofrece encogido, envolviendo sus campos en dos líneas, que es lo que ya
+  sabía hacer) y a "nombre" un suelo de verdad (`minmax(140px, 1fr)`).
+- **Asistente, el selector de proveedores se reseteaba a solo Gemini**:
+  `disponibles` (lo que el Worker dice que tiene configurado) solo vivía en
+  estado de React, sin guardarse — a diferencia de la URL o el proveedor
+  elegido, que sí se guardan. Cada apertura del Asistente lo perdía hasta la
+  siguiente pregunta. Arreglado guardándolo con `leerJSON`/`guardarJSON`
+  (`gula_asistente_disponibles`), igual que el resto de ajustes.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
