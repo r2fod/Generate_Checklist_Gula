@@ -825,7 +825,15 @@ export default function Formulario({ codigo }) {
             <div key={o.valor}>
               <button
                 className={`form-opcion ${puesta ? "es-elegida" : ""}`}
-                onClick={() => pon(p.id, puesta ? marcadas.filter(v => v !== o.valor) : [...marcadas, o.valor])}
+                onClick={() => {
+                  const activar = !puesta;
+                  pon(p.id, activar ? [...marcadas, o.valor] : marcadas.filter(v => v !== o.valor));
+                  // Al marcar por primera vez una de lista, se ofrece ya una fila para
+                  // rellenar: una lista vacía recién abierta no invita a tocar nada.
+                  if (activar && o.conLista && !(respuestas[o.campoLista] || []).length) {
+                    pon(o.campoLista, [{ nombre: "", mesas: 1 }]);
+                  }
+                }}
               >
                 <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
                 {o.texto}
@@ -853,6 +861,48 @@ export default function Formulario({ codigo }) {
                       }}
                       onBlur={() => { if (respuestas[campo] === "") pon(campo, 1); }}
                     />
+                  </div>
+                );
+              })()}
+              {/* conLista: varias cosas distintas bajo la misma casilla ("otro" buffet
+                  puede ser gildas Y un rincón de gin-tonics, cada uno con sus mesas),
+                  no un número único como el resto de opciones. */}
+              {puesta && o.conLista && (() => {
+                const campo = o.campoLista;
+                const lista = respuestas[campo] || [];
+                const cambiarFila = (i, clave, valor) =>
+                  pon(campo, lista.map((f, j) => (j === i ? { ...f, [clave]: valor } : f)));
+                return (
+                  <div className="form-lista-otro">
+                    {lista.map((fila, i) => (
+                      <div className="form-lista-otro-fila" key={i}>
+                        <input
+                          type="text" className="form-input" placeholder="¿Qué es? (ej: gildas)"
+                          value={fila.nombre || ""}
+                          onChange={e => cambiarFila(i, "nombre", e.target.value)}
+                        />
+                        <input
+                          type="number" min="1" className="form-input form-input-corto" aria-label="¿Cuántas mesas?"
+                          value={fila.mesas ?? ""}
+                          onChange={e => {
+                            const v = e.target.value;
+                            if (v === "") { cambiarFila(i, "mesas", ""); return; }
+                            const n = parseInt(v, 10);
+                            if (!Number.isNaN(n)) cambiarFila(i, "mesas", Math.max(1, n));
+                          }}
+                          onBlur={() => { if (fila.mesas === "") cambiarFila(i, "mesas", 1); }}
+                        />
+                        <button
+                          type="button" className="form-lista-otro-quitar"
+                          aria-label={`Quitar ${fila.nombre || "esta fila"}`}
+                          onClick={() => pon(campo, lista.filter((_, j) => j !== i))}
+                        >✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button" className="form-comentario-abrir"
+                      onClick={() => pon(campo, [...lista, { nombre: "", mesas: 1 }])}
+                    >+ Añadir otro</button>
                   </div>
                 );
               })()}

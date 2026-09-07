@@ -1173,6 +1173,38 @@ console.log("\n══ Buffets: las mesas sí llegan a la checklist ══");
     "sin contestar, no se toca");
 }
 
+// "Otro" no es un buffet más: pueden ser varios (gildas, un rincón de gin-tonics...),
+// cada uno con su propio nombre y sus propias mesas, así que lleva lista, no número.
+console.log("\n══ Buffets: 'Otro' admite varios, cada uno con su nombre ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  const conDos = aRespuestasDeLaApp({
+    ...base, buffets: ["otro"],
+    buffetsOtros: [{ nombre: "Gildas", mesas: 1 }, { nombre: "Rincón de gin-tonics", mesas: 2 }],
+  });
+  ok(conDos.numMesasBuffet === 3, `las mesas de los dos "otro" se suman (1 + 2 = 3) → ${conDos.numMesasBuffet}`);
+
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["otro"], buffetsOtros: [{ nombre: "Gildas" }] }).numMesasBuffet === 1,
+    "un 'otro' sin poner mesas cuenta como 1, no 0");
+
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["otro"], buffetsOtros: [] }).numMesasBuffet === 0,
+    "marcar 'otro' sin haber añadido ninguna fila todavía no suma nada");
+
+  const filas = resumirEnvio({
+    ...base, buffets: ["otro"],
+    buffetsOtros: [{ nombre: "Gildas", mesas: 1 }, { nombre: "Rincón de gin-tonics", mesas: 2 }],
+  });
+  const resumen = filas.find(f => f.id === "buffets").respuesta;
+  ok(resumen === "Gildas (1), Rincón de gin-tonics (2)",
+    `en las notas sale cada uno con su nombre, no "Otro" a secas → "${resumen}"`);
+
+  // Las filas sin nombre (a medias de escribir) no ensucian el resumen
+  const aMedias = resumirEnvio({ ...base, buffets: ["otro"], buffetsOtros: [{ nombre: "", mesas: 1 }] });
+  ok(aMedias.find(f => f.id === "buffets").respuesta === "",
+    "una fila sin nombre todavía no sale en las notas");
+}
+
 // Mobiliario de alquiler (qué + proveedor propio) y "otros alquileres" (cajón de
 // sastre): el sí/no y el proveedor del mobiliario van al estado como el resto de
 // interruptores; el qué de cada uno va a las notas, igual que alergias/excepciones.

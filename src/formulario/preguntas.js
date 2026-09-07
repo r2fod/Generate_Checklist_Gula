@@ -665,7 +665,10 @@ export const PREGUNTAS = [
       { valor: "ibericos", texto: "Ibéricos", conNumero: "¿Cuántas mesas?" },
       { valor: "croquetas", texto: "Croquetas / frito", conNumero: "¿Cuántas mesas?" },
       { valor: "fruta", texto: "Fruta", conNumero: "¿Cuántas mesas?" },
-      { valor: "otro", texto: "Otro", conNumero: "¿Cuántas mesas?" },
+      // "Otro" no es UN buffet más: son los que no están en la lista (gildas, un
+      // photocall de gin-tonics...) y pueden ser varios distintos el mismo evento, cada
+      // uno con su propio nombre y sus propias mesas — por eso lleva lista, no número.
+      { valor: "otro", texto: "Otro", conLista: true, campoLista: "buffetsOtros" },
     ],
   },
   {
@@ -730,9 +733,17 @@ export function resumirRespuesta(p, r, tipo) {
     if (!v.length) return "nada";
     // Con su número si lo lleva: "Algo frito (3)" dice lo que hay que cargar, "Algo
     // frito" a secas no, y esto es lo último que se lee antes de darle a enviar.
-    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => {
+    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).flatMap(o => {
+      // conLista es varias cosas distintas bajo la misma casilla (los "otro" de un
+      // buffet: gildas, un rincón de gin-tonics...), cada una con su propio nombre —
+      // por eso sale como varias líneas, no como una sola con un número.
+      if (o.conLista) {
+        return (Array.isArray(r[o.campoLista]) ? r[o.campoLista] : [])
+          .filter(x => (x.nombre || "").trim())
+          .map(x => `${x.nombre.trim()} (${x.mesas || 1})`);
+      }
       const n = o.conNumero ? r[o.campoNumero || `${o.valor}Numero`] : null;
-      return n ? `${o.texto} (${n})` : o.texto;
+      return [n ? `${o.texto} (${n})` : o.texto];
     }).join(", ");
   }
   const op = (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).find(o => o.valor === v);
@@ -896,7 +907,15 @@ export function aRespuestasDeLaApp(r = {}) {
   // tres tipos de evento, no solo en producción: buildChecklistBoda/Cumpleanos no
   // tenían ninguna línea de mesa de buffet hasta ahora.
   if (Array.isArray(r.buffets) && r.buffets.length) {
-    estado.numMesasBuffet = r.buffets.reduce((acc, v) => acc + (Number(r[`${v}Numero`]) || 1), 0);
+    // "otro" no tiene un solo número: son las mesas de todos los buffets sin lista
+    // propia que se hayan añadido (gildas, rincón de gin-tonics...), sumadas.
+    estado.numMesasBuffet = r.buffets.reduce((acc, v) => {
+      if (v === "otro") {
+        const lista = Array.isArray(r.buffetsOtros) ? r.buffetsOtros : [];
+        return acc + lista.reduce((s, x) => s + (Number(x.mesas) || 1), 0);
+      }
+      return acc + (Number(r[`${v}Numero`]) || 1);
+    }, 0);
   }
 
   if (tipo === "produccion") {
