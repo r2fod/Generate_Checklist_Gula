@@ -495,13 +495,14 @@ tanda de fusiones.
   saber) o ya se auto-deriva de un dato ya recogido (la temporada verano/invierno
   sale sola de la fecha). El dueño confirmó que no hace falta subir de nivel nada
   más por ahora.
-- **Pendiente, pedido explícitamente**: rellenar `FondoIconos.jsx`
-  (`ICONOS_POR_PREGUNTA`) para las ~26 preguntas nuevas que hoy caen en el icono
-  genérico por defecto (carpas, parabanes, buffets, alergias...), y quitar las dos
-  entradas muertas (`sombra`, `carpasAlquiler`, preguntas que ya no existen). La
-  animación en sí (iconos flotando de fondo, cambian con la pregunta) ya existe y
-  ya es CSS puro y respeta `prefers-reduced-motion` — no hace falta construir nada
-  nuevo, solo completar el mapa.
+- **Iconos animados del formulario — HECHO**: `FondoIconos.jsx`
+  (`ICONOS_POR_PREGUNTA`) rellenado para las ~26 preguntas que caían en el icono
+  genérico por defecto (carpas, parabanes, buffets, alergias...), y quitadas las
+  dos entradas muertas (`sombra`, `carpasAlquiler`, preguntas que ya no existen).
+  La animación en sí (iconos flotando de fondo, cambian con la pregunta) ya
+  existía y ya es CSS puro y respeta `prefers-reduced-motion` — no hizo falta
+  construir nada nuevo, solo completar el mapa. Verificado con capturas en
+  `npm run dev`.
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
