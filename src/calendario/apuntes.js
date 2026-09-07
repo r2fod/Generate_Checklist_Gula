@@ -188,6 +188,21 @@ export function porDia(apuntes) {
   return mapa;
 }
 
+// Cuando dos apuntes del mismo día se llaman exactamente igual ("Camión Covey" dos
+// veces, dos furgonetas el mismo día...) se ven idénticos en el chip del mes: no hay
+// forma de saber que son dos cosas distintas sin abrir el día uno a uno. Aquí se
+// numeran SOLO los que de verdad se repiten (comparando el título tal cual); el resto
+// no se toca, así un día sin repetidos se ve exactamente igual que siempre.
+export function numeraRepetidos(lista) {
+  const porTitulo = {};
+  for (const a of lista) (porTitulo[a.titulo] ||= []).push(a);
+  const numero = {};
+  for (const grupo of Object.values(porTitulo)) {
+    if (grupo.length > 1) grupo.forEach((a, i) => { numero[a.id] = i + 1; });
+  }
+  return numero;
+}
+
 // Lo que viene: los eventos de los próximos N días, ordenados por lo que queda. Solo
 // eventos — las vacaciones y los días cerrados no son cosas que haya que preparar, se
 // cruzan aparte para avisar de que falta gente.

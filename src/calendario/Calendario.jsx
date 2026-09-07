@@ -14,7 +14,7 @@ import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, Cli
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
-  turnosDe, DIAS_ANTICIPACION, apuntesPorPromover,
+  turnosDe, DIAS_ANTICIPACION, apuntesPorPromover, numeraRepetidos,
 } from "./apuntes.js";
 import { hoyISO } from "../fecha.js";
 import { personalNecesario, resumenAsignados, personalQueFalta, horasEntre, ROLES } from "../personal.js";
@@ -203,6 +203,9 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             // apunte: si no, un día con una boda y unas vacaciones se pintaría del gris
             // de las vacaciones y la boda desaparecería del mes.
             const dominante = (del.find(a => esTipoEvento(a.tipo)) || del[0] || {}).tipo || "";
+            // Dos apuntes con el mismo título el mismo día ("Camión Covey" dos veces)
+            // se numeran para poder distinguirlos de un vistazo, sin abrir el día.
+            const numero = numeraRepetidos(del);
             return (
               <button
                 type="button"
@@ -228,7 +231,9 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                 {del.map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
-                    <span className="cal-chip-texto">{a.titulo}</span>
+                    <span className="cal-chip-texto">
+                      {a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}
+                    </span>
                     {a.pax ? <span className="cal-chip-pax">{a.pax}</span> : null}
                   </span>
                 ))}
@@ -261,26 +266,31 @@ function PanelDia({ dia, apuntes, puedeEditar, soloAnadir, onCerrar, onEditar, o
 
         {apuntes.length === 0
           ? <div className="cal-dia-vacio">No hay nada apuntado este día.</div>
-          : apuntes.map(a => (
-            <div className={`cal-dia-item tipo-${a.tipo}`} key={a.id}>
-              <IconoTipo tipo={a.tipo} size={17} />
-              <span className="cal-dia-item-texto">
-                <strong>{a.titulo}</strong>
-                <small>
-                  {TIPOS[a.tipo].nombre}
-                  {a.sitio ? ` · ${a.sitio}` : ""}
-                  {a.pax ? ` · ${a.pax} pax` : ""}
-                  {a.hasta && a.hasta !== a.fecha ? ` · hasta el ${Number(a.hasta.slice(8))}` : ""}
-                </small>
-              </span>
-              {a.evento && onAbrirEvento && (
-                <button className="btn btn-outline cal-dia-btn" onClick={() => onAbrirEvento(a.evento)}>Abrir</button>
-              )}
-              {puedeEditar && !soloAnadir && (
-                <button className="btn btn-outline cal-dia-btn" onClick={() => onEditar(a)}>Editar</button>
-              )}
-            </div>
-          ))}
+          : (() => {
+            // Dos apuntes con el mismo título el mismo día ("Camión Covey" dos veces)
+            // se numeran para poder distinguirlos, igual que en el chip del mes.
+            const numero = numeraRepetidos(apuntes);
+            return apuntes.map(a => (
+              <div className={`cal-dia-item tipo-${a.tipo}`} key={a.id}>
+                <IconoTipo tipo={a.tipo} size={17} />
+                <span className="cal-dia-item-texto">
+                  <strong>{a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}</strong>
+                  <small>
+                    {TIPOS[a.tipo].nombre}
+                    {a.sitio ? ` · ${a.sitio}` : ""}
+                    {a.pax ? ` · ${a.pax} pax` : ""}
+                    {a.hasta && a.hasta !== a.fecha ? ` · hasta el ${Number(a.hasta.slice(8))}` : ""}
+                  </small>
+                </span>
+                {a.evento && onAbrirEvento && (
+                  <button className="btn btn-outline cal-dia-btn" onClick={() => onAbrirEvento(a.evento)}>Abrir</button>
+                )}
+                {puedeEditar && !soloAnadir && (
+                  <button className="btn btn-outline cal-dia-btn" onClick={() => onEditar(a)}>Editar</button>
+                )}
+              </div>
+            ));
+          })()}
 
         {puedeEditar && (
           <button className="btn btn-green cal-dia-anadir" onClick={onAnadir}>+ Añadir a este día</button>

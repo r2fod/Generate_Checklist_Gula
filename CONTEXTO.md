@@ -533,6 +533,12 @@ tanda de fusiones.
   siguiente pregunta. Arreglado guardándolo con `leerJSON`/`guardarJSON`
   (`gula_asistente_disponibles`), igual que el resto de ajustes.
 
+**Calendario, dos apuntes iguales el mismo día ahora se distinguen — HECHO**:
+pedido por el dueño ("dos camiones Covey" que se veían idénticos). Nueva
+`numeraRepetidos(lista)` en `apuntes.js`: numera SOLO los apuntes de un día que
+comparten título tal cual ("Camión Covey 1" / "Camión Covey 2"); un día sin
+repetidos no se toca. Se usa tanto en el chip del mes como en el panel del día.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
