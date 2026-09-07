@@ -1004,7 +1004,7 @@ console.log("\n══ Paella: cuántas y de qué tamaño ══");
 
   const auto = aRespuestasDeLaApp({ ...base, tamanoPaella: "Auto", cuantasPaellas: "auto" });
   ok(auto.tipoPaella === "Auto" && auto.numPaellas === 0,
-    "y decir \"las que salgan por la gente\" es una respuesta: se escribe, no se deja a medias");
+    "y decir \"las que salgan según la gente\" es una respuesta: se escribe, no se deja a medias");
 
   const sinTocar = aRespuestasDeLaApp(base);
   ok(sinTocar.tipoPaella === undefined && sinTocar.numPaellas === undefined,
