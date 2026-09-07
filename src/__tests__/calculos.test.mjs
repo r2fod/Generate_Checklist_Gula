@@ -868,6 +868,42 @@ console.log("\n══ Gastros: un mínimo de serie en vez de dejarlo en blanco �
     `producción sigue con su propia cuenta (2 por chafer), sin tocar (${item(prod, "Menaje y Utensilios", "Gastros")[1]})`);
 }
 
+console.log("\n══ Mesas de buffet: de texto libre a un número real en la checklist ══");
+{
+  // Antes "buffets" era texto libre a las notas, sin mover nada de la checklist —
+  // ni boda ni cumpleaños tenían ninguna línea de mesa de buffet. Ahora el total
+  // que suma el formulario (numMesasBuffet) sí carga una línea de verdad.
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : undefined;
+  };
+
+  const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinContestar, "Mobiliario, sala y decoración", "Mesas de buffet") === null,
+    "sin contestar, la fila de mesas de buffet se queda apagada (cantidad null), como el resto de mobiliario condicional");
+
+  const conBuffet = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 3 });
+  ok(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de buffet") === "3",
+    "con el total del formulario, sale la línea con ese número");
+
+  const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { numMesasBuffet: 2 });
+  ok(item(cumple, "Mobiliario", "Mesas de buffet") === "2", "y en cumpleaños igual, en su categoría");
+
+  // Producción: el mínimo de siempre por pax se mantiene si el formulario dice
+  // menos (o no dice nada); una respuesta detallada solo puede subirlo.
+  const prodSinContestar = buildChecklist("produccion", 40, 0, 0, 0, {});
+  ok(item(prodSinContestar, "Mobiliario", "Mesas de 1,8m") !== undefined,
+    "producción sigue generando su línea de mesas de 1,8m de siempre");
+  const prodPorDebajo = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 1 });
+  const prodSinTocar = buildChecklist("produccion", 40, 0, 0, 0, {});
+  ok(item(prodPorDebajo, "Mobiliario", "Mesas de 1,8m") === item(prodSinTocar, "Mobiliario", "Mesas de 1,8m"),
+    "con menos buffets que el mínimo de pax, la cuenta no baja del mínimo de siempre");
+  const prodPorEncima = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 20 });
+  ok(Number(item(prodPorEncima, "Mobiliario", "Mesas de 1,8m")) > Number(item(prodSinTocar, "Mobiliario", "Mesas de 1,8m")),
+    "y con más buffets de los que caben en el mínimo, sí sube");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,
