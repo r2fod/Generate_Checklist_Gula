@@ -539,6 +539,14 @@ pedido por el dueño ("dos camiones Covey" que se veían idénticos). Nueva
 comparten título tal cual ("Camión Covey 1" / "Camión Covey 2"); un día sin
 repetidos no se toca. Se usa tanto en el chip del mes como en el panel del día.
 
+**Formulario, icono también en la pantalla de "qué evento es" — HECHO**: la
+pantalla de elegir evento (`paso === -1`) tenía su propio `<h1>`/botones, fuera
+del recorrido normal de preguntas, así que se había quedado sin el icono de
+título/opción de la ronda anterior. Título con `iconoDePregunta("elegir")`, y
+cada evento de la lista con el icono de su tipo (`iconoDeOpcion("tipo", ...)`,
+buscando el índice en `TIPOS_EVENTO`) — mismo Heart/Church/Briefcase/Cake/
+Clapperboard que ya se usa en la pregunta "tipo".
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

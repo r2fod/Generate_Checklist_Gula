@@ -5402,6 +5402,11 @@ hr {
 .form-evento:hover { border-color: var(--accent); }
 .form-evento-nombre { font-weight: 700; font-size: 0.95rem; color: var(--text-main); }
 .form-evento-datos { font-size: 0.8rem; color: var(--text-muted); }
+/* Solo la lista de "de qué evento son los datos" lleva icono — la de "lo mío"
+   (form-mio) reutiliza form-evento tal cual, en columna, y no debe moverse. */
+.form-evento.form-evento-con-icono { flex-direction: row; align-items: center; gap: 10px; }
+.form-evento-icono { flex-shrink: 0; color: var(--accent); opacity: 0.75; }
+.form-evento-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
 .form-repaso {
   display: flex;
