@@ -579,6 +579,13 @@ en el almacén hay 4 de madera y 2 de plástico, así que no puede pedir más de
 lo que hay. Sin buffet se queda en "—" como siempre. En boda/comunión/
 corporativo y en producción (cumpleaños no tenía esta línea).
 
+**Hielo: se puede decir que no hace falta — HECHO**: antes se cargaba siempre,
+sin preguntar (kilos, bolsas y taxis enteros de más en un sitio que ya lo da,
+o en un evento que no lo necesita). Nueva pregunta "¿Llevamos hielo?" tras
+congelador; con "No hace falta" (`llevaHielo: false`), `calcBebidas()` no
+calcula nada y la línea "Hielo" se apaga en checklist (boda/comunión/
+corporativo, cumpleaños y producción, cada uno con su propia fórmula).
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

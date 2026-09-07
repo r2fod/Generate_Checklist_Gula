@@ -1416,6 +1416,29 @@ console.log("\n══ Los niños beben agua y refresco, no vino ══");
     "sin niños no cambia nada de lo de siempre");
 }
 
+console.log("\n══ Hielo: se puede decir que no hace falta ══");
+{
+  // Antes se cargaba siempre, sin preguntar: un sitio que ya lo da, o un evento que no
+  // lo necesita, se quedaba con kilos, bolsas y taxis enteros de más.
+  const con = calcBebidas(100, 4, true, false, false, 4, { llevaHielo: true });
+  ok(con.hieloKg > 0 && con.taxisHielo > 0, `por defecto sigue calculando hielo → ${con.hieloKg}kg`);
+  const sin = calcBebidas(100, 4, true, false, false, 4, { llevaHielo: false });
+  ok(sin.hieloKg === 0 && sin.taxisHielo === 0, "y con \"no hace falta\", se queda a cero");
+
+  // Y en la checklist, la línea entera desaparece (no se queda en "0 kg")
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === "Hielo");
+    return it ? it[1] : it;
+  };
+  const bodaConHielo = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(bodaConHielo, "Bebidas frías"), `boda: con hielo por defecto sale la línea → ${item(bodaConHielo, "Bebidas frías").u} kg`);
+  const bodaSinHielo = buildChecklist("boda", 100, 2, 4, 0, { llevaHielo: false });
+  ok(item(bodaSinHielo, "Bebidas frías") === null, "boda: sin hielo, la línea se apaga (null), no se queda en 0");
+  const prodSinHielo = buildChecklist("produccion", 40, 0, 0, 0, { llevaHielo: false });
+  ok(item(prodSinHielo, "Desechables y Bebidas") === null, "y en producción igual, con su propia fórmula de taxis");
+}
+
 console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
 {
   // Coca normal, Zero y Nestea cuadran EXACTOS con el evento de 65 pax del que salieron
