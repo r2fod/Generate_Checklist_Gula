@@ -5364,6 +5364,29 @@ hr {
   color: var(--text-muted);
 }
 
+/* La lista de "otro" (buffets sin hueco propio: gildas, un rincón de gin-tonics...):
+   cada fila es libre de nombre, con sus propias mesas. */
+.form-lista-otro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 4px 2px 14px;
+}
+.form-lista-otro-fila { display: flex; gap: 8px; align-items: center; }
+.form-lista-otro-fila .form-input { flex: 1; min-width: 0; }
+.form-lista-otro-fila .form-input-corto { flex: 0 0 64px; max-width: 64px; }
+.form-lista-otro-quitar {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none;
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.form-lista-otro-quitar:hover { border-color: var(--error-texto-fuerte); color: var(--error-texto-fuerte); }
+
 .form-horas {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

@@ -547,6 +547,14 @@ cada evento de la lista con el icono de su tipo (`iconoDeOpcion("tipo", ...)`,
 buscando el índice en `TIPOS_EVENTO`) — mismo Heart/Church/Briefcase/Cake/
 Clapperboard que ya se usa en la pregunta "tipo".
 
+**Buffets, "Otro" admite varios distintos con su propio nombre — HECHO**: antes
+"Otro" en la pregunta de buffets era una casilla más con un número, sin decir
+QUÉ era (había que aclararlo en el comentario libre). Ahora abre una lista
+(`conLista`/`campoLista`, nuevo en `preguntas.js` y `Formulario.jsx`): cada fila
+tiene su nombre ("gildas", "rincón de gin-tonics"...) y sus propias mesas,
+sumadas al total de `numMesasBuffet` igual que el resto. La nota del evento sale
+como "gildas (1), rincón de gin-tonics (2)" en vez de un número suelto.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
