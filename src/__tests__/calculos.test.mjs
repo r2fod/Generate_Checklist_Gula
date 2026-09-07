@@ -22,7 +22,7 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
@@ -963,6 +963,29 @@ console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");
   // Y un tipo que no existe cae en boda, que es el comportamiento de siempre
   ok(saneaLista([{ fecha: "2026-09-03", titulo: "X", tipo: "inventado" }])[0].tipo === "boda",
     "un tipo desconocido sigue cayendo en boda, como antes");
+}
+
+console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");
+{
+  // "Camión Covey" pedido dos veces el mismo día se veía idéntico en el chip del
+  // mes: sin abrir el día, no había forma de saber que eran dos furgonetas y no una
+  // repetida por error.
+  const dia = [
+    { id: "a1", titulo: "Camión Covey", tipo: "logistica" },
+    { id: "a2", titulo: "Boda Marina", tipo: "boda" },
+    { id: "a3", titulo: "Camión Covey", tipo: "logistica" },
+  ];
+  const numero = numeraRepetidos(dia);
+  ok(numero.a1 === 1 && numero.a3 === 2 && numero.a2 === undefined,
+    `solo se numeran los que de verdad se repiten → ${JSON.stringify(numero)}`);
+
+  // Un día sin nada repetido no numera a nadie: no hay que ir arrastrando un "1"
+  // detrás de cada apunte que no lo necesita.
+  const sinRepetidos = numeraRepetidos([
+    { id: "b1", titulo: "Boda Ana", tipo: "boda" },
+    { id: "b2", titulo: "Camión Covey", tipo: "logistica" },
+  ]);
+  ok(Object.keys(sinRepetidos).length === 0, "sin repetidos, no se numera nada");
 }
 
 console.log("\n══ Los dos enlaces del calendario ══");
