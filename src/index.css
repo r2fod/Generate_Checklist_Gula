@@ -5473,6 +5473,25 @@ hr {
   background: rgba(127, 127, 127, 0.12);
   border-radius: 999px;
 }
+/* La tarjeta entera también se distingue, no solo el badge: para que los que
+   quedan por configurar destaquen de un vistazo sobre los que ya no hace falta
+   tocar. Mismo gris neutro que el badge, para que se lean como la misma señal. */
+.form-evento.es-configurado { border-color: var(--border-color); background: rgba(127, 127, 127, 0.06); }
+/* Si además ya se le mandó algo, manda el verde: es la señal más útil ahora mismo
+   (algo que la oficina acaba de hacer), por delante del gris de "ya está montado". */
+.form-evento.es-configurado.es-enviado { border-color: var(--ok-borde); background: var(--ok-bg); }
+/* El corte entre "por configurar" y "ya configurados": los dos grupos venían
+   pegados sin nada que los separase, aunque ya llegaban ordenados. */
+.form-separador-eventos {
+  margin: 4px 2px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
 
 .form-repaso {
   display: flex;
