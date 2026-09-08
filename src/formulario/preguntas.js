@@ -57,7 +57,7 @@ const GASTROS_MINIMO = 4;
 // pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
 // tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
 // entrante, estiloPlatoPostre después de estiloPlato, hielo después de
-// congelador, numBarras después de coctel/copas).
+// congelador, numBarras después de coctel/copas, queDobla después de menu).
 export const PREGUNTAS = [
   // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
@@ -246,19 +246,37 @@ export const PREGUNTAS = [
   },
   {
     id: "menu", tipo: "marcar", texto: "¿Qué lleva el menú?",
-    // "Dos platos principales" dobla cubiertos, copas y platos en TODA la checklist
-    // (es el mismo interruptor "Doble servicio" de la app: "dobla cubierto, copa y
-    // plato"). Es para cuando se sirven LOS DOS platos a cada invitado, uno detrás de
-    // otro — no para un menú que simplemente deja elegir uno entre dos opciones (eso
-    // no dobla nada, cada invitado come un plato).
-    nota: "\"Dos platos principales\" es cuando se sirven los DOS a todo el mundo (dos pases seguidos): dobla cubiertos, copas y platos. Si el menú solo deja elegir uno de los dos, no marques esto.",
+    // "Primero + segundo" dobla platos siempre, y cubiertos/cristalería según se
+    // conteste en la pregunta de seguimiento "queDobla" (justo debajo). Es para
+    // cuando se sirven LOS DOS platos a cada invitado, uno detrás de otro — no para
+    // un menú que simplemente deja elegir uno entre dos opciones (eso no dobla nada,
+    // cada invitado come un plato).
+    nota: "\"Primero + segundo\" es cuando se sirven los DOS a todo el mundo (dos pases seguidos): dobla el plato siempre, y cubiertos/cristalería según se conteste después. Si el menú solo deja elegir uno de los dos, no marques esto.",
     opciones: [
       { valor: "paella", texto: "Paella" },
       // Cuántas sartenes parisiene, que no es lo mismo un frito que tres a la vez: cada
       // una lleva su difusor, su trípode y su bombona, y la app se quedaba siempre en una.
       { valor: "frito", texto: "Algo frito", conNumero: "¿Cuántas sartenes parisiene?", campoNumero: "numFrituras" },
-      { valor: "dosPlatos", texto: "Dos platos principales (se sirven los dos)", soloEn: CON_BARRA },
+      { valor: "dosPlatos", texto: "Primero + segundo (se sirven los dos)", soloEn: CON_BARRA },
     ],
+  },
+  {
+    // Cubiertos SIEMPRE doblan con "primero + segundo" (premarcado, editable); la
+    // cristalería normalmente NO — la misma copa se rellena durante toda la comida,
+    // así que sale sin marcar por defecto, pero se puede marcar si hace falta.
+    id: "queDobla", tipo: "marcar", texto: "¿Qué se dobla?",
+    nota: "Los cubiertos ya vienen marcados (lo normal). La cristalería no suele doblar —se rellena la misma copa—, márcala si hace falta.",
+    opciones: [
+      { valor: "tenedor", texto: "Tenedor" },
+      { valor: "cuchillo", texto: "Cuchillo" },
+      { valor: "cuchara", texto: "Cuchara" },
+      { valor: "vino", texto: "Copa de vino" },
+      { valor: "agua", texto: "Vaso de agua" },
+      { valor: "cava", texto: "Copa de cava" },
+    ],
+    porDefecto: ["tenedor", "cuchillo", "cuchara"],
+    soloEn: CON_BARRA,
+    si: (r) => Array.isArray(r.menu) && r.menu.includes("dosPlatos"),
   },
   {
     // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
@@ -712,12 +730,14 @@ export const PREGUNTAS = [
     // "texto-largo" a mano ("cubiertos de pescado en la mesa 4..."), lo que se
     // escribiera ahí no se leía dos veces igual; con casillas se lee siempre igual
     // y con su número, mismo patrón que buffets/extras (marcar + conNumero).
+    // "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" vivían aquí, pero eran
+    // una excepción de mesa cuando en realidad el dueño quería el default de TODO el
+    // evento — eso ya lo cubre "queDobla" (arriba, en el menú). Esto es solo para una
+    // mesa CONCRETA que necesita algo que el resto no — el caso raro de "una mesa
+    // suelta con doble cubierto" se resuelve editando la línea a mano en la app.
     id: "excepcionesMesa", tipo: "marcar", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
     nota: "Marca lo que aplique y di en cuántas mesas. Si no hay ninguna excepción, se deja sin marcar.",
     opciones: [
-      { valor: "dobleTenedor", texto: "Doble tenedor", conNumero: "Cantidad en mesa" },
-      { valor: "dobleCuchillo", texto: "Doble cuchillo", conNumero: "Cantidad en mesa" },
-      { valor: "cristaleriaAparte", texto: "Cristalería aparte", conNumero: "Cantidad en mesa" },
       { valor: "menuInfantil", texto: "Menú infantil", conNumero: "Cantidad en mesa" },
       { valor: "otro", texto: "Otro", conNumero: "Cantidad en mesa" },
     ],
@@ -1115,6 +1135,16 @@ export function aRespuestasDeLaApp(r = {}) {
     estado.tieneFrituras = marcado("menu", "frito");
     if (estado.tieneFrituras && r.numFrituras > 0) estado.numFrituras = r.numFrituras;
     if (tipo !== "produccion") estado.dobleServicio = marcado("menu", "dosPlatos");
+  }
+  // Qué dobla en concreto: cubiertos y cristalería por separado, en vez de todo
+  // atado al mismo "dobleServicio" de siempre (que sigue mandando solo en el plato).
+  if (Array.isArray(r.queDobla)) {
+    estado.dobleTenedor = r.queDobla.includes("tenedor");
+    estado.dobleCuchillo = r.queDobla.includes("cuchillo");
+    estado.dobleCuchara = r.queDobla.includes("cuchara");
+    estado.dobleVino = r.queDobla.includes("vino");
+    estado.dobleAgua = r.queDobla.includes("agua");
+    estado.dobleCava = r.queDobla.includes("cava");
   }
   // Talla y número de paellas. "Auto" y "las que salgan según la gente" son respuestas de
   // verdad: dicen "déjalo como lo calcula la app", y por eso se escriben (Auto y 0) en

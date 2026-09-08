@@ -866,15 +866,40 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["jamonero"] }).llevaJamonero === undefined,
     "marcarlo por error en \"menu\" (que ya no lo ofrece) no hace nada: no hay opción con ese valor ahí");
 
-  // "Dos platos principales" dobla cubiertos, copas y platos en toda la checklist (es
-  // el mismo "Doble servicio" de la app). Solo se le aclaró el texto y se le puso nota
-  // para no confundirlo con un menú que deja elegir uno de los dos — el valor que
-  // guarda ("dosPlatos") no se ha tocado.
+  // "Primero + segundo" (antes "Dos platos principales") sigue doblando el plato
+  // en toda la checklist (dobleServicio, sin tocar). Lo que YA NO hace es doblar
+  // cubiertos/cristalería a ciegas: eso ahora lo decide la pregunta de seguimiento
+  // "queDobla" — el valor que guarda ("dosPlatos") no se ha tocado.
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"] }).dobleServicio === true,
-    "marcarlo sigue doblando el servicio, con el texto nuevo");
+    "marcarlo sigue doblando el servicio (el plato), con el texto nuevo");
   const menuPregunta = PREGUNTAS.find(p => p.id === "menu");
-  ok(/dobla cubiertos/i.test(menuPregunta.nota || ""),
-    "y la pregunta explica que dobla cubiertos, para no confundirlo con un menú a elegir");
+  ok(/primero \+ segundo/i.test(opcionesDe(menuPregunta, "boda").find(o => o.valor === "dosPlatos").texto),
+    "la opción se llama \"Primero + segundo\", no \"Dos platos principales\"");
+
+  // "queDobla": solo sale si se marcó "primero + segundo", con cubiertos premarcados
+  // (lo normal) y cristalería sin marcar (no suele doblar, se rellena la misma copa).
+  ok(!preguntasDe("boda", { menu: ["paella"] }).some(p => p.id === "queDobla"),
+    "sin marcar primero+segundo, no se pregunta qué dobla");
+  ok(preguntasDe("boda", { menu: ["dosPlatos"] }).some(p => p.id === "queDobla"),
+    "marcando primero+segundo, sí se pregunta");
+  const queDoblaPregunta = PREGUNTAS.find(p => p.id === "queDobla");
+  ok(JSON.stringify(queDoblaPregunta.porDefecto) === JSON.stringify(["tenedor", "cuchillo", "cuchara"]),
+    "por defecto vienen marcados los cubiertos, no la cristalería");
+
+  const conDefecto = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"], queDobla: ["tenedor", "cuchillo", "cuchara"] });
+  ok(conDefecto.dobleTenedor === true && conDefecto.dobleCuchillo === true && conDefecto.dobleCuchara === true,
+    "marcados los tres cubiertos, los tres doblan");
+  ok(conDefecto.dobleVino === false && conDefecto.dobleAgua === false && conDefecto.dobleCava === false,
+    "y sin marcar cristalería, ninguna dobla");
+
+  const soloTenedorYVino = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"], queDobla: ["tenedor", "vino"] });
+  ok(soloTenedorYVino.dobleTenedor === true && soloTenedorYVino.dobleCuchillo === false && soloTenedorYVino.dobleCuchara === false,
+    "granular de verdad: solo el tenedor dobla, no los otros dos cubiertos");
+  ok(soloTenedorYVino.dobleVino === true && soloTenedorYVino.dobleAgua === false && soloTenedorYVino.dobleCava === false,
+    "y de la cristalería, solo el vino, si es lo único marcado");
+
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"] }).dobleTenedor === undefined,
+    "sin contestar queDobla todavía (aunque se marcara primero+segundo), no se toca: cae al dobleServicio de siempre");
 }
 
 // ── A quién se avisa por WhatsApp ─────────────────────────────────────────────
@@ -1297,21 +1322,27 @@ console.log("\n══ Tarta y alergias ══");
 // bloque); la línea de notas se reconstruye con resumirRespuesta() en los dos casos.
 console.log("\n══ Excepciones de mesa y buffets ══");
 {
-  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
   const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
   const con = aRespuestasDeLaApp({
     ...base, alergias: "1 vegano",
-    excepcionesMesa: ["cristaleriaAparte", "dobleTenedor"], cristaleriaAparteNumero: 1, dobleTenedorNumero: 3,
+    excepcionesMesa: ["menuInfantil", "otro"], menuInfantilNumero: 3, otroNumero: 1,
     buffets: ["quesos"], quesosNumero: 2,
   });
-  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: Doble tenedor (3), Cristalería aparte (1)\n🥐 BUFFETS: Buffet de quesos (2)",
+  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: Menú infantil (3), Otro (1)\n🥐 BUFFETS: Buffet de quesos (2)",
     `alergias, excepciones y buffets, cada uno en su línea → ${JSON.stringify(con.notasEvento)}`);
-  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: ["dobleCuchillo"] }).notasEvento === "🍽️ EXCEPCIONES DE MESA: Doble cuchillo",
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: ["menuInfantil"] }).notasEvento === "🍽️ EXCEPCIONES DE MESA: Menú infantil",
     "marcada sin poner número, sale sin paréntesis — no se inventa una cifra");
   ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: [] }).notasEvento === undefined,
     "marcar la pantalla sin marcar ninguna casilla no deja una línea vacía");
   ok(aRespuestasDeLaApp(base).notasEvento === undefined,
     "sin contestar ninguna de las tres, las notas del evento no se tocan");
+  // "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" vivían aquí, pero eran una
+  // excepción de UNA mesa cuando el dueño quería el default de todo el evento — eso
+  // ya lo cubre "queDobla" (en el menú). Ya no se ofrecen: solo quedan las que de
+  // verdad son por mesa.
+  ok(opcionesDe(PREGUNTAS.find(p => p.id === "excepcionesMesa"), "boda").every(o => !["dobleTenedor", "dobleCuchillo", "cristaleriaAparte"].includes(o.valor)),
+    "las opciones de doblado ya no están en excepcionesMesa");
 }
 
 // Buffets: antes era texto libre sin efecto en la checklist ("buffet de quesos" no

@@ -263,6 +263,19 @@ console.log("\n══ Cristalería ══");
     `y el brindis sube las de cava a 1,5 por cabeza (${normal.cava.u} → ${conBrindis.cava.u})`);
   ok(normal.chupito === null && calcCristaleria(100, 5, false, false, true).chupito !== null,
     "los vasos de chupito solo salen si hay entrante de chupito");
+
+  // dobleCopa también acepta un objeto {vino, agua, cava}: un flag por tipo, para
+  // "primero + segundo" con doblado granular editable (task #26). El booleano de
+  // siempre sigue funcionando igual (probado arriba) — esto es aditivo.
+  const soloVino = calcCristaleria(100, 5, { vino: true, agua: false, cava: false }, false, false);
+  ok(soloVino.vino.u > normal.vino.u && soloVino.agua.u === normal.agua.u,
+    "granular de verdad: solo el vino dobla, el agua se queda igual");
+  const soloCava = calcCristaleria(100, 5, { vino: false, agua: false, cava: true }, false, false);
+  ok(soloCava.cava.u > normal.cava.u,
+    "y la cava SÍ puede doblar con el objeto — con el booleano de siempre, nunca podía");
+  const ningunoDobla = calcCristaleria(100, 5, { vino: false, agua: false, cava: false }, false, false);
+  ok(ningunoDobla.vino.u === normal.vino.u && ningunoDobla.agua.u === normal.agua.u && ningunoDobla.cava.u === normal.cava.u,
+    "objeto con todo a false es exactamente el comportamiento de siempre, sin doblar nada");
 }
 
 console.log("\n══ Factores de cristalería (cristaleria.js) ══");
@@ -951,6 +964,64 @@ console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax
   const conBarraPaxAlto = buildChecklist("boda", 120, 2, 4, 0, { numBarras: 1 });
   ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "4",
     "1 barra con 120 pax → 4 mesas altas");
+}
+
+console.log("\n══ Primero + segundo: cubiertos y cristalería doblan por separado ══");
+{
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : undefined;
+  };
+
+  // Sin dobleServicio ni granular, nada dobla (comportamiento de siempre)
+  const sinDoblar = buildChecklist("boda", 100, 2, 4, 0, { llevaCubiertos: true });
+  const base = item(sinDoblar, "Vajilla", "Tenedores grandes");
+
+  // dobleServicio a secas (eventos de antes de esta tarea, sin campos granulares):
+  // TODOS los cubiertos doblan y vino/agua también, cava nunca — exactamente el
+  // comportamiento viejo, para no romper nada ya guardado.
+  const soloDobleServicio = buildChecklist("boda", 100, 2, 4, 0, { llevaCubiertos: true, dobleServicio: true });
+  ok(Number(item(soloDobleServicio, "Vajilla", "Tenedores grandes")) > Number(base),
+    "dobleServicio solo (sin granular) sigue doblando los tenedores, como siempre");
+  ok(item(soloDobleServicio, "Vajilla", "Tenedores grandes") === item(soloDobleServicio, "Vajilla", "Cuchillos grandes"),
+    "y cuchillos igual que tenedores: cae al mismo dobleServicio en los tres");
+  const cristalConDobleServicio = calcCristaleria(100, 4, true, false, false);
+  ok(cristalConDobleServicio.cava.u === calcCristaleria(100, 4, false, false, false).cava.u,
+    "y la cava, con el booleano de siempre, nunca dobla (ni con dobleServicio)");
+
+  // Granular DE VERDAD: solo el tenedor dobla, cuchillo y cuchara no
+  const soloTenedor = buildChecklist("boda", 100, 2, 4, 0, {
+    llevaCubiertos: true, dobleServicio: true, dobleTenedor: true, dobleCuchillo: false, dobleCuchara: false,
+  });
+  ok(Number(item(soloTenedor, "Vajilla", "Tenedores grandes")) > Number(base),
+    "con el follow-up contestado, el tenedor dobla si se marcó");
+  ok(item(soloTenedor, "Vajilla", "Cuchillos grandes") === base,
+    "pero el cuchillo NO dobla si no se marcó, aunque dobleServicio sea true");
+
+  // Cristalería granular: solo el vino dobla — la etiqueta lleva "(doble)" solo en
+  // la línea que de verdad dobla, no en las otras (antes el sufijo iba atado al
+  // dobleServicio de todo el evento, ahora va con el tipo concreto).
+  const soloVinoDobla = buildChecklist("boda", 100, 2, 4, 0, {
+    dobleServicio: true, dobleVino: true, dobleAgua: false, dobleCava: false,
+  });
+  const cristalBase = calcCristaleria(100, 4, false, false, false);
+  ok(item(soloVinoDobla, "Cristalería", "Copas de vino") === undefined,
+    "la línea de vino cambia de etiqueta a \"(doble)\" cuando dobla, no se queda con la de siempre");
+  ok(Number(item(soloVinoDobla, "Cristalería", "Copas de vino (doble)")) > cristalBase.vino.u,
+    "el vino dobla si se marcó en el follow-up");
+  ok(Number(item(soloVinoDobla, "Cristalería", "Vasos de agua")) === cristalBase.agua.u,
+    "pero el agua no, aunque dobleServicio sea true, y mantiene su etiqueta sin \"(doble)\"");
+
+  // Mismo hilo en cumpleaños (comparte la misma fórmula de cubiertos/cristalería)
+  const cumpleGranular = buildChecklist("cumpleanos", 80, 0, 3, 8, {
+    llevaCubiertos: true, dobleServicio: true, dobleTenedor: true, dobleCuchillo: false, dobleCuchara: false,
+  });
+  const cumpleBase = buildChecklist("cumpleanos", 80, 0, 3, 8, { llevaCubiertos: true });
+  ok(Number(item(cumpleGranular, "Vajilla, Cubertería y Cristalería", "Tenedores grandes")) > Number(item(cumpleBase, "Vajilla, Cubertería y Cristalería", "Tenedores grandes")),
+    "cumpleaños: el tenedor dobla si se marcó");
+  ok(item(cumpleGranular, "Vajilla, Cubertería y Cristalería", "Cuchillos grandes") === item(cumpleBase, "Vajilla, Cubertería y Cristalería", "Cuchillos grandes"),
+    "cumpleaños: pero el cuchillo no, si no se marcó");
 }
 
 console.log("\n══ Quién va a cada evento: horas e importe ══");
