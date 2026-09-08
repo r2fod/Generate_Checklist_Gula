@@ -48,3 +48,13 @@ export function apuntarEnvio({ id, respuestas, eventoDestino }) {
 export function olvidarEnvio(id) {
   guardar(leerMios().filter(x => x.id !== id));
 }
+
+// Busca en la lista el envío hecho para ese nombre de evento, sin mirar
+// mayúsculas ni espacios de sobra. Lo usan tanto el aviso de "ya mandaste esto"
+// del repaso como la marca de "enviado" en la lista de elegir evento: es la
+// misma pregunta ("¿ya se mandó algo para este nombre?") hecha en dos sitios.
+export function buscarEnvioPorNombre(mios, nombre) {
+  const buscado = (nombre || "").trim().toLowerCase();
+  if (!buscado) return null;
+  return mios.find(m => (m.eventoDestino || m.nombre || "").trim().toLowerCase() === buscado) || null;
+}

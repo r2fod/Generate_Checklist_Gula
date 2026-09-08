@@ -5449,7 +5449,16 @@ hr {
    (form-mio) reutiliza form-evento tal cual, en columna, y no debe moverse. */
 .form-evento.form-evento-con-icono { flex-direction: row; align-items: center; gap: 10px; }
 .form-evento-icono { flex-shrink: 0; color: var(--accent); opacity: 0.75; }
-.form-evento-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.form-evento-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+/* Ya se le mandó algo desde este móvil: no lo saca de la lista (puede hacer falta
+   una corrección), solo lo distingue de un vistazo con un verde suave y su check. */
+.form-evento.es-enviado { border-color: var(--ok-borde); background: var(--ok-bg); }
+.form-evento-check {
+  flex-shrink: 0;
+  color: var(--ok-texto);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
 
 .form-repaso {
   display: flex;

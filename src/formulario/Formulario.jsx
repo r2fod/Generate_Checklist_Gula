@@ -11,7 +11,7 @@ import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpi
 import logoGula from "../assets/gula-logo.webp";
 import FondoIconos, { iconoDePregunta, iconoDeOpcion } from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
-import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
+import { leerMios, apuntarEnvio, olvidarEnvio, buscarEnvioPorNombre } from "./mios.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, silenciar } from "./instalar.js";
 import { leerJSON, guardarJSON, borrar } from "../almacen.js";
 
@@ -509,10 +509,14 @@ export default function Formulario({ codigo }) {
             // El mismo icono que ya distingue el tipo en la pregunta "tipo": boda,
             // comunión, empresa... así se reconoce de un vistazo sin leer el nombre.
             const IconoEvento = iconoDeOpcion("tipo", Math.max(0, TIPOS_EVENTO.findIndex(t => t.valor === e.tipo)));
+            // Ya se le mandó algo desde este móvil: se distingue de un vistazo, sin
+            // tener que abrirlo. No lo saca de la lista —puede hacer falta mandarle
+            // una corrección o un dato más—, solo dice que ya tiene algo enviado.
+            const enviado = buscarEnvioPorNombre(mios, e.nombre);
             return (
               <button
                 key={e.nombre}
-                className="form-evento form-evento-con-icono"
+                className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}`}
                 onClick={() => {
                   setEventoDestino(e.nombre);
                   setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
@@ -525,6 +529,9 @@ export default function Formulario({ codigo }) {
                   <span className="form-evento-nombre">{e.nombre}</span>
                   <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
                 </span>
+                {enviado && (
+                  <span className="form-evento-check" title={`Ya mandaste datos ${fmtCuando(enviado.enviado)}`} aria-hidden="true">✓</span>
+                )}
               </button>
             );
           })}
@@ -555,10 +562,7 @@ export default function Formulario({ codigo }) {
   if (paso >= preguntas.length) {
     const falta = respuestasQueFaltan(respuestas);
     const sinContestar = (pr) => respuestas[pr.id] === undefined || respuestas[pr.id] === null;
-    const suNombre = (respuestas.nombre || eventoDestino || "").trim().toLowerCase();
-    const yaMandado = suNombre
-      ? mios.find(m => (m.eventoDestino || m.nombre || "").trim().toLowerCase() === suNombre)
-      : null;
+    const yaMandado = buscarEnvioPorNombre(mios, respuestas.nombre || eventoDestino);
     const enviar = async () => {
       setEnviando(true); setError("");
       try {

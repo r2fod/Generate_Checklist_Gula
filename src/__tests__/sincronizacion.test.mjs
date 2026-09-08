@@ -619,6 +619,29 @@ console.log("\n══ Borrar un evento ══");
     `y desaparece de los próximos que ve la oficina → ${JSON.stringify(paraOficina)}`);
 }
 
+// ── "Ya mandaste esto" — mismo buscador para el repaso y la lista de elegir evento ──
+// Antes cada pantalla comparaba nombres a su manera, con el mismo código repetido dos
+// veces. Ahora las dos llaman a buscarEnvioPorNombre: si el emparejamiento cambia (por
+// ejemplo, a tener en cuenta acentos) solo hay que tocarlo una vez.
+console.log("\n══ buscarEnvioPorNombre: sin mayúsculas ni espacios de sobra ══");
+{
+  const { buscarEnvioPorNombre } = await import("../formulario/mios.js");
+  const mios = [
+    { id: "a1", eventoDestino: "Boda Ana", nombre: "Boda Ana", enviado: 1 },
+    { id: "a2", eventoDestino: "", nombre: "Cumple Marta", enviado: 2 },
+  ];
+  ok(buscarEnvioPorNombre(mios, "Boda Ana")?.id === "a1",
+    "encuentra por eventoDestino");
+  ok(buscarEnvioPorNombre(mios, "  boda ana  ")?.id === "a1",
+    "sin fijarse en mayúsculas ni espacios de sobra");
+  ok(buscarEnvioPorNombre(mios, "Cumple Marta")?.id === "a2",
+    "y si no hay eventoDestino, cae al nombre");
+  ok(buscarEnvioPorNombre(mios, "Boda Que No Existe") === null,
+    "nada si no hay envío con ese nombre");
+  ok(buscarEnvioPorNombre(mios, "") === null && buscarEnvioPorNombre(mios, undefined) === null,
+    "y sin nombre que buscar, tampoco hay falso positivo");
+}
+
 // ── Flores y minutas: no son material, son un sitio y un día ──────────────────
 // No se cargan del almacén: alguien tiene que ir a por ellas. Si no acaban en las
 // recogidas con su fecha, no avisa nadie y el día del evento no están.
