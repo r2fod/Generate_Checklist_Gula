@@ -504,34 +504,6 @@ export const PREGUNTAS = [
     // En todos los tipos: un rodaje también carga platos, cubiertos y bandejas.
   },
 
-  // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
-  // En un rodaje el menú se imprime y se ponen etiquetas: si el archivo no viaja con
-  // los datos, acaba en un WhatsApp perdido y el día del rodaje no lo encuentra nadie.
-  // Va dentro del propio envío, así que la foto se encoge antes de subirse.
-  {
-    id: "imprimirMenu", tipo: "opciones", texto: "¿Hay que imprimir el menú?",
-    opciones: [
-      { valor: "no", texto: "No hace falta" },
-      {
-        valor: "si", texto: "Sí",
-        conArchivo: { sufijo: "Archivo", etiqueta: "Sube el menú o hazle una foto" },
-      },
-    ],
-    soloEn: ["produccion"],
-  },
-  {
-    id: "etiquetas", tipo: "opciones", texto: "¿Hay que imprimir etiquetas?",
-    nota: "La imagen que va en la máquina de etiquetas.",
-    opciones: [
-      { valor: "no", texto: "No hace falta" },
-      {
-        valor: "si", texto: "Sí",
-        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la imagen o hazle una foto" },
-      },
-    ],
-    soloEn: ["produccion"],
-  },
-
   // ── Mantelería y vajilla ───────────────────────────────────────────────────
   // Cuántos manteles lo calcula la app por las mesas: aquí solo se elige de cuáles.
   {
@@ -645,6 +617,34 @@ export const PREGUNTAS = [
     ],
     // En un rodaje no se ponen minutas
     soloEn: CON_BARRA,
+  },
+
+  // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
+  // En un rodaje el menú se imprime y se ponen etiquetas: si el archivo no viaja con
+  // los datos, acaba en un WhatsApp perdido y el día del rodaje no lo encuentra nadie.
+  // Va dentro del propio envío, así que la foto se encoge antes de subirse.
+  {
+    id: "imprimirMenu", tipo: "opciones", texto: "¿Hay que imprimir el menú?",
+    opciones: [
+      { valor: "no", texto: "No hace falta" },
+      {
+        valor: "si", texto: "Sí",
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube el menú o hazle una foto" },
+      },
+    ],
+    soloEn: ["produccion"],
+  },
+  {
+    id: "etiquetas", tipo: "opciones", texto: "¿Hay que imprimir etiquetas?",
+    nota: "La imagen que va en la máquina de etiquetas.",
+    opciones: [
+      { valor: "no", texto: "No hace falta" },
+      {
+        valor: "si", texto: "Sí",
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la imagen o hazle una foto" },
+      },
+    ],
+    soloEn: ["produccion"],
   },
 
   // ── Cierre ─────────────────────────────────────────────────────────────────
