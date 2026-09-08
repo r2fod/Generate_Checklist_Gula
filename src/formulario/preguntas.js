@@ -193,6 +193,18 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
   {
+    // Independiente de si hay barra libre a propósito: puede que no haya cóctel ni
+    // copas y aun así se sirva vino/agua/cava con la comida (cristalería de mesa,
+    // no de barra) — por eso NO depende de "coctel"/"copas", se pregunta siempre.
+    id: "cristaleria", tipo: "opciones", texto: "¿Llevamos cristalería?",
+    nota: "Independiente de si hay barra libre: puede que no haya cóctel ni copas y aun así se sirva vino o agua con la comida.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No hace falta" },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
     // día): lo que cambia es el envase, y eso lo sabe quien lo ha presupuestado.
     id: "aguaPequena", tipo: "opciones", texto: "Las aguas pequeñas, ¿de qué son?",
@@ -1065,6 +1077,7 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.nevera)) estado.tipoNevera = r.nevera;
   if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
   if (puesto(r.hielo)) estado.llevaHielo = r.hielo === "si";
+  if (puesto(r.cristaleria)) estado.llevaCristaleria = r.cristaleria === "si";
   if (Array.isArray(r.menu)) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");

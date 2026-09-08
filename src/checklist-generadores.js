@@ -244,7 +244,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
     llevaCarpas = false, llevaParabanes = false, numParabanes,
-    numMesasBuffet = 0,
+    numMesasBuffet = 0, llevaCristaleria = true,
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
@@ -304,7 +304,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
   // se bebe el mismo vino con la misma comida haya barra detrás o no.
-  const cristal    = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal    = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0, llevaCristaleria);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -425,11 +425,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
-    [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)],
+    opt(llevaCristaleria, [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)]),
     opt(cristal.cubata.u > 0, ["Vasos de cubata", String(cristal.cubata.u)]),
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
-    [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)],
-    ["Copas de cava",                                     String(cristal.cava.u)],
+    opt(llevaCristaleria, [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)]),
+    opt(llevaCristaleria, ["Copas de cava",                                     String(cristal.cava.u)]),
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(llevaJarrasCristal, ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]),
@@ -554,7 +554,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
     llevaCarpas = false, llevaParabanes = false, numParabanes,
-    numMesasBuffet = 0,
+    numMesasBuffet = 0, llevaCristaleria = true,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
@@ -570,7 +570,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos", llevaHielo });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
-  const cristal = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0, llevaCristaleria);
   // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
   // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
@@ -688,9 +688,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
       ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
       ["Cucharas postre", String(conMargen(totalPax))],
     ] : []),
-    [`Copas de vino${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)],
-    ["Vasos de agua", String(cristal.agua.u)],
-    ["Copas de cava", String(cristal.cava.u)],
+    opt(llevaCristaleria, [`Copas de vino${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)]),
+    opt(llevaCristaleria, ["Vasos de agua", String(cristal.agua.u)]),
+    opt(llevaCristaleria, ["Copas de cava", String(cristal.cava.u)]),
     opt(cristal.cubata.u > 0, ["Vasos de cubata", String(cristal.cubata.u)]),
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),

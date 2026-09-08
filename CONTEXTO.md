@@ -685,6 +685,20 @@ delante de las de 3/4 — usa el mismo cálculo que ya existía
 (`personasPorPlatoEntrante = 1` da exactamente un plato extra por
 persona), sin tocar la fórmula.
 
+**Cristalería: pregunta independiente de la barra libre — HECHO**: "Cristalería
+aparte" (en excepciones de mesa) confundía al dueño con otra cosa; lo que hacía falta
+era una pregunta nueva, "¿Llevamos cristalería?" (`preguntas.js`, tras "copas"),
+que a propósito NO depende de cóctel/copas (`si:` ninguno) — puede que no haya barra
+libre y aun así se sirva vino/agua/cava con la comida. `calcCristaleria()`
+(`calculos.js`) admite ahora `llevaCristaleria` (por defecto `true`, para no
+tocar ningún evento ya guardado); a `false` devuelve todo a cero y las líneas de
+"Vasos de agua", "Copas de vino" y "Copas de cava" desaparecen de la checklist
+(`opt(...)`, boda y cumpleaños — producción no lleva cristalería). Cableado igual
+que "Jarras de cristal": estado propio en `App.jsx` (con su casilla manual en
+Vajilla/Cristalería, por si hay que corregirlo a mano) y `getEstadoActual()`,
+para que lo que conteste el formulario se vea también en la checklist real, no
+solo en la calibración del asistente.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

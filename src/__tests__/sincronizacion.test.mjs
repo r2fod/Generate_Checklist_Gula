@@ -810,6 +810,21 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(!preguntasDe("boda", {}).some(p => p.id === "hielo"),
     "y sin contestar todavía lo del congelador, tampoco (por defecto no se muestra hasta saberlo)");
 
+  // Cristalería: independiente de si hay barra libre, cóctel o copas — se pregunta
+  // siempre para boda/comunión/corporativo/cumpleaños, nunca escondida detrás de esas.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cristaleria: "si" }).llevaCristaleria === true,
+    "contestar que sí lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cristaleria: "no" }).llevaCristaleria === false,
+    "y que no hace falta, también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaCristaleria === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+  ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "cristaleria"),
+    "se pregunta aunque cóctel y copas estén a 0 horas");
+  ok(preguntasDe("boda", {}).some(p => p.id === "cristaleria"),
+    "y aunque cóctel/copas no se hayan contestado todavía");
+  ok(!preguntasDe("produccion", {}).some(p => p.id === "cristaleria"),
+    "en un rodaje no se pregunta: no lleva cristalería de mesa");
+
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),

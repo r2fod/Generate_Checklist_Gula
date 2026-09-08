@@ -1439,6 +1439,41 @@ console.log("\n══ Hielo: se puede decir que no hace falta ══");
   ok(item(prodSinHielo, "Desechables y Bebidas") === null, "y en producción igual, con su propia fórmula de taxis");
 }
 
+console.log("\n══ Cristalería: independiente de la barra, apagable del todo ══");
+{
+  // Igual que el hielo: por defecto se sigue calculando todo como siempre.
+  const con = calcCristaleria(100, 4, false, true, false);
+  ok(con.agua.u > 0 && con.vino.u > 0 && con.cava.u > 0, "por defecto sigue calculando cristalería");
+  const sin = calcCristaleria(100, 4, false, true, false, 0, false);
+  ok(sin.agua.u === 0 && sin.vino.u === 0 && sin.cava.u === 0 && sin.cubata.u === 0 && sin.chupito === null,
+    "y con \"no hace falta\", todo a cero (chupito directamente null)");
+
+  // Y en la checklist, las líneas de cristalería desaparecen (no se quedan en "0")
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : it;
+  };
+  const bodaConCristaleria = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(bodaConCristaleria, "Cristalería", "Copas de vino"), "boda: con cristalería por defecto sale la línea de vino");
+  const bodaSinCristaleria = buildChecklist("boda", 100, 2, 4, 0, { llevaCristaleria: false });
+  ok(item(bodaSinCristaleria, "Cristalería", "Copas de vino") === null, "boda: sin cristalería, vino se apaga (null)");
+  ok(item(bodaSinCristaleria, "Cristalería", "Vasos de agua") === null, "boda: sin cristalería, agua se apaga (null)");
+  ok(item(bodaSinCristaleria, "Cristalería", "Copas de cava") === null, "boda: sin cristalería, cava se apaga (null)");
+
+  // Independiente de la barra: sin cóctel ni copas (0 horas), la cristalería de mesa
+  // sigue calculándose igual — es justo lo que pedía el dueño.
+  const bodaSinBarra = buildChecklist("boda", 100, 0, 0, 0, {});
+  ok(item(bodaSinBarra, "Cristalería", "Copas de vino"), "boda sin barra libre: la cristalería de mesa no depende de ella");
+
+  const cumpleConCristaleria = buildChecklist("cumpleanos", 80, 0, 3, 8, {});
+  ok(item(cumpleConCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de vino"), "cumpleaños: con cristalería por defecto sale la línea");
+  const cumpleSinCristaleria = buildChecklist("cumpleanos", 80, 0, 3, 8, { llevaCristaleria: false });
+  ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de vino") === null, "cumpleaños: sin cristalería, vino se apaga");
+  ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Vasos de agua") === null, "cumpleaños: sin cristalería, agua se apaga");
+  ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de cava") === null, "cumpleaños: sin cristalería, cava se apaga");
+}
+
 console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
 {
   // Coca normal, Zero y Nestea cuadran EXACTOS con el evento de 65 pax del que salieron

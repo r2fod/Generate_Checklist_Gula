@@ -225,7 +225,7 @@ const ETIQUETAS_CAMPO = {
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
-  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
+  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", llevaCristaleria: "Llevamos cristalería", tipoCafetera: "Cafetera",
   cafeParaInvitados: "Café para invitados",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
   llevaMobiliarioAlquiler: "Mobiliario de alquiler", proveedorMobiliarioAlquiler: "Proveedor del mobiliario",
@@ -570,6 +570,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [colorManteles, setColorManteles] = useState(estadoInicial.colorManteles ?? "");
   const [porcentajeBeige, setPorcentajeBeige] = useState(estadoInicial.porcentajeBeige ?? 50);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
+  // Independiente de si hay barra libre: puede que no haya cóctel ni copas y aun así
+  // se sirva vino/agua/cava con la comida. Por defecto SÍ, como se calculaba siempre
+  // antes de existir esta pregunta.
+  const [llevaCristaleria, setLlevaCristaleria]     = useState(estadoInicial.llevaCristaleria ?? true);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
   // Por defecto SÍ es para invitados (como se calculaba siempre antes de esta
   // pregunta): un evento guardado antes de existir esto carga exactamente lo mismo.
@@ -876,7 +880,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
     alquilaCarpas, numCarpas, llevaParabanes, numParabanes, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -978,7 +982,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
-    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
+    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, llevaCristaleria: setLlevaCristaleria, tipoCafetera: setTipoCafetera,
     cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, proveedorMobiliarioAlquiler: setProveedorMobiliarioAlquiler,
@@ -2521,7 +2525,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
@@ -2538,7 +2542,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
-    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
@@ -4439,6 +4443,9 @@ export default function App({ onCerrarSesion } = {}) {
                 : []),
               ...(evento !== "cumpleanos" && evento !== "produccion"
                 ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
+                : []),
+              ...(evento !== "produccion"
+                ? [[llevaCristaleria, setLlevaCristaleria, "Llevamos cristalería", "desmárcalo si no se sirve vino/agua/cava en vaso o copa"]]
                 : []),
             ].map(([val, fn, lab, sub]) => (
               <label key={lab} className="checkbox-label-normal">

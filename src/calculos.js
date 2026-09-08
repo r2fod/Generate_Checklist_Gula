@@ -374,7 +374,12 @@ export function calcDestilados(pax, h) {
  * @param {boolean} tieneBrindisCava @param {boolean} llevaEntrante @param {number} [extraAguaDesayuno]
  * @returns {Record<string, { u: number, b: number, size: number } | null>}
  */
-export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0) {
+export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0, llevaCristaleria = true) {
+  // Independiente de la barra: puede que no haya cóctel ni copas y aun así se sirva
+  // vino/agua/cava con la comida (cristalería de mesa), o al revés — que digan que
+  // no llevan nada de cristalería y entonces no se carga ni un vaso.
+  const cero = { u: 0, b: 0, size: 1 };
+  if (!llevaCristaleria) return { agua: cero, cubata: cero, vino: cero, cava: cero, chupito: null };
   // Ajustable desde Ajustes/asistente (ver cristaleria.js): 1 si nadie lo ha tocado,
   // así que sin ajustar da exactamente lo de siempre.
   const f = leerFactoresCristaleria();
