@@ -825,6 +825,25 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(!preguntasDe("produccion", {}).some(p => p.id === "cristaleria"),
     "en un rodaje no se pregunta: no lleva cristalería de mesa");
 
+  // Mesas altas: por nº de barras en vez de una fórmula fija por pax. Solo tiene
+  // sentido si hay barra de verdad — depende de coctel/copas, al revés que cristalería.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: 1 }).numBarras === 1,
+    "1 barra se guarda tal cual");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: 2 }).numBarras === 2,
+    "2 barras también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: "otras", numBarrasOtras: 5 }).numBarras === 5,
+    "\"otro número\" manda el número escrito, no el texto \"otras\"");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).numBarras === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+  ok(!preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "numBarras"),
+    "sin cóctel ni copas (0 horas), no se pregunta: no hay barra que montar");
+  ok(!preguntasDe("boda", {}).some(p => p.id === "numBarras"),
+    "y sin contestar cóctel/copas todavía, tampoco (por defecto no se muestra hasta saberlo)");
+  ok(preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "numBarras"),
+    "con cóctel puesto (aunque copas esté a 0), sí se pregunta");
+  ok(!preguntasDe("produccion", { coctel: 2 }).some(p => p.id === "numBarras"),
+    "en un rodaje no se pregunta: no lleva \"Mesa alta\" en su checklist");
+
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),

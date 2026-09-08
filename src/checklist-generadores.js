@@ -5,7 +5,7 @@
 import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
   terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen, taxisDeHielo, calcMesasCalientes,
-  alturasBuffet,
+  calcMesasAltas, alturasBuffet,
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
@@ -244,7 +244,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
     llevaCarpas = false, llevaParabanes = false, numParabanes,
-    numMesasBuffet = 0, llevaCristaleria = true,
+    numMesasBuffet = 0, llevaCristaleria = true, numBarras,
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
@@ -330,8 +330,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
     calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: evtKey });
-  // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
-  const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
+  // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la
+  // gente de pie. Por nº de barras si se contestó (calcMesasAltas cae sola al cálculo
+  // viejo por pax si no).
+  const mesasAltas = hayBarra ? calcMesasAltas(pax, numBarras) : 0;
   // Carpas: antes solo existían en producción (sitios siempre al aire libre). Aquí son
   // la excepción, no la norma (fincas con nave/interior), de ahí que lleguen apagadas
   // por defecto — mismo cálculo compartido que producción (carpas.js), con el pax

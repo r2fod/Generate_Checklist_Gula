@@ -16,7 +16,7 @@ import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras,
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
-  calcHielo, KG_POR_TAXI, KG_POR_BOLSA, taxisDeHielo, calcMesasCalientes,
+  calcHielo, KG_POR_TAXI, KG_POR_BOLSA, taxisDeHielo, calcMesasCalientes, calcMesasAltas,
   ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo, factorHieloDe,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
@@ -919,6 +919,38 @@ console.log("\n══ Mesas de buffet: de texto libre a un número real en la ch
   const prodConBuffet = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 3 });
   ok(item(prodConBuffet, "Mobiliario", "Cajas de madera para alturas") === "3",
     "y en producción, misma cuenta");
+}
+
+console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax ══");
+{
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : undefined;
+  };
+
+  // Sin barra libre (cóctel y copas a 0), ni se calcula
+  const sinBarra = buildChecklist("boda", 90, 0, 0, 0, {});
+  ok(item(sinBarra, "Mobiliario, sala y decoración", "Mesa alta") === "—",
+    "sin cóctel ni copas, no hay mesas altas que montar");
+
+  // Con barra pero sin contestar numBarras, cae al cálculo viejo por pax
+  const sinNumBarras = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinNumBarras, "Mobiliario, sala y decoración", "Mesa alta") === String(calcMesasAltas(90)),
+    `con barra pero sin contestar barras, cae al cálculo viejo por pax (90 → ${calcMesasAltas(90)})`);
+
+  // Con numBarras contestado, manda esa cuenta (2 por barra bajo 100 pax)
+  const conUnaBarra = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 1 });
+  ok(item(conUnaBarra, "Mobiliario, sala y decoración", "Mesa alta") === "2",
+    "1 barra bajo 100 pax → 2 mesas altas");
+  const conDosBarras = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 2 });
+  ok(item(conDosBarras, "Mobiliario, sala y decoración", "Mesa alta") === "4",
+    "2 barras bajo 100 pax → 4 mesas altas");
+
+  // Con 100 pax o más, 4 por barra
+  const conBarraPaxAlto = buildChecklist("boda", 120, 2, 4, 0, { numBarras: 1 });
+  ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "4",
+    "1 barra con 120 pax → 4 mesas altas");
 }
 
 console.log("\n══ Quién va a cada evento: horas e importe ══");
@@ -2664,6 +2696,18 @@ console.log("\n══ Mesas calientes y taxis de hielo, como funciones sueltas �
   ok(calcMesasCalientes(40) === 1 && calcMesasCalientes(41) === 2,
     `1 mesa caliente por cada ~40 pax: 40 → 1, 41 → 2 (${calcMesasCalientes(40)}, ${calcMesasCalientes(41)})`);
   ok(calcMesasCalientes(0) === 1, "sin pax puesto, el mínimo es 1, no 0");
+
+  // Mesas altas: antes pax/15 fijo; ahora depende de cuántas barras se van a montar
+  // (2 por barra, 4 con 100 pax o más), y sin contestar cae sola al cálculo viejo.
+  ok(calcMesasAltas(99, 1) === 2 && calcMesasAltas(99, 2) === 4,
+    `2 mesas por barra bajo 100 pax: 1 barra → 2, 2 barras → 4 (${calcMesasAltas(99, 1)}, ${calcMesasAltas(99, 2)})`);
+  ok(calcMesasAltas(120, 1) === 4 && calcMesasAltas(120, 2) === 8,
+    `4 mesas por barra con 100 pax o más: 1 barra → 4, 2 barras → 8 (${calcMesasAltas(120, 1)}, ${calcMesasAltas(120, 2)})`);
+  ok(calcMesasAltas(99, 3) === 6, "el salto de 2 a 4 es por pax, no por nº de barras (99 pax, 3 barras → 6)");
+  ok(calcMesasAltas(100, 0) === Math.max(2, Math.ceil(100 / 15)),
+    "sin barras contestadas (0), cae al cálculo viejo por pax");
+  ok(calcMesasAltas(100, undefined) === Math.max(2, Math.ceil(100 / 15)),
+    "y sin el campo siquiera (undefined), igual — eventos guardados antes de esta pregunta");
 
   ok(taxisDeHielo(24) === 1 && taxisDeHielo(25) === 2,
     `24kg entran en 1 taxi, 25kg ya piden 2 (${taxisDeHielo(24)}, ${taxisDeHielo(25)})`);
