@@ -780,9 +780,27 @@ aparte que necesita sus propias unidades físicas.
 - Cableado en App.jsx: seis casillas nuevas junto a "Doble servicio" (que ahora dice
   "dobla el plato", ya no "cubierto, copa y plato"), con el mismo fallback a
   `dobleServicio` al cargar un evento antiguo.
-- Pendiente, en su propio PR aparte: "bebida aparte" (cliente trae su propia bebida)
-  — sustituir el sí/no de "¿Llevamos cristalería?" por elegir qué bebidas concretas
-  se sirven cuando el cliente la trae, y decidir si también afecta a `calcBebidas()`.
+
+**"Bebida aparte": el cliente/la finca trae su propia bebida — HECHO**: con barra
+libre (cóctel o copas) la respuesta de quién pone la bebida y la cristalería es
+obvia — las pone Gula, siempre — así que las dos preguntas ("¿La bebida la trae el
+cliente/la finca, o la sirve Gula?", nueva, y "¿Llevamos cristalería?", de PR #203)
+ahora solo se hacen cuando NO hay barra libre (`si: (r) => !(coctel>0) &&
+!(copas>0)`, `preguntas.js`), que es el único caso realmente ambiguo. Con barra, se
+saltan y se calcula todo como siempre.
+- `calcBebidas()` (`calculos.js`) gana `llevaBebida = true`: a `false` pone a cero
+  TODO el alcohol y los refrescos (cerveza, vinos, cava, refrescos, tónica,
+  redbull...) — el hielo, que tiene su propio interruptor (`llevaHielo`) y es
+  aparte de la bebida, se sigue calculando igual (movido al principio de la
+  función, antes del corte, para que no dependa de `llevaBebida`). El agua para el
+  personal ya vivía en `calcPersonal()`, una función totalmente aparte — no hace
+  falta tocar nada ahí, ya estaba desacoplada.
+  Las líneas de bebida en la checklist quedan a "0" (no null): ahí siempre se ha
+  visto el número, nunca una línea que desaparece — a diferencia de cristalería o
+  hielo, que si se apagan sí quitan la línea entera.
+- Los vasos de cubata (ligados a horas de copas, no a esto) no se tocan.
+- `aRespuestasDeLaApp()`: `estado.llevaBebida = r.bebidaAparte === "no"` ("no" =
+  "la sirve Gula" = sí se calcula).
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16

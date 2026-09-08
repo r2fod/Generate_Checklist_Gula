@@ -57,7 +57,8 @@ const GASTROS_MINIMO = 4;
 // pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
 // tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
 // entrante, estiloPlatoPostre después de estiloPlato, hielo después de
-// congelador, numBarras después de coctel/copas, queDobla después de menu).
+// congelador, numBarras/bebidaAparte/cristaleria después de coctel/copas,
+// queDobla después de menu).
 export const PREGUNTAS = [
   // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
@@ -193,16 +194,32 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
   {
+    // Con barra libre (cóctel o copas) la respuesta es obvia: la bebida y la
+    // cristalería las pone Gula, así que no hace falta preguntar — se calculan
+    // solas. Esto solo tiene sentido SIN barra libre, que es cuando de verdad puede
+    // ser que el cliente/la finca traiga su propia bebida.
+    id: "bebidaAparte", tipo: "opciones", texto: "¿La bebida la trae el cliente/la finca, o la sirve Gula?",
+    nota: "Si la trae el cliente, no se calculan refrescos ni alcohol — el agua del personal no se toca, esa es aparte.",
+    opciones: [
+      { valor: "no", texto: "La sirve Gula" },
+      { valor: "si", texto: "La trae el cliente/la finca" },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => !(Number(r.coctel) > 0) && !(Number(r.copas) > 0),
+  },
+  {
     // Independiente de si hay barra libre a propósito: puede que no haya cóctel ni
     // copas y aun así se sirva vino/agua/cava con la comida (cristalería de mesa,
-    // no de barra) — por eso NO depende de "coctel"/"copas", se pregunta siempre.
+    // no de barra). Pero con barra libre la respuesta es obvia (hace falta sí o sí),
+    // así que solo se pregunta cuando NO hay barra — igual que "bebidaAparte".
     id: "cristaleria", tipo: "opciones", texto: "¿Llevamos cristalería?",
-    nota: "Independiente de si hay barra libre: puede que no haya cóctel ni copas y aun así se sirva vino o agua con la comida.",
+    nota: "Sin barra libre puede que aun así se sirva vino o agua con la comida — o que no haga falta ni un vaso.",
     opciones: [
       { valor: "si", texto: "Sí" },
       { valor: "no", texto: "No hace falta" },
     ],
     soloEn: CON_BARRA,
+    si: (r) => !(Number(r.coctel) > 0) && !(Number(r.copas) > 0),
   },
   {
     // Con esto se calculan las mesas altas (2 por barra, 4 si son 100 pax o más) en
@@ -1127,6 +1144,7 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
   if (puesto(r.hielo)) estado.llevaHielo = r.hielo === "si";
   if (puesto(r.cristaleria)) estado.llevaCristaleria = r.cristaleria === "si";
+  if (puesto(r.bebidaAparte)) estado.llevaBebida = r.bebidaAparte === "no";
   if (puesto(r.numBarras)) {
     estado.numBarras = r.numBarras === "otras" ? r.numBarrasOtras : r.numBarras;
   }

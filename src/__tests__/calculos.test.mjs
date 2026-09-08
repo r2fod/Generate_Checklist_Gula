@@ -1577,6 +1577,39 @@ console.log("\n══ Cristalería: independiente de la barra, apagable del todo
   ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de cava") === null, "cumpleaños: sin cristalería, cava se apaga");
 }
 
+console.log("\n══ Bebida aparte: el cliente la trae, Gula no pone nada de beber ══");
+{
+  // Por defecto (llevaBebida no puesto o true) se calcula todo como siempre.
+  const con = calcBebidas(100, 4, true, false, false, 4, { llevaBebida: true });
+  ok(con.vinoBlanco > 0 && con.cerveza > 0 && con.agua15 > 0, "por defecto sigue calculando bebida");
+
+  // Con llevaBebida: false, todo el alcohol/refrescos a cero...
+  const sin = calcBebidas(100, 4, true, false, false, 4, { llevaBebida: false, llevaHielo: true });
+  ok(sin.vinoBlanco === 0 && sin.vinoTinto === 0 && sin.cava === 0 && sin.cerveza === 0 && sin.agua15 === 0
+    && sin.cocaNormal === 0 && sin.tonica === 0 && sin.redbull === 0,
+    "y con bebida aparte, todo a cero");
+  // ...pero el hielo, que es aparte, se sigue calculando igual (tiene su propio interruptor).
+  ok(sin.hieloKg > 0 && sin.taxisHielo > 0, `el hielo no se toca → ${sin.hieloKg}kg`);
+  const sinNiHielo = calcBebidas(100, 4, true, false, false, 4, { llevaBebida: false, llevaHielo: false });
+  ok(sinNiHielo.hieloKg === 0, "salvo que tampoco se quiera hielo, claro (su propio interruptor)");
+
+  // Y en la checklist, las líneas de bebida quedan a "0" (no null): aquí siempre se ha
+  // visto el número, nunca una línea que desaparece.
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : it;
+  };
+  const bodaConBebida = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(bodaConBebida, "Bebidas frías", "Vino blanco").u > 0, "boda: con bebida por defecto sale vino");
+  const bodaSinBebida = buildChecklist("boda", 100, 2, 4, 0, { llevaBebida: false });
+  ok(item(bodaSinBebida, "Bebidas frías", "Vino blanco").u === 0, "boda: bebida aparte, vino queda a 0 botellas");
+  ok(item(bodaSinBebida, "Bebidas frías", "Hielo"), "boda: bebida aparte, el hielo sigue saliendo");
+
+  const cumpleSinBebida = buildChecklist("cumpleanos", 80, 0, 3, 8, { llevaBebida: false });
+  ok(item(cumpleSinBebida, "Bebidas", "Vino blanco").u === 0, "cumpleaños: bebida aparte, vino a 0 también");
+}
+
 console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
 {
   // Coca normal, Zero y Nestea cuadran EXACTOS con el evento de 65 pax del que salieron

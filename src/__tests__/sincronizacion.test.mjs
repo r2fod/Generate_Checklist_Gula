@@ -810,8 +810,9 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(!preguntasDe("boda", {}).some(p => p.id === "hielo"),
     "y sin contestar todavía lo del congelador, tampoco (por defecto no se muestra hasta saberlo)");
 
-  // Cristalería: independiente de si hay barra libre, cóctel o copas — se pregunta
-  // siempre para boda/comunión/corporativo/cumpleaños, nunca escondida detrás de esas.
+  // Cristalería y bebida aparte: solo tienen sentido SIN barra libre — con cóctel o
+  // copas la respuesta es obvia (Gula pone las dos), así que se preguntan solo cuando
+  // ni cóctel ni copas tienen horas.
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cristaleria: "si" }).llevaCristaleria === true,
     "contestar que sí lo guarda");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cristaleria: "no" }).llevaCristaleria === false,
@@ -819,11 +820,32 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaCristaleria === undefined,
     "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
   ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "cristaleria"),
-    "se pregunta aunque cóctel y copas estén a 0 horas");
+    "se pregunta si cóctel y copas están a 0 horas");
   ok(preguntasDe("boda", {}).some(p => p.id === "cristaleria"),
-    "y aunque cóctel/copas no se hayan contestado todavía");
+    "y si cóctel/copas no se han contestado todavía");
+  ok(!preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "cristaleria"),
+    "pero no si hay barra de cóctel: la trae Gula seguro");
+  ok(!preguntasDe("boda", { coctel: 0, copas: 3 }).some(p => p.id === "cristaleria"),
+    "ni si hay barra de copas");
   ok(!preguntasDe("produccion", {}).some(p => p.id === "cristaleria"),
     "en un rodaje no se pregunta: no lleva cristalería de mesa");
+
+  // Bebida aparte: mismo patrón de si: que cristalería, y solo tiene sentido cuando
+  // hay barra en el evento (CON_BARRA) sin horas de cóctel/copas puestas.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, bebidaAparte: "si" }).llevaBebida === false,
+    "el cliente trae la bebida: no se calcula");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, bebidaAparte: "no" }).llevaBebida === true,
+    "la sirve Gula: se calcula como siempre");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaBebida === undefined,
+    "sin contestar, no se toca");
+  ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "bebidaAparte"),
+    "se pregunta sin barra libre");
+  ok(!preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "bebidaAparte"),
+    "no se pregunta con barra de cóctel");
+  ok(!preguntasDe("boda", { coctel: 0, copas: 3 }).some(p => p.id === "bebidaAparte"),
+    "ni con barra de copas");
+  ok(!preguntasDe("produccion", {}).some(p => p.id === "bebidaAparte"),
+    "en un rodaje no se pregunta");
 
   // Mesas altas: por nº de barras en vez de una fórmula fija por pax. Solo tiene
   // sentido si hay barra de verdad — depende de coctel/copas, al revés que cristalería.
