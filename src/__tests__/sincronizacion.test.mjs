@@ -883,7 +883,7 @@ console.log("\n══ Lo obligatorio del formulario ══");
 console.log("\n══ Color de los manteles ══");
 {
   const { repartoManteles, colorPorDefecto } = await import("../manteles.js");
-  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
 
   ok(colorPorDefecto("boda") === "Beige" && colorPorDefecto("produccion") === "Negros",
     "sin elegir nada se carga lo de siempre: beige en salón, negros en rodaje");
@@ -928,6 +928,13 @@ console.log("\n══ Color de los manteles ══");
   ok(azul.estiloPlatoPostre === "Azul", "el plato de postre azul llega tal cual, sin pasar por \"Otro\"");
   const naranja = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Naranja" });
   ok(naranja.estiloPlatoPostre === "Naranja", "y el naranja igual");
+
+  // Y el plato grande (relieve) también, para cuando el postre se sirve en el mismo
+  // plato que el principal en vez de uno pequeño aparte.
+  const relieve = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Relieve blanco" });
+  ok(relieve.estiloPlatoPostre === "Relieve blanco", "el plato de postre \"Relieve blanco\" llega tal cual, sin pasar por \"Otro\"");
+  ok(opcionesDe(PREGUNTAS.find(p => p.id === "estiloPlatoPostre"), "boda").some(o => o.valor === "Relieve blanco"),
+    "y sale como botón rápido, igual que en el plato principal");
 }
 
 // ── Lo que hay que comprar ────────────────────────────────────────────────────

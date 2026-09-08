@@ -630,6 +630,13 @@ confundirse con un menú que simplemente deja elegir uno de los dos (que no
 dobla nada). Aclarado con nota en la pregunta y texto de la opción más
 explícito ("se sirven los dos"); el valor guardado (`dosPlatos`) no cambió.
 
+**Plato de postre: añadida "Relieve blanco" — HECHO**: ya existía en el plato
+principal (`estiloPlato`) pero faltaba en el de postre, para cuando el postre
+se sirve en el mismo plato grande en vez de uno pequeño aparte. "Verde" ya
+estaba en los dos desde antes. Sin tocar ningún valor existente (serían el
+label literal de la línea de checklist — un rename sin migración según
+CLAUDE.md), solo se añadió la opción nueva.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

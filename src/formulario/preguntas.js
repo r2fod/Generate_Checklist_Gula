@@ -582,6 +582,9 @@ export const PREGUNTAS = [
       { valor: "Azul", texto: "Azul" },
       { valor: "Naranja", texto: "Naranja" },
       { valor: "Verde", texto: "Verde" },
+      // Ya existía en el plato principal (estiloPlato, justo arriba); faltaba aquí
+      // para cuando el postre se sirve en el mismo plato grande, no en uno pequeño.
+      { valor: "Relieve blanco", texto: "Relieve blanco" },
       { valor: "Negro/gris", texto: "Negro o gris" },
       {
         valor: "Otro", texto: "Otro (escribirlo)",
