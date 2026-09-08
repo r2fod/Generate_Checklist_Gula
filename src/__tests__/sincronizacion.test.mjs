@@ -705,7 +705,7 @@ console.log("\n══ Flores y minutas → recogidas ══");
 console.log("\n══ Cuántas carpas y cuántas alquilar ══");
 {
   const { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } = await import("../carpas.js");
-  const { aRespuestasDeLaApp, resumirEnvio, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, resumirEnvio, opcionesDe, PREGUNTAS, preguntasDe } = await import("../formulario/preguntas.js");
 
   ok(carpasRecomendadas(40) === 6, `40 pax → 6 carpas (4 de comer + buffet + camión): ${carpasRecomendadas(40)}`);
   ok(carpasRecomendadas(12) === 3, `12 pax → 3: ${carpasRecomendadas(12)}`);
@@ -768,6 +768,17 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
     "y que no hace falta, también");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaHielo === undefined,
     "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+
+  // Con congelador no hace falta ni preguntar: no tiene sentido llevarlo y no
+  // querer hielo, así que la pregunta solo sale sin congelador.
+  ok(preguntasDe("boda", { congelador: "No lleva" }).some(p => p.id === "hielo"),
+    "sin congelador, sí se pregunta");
+  ok(!preguntasDe("boda", { congelador: "Mediana" }).some(p => p.id === "hielo"),
+    "con congelador mediano, no se pregunta");
+  ok(!preguntasDe("boda", { congelador: "Grande" }).some(p => p.id === "hielo"),
+    "ni con uno grande");
+  ok(!preguntasDe("boda", {}).some(p => p.id === "hielo"),
+    "y sin contestar todavía lo del congelador, tampoco (por defecto no se muestra hasta saberlo)");
 
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
