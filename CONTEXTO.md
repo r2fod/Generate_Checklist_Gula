@@ -586,6 +586,18 @@ congelador; con "No hace falta" (`llevaHielo: false`), `calcBebidas()` no
 calcula nada y la línea "Hielo" se apaga en checklist (boda/comunión/
 corporativo, cumpleaños y producción, cada uno con su propia fórmula).
 
+**Elegir evento: distinguir los que ya se mandaron — HECHO**: en la pantalla de
+elegir evento, los que ya se enviaron desde este móvil se marcan con borde/fondo
+verde y un ✓ (mismo criterio que ya usaba el aviso "Ya mandaste datos de..." del
+repaso). Antes cada pantalla comparaba el nombre a su manera con el mismo código
+repetido dos veces; ahora ambas llaman a `buscarEnvioPorNombre()` (`mios.js`).
+De paso, aclarado: la lista de "Ver lo que he mandado" vive en el propio
+navegador (localStorage) — si se borran los datos del sitio (recomendado antes
+para forzar el icono nuevo) se pierde esa lista cómoda, aunque lo mandado sigue
+a salvo en la nube. Y confirmado que reenviar el mismo evento NO duplica: cada
+envío es un documento nuevo en `envios/`, y el aviso de "ya mandaste esto" es
+un recordatorio, no un bloqueo — mandar una corrección aposta es un caso válido.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
