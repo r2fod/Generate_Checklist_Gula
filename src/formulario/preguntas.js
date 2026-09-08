@@ -961,16 +961,21 @@ export function aRespuestasDeLaApp(r = {}) {
   // número, mismo mínimo que ya aplica el propio campo en Formulario.jsx). En los
   // tres tipos de evento, no solo en producción: buildChecklistBoda/Cumpleanos no
   // tenían ninguna línea de mesa de buffet hasta ahora.
-  if (Array.isArray(r.buffets) && r.buffets.length) {
+  //
+  // Array.isArray(r.buffets), NO ".length": si la pantalla se contestó desmarcando
+  // todos los buffets, r.buffets llega como [] — un evento que ya tenía mesas de un
+  // envío anterior tiene que bajar a 0, no quedarse con el número viejo. Solo si la
+  // pantalla NUNCA se contestó (r.buffets === undefined) se deja lo que ya hubiera.
+  if (Array.isArray(r.buffets)) {
     // "otro" no tiene un solo número: son las mesas de todos los buffets sin lista
     // propia que se hayan añadido (gildas, rincón de gin-tonics...), sumadas.
-    estado.numMesasBuffet = r.buffets.reduce((acc, v) => {
+    estado.numMesasBuffet = r.buffets.length ? r.buffets.reduce((acc, v) => {
       if (v === "otro") {
         const lista = Array.isArray(r.buffetsOtros) ? r.buffetsOtros : [];
         return acc + lista.reduce((s, x) => s + (Number(x.mesas) || 1), 0);
       }
       return acc + (Number(r[`${v}Numero`]) || 1);
-    }, 0);
+    }, 0) : 0;
   }
 
   if (tipo === "produccion") {
