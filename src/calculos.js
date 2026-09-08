@@ -214,11 +214,28 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
  * @param {boolean} tieneCongelador
  * @param {boolean} [tieneBrindisCava]
  * @param {number} [horasCopas]
- * @param {{ alcoholPax?: number, tipo?: string, llevaHielo?: boolean }} [opciones] alcoholPax = solo adultos
+ * @param {{ alcoholPax?: number, tipo?: string, llevaHielo?: boolean, llevaBebida?: boolean }} [opciones] alcoholPax = solo adultos
  * @returns {Record<string, any>}
  */
-export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax, tipo = "", llevaHielo = true } = {}) {
+export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = h, { alcoholPax = pax, tipo = "", llevaHielo = true, llevaBebida = true } = {}) {
   const factor = factoresDeTipo(tipo);
+  // El hielo tiene su propio interruptor (llevaHielo, ya existía) y va aparte de la
+  // bebida: si el cliente trae su bebida, puede que igualmente necesite el hielo de
+  // Gula, así que se calcula siempre igual antes de mirar llevaBebida.
+  const hielo = llevaHielo ? calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador, tipo }) : { kg: 0, bolsas: 0, taxis: 0 };
+  const taxisHielo = hielo.taxis;
+  // "Bebida aparte": el cliente/la finca trae su propia bebida, Gula no aporta nada
+  // de esto. Se apaga TODO lo de beber (cero, no null: aquí siempre se ha mostrado
+  // el número, nunca una línea que desaparece) — el hielo, que es aparte, no se toca.
+  if (!llevaBebida) {
+    return {
+      cerveza: 0, vinoBlanco: 0, vinoTinto: 0, cava: 0, tonica: 0, agua15: 0, agua15Packs: 0, redbull: 0,
+      aguasPequenasCajas: 0, aguasPequenasUds: 0, vermutRojo: 0, vermutBlanco: 0, tintoVerano: 0,
+      cocaNormal: 0, cocaZero: 0, fantaNaranja: 0, fantaLimon: 0, aquarius: 0, sprite: 0, nestea: 0,
+      aguaConGas: 0, cerveza00: 0, sinGluten: 0,
+      taxisHielo, hieloKg: hielo.kg, hieloBolsas: hielo.bolsas,
+    };
+  }
   // Suelo de 2 horas para el VOLUMEN. Un evento sin barra libre lleva cerveza igual —
   // la de la comida— y eso antes se resolvía llamando aquí con un 2 fijo cuando no
   // había barra. El efecto era absurdo: media hora de cóctel pedía MENOS que no tener
@@ -292,14 +309,6 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
   const aguasPequenasUds = Math.round(pax * 3);
   const aguasPequenasCajas = Math.max(1, Math.ceil(aguasPequenasUds / 35));
-  // El hielo sale de calcHielo: kilos, bolsas y taxis, y depende de la temporada, de si
-  // hay barra y de si en el sitio hay congelador donde guardarlo (ver arriba). Antes era
-  // "taxis = pax/30" y con congelador CERO, dando por hecho que se hacía in situ: una
-  // finca con arca te deja guardarlo, no fabricarlo. Si el cliente dice que no hace
-  // falta (lo pone el sitio, o no lo necesitan), no se calcula nada: no tiene sentido
-  // pedir hielo, bolsas ni taxis para algo que no se va a llevar.
-  const hielo = llevaHielo ? calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador, tipo }) : { kg: 0, bolsas: 0, taxis: 0 };
-  const taxisHielo = hielo.taxis;
   // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
   // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas).
   // Calibrado con datos reales (65 pax → 6 rojo, 5 blanco).
