@@ -699,6 +699,18 @@ Vajilla/Cristalería, por si hay que corregirlo a mano) y `getEstadoActual()`,
 para que lo que conteste el formulario se vea también en la checklist real, no
 solo en la calibración del asistente.
 
+**Buffets: desmarcar todos ahora baja las mesas a 0 — HECHO**: bug real, encontrado
+al auditar la checklist a fondo. `aRespuestasDeLaApp()` solo escribía
+`numMesasBuffet` cuando `r.buffets.length > 0` — si un evento ya tenía mesas de un
+envío anterior y llegaba una CORRECCIÓN desmarcando todos los buffets, `r.buffets`
+llegaba como `[]` (Formulario.jsx inicializa así una pantalla de "marcar" que se
+pasó sin marcar nada) pero el `if` no entraba, y `numMesasBuffet` se quedaba con el
+número viejo — la checklist seguía enseñando mesas de buffet que ya no había.
+Arreglado distinguiendo "nunca se contestó" (`r.buffets === undefined`, no se toca,
+igual que siempre) de "se contestó y no se marcó ninguno" (`Array.isArray(r.buffets)`
+aunque esté vacío → `numMesasBuffet = 0` explícito). Un test afirmaba a propósito el
+comportamiento viejo ("no se toca" con `buffets: []`); corregido para esperar `0`.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

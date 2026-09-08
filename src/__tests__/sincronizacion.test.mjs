@@ -1295,10 +1295,10 @@ console.log("\n══ Buffets: las mesas sí llegan a la checklist ══");
     "marcar un buffet sin poner número cuenta como 1 mesa, no 0");
   ok(aRespuestasDeLaApp({ ...base, buffets: ["quesos", "dulce"], quesosNumero: 2, dulceNumero: 1 }).numMesasBuffet === 3,
     "dos buffets con su propio número se suman (2 + 1 = 3)");
-  ok(aRespuestasDeLaApp({ ...base, buffets: [] }).numMesasBuffet === undefined,
-    "marcar la pantalla sin marcar ningún buffet no pone un 0 de más: no se toca");
+  ok(aRespuestasDeLaApp({ ...base, buffets: [] }).numMesasBuffet === 0,
+    "marcar la pantalla sin marcar ningún buffet baja a 0: si ya había mesas de un envío anterior, se quitan");
   ok(aRespuestasDeLaApp(base).numMesasBuffet === undefined,
-    "sin contestar, no se toca");
+    "sin contestar la pantalla (ni siquiera visitarla), no se toca");
 }
 
 // "Otro" no es un buffet más: pueden ser varios (gildas, un rincón de gin-tonics...),
