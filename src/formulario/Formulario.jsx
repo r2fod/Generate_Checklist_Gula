@@ -5,7 +5,7 @@
 //
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
@@ -490,6 +490,10 @@ export default function Formulario({ codigo }) {
       .filter(e => !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()))
       .slice()
       .sort((a, b) => (a.configurado === b.configurado ? 0 : a.configurado ? 1 : -1));
+    // Dónde empieza el bloque de "ya configurados", para meter un separador ahí en
+    // vez de dejar los dos grupos pegados sin ningún corte visual. Si no hay mezcla
+    // (todos configurados, o ninguno) no hay nada que separar.
+    const primerConfiguradoIdx = lista.findIndex(e => e.configurado);
     const IconoElegir = iconoDePregunta("elegir");
     return (
       <div className="form-pantalla">
@@ -511,7 +515,7 @@ export default function Formulario({ codigo }) {
           <p className="form-nota">No hay eventos próximos guardados. Sigue y lo creamos nuevo.</p>
         )}
         <div className="form-lista-eventos">
-          {lista.map(e => {
+          {lista.map((e, i) => {
             // El mismo icono que ya distingue el tipo en la pregunta "tipo": boda,
             // comunión, empresa... así se reconoce de un vistazo sin leer el nombre.
             const IconoEvento = iconoDeOpcion("tipo", Math.max(0, TIPOS_EVENTO.findIndex(t => t.valor === e.tipo)));
@@ -519,10 +523,16 @@ export default function Formulario({ codigo }) {
             // tener que abrirlo. No lo saca de la lista —puede hacer falta mandarle
             // una corrección o un dato más—, solo dice que ya tiene algo enviado.
             const enviado = buscarEnvioPorNombre(mios, e.nombre);
+            // Separador entre "por configurar" y "ya configurados": solo si hay
+            // mezcla de los dos (primerConfiguradoIdx > 0, y no -1).
+            const esInicioDeConfigurados = i === primerConfiguradoIdx && primerConfiguradoIdx > 0;
             return (
-              <button
-                key={e.nombre}
-                className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}`}
+              <Fragment key={e.nombre}>
+                {esInicioDeConfigurados && (
+                  <div className="form-separador-eventos" role="separator">Ya configurados</div>
+                )}
+                <button
+                className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}${e.configurado ? " es-configurado" : ""}`}
                 onClick={() => {
                   setEventoDestino(e.nombre);
                   setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
@@ -546,7 +556,8 @@ export default function Formulario({ codigo }) {
                 {enviado && (
                   <span className="form-evento-check" title={`Ya mandaste datos ${fmtCuando(enviado.enviado)}`} aria-hidden="true">✓</span>
                 )}
-              </button>
+                </button>
+              </Fragment>
             );
           })}
         </div>

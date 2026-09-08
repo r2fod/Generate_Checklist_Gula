@@ -725,6 +725,20 @@ criterio que "Jarras de cristal"), y "pudiendo modificarlas" ya lo cubre el meca
 genérico de `overridesManuales` que tiene toda la checklist — no hacía falta nada
 nuevo para eso.
 
+**Elegir evento: separar visualmente los configurados de los que no — HECHO**: el
+badge "Ya configurado" (PR #201) no era suficiente para el dueño — pidió primero
+colorear la tarjeta, y viendo la lista real, separar los dos grupos del todo. Ahora
+la tarjeta entera de un evento configurado lleva un fondo gris neutro (`.es-configurado`
+en `index.css`, a juego con el badge), y si además ya se le mandó algo desde este
+móvil manda el verde de `.es-enviado` (regla combinada, es la señal más útil ahora
+mismo). Y como `lista` ya venía ordenada (sin configurar primero — PR #201), se
+localiza dónde empieza el bloque de configurados (`primerConfiguradoIdx`) y se mete
+un separador con su rótulo justo ahí (`Formulario.jsx`, envolviendo cada fila en un
+`Fragment` con key para poder intercalarlo); si no hay mezcla de los dos grupos, no
+sale separador. Verificado con una maqueta estática cargando el CSS real compilado
+(la lista poblada de "próximos eventos" no se puede simular en este entorno — mismo
+límite ya documentado en PR #195/#201, Firestore no es alcanzable offline).
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
