@@ -619,6 +619,28 @@ console.log("\n══ Borrar un evento ══");
     `y desaparece de los próximos que ve la oficina → ${JSON.stringify(paraOficina)}`);
 }
 
+// "configurado" viaja en la lista corta, para que el formulario distinga los
+// eventos que el calendario creó en blanco (sinConfigurar) de los que ya tienen
+// datos de verdad — sin depender de si ESTE móvil mandó algo antes (eso es aparte,
+// mios.js/localStorage).
+console.log("\n══ 'configurado' en la lista corta de la oficina ══");
+{
+  const { resumirParaOficina } = await import("../formulario/envios.js");
+  const eventos = {
+    "Boda sin configurar": { pax: 100, fechaEvento: "2027-08-11", sinConfigurar: true },
+    "Boda ya configurada": { pax: 100, fechaEvento: "2027-08-12", sinConfigurar: false },
+    "Boda de siempre": { pax: 100, fechaEvento: "2027-08-13" },
+  };
+  const lista = resumirParaOficina(eventos, "2027-01-01");
+  const de = (nombre) => lista.find(e => e.nombre === nombre);
+  ok(de("Boda sin configurar").configurado === false,
+    "sinConfigurar:true → configurado:false");
+  ok(de("Boda ya configurada").configurado === true,
+    "sinConfigurar:false → configurado:true");
+  ok(de("Boda de siempre").configurado === true,
+    "sin el campo (eventos de siempre, montados a mano) cuenta como configurado");
+}
+
 // ── "Ya mandaste esto" — mismo buscador para el repaso y la lista de elegir evento ──
 // Antes cada pantalla comparaba nombres a su manera, con el mismo código repetido dos
 // veces. Ahora las dos llaman a buscarEnvioPorNombre: si el emparejamiento cambia (por

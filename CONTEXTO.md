@@ -661,6 +661,20 @@ cierre, no en medio del bloque de mobiliario/cocina). Verificado con
 prueba de que el orden no afecta al dato) y recorrido visual completo de
 los tres tipos de evento con Playwright.
 
+**Elegir evento: distinguir configurados de sin configurar — HECHO**: el
+evento ya llevaba la señal exacta que hacía falta —`sinConfigurar`
+(App.jsx): la pone el calendario al crear un evento en blanco (solo tipo/
+día/sitio/pax) y se quita sola al aplicar un formulario, o a mano con
+"Ya está configurado". `resumirParaOficina()` (envios.js) ahora también
+publica `configurado: !sinConfigurar` en la lista corta que ve el
+formulario. En "¿De qué evento son los datos?": los sin configurar salen
+primero (son los que de verdad hace falta rellenar) y los ya configurados
+al final, con un badge neutro "Ya configurado" — distinto del check verde
+de "ya te mandé algo" (PR #195), que es otra señal aparte y puede darse a
+la vez. Al vivir en el documento del evento en Firestore (no en
+localStorage de un móvil), sale igual para cualquiera que abra el enlace
+del formulario, sin depender de qué móvil lo mire.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

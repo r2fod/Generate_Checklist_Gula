@@ -482,8 +482,14 @@ export default function Formulario({ codigo }) {
 
   // ── Elegir a qué evento van los datos ──────────────────────────────────────
   if (paso === -1) {
-    const lista = (proximos || []).filter(e =>
-      !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()));
+    // Los que de verdad hace falta rellenar (el calendario los creó en blanco) van
+    // primero; los que ya tienen datos de verdad, al final — así no se elige uno ya
+    // configurado por error solo porque estaba más arriba. Dentro de cada grupo se
+    // respeta el orden por fecha que ya trae la lista.
+    const lista = (proximos || [])
+      .filter(e => !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()))
+      .slice()
+      .sort((a, b) => (a.configurado === b.configurado ? 0 : a.configurado ? 1 : -1));
     const IconoElegir = iconoDePregunta("elegir");
     return (
       <div className="form-pantalla">
@@ -528,6 +534,14 @@ export default function Formulario({ codigo }) {
                 <span className="form-evento-texto">
                   <span className="form-evento-nombre">{e.nombre}</span>
                   <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
+                  {/* Ya tiene datos de verdad, no lo creó el calendario en blanco: no es
+                      que se le haya mandado algo (eso es el check verde), es que ya
+                      está montado — mejor no tocarlo sin querer. */}
+                  {e.configurado && (
+                    <span className="form-evento-configurado" title="Este evento ya tiene datos configurados en la app">
+                      Ya configurado
+                    </span>
+                  )}
                 </span>
                 {enviado && (
                   <span className="form-evento-check" title={`Ya mandaste datos ${fmtCuando(enviado.enviado)}`} aria-hidden="true">✓</span>
