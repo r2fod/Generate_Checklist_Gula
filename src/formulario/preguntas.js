@@ -56,7 +56,8 @@ const GASTROS_MINIMO = 4;
 // checklist — lo único que hay que respetar son las dependencias `si:` (una
 // pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
 // tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
-// entrante, estiloPlatoPostre después de estiloPlato).
+// entrante, estiloPlatoPostre después de estiloPlato, hielo después de
+// congelador).
 export const PREGUNTAS = [
   // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
@@ -338,13 +339,16 @@ export const PREGUNTAS = [
   },
   {
     // Antes el hielo se cargaba siempre, sin preguntar: en un sitio que ya lo da o
-    // en un evento que no lo necesita, sobraban kilos, bolsas y taxis enteros.
+    // en un evento que no lo necesita, sobraban kilos, bolsas y taxis enteros. Pero
+    // si SÍ se lleva congelador no hace falta ni preguntarlo: no tiene sentido llevar
+    // congelador y no querer hielo, así que la pregunta solo sale sin congelador.
     id: "hielo", tipo: "opciones", texto: "¿Llevamos hielo?",
     nota: "Si el sitio ya lo da, o no hace falta, di que no: así no se carga ni un taxi de más.",
     opciones: [
       { valor: "si", texto: "Sí" },
       { valor: "no", texto: "No hace falta" },
     ],
+    si: (r) => r.congelador === "No lleva",
   },
   {
     id: "horno", tipo: "opciones", texto: "¿Qué horno hace falta?",

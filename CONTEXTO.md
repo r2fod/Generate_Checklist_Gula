@@ -637,6 +637,12 @@ estaba en los dos desde antes. Sin tocar ningún valor existente (serían el
 label literal de la línea de checklist — un rename sin migración según
 CLAUDE.md), solo se añadió la opción nueva.
 
+**"¿Llevamos hielo?" solo si NO se lleva congelador — HECHO**: no tiene
+sentido llevar congelador y no querer hielo, así que la pregunta (justo
+después de "¿Y congelador?") ahora solo aparece cuando se contesta "No
+lleva" ahí. Con congelador (mediano o grande) se salta directo a la
+siguiente pregunta y se asume que sí hace falta hielo, como siempre.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
