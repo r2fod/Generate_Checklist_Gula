@@ -643,6 +643,24 @@ después de "¿Y congelador?") ahora solo aparece cuando se contesta "No
 lleva" ahí. Con congelador (mediano o grande) se salta directo a la
 siguiente pregunta y se asume que sí hace falta hielo, como siempre.
 
+**Formulario reordenado en 11 bloques temáticos — HECHO**: repaso a fondo
+pedido por el dueño tras varias rondas añadiendo preguntas cerca de lo que
+había en cada momento, no según un mapa pensado de principio a fin. Solo
+cambia el ORDEN del array `PREGUNTAS` — ningún id/valor/campoNumero/soloEn/
+si/conNumero/conCampos/conArchivo se toca, así que es seguro por diseño
+(`aRespuestasDeLaApp()` lee por id, `Formulario.jsx` navega el array
+dinámicamente, ninguno de los dos depende de la posición). La mayoría del
+orden ya coincidía con el mapa de 11 bloques (sitio y mobiliario exterior,
+barra, menú, cocina, alquileres, excepciones, mantelería, recogidas,
+impresión de producción, cierre) de rondas anteriores; solo hacía falta
+mover "¿Hay que imprimir el menú?"/"¿etiquetas?" (solo producción) del
+hueco justo después de "¿Algo distinto de lo normal?" al final, junto a
+"comprar"/"alergias", que es donde de verdad encaja (justo antes del
+cierre, no en medio del bloque de mobiliario/cocina). Verificado con
+`npm run test:rapido` en verde SIN tocar `sincronizacion.test.mjs` (la
+prueba de que el orden no afecta al dato) y recorrido visual completo de
+los tres tipos de evento con Playwright.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
