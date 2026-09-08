@@ -675,6 +675,16 @@ la vez. Al vivir en el documento del evento en Firestore (no en
 localStorage de un móvil), sale igual para cualquiera que abra el enlace
 del formulario, sin depender de qué móvil lo mire.
 
+**Entrante: opción "Individual" — HECHO**: la pregunta "El entrante para
+compartir, ¿cada cuántas personas?" solo tenía 3, 4 u "otro número" —
+para un entrante que en realidad es individual (un plato por persona,
+no compartido) había que marcar "compartir" y escribir "1" a mano en
+"otro número", que no tiene sentido llamarlo "compartir". Añadida
+"Individual (un plato por persona)" como opción de serie (`valor: 1`),
+delante de las de 3/4 — usa el mismo cálculo que ya existía
+(`personasPorPlatoEntrante = 1` da exactamente un plato extra por
+persona), sin tocar la fórmula.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

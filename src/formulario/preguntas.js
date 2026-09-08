@@ -291,7 +291,11 @@ export const PREGUNTAS = [
     // Solo si hay entrante para compartir: es lo que decide cuántos platos extra se
     // cargan (un plato cada 3 personas no es lo mismo que cada 4).
     id: "entrantePersonas", tipo: "opciones", texto: "El entrante para compartir, ¿cada cuántas personas?",
+    // "Individual" no es un caso raro que tocara meter en "Otro número" escribiendo un
+    // 1: pasa bastante — el "compartir" era para llevar la cuenta de cuántos entrantes
+    // distintos hay, no que tengan que repartirse entre varios comensales.
     opciones: [
+      { valor: 1, texto: "Individual (un plato por persona)" },
       { valor: 3, texto: "Un plato cada 3 personas" },
       { valor: 4, texto: "Un plato cada 4 personas" },
       {
