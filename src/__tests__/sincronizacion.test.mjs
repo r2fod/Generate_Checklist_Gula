@@ -1176,19 +1176,26 @@ console.log("\n══ Tarta y alergias ══");
     "y la tarta en todos menos en un rodaje");
 }
 
-// Excepciones de mesa: texto libre a las notas del evento, mismo mecanismo que
-// alergias — no toca el cálculo agregado por pax, lo complementa. Buffets, en
-// cambio, SÍ mueve un número real de la checklist (ver el siguiente bloque) — pero
-// la línea de notas se sigue viendo igual que cuando era texto libre.
+// Excepciones de mesa: de texto libre a casillas con su número de mesas cada una
+// (mismo patrón que buffets: marcar + conNumero) — no toca el cálculo agregado por
+// pax, lo complementa. Ni excepciones ni buffets mueven un número de la checklist
+// que no sea el suyo propio (buffets sí mueve numMesasBuffet, ver el siguiente
+// bloque); la línea de notas se reconstruye con resumirRespuesta() en los dos casos.
 console.log("\n══ Excepciones de mesa y buffets ══");
 {
   const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
   const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
-  const con = aRespuestasDeLaApp({ ...base, alergias: "1 vegano", excepcionesMesa: "cristalería aparte mesa 7", buffets: ["quesos"], quesosNumero: 2 });
-  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: cristalería aparte mesa 7\n🥐 BUFFETS: Buffet de quesos (2)",
+  const con = aRespuestasDeLaApp({
+    ...base, alergias: "1 vegano",
+    excepcionesMesa: ["cristaleriaAparte", "dobleTenedor"], cristaleriaAparteNumero: 1, dobleTenedorNumero: 3,
+    buffets: ["quesos"], quesosNumero: 2,
+  });
+  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: Doble tenedor (3), Cristalería aparte (1)\n🥐 BUFFETS: Buffet de quesos (2)",
     `alergias, excepciones y buffets, cada uno en su línea → ${JSON.stringify(con.notasEvento)}`);
-  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: "  " }).notasEvento === undefined,
-    "en blanco no deja una línea vacía");
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: ["dobleCuchillo"] }).notasEvento === "🍽️ EXCEPCIONES DE MESA: Doble cuchillo",
+    "marcada sin poner número, sale sin paréntesis — no se inventa una cifra");
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: [] }).notasEvento === undefined,
+    "marcar la pantalla sin marcar ninguna casilla no deja una línea vacía");
   ok(aRespuestasDeLaApp(base).notasEvento === undefined,
     "sin contestar ninguna de las tres, las notas del evento no se tocan");
 }

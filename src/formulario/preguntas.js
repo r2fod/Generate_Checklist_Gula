@@ -653,14 +653,21 @@ export const PREGUNTAS = [
   },
   {
     // "Por mesa" no significa un editor mesa a mesa (dispararía la complejidad para
-    // lo que es la excepción, no la norma): una pregunta de excepciones que viaja a
-    // las notas del evento, igual que las alergias, sin tocar el cálculo agregado
-    // por pax que ya existe — lo complementa, no lo sustituye.
-    id: "excepcionesMesa", tipo: "texto-largo", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
-    campo: "excepcionesMesa",
-    nota: "Cubiertos de pescado extra, cristalería aparte, menú infantil en una mesa concreta... Si no hay ninguna excepción, se deja en blanco.",
-    ejemplo: "Ej: cubiertos de pescado en la mesa 4, cristalería aparte en la 7...",
-    noSe: false,
+    // lo que es la excepción, no la norma): casillas con cuántas mesas afecta cada
+    // una, que viajan a las notas del evento igual que antes en texto libre — sin
+    // tocar el cálculo agregado por pax que ya existe, lo complementa. Antes era
+    // "texto-largo" a mano ("cubiertos de pescado en la mesa 4..."), lo que se
+    // escribiera ahí no se leía dos veces igual; con casillas se lee siempre igual
+    // y con su número, mismo patrón que buffets/extras (marcar + conNumero).
+    id: "excepcionesMesa", tipo: "marcar", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
+    nota: "Marca lo que aplique y di en cuántas mesas. Si no hay ninguna excepción, se deja sin marcar.",
+    opciones: [
+      { valor: "dobleTenedor", texto: "Doble tenedor", conNumero: "Cantidad en mesa" },
+      { valor: "dobleCuchillo", texto: "Doble cuchillo", conNumero: "Cantidad en mesa" },
+      { valor: "cristaleriaAparte", texto: "Cristalería aparte", conNumero: "Cantidad en mesa" },
+      { valor: "menuInfantil", texto: "Menú infantil", conNumero: "Cantidad en mesa" },
+      { valor: "otro", texto: "Otro", conNumero: "Cantidad en mesa" },
+    ],
   },
   {
     // Antes era texto libre a las notas, sin mover ni un número de la checklist:
@@ -839,12 +846,15 @@ export function aRespuestasDeLaApp(r = {}) {
   // es por donde le llegan a quien está en el sitio. Y van arriba porque una alergia
   // leída después de servir no sirve de nada.
   const alergias = (r.alergias || "").trim();
-  const excepcionesMesa = (r.excepcionesMesa || "").trim();
-  // "Buffets" pasó de texto libre a marcado múltiple (con mesas por buffet), pero la
-  // línea de notas se ve igual que antes — se reconstruye con resumirRespuesta(),
-  // que ya sabe formatear una pregunta "marcar" como "Buffet de quesos (2), ...".
-  // El detalle de "Otro" (qué es) va aparte, en su comentario libre de pregunta,
-  // como cualquier otra aclaración — no hace falta tratarlo distinto aquí.
+  // "Excepciones de mesa" y "Buffets" pasaron de texto libre a marcado múltiple (con
+  // su número de mesas cada una), pero la línea de notas se ve igual que antes — se
+  // reconstruye con resumirRespuesta(), que ya sabe formatear una pregunta "marcar"
+  // como "Doble tenedor (2), Cristalería aparte (1)". El detalle de "Otro" (qué es)
+  // va aparte, en su comentario libre de pregunta, como cualquier otra aclaración —
+  // no hace falta tratarlo distinto aquí.
+  const excepcionesMesa = Array.isArray(r.excepcionesMesa) && r.excepcionesMesa.length
+    ? resumirRespuesta(PREGUNTAS.find(p => p.id === "excepcionesMesa"), r, tipo)
+    : "";
   const buffets = Array.isArray(r.buffets) && r.buffets.length
     ? resumirRespuesta(PREGUNTAS.find(p => p.id === "buffets"), r, tipo)
     : "";
