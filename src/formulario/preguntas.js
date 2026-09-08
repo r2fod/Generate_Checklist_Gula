@@ -588,12 +588,14 @@ export const PREGUNTAS = [
     // postre, y sería una pantalla de más.
     id: "estiloPlatoPostre", tipo: "opciones", texto: "¿Y el plato de postre?",
     opciones: [
+      // Muchas veces el postre va en el MISMO plato que el principal (grande), no en
+      // uno pequeño aparte — de ahí esta opción primero, en vez de forzar a repetir a
+      // mano el mismo color/estilo que ya se contestó arriba.
+      { valor: "Mismo que el principal", texto: "El mismo que el principal (no uno pequeño de postre)" },
       { valor: "Blanco", texto: "Blanco" },
       { valor: "Azul", texto: "Azul" },
       { valor: "Naranja", texto: "Naranja" },
       { valor: "Verde", texto: "Verde" },
-      // Ya existía en el plato principal (estiloPlato, justo arriba); faltaba aquí
-      // para cuando el postre se sirve en el mismo plato grande, no en uno pequeño.
       { valor: "Relieve blanco", texto: "Relieve blanco" },
       { valor: "Negro/gris", texto: "Negro o gris" },
       {
@@ -1093,7 +1095,11 @@ export function aRespuestasDeLaApp(r = {}) {
   }
   if (puesto(r.estiloPlatoPostre)) {
     const suyo = (r.estiloPlatoPostreCual || "").trim();
-    if (r.estiloPlatoPostre !== "Otro") estado.estiloPlatoPostre = r.estiloPlatoPostre;
+    // "Mismo que el principal": la pregunta de arriba (estiloPlato) ya se procesó, así
+    // que estado.estiloPlatoPrincipal ya está puesto — se copia tal cual, sin inventar
+    // un plato "de postre" que en realidad no existe como pieza aparte.
+    if (r.estiloPlatoPostre === "Mismo que el principal") estado.estiloPlatoPostre = estado.estiloPlatoPrincipal;
+    else if (r.estiloPlatoPostre !== "Otro") estado.estiloPlatoPostre = r.estiloPlatoPostre;
     else if (suyo) estado.estiloPlatoPostre = suyo;
   }
   if (puesto(r.horno)) estado.tipoHorno = r.horno;

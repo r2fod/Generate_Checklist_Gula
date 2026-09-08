@@ -1010,6 +1010,18 @@ console.log("\n══ Color de los manteles ══");
   ok(relieve.estiloPlatoPostre === "Relieve blanco", "el plato de postre \"Relieve blanco\" llega tal cual, sin pasar por \"Otro\"");
   ok(opcionesDe(PREGUNTAS.find(p => p.id === "estiloPlatoPostre"), "boda").some(o => o.valor === "Relieve blanco"),
     "y sale como botón rápido, igual que en el plato principal");
+
+  // "Mismo que el principal": muchas veces el postre va en el MISMO plato grande que
+  // el principal, no en uno pequeño aparte propio de postre — se copia el valor de
+  // arriba en vez de obligar a repetirlo a mano o inventar un plato que no existe.
+  const mismoQuePrincipal = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Mismo que el principal" });
+  ok(mismoQuePrincipal.estiloPlatoPostre === "Verde",
+    `"Mismo que el principal" copia el estilo del plato principal → "${mismoQuePrincipal.estiloPlatoPostre}"`);
+  const mismoConEscrito = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, estiloPlato: "Otro", estiloPlatoCual: "Pizarra", estiloPlatoPostre: "Mismo que el principal",
+  });
+  ok(mismoConEscrito.estiloPlatoPostre === "Pizarra",
+    "y si el principal se escribió a mano, copia lo escrito, no la palabra \"Otro\"");
 }
 
 // ── Lo que hay que comprar ────────────────────────────────────────────────────
