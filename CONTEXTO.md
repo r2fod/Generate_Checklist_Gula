@@ -598,6 +598,17 @@ a salvo en la nube. Y confirmado que reenviar el mismo evento NO duplica: cada
 envío es un documento nuevo en `envios/`, y el aviso de "ya mandaste esto" es
 un recordatorio, no un bloqueo — mandar una corrección aposta es un caso válido.
 
+**Excepciones de mesa: de texto libre a casillas con su número de mesas —
+HECHO**: "cubiertos de pescado en la mesa 4, cristalería aparte en la 7..." se
+escribía a mano y se leía distinto cada vez. Ahora es una pregunta `marcar`
+(mismo patrón que buffets: doble tenedor, doble cuchillo, cristalería aparte,
+menú infantil, otro — cada una con "¿En cuántas mesas?"), y la línea de notas
+del evento se reconstruye con `resumirRespuesta()` igual que ya hace buffets,
+así que se lee siempre igual: "Doble tenedor (3), Cristalería aparte (2)". No
+toca el cálculo agregado por pax que ya existe (cubiertos/copas totales), lo
+complementa — sigue siendo una excepción sobre el aviso, no un editor mesa a
+mesa.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
