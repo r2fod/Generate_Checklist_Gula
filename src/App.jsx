@@ -231,7 +231,7 @@ const ETIQUETAS_CAMPO = {
   llevaMobiliarioAlquiler: "Mobiliario de alquiler", proveedorMobiliarioAlquiler: "Proveedor del mobiliario",
   archivosAlquiler: "Documentos de alquiler",
   alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
-  llevaParabanes: "Parabanes", numParabanes: "Nº de parabanes",
+  llevaParabanes: "Parabanes", numParabanes: "Nº de parabanes", numBarras: "Nº de barras",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -565,6 +565,9 @@ export default function App({ onCerrarSesion } = {}) {
   // cinco tipos de evento, así que empieza apagado siempre.
   const [llevaParabanes, setLlevaParabanes] = useState(estadoInicial.llevaParabanes ?? false);
   const [numParabanes, setNumParabanes] = useState(estadoInicial.numParabanes ?? 0);
+  // Mesas altas: 2 por barra, 4 si son 100 pax o más. Sin barras contestadas (0), cae
+  // sola al cálculo viejo por pax — ver calcMesasAltas en calculos.js.
+  const [numBarras, setNumBarras] = useState(estadoInicial.numBarras ?? 0);
   // Color de los manteles. Vacío = el de siempre según el tipo de evento, para que un
   // evento guardado antes de existir esta opción cargue exactamente lo mismo.
   const [colorManteles, setColorManteles] = useState(estadoInicial.colorManteles ?? "");
@@ -882,7 +885,7 @@ export default function App({ onCerrarSesion } = {}) {
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
-    alquilaCarpas, numCarpas, llevaParabanes, numParabanes, tieneBrindisCava, colorManteles, porcentajeBeige,
+    alquilaCarpas, numCarpas, llevaParabanes, numParabanes, numBarras, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -988,7 +991,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, proveedorMobiliarioAlquiler: setProveedorMobiliarioAlquiler,
     archivosAlquiler: setArchivosAlquiler,
     alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
-    llevaParabanes: setLlevaParabanes, numParabanes: setNumParabanes,
+    llevaParabanes: setLlevaParabanes, numParabanes: setNumParabanes, numBarras: setNumBarras,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
@@ -2526,7 +2529,7 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
+    llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2543,7 +2546,7 @@ export default function App({ onCerrarSesion } = {}) {
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria,
-    llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes,
+    llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre, tipoMesa,
@@ -4148,6 +4151,22 @@ export default function App({ onCerrarSesion } = {}) {
                   onChange={e => setNumMesasBuffet(Math.max(0, parseInt(e.target.value) || 0))}
                 />
               </div>
+              {/* Mesas altas: 2 por barra, 4 con 100 pax o más. En blanco cae sola al
+                  cálculo viejo por pax (ver calcMesasAltas). Solo boda/comunión/corporativo:
+                  cumpleaños y producción no llevan "Mesa alta" en su checklist. */}
+              {evento !== "cumpleanos" && evento !== "produccion" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº de barras</span>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={numBarras || ""}
+                    min="0"
+                    placeholder="según pax"
+                    onChange={e => setNumBarras(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                </div>
+              )}
               {/* Mobiliario EXTRA, el que no tenemos: se alquila a Event Style cuando el
                   cliente pide más de lo nuestro. En un rodaje no se lleva, así que ahí no
                   se ofrece. Los chill out son nuestros y se configuran en Extras: esos no

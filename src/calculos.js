@@ -156,6 +156,16 @@ export function taxisDeHielo(kg) { return Math.max(1, Math.ceil(kg / KG_POR_TAXI
 /** @param {number} pax @returns {number} */
 export function calcMesasCalientes(pax) { return Math.max(1, Math.ceil((pax || 0) / 40)); }
 
+// Mesas altas: antes una fórmula fija por pax (pax/15); ahora depende de cuántas
+// barras se van a montar de verdad (2 mesas por barra, 4 si son 100 pax o más).
+// Sin numBarras (eventos guardados antes de esta pregunta, o sin contestar) cae al
+// cálculo viejo por pax, para no dejar de dar un número razonable.
+/** @param {number} pax @param {number} [numBarras] @returns {number} */
+export function calcMesasAltas(pax, numBarras) {
+  if (!numBarras) return Math.max(2, Math.ceil((pax || 0) / 15));
+  return numBarras * (pax >= 100 ? 4 : 2);
+}
+
 // Cuántas copas/vasos caben en cada batea, por tipo
 export const BATEA = { vino: 25, cava: 36, agua: 25, cubata: 25, chupito: 49 };
 /** @param {number} units @param {number} size @returns {number} */

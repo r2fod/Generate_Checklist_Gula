@@ -711,6 +711,20 @@ igual que siempre) de "se contestó y no se marcó ninguno" (`Array.isArray(r.bu
 aunque esté vacío → `numMesasBuffet = 0` explícito). Un test afirmaba a propósito el
 comportamiento viejo ("no se toca" con `buffets: []`); corregido para esperar `0`.
 
+**Mesa alta: por nº de barras, no una fórmula fija por pax — HECHO**: segundo punto
+de la misma tarea de buffets. Antes `mesasAltas = hayBarra ? Math.max(2, pax/15) :
+0` (solo en boda/comunión/corporativo, ni cumpleaños ni producción llevan "Mesa
+alta"). Ahora hay una pregunta "¿Cuántas barras se van a montar?" (tras
+"cristalería", solo si cóctel o copas tienen horas contestadas — sin barra no tiene
+sentido preguntarlo) y `calcMesasAltas(pax, numBarras)` en `calculos.js`: 2 mesas por
+barra, 4 si son 100 pax o más; sin contestar (`numBarras` a 0/undefined) cae sola al
+cálculo viejo por pax, así que un evento guardado antes de esto sigue dando el mismo
+número de siempre. Cableado en `App.jsx` igual que "Nº de mesas de buffet": estado
+propio con su casilla manual (solo boda/comunión/corporativo, gastado el mismo
+criterio que "Jarras de cristal"), y "pudiendo modificarlas" ya lo cubre el mecanismo
+genérico de `overridesManuales` que tiene toda la checklist — no hacía falta nada
+nuevo para eso.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

@@ -57,7 +57,7 @@ const GASTROS_MINIMO = 4;
 // pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
 // tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
 // entrante, estiloPlatoPostre después de estiloPlato, hielo después de
-// congelador).
+// congelador, numBarras después de coctel/copas).
 export const PREGUNTAS = [
   // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
@@ -203,6 +203,24 @@ export const PREGUNTAS = [
       { valor: "no", texto: "No hace falta" },
     ],
     soloEn: CON_BARRA,
+  },
+  {
+    // Con esto se calculan las mesas altas (2 por barra, 4 si son 100 pax o más) en
+    // vez de una fórmula fija por pax — solo tiene sentido si hay barra de verdad.
+    id: "numBarras", tipo: "opciones", texto: "¿Cuántas barras se van a montar?",
+    nota: "Con esto se calculan las mesas altas: 2 por barra, o 4 si son 100 pax o más.",
+    opciones: [
+      { valor: 1, texto: "1 barra" },
+      { valor: 2, texto: "2 barras" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cuántas barras?",
+        campoNumero: "numBarrasOtras",
+        sugerido: (r) => (paxDeLaGente(r) >= 100 ? 2 : 1),
+      },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => Number(r.coctel) > 0 || Number(r.copas) > 0,
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
@@ -1083,6 +1101,9 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
   if (puesto(r.hielo)) estado.llevaHielo = r.hielo === "si";
   if (puesto(r.cristaleria)) estado.llevaCristaleria = r.cristaleria === "si";
+  if (puesto(r.numBarras)) {
+    estado.numBarras = r.numBarras === "otras" ? r.numBarrasOtras : r.numBarras;
+  }
   if (Array.isArray(r.menu)) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");
