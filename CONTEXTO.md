@@ -739,6 +739,17 @@ sale separador. Verificado con una maqueta estática cargando el CSS real compil
 (la lista poblada de "próximos eventos" no se puede simular en este entorno — mismo
 límite ya documentado en PR #195/#201, Firestore no es alcanzable offline).
 
+**Plato de postre: "Mismo que el principal" — HECHO**: el dueño explicó que muchas
+veces el postre se sirve en el MISMO plato (grande) que el principal, no en uno
+pequeño aparte — obligar a repetir a mano el mismo color en la pregunta de postre no
+tenía sentido. Nueva opción, primera de la lista en `estiloPlatoPostre`: "El mismo
+que el principal (no uno pequeño de postre)". Al marcarla, `aRespuestasDeLaApp()`
+copia el valor ya resuelto de `estiloPlatoPrincipal` (la pregunta de arriba se
+procesa antes, así que ya está puesto — funciona igual si el principal se escribió
+a mano en "Otro"). Solo cambia la ETIQUETA del plato de postre en la checklist; la
+cantidad (`platosDoble + platosPostreExtra`) no se toca, sigue siendo un curso
+aparte que necesita sus propias unidades físicas.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
