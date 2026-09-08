@@ -602,12 +602,33 @@ un recordatorio, no un bloqueo — mandar una corrección aposta es un caso vál
 HECHO**: "cubiertos de pescado en la mesa 4, cristalería aparte en la 7..." se
 escribía a mano y se leía distinto cada vez. Ahora es una pregunta `marcar`
 (mismo patrón que buffets: doble tenedor, doble cuchillo, cristalería aparte,
-menú infantil, otro — cada una con "¿En cuántas mesas?"), y la línea de notas
+menú infantil, otro — cada una con "Cantidad en mesa"), y la línea de notas
 del evento se reconstruye con `resumirRespuesta()` igual que ya hace buffets,
 así que se lee siempre igual: "Doble tenedor (3), Cristalería aparte (2)". No
 toca el cálculo agregado por pax que ya existe (cubiertos/copas totales), lo
 complementa — sigue siendo una excepción sobre el aviso, no un editor mesa a
 mesa.
+
+**Menú: jamonero movido a "extras", "dos platos principales" aclarado —
+HECHO**: dos hallazgos revisando el formulario a fondo, a petición del dueño.
+(1) "Jamonero" vivía en "¿Qué lleva el menú?", junto a la paella, pero no es
+comida del menú — es un servicio que se presupuesta, como el desayuno, con
+quien además comparte fórmula (`platosPostreExtra` suma jamonero + tarta +
+desayuno en `checklist-generadores.js`). Movido a "¿Está presupuestado algo
+de esto?", junto al desayuno. De paso corregido un efecto secundario real:
+como la lectura de jamonero antes vivía FUERA del reparto boda/rodaje, un
+envío de producción sobreescribía `llevaJamonero` a `false` siempre —
+aunque se hubiera puesto a mano en la app — porque la opción no se ofrecía
+ahí (`soloEn` la excluye) y `marcado()` daba `false` igualmente. Ahora, al
+vivir dentro del bloque de "extras" (que ya no se procesa para producción),
+un envío de rodaje simplemente no lo toca, como el resto del formulario.
+(2) "Dos platos principales" dobla cubiertos, copas Y platos en toda la
+checklist (es el mismo interruptor "Doble servicio" de la app: "dobla
+cubierto, copa y plato") — para cuando se sirven los DOS platos a cada
+invitado, uno detrás de otro. El texto no lo dejaba claro y podía
+confundirse con un menú que simplemente deja elegir uno de los dos (que no
+dobla nada). Aclarado con nota en la pregunta y texto de la opción más
+explícito ("se sirven los dos"); el valor guardado (`dosPlatos`) no cambió.
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16

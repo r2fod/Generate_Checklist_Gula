@@ -215,13 +215,18 @@ export const PREGUNTAS = [
   },
   {
     id: "menu", tipo: "marcar", texto: "¿Qué lleva el menú?",
+    // "Dos platos principales" dobla cubiertos, copas y platos en TODA la checklist
+    // (es el mismo interruptor "Doble servicio" de la app: "dobla cubierto, copa y
+    // plato"). Es para cuando se sirven LOS DOS platos a cada invitado, uno detrás de
+    // otro — no para un menú que simplemente deja elegir uno entre dos opciones (eso
+    // no dobla nada, cada invitado come un plato).
+    nota: "\"Dos platos principales\" es cuando se sirven los DOS a todo el mundo (dos pases seguidos): dobla cubiertos, copas y platos. Si el menú solo deja elegir uno de los dos, no marques esto.",
     opciones: [
       { valor: "paella", texto: "Paella" },
       // Cuántas sartenes parisiene, que no es lo mismo un frito que tres a la vez: cada
       // una lleva su difusor, su trípode y su bombona, y la app se quedaba siempre en una.
       { valor: "frito", texto: "Algo frito", conNumero: "¿Cuántas sartenes parisiene?", campoNumero: "numFrituras" },
-      { valor: "jamonero", texto: "Jamonero", soloEn: CON_BARRA },
-      { valor: "dosPlatos", texto: "Dos platos principales", soloEn: CON_BARRA },
+      { valor: "dosPlatos", texto: "Dos platos principales (se sirven los dos)", soloEn: CON_BARRA },
     ],
   },
   {
@@ -416,6 +421,11 @@ export const PREGUNTAS = [
       // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
+      // Estaba en "¿Qué lleva el menú?", junto a la paella y el frito, pero no es
+      // comida del menú: es un servicio que se presupuesta aparte y que carga platos
+      // extra de postre — igual que el desayuno, justo aquí arriba (mismo cálculo en
+      // checklist-generadores.js: platosPostreExtra suma jamonero + tarta + desayuno).
+      { valor: "jamonero", texto: "Jamonero", soloEn: CON_BARRA },
     ],
   },
   {
@@ -995,6 +1005,9 @@ export function aRespuestasDeLaApp(r = {}) {
         : marcado("extras", "barril30") ? "30L" : "No lleva";
       if (estado.tamanoBarril !== "No lleva" && r.numBarriles > 0) estado.numBarriles = r.numBarriles;
       estado.llevaJarrasCristal = marcado("extras", "jarras");
+      // Estaba en "menu" (aRespuestasDeLaApp lo leía de "menu"/"jamonero"), pero no es
+      // comida del menú: es un servicio presupuestado, como el desayuno justo arriba.
+      estado.llevaJamonero = marcado("extras", "jamonero");
     }
   }
 
@@ -1045,7 +1058,6 @@ export function aRespuestasDeLaApp(r = {}) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");
     if (estado.tieneFrituras && r.numFrituras > 0) estado.numFrituras = r.numFrituras;
-    estado.llevaJamonero = marcado("menu", "jamonero");
     if (tipo !== "produccion") estado.dobleServicio = marcado("menu", "dosPlatos");
   }
   // Talla y número de paellas. "Auto" y "las que salgan según la gente" son respuestas de

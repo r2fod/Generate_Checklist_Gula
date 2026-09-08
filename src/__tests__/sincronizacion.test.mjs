@@ -705,7 +705,7 @@ console.log("\n══ Flores y minutas → recogidas ══");
 console.log("\n══ Cuántas carpas y cuántas alquilar ══");
 {
   const { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } = await import("../carpas.js");
-  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, resumirEnvio, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
 
   ok(carpasRecomendadas(40) === 6, `40 pax → 6 carpas (4 de comer + buffet + camión): ${carpasRecomendadas(40)}`);
   ok(carpasRecomendadas(12) === 3, `12 pax → 3: ${carpasRecomendadas(12)}`);
@@ -773,13 +773,33 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),
     "ya no se pregunta por la sombra ni si se alquilan: lo dice el número");
-  const opcionesMenu = resumirEnvio({ tipo: "produccion", menu: ["paella", "frito", "jamonero"] });
-  ok(!/Jamonero/.test(opcionesMenu.find(f => f.id === "menu").respuesta),
-    "en un rodaje no se ofrece jamonero");
   ok(!ids.includes("extras"),
     "y sin chill out ni palomitera no queda nada que preguntar de lo presupuestado: esa pantalla no sale");
   ok(resumirEnvio({ tipo: "boda" }).some(f => f.id === "extras"),
     "pero en una boda esa pregunta sigue estando");
+
+  // Jamonero: vivía en "¿Qué lleva el menú?" junto a la paella, pero no es comida —
+  // es un servicio que se presupuesta, así que se movió a "extras", con el desayuno
+  // (con quien comparte fórmula: los dos suman platos extra de postre).
+  const extrasPregunta = PREGUNTAS.find(p => p.id === "extras");
+  ok(opcionesDe(extrasPregunta, "boda").some(o => o.valor === "jamonero"),
+    "el jamonero se ofrece en \"extras\" para una boda");
+  ok(opcionesDe(extrasPregunta, "produccion").every(o => o.valor !== "jamonero"),
+    "pero no en un rodaje, igual que antes en \"menu\"");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, extras: ["jamonero"] }).llevaJamonero === true,
+    "marcarlo en extras lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["jamonero"] }).llevaJamonero === undefined,
+    "marcarlo por error en \"menu\" (que ya no lo ofrece) no hace nada: no hay opción con ese valor ahí");
+
+  // "Dos platos principales" dobla cubiertos, copas y platos en toda la checklist (es
+  // el mismo "Doble servicio" de la app). Solo se le aclaró el texto y se le puso nota
+  // para no confundirlo con un menú que deja elegir uno de los dos — el valor que
+  // guarda ("dosPlatos") no se ha tocado.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"] }).dobleServicio === true,
+    "marcarlo sigue doblando el servicio, con el texto nuevo");
+  const menuPregunta = PREGUNTAS.find(p => p.id === "menu");
+  ok(/dobla cubiertos/i.test(menuPregunta.nota || ""),
+    "y la pregunta explica que dobla cubiertos, para no confundirlo con un menú a elegir");
 }
 
 // ── A quién se avisa por WhatsApp ─────────────────────────────────────────────
