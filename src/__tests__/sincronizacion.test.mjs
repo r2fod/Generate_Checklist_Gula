@@ -576,6 +576,14 @@ console.log("\n══ Entrante de chupito Y para compartir ══");
   });
   ok(otroNumero.personasPorPlatoEntrante === 7,
     `"Otro número" manda su propia cifra, no solo 3 o 4 → cada ${otroNumero.personasPorPlatoEntrante}`);
+
+  // "Individual" no es un entrante compartido de verdad — es un plato por persona,
+  // sin tener que marcar "compartir" y poner "otro número: 1" a mano.
+  const individual = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["compartir"], entrantePersonas: 1,
+  });
+  ok(individual.personasPorPlatoEntrante === 1,
+    `"Individual" manda 1 persona por plato → cada ${individual.personasPorPlatoEntrante}`);
 }
 
 // ── El staff se pregunta con los adultos y los niños ──────────────────────────
