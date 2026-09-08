@@ -712,7 +712,7 @@ export default function Formulario({ codigo }) {
     const falta = p.falta ? p.falta(respuestas) : "";
     if (falta) { setAviso(falta); return; }
     setAviso("");
-    if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, []);
+    if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, p.porDefecto || []);
     siguiente();
   };
 
@@ -847,7 +847,10 @@ export default function Formulario({ codigo }) {
         })}
 
         {p.tipo === "marcar" && opcionesDe(p, tipo).map((o, i) => {
-          const marcadas = respuestas[p.id] || [];
+          // porDefecto: para preguntas donde lo normal es que casi todo venga
+          // marcado (ej. "qué dobla" con primero+segundo) — se muestra premarcado
+          // hasta que se toque algo, en vez de partir siempre de una lista vacía.
+          const marcadas = respuestas[p.id] !== undefined ? respuestas[p.id] : (p.porDefecto || []);
           const puesta = marcadas.includes(o.valor);
           const IconoOpcion = iconoDeOpcion(p.id, i);
           return (

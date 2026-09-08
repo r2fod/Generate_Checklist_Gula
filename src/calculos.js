@@ -380,7 +380,10 @@ export function calcDestilados(pax, h) {
 // estorbe y lo quite, todos los de detrás se corren un sitio y "dobleCopa" pasa a leer
 // las horas de copas. Fuera antes de que pase.
 /**
- * @param {number} pax @param {number} horasCopas @param {boolean} dobleCopa
+ * @param {number} pax @param {number} horasCopas
+ * @param {boolean | { vino?: boolean, agua?: boolean, cava?: boolean }} dobleCopa
+ *   Booleano (dobla vino+agua, cava nunca — comportamiento de siempre) u objeto con
+ *   un flag por tipo (para "primero + segundo" con doblado granular editable).
  * @param {boolean} tieneBrindisCava @param {boolean} llevaEntrante @param {number} [extraAguaDesayuno]
  * @returns {Record<string, { u: number, b: number, size: number } | null>}
  */
@@ -390,6 +393,11 @@ export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, ll
   // no llevan nada de cristalería y entonces no se carga ni un vaso.
   const cero = { u: 0, b: 0, size: 1 };
   if (!llevaCristaleria) return { agua: cero, cubata: cero, vino: cero, cava: cero, chupito: null };
+  // dobleCopa como objeto: un flag por tipo. Como booleano (de toda la vida): dobla
+  // vino y agua igual, cava nunca (nunca dobló, ni siquiera con "doble servicio").
+  const dobleTipo = typeof dobleCopa === "object" && dobleCopa !== null
+    ? dobleCopa
+    : { vino: dobleCopa, agua: dobleCopa, cava: false };
   // Ajustable desde Ajustes/asistente (ver cristaleria.js): 1 si nadie lo ha tocado,
   // así que sin ajustar da exactamente lo de siempre.
   const f = leerFactoresCristaleria();
@@ -416,14 +424,16 @@ export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, ll
   // horas hasta el tope del sector. A las 4h ya está en 4/pax; de ahí no sube, porque
   // los camareros friegan y reutilizan durante el servicio.
   const copasBarraPorPax = horasCopas > 0 ? Math.min(VASOS_CUBATA_TOPE, 1 + horasCopas * 0.75) : 0;
-  const mult = dobleCopa ? 2 : 1;
+  const multVino = dobleTipo.vino ? 2 : 1;
+  const multAgua = dobleTipo.agua ? 2 : 1;
+  const multCava = dobleTipo.cava ? 2 : 1;
   // Margen de seguridad del 10% para cubrir roturas/pérdidas de cristalería durante el servicio
-  const vino = conMargen(pax * COPAS_VINO_POR_PAX * mult * factorCristaleria(f, "vino"));
+  const vino = conMargen(pax * COPAS_VINO_POR_PAX * multVino * factorCristaleria(f, "vino"));
   // extraAguaDesayuno va DESPUÉS del margen y del factor: son vasos de un servicio
   // aparte (el desayuno), no cristalería del cóctel/copas que se esté ajustando aquí.
-  const agua = conMargen(pax * VASOS_AGUA_POR_PAX * mult * factorCristaleria(f, "agua")) + extraAguaDesayuno;
+  const agua = conMargen(pax * VASOS_AGUA_POR_PAX * multAgua * factorCristaleria(f, "agua")) + extraAguaDesayuno;
   const cubata = conMargen(pax * copasBarraPorPax * factorCristaleria(f, "cubata"));
-  const cavaCopas = conMargen(pax * (tieneBrindisCava ? COPAS_CAVA_CON_BRINDIS : COPAS_CAVA_POR_PAX) * factorCristaleria(f, "cava"));
+  const cavaCopas = conMargen(pax * (tieneBrindisCava ? COPAS_CAVA_CON_BRINDIS : COPAS_CAVA_POR_PAX) * multCava * factorCristaleria(f, "cava"));
   const fmt = (/** @type {number} */ u, /** @type {number} */ size) => ({ u: Math.ceil(u / size) * size, b: bateas(u, size), size });
   return {
     agua: fmt(agua, BATEA.agua), cubata: fmt(cubata, BATEA.cubata),

@@ -219,6 +219,8 @@ const ETIQUETAS_CAMPO = {
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   diasProduccion: "Días de producción",
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
+  dobleTenedor: "Doble tenedor", dobleCuchillo: "Doble cuchillo", dobleCuchara: "Doble cuchara",
+  dobleVino: "Doble copa de vino", dobleAgua: "Doble vaso de agua", dobleCava: "Doble copa de cava",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros", numMesasBuffet: "Nº de mesas de buffet",
@@ -461,6 +463,17 @@ export default function App({ onCerrarSesion } = {}) {
   const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
   const [horasCopas, setHorasCopas]   = useState(estadoInicial.horasCopas ?? 4);
   const [dobleServicio, setDobleServicio]             = useState(estadoInicial.dobleServicio ?? false);
+  // Qué dobla en concreto con "primero + segundo": cubiertos y cristalería por
+  // separado, en vez de todo atado al mismo dobleServicio (que ahora solo manda en
+  // el plato). Sin contestar la pregunta de seguimiento del formulario (eventos de
+  // antes de esta tarea), cae al propio dobleServicio — comportamiento de siempre.
+  // La cava nunca dobló con dobleServicio, así que su fallback es fijo a false.
+  const [dobleTenedor, setDobleTenedor] = useState(estadoInicial.dobleTenedor ?? estadoInicial.dobleServicio ?? false);
+  const [dobleCuchillo, setDobleCuchillo] = useState(estadoInicial.dobleCuchillo ?? estadoInicial.dobleServicio ?? false);
+  const [dobleCuchara, setDobleCuchara] = useState(estadoInicial.dobleCuchara ?? estadoInicial.dobleServicio ?? false);
+  const [dobleVino, setDobleVino] = useState(estadoInicial.dobleVino ?? estadoInicial.dobleServicio ?? false);
+  const [dobleAgua, setDobleAgua] = useState(estadoInicial.dobleAgua ?? estadoInicial.dobleServicio ?? false);
+  const [dobleCava, setDobleCava] = useState(estadoInicial.dobleCava ?? false);
   // Barril de cerveza (30L/50L, con tirador): descuenta esos litros de los tercios
   // necesarios en vez de sustituirlos del todo — puede haber tercios y barril a la
   // vez (el barril cubre parte y el resto se completa con botellín), solo barril
@@ -878,7 +891,8 @@ export default function App({ onCerrarSesion } = {}) {
     sinConfigurar,
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
-    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
+    dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
+    tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
     tipoHorno, tipoBBQ, estacion, mesVerano,
@@ -978,7 +992,9 @@ export default function App({ onCerrarSesion } = {}) {
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas, diasProduccion: setDiasProduccion,
-    dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
+    dobleServicio: setDobleServicio, dobleTenedor: setDobleTenedor, dobleCuchillo: setDobleCuchillo, dobleCuchara: setDobleCuchara,
+    dobleVino: setDobleVino, dobleAgua: setDobleAgua, dobleCava: setDobleCava,
+    tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros, numMesasBuffet: setNumMesasBuffet,
@@ -2525,7 +2541,8 @@ export default function App({ onCerrarSesion } = {}) {
   // CADA tecla que se pulsara en cualquier campo. Memorizado por su contenido, solo
   // se rehace cuando de verdad cambia algo que afecta a las cantidades.
   const opts = useMemo(() => ({
-    dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
+    dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
+    tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
@@ -2542,7 +2559,8 @@ export default function App({ onCerrarSesion } = {}) {
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   }), [
     notasEvento,
-    dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
+    dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
+    tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria,
@@ -4427,7 +4445,18 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="section-title">Extras</div>
           <div className="checkbox-grid">
             {[
-              [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
+              [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla el plato"],
+              // Qué dobla en concreto (cubiertos y cristalería), aparte del plato de
+              // arriba: por defecto caen en dobleServicio (ver useState), pero cada uno
+              // es su propia casilla — no todo tiene por qué doblar a la vez.
+              ...(evento !== "produccion" ? [
+                [dobleTenedor, setDobleTenedor, "Doble tenedor", "primero + segundo"],
+                [dobleCuchillo, setDobleCuchillo, "Doble cuchillo", "primero + segundo"],
+                [dobleCuchara, setDobleCuchara, "Doble cuchara", "primero + segundo"],
+                [dobleVino, setDobleVino, "Doble copa de vino", "no suele doblar: se rellena la misma"],
+                [dobleAgua, setDobleAgua, "Doble vaso de agua", "no suele doblar: se rellena el mismo"],
+                [dobleCava, setDobleCava, "Doble copa de cava", "no suele doblar: se rellena la misma"],
+              ] : []),
               [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
               [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
               /* "Lleva canapés" ya no existe: las bandejas para pasar comida van siempre,

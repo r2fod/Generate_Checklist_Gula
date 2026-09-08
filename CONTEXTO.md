@@ -750,6 +750,40 @@ a mano en "Otro"). Solo cambia la ETIQUETA del plato de postre en la checklist; 
 cantidad (`platosDoble + platosPostreExtra`) no se toca, sigue siendo un curso
 aparte que necesita sus propias unidades físicas.
 
+**"Primero + segundo": cubiertos y cristalería doblan por separado, no todo a la vez
+— HECHO**: había DOS mecanismos distintos sobre "doblar" que se pisaban: el menú
+("Dos platos principales") doblaba TODO (cubiertos+cristalería+plato) de golpe vía
+`dobleServicio`, y `excepcionesMesa` tenía "Doble tenedor"/"Doble cuchillo"/
+"Cristalería aparte" para UNA mesa concreta — el dueño pidió unificarlo:
+- La opción se renombra a "Primero + segundo (se sirven los dos)". Sigue doblando
+  el PLATO siempre (`dobleServicio`, sin tocar).
+- Nueva pregunta de seguimiento, "¿Qué se dobla?" (`queDobla`, tras el menú, solo si
+  se marcó "primero + segundo"): cubiertos (tenedor/cuchillo/cuchara) y cristalería
+  (vino/agua/cava), cada uno su propia casilla. Por defecto vienen marcados los
+  cubiertos (lo normal) y SIN marcar la cristalería — la misma copa se rellena
+  durante toda la comida, no suele doblar, pero se puede marcar si hace falta.
+  Nuevo mecanismo genérico en `Formulario.jsx`: `porDefecto` en una pregunta `marcar`
+  la muestra premarcada con esa lista en vez de partir siempre de `[]`.
+- `calcCristaleria()` (`calculos.js`): su parámetro `dobleCopa` ahora acepta también
+  un objeto `{vino, agua, cava}` con un flag por tipo (antes solo booleano, que dobla
+  vino+agua igual y nunca cava — ese comportamiento se conserva tal cual si se sigue
+  pasando un booleano, retrocompatible). `checklist-generadores.js`: `cubiertosDoble`
+  (una cuenta compartida) pasa a tres — `tenedorDoble`/`cuchilloDoble`/`cucharaDoble`
+  — cada una con su propio flag (`dobleTenedor`/`dobleCuchillo`/`dobleCuchara`, con
+  fallback a `dobleServicio` si no se contestó el seguimiento — eventos de antes de
+  esta tarea siguen calculando exactamente igual que siempre).
+- `excepcionesMesa` pierde "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" —
+  ya las cubre la pregunta de seguimiento (que es del evento entero, que es lo que
+  el dueño quería de verdad). Quedan solo "Menú infantil" y "Otro", genuinamente por
+  mesa; el caso raro de una mesa suelta con doble cubierto se resuelve editando la
+  línea a mano en la app (`overridesManuales`, ya existente).
+- Cableado en App.jsx: seis casillas nuevas junto a "Doble servicio" (que ahora dice
+  "dobla el plato", ya no "cubierto, copa y plato"), con el mismo fallback a
+  `dobleServicio` al cargar un evento antiguo.
+- Pendiente, en su propio PR aparte: "bebida aparte" (cliente trae su propia bebida)
+  — sustituir el sí/no de "¿Llevamos cristalería?" por elegir qué bebidas concretas
+  se sirven cuando el cliente la trae, y decidir si también afecta a `calcBebidas()`.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
