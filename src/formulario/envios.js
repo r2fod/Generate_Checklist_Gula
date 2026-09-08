@@ -47,8 +47,11 @@ export function limpiarAvisos(avisos = []) {
 export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO()) {
   return Object.entries(eventosGuardados)
     // El tipo va incluido para que, al elegir un evento que ya existe, el formulario
-    // sepa qué preguntas tocan sin tener que preguntárselo otra vez a la oficina
-    .map(([nombre, e]) => ({ nombre, fecha: e?.fechaEvento || "", sitio: e?.ubicacion || "", tipo: e?.evento || "boda" }))
+    // sepa qué preguntas tocan sin tener que preguntárselo otra vez a la oficina.
+    // "configurado" viaja igual: si el evento lo creó el calendario en blanco
+    // (sinConfigurar) o ya tiene datos de verdad, para que la lista distinga uno de
+    // otro sin depender de si ESTE móvil mandó algo antes (eso es mios.js, aparte).
+    .map(([nombre, e]) => ({ nombre, fecha: e?.fechaEvento || "", sitio: e?.ubicacion || "", tipo: e?.evento || "boda", configurado: !e?.sinConfigurar }))
     .filter(e => e.fecha >= hoy)
     .sort((a, b) => a.fecha.localeCompare(b.fecha))
     .slice(0, MAX_PROXIMOS);

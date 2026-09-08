@@ -5459,6 +5459,20 @@ hr {
   font-weight: 800;
   font-size: 1.05rem;
 }
+/* Ya tiene datos de verdad en la app (no lo creó el calendario en blanco): un
+   badge neutro, distinto del verde de "ya te mandé algo" — son dos cosas distintas
+   y pueden darse las dos a la vez en el mismo evento. */
+.form-evento-configurado {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(127, 127, 127, 0.12);
+  border-radius: 999px;
+}
 
 .form-repaso {
   display: flex;
