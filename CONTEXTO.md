@@ -810,6 +810,32 @@ saltan y se calcula todo como siempre.
 - `aRespuestasDeLaApp()`: `estado.llevaBebida = r.bebidaAparte === "no"` ("no" =
   "la sirve Gula" = sí se calcula).
 
+**El aviso de "hay una versión nueva" llevaba dos semanas mostrando lo mismo —
+HECHO**: `cambios.js` se mantiene a mano (mismo estilo que `precios.js`/`sector.js`) y
+nadie la había tocado desde el 2026-08-25, así que el banner de la checklist llevaba
+~30 PRs de fondo sin decir nada de lo que de verdad había cambiado — el dueño lo cazó
+al ver siempre la misma nota. Añadida una entrada nueva con las mejoras reales más
+recientes, en el idioma de quien carga el camión, no del código. **A partir de
+ahora, tocar `cambios.js` en el mismo commit de cualquier cambio con impacto de
+usuario, igual que `CONTEXTO.md`** — si no, vuelve a quedarse atrás.
+
+**Calendario: la fila de "Asignados" se veía rota en pantallas anchas — HECHO**: el
+dueño mandó una captura real de producción — en "Editar apunte" el nombre de una
+persona parecía flotar entre la hora de entrada de ARRIBA y el importe/horas de
+ABAJO, como si fueran de otra persona. Causa real: a partir de 560px `.cal-asignado`
+pasa a una sola fila con `horario` encogido a `min-content` (`calendario.css`); si su
+contenido no cabe entero, envuelve en varias líneas dentro de esa columna, y con
+`align-items: center` las celdas nombre/rol/quitar (de una sola línea) quedaban
+centradas verticalmente contra ese bloque alto — el nombre acababa a media altura del
+horario de al lado. Con el modal a su ancho fijo (520px), esto pasa en CASI cualquier
+pantalla que no sea un móvil estrecho, no es un caso raro. Arreglado con
+`align-items: start` en ese breakpoint (todo se lee de arriba abajo, junto a la
+primera línea de horario) y un borde separador entre cada persona (`border-bottom` en
+`.cal-asignado`, quitado en la última) para que nunca se confundan dos filas
+distintas aunque una envuelva. Verificado en vivo con el banco de pruebas
+(`pruebas/calendario.html`), añadiendo gente de mentira a un evento y probando 320,
+390, 700 y 900px en claro y oscuro.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
