@@ -836,6 +836,19 @@ distintas aunque una envuelva. Verificado en vivo con el banco de pruebas
 (`pruebas/calendario.html`), añadiendo gente de mentira a un evento y probando 320,
 390, 700 y 900px en claro y oscuro.
 
+**"Mesa alta" se quedaba en "—" sin barra libre aunque SÍ se llevaran — HECHO**: caso
+real del dueño ("Antoine y María" — bebida aparte, sin barra libre ni de cóctel ni de
+copas, pero sí lleva mesas altas y cristalería). La checklist tenía `mesasAltas =
+hayBarra ? calcMesasAltas(pax, numBarras) : 0` (`checklist-generadores.js`): sin
+barra, el "Nº de barras" contestado a mano en la app se ignoraba del todo — el único
+interruptor para pedir mesas altas sin barra no servía de nada. Arreglado a
+`(hayBarra || numBarras) ? calcMesasAltas(...) : 0`: con barra, igual que siempre (cae
+al cálculo por pax si no se contesta); sin barra, se queda en "—" salvo que se
+conteste "Nº de barras" a mano, que entonces manda igual que con barra. Nada nuevo que
+rellenar: ese campo ya estaba siempre visible en boda/comunión/corporativo, solo que
+no hacía nada sin barra. Verificado en vivo con un evento de mentira igual al real
+(sin cóctel ni copas, "Nº de barras": 1 → "Mesa alta: 2").
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

@@ -333,10 +333,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
     calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: evtKey });
-  // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la
-  // gente de pie. Por nº de barras si se contestó (calcMesasAltas cae sola al cálculo
-  // viejo por pax si no).
-  const mesasAltas = hayBarra ? calcMesasAltas(pax, numBarras) : 0;
+  // Mesas altas (cóctel de pie): lo normal es que hagan falta solo con barra
+  // libre/aperitivo con la gente de pie, pero hay eventos sin barra (el cliente trae su
+  // propia bebida) que igual llevan mesas altas — para eso está "Nº de barras" en la
+  // app, visible siempre: si se contesta a mano, manda aunque no haya barra. Por nº de
+  // barras si se contestó (calcMesasAltas cae sola al cálculo viejo por pax si no).
+  const mesasAltas = (hayBarra || numBarras) ? calcMesasAltas(pax, numBarras) : 0;
   // Carpas: antes solo existían en producción (sitios siempre al aire libre). Aquí son
   // la excepción, no la norma (fincas con nave/interior), de ahí que lleguen apagadas
   // por defecto — mismo cálculo compartido que producción (carpas.js), con el pax

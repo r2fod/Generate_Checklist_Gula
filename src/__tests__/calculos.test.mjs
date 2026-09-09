@@ -964,6 +964,16 @@ console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax
   const conBarraPaxAlto = buildChecklist("boda", 120, 2, 4, 0, { numBarras: 1 });
   ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "4",
     "1 barra con 120 pax → 4 mesas altas");
+
+  // Sin barra libre (el cliente trae su bebida) pero SÍ se llevan mesas altas: antes se
+  // ignoraba "Nº de barras" del todo si no había barra — un evento real así se quedaba
+  // en "—" aunque en la app se hubiera contestado. Contestar a mano manda igual.
+  const sinBarraConMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 1 });
+  ok(item(sinBarraConMesas, "Mobiliario, sala y decoración", "Mesa alta") === "2",
+    "sin barra pero con 'Nº de barras' contestado a mano, sí se calculan mesas altas");
+  const sinBarraSinMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 0 });
+  ok(item(sinBarraSinMesas, "Mobiliario, sala y decoración", "Mesa alta") === "—",
+    "y sin barra Y sin contestar, se queda en '—' como siempre (no cambia el caso normal)");
 }
 
 console.log("\n══ Primero + segundo: cubiertos y cristalería doblan por separado ══");
