@@ -847,8 +847,11 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(!preguntasDe("produccion", {}).some(p => p.id === "bebidaAparte"),
     "en un rodaje no se pregunta");
 
-  // Mesas altas: por nº de barras en vez de una fórmula fija por pax. Solo tiene
-  // sentido si hay barra de verdad — depende de coctel/copas, al revés que cristalería.
+  // Mesas altas: por nº de barras en vez de una fórmula fija por pax. Se pregunta
+  // SIEMPRE (a diferencia de bebidaAparte/cristaleria): con barra de verdad calcula
+  // las mesas de la barra; sin barra, checklist-generadores.js igual las calcula si
+  // se contesta aquí — es lo que necesitaba un evento con bebida aparte que aun así
+  // lleva mesas altas (caso real: sin barra ni de cóctel ni de copas).
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: 1 }).numBarras === 1,
     "1 barra se guarda tal cual");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: 2 }).numBarras === 2,
@@ -857,12 +860,12 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
     "\"otro número\" manda el número escrito, no el texto \"otras\"");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).numBarras === undefined,
     "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
-  ok(!preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "numBarras"),
-    "sin cóctel ni copas (0 horas), no se pregunta: no hay barra que montar");
-  ok(!preguntasDe("boda", {}).some(p => p.id === "numBarras"),
-    "y sin contestar cóctel/copas todavía, tampoco (por defecto no se muestra hasta saberlo)");
+  ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "numBarras"),
+    "se pregunta aunque cóctel y copas estén a 0 horas: puede que igual lleve mesas altas");
+  ok(preguntasDe("boda", {}).some(p => p.id === "numBarras"),
+    "y aunque cóctel/copas no se hayan contestado todavía");
   ok(preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "numBarras"),
-    "con cóctel puesto (aunque copas esté a 0), sí se pregunta");
+    "y con cóctel puesto, claro que también");
   ok(!preguntasDe("produccion", { coctel: 2 }).some(p => p.id === "numBarras"),
     "en un rodaje no se pregunta: no lleva \"Mesa alta\" en su checklist");
 
