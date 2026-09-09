@@ -4169,9 +4169,12 @@ export default function App({ onCerrarSesion } = {}) {
                   onChange={e => setNumMesasBuffet(Math.max(0, parseInt(e.target.value) || 0))}
                 />
               </div>
-              {/* Mesas altas: 2 por barra, 4 con 100 pax o más. En blanco cae sola al
-                  cálculo viejo por pax (ver calcMesasAltas). Solo boda/comunión/corporativo:
-                  cumpleaños y producción no llevan "Mesa alta" en su checklist. */}
+              {/* Mesas altas: 2 por barra, 4 con 100 pax o más. En blanco, con barra libre
+                  cae sola al cálculo viejo por pax; sin barra libre (el cliente trae su
+                  bebida) se queda a 0 salvo que se conteste aquí a mano — es el único
+                  interruptor para llevar mesas altas sin barra (ver calcMesasAltas).
+                  Solo boda/comunión/corporativo: cumpleaños y producción no llevan
+                  "Mesa alta" en su checklist. */}
               {evento !== "cumpleanos" && evento !== "produccion" && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº de barras</span>
