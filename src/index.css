@@ -5475,8 +5475,10 @@ hr {
 }
 /* La tarjeta entera también se distingue, no solo el badge: para que los que
    quedan por configurar destaquen de un vistazo sobre los que ya no hace falta
-   tocar. Mismo gris neutro que el badge, para que se lean como la misma señal. */
-.form-evento.es-configurado { border-color: var(--border-color); background: rgba(127, 127, 127, 0.06); }
+   tocar. Mismo gris neutro que el badge, para que se lean como la misma señal.
+   0.06 era casi invisible sobre el fondo oscuro (el dueño lo vio en una captura
+   real): subido a 0.16 y con el borde fuerte, que sí se nota en los dos temas. */
+.form-evento.es-configurado { border-color: var(--border-color-strong); background: rgba(127, 127, 127, 0.16); }
 /* Si además ya se le mandó algo, manda el verde: es la señal más útil ahora mismo
    (algo que la oficina acaba de hacer), por delante del gris de "ya está montado". */
 .form-evento.es-configurado.es-enviado { border-color: var(--ok-borde); background: var(--ok-bg); }

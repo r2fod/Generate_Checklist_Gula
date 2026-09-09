@@ -739,6 +739,14 @@ sale separador. Verificado con una maqueta estática cargando el CSS real compil
 (la lista poblada de "próximos eventos" no se puede simular en este entorno — mismo
 límite ya documentado en PR #195/#201, Firestore no es alcanzable offline).
 
+**Elegir evento: el gris de "ya configurado" se veía casi invisible — HECHO**: el
+dueño mandó una captura real de producción — el 6% de opacidad de `.es-configurado`
+no se distinguía del resto en el tema oscuro, solo se notaba por la etiqueta y el
+separador, no por color. Subido a 16% de opacidad y borde `--border-color-strong`
+(mismo gris neutro, más fuerte); sigue sin competir con el verde de `.es-enviado`,
+que manda cuando se dan las dos cosas a la vez. Verificado con la misma maqueta
+estática, en claro y oscuro.
+
 **Plato de postre: "Mismo que el principal" — HECHO**: el dueño explicó que muchas
 veces el postre se sirve en el MISMO plato (grande) que el principal, no en uno
 pequeño aparte — obligar a repetir a mano el mismo color en la pregunta de postre no
