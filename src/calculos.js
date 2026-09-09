@@ -156,6 +156,15 @@ export function taxisDeHielo(kg) { return Math.max(1, Math.ceil(kg / KG_POR_TAXI
 /** @param {number} pax @returns {number} */
 export function calcMesasCalientes(pax) { return Math.max(1, Math.ceil((pax || 0) / 40)); }
 
+// Logística para la lista de Personal: la gente real puesta en el "Equipo de
+// logística"; si no hay nadie, el recomendado (1 cada 60 pax). Estaba escrita tres
+// veces, una por generador (una de ellas incluso extraída a variable y las otras dos
+// no) — dos copias de la misma fórmula son una que se queda atrás.
+/** @param {number} pax @param {number} [numLogisticaEquipo] @returns {number} */
+export function calcLogistica(pax, numLogisticaEquipo = 0) {
+  return numLogisticaEquipo > 0 ? numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60));
+}
+
 // Mesas altas: antes una fórmula fija por pax (pax/15); ahora depende de cuántas
 // barras se van a montar de verdad (2 mesas por barra, 4 si son 100 pax o más).
 // Sin numBarras (eventos guardados antes de esta pregunta, o sin contestar) cae al
@@ -394,6 +403,7 @@ export function calcDestilados(pax, h) {
  *   Booleano (dobla vino+agua, cava nunca — comportamiento de siempre) u objeto con
  *   un flag por tipo (para "primero + segundo" con doblado granular editable).
  * @param {boolean} tieneBrindisCava @param {boolean} llevaEntrante @param {number} [extraAguaDesayuno]
+ * @param {boolean} [llevaCristaleria] a false lo apaga todo (vasos de chupito incluidos)
  * @returns {Record<string, { u: number, b: number, size: number } | null>}
  */
 export function calcCristaleria(pax, horasCopas, dobleCopa, tieneBrindisCava, llevaEntrante, extraAguaDesayuno = 0, llevaCristaleria = true) {

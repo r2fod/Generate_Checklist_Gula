@@ -1205,6 +1205,44 @@ async function main() {
     ok(mudos.length === 0, `${tipo}: los ${grupos.length} controles cambian la checklist${mudos.length ? ` → sin efecto: ${mudos.join(", ")}` : ""}`);
   }
 
+  // "Llevamos hielo" y "La bebida la pone Gula": dos casillas que existían solo a
+  // medias — el formulario y calculos.js las tenían enteras, pero App.jsx nunca las
+  // cableaba (ni useState, ni opts, ni la propia casilla), así que desmarcarlas en
+  // la app de verdad no cambiaba nada. Se prueba con la app real, no con buildChecklist
+  // directo, que es justo lo que no habría cazado este fallo.
+  console.log("\n── 'Llevamos hielo' y 'La bebida la pone Gula' cambian la checklist de verdad ──");
+  {
+    await page.goto(url({ evento: "boda", pax: 100, barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4 }),
+      { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1900);
+    const casilla = (txt) => page.locator(".checkbox-label-normal", { hasText: txt }).locator("input");
+    const filaDe = async (trozo) => (await listaItems(page)).find(i => i.startsWith(trozo)) || "";
+    // La cantidad va entre el "=" y un posible "|sufijo": comparar la fila entera
+    // fallaba con el sufijo detrás ("...=0|= 0 cajas de 6" no acaba en "=0").
+    const cantidad = (fila) => fila.split("=")[1].split("|")[0];
+
+    const hieloAntes = await filaDe("Hielo=");
+    ok(hieloAntes.length > 0 && cantidad(hieloAntes) !== "0" && cantidad(hieloAntes) !== "",
+      `por defecto lleva hielo, con una cantidad real → ${hieloAntes}`);
+    await casilla("Llevamos hielo").uncheck();
+    await page.waitForTimeout(420);
+    ok(!(await listaItems(page)).some(i => i.startsWith("Hielo=")),
+      "desmarcar 'Llevamos hielo' quita la línea de verdad");
+    await casilla("Llevamos hielo").check();
+    await page.waitForTimeout(420);
+    ok((await filaDe("Hielo=")) === hieloAntes, "y volver a marcarla la trae de vuelta igual que antes");
+
+    const vinoAntes = await filaDe("Vino blanco=");
+    ok(vinoAntes.length > 0 && cantidad(vinoAntes) !== "0", `por defecto la bebida se calcula → ${vinoAntes}`);
+    await casilla("La bebida la pone Gula").uncheck();
+    await page.waitForTimeout(420);
+    ok(cantidad(await filaDe("Vino blanco=")) === "0",
+      "desmarcarla (bebida aparte) deja el vino a 0 de verdad, no solo en el formulario");
+    await casilla("La bebida la pone Gula").check();
+    await page.waitForTimeout(420);
+    ok((await filaDe("Vino blanco=")) === vinoAntes, "y volver a marcarla lo recalcula igual que antes");
+  }
+
   // Los campos NUMÉRICOS de la configuración no entran en el barrido de arriba, que solo
   // recorre los selectores. Y son justo los que dicen CUÁNTO se carga: si uno se queda
   // desconectado del cálculo, la pantalla enseña el número que has puesto y el camión

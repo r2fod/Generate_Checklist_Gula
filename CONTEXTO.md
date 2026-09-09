@@ -861,6 +861,44 @@ tocarse (mismo patrón de siempre) — un evento con barra de verdad se comporta
 exactamente igual que antes. Verificado en vivo: la pregunta sale con cóctel y copas a
 0 horas.
 
+**Auditoría a fondo pedida por el dueño (funcionalidad, duplicidad, escalabilidad,
+responsive) — HECHO, un fallo real encontrado y arreglado**:
+
+- **`llevaHielo` y `llevaBebida` nunca llegaban a la checklist real — el hallazgo
+  gordo**. `aRespuestasDeLaApp()` (`preguntas.js`) calculaba bien las dos, y
+  `calcBebidas()`/los tres generadores las aceptaban y usaban bien — pero `App.jsx`
+  no las tenía en NINGÚN sitio: ni `useState`, ni `SETTERS_SYNC` (el mapa que aplica
+  un envío del formulario), ni el objeto `opts` que de verdad llega a `buildChecklist`,
+  ni una casilla para tocarlo a mano. Resultado: contestar "no hace falta hielo" o
+  "la bebida la trae el cliente" en el formulario se guardaba, pero la checklist
+  seguía pidiendo hielo y bebida completos como si nadie hubiera contestado nada —
+  exactamente el mismo patrón de fallo silencioso que ya cazó antes "`buildChecklist()`
+  no leía `leerRatios()`". Arreglado replicando el cableado completo que ya tenía
+  `llevaCristaleria` (mismo patrón, en los mismos 6-7 sitios): `useState`, entrada en
+  `SETTERS_SYNC`, en `opts` y su array de dependencias, en `ETIQUETAS_CAMPO`, y una
+  casilla manual junto a "Llevamos cristalería" (`llevaBebida` no sale en producción,
+  que no usa `calcBebidas`; `llevaHielo` sí, en los cinco tipos). Nuevo test en
+  `app.test.mjs` que desmarca las dos casillas en la app REAL (no en `buildChecklist`
+  directo, que es justo lo que no habría cazado este fallo) y comprueba que la
+  checklist cambia de verdad — para que esta clase de fallo no vuelva a colarse en
+  silencio.
+- **Limpieza menor, de paso**: `calcCristaleria()` le faltaba la línea `@param` de
+  `llevaCristaleria` en el JSDoc (añadida). Y la fórmula de logística
+  (`numLogisticaEquipo > 0 ? ... : Math.max(1, Math.ceil(pax/60))`) estaba escrita
+  tres veces, una por generador — extraída a `calcLogistica()` en `calculos.js`,
+  mismo patrón que `calcMesasCalientes`/`calcMesasAltas`.
+- **Responsive**: barrido visual manual (no solo la batería automática, que ya cubre
+  9 anchos × 2 temas) por las pantallas más densas en campos de las tres apps — el
+  panel de configuración del evento con casi todo marcado, una lista de bebidas con
+  números de tres cifras, preguntas del formulario con muchas opciones, el equipo del
+  calendario — en 320/390/768/1280px, claro y oscuro. Sin desbordamiento ni solapes
+  en ninguna.
+- **Sin más hallazgos que mereciera la pena forzar**: código muerto (revisados los 28
+  exports de `calculos.js`/`checklist-generadores.js`, todos con uso real), render
+  sin memorizar, y duplicidad real entre `calculos.js` y los generadores — la
+  disciplina de extraer en cuanto algo se repite (bandejas, mesas calientes, mesas
+  altas, cristalería, alturas de buffet) se mantiene bien en el resto del código.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

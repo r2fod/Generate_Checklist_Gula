@@ -5,7 +5,7 @@
 import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
   terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen, taxisDeHielo, calcMesasCalientes,
-  calcMesasAltas, alturasBuffet,
+  calcMesasAltas, alturasBuffet, calcLogistica,
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
@@ -251,7 +251,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
-  const numLogistica = numLogisticaEquipo > 0 ? numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60));
+  const numLogistica = calcLogistica(pax, numLogisticaEquipo);
   // El origen de las sillas (alquiler Dealde/Carvillo o propias) se refleja en el
   // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre.
   // Los cojines vienen incluidos con la silla de alquiler en bodas (no es un item
@@ -602,7 +602,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // 60 pax (carga/transporte), cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, opts.numCamareros, divisorCam))],
-    ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
+    ["Logística", String(calcLogistica(pax, opts.numLogisticaEquipo))],
     ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
   ]});
 
@@ -825,7 +825,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros / office", String(nSala)],
-    ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
+    ["Logística", String(calcLogistica(pax, opts.numLogisticaEquipo))],
     ["Cocina", String(nCocina)],
   ]});
 

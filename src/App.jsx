@@ -227,7 +227,7 @@ const ETIQUETAS_CAMPO = {
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
-  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", llevaCristaleria: "Llevamos cristalería", tipoCafetera: "Cafetera",
+  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", llevaCristaleria: "Llevamos cristalería", llevaHielo: "Llevamos hielo", llevaBebida: "La bebida la pone Gula", tipoCafetera: "Cafetera",
   cafeParaInvitados: "Café para invitados",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
   llevaMobiliarioAlquiler: "Mobiliario de alquiler", proveedorMobiliarioAlquiler: "Proveedor del mobiliario",
@@ -590,6 +590,12 @@ export default function App({ onCerrarSesion } = {}) {
   // se sirva vino/agua/cava con la comida. Por defecto SÍ, como se calculaba siempre
   // antes de existir esta pregunta.
   const [llevaCristaleria, setLlevaCristaleria]     = useState(estadoInicial.llevaCristaleria ?? true);
+  // Por defecto SÍ, como se calculaba siempre antes de existir esta pregunta — un
+  // evento guardado antes de esto sigue pidiendo hielo igual que siempre.
+  const [llevaHielo, setLlevaHielo]                 = useState(estadoInicial.llevaHielo ?? true);
+  // "No" significa que la trae el cliente/la finca (bebida aparte); por defecto SÍ
+  // (la pone Gula), igual que se calculaba siempre antes de existir esta pregunta.
+  const [llevaBebida, setLlevaBebida]               = useState(estadoInicial.llevaBebida ?? true);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
   // Por defecto SÍ es para invitados (como se calculaba siempre antes de esta
   // pregunta): un evento guardado antes de existir esto carga exactamente lo mismo.
@@ -897,7 +903,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
-    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
     alquilaCarpas, numCarpas, llevaParabanes, numParabanes, numBarras, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -1001,7 +1007,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
-    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, llevaCristaleria: setLlevaCristaleria, tipoCafetera: setTipoCafetera,
+    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, llevaCristaleria: setLlevaCristaleria, llevaHielo: setLlevaHielo, llevaBebida: setLlevaBebida, tipoCafetera: setTipoCafetera,
     cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, proveedorMobiliarioAlquiler: setProveedorMobiliarioAlquiler,
@@ -2545,7 +2551,7 @@ export default function App({ onCerrarSesion } = {}) {
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
-    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
@@ -2563,7 +2569,7 @@ export default function App({ onCerrarSesion } = {}) {
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
-    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
@@ -4497,6 +4503,10 @@ export default function App({ onCerrarSesion } = {}) {
                 : []),
               ...(evento !== "produccion"
                 ? [[llevaCristaleria, setLlevaCristaleria, "Llevamos cristalería", "desmárcalo si no se sirve vino/agua/cava en vaso o copa"]]
+                : []),
+              [llevaHielo, setLlevaHielo, "Llevamos hielo", "desmárcalo si el sitio ya lo da o no hace falta"],
+              ...(evento !== "produccion"
+                ? [[llevaBebida, setLlevaBebida, "La bebida la pone Gula", "desmárcalo si la trae el cliente/la finca (bebida aparte)"]]
                 : []),
             ].map(([val, fn, lab, sub]) => (
               <label key={lab} className="checkbox-label-normal">
