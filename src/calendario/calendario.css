@@ -1467,7 +1467,14 @@ button.cal-turnos.es-vacia {
     "horario horario  horario";
   gap: 4px;
   align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
 }
+/* Sin este borde, cuando el horario de una persona baja a su propia línea (poco
+   ancho, o el navegador pinta la hora en 12h y ocupa más sitio) el "€"/"Nh" sueltos
+   quedaban pegados al nombre de la persona de ABAJO, sin nada que dijera de quién
+   eran — justo lo que el dueño vio en una captura real. Cada persona, su caja. */
+.cal-asignado:last-of-type { border-bottom: none; padding-bottom: 0; }
 
 .cal-asignado-nombre  { grid-area: nombre; }
 .cal-asignado-rol     { grid-area: rol; }
@@ -1492,6 +1499,15 @@ button.cal-turnos.es-vacia {
        sus campos en dos líneas) y nombre tiene un suelo de verdad. */
     grid-template-columns: minmax(140px, 1fr) 104px minmax(0, min-content) 32px;
     grid-template-areas: "nombre rol horario quitar";
+    /* Si "horario" no cabe entero y envuelve dentro de su columna (encogida a
+       min-content), la fila se vuelve más alta que nombre/rol/quitar — con
+       align-items:center (el de arriba) esas tres celdas quedaban centradas
+       verticalmente contra un bloque de varias líneas, así que el nombre parecía
+       flotar a media altura, con la hora de entrada "por encima" y el importe/las
+       horas "por debajo" de una persona que en realidad era la de al lado. Arriba
+       del todo, junto a la primera línea de "horario" (entrada+salida), es lo que
+       se lee de corrido. */
+    align-items: start;
   }
 }
 
