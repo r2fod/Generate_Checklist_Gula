@@ -899,6 +899,19 @@ responsive) — HECHO, un fallo real encontrado y arreglado**:
   disciplina de extraer en cuanto algo se repite (bandejas, mesas calientes, mesas
   altas, cristalería, alturas de buffet) se mantiene bien en el resto del código.
 
+**Café del personal: se pisaba con el de invitados, en vez de sumarse — HECHO**:
+encontrado por el dueño justo revisando la auditoría de arriba. `calcCafe()`
+(`checklist-generadores.js`) trataba "café para invitados" y "café del personal"
+como mutuamente excluyentes (`if (paraInvitados) {...} else if (numPersonal > 0)
+{...}`): con invitados marcado (el caso normal), el personal se quedaba sin su
+propia cafetera, dando por hecho que "tomaba prestado" de la de invitados. Pero el
+personal curra las mismas horas haya o no café de invitados — su parte tiene que
+calcularse SIEMPRE que haya plantilla, no solo cuando los invitados no lo piden.
+Arreglado quitando el `else`: los dos bloques son independientes ahora, y con
+invitados + personal a la vez salen las dos cafeteras y sus cápsulas por separado.
+Sin cambios en el caso "solo personal" (ya funcionaba bien) ni en producción (no usa
+`calcCafe` para el personal, tiene su propia cafetera de mantenimiento aparte).
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
