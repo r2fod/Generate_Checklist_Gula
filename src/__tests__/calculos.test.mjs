@@ -741,6 +741,12 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "con café para invitados, sale la cafetera de servicio de siempre");
   ok(catCafe(conInvitados).items.some(x => /Tazas café/.test(x[0])),
     "y las tazas para los invitados");
+  // El café de invitados y el del personal son independientes, no "uno u otro": con
+  // café para invitados marcado, el personal (que curra las mismas horas) TAMBIÉN
+  // lleva su propia cafetera — antes se quedaba sin nada, dando por hecho que
+  // "tomaba prestado" de la de invitados.
+  ok(catCafe(conInvitados).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
+    "y con café para invitados TAMBIÉN se calcula el del personal, no uno u otro");
 
   // Sin invitados, el personal se queda sin la cafetera de la que "tomar prestado":
   // hace falta una propia, aunque modesta (nada de tazas ni platos, eso sí es de
@@ -752,6 +758,9 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "pero si el personal sí toma café, se lleva su propia cafetera");
   ok(JSON.stringify(vasosPersonal(conInvitados)) === JSON.stringify(vasosPersonal(soloPersonal)),
     "y los vasos de cartón del personal no cambian: son aparte, no dependen de esto");
+  ok(JSON.stringify(catCafe(conInvitados).items.find(x => x[0] === "Cápsulas café (para el personal)"))
+    === JSON.stringify(catCafe(soloPersonal).items.find(x => x[0] === "Cápsulas café (para el personal)")),
+    "y las cápsulas del personal son las mismas con o sin café de invitados: el mismo personal");
 
   const sinContestar = buildChecklist("boda", 100, 2, 4, 0, {});
   ok(catCafe(sinContestar).items.length === catCafe(conInvitados).items.length,

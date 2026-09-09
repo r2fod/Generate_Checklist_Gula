@@ -128,13 +128,15 @@ const CAPSULAS_POR_PAX_PRODUCCION = 5.5;
 
 function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false, ratioCapsulas = null, paraInvitados = true, numPersonal = 0) {
   const items = [];
-  // Sin invitados de por medio (formulario: "el café es solo para el personal") no se
-  // pide nada de lo de invitados — ni tazas, ni platos, ni las cápsulas de sobra que
-  // antes "tomaba prestadas" el personal de la máquina de invitados. Los vasos de
-  // cartón del personal siguen siendo aparte y no dependen de este flag (calcPersonal,
-  // en Servicio y limpieza) — lo único que cambia es si además hay máquina y cápsulas
-  // para hacer ese café. En producción no hace falta nada de esto: ya lleva su propia
-  // cafetera de mantenimiento sin depender de calcCafe (ver buildChecklistProduccion).
+  // El café de invitados y el del personal son independientes, no "uno u otro": el
+  // personal curra las mismas horas haya o no café de invitados, así que su parte
+  // (más abajo, `numPersonal > 0`) se calcula siempre que haya plantilla, no solo
+  // cuando los invitados no lo piden — antes se pisaban (con invitados marcado, el
+  // personal se quedaba sin nada, dando por hecho que "tomaba prestado" de la
+  // máquina de invitados). Los vasos de cartón del personal son aparte y no
+  // dependen de nada de esto (calcPersonal, en Servicio y limpieza). En producción
+  // no hace falta nada de esto: ya lleva su propia cafetera de mantenimiento sin
+  // depender de calcCafe (ver buildChecklistProduccion).
   if (paraInvitados) {
   // paxConsumo ≠ totalPax solo en producciones de varios días: lo que se gasta
   // (cápsulas, café, infusiones, azúcar, leches) se calcula sobre la suma de pax
@@ -168,10 +170,10 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(paxConsumo / (hayDesayuno ? 8 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / (hayDesayuno ? 20 : 40))))],
   );
-  } else if (numPersonal > 0) {
-    // El personal curra horas largas y sigue queriendo su café aunque los invitados
-    // no lo pidan: sin la máquina de invitados de la que "tomar prestado", hace falta
-    // una propia, aunque sea modesta. ~2 cápsulas por persona cubren un par de rondas
+  }
+  if (numPersonal > 0) {
+    // El personal quiere su café aunque haya (o no) café de invitados: su propia
+    // máquina, aunque sea modesta. ~2 cápsulas por persona cubren un par de rondas
     // durante el turno — muchas menos que las de invitados (2,2-3,2/pax), porque aquí
     // no hay sobremesa ni tarta, solo cortar el cansancio.
     items.push(
