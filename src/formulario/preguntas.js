@@ -57,8 +57,8 @@ const GASTROS_MINIMO = 4;
 // pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
 // tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
 // entrante, estiloPlatoPostre después de estiloPlato, hielo después de
-// congelador, numBarras/bebidaAparte/cristaleria después de coctel/copas,
-// queDobla después de menu).
+// congelador, bebidaAparte/cristaleria después de coctel/copas, queDobla después de
+// menu). numBarras ya no depende de coctel/copas: se pregunta siempre.
 export const PREGUNTAS = [
   // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
@@ -223,9 +223,13 @@ export const PREGUNTAS = [
   },
   {
     // Con esto se calculan las mesas altas (2 por barra, 4 si son 100 pax o más) en
-    // vez de una fórmula fija por pax — solo tiene sentido si hay barra de verdad.
-    id: "numBarras", tipo: "opciones", texto: "¿Cuántas barras se van a montar?",
-    nota: "Con esto se calculan las mesas altas: 2 por barra, o 4 si son 100 pax o más.",
+    // vez de una fórmula fija por pax. Antes solo se preguntaba con barra libre de
+    // verdad — pero hay eventos sin barra (el cliente trae su bebida) que igual llevan
+    // mesas altas y cristalería (checklist-generadores.js ya lo respeta: sin barra,
+    // esto manda igual si se contesta). Por eso ya no lleva `si:`: se pregunta siempre
+    // en los tipos con barra, la haya montado o no.
+    id: "numBarras", tipo: "opciones", texto: "¿Cuántas barras hacen falta para las mesas altas?",
+    nota: "2 mesas altas por barra, o 4 si son 100 pax o más. Se pregunta aunque no haya barra libre: puede que igual llevéis mesas altas.",
     opciones: [
       { valor: 1, texto: "1 barra" },
       { valor: 2, texto: "2 barras" },
@@ -237,7 +241,6 @@ export const PREGUNTAS = [
       },
     ],
     soloEn: CON_BARRA,
-    si: (r) => Number(r.coctel) > 0 || Number(r.copas) > 0,
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el

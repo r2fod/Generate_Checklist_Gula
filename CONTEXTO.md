@@ -849,6 +849,18 @@ rellenar: ese campo ya estaba siempre visible en boda/comunión/corporativo, sol
 no hacía nada sin barra. Verificado en vivo con un evento de mentira igual al real
 (sin cóctel ni copas, "Nº de barras": 1 → "Mesa alta: 2").
 
+**Y el formulario tampoco lo preguntaba sin barra libre — mismo commit, mismo hallazgo
+del dueño, HECHO**: el arreglo de arriba deja el campo funcionando en la app, pero la
+pregunta "numBarras" del formulario (`preguntas.js`) tenía `si: (r) => coctel>0 ||
+copas>0` — sin barra, la oficina no podía contestarlo desde el envío y alguien tenía
+que acordarse de rellenarlo a mano en la app después. Quitado el `si:`: ahora se
+pregunta siempre en los tipos con barra (`CON_BARRA`), texto reescrito para que tenga
+sentido sin barra libre ("¿Cuántas barras hacen falta para las mesas altas?", con nota
+aclarando que se pregunta aunque no haya barra libre). Sin contestar, sigue sin
+tocarse (mismo patrón de siempre) — un evento con barra de verdad se comporta
+exactamente igual que antes. Verificado en vivo: la pregunta sale con cóctel y copas a
+0 horas.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
