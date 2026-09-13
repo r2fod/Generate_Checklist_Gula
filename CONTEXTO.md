@@ -940,6 +940,35 @@ calibración dejaría de tener datos limpios de qué sale de verdad con el pax s
 deja tal cual hasta confirmar con el dueño si merece la pena perder esa señal a cambio
 de una pantalla menos.
 
+**Modo carga nunca avisaba de los items de alquiler — HECHO**: el dueño lo encontró
+en un evento real (sillas de Dealde) — la lista normal (`FilaItem.jsx`) pinta de
+amarillo y pone el cartelito "ALQUILER" en los items de un proveedor externo (por
+nombre, o marcados a mano con el ✎), pero `ModalModoCarga.jsx` descartaba ese dato al
+desestructurar la tupla del item (`[label, qty, , labelOriginal, , sufijo]` — la
+coma vacía era justo la marca de alquiler) y por eso ningún evento la mostraba ahí,
+nunca. Arreglado:
+- Extraída `esItemDeAlquiler(label, esAlquilerManual)` a `checklist-format.js` — el
+  criterio (tag manual, o el nombre lleva Dealde/Carvillo/Novelda/alquiler) estaba
+  copiado a mano en `FilaItem.jsx` y en el exportador de Word; ahora los tres (los dos
+  de antes + Modo carga) llaman a la misma función.
+- `FilaCargaPrep`/`FilaCargaVuelta` reciben `esAlquiler` y pintan `.carga-row.is-alquiler`
+  (mismo `--alquiler-bg` que la lista normal) más el cartelito.
+- **Dos fallos de layout cazados por la propia batería, no a ojo**: (1) el cartelito
+  puesto como hermano directo del nombre le robaba ancho hasta partir palabras letra a
+  letra a 320px — arreglado agrupando icono+nombre en `.carga-nombre-lead` con
+  `flex-basis:100%`, que fuerza al cartelito a su propia línea sin tocar el nombre. (2)
+  el gris apagado de `.carga-cantidad` sobre el fondo amarillo bajaba a 4,48 de
+  contraste (el mínimo AA es 4,5) — la prueba de contraste automática lo cazó con la
+  cantidad "1" de un item real; arreglado con `var(--alquiler-text)` (el mismo ámbar
+  del cartelito) en vez del gris, que si sube a 4,65.
+- Un test ya existente ("los alquileres están en Modo carga para marcarlos") leía el
+  nombre completo de `.carga-nombre` esperando texto exacto — al añadir el cartelito
+  ahí al lado dejó de coincidir. No era un fallo del test: es que el cartelito ahora
+  vive en el mismo contenedor. Se corrigió apuntando a `.carga-nombre-texto` (el
+  nombre puro, sin el cartelito), que es lo que ese test siempre quiso comprobar.
+- Verificado con capturas en claro/oscuro a 320/390px, y `npm run test` completo:
+  761 comprobaciones, 0 fallidas.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

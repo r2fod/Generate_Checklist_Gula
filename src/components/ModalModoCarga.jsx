@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
-  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X,
+  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag,
 } from "lucide-react";
 import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
-import { fmtCantidadCompleta, quitarItemsSinCantidad } from "../checklist-format.js";
+import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
 import { leerPrecios, guardarPrecios, parsePreciosPegados } from "../precios.js";
@@ -36,14 +36,24 @@ import Escaleta from "./Escaleta.jsx";
 // onToggleSale, onVuelve y onRoturas van con useCallback en App.jsx: una función
 // nueva en cada tecla habría dejado el memo en nada, todas las filas "cambiadas".
 const FilaCargaPrep = memo(function FilaCargaPrep({
-  dataKey, label, qty, sufijo, enPreparacion, marcado, otroMarcado, marcaRevisar, onToggle,
+  dataKey, label, qty, sufijo, enPreparacion, marcado, otroMarcado, marcaRevisar, esAlquiler, onToggle,
 }) {
   return (
-    <div className={`carga-row ${marcado ? "is-marcado" : ""}`}
+    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""}`}
          data-revisar={marcaRevisar ? dataKey : undefined}>
       <label className="carga-row-principal">
         <input type="checkbox" checked={marcado} onChange={() => onToggle && onToggle(dataKey)} />
-        <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
+        <span className="carga-nombre">
+          {/* El tag va FUERA de carga-nombre-texto (que es el nombre puro: algo lo lee
+              con innerText, ver "los alquileres están en Modo carga" en app.test.mjs) y
+              en su propia línea vía flex-wrap + flex-basis:100% en carga-nombre-lead —
+              como hermano directo sin eso, el tag le robaba ancho al nombre y a 320px
+              se partía letra a letra. */}
+          <span className="carga-nombre-lead">
+            <IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span>
+          </span>
+          {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+        </span>
         {otroMarcado && (
           <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
                 title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
@@ -66,7 +76,7 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
   );
 });
 
-const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, consumible, onVuelve, onRoturas }) {
+const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, consumible, esAlquiler, onVuelve, onRoturas }) {
   const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
   const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
   const marcado = valorVuelta !== undefined && valorVuelta !== "";
@@ -84,13 +94,18 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
   // lo normal, no una rotura: no se sugiere marcarlo como tal (ver consumibles.js).
   const sugerirRoturas = faltan > 0 && !roturaValor && !consumible;
   return (
-    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""}`}>
+    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""} ${esAlquiler ? "is-alquiler" : ""}`}>
       {/* La pastilla "todo" va en la línea del nombre, que es donde está la casilla de
           marcar en Prep. y en Salida: es la misma acción y tiene que estar en el mismo
           sitio. Debajo se apilaba, y entre eso y los dos campos cada item ocupaba cuatro
           líneas — recorrer la vuelta de un rodaje era bajar el triple de lo necesario. */}
       <div className="carga-row-principal carga-row-vuelta">
-        <span className="carga-nombre"><IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span></span>
+        <span className="carga-nombre">
+          <span className="carga-nombre-lead">
+            <IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span>
+          </span>
+          {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+        </span>
         <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
         <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
           <input
@@ -785,8 +800,13 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 <span>{cat.nombre}</span>
               </div>
               <div className="carga-lista">
-                {cat.items.map(([label, qty, , labelOriginal, , sufijo]) => {
+                {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo]) => {
                   const dataKey = `${cat.nombre}::${labelOriginal}`;
+                  // Mismo criterio que la lista normal (FilaItem.jsx): el tag manual, o
+                  // si el propio nombre ya lo delata (Dealde/Carvillo/Novelda/alquiler).
+                  // Sin esto, un item de alquiler salía en Modo carga como uno más, sin
+                  // el fondo amarillo ni el cartelito que sí se ve en la lista normal.
+                  const esAlquiler = esItemDeAlquiler(label, esAlquilerManual);
                   // Preparación y Salida son la misma fila con distinta marca. Cada una
                   // enseña en pequeño cómo va la otra: preparando ves lo que ya está en
                   // el camión, y cargando ves lo que venía preparado.
@@ -805,6 +825,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                         marcado={marcado}
                         otroMarcado={otroMarcado}
                         marcaRevisar={marcado && !!marcasRevisar[dataKey]}
+                        esAlquiler={esAlquiler}
                         onToggle={enPreparacion ? onTogglePreparado : onToggleSale}
                       />
                     );
@@ -819,6 +840,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                       valorVuelta={vueltos[dataKey]}
                       roturaValor={roturas[dataKey]}
                       consumible={esConsumible(cat.nombre, labelOriginal)}
+                      esAlquiler={esAlquiler}
                       onVuelve={onVuelve}
                       onRoturas={onRoturas}
                     />

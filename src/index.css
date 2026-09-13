@@ -3509,6 +3509,10 @@ hr {
   background-color: var(--bg-color);
 }
 
+.carga-row.is-alquiler {
+  background-color: var(--alquiler-bg);
+}
+
 .carga-row-principal {
   display: flex;
   align-items: center;
@@ -3958,8 +3962,21 @@ hr {
   font-size: 0.9rem;
   color: var(--text-main);
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+/* El icono+nombre van agrupados y con flex-basis:100%: eso fuerza al cartelito
+   "ALQUILER" (el otro hijo de .carga-nombre) a caer SIEMPRE a su propia línea, en vez
+   de compartir fila y robarle ancho al nombre — que es justo lo que pasaba cuando el
+   cartelito iba como hermano directo, sin este grupo: a 320px el nombre se quedaba
+   con tan poco sitio que se partía letra a letra. */
+.carga-nombre-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 100%;
+  min-width: 0;
 }
 /* El nombre del material va en su propio elemento y no como texto suelto dentro del
    flex. Suelto era un "item anónimo" que no baja de su ancho natural: a 320px
@@ -4406,6 +4423,10 @@ hr {
 .preview-header-title > svg { color: var(--accent); }
 .dialogo-titulo > svg { color: var(--accent); }
 .carga-nombre + .carga-cantidad, .carga-cantidad { color: var(--text-muted); }
+/* Sobre el fondo amarillo de alquiler, el gris apagado de siempre se queda corto de
+   contraste (4,48 de los 4,5 que pide AA — lo cazó la prueba de contraste, no a
+   simple vista). El mismo tono ámbar que ya usa el cartelito "ALQUILER" sí cumple. */
+.carga-row.is-alquiler .carga-cantidad { color: var(--alquiler-text); }
 .section-title svg { color: inherit; }
 .form-label svg { color: var(--accent); }
 .range-value, .dias-produccion-resumen { color: var(--accent); }

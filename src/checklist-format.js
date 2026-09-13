@@ -78,6 +78,13 @@ export function fmtCantidadCompleta(label, qtyTexto, sufijo) {
 export const PALABRAS_ALQUILER = ["dealde", "carvillo", "novelda", "alquiler"];
 export const CATEGORIA_MANUAL = "Otros (añadidos manualmente)";
 
+// Las tres formas de arriba, en una sola función: estaba repetida (FilaItem.jsx,
+// el Word de más abajo, y Modo carga) y cada copia era una ocasión de que una se
+// actualizara y las otras dos se quedaran atrás.
+export function esItemDeAlquiler(label, esAlquilerManual) {
+  return !!esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+}
+
 // Un item sin cantidad real (vacío, solo "—" a decidir in situ, o en 0 porque no
 // hace falta ninguno) no aporta nada a la hora de cargar el camión ni de imprimir
 // — se queda fuera de Modo carga, Vista previa y Word/PDF, pero sigue editable en
@@ -222,7 +229,7 @@ export function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, bar
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
       <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
       <tbody>${items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo], i) => {
-        const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+        const alq = esItemDeAlquiler(label, esAlquilerManual);
         const key = `${catNombre}::${labelOriginal ?? label}`;
         const prep = preparados[key] ? "✓" : "";
         const sale = checkeados[key] ? "✓" : "";

@@ -812,6 +812,63 @@ async function main() {
     await c.close();
   }
 
+  // ── Modo carga también avisa de los items de alquiler ───────────────────────
+  // La lista normal (FilaItem.jsx) pinta de amarillo y pone el cartelito "ALQUILER"
+  // en items de un proveedor externo (por nombre, o marcados a mano con el ✎), pero
+  // Modo carga los pintaba como cualquier otro: se descartaba ese dato de la tupla
+  // del item al desestructurar ([label, qty, , labelOriginal, , sufijo]), la casilla
+  // de en medio. El dueño lo pilló en un evento real con sillas de Dealde.
+  console.log("\n── Modo carga: los items de alquiler también llevan su aviso ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    // "Dealde" en el nombre lo detecta solo (origenSillas); el candy bar se marca a
+    // mano con itemsAlquilerManual, que es justo el camino que no lleva ningún
+    // proveedor en el nombre y por eso no se detecta solo.
+    await p.goto(url({
+      evento: "boda", pax: 80, nombreEvento: "Boda alquiler",
+      origenSillas: "Dealde",
+      itemsManuales: [{ categoria: "Mobiliario, sala y decoración", label: "Candy bar", cantidad: "1" }],
+      itemsAlquilerManual: { "Mobiliario, sala y decoración::Candy bar": true },
+    }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1200);
+
+    const contarAlquiler = () => p.evaluate(() => ({
+      filas: document.querySelectorAll(".carga-row.is-alquiler").length,
+      tags: document.querySelectorAll(".carga-row .tag-alquiler").length,
+    }));
+    const enSalida = await contarAlquiler();
+    ok(enSalida.filas >= 2 && enSalida.tags >= 2,
+      `en Salida, sillas (por nombre) y candy bar (marcado a mano) llevan el aviso → ${JSON.stringify(enSalida)}`);
+
+    // El fondo de verdad se pinta, no solo la clase: mismo color que la lista normal
+    const fondoDeUnaFila = await p.evaluate(() => {
+      const fila = document.querySelector(".carga-row.is-alquiler");
+      return fila ? getComputedStyle(fila).backgroundColor : null;
+    });
+    ok(!!fondoDeUnaFila && fondoDeUnaFila !== "rgba(0, 0, 0, 0)" && fondoDeUnaFila !== "transparent",
+      `y el fondo amarillo se pinta de verdad, no solo la clase → ${fondoDeUnaFila}`);
+
+    // Y en Vuelta, sin que el cartelito le robe el sitio al nombre (a 320px sobre
+    // todo: ver el test de arriba de "la pastilla todo no puede aplastar el nombre")
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(900);
+    const enVuelta = await contarAlquiler();
+    ok(enVuelta.filas >= 2 && enVuelta.tags >= 2,
+      `y en Vuelta también, no solo en Prep./Salida → ${JSON.stringify(enVuelta)}`);
+    // Mismo umbral que el test de arriba ("Vuelta a 320px: el nombre tiene sitio de
+    // sobra"): >=100px es lo que se considera "con sitio", no una cifra inventada
+    // aparte para este caso.
+    const anchoNombreConTag = await p.evaluate(() =>
+      document.querySelector(".carga-row.is-alquiler .carga-nombre").getBoundingClientRect().width);
+    ok(anchoNombreConTag >= 100,
+      `y a 390px el nombre conserva sitio de sobra, el cartelito no se lo come → ${Math.round(anchoNombreConTag)}px`);
+    await c.close();
+  }
+
   // ── El botón "Recalcular cantidades" ────────────────────────────────────────
   // Compara el cálculo de AHORA con la foto que se guardó (valoresCalculados) y ofrece,
   // una por una, mantener lo que hay o coger lo nuevo. Es el botón que salva a los
@@ -3567,7 +3624,9 @@ async function main() {
     await p.waitForTimeout(600);
     await p.locator("button", { hasText: "Modo carga" }).first().click();
     await p.waitForTimeout(1400);
-    const enCarga = async () => (await p.locator(".carga-nombre").allInnerTexts()).map(x => x.trim());
+    // El nombre puro va en .carga-nombre-texto; .carga-nombre (su contenedor) puede
+    // llevar también el cartelito "ALQUILER" al lado, que no es parte del nombre.
+    const enCarga = async () => (await p.locator(".carga-nombre-texto").allInnerTexts()).map(x => x.trim());
     let cargaSalida = await enCarga();
     const debenEstar = ["Generador", "Armario caliente (alquiler Dealde)", "Carpas"];
     const faltan = debenEstar.filter(n => !cargaSalida.some(x => x === n));
