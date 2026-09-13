@@ -548,12 +548,12 @@ export default function Formulario({ codigo }) {
                 <span className="form-evento-texto">
                   <span className="form-evento-nombre">{e.nombre}</span>
                   <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
-                  {/* Ya tiene datos de verdad, no lo creó el calendario en blanco: no es
-                      que se le haya mandado algo (eso es el check verde), es que ya
-                      está montado — mejor no tocarlo sin querer. Si además hay
-                      respuestas guardadas de un envío anterior, se avisa de que vienen
-                      puestas: si no, "Ya configurado" sonaba a "no hace falta tocar
-                      nada" y luego, al entrar, preguntaba todo de cero igualmente. */}
+                  {/* Ya tiene datos de verdad, no lo creó el calendario en blanco: lleva
+                      el mismo verde y check que "ya te mandé algo" (abajo), para que se
+                      vea igual desde cualquier móvil, no solo el que lo mandó. Si además
+                      hay respuestas guardadas de un envío anterior, se avisa de que
+                      vienen puestas: si no, "Ya configurado" sonaba a "no hace falta
+                      tocar nada" y luego, al entrar, preguntaba todo de cero igualmente. */}
                   {e.configurado && (
                     <span
                       className="form-evento-configurado"
@@ -565,8 +565,12 @@ export default function Formulario({ codigo }) {
                     </span>
                   )}
                 </span>
-                {enviado && (
-                  <span className="form-evento-check" title={`Ya mandaste datos ${fmtCuando(enviado.enviado)}`} aria-hidden="true">✓</span>
+                {(enviado || e.configurado) && (
+                  <span
+                    className="form-evento-check"
+                    title={enviado ? `Ya mandaste datos ${fmtCuando(enviado.enviado)}` : "Ya está configurado en la app"}
+                    aria-hidden="true"
+                  >✓</span>
                 )}
                 </button>
               </Fragment>
