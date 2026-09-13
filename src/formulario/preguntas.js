@@ -348,10 +348,15 @@ export const PREGUNTAS = [
     // el otro. Muchas veces tampoco es un entrante para compartir, son dos: por eso
     // lleva su número, y cada uno multiplica sus platos.
     id: "entrante", tipo: "marcar", texto: "¿Lleva entrante?",
-    nota: "Puede llevar los dos: el de chupito y uno (o varios) para compartir.",
+    // "Individual" no es un caso raro de "para compartir" (no tiene sentido elegir
+    // "compartir" para decir que NO se comparte): es su propio botón, con ratio 1
+    // fijo y sin preguntar nada más después — antes había que marcar "compartir" y
+    // esperar a la siguiente pantalla para decir "en realidad es individual".
+    nota: "Puede llevar varios a la vez: de chupito, individual y/o para compartir entre varios.",
     opciones: [
       { valor: "chupito", texto: "De chupito" },
-      { valor: "compartir", texto: "Para compartir", conNumero: "¿Cuántos entrantes distintos?" },
+      { valor: "individual", texto: "Individual (un plato por persona)", conNumero: "¿Cuántos entrantes distintos?" },
+      { valor: "compartir", texto: "Para compartir (varias personas por plato)", conNumero: "¿Cuántos entrantes distintos?" },
     ],
     soloEn: CON_BARRA,
   },
@@ -1061,19 +1066,28 @@ export function aRespuestasDeLaApp(r = {}) {
       // 100 personas son seis camareros donde se ponen tres o cuatro.
       estado.paxPorCamarero = r.servicio === "bandeja" ? 25 : 12;
     }
-    // Los dos entrantes son independientes: un menú puede llevar chupito Y compartido
+    // Los tres entrantes son independientes: un menú puede llevar chupito, individual
+    // y compartido a la vez
     if (Array.isArray(r.entrante)) {
       estado.llevaEntrante = marcado("entrante", "chupito");
-      estado.entranteCompartido = marcado("entrante", "compartir");
+      const entranteIndividual = marcado("entrante", "individual");
+      const entranteCompartir = marcado("entrante", "compartir");
+      estado.entranteCompartido = entranteIndividual || entranteCompartir;
       if (estado.entranteCompartido) {
-        // Cada cuántas personas va un plato, y cuántos entrantes distintos hay (lo
-        // normal es 1, pero hay menús con 2). Si no lo contestan, manda el valor de
-        // siempre de la app.
-        if (puesto(r.entrantePersonas)) {
+        // El ratio de "individual" es 1 fijo, sin preguntar nada más. El de "compartir"
+        // lo pregunta aparte (entrantePersonas). Si se marcan los dos a la vez manda el
+        // de "compartir": la checklist solo tiene una línea con un ratio, no dos.
+        if (entranteCompartir && puesto(r.entrantePersonas)) {
           estado.personasPorPlatoEntrante = r.entrantePersonas === "otras"
             ? r.entrantePersonasOtras : r.entrantePersonas;
+        } else if (entranteIndividual) {
+          estado.personasPorPlatoEntrante = 1;
         }
-        if (r.compartirNumero > 0) estado.numEntrantesCompartir = r.compartirNumero;
+        // Los entrantes distintos de cada tipo se suman: da igual si son individuales
+        // o para compartir, todos cargan su propio plato extra.
+        const numIndividual = entranteIndividual ? (r.individualNumero > 0 ? r.individualNumero : 1) : 0;
+        const numCompartir = entranteCompartir ? (r.compartirNumero > 0 ? r.compartirNumero : 1) : 0;
+        if (numIndividual + numCompartir > 0) estado.numEntrantesCompartir = numIndividual + numCompartir;
       }
     }
     // "finca" = no las llevamos nosotros; el resto es literalmente el valor que usa la
