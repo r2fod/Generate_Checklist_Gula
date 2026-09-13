@@ -912,6 +912,34 @@ invitados + personal a la vez salen las dos cafeteras y sus cápsulas por separa
 Sin cambios en el caso "solo personal" (ya funcionaba bien) ni en producción (no usa
 `calcCafe` para el personal, tiene su propia cafetera de mantenimiento aparte).
 
+**Entrante "Individual" como su propia casilla, no un rodeo por "compartir" — HECHO**:
+el dueño señaló que en "¿Lleva entrante?" (`preguntas.js`) la única forma de decir "un
+plato por persona" era marcar "Para compartir" y, en la SIGUIENTE pantalla
+(`entrantePersonas`), elegir "Individual (un plato por persona)" — al revés de lo que
+dice la palabra "compartir". Añadida "Individual" como tercera casilla junto a
+"chupito"/"compartir" en la misma pregunta, con su propio número inline
+(`individualNumero`, mismo patrón que las demás casillas de `marcar`+`conNumero`).
+Al marcarla, `entranteCompartido` sale `true` con `personasPorPlatoEntrante` fijo a 1
+SIN preguntar nada más — la pantalla `entrantePersonas` sigue atada solo a "compartir"
+(su `si:` no cambia), así que elegir solo "individual" ya no mete una pantalla de más
+en medio. Si se marcan "individual" y "compartir" a la vez (raro, pero el marcar
+siempre ha permitido varias casillas), sus números se suman en una sola línea de
+"Platos extra entrante" con el ratio de "compartir" — la checklist solo tiene sitio
+para un ratio, no dos, limitación que ya existía antes de este cambio. Verificado en
+vivo con Playwright: marcar solo "individual" y pulsar "Siguiente" salta directo a la
+pregunta del café, sin pasar por "cada cuántas personas".
+
+De paso, revisado el aviso de que "seleccionar paella corta el hilo" (pregunta menú →
+tamaño → cuántas, cada una en su propia pantalla): `cuantasPaellas` tiene un porqué
+para seguir aparte y no meterse como número en la propia casilla "Paella" del menú —
+`calibracion.js` usa explícitamente que `numPaellas > 0` signifique "el número lo puso
+alguien a mano", para NO aprender de esos eventos y no torcer el ratio automático por
+pax. Si el número se autorrellenara nada más marcar "Paella" (como si fuera
+`conNumero` normal), CADA evento con paella pasaría a contar como "puesto a mano" y la
+calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Se
+deja tal cual hasta confirmar con el dueño si merece la pena perder esa señal a cambio
+de una pantalla menos.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

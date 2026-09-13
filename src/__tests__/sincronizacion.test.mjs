@@ -584,6 +584,31 @@ console.log("\n══ Entrante de chupito Y para compartir ══");
   });
   ok(individual.personasPorPlatoEntrante === 1,
     `"Individual" manda 1 persona por plato → cada ${individual.personasPorPlatoEntrante}`);
+
+  // Ahora "individual" es su propia casilla en "¿Lleva entrante?", no hay que pasar
+  // por "compartir" para decir que en realidad no se comparte.
+  const individualDirecto = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["individual"], individualNumero: 2,
+  });
+  ok(individualDirecto.entranteCompartido === true && individualDirecto.personasPorPlatoEntrante === 1,
+    "\"Individual\" directo también da ratio 1, sin marcar \"compartir\"");
+  ok(individualDirecto.numEntrantesCompartir === 2,
+    `y con su propio número de entrantes distintos → ${individualDirecto.numEntrantesCompartir}`);
+
+  // Y no hace falta preguntar "cada cuántas personas" si solo es individual: por eso
+  // esa pantalla sigue atada solo a "compartir", no a cualquier entrante.
+  const filasSoloIndividual = resumirEnvio({ tipo: "boda", entrante: ["individual"] });
+  ok(!filasSoloIndividual.some(f => f.id === "entrantePersonas"),
+    "con solo \"individual\" no se pregunta cada cuántas personas: el ratio ya es 1");
+
+  // Individual y compartir a la vez: los dos cuentan, cada uno con su número de
+  // entrantes distintos (la checklist solo tiene una línea, así que se suman).
+  const ambos = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["individual", "compartir"],
+    individualNumero: 1, compartirNumero: 2, entrantePersonas: 4,
+  });
+  ok(ambos.numEntrantesCompartir === 3 && ambos.personasPorPlatoEntrante === 4,
+    `individual + compartir se suman → ${ambos.numEntrantesCompartir} entrantes, ratio de "compartir" (cada ${ambos.personasPorPlatoEntrante})`);
 }
 
 // ── El staff se pregunta con los adultos y los niños ──────────────────────────
