@@ -535,7 +535,11 @@ export default function Formulario({ codigo }) {
                 className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}${e.configurado ? " es-configurado" : ""}`}
                 onClick={() => {
                   setEventoDestino(e.nombre);
-                  setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
+                  // Si ya se aplicó un envío de esta oficina antes, sus respuestas
+                  // (filtradas, ver respuestasParaOficina) vienen puestas: así un
+                  // evento "Ya configurado" se rellena solo en vez de preguntarlo
+                  // todo de cero otra vez.
+                  setRespuestas(r => ({ ...r, ...(e.respuestasPrevias || {}), tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
                   setPasoGuardado(null);
                   setPaso(0);
                 }}
@@ -546,10 +550,18 @@ export default function Formulario({ codigo }) {
                   <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
                   {/* Ya tiene datos de verdad, no lo creó el calendario en blanco: no es
                       que se le haya mandado algo (eso es el check verde), es que ya
-                      está montado — mejor no tocarlo sin querer. */}
+                      está montado — mejor no tocarlo sin querer. Si además hay
+                      respuestas guardadas de un envío anterior, se avisa de que vienen
+                      puestas: si no, "Ya configurado" sonaba a "no hace falta tocar
+                      nada" y luego, al entrar, preguntaba todo de cero igualmente. */}
                   {e.configurado && (
-                    <span className="form-evento-configurado" title="Este evento ya tiene datos configurados en la app">
-                      Ya configurado
+                    <span
+                      className="form-evento-configurado"
+                      title={e.respuestasPrevias
+                        ? "Este evento ya tiene datos en la app: las respuestas de la última vez vienen puestas, solo hay que revisarlas"
+                        : "Este evento ya tiene datos en la app, puestos a mano: el formulario no tiene respuestas de antes, así que las vuelve a preguntar todas"}
+                    >
+                      {e.respuestasPrevias ? "Ya configurado · se rellena solo" : "Ya configurado"}
                     </span>
                   )}
                 </span>

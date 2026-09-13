@@ -674,6 +674,64 @@ console.log("\n══ 'configurado' en la lista corta de la oficina ══");
     "sin el campo (eventos de siempre, montados a mano) cuenta como configurado");
 }
 
+// ── Un evento "ya configurado" se rellena solo si vino de un envío anterior ───────
+// El dueño avisó de un conflicto: la lista decía "Ya configurado" pero al entrar
+// preguntaba todo de cero — la etiqueta hablaba de la CHECKLIST, no del formulario.
+// Si ese evento se configuró aplicando un envío, App.jsx guarda las respuestas de
+// aquella vez en `formularioRespuestas`; ahora viajan de vuelta (filtradas) para que
+// el formulario se rellene solo. Si se configuró a mano en la app (sin pasar nunca
+// por el formulario), no hay nada que traer — sigue preguntando todo, pero al menos
+// ya no promete lo que no puede cumplir (ver el texto distinto en Formulario.jsx).
+console.log("\n══ 'respuestasPrevias': el formulario se rellena solo si ya se aplicó un envío ══");
+{
+  const { resumirParaOficina, respuestasParaOficina } = await import("../formulario/envios.js");
+
+  // Filtro puro: qué pasa y qué se queda fuera
+  const filtradas = respuestasParaOficina({
+    tipo: "boda", nombreYsitio: {}, cuando: {}, // ya viajan sueltos (nombre/fecha/sitio/tipo)
+    adultos: 120, ninos: 5, menu: ["paella"], entrante: ["individual"],
+    comprar: "una escalera", alergias: "1 celíaco", notas: "llamar antes",
+    menu_comentario: "sin cebolla", imprimirMenuArchivo: "data:image/png;base64,AAAA",
+  });
+  ok(filtradas.adultos === 120 && filtradas.ninos === 5 && JSON.stringify(filtradas.menu) === '["paella"]'
+     && JSON.stringify(filtradas.entrante) === '["individual"]',
+    `las respuestas de verdad se quedan → ${JSON.stringify(filtradas)}`);
+  ok(!("tipo" in filtradas) && !("nombreYsitio" in filtradas) && !("cuando" in filtradas),
+    "lo que ya viaja suelto (tipo/nombre/sitio/fecha) no se duplica aquí");
+  ok(!("comprar" in filtradas) && !("alergias" in filtradas) && !("notas" in filtradas),
+    "el texto libre (comprar/alergias/notas) se queda fuera: puede llevar cualquier cosa");
+  ok(!("menu_comentario" in filtradas) && !("imprimirMenuArchivo" in filtradas),
+    "los comentarios por pregunta y los archivos subidos tampoco viajan de vuelta");
+
+  ok(respuestasParaOficina(null) === null && respuestasParaOficina(undefined) === null,
+    "sin respuestas guardadas, no hay nada que filtrar");
+  ok(respuestasParaOficina({ comprar: "algo", notas: "algo" }) === null,
+    "si tras filtrar no queda nada de verdad, se manda null, no un objeto vacío");
+  ok(respuestasParaOficina({ notasLargas: "x".repeat(30_000) }) === null,
+    "y si lo que queda pesa demasiado (tope de 20 KB), tampoco se manda: mejor eso que reventar publico/{codigo}");
+
+  // Integrado en resumirParaOficina: solo los eventos con formularioRespuestas llevan
+  // respuestasPrevias; los configurados a mano (sin ese campo) no la llevan
+  const eventos = {
+    "Boda con envío aplicado": {
+      pax: 120, fechaEvento: "2027-08-11", sinConfigurar: false,
+      formularioRespuestas: { adultos: 120, menu: ["paella"], comprar: "no repetir esto" },
+    },
+    "Boda a mano": { pax: 80, fechaEvento: "2027-08-12", sinConfigurar: false },
+  };
+  const lista = resumirParaOficina(eventos, "2027-01-01");
+  const conEnvio = lista.find(e => e.nombre === "Boda con envío aplicado");
+  const aMano = lista.find(e => e.nombre === "Boda a mano");
+  ok(!!conEnvio.respuestasPrevias && conEnvio.respuestasPrevias.adultos === 120,
+    `el evento configurado por un envío trae sus respuestas → ${JSON.stringify(conEnvio.respuestasPrevias)}`);
+  ok(!("comprar" in conEnvio.respuestasPrevias),
+    "filtradas también aquí: \"no repetir esto\" (comprar) no debería aparecer");
+  ok(aMano.respuestasPrevias === undefined,
+    "el configurado a mano, sin formularioRespuestas, no lleva la clave ni vacía");
+  ok(!("pax" in conEnvio) && !("pax" in aMano),
+    "y lo que la checklist calcula por su cuenta (pax del evento, no de un envío) sigue sin viajar aquí");
+}
+
 // ── "Ya mandaste esto" — mismo buscador para el repaso y la lista de elegir evento ──
 // Antes cada pantalla comparaba nombres a su manera, con el mismo código repetido dos
 // veces. Ahora las dos llaman a buscarEnvioPorNombre: si el emparejamiento cambia (por
