@@ -1269,23 +1269,29 @@ mandado ese teléfono o no — con varias personas usando el formulario, el gris
 decía nada al resto.
 
 **Auditoría a fondo del formulario, pedida por el dueño ("que configure bien la
-checklist")** — con cita exacta fichero:línea, sin tocar código todavía:
-- **Orden**: `buffets` mueve un número real (`numMesasBuffet`) pero vive en "Cierre"
-  en vez de junto a `extras`, su pariente de patrón. `tarta` vive en el bloque de "lo
-  que genera una recogida" (flores/minutas) pero no genera ninguna.
-- **Duplicación real**: `barril30`/`barril50` (dentro de `extras`, de marcar-varios)
-  comparten el mismo `campoNumero` — marcar los dos descarta en silencio el número de
-  uno de ellos.
-- **Huérfanas / datos que faltan**: `numBarras` se pregunta en cumpleaños pero
-  cumpleaños no calcula "Mesa alta". Peor: **`entrante`, `armarioCaliente` y todo el
-  bloque `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en
-  producción, pero `buildChecklistProduccion` SÍ usa esos datos** — un rodaje no puede
-  configurar bien su propia checklist en estas tres cosas desde el formulario.
+checklist")** — con cita exacta fichero:línea:
+- **Orden — HECHO**: `buffets` mueve un número real (`numMesasBuffet`) pero vivía en
+  "Cierre" en vez de junto a `extras`, su pariente de patrón — movida ahí. `tarta`
+  vivía en el bloque de "lo que genera una recogida" (flores/minutas) pero no genera
+  ninguna — movida a cerrar mantelería y vajilla (monta o no una mesa, no es un
+  encargo que ir a buscar).
+- **Duplicación real — HECHO**: `barril30`/`barril50` (dentro de `extras`, de
+  marcar-varios) compartían el mismo `campoNumero` — marcar los dos descartaba en
+  silencio cuál de los dos tamaños era el real (la checklist solo soporta uno).
+  Añadido un `excluye` genérico en el toggle de `marcar` (`Formulario.jsx`): marcar
+  uno desmarca el otro, ya no se puede llegar a ese estado ambiguo.
+- **Huérfana — HECHO**: `numBarras` se preguntaba en cumpleaños pero solo
+  `buildChecklistBoda` (boda/comunión/corporativo comparten ese generador) calcula
+  "Mesa alta" — restringida a esos tres tipos.
 - **Dependencias `si:`**: sin hallazgos, las 8 condicionales del fichero están todas
   bien ordenadas.
-- Pendiente: arreglar orden + bug de barriles + `numBarras` huérfano (seguro, sin
-  decisión de producto); añadir las preguntas que faltan a producción es una laguna
-  real pero más grande, a decidir con el dueño antes de tocarla.
+- **PENDIENTE, decisión del dueño**: `entrante`, `armarioCaliente` y todo el bloque
+  `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en producción,
+  pero `buildChecklistProduccion` SÍ usa esos datos — un rodaje no puede configurar
+  bien su propia checklist en estas tres cosas desde el formulario. Es una laguna
+  real pero más grande (añadir preguntas nuevas a producción), a decidir con el dueño
+  antes de tocarla.
+- Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
 
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
