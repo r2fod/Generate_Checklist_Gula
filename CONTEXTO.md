@@ -969,6 +969,46 @@ nunca. Arreglado:
 - Verificado con capturas en claro/oscuro a 320/390px, y `npm run test` completo:
   761 comprobaciones, 0 fallidas.
 
+**Auditoría visual móvil pedida por el dueño ("hay cosas mal") — 2 de 3 HECHO,
+1 pendiente de una decisión suya**: sesión aparte con Playwright en 320/375/390/412px,
+dos temas, las tres apps. Formulario y calendario salieron limpios; en la checklist,
+tres hallazgos reales, los dos primeros con la misma causa de fondo:
+
+1. **HECHO — El contador de items y la flecha ▼/▲ de cada categoría desaparecían a
+   320px, en 9 de cada 10 categorías, sin dejar rastro (ni scroll ni aviso)**.
+   `.category-header` es un flex `space-between` con `.cat-name` (nombre) y
+   `.cat-count` (los 3 botones ✎/⌃/⌄ + el número + la flecha, con
+   `flex-shrink:0`). Sin `min-width:0`, un flex item no encoge por debajo de su
+   contenido — así que a 320px, con `.cat-count` fijo, algo tenía que desbordar, y
+   la tarjeta redondeada con `overflow:hidden` se lo tragaba en silencio. Arreglado
+   dándole a `.cat-name` `min-width:0` y envolviendo el texto en
+   `.cat-name-texto` con `text-overflow:ellipsis` — ahora el que cede es el
+   NOMBRE (se recorta con "…"), nunca la píldora del contador, que es la única
+   pista de cuántos items tiene la categoría y si está abierta.
+2. **HECHO — La cabecera perdía la hora y el sitio del evento a 320px**. Ya se
+   había arreglado una vez (ocultar cóctel/nº de conceptos en móvil, limitar a 2
+   líneas) y a 375px cabe entero, pero a 320px el texto seguía necesitando algo
+   más de 2 líneas y se cortaba justo antes de la hora y el sitio. Arreglado con
+   `-webkit-line-clamp:3` solo por debajo de 340px (a partir de 375px sigue en 2).
+3. **PENDIENTE, necesita decisión del dueño — Modo carga tapa el primer ítem con
+   su propia cabecera a 320px (78% de una pantalla de móvil real, 844px, antes de
+   ver el primer checkbox)**. Ya se había medido y arreglado esto una vez
+   (compactar los cronómetros a una línea, documentado en `.carga-modal` en
+   `index.css`), pero la tarjeta "Escaleta del día" (añadida después de aquella
+   medición) se suma al título + contador + barra de progreso + tiempos estimados
+   + los cronómetros de Salida, y entre todos vuelven a tapar la lista — peor que
+   antes de aquel arreglo. La escaleta YA está plegada por defecto
+   (`Escaleta.jsx`, `useState(false)`), así que no es "una cosa más sin plegar":
+   es que hay demasiadas cosas plegadas-pero-visibles apiladas antes de la lista.
+   Arreglarlo bien significa decidir QUÉ información deja de verse por defecto en
+   la pantalla que usa quien está cargando el camión en vivo — una decisión de
+   producto, no un bug de CSS suelto. Se deja sin tocar hasta hablarlo con el
+   dueño.
+- Test nuevo en `app.test.mjs` para los dos hechos: contador/flecha de TODAS las
+  categorías visible a 320px, y el subtítulo con hora+sitio incluidos.
+- Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
+  terminar, sin tocar código.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

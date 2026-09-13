@@ -242,6 +242,41 @@ async function main() {
     await ctx.close();
   }
 
+  // ── A 320px no se pierde nada por overflow:hidden invisible ─────────────────
+  // Dos hallazgos de la misma auditoría visual en móvil, los dos por la misma causa
+  // de fondo: un flex item sin min-width:0 no encoge por debajo de su contenido, así
+  // que a 320px algo tenía que desbordar — y como las tarjetas redondeadas recortan
+  // con overflow:hidden, el desborde se perdía en silencio, sin scroll ni aviso.
+  console.log("\n── A 320px no se pierde nada por overflow oculto ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // Hallazgo 1: el contador de items y la flecha ▼/▲ de CADA categoría tienen que
+    // seguir visibles dentro de su tarjeta — antes se recortaban en 9 de cada 10
+    // categorías porque el nombre no cedía sitio a la píldora del contador.
+    const categorias = await p.evaluate(() => [...document.querySelectorAll(".category-header")].map(r => {
+      const box = r.getBoundingClientRect();
+      const pill = r.querySelector(".cat-count").getBoundingClientRect();
+      return pill.right <= box.right + 0.5 && pill.left >= box.left - 0.5;
+    }));
+    ok(categorias.length > 5 && categorias.every(Boolean),
+      `el contador y la flecha de las ${categorias.length} categorías caben dentro de su tarjeta`);
+
+    // Hallazgo 2: el subtítulo de la cabecera tiene que traer la hora y el sitio, no
+    // solo el día — antes se cortaba con "…" justo antes de llegar a ellos.
+    const subtitulo = await p.locator(".header-info p").innerText();
+    ok(subtitulo.includes(EVENTO_COMPLETO.horaInicio) && subtitulo.includes(EVENTO_COMPLETO.ubicacion),
+      `el subtítulo trae la hora y el sitio a 320px → "${subtitulo.replace(/\n/g, " / ")}"`);
+
+    ok((await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0,
+      "y nada de esto desborda la pantalla");
+    await c.close();
+  }
+
   // ── Cada tipo de evento genera una checklist coherente y usable ─────────────
   console.log("\n── Los cinco tipos de evento ──");
   const ctx = await navegador.newContext({ viewport: { width: 1440, height: 1100 }, acceptDownloads: true });

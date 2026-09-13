@@ -2214,6 +2214,22 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  /* Sin min-width:0 un flex item no encoge por debajo de su contenido (el nombre
+     entero), así que a 320px, con la píldora de al lado en flex-shrink:0, algo
+     tenía que desbordar — y la tarjeta redondeada con overflow oculto se lo
+     tragaba en silencio: la píldora del contador y la flecha ▼/▲ desaparecían
+     sin aviso en 9 de cada 10 categorías, justo lo que hace falta para saber si
+     está abierta y cuántos items tiene. Con esto el que cede es el NOMBRE (se
+     recorta con puntos suspensivos vía .cat-name-texto), nunca la píldora. */
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.cat-name-texto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .category-header .cat-icon {
@@ -2739,6 +2755,14 @@ hr {
      para ir. El cóctel y el nº de conceptos se quitan del móvil: el recuento ya está
      en su contador debajo y el cóctel en la configuración. */
   .hdr-detalle { display: none; }
+}
+
+@media (max-width: 340px) {
+  /* A 375px ya cabe todo (día + hora + sitio) en las 2 líneas de arriba, pero a
+     320px seguía sin caber y se perdían la hora y el sitio con "…" — justo lo que
+     el recorte de arriba quería salvar. Una línea más de margen en el móvil más
+     estrecho que soporta la app. */
+  .header-info p { -webkit-line-clamp: 3; }
 }
 
 /* ─── Vista previa ────────────────────────────────────────────────────── */
