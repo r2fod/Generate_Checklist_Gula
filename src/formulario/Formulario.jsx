@@ -875,7 +875,12 @@ export default function Formulario({ codigo }) {
                 className={`form-opcion ${puesta ? "es-elegida" : ""}`}
                 onClick={() => {
                   const activar = !puesta;
-                  pon(p.id, activar ? [...marcadas, o.valor] : marcadas.filter(v => v !== o.valor));
+                  // excluye: opciones que no tiene sentido llevar a la vez (barril de 30L
+                  // Y de 50L comparten el mismo campoNumero -son un único "cuántos
+                  // barriles"-, así que marcar los dos a la vez perdía en silencio cuál
+                  // de los dos tamaños era el de verdad).
+                  const sinExcluidas = o.excluye ? marcadas.filter(v => !o.excluye.includes(v)) : marcadas;
+                  pon(p.id, activar ? [...sinExcluidas, o.valor] : marcadas.filter(v => v !== o.valor));
                   // Al marcar por primera vez una de lista, se ofrece ya una fila para
                   // rellenar: una lista vacía recién abierta no invita a tocar nada.
                   if (activar && o.conLista && !(respuestas[o.campoLista] || []).length) {

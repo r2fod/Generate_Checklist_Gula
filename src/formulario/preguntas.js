@@ -240,7 +240,10 @@ export const PREGUNTAS = [
         sugerido: (r) => (paxDeLaGente(r) >= 100 ? 2 : 1),
       },
     ],
-    soloEn: CON_BARRA,
+    // No CON_BARRA a secas: "Mesa alta" solo lo calcula buildChecklistBoda (boda,
+    // comunión y corporativo comparten ese generador) — en cumpleaños contestar esto
+    // no movía nada de la checklist.
+    soloEn: ["boda", "comunion", "corporativo"],
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
@@ -498,9 +501,12 @@ export const PREGUNTAS = [
     opciones: [
       { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
       { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
-      // Cuántos barriles: hasta ahora se daba por hecho que era uno
-      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
-      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
+      // Cuántos barriles: hasta ahora se daba por hecho que era uno. Los dos comparten
+      // campoNumero (la checklist solo soporta UN tamaño de barril a la vez, ver
+      // tamanoBarril en checklist-generadores.js) — "excluye" evita marcar los dos a la
+      // vez, que antes perdía en silencio cuál de los dos tamaños era el real.
+      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril50"], soloEn: CON_BARRA },
+      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril30"], soloEn: CON_BARRA },
       // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
       // se añade otra pantalla a un formulario que ya tiene quince
       { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
@@ -555,6 +561,29 @@ export const PREGUNTAS = [
         ],
         conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
       },
+    ],
+  },
+  {
+    // Antes era texto libre a las notas, sin mover ni un número de la checklist:
+    // decir "buffet de quesos" no cargaba ninguna mesa. Ahora es marcado múltiple
+    // con su número de mesas cada uno (mismo patrón que chillout/barril30/barril50
+    // dentro de "extras"), y ese total sí llega a la checklist como Mesas de
+    // buffet. "Otro" no lleva descripción propia: para eso está el comentario
+    // libre de la propia pregunta (+ ¿algo más que aclarar aquí?). Va aquí, junto
+    // a "extras" y no en el cierre: es lo mismo, presupuestado que mueve un número
+    // real de la checklist, no una excepción suelta como excepcionesMesa.
+    id: "buffets", tipo: "marcar", texto: "¿Lleva buffet(s) aparte del servicio principal?",
+    nota: "Cada uno con sus mesas — una por defecto, se puede subir.",
+    opciones: [
+      { valor: "quesos", texto: "Buffet de quesos", conNumero: "¿Cuántas mesas?" },
+      { valor: "dulce", texto: "Mesa dulce / candy bar", conNumero: "¿Cuántas mesas?" },
+      { valor: "ibericos", texto: "Ibéricos", conNumero: "¿Cuántas mesas?" },
+      { valor: "croquetas", texto: "Croquetas / frito", conNumero: "¿Cuántas mesas?" },
+      { valor: "fruta", texto: "Fruta", conNumero: "¿Cuántas mesas?" },
+      // "Otro" no es UN buffet más: son los que no están en la lista (gildas, un
+      // photocall de gin-tonics...) y pueden ser varios distintos el mismo evento, cada
+      // uno con su propio nombre y sus propias mesas — por eso lleva lista, no número.
+      { valor: "otro", texto: "Otro", conLista: true, campoLista: "buffetsOtros" },
     ],
   },
 
@@ -656,6 +685,22 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
     si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null,
   },
+  {
+    // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
+    // tarta o no; en un cumpleaños no se cargaba mesa ninguna; y la pala y el cuchillo
+    // con los que se corta no se cargaban nunca en ningún sitio. Con esta pregunta la
+    // mesa va donde hay tarta y no va donde no la hay. Va aquí, cerrando mantelería y
+    // vajilla, y no junto a flores/minutas: a diferencia de esas dos, no genera
+    // recogida (no tiene quién/fecha) — es una mesa más que montar, no un encargo que
+    // ir a buscar.
+    id: "tarta", tipo: "opciones", texto: "¿Lleva tarta?",
+    nota: "Si la lleva, se carga su mesa redonda con la pala y el cuchillo.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
+  },
 
   // ── Lo que hay que ir a buscar ─────────────────────────────────────────────
   // Flores y minutas no se cargan del almacén: alguien tiene que ir a recogerlas a
@@ -674,19 +719,6 @@ export const PREGUNTAS = [
         ],
       },
     ],
-  },
-  {
-    // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
-    // tarta o no; en un cumpleaños no se cargaba mesa ninguna; y la pala y el cuchillo
-    // con los que se corta no se cargaban nunca en ningún sitio. Con esta pregunta la
-    // mesa va donde hay tarta y no va donde no la hay.
-    id: "tarta", tipo: "opciones", texto: "¿Lleva tarta?",
-    nota: "Si la lleva, se carga su mesa redonda con la pala y el cuchillo.",
-    opciones: [
-      { valor: "si", texto: "Sí" },
-      { valor: "no", texto: "No lleva" },
-    ],
-    soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
   },
   {
     id: "minutas", tipo: "opciones", texto: "¿Lleva minutas?",
@@ -772,27 +804,6 @@ export const PREGUNTAS = [
     opciones: [
       { valor: "menuInfantil", texto: "Menú infantil", conNumero: "Cantidad en mesa" },
       { valor: "otro", texto: "Otro", conNumero: "Cantidad en mesa" },
-    ],
-  },
-  {
-    // Antes era texto libre a las notas, sin mover ni un número de la checklist:
-    // decir "buffet de quesos" no cargaba ninguna mesa. Ahora es marcado múltiple
-    // con su número de mesas cada uno (mismo patrón que chillout/barril30/barril50
-    // dentro de "extras"), y ese total sí llega a la checklist como Mesas de
-    // buffet. "Otro" no lleva descripción propia: para eso está el comentario
-    // libre de la propia pregunta (+ ¿algo más que aclarar aquí?).
-    id: "buffets", tipo: "marcar", texto: "¿Lleva buffet(s) aparte del servicio principal?",
-    nota: "Cada uno con sus mesas — una por defecto, se puede subir.",
-    opciones: [
-      { valor: "quesos", texto: "Buffet de quesos", conNumero: "¿Cuántas mesas?" },
-      { valor: "dulce", texto: "Mesa dulce / candy bar", conNumero: "¿Cuántas mesas?" },
-      { valor: "ibericos", texto: "Ibéricos", conNumero: "¿Cuántas mesas?" },
-      { valor: "croquetas", texto: "Croquetas / frito", conNumero: "¿Cuántas mesas?" },
-      { valor: "fruta", texto: "Fruta", conNumero: "¿Cuántas mesas?" },
-      // "Otro" no es UN buffet más: son los que no están en la lista (gildas, un
-      // photocall de gin-tonics...) y pueden ser varios distintos el mismo evento, cada
-      // uno con su propio nombre y sus propias mesas — por eso lleva lista, no número.
-      { valor: "otro", texto: "Otro", conLista: true, campoLista: "buffetsOtros" },
     ],
   },
   {
