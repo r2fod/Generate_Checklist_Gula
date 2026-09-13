@@ -940,6 +940,59 @@ calibración dejaría de tener datos limpios de qué sale de verdad con el pax s
 deja tal cual hasta confirmar con el dueño si merece la pena perder esa señal a cambio
 de una pantalla menos.
 
+**"Ya configurado" mentía en el formulario: decía que el evento estaba listo pero al
+entrar preguntaba todo de cero — HECHO, revierte a propósito una garantía de privacidad
+anterior, requiere revisión del dueño antes de fusionar (regla de `CLAUDE.md`: "AI
+Branches: Human security review required before main merge")**:
+
+- **El conflicto que vio el dueño**: en "¿De qué evento son los datos?"
+  (`Formulario.jsx`), un evento marcado "Ya configurado" (`sinConfigurar: false` en la
+  checklist) sonaba a "esto ya está resuelto, no hace falta tocarlo" — pero al entrar,
+  el formulario preguntaba las ~40 preguntas igual que a un evento nuevo. La etiqueta
+  hablaba de la CHECKLIST (`e.sinConfigurar`); el formulario nunca ha leído esos datos:
+  cada envío empezaba de cero por diseño — el enlace público (`publico/{codigo}`) solo
+  exponía `nombre/fecha/sitio/tipo/configurado`, nada de respuestas reales, A PROPÓSITO
+  (`resumirParaOficina()` llevaba un test explícito, `!('pax' in ...)`, verificando que
+  NADA de dentro del evento saliera por ese canal).
+- **Decisión del dueño, tras verle tres formas de arreglarlo** (solo aclarar el aviso /
+  recordar en este móvil con `mios.js` / traer lo real de la checklist): la tercera —
+  la que de verdad cumple lo pedido, a costa de mover esa frontera de privacidad.
+- **Qué viaja y qué NO**: cuando la oficina aplica un envío (`handleAplicarEnvio`),
+  `App.jsx` guarda ahora `formularioRespuestas` en el evento — las respuestas de esa
+  vez, tal cual, sin entrar en ningún cálculo (mismo patrón de metadato que
+  `eventoNubeId`: `useState` + `getEstadoActual()` + `SETTERS_SYNC`, fuera de
+  `ETIQUETAS_CAMPO`/`opts`). `resumirParaOficina()` (`envios.js`) las re-expone
+  filtradas por la nueva `respuestasParaOficina()`:
+  - Fuera `tipo`/`nombreYsitio`/`cuando` (ya viajan sueltos, no se duplican).
+  - Fuera `comprar`/`alergias`/`notas` (texto libre sin fondo — alergias es dato de
+    salud de un invitado — y cualquier `*_comentario` por pregunta): se quedan fuera
+    aunque cueste un poco más de tecleo volver a escribirlas.
+  - Fuera cualquier `*Archivo` (menú/hojas de alquiler subidas como foto o PDF): no
+    sirven para rellenar nada y pueden pesar.
+  - Tope duro de 20 KB tras filtrar: si algún día se cuela un campo pesado que no está
+    en la lista de arriba, se manda `null` en vez de arriesgarse a reventar el límite
+    de 1 MiB de `publico/{codigo}` (que lleva hasta 8 eventos en un solo documento) y
+    dejar a la oficina sin lista de próximos eventos — un fallo mucho peor que el que
+    se está arreglando.
+  - Solo se re-expone lo que YA viajó una vez por ese mismo canal público (una
+    respuesta de formulario que alguien mandó con ese código) — no se lee nunca nada
+    de lo que la checklist calcula o de lo que se edita a mano en la app.
+- **Lo que NO se arregla**: un evento configurado a mano en la app (sin pasar nunca por
+  el formulario, como parecían ser los ejemplos reales que vio el dueño) no tiene
+  `formularioRespuestas` que traer — sigue preguntando todo. Para no repetir el mismo
+  conflicto, la etiqueta ahora distingue los dos casos: "Ya configurado · se rellena
+  solo" (con respuestas de antes) frente a "Ya configurado" a secas (con un tooltip que
+  ya no promete que vengan puestas).
+- **Test que antes garantizaba lo contrario, ahora conviven los dos casos**: el test
+  original (`!('pax' in publicado.eventos[0])`, con un evento SIN `formularioRespuestas`)
+  se deja intacto sin tocar una línea — sigue demostrando que un evento configurado a
+  mano no filtra nada. Al lado, un test nuevo demuestra el caso contrario a propósito:
+  un evento CON `formularioRespuestas` sí lleva `respuestasPrevias`, filtradas.
+- **Verificación**: `npm run test:rapido` en verde (filtro puro + integración con
+  `resumirParaOficina`); `npm run test` completo antes de fusionar. Dado que esto mueve
+  una frontera de privacidad documentada a propósito, se deja SIN FUSIONAR hasta que el
+  dueño lo revise él mismo (no se auto-fusiona como el resto de PRs de esta sesión).
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas

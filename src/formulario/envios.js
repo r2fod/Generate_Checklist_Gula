@@ -41,6 +41,40 @@ export function limpiarAvisos(avisos = []) {
     .slice(0, 6);
 }
 
+// Campos de un envío que NO vuelven a la oficina aunque el evento ya esté
+// "configurado" y tenga sus respuestas guardadas: tipo/nombreYsitio/cuando ya viajan
+// sueltos (nombre/fecha/sitio/tipo, arriba); comprar/alergias/notas son texto libre
+// sin fondo —puede llevar cualquier cosa, alergias es dato de salud de un invitado—
+// y se dejan fuera aunque cueste un poco más de tecleo volver a escribirlas.
+const CAMPOS_OFICINA_EXCLUIDOS = new Set(["tipo", "nombreYsitio", "cuando", "comprar", "alergias", "notas"]);
+
+// Tope de bytes de lo que se re-expone por evento: publico/{codigo} lleva hasta
+// MAX_PROXIMOS eventos en un solo documento de Firestore (límite de 1 MiB). Mejor no
+// mandar nada que arriesgarse a que una respuesta pesada (una versión futura con un
+// campo que no está en la lista de arriba) reviente ese límite y deje a la oficina
+// sin lista de próximos eventos.
+const TOPE_BYTES_RESPUESTAS_PREVIAS = 20_000;
+
+// Deja solo lo que hace falta para que el FORMULARIO se rellene solo (las respuestas
+// estructuradas de la última vez), nunca lo que la CHECKLIST calcula por su cuenta —
+// esta función nunca ve esos campos, solo lo que ya viajó una vez por este mismo
+// canal público cuando alguien mandó el formulario.
+export function respuestasParaOficina(respuestas) {
+  if (!respuestas || typeof respuestas !== "object" || Array.isArray(respuestas)) return null;
+  const limpio = {};
+  for (const [k, v] of Object.entries(respuestas)) {
+    if (CAMPOS_OFICINA_EXCLUIDOS.has(k)) continue;
+    // "_comentario": el comentario libre de cada pregunta. "Archivo": el menú/las
+    // hojas de alquiler subidas como foto o PDF — puede pesar bastante y no sirve
+    // para rellenar nada, el formulario vuelve a pedir subirlo si hace falta.
+    if (k.endsWith("_comentario") || k.endsWith("Archivo")) continue;
+    limpio[k] = v;
+  }
+  if (Object.keys(limpio).length === 0) return null;
+  if (JSON.stringify(limpio).length > TOPE_BYTES_RESPUESTAS_PREVIAS) return null;
+  return limpio;
+}
+
 // Deja SOLO lo que la oficina necesita para reconocer un evento. Esta función es la
 // frontera de lo que sale de la app: si algún día se añade un campo al evento, aquí
 // no aparece salvo que se ponga a mano, que es justo lo que se quiere.
@@ -51,7 +85,14 @@ export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO()) {
     // "configurado" viaja igual: si el evento lo creó el calendario en blanco
     // (sinConfigurar) o ya tiene datos de verdad, para que la lista distinga uno de
     // otro sin depender de si ESTE móvil mandó algo antes (eso es mios.js, aparte).
-    .map(([nombre, e]) => ({ nombre, fecha: e?.fechaEvento || "", sitio: e?.ubicacion || "", tipo: e?.evento || "boda", configurado: !e?.sinConfigurar }))
+    // "respuestasPrevias": si ya se aplicó un envío de esta oficina antes, sus
+    // respuestas (filtradas) viajan también, para que el formulario se rellene solo
+    // en vez de preguntarlo todo de cero en un evento que dice "Ya configurado".
+    .map(([nombre, e]) => {
+      const base = { nombre, fecha: e?.fechaEvento || "", sitio: e?.ubicacion || "", tipo: e?.evento || "boda", configurado: !e?.sinConfigurar };
+      const previas = respuestasParaOficina(e?.formularioRespuestas);
+      return previas ? { ...base, respuestasPrevias: previas } : base;
+    })
     .filter(e => e.fecha >= hoy)
     .sort((a, b) => a.fecha.localeCompare(b.fecha))
     .slice(0, MAX_PROXIMOS);
