@@ -1025,6 +1025,26 @@ tres hallazgos reales, los dos primeros con la misma causa de fondo:
 - Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
   terminar, sin tocar código.
 
+**Nueva pieza planificada, sin código todavía — vista de logística por persona +
+asistente integrado** (`PLAN_LOGISTICA.md`, mismo criterio de siempre: "nada se
+arranca sin mostrarle antes una preview"). El dueño pidió una pantalla para ver/elegir
+a cada persona de logística (ejemplo suyo: alguien conductor, el resto de reparto) y
+pedirle cambios al asistente ahí mismo ("cambia el horario a fulano", "añade tal
+tarea"). Investigado antes de diseñar: hoy no hay un roster de logística como
+concepto propio — `logisticaEquipo` (checklist, por evento, sin desplegable),
+`apunte.personal` (calendario, por apunte) y `EQUIPO` (`calendario/apuntes.js`, el
+único roster persistente, hoy solo nombre+apodos) se pisan a medias sin resolver
+"quién es esta persona en general". Diseño propuesto: `EQUIPO` gana un `rol` opcional
+(se dice una vez, no por evento); pestaña "Personal" nueva en el calendario con
+selector + agenda de esa persona (función pura `apuntesDePersona()`, reutiliza los
+apuntes ya cargados, cero peticiones nuevas); las tareas de una persona usan el
+`tipo: "tarea"` que YA existe (sin colección nueva) rellenando su `personal`; y dos
+tools nuevas del asistente desde el principio (`asignar_tarea_personal`,
+`cambiar_horario_personal`, conector propio, ambas por `onEscribir` como el resto —
+nada de una tool genérica "modifica personal"). No toca `logisticaEquipo` ni
+`personal.js`/`ROLES` (cálculos de coste/plantilla ya en producción). Pendiente de
+que el dueño lo revise y dé el visto bueno antes de tocar código.
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
