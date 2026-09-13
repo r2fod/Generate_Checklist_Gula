@@ -1,7 +1,7 @@
 import { memo, useState, useRef, useEffect } from "react";
 import { Tag, Asterisk, Pencil, X } from "lucide-react";
 import { IconoItem } from "./Iconos.jsx";
-import { PALABRAS_ALQUILER, bateaSizeDe, cajaSizeDe } from "../checklist-format.js";
+import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe } from "../checklist-format.js";
 
 // ─── UNA FILA DE LA LISTA ──────────────────────────────────────────────────────
 // Está fuera del componente grande y envuelta en React.memo por una razón medida: con
@@ -16,7 +16,7 @@ const FilaItem = memo(function FilaItem({
   categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo,
   editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones, soloMarcar = false,
 }) {
-  const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+  const alq = esItemDeAlquiler(label, esAlquilerManual);
   const keyId = `${categoria}::${labelOriginal ?? label}`;
   const esItemManual = manualIdx !== undefined;
 

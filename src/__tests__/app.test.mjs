@@ -242,6 +242,41 @@ async function main() {
     await ctx.close();
   }
 
+  // ── A 320px no se pierde nada por overflow:hidden invisible ─────────────────
+  // Dos hallazgos de la misma auditoría visual en móvil, los dos por la misma causa
+  // de fondo: un flex item sin min-width:0 no encoge por debajo de su contenido, así
+  // que a 320px algo tenía que desbordar — y como las tarjetas redondeadas recortan
+  // con overflow:hidden, el desborde se perdía en silencio, sin scroll ni aviso.
+  console.log("\n── A 320px no se pierde nada por overflow oculto ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // Hallazgo 1: el contador de items y la flecha ▼/▲ de CADA categoría tienen que
+    // seguir visibles dentro de su tarjeta — antes se recortaban en 9 de cada 10
+    // categorías porque el nombre no cedía sitio a la píldora del contador.
+    const categorias = await p.evaluate(() => [...document.querySelectorAll(".category-header")].map(r => {
+      const box = r.getBoundingClientRect();
+      const pill = r.querySelector(".cat-count").getBoundingClientRect();
+      return pill.right <= box.right + 0.5 && pill.left >= box.left - 0.5;
+    }));
+    ok(categorias.length > 5 && categorias.every(Boolean),
+      `el contador y la flecha de las ${categorias.length} categorías caben dentro de su tarjeta`);
+
+    // Hallazgo 2: el subtítulo de la cabecera tiene que traer la hora y el sitio, no
+    // solo el día — antes se cortaba con "…" justo antes de llegar a ellos.
+    const subtitulo = await p.locator(".header-info p").innerText();
+    ok(subtitulo.includes(EVENTO_COMPLETO.horaInicio) && subtitulo.includes(EVENTO_COMPLETO.ubicacion),
+      `el subtítulo trae la hora y el sitio a 320px → "${subtitulo.replace(/\n/g, " / ")}"`);
+
+    ok((await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0,
+      "y nada de esto desborda la pantalla");
+    await c.close();
+  }
+
   // ── Cada tipo de evento genera una checklist coherente y usable ─────────────
   console.log("\n── Los cinco tipos de evento ──");
   const ctx = await navegador.newContext({ viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
@@ -809,6 +844,63 @@ async function main() {
       document.querySelector(".carga-row-vuelta .carga-nombre").getBoundingClientRect().width);
     ok(anchoNombre >= 100,
       `a 320px el nombre tiene al menos 100px (no los ~74px que dejaba la pastilla) → ${Math.round(anchoNombre)}px`);
+    await c.close();
+  }
+
+  // ── Modo carga también avisa de los items de alquiler ───────────────────────
+  // La lista normal (FilaItem.jsx) pinta de amarillo y pone el cartelito "ALQUILER"
+  // en items de un proveedor externo (por nombre, o marcados a mano con el ✎), pero
+  // Modo carga los pintaba como cualquier otro: se descartaba ese dato de la tupla
+  // del item al desestructurar ([label, qty, , labelOriginal, , sufijo]), la casilla
+  // de en medio. El dueño lo pilló en un evento real con sillas de Dealde.
+  console.log("\n── Modo carga: los items de alquiler también llevan su aviso ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    // "Dealde" en el nombre lo detecta solo (origenSillas); el candy bar se marca a
+    // mano con itemsAlquilerManual, que es justo el camino que no lleva ningún
+    // proveedor en el nombre y por eso no se detecta solo.
+    await p.goto(url({
+      evento: "boda", pax: 80, nombreEvento: "Boda alquiler",
+      origenSillas: "Dealde",
+      itemsManuales: [{ categoria: "Mobiliario, sala y decoración", label: "Candy bar", cantidad: "1" }],
+      itemsAlquilerManual: { "Mobiliario, sala y decoración::Candy bar": true },
+    }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1200);
+
+    const contarAlquiler = () => p.evaluate(() => ({
+      filas: document.querySelectorAll(".carga-row.is-alquiler").length,
+      tags: document.querySelectorAll(".carga-row .tag-alquiler").length,
+    }));
+    const enSalida = await contarAlquiler();
+    ok(enSalida.filas >= 2 && enSalida.tags >= 2,
+      `en Salida, sillas (por nombre) y candy bar (marcado a mano) llevan el aviso → ${JSON.stringify(enSalida)}`);
+
+    // El fondo de verdad se pinta, no solo la clase: mismo color que la lista normal
+    const fondoDeUnaFila = await p.evaluate(() => {
+      const fila = document.querySelector(".carga-row.is-alquiler");
+      return fila ? getComputedStyle(fila).backgroundColor : null;
+    });
+    ok(!!fondoDeUnaFila && fondoDeUnaFila !== "rgba(0, 0, 0, 0)" && fondoDeUnaFila !== "transparent",
+      `y el fondo amarillo se pinta de verdad, no solo la clase → ${fondoDeUnaFila}`);
+
+    // Y en Vuelta, sin que el cartelito le robe el sitio al nombre (a 320px sobre
+    // todo: ver el test de arriba de "la pastilla todo no puede aplastar el nombre")
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(900);
+    const enVuelta = await contarAlquiler();
+    ok(enVuelta.filas >= 2 && enVuelta.tags >= 2,
+      `y en Vuelta también, no solo en Prep./Salida → ${JSON.stringify(enVuelta)}`);
+    // Mismo umbral que el test de arriba ("Vuelta a 320px: el nombre tiene sitio de
+    // sobra"): >=100px es lo que se considera "con sitio", no una cifra inventada
+    // aparte para este caso.
+    const anchoNombreConTag = await p.evaluate(() =>
+      document.querySelector(".carga-row.is-alquiler .carga-nombre").getBoundingClientRect().width);
+    ok(anchoNombreConTag >= 100,
+      `y a 390px el nombre conserva sitio de sobra, el cartelito no se lo come → ${Math.round(anchoNombreConTag)}px`);
     await c.close();
   }
 
@@ -3567,7 +3659,9 @@ async function main() {
     await p.waitForTimeout(600);
     await p.locator("button", { hasText: "Modo carga" }).first().click();
     await p.waitForTimeout(1400);
-    const enCarga = async () => (await p.locator(".carga-nombre").allInnerTexts()).map(x => x.trim());
+    // El nombre puro va en .carga-nombre-texto; .carga-nombre (su contenedor) puede
+    // llevar también el cartelito "ALQUILER" al lado, que no es parte del nombre.
+    const enCarga = async () => (await p.locator(".carga-nombre-texto").allInnerTexts()).map(x => x.trim());
     let cargaSalida = await enCarga();
     const debenEstar = ["Generador", "Armario caliente (alquiler Dealde)", "Carpas"];
     const faltan = debenEstar.filter(n => !cargaSalida.some(x => x === n));

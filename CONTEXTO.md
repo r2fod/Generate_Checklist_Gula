@@ -936,9 +936,94 @@ para seguir aparte y no meterse como número en la propia casilla "Paella" del m
 alguien a mano", para NO aprender de esos eventos y no torcer el ratio automático por
 pax. Si el número se autorrellenara nada más marcar "Paella" (como si fuera
 `conNumero` normal), CADA evento con paella pasaría a contar como "puesto a mano" y la
-calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Se
-deja tal cual hasta confirmar con el dueño si merece la pena perder esa señal a cambio
-de una pantalla menos.
+calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Por
+eso NO se fusiona con la casilla del menú — pero el dueño siguió insistiendo en que
+"hay cosas donde no debería estar", y repasando el orden entero contra los 11 bloques
+del reorden de #184 apareció el problema real, que no era el número de pantallas sino
+DÓNDE estaban: **"¿Tamaño de paella?" y "¿Cuántas paellas?" están HECHO, movidas a
+"Cocina y equipamiento"** — justo después de "¿Qué horno hace falta?", antes de
+"¿Lleva armario caliente?". No son preguntas de MENÚ (qué se come), son de equipo de
+cocina (paellera, trípode, bombona), así que interrumpían "menú → entrante → café" con
+una pregunta que no era de ese tema, y encima estaban lejos del resto de "cuánto
+material de cocina hace falta" (nevera/congelador/horno/gastros), que es donde de
+verdad encajan. Solo se ha movido de sitio el objeto de la pregunta dentro del array
+— mismo `id`, misma `si:` (`menu.includes("paella")`, que se sigue cumpliendo:
+"menu" sigue estando mucho antes) — cero cambios de lógica ni de `calibracion.js`.
+Verificado en vivo: con "Paella" marcada, el recorrido para una boda ahora es
+menú → entrante → café → nevera → congelador → horno → **tamaño → cuántas** →
+armario caliente, en vez de menú → tamaño → cuántas → entrante → café de antes.
+`npm run test:rapido` en verde (1600 comprobaciones): ningún test de
+`aRespuestasDeLaApp()`/`resumirEnvio()` depende del orden del array, que es
+justo la prueba de que reordenar es seguro.
+
+**Modo carga nunca avisaba de los items de alquiler — HECHO**: el dueño lo encontró
+en un evento real (sillas de Dealde) — la lista normal (`FilaItem.jsx`) pinta de
+amarillo y pone el cartelito "ALQUILER" en los items de un proveedor externo (por
+nombre, o marcados a mano con el ✎), pero `ModalModoCarga.jsx` descartaba ese dato al
+desestructurar la tupla del item (`[label, qty, , labelOriginal, , sufijo]` — la
+coma vacía era justo la marca de alquiler) y por eso ningún evento la mostraba ahí,
+nunca. Arreglado:
+- Extraída `esItemDeAlquiler(label, esAlquilerManual)` a `checklist-format.js` — el
+  criterio (tag manual, o el nombre lleva Dealde/Carvillo/Novelda/alquiler) estaba
+  copiado a mano en `FilaItem.jsx` y en el exportador de Word; ahora los tres (los dos
+  de antes + Modo carga) llaman a la misma función.
+- `FilaCargaPrep`/`FilaCargaVuelta` reciben `esAlquiler` y pintan `.carga-row.is-alquiler`
+  (mismo `--alquiler-bg` que la lista normal) más el cartelito.
+- **Dos fallos de layout cazados por la propia batería, no a ojo**: (1) el cartelito
+  puesto como hermano directo del nombre le robaba ancho hasta partir palabras letra a
+  letra a 320px — arreglado agrupando icono+nombre en `.carga-nombre-lead` con
+  `flex-basis:100%`, que fuerza al cartelito a su propia línea sin tocar el nombre. (2)
+  el gris apagado de `.carga-cantidad` sobre el fondo amarillo bajaba a 4,48 de
+  contraste (el mínimo AA es 4,5) — la prueba de contraste automática lo cazó con la
+  cantidad "1" de un item real; arreglado con `var(--alquiler-text)` (el mismo ámbar
+  del cartelito) en vez del gris, que si sube a 4,65.
+- Un test ya existente ("los alquileres están en Modo carga para marcarlos") leía el
+  nombre completo de `.carga-nombre` esperando texto exacto — al añadir el cartelito
+  ahí al lado dejó de coincidir. No era un fallo del test: es que el cartelito ahora
+  vive en el mismo contenedor. Se corrigió apuntando a `.carga-nombre-texto` (el
+  nombre puro, sin el cartelito), que es lo que ese test siempre quiso comprobar.
+- Verificado con capturas en claro/oscuro a 320/390px, y `npm run test` completo:
+  761 comprobaciones, 0 fallidas.
+
+**Auditoría visual móvil pedida por el dueño ("hay cosas mal") — 2 de 3 HECHO,
+1 pendiente de una decisión suya**: sesión aparte con Playwright en 320/375/390/412px,
+dos temas, las tres apps. Formulario y calendario salieron limpios; en la checklist,
+tres hallazgos reales, los dos primeros con la misma causa de fondo:
+
+1. **HECHO — El contador de items y la flecha ▼/▲ de cada categoría desaparecían a
+   320px, en 9 de cada 10 categorías, sin dejar rastro (ni scroll ni aviso)**.
+   `.category-header` es un flex `space-between` con `.cat-name` (nombre) y
+   `.cat-count` (los 3 botones ✎/⌃/⌄ + el número + la flecha, con
+   `flex-shrink:0`). Sin `min-width:0`, un flex item no encoge por debajo de su
+   contenido — así que a 320px, con `.cat-count` fijo, algo tenía que desbordar, y
+   la tarjeta redondeada con `overflow:hidden` se lo tragaba en silencio. Arreglado
+   dándole a `.cat-name` `min-width:0` y envolviendo el texto en
+   `.cat-name-texto` con `text-overflow:ellipsis` — ahora el que cede es el
+   NOMBRE (se recorta con "…"), nunca la píldora del contador, que es la única
+   pista de cuántos items tiene la categoría y si está abierta.
+2. **HECHO — La cabecera perdía la hora y el sitio del evento a 320px**. Ya se
+   había arreglado una vez (ocultar cóctel/nº de conceptos en móvil, limitar a 2
+   líneas) y a 375px cabe entero, pero a 320px el texto seguía necesitando algo
+   más de 2 líneas y se cortaba justo antes de la hora y el sitio. Arreglado con
+   `-webkit-line-clamp:3` solo por debajo de 340px (a partir de 375px sigue en 2).
+3. **PENDIENTE, necesita decisión del dueño — Modo carga tapa el primer ítem con
+   su propia cabecera a 320px (78% de una pantalla de móvil real, 844px, antes de
+   ver el primer checkbox)**. Ya se había medido y arreglado esto una vez
+   (compactar los cronómetros a una línea, documentado en `.carga-modal` en
+   `index.css`), pero la tarjeta "Escaleta del día" (añadida después de aquella
+   medición) se suma al título + contador + barra de progreso + tiempos estimados
+   + los cronómetros de Salida, y entre todos vuelven a tapar la lista — peor que
+   antes de aquel arreglo. La escaleta YA está plegada por defecto
+   (`Escaleta.jsx`, `useState(false)`), así que no es "una cosa más sin plegar":
+   es que hay demasiadas cosas plegadas-pero-visibles apiladas antes de la lista.
+   Arreglarlo bien significa decidir QUÉ información deja de verse por defecto en
+   la pantalla que usa quien está cargando el camión en vivo — una decisión de
+   producto, no un bug de CSS suelto. Se deja sin tocar hasta hablarlo con el
+   dueño.
+- Test nuevo en `app.test.mjs` para los dos hechos: contador/flecha de TODAS las
+  categorías visible a 320px, y el subtítulo con hora+sitio incluidos.
+- Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
+  terminar, sin tocar código.
 
 **"Ya configurado" mentía en el formulario: decía que el evento estaba listo pero al
 entrar preguntaba todo de cero — HECHO, revierte a propósito una garantía de privacidad
