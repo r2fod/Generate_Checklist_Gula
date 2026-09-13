@@ -4833,7 +4833,7 @@ export default function App({ onCerrarSesion } = {}) {
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
               <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
-                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span>{cat.nombre}</span>
+                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span><span className="cat-name-texto">{cat.nombre}</span></span>
                 <span className="cat-count">
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, -1); }} disabled={idx === 0} title="Subir esta categoría" aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={13} /></button>
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, 1); }} disabled={idx === checklist.length - 1} title="Bajar esta categoría" aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={13} /></button>
