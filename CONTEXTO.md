@@ -936,9 +936,25 @@ para seguir aparte y no meterse como número en la propia casilla "Paella" del m
 alguien a mano", para NO aprender de esos eventos y no torcer el ratio automático por
 pax. Si el número se autorrellenara nada más marcar "Paella" (como si fuera
 `conNumero` normal), CADA evento con paella pasaría a contar como "puesto a mano" y la
-calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Se
-deja tal cual hasta confirmar con el dueño si merece la pena perder esa señal a cambio
-de una pantalla menos.
+calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Por
+eso NO se fusiona con la casilla del menú — pero el dueño siguió insistiendo en que
+"hay cosas donde no debería estar", y repasando el orden entero contra los 11 bloques
+del reorden de #184 apareció el problema real, que no era el número de pantallas sino
+DÓNDE estaban: **"¿Tamaño de paella?" y "¿Cuántas paellas?" están HECHO, movidas a
+"Cocina y equipamiento"** — justo después de "¿Qué horno hace falta?", antes de
+"¿Lleva armario caliente?". No son preguntas de MENÚ (qué se come), son de equipo de
+cocina (paellera, trípode, bombona), así que interrumpían "menú → entrante → café" con
+una pregunta que no era de ese tema, y encima estaban lejos del resto de "cuánto
+material de cocina hace falta" (nevera/congelador/horno/gastros), que es donde de
+verdad encajan. Solo se ha movido de sitio el objeto de la pregunta dentro del array
+— mismo `id`, misma `si:` (`menu.includes("paella")`, que se sigue cumpliendo:
+"menu" sigue estando mucho antes) — cero cambios de lógica ni de `calibracion.js`.
+Verificado en vivo: con "Paella" marcada, el recorrido para una boda ahora es
+menú → entrante → café → nevera → congelador → horno → **tamaño → cuántas** →
+armario caliente, en vez de menú → tamaño → cuántas → entrante → café de antes.
+`npm run test:rapido` en verde (1600 comprobaciones): ningún test de
+`aRespuestasDeLaApp()`/`resumirEnvio()` depende del orden del array, que es
+justo la prueba de que reordenar es seguro.
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16

@@ -299,49 +299,6 @@ export const PREGUNTAS = [
     si: (r) => Array.isArray(r.menu) && r.menu.includes("dosPlatos"),
   },
   {
-    // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
-    // para arriba) y nunca se preguntaba. Pero el pax no lo sabe todo: con el mismo
-    // número de gente cocina puede querer una talla u otra según el arroz y el sitio,
-    // y eso lo sabe quien lo ha hablado con el cliente.
-    id: "tamanoPaella", tipo: "opciones", texto: "La paella, ¿de qué tamaño?",
-    nota: (r) => {
-      const pax = paxDeLaGente(r);
-      return pax
-        ? `Con ${pax} personas saldría ${tallaPorPax(pax)}. Solo hay que tocarlo si cocina quiere otra.`
-        : "Si no lo sabes, se pone la que salga según la gente.";
-    },
-    opciones: [
-      { valor: "Auto", texto: "La que salga según la gente" },
-      { valor: "Pequeña", texto: "Pequeña" },
-      { valor: "Mediana", texto: "Mediana" },
-      { valor: "Grande", texto: "Grande" },
-    ],
-    si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
-  },
-  {
-    // Y cuántas. La cuenta de la app es una cada 30 personas, pero hay menús en los que
-    // se prefieren dos medianas a una grande (o al revés, y se hacen dos pases con la
-    // misma). El número arrastra paletas, difusores, trípodes, paravientos y bombonas,
-    // así que decirlo aquí evita cargar de menos.
-    id: "cuantasPaellas", tipo: "opciones", texto: "¿Cuántas paellas se hacen?",
-    nota: (r) => {
-      const pax = paxDeLaGente(r);
-      return pax
-        ? `Con ${pax} personas salen ${paellasPorPax(pax, r.tipo)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
-        : "Cada paella lleva su paleta, su trípode y su bombona.";
-    },
-    opciones: [
-      { valor: "auto", texto: "Las que salgan según la gente" },
-      {
-        valor: "otras", texto: "Otro número",
-        conNumero: "¿Cuántas?",
-        campoNumero: "numPaellas",
-        sugerido: (r) => paellasPorPax(paxDeLaGente(r), r.tipo) || 1,
-      },
-    ],
-    si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
-  },
-  {
     // Los dos entrantes NO son excluyentes: en la app son dos interruptores distintos
     // (el de chupito carga vasos de chupito, el compartido carga platos extra) y hay
     // menús que llevan los dos. Antes esta pregunta obligaba a elegir uno y se perdía
@@ -435,6 +392,56 @@ export const PREGUNTAS = [
       { valor: "Ambos", texto: "Los dos" },
       { valor: "No lleva", texto: "No lleva" },
     ],
+  },
+  {
+    // Van aquí, con el resto del equipamiento de cocina, y no pegadas a "menú": son
+    // el equipo para HACER la paella (paellera, trípode, bombona), no qué hay de
+    // comer — antes venían justo después de elegir el menú, cortando el hilo de
+    // "qué se come" (menú → paella → cuántas → entrante → café) con una pregunta
+    // que no es de menú, es de cocina. Solo hace falta seguir viniendo después de
+    // "menu" (`si:` de abajo), que sigue siendo verdad aquí.
+    //
+    // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
+    // para arriba) y nunca se preguntaba. Pero el pax no lo sabe todo: con el mismo
+    // número de gente cocina puede querer una talla u otra según el arroz y el sitio,
+    // y eso lo sabe quien lo ha hablado con el cliente.
+    id: "tamanoPaella", tipo: "opciones", texto: "La paella, ¿de qué tamaño?",
+    nota: (r) => {
+      const pax = paxDeLaGente(r);
+      return pax
+        ? `Con ${pax} personas saldría ${tallaPorPax(pax)}. Solo hay que tocarlo si cocina quiere otra.`
+        : "Si no lo sabes, se pone la que salga según la gente.";
+    },
+    opciones: [
+      { valor: "Auto", texto: "La que salga según la gente" },
+      { valor: "Pequeña", texto: "Pequeña" },
+      { valor: "Mediana", texto: "Mediana" },
+      { valor: "Grande", texto: "Grande" },
+    ],
+    si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
+  },
+  {
+    // Y cuántas. La cuenta de la app es una cada 30 personas, pero hay menús en los que
+    // se prefieren dos medianas a una grande (o al revés, y se hacen dos pases con la
+    // misma). El número arrastra paletas, difusores, trípodes, paravientos y bombonas,
+    // así que decirlo aquí evita cargar de menos.
+    id: "cuantasPaellas", tipo: "opciones", texto: "¿Cuántas paellas se hacen?",
+    nota: (r) => {
+      const pax = paxDeLaGente(r);
+      return pax
+        ? `Con ${pax} personas salen ${paellasPorPax(pax, r.tipo)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
+        : "Cada paella lleva su paleta, su trípode y su bombona.";
+    },
+    opciones: [
+      { valor: "auto", texto: "Las que salgan según la gente" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cuántas?",
+        campoNumero: "numPaellas",
+        sugerido: (r) => paellasPorPax(paxDeLaGente(r), r.tipo) || 1,
+      },
+    ],
+    si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
   },
   {
     // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
