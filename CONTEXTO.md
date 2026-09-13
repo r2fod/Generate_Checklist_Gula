@@ -1025,6 +1025,59 @@ tres hallazgos reales, los dos primeros con la misma causa de fondo:
 - Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
   terminar, sin tocar código.
 
+**"Ya configurado" mentía en el formulario: decía que el evento estaba listo pero al
+entrar preguntaba todo de cero — HECHO, revierte a propósito una garantía de privacidad
+anterior, requiere revisión del dueño antes de fusionar (regla de `CLAUDE.md`: "AI
+Branches: Human security review required before main merge")**:
+
+- **El conflicto que vio el dueño**: en "¿De qué evento son los datos?"
+  (`Formulario.jsx`), un evento marcado "Ya configurado" (`sinConfigurar: false` en la
+  checklist) sonaba a "esto ya está resuelto, no hace falta tocarlo" — pero al entrar,
+  el formulario preguntaba las ~40 preguntas igual que a un evento nuevo. La etiqueta
+  hablaba de la CHECKLIST (`e.sinConfigurar`); el formulario nunca ha leído esos datos:
+  cada envío empezaba de cero por diseño — el enlace público (`publico/{codigo}`) solo
+  exponía `nombre/fecha/sitio/tipo/configurado`, nada de respuestas reales, A PROPÓSITO
+  (`resumirParaOficina()` llevaba un test explícito, `!('pax' in ...)`, verificando que
+  NADA de dentro del evento saliera por ese canal).
+- **Decisión del dueño, tras verle tres formas de arreglarlo** (solo aclarar el aviso /
+  recordar en este móvil con `mios.js` / traer lo real de la checklist): la tercera —
+  la que de verdad cumple lo pedido, a costa de mover esa frontera de privacidad.
+- **Qué viaja y qué NO**: cuando la oficina aplica un envío (`handleAplicarEnvio`),
+  `App.jsx` guarda ahora `formularioRespuestas` en el evento — las respuestas de esa
+  vez, tal cual, sin entrar en ningún cálculo (mismo patrón de metadato que
+  `eventoNubeId`: `useState` + `getEstadoActual()` + `SETTERS_SYNC`, fuera de
+  `ETIQUETAS_CAMPO`/`opts`). `resumirParaOficina()` (`envios.js`) las re-expone
+  filtradas por la nueva `respuestasParaOficina()`:
+  - Fuera `tipo`/`nombreYsitio`/`cuando` (ya viajan sueltos, no se duplican).
+  - Fuera `comprar`/`alergias`/`notas` (texto libre sin fondo — alergias es dato de
+    salud de un invitado — y cualquier `*_comentario` por pregunta): se quedan fuera
+    aunque cueste un poco más de tecleo volver a escribirlas.
+  - Fuera cualquier `*Archivo` (menú/hojas de alquiler subidas como foto o PDF): no
+    sirven para rellenar nada y pueden pesar.
+  - Tope duro de 20 KB tras filtrar: si algún día se cuela un campo pesado que no está
+    en la lista de arriba, se manda `null` en vez de arriesgarse a reventar el límite
+    de 1 MiB de `publico/{codigo}` (que lleva hasta 8 eventos en un solo documento) y
+    dejar a la oficina sin lista de próximos eventos — un fallo mucho peor que el que
+    se está arreglando.
+  - Solo se re-expone lo que YA viajó una vez por ese mismo canal público (una
+    respuesta de formulario que alguien mandó con ese código) — no se lee nunca nada
+    de lo que la checklist calcula o de lo que se edita a mano en la app.
+- **Lo que NO se arregla**: un evento configurado a mano en la app (sin pasar nunca por
+  el formulario, como parecían ser los ejemplos reales que vio el dueño) no tiene
+  `formularioRespuestas` que traer — sigue preguntando todo. Para no repetir el mismo
+  conflicto, la etiqueta ahora distingue los dos casos: "Ya configurado · se rellena
+  solo" (con respuestas de antes) frente a "Ya configurado" a secas (con un tooltip que
+  ya no promete que vengan puestas).
+- **Test que antes garantizaba lo contrario, ahora conviven los dos casos**: el test
+  original (`!('pax' in publicado.eventos[0])`, con un evento SIN `formularioRespuestas`)
+  se deja intacto sin tocar una línea — sigue demostrando que un evento configurado a
+  mano no filtra nada. Al lado, un test nuevo demuestra el caso contrario a propósito:
+  un evento CON `formularioRespuestas` sí lleva `respuestasPrevias`, filtradas.
+- **Verificación**: `npm run test:rapido` en verde (filtro puro + integración con
+  `resumirParaOficina`); `npm run test` completo antes de fusionar. Dado que esto mueve
+  una frontera de privacidad documentada a propósito, se deja SIN FUSIONAR hasta que el
+  dueño lo revise él mismo (no se auto-fusiona como el resto de PRs de esta sesión).
+
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
 eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
@@ -1196,6 +1249,43 @@ justifica cruzar esa frontera. De paso, el tope del bucle de "recorrer el formul
 contestando No lo sé" en `app.test.mjs` vivía pegado al número exacto de preguntas de
 una boda (32) — con dos preguntas más pasó a 34 y lo superó. Subido a 45, con margen
 de verdad en vez de ir pegado a la cifra exacta.
+
+**Formulario: "Ya configurado" se rellena solo, y en verde para todos — HECHO,
+con revisión de seguridad del dueño**: en "¿De qué evento son los datos?", un evento
+"Ya configurado" preguntaba las ~40 preguntas igual que uno nuevo — la etiqueta hablaba
+de la CHECKLIST, el formulario nunca había leído esos datos. Ahora `App.jsx` guarda las
+respuestas de cada envío aplicado en el propio evento (`formularioRespuestas`, metadato
+fuera de cualquier cálculo) y `resumirParaOficina()` las re-expone **filtradas**
+(`respuestasParaOficina()`): fuera tipo/nombreYsitio/cuando (ya viajan sueltos),
+comprar/alergias/notas/comentarios libres (texto sin fondo, alergias es dato de salud)
+y cualquier archivo adjunto; tope duro de 20 KB. Solo se re-expone lo que YA viajó una
+vez por ese mismo canal público — nunca lo que la checklist calcula. Esto mueve a
+propósito una frontera de privacidad que el código llevaba probada ("nada de dentro de
+un evento sale por el enlace público"), así que se dejó sin fusionar hasta que el dueño
+lo revisara y diera el visto bueno explícito (regla de este archivo: "AI Branches").
+De paso, el "Ya configurado" pasó de gris (visible solo desde el móvil que lo mandó,
+`es-enviado`/`mios.js`) a verde con su ✓ para CUALQUIER evento configurado, lo haya
+mandado ese teléfono o no — con varias personas usando el formulario, el gris no le
+decía nada al resto.
+
+**Auditoría a fondo del formulario, pedida por el dueño ("que configure bien la
+checklist")** — con cita exacta fichero:línea, sin tocar código todavía:
+- **Orden**: `buffets` mueve un número real (`numMesasBuffet`) pero vive en "Cierre"
+  en vez de junto a `extras`, su pariente de patrón. `tarta` vive en el bloque de "lo
+  que genera una recogida" (flores/minutas) pero no genera ninguna.
+- **Duplicación real**: `barril30`/`barril50` (dentro de `extras`, de marcar-varios)
+  comparten el mismo `campoNumero` — marcar los dos descarta en silencio el número de
+  uno de ellos.
+- **Huérfanas / datos que faltan**: `numBarras` se pregunta en cumpleaños pero
+  cumpleaños no calcula "Mesa alta". Peor: **`entrante`, `armarioCaliente` y todo el
+  bloque `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en
+  producción, pero `buildChecklistProduccion` SÍ usa esos datos** — un rodaje no puede
+  configurar bien su propia checklist en estas tres cosas desde el formulario.
+- **Dependencias `si:`**: sin hallazgos, las 8 condicionales del fichero están todas
+  bien ordenadas.
+- Pendiente: arreglar orden + bug de barriles + `numBarras` huérfano (seguro, sin
+  decisión de producto); añadir las preguntas que faltan a producción es una laguna
+  real pero más grande, a decidir con el dueño antes de tocarla.
 
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,

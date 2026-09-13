@@ -256,7 +256,7 @@ function resumirCambios(prev, nuevo) {
   const cambios = [];
   const claves = new Set([...Object.keys(prev || {}), ...Object.keys(nuevo || {})]);
   claves.forEach(k => {
-    if (k === "eventoNubeId") return;
+    if (k === "eventoNubeId" || k === "formularioRespuestas") return;
     const a = prev?.[k], b = nuevo?.[k];
     if (JSON.stringify(a) === JSON.stringify(b)) return;
     const etiqueta = ETIQUETAS_CAMPO[k] || k;
@@ -887,6 +887,13 @@ export default function App({ onCerrarSesion } = {}) {
   // alguien dice que ya está. Se guarda con el evento, así que se ve desde cualquier
   // dispositivo y no solo en el que la creó.
   const [sinConfigurar, setSinConfigurar] = useState(estadoInicial.sinConfigurar ?? false);
+  // Lo último que mandó la oficina por el formulario, tal cual lo contestó — no entra
+  // en ningún cálculo ni se ve en ninguna pantalla de la checklist. Solo sirve para que
+  // el propio formulario se rellene solo si vuelven a elegir este evento (ver
+  // resumirParaOficina/respuestasParaOficina en formulario/envios.js): sin esto, un
+  // evento "ya configurado" seguía preguntándolo todo de cero, aunque ya se hubiera
+  // contestado una vez.
+  const [formularioRespuestas, setFormularioRespuestas] = useState(estadoInicial.formularioRespuestas ?? null);
   const [nombreOcupado, setNombreOcupado] = useState(false);
   const [historial, setHistorial] = useState([]);
   const ultimaClaveEditadaRef = React.useRef(null);
@@ -912,6 +919,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoNevera, tipoCongelador, origenSillas, tipoMesa, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
+    formularioRespuestas,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -1025,6 +1033,7 @@ export default function App({ onCerrarSesion } = {}) {
     itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, marcasRevisar: setMarcasRevisar, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
+    formularioRespuestas: setFormularioRespuestas,
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
   settersSyncRef.current = SETTERS_SYNC;
@@ -1959,7 +1968,11 @@ export default function App({ onCerrarSesion } = {}) {
         // Y aquí deja de estar "sin configurar": esto es exactamente lo que le faltaba.
         // El aviso existe para que nadie cargue un camión con los valores de fábrica;
         // una vez llegan los datos de la oficina, seguir avisando sería ruido.
-        const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false };
+        // formularioRespuestas guarda lo último que contestó la oficina tal cual: es lo
+        // que el propio formulario recupera si vuelven a elegir este evento (ver
+        // resumirParaOficina), para no preguntarlo todo de cero un evento que "ya
+        // configurado" decía tener resuelto.
+        const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false, formularioRespuestas: envio.respuestas || {} };
         // Las notas se SUMAN, no se sustituyen (ver notasFusionadas en preguntas.js,
         // que explica por qué se compara línea a línea y no el bloque entero).
         estado.notasEvento = notasFusionadas(base.notasEvento, cambios.notasEvento);
