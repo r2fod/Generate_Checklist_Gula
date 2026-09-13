@@ -1250,6 +1250,43 @@ contestando No lo sé" en `app.test.mjs` vivía pegado al número exacto de preg
 una boda (32) — con dos preguntas más pasó a 34 y lo superó. Subido a 45, con margen
 de verdad en vez de ir pegado a la cifra exacta.
 
+**Formulario: "Ya configurado" se rellena solo, y en verde para todos — HECHO,
+con revisión de seguridad del dueño**: en "¿De qué evento son los datos?", un evento
+"Ya configurado" preguntaba las ~40 preguntas igual que uno nuevo — la etiqueta hablaba
+de la CHECKLIST, el formulario nunca había leído esos datos. Ahora `App.jsx` guarda las
+respuestas de cada envío aplicado en el propio evento (`formularioRespuestas`, metadato
+fuera de cualquier cálculo) y `resumirParaOficina()` las re-expone **filtradas**
+(`respuestasParaOficina()`): fuera tipo/nombreYsitio/cuando (ya viajan sueltos),
+comprar/alergias/notas/comentarios libres (texto sin fondo, alergias es dato de salud)
+y cualquier archivo adjunto; tope duro de 20 KB. Solo se re-expone lo que YA viajó una
+vez por ese mismo canal público — nunca lo que la checklist calcula. Esto mueve a
+propósito una frontera de privacidad que el código llevaba probada ("nada de dentro de
+un evento sale por el enlace público"), así que se dejó sin fusionar hasta que el dueño
+lo revisara y diera el visto bueno explícito (regla de este archivo: "AI Branches").
+De paso, el "Ya configurado" pasó de gris (visible solo desde el móvil que lo mandó,
+`es-enviado`/`mios.js`) a verde con su ✓ para CUALQUIER evento configurado, lo haya
+mandado ese teléfono o no — con varias personas usando el formulario, el gris no le
+decía nada al resto.
+
+**Auditoría a fondo del formulario, pedida por el dueño ("que configure bien la
+checklist")** — con cita exacta fichero:línea, sin tocar código todavía:
+- **Orden**: `buffets` mueve un número real (`numMesasBuffet`) pero vive en "Cierre"
+  en vez de junto a `extras`, su pariente de patrón. `tarta` vive en el bloque de "lo
+  que genera una recogida" (flores/minutas) pero no genera ninguna.
+- **Duplicación real**: `barril30`/`barril50` (dentro de `extras`, de marcar-varios)
+  comparten el mismo `campoNumero` — marcar los dos descarta en silencio el número de
+  uno de ellos.
+- **Huérfanas / datos que faltan**: `numBarras` se pregunta en cumpleaños pero
+  cumpleaños no calcula "Mesa alta". Peor: **`entrante`, `armarioCaliente` y todo el
+  bloque `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en
+  producción, pero `buildChecklistProduccion` SÍ usa esos datos** — un rodaje no puede
+  configurar bien su propia checklist en estas tres cosas desde el formulario.
+- **Dependencias `si:`**: sin hallazgos, las 8 condicionales del fichero están todas
+  bien ordenadas.
+- Pendiente: arreglar orden + bug de barriles + `numBarras` huérfano (seguro, sin
+  decisión de producto); añadir las preguntas que faltan a producción es una laguna
+  real pero más grande, a decidir con el dueño antes de tocarla.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").
