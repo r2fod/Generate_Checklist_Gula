@@ -1369,6 +1369,27 @@ Google nunca habían llegado al calendario de la app.
   y diciembre (semanas mal cuadradas o contenido duplicado/vacío) — quedan
   pendientes de repasar a mano.
 
+**Modo carga → Resumen: la tabla se ajustaba al pixel justo y podía obligar a
+arrastrar — HECHO**: el dueño lo vio en la app real (captura). `.resumen-tabla-producto`
+estaba tuneada a mano para medir exactamente los 810px disponibles dentro del modal
+(comentario en el código: "con 220 la tabla medía 813px... con 190 sobran ~33px");
+con `width: 100%` en la tabla, cualquier margen que se liberara (menos padding, menos
+max-width) el navegador se lo repartía entre las demás columnas hasta rellenar el
+ancho entero — no quedaba NUNCA margen real, así que una fuente de sistema un pelín
+más ancha que la de las pruebas volvía a desbordar.
+- Cambiado `.resumen-tabla` a `width: auto` (con `max-width: 100%` de tope): ahora la
+  tabla mide lo que de verdad necesita su contenido, no lo que quepa en el hueco —
+  733px de 810 disponibles, ~76px de margen real. Si algún día hiciera falta más
+  (nombres/sufijos más largos), cae en el scroll de `.resumen-tabla-wrap` como red,
+  no se rompe.
+  También menos padding por celda (12px → 8px) y `.resumen-tabla-producto` de 190px
+  a 165px, para no depender de un solo número exacto.
+- Test nuevo en `app.test.mjs`: el margen de la tabla del Resumen (boda) tiene que
+  ser de al menos 40px, no solo "no desborda" — así una vuelta a apretarla al pixel
+  justo se pilla en la próxima batería, no en una captura del dueño.
+- Verificación: medido con Playwright a 1280/1440/1920px (0 desbordamiento, ~76px de
+  margen en los tres) y a 320px (la página entera sigue sin desbordar).
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").

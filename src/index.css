@@ -3758,7 +3758,14 @@ hr {
 .resumen-tabla thead th:first-child { z-index: 4; }
 
 .resumen-tabla {
-  width: 100%;
+  /* auto y no 100%: con 100% el navegador reparte lo que sobra entre las columnas
+     hasta llenar el ancho entero, así que apretar el padding o el nombre del
+     producto no dejaba ni un píxel de margen real — solo cambiaba quién se comía
+     el hueco. Con auto, la tabla mide lo que de verdad necesita su contenido (casi
+     siempre menos de lo disponible) y max-width la frena si algún día hiciera
+     falta más, cayendo entonces en el scroll de .resumen-tabla-wrap como red. */
+  width: auto;
+  max-width: 100%;
   border-collapse: collapse;
   font-size: 0.82rem;
   white-space: nowrap;
@@ -3766,7 +3773,7 @@ hr {
 
 .resumen-tabla th,
 .resumen-tabla td {
-  padding: 9px 12px;
+  padding: 9px 8px;
   text-align: right;
   border-bottom: 1px solid var(--border-color);
 }
@@ -3787,12 +3794,14 @@ hr {
   background: var(--card-bg);
 }
 
-/* 190 y no 220: con 220 la tabla medía 813px dentro de 810 y la última columna quedaba
-   cortada por 3px — justo el "€" del coste total, que es la cifra que se mira. Tres
-   píxeles de más obligaban a arrastrar la tabla en escritorio para ver el número
-   completo. Con 190 sobran ~33px y entra entera. */
+/* Ajustar esto al pixel justo (190px medía exactos los 810px disponibles, sin
+   margen) se rompía solo con que la fuente del sistema del dueño rindiera un pelín
+   más ancha que en las pruebas: la tabla se pasaba por unos pocos píxeles y tocaba
+   arrastrar en escritorio para ver el "€" del coste total, la cifra que se mira.
+   Con 165px (y menos aire por celda, ver .resumen-tabla th/td) sobran ~65px de
+   margen real: aguanta esas diferencias sin depender de acertar un número exacto. */
 .resumen-tabla-producto {
-  max-width: 190px;
+  max-width: 165px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
