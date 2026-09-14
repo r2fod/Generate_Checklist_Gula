@@ -856,6 +856,23 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaParabanes === undefined,
     "sin contestar, no se toca");
 
+  // "¿Cómo se come?" también en producción: buildChecklistProduccion ya sabía ocultar
+  // platos/hondos/metálicos con soloBandeja, pero nadie podía contestarlo desde el
+  // formulario para un rodaje. El ratio de camareros (paxPorCamarero) NO se toca aquí:
+  // producción tiene el suyo propio (leerRatios().produccion), y el 25/12 de un
+  // banquete sentado no pinta nada en un rodaje.
+  ok(preguntasDe("produccion", {}).some(p => p.id === "servicio"),
+    "la pregunta ahora también sale en un rodaje");
+  const produBandeja = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], servicio: "bandeja" });
+  ok(produBandeja.soloBandeja === true && produBandeja.paxPorCamarero === undefined,
+    "en producción activa soloBandeja pero no toca el ratio de camareros");
+  const produSentados = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], servicio: "sentados" });
+  ok(produSentados.soloBandeja === false,
+    "y \"sentados\" lo deja en false, no sin contestar");
+  const bodaBandeja = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, servicio: "bandeja" });
+  ok(bodaBandeja.soloBandeja === true && bodaBandeja.paxPorCamarero === 25,
+    "en una boda sigue ajustando también el ratio de camareros, como siempre");
+
   // Mesas calientes: antes se cargaban solas en producción y en el resto ni existían
   // ni se preguntaban.
   const conMesasCalientes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, mesasCalientes: "si" });
@@ -1246,22 +1263,27 @@ console.log("\n══ Jarras, aguas y barriles ══");
 
   ok(ops("boda").includes("jarras") && !ops("cumpleanos").includes("jarras"),
     "las jarras se ofrecen donde la app las tiene: no en cumpleaños ni en rodaje");
-  ok(!ops("boda").includes("aguasPequenas"),
-    "las aguas pequeñas no se preguntan aquí: son cosa de rodaje y allí van siempre");
+  // El interruptor real de la checklist (llevaAguasPequenas) no lo preguntaba nadie en
+  // un banquete: se quedaba siempre apagado salvo que alguien se acordara de tocarlo a
+  // mano en la app. En rodaje no hace falta: ahí van siempre, solo se pregunta el
+  // envase (ver "Envase de las aguas pequeñas", debajo).
+  ok(ops("boda").includes("aguasPequenas") && !ops("produccion").includes("aguasPequenas"),
+    "las aguas pequeñas sí se preguntan aquí para un banquete, pero no en rodaje");
 
   const e = aRespuestasDeLaApp({
     tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100,
-    extras: ["barril50", "jarras"], numBarriles: 3,
+    extras: ["barril50", "jarras", "aguasPequenas"], numBarriles: 3,
   });
   ok(e.tamanoBarril === "50L" && e.numBarriles === 3,
     `el barril lleva su tamaño y cuántos → ${e.tamanoBarril} ×${e.numBarriles}`);
   ok(e.llevaJarrasCristal === true, "y las jarras llegan marcadas");
+  ok(e.llevaAguasPequenas === true, "y las aguas pequeñas activan el interruptor de la checklist");
 
   const sinBarril = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: ["jarras"], numBarriles: 3 });
   ok(sinBarril.numBarriles === undefined,
     "sin barril marcado no se cuela un número de barriles");
   const nada = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: [] });
-  ok(nada.llevaJarrasCristal === false,
+  ok(nada.llevaJarrasCristal === false && nada.llevaAguasPequenas === false,
     "y decir que no hay nada presupuestado es una respuesta, no un hueco");
 }
 
