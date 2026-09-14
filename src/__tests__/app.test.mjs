@@ -301,6 +301,23 @@ async function main() {
     const resumen = await page.locator(".resumen-tabla").first().innerText();
     ok(items > 20 && iconos === items && invalidas === 0 && selectores === 2 && marcados === filas && !/NaN/.test(resumen),
       `${tipo}: ${items} items · ${iconos} iconos · ${invalidas} inválidas · ${selectores} selectores · ${marcados}/${filas} vueltos · Resumen sin NaN`);
+    // La tabla del Resumen no debe arañar el ancho del modal (antes se ajustaba al
+    // pixel justo y una fuente un pelín más ancha que la de las pruebas ya la hacía
+    // desbordar y obligar a arrastrar para ver el coste total). Con margen real de
+    // verdad no debería pasar por poco.
+    if (tipo === "boda") {
+      const margen = await page.evaluate(() => {
+        const w = document.querySelector(".resumen-tabla-wrap");
+        const t = document.querySelector(".resumen-tabla");
+        // clientWidth - scrollWidth nunca mide margen real: scrollWidth nunca baja
+        // del propio clientWidth cuando NO hay overflow, así que esa resta siempre
+        // da ≤0 aunque sobre sitio de verdad. Lo que hace falta es comparar el hueco
+        // disponible contra el ancho que la tabla ocupa de verdad.
+        return w && t ? w.clientWidth - t.getBoundingClientRect().width : null;
+      });
+      ok(margen !== null && margen >= 40,
+        `y la tabla del Resumen deja margen real sin arrastrar (${margen}px, ≥40)`);
+    }
   }
 
   // ── EL PANEL DEL ASISTENTE ESCAPA DEL HEADER ────────────────────────────────
