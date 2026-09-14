@@ -940,19 +940,21 @@ calibración dejaría de tener datos limpios de qué sale de verdad con el pax s
 eso NO se fusiona con la casilla del menú — pero el dueño siguió insistiendo en que
 "hay cosas donde no debería estar", y repasando el orden entero contra los 11 bloques
 del reorden de #184 apareció el problema real, que no era el número de pantallas sino
-DÓNDE estaban: **"¿Tamaño de paella?" y "¿Cuántas paellas?" están HECHO, movidas a
-"Cocina y equipamiento"** — justo después de "¿Qué horno hace falta?", antes de
-"¿Lleva armario caliente?". No son preguntas de MENÚ (qué se come), son de equipo de
-cocina (paellera, trípode, bombona), así que interrumpían "menú → entrante → café" con
-una pregunta que no era de ese tema, y encima estaban lejos del resto de "cuánto
-material de cocina hace falta" (nevera/congelador/horno/gastros), que es donde de
-verdad encajan. Solo se ha movido de sitio el objeto de la pregunta dentro del array
-— mismo `id`, misma `si:` (`menu.includes("paella")`, que se sigue cumpliendo:
-"menu" sigue estando mucho antes) — cero cambios de lógica ni de `calibracion.js`.
+DÓNDE estaban: **"¿Tamaño de paella?" y "¿Cuántas paellas?" — movidas primero a
+"Cocina y equipamiento" (justo después de horno), y CORREGIDO otra vez tras verlo el
+dueño en vivo**: quedaba demasiado lejos de haber dicho "llevamos paella" en el menú
+— entre medias había cinco preguntas de equipamiento genérico (queDobla, entrante,
+entrantePersonas, café, nevera, congelador, hielo, horno) sin nada que ver con la
+paella, así que llegar a "¿tamaño?" se sentía como una pregunta reaparecida de la
+nada, no como continuar algo. Movidas de nuevo, esta vez a justo después de "café"
+— cierran "qué se come" (siguen sin cortar entrante/café, la razón de no pegarlas a
+"menu") sin quedar enterradas entre preguntas de equipo que no tienen nada que ver
+con haber dicho paella. Mismo `id`, misma `si:` (`menu.includes("paella")`) — cero
+cambios de lógica ni de `calibracion.js`.
 Verificado en vivo: con "Paella" marcada, el recorrido para una boda ahora es
-menú → entrante → café → nevera → congelador → horno → **tamaño → cuántas** →
-armario caliente, en vez de menú → tamaño → cuántas → entrante → café de antes.
-`npm run test:rapido` en verde (1600 comprobaciones): ningún test de
+menú → entrante → café → **tamaño → cuántas** → nevera → congelador → horno →
+armario caliente.
+`npm run test` completo en verde (2375 comprobaciones): ningún test de
 `aRespuestasDeLaApp()`/`resumirEnvio()` depende del orden del array, que es
 justo la prueba de que reordenar es seguro.
 
@@ -1291,6 +1293,17 @@ checklist")** — con cita exacta fichero:línea:
   bien su propia checklist en estas tres cosas desde el formulario. Es una laguna
   real pero más grande (añadir preguntas nuevas a producción), a decidir con el dueño
   antes de tocarla.
+- Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
+
+**Dos hallazgos más, vistos por el dueño en la app real — HECHO**:
+- **"tipoMesa" con icono de sofá**: `ICONOS_POR_PREGUNTA.tipoMesa` solo tenía 2
+  iconos (`Table2, Armchair`) para 4 opciones — al repetir el juego (`indice %
+  juego.length`), la primera mesa redonda de alquiler salía con un icono de sofá
+  (`Armchair`, que sí es correcto en `sillas`/`gente`/`mobiliarioAlquiler`, pero no
+  aquí). Puestos los 4 explícitos, todos mesa.
+- **Esa misma pregunta preguntaba mal**: "¿De qué son las mesas donde come la
+  gente?" pide MATERIAL, pero las 4 opciones son forma+tamaño (rectangular 1,8m /
+  redondas 1,5m, 1,8m, 2m). Cambiado a "¿Cómo son las mesas donde come la gente?".
 - Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
 
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
