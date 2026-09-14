@@ -259,13 +259,19 @@ export const PREGUNTAS = [
 
   // ── Cómo se come y el menú ─────────────────────────────────────────────────
   {
+    // También en producción: buildChecklistProduccion ya sabe ocultar platos/hondos/
+    // metálicos con soloBandeja (opts.soloBandeja), pero nadie podía contestarlo desde
+    // el formulario — un rodaje se quedaba siempre con lo que ya tuviera la app. Aquí
+    // el ratio de camareros no se toca (ver aRespuestasDeLaApp): producción ya tiene
+    // el suyo propio (1 cada 20, leerRatios().produccion), y el 25/12 de un banquete
+    // sentado no pinta nada en un rodaje.
     id: "servicio", tipo: "opciones", texto: "¿Cómo se come?",
     nota: "Si es todo en bandeja no se cargan platos de ningún tipo, solo bandejas y cubiertos.",
     opciones: [
       { valor: "sentados", texto: "Sentados, con platos" },
       { valor: "bandeja", texto: "De pie, todo en bandeja" },
     ],
-    soloEn: CON_BARRA,
+    soloEn: [...CON_BARRA, "produccion"],
   },
   {
     id: "menu", tipo: "marcar", texto: "¿Qué lleva el menú?",
@@ -515,6 +521,11 @@ export const PREGUNTAS = [
       // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
+      // El interruptor real que enseña la línea "Aguas pequeñas (33cl)" en la checklist
+      // (llevaAguasPequenas) no lo preguntaba nadie: en un banquete se quedaba siempre
+      // apagado salvo que alguien se acordara de tocarlo a mano en la app. En producción
+      // esto no hace falta: las aguas pequeñas van siempre (ver "aguaPequena", más abajo).
+      { valor: "aguasPequenas", texto: "Aguas pequeñas (botellines individuales)", soloEn: CON_BARRA },
       // Estaba en "¿Qué lleva el menú?", junto a la paella y el frito, pero no es
       // comida del menú: es un servicio que se presupuesta aparte y que carga platos
       // extra de postre — igual que el desayuno, justo aquí arriba (mismo cálculo en
@@ -1071,6 +1082,10 @@ export function aRespuestasDeLaApp(r = {}) {
     // contestar no se toca nada, como todo lo demás del formulario.
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
+    // Solo soloBandeja: el ratio de camareros de "servicio" (25/12, pensado para un
+    // banquete) no pinta nada aquí — producción ya tiene el suyo propio, ver
+    // buildChecklistProduccion (leerRatios().produccion).
+    if (puesto(r.servicio)) estado.soloBandeja = r.servicio === "bandeja";
   } else {
     pon("pax", r.adultos);
     pon("ninos", r.ninos);
@@ -1128,6 +1143,12 @@ export function aRespuestasDeLaApp(r = {}) {
       // Estaba en "menu" (aRespuestasDeLaApp lo leía de "menu"/"jamonero"), pero no es
       // comida del menú: es un servicio presupuestado, como el desayuno justo arriba.
       estado.llevaJamonero = marcado("extras", "jamonero");
+      // El interruptor real de la checklist (llevaAguasPequenas) no lo preguntaba nadie
+      // en un banquete: se quedaba siempre en su valor por defecto (apagado).
+      estado.llevaAguasPequenas = marcado("extras", "aguasPequenas");
+      estado.llevaChillOut = marcado("extras", "chillout");
+      if (estado.llevaChillOut && r.chilloutNumero > 0) estado.numChillOut = r.chilloutNumero;
+      estado.llevaPalomitera = marcado("extras", "palomitera");
     }
   }
 
@@ -1208,11 +1229,6 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.tamanoPaella)) estado.tipoPaella = r.tamanoPaella;
   if (puesto(r.cuantasPaellas)) {
     estado.numPaellas = r.cuantasPaellas === "otras" && r.numPaellas > 0 ? r.numPaellas : 0;
-  }
-  if (Array.isArray(r.extras)) {
-    estado.llevaChillOut = marcado("extras", "chillout");
-    if (estado.llevaChillOut && r.chilloutNumero > 0) estado.numChillOut = r.chilloutNumero;
-    estado.llevaPalomitera = marcado("extras", "palomitera");
   }
 
   return estado;

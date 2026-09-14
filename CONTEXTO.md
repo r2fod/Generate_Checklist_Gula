@@ -1306,6 +1306,43 @@ checklist")** — con cita exacta fichero:línea:
   redondas 1,5m, 1,8m, 2m). Cambiado a "¿Cómo son las mesas donde come la gente?".
 - Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
 
+**Auditoría completa del formulario (49 preguntas, contraste con los tres generadores)
+— HECHO**: pedida por el dueño ("formulario inteligente": cada tipo de evento solo ve
+sus preguntas, no todas). Recorridas las 49 preguntas contra `aRespuestasDeLaApp()` y
+los tres `buildChecklist*`, confirmando que `soloEn`/`si:` ya scopea correctamente cada
+una a su tipo de evento. Dos hallazgos reales, arreglados en la misma pasada:
+- **Bloque `extras` duplicado en `aRespuestasDeLaApp()`**: se procesaba en DOS `if
+  (Array.isArray(r.extras))` distintos — uno dentro de la rama no-producción
+  (brindis/barbacoa/desayuno/barril/jarras/jamonero) y otro suelto al final del todo
+  (chillout/palomitera). No rompía nada hoy porque TODAS las opciones de `extras`
+  excluyen producción (`soloEn`), pero si algún día se añadiera una opción válida para
+  producción, la mitad de los campos se aplicarían y la otra mitad no, sin que se
+  notara. Unificado en un solo bloque.
+- **Aguas pequeñas en banquete, sin pregunta**: el interruptor real de la checklist
+  (`llevaAguasPequenas`, ya usado por `buildChecklistBoda`/`Cumpleanos` para enseñar
+  "Aguas pequeñas (33cl)") no lo preguntaba nadie fuera de producción — se quedaba
+  siempre apagado salvo tocarlo a mano en la app. Añadida como opción más de `extras`
+  (`aguasPequenas`, `soloEn: CON_BARRA`), mismo patrón que Chill out/Brindis — en
+  producción no hace falta, ahí ya van siempre (pregunta aparte, solo el envase).
+- **"¿Cómo se come?" nunca se preguntaba en producción**: `buildChecklistProduccion` ya
+  sabe ocultar platos trinchero/hondos/metálicos con `soloBandeja`, pero la pregunta
+  `servicio` tenía `soloEn: CON_BARRA` (sin producción) — un rodaje se quedaba siempre
+  con lo que ya tuviera la app. Extendido `soloEn` a `[...CON_BARRA, "produccion"]`.
+  Importante: el ratio de camareros que esa misma pregunta ajusta en banquetes (25/12)
+  NO se toca en producción — un rodaje ya tiene el suyo propio
+  (`leerRatios().produccion`, 1 cada 20), así que `aRespuestasDeLaApp()` solo pone
+  `soloBandeja` en la rama de producción, `paxPorCamarero` se queda fuera.
+- Sigue **PENDIENTE, decisión del dueño** (sin tocar en esta pasada, ver entrada
+  anterior): `entrante`/`armarioCaliente`/el resto de `extras`
+  (desayuno/jamonero/palomitera/chillout) sin preguntar en producción aunque
+  `buildChecklistProduccion` sí usa esos campos — laguna más grande, requiere decidir
+  qué preguntas nuevas añadir.
+- Tests nuevos en `sincronizacion.test.mjs`: el bloque "Jarras, aguas y barriles"
+  (antes afirmaba justo lo contrario: que las aguas pequeñas NO se ofrecían en un
+  banquete) y un bloque nuevo junto a las pruebas de carpas/parabanes que cubre
+  `servicio` en producción (`soloBandeja` sí, `paxPorCamarero` no).
+- Verificación: `npm run test` completo en curso.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").
