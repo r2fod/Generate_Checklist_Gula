@@ -22,7 +22,7 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
@@ -1102,6 +1102,35 @@ console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");
   // Y un tipo que no existe cae en boda, que es el comportamiento de siempre
   ok(saneaLista([{ fecha: "2026-09-03", titulo: "X", tipo: "inventado" }])[0].tipo === "boda",
     "un tipo desconocido sigue cayendo en boda, como antes");
+}
+
+console.log("\n══ Traer apuntes de golpe sobre un calendario que ya tiene datos ══");
+{
+  // "Traer" (Traer.jsx) solo salía abierto con el calendario vacío: con datos ya
+  // puestos no había forma de pegar una hoja entera sin borrar lo que ya había primero.
+  // mezclaApuntes es lo que deja añadir sin pisar: un id que ya estuviera (misma fecha
+  // y título) se descarta de los nuevos, gana el que ya estaba.
+  const yaHabia = saneaLista([
+    { fecha: "2026-09-12", titulo: "Boda Ana y Luis", tipo: "boda", pax: 120, notas: "Ya confirmado el menú" },
+    { fecha: "2026-09-20", titulo: "Comunión García", tipo: "comunion" },
+  ]);
+  const traidos = saneaLista([
+    { fecha: "2026-09-12", titulo: "Boda Ana y Luis", tipo: "boda" }, // mismo id: sin pax ni notas
+    { fecha: "2026-10-05", titulo: "Cumpleaños Marta", tipo: "cumpleanos" },
+  ]);
+  const nuevos = mezclaApuntes(yaHabia, traidos);
+  ok(nuevos.length === 1 && nuevos[0].titulo === "Cumpleaños Marta",
+    "solo entra el que de verdad es nuevo, no el que ya estaba con otro id igual");
+  const final = saneaLista([...yaHabia, ...nuevos]);
+  const boda = final.find(a => a.id === yaHabia[0].id);
+  ok(boda.pax === 120 && boda.notas === "Ya confirmado el menú",
+    "y lo que ya había NO se pisa: el pax y las notas puestas a mano se quedan");
+  ok(final.length === 3, `el total suma bien: 2 que ya había + 1 nuevo → ${final.length}`);
+
+  // Traer la MISMA hoja dos veces (el caso normal de "se me olvidó algo, la peno otra
+  // vez") no debe duplicar nada de lo que ya se trajo la primera vez.
+  const reenviado = mezclaApuntes(saneaLista([...yaHabia, ...nuevos]), traidos);
+  ok(reenviado.length === 0, "repetir el mismo pegado no añade nada de segundas");
 }
 
 console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");

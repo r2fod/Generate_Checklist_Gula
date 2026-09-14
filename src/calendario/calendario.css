@@ -661,8 +661,9 @@
   .cal-punto { width: 6px; height: 6px; }
 }
 
-/* Ofrecimiento de traer lo de la hoja de Google. Sale solo con el calendario vacío y
-   desaparece en cuanto hay algo: no es un ajuste, es un empujón de una vez. */
+/* Ofrecimiento de traer lo de la hoja de Google (u otro sitio). Con el calendario
+   vacío sale siempre abierto; con apuntes ya puestos, plegado detrás de .cal-traer-cab
+   — sigue disponible para AÑADIR más, pero no estorba el día a día. */
 .cal-traer {
   display: flex;
   flex-direction: column;
@@ -695,6 +696,30 @@
 }
 
 .cal-traer-error { color: var(--error-texto-fuerte); font-weight: 700; font-size: 0.82rem; }
+.cal-traer-ok { color: var(--ok-texto); font-weight: 700; font-size: 0.82rem; }
+.cal-traer-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* El disparador plegado, cuando ya hay apuntes: mismo patrón que "Compartir" (más
+   abajo) — se usa el día que hace falta traer más de golpe y luego estorba. */
+.cal-traer-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+.cal-traer-cab span { flex: 1 1 auto; }
 
 /* ─── ICONOS Y MOVIMIENTO ─────────────────────────────────────────────────────
    El icono lleva el color de su tipo, igual que el punto y el chip: un solo tono por
