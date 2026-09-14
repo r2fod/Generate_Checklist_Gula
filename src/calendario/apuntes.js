@@ -121,6 +121,16 @@ export function idDeApunte(fecha, titulo) {
   return `${fecha}_${limpio}`;
 }
 
+// Une una lista traída de golpe (la hoja de pared, otro calendario) con la que ya
+// había, SIN pisar nada: un id (fecha+título, ver idDeApunte) que ya existiera se
+// descarta de los nuevos y gana el que ya estaba. Lo usa "Traer" (Traer.jsx) cuando el
+// calendario ya no está vacío — pegar de más nunca puede sustituir un apunte que
+// alguien ya haya editado a mano (personal asignado, notas, hora...).
+export function mezclaApuntes(existentes, nuevos) {
+  const yaEstan = new Set(existentes.map(a => a.id));
+  return nuevos.filter(a => !yaEstan.has(a.id));
+}
+
 // Descarta lo que no vale y quita repetidos, quedándose con el último de cada id: dos
 // dispositivos pueden haber tocado el mismo apunte.
 export function saneaLista(lista) {

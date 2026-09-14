@@ -1341,7 +1341,33 @@ una a su tipo de evento. Dos hallazgos reales, arreglados en la misma pasada:
   (antes afirmaba justo lo contrario: que las aguas pequeñas NO se ofrecían en un
   banquete) y un bloque nuevo junto a las pruebas de carpas/parabanes que cubre
   `servicio` en producción (`soloBandeja` sí, `paxPorCamarero` no).
-- Verificación: `npm run test` completo en curso.
+- Verificación: `npm run test` completo, 764 comprobaciones, 0 fallidas. Fusionado
+  (PR #225).
+
+**Calendario: "Traer" apuntes de golpe también con datos ya puestos — HECHO**: la
+pantalla de pegar una lista JSON (`Traer.jsx`) solo salía con el calendario vacío
+("un empujón de una vez, no un ajuste") — con apuntes ya cargados no había forma de
+añadir una tanda nueva (la hoja de pared, otro calendario) sin borrar antes lo que
+ya había. Pedido por el dueño tras encontrar que unos cambios recientes de la hoja de
+Google nunca habían llegado al calendario de la app.
+- Con el calendario vacío, se comporta exactamente igual que antes (abierto de
+  siempre). Con datos ya puestos, sale plegado detrás de un botón ("Añadir varios
+  apuntes de golpe", mismo patrón que "Compartir") y solo AÑADE: nueva función pura
+  `mezclaApuntes(existentes, nuevos)` en `apuntes.js` descarta de los nuevos
+  cualquier id (fecha+título, `idDeApunte`) que ya existiera — pegar de más nunca
+  puede pisar un apunte que alguien ya haya editado a mano (personal, notas, hora...).
+- Tests nuevos en `calculos.test.mjs`: pegar una hoja que se solapa con lo que ya
+  había solo añade lo de verdad nuevo, sin tocar lo existente; repetir el mismo
+  pegado dos veces no duplica nada.
+- Verificación: `npm run test` completo, 764 comprobaciones, 0 fallidas.
+- Aparte, sin tocar código: se extrajeron del "CALENDARIO GULA" de Google Sheets del
+  dueño (hoja "2026. EVENTOS" + lista "BODASGULA 2026") 359 apuntes de 2026 listos
+  para pegar aquí una vez esto esté desplegado — 32 bodas, 3 comuniones, 29
+  vacaciones, 9 días cerrados y 286 tareas/visitas. Los datos reales NO van en el
+  repo (viven en Firestore, no en el código): el JSON se le pasó al dueño aparte.
+  Excluidos de esta pasada por datos poco fiables en la hoja de origen: junio, julio
+  y diciembre (semanas mal cuadradas o contenido duplicado/vacío) — quedan
+  pendientes de repasar a mano.
 
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
