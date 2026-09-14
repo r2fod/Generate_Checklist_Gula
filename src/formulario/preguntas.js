@@ -167,7 +167,7 @@ export const PREGUNTAS = [
     soloEn: [...CON_BARRA, "produccion"],
   },
   {
-    id: "tipoMesa", tipo: "opciones", texto: "¿De qué son las mesas donde come la gente?",
+    id: "tipoMesa", tipo: "opciones", texto: "¿Cómo son las mesas donde come la gente?",
     // Cuántas no se pregunta: salen del pax. De qué tipo sí, porque las redondas no son
     // nuestras y cada alquiler es una recogida — y porque entran más comensales por
     // mesa, así que el número cambia.
@@ -354,55 +354,13 @@ export const PREGUNTAS = [
       { valor: "personal", texto: "Solo para el personal" },
     ],
   },
-
-  // ── Cocina y equipamiento ──────────────────────────────────────────────────
   {
-    // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
-    // poner tal cual sin traducir nada por el camino.
-    id: "nevera", tipo: "opciones", texto: "¿Qué nevera hace falta?",
-    opciones: [
-      { valor: "Mediana", texto: "Mediana" },
-      { valor: "Grande", texto: "Grande" },
-      { valor: "No lleva", texto: "No lleva" },
-    ],
-  },
-  {
-    id: "congelador", tipo: "opciones", texto: "¿Y congelador?",
-    opciones: [
-      { valor: "Mediana", texto: "Mediano" },
-      { valor: "Grande", texto: "Grande" },
-      { valor: "No lleva", texto: "No lleva" },
-    ],
-  },
-  {
-    // Antes el hielo se cargaba siempre, sin preguntar: en un sitio que ya lo da o
-    // en un evento que no lo necesita, sobraban kilos, bolsas y taxis enteros. Pero
-    // si SÍ se lleva congelador no hace falta ni preguntarlo: no tiene sentido llevar
-    // congelador y no querer hielo, así que la pregunta solo sale sin congelador.
-    id: "hielo", tipo: "opciones", texto: "¿Llevamos hielo?",
-    nota: "Si el sitio ya lo da, o no hace falta, di que no: así no se carga ni un taxi de más.",
-    opciones: [
-      { valor: "si", texto: "Sí" },
-      { valor: "no", texto: "No hace falta" },
-    ],
-    si: (r) => r.congelador === "No lleva",
-  },
-  {
-    id: "horno", tipo: "opciones", texto: "¿Qué horno hace falta?",
-    opciones: [
-      { valor: "Pequeño", texto: "Pequeño" },
-      { valor: "Grande", texto: "Grande" },
-      { valor: "Ambos", texto: "Los dos" },
-      { valor: "No lleva", texto: "No lleva" },
-    ],
-  },
-  {
-    // Van aquí, con el resto del equipamiento de cocina, y no pegadas a "menú": son
-    // el equipo para HACER la paella (paellera, trípode, bombona), no qué hay de
-    // comer — antes venían justo después de elegir el menú, cortando el hilo de
-    // "qué se come" (menú → paella → cuántas → entrante → café) con una pregunta
-    // que no es de menú, es de cocina. Solo hace falta seguir viniendo después de
-    // "menu" (`si:` de abajo), que sigue siendo verdad aquí.
+    // Es el equipo para HACER la paella (paellera, trípode, bombona), no qué hay de
+    // comer — por eso no va pegada a "menu" cortando el hilo de "qué se come" (menú
+    // → paella → cuántas → entrante → café), pero tampoco va enterrada varias
+    // preguntas dentro de "Cocina y equipamiento" (nevera/congelador/hielo/horno son
+    // de CUALQUIER menú, no tienen nada que ver con haber dicho paella hace un
+    // momento). Aquí, justo al cerrar "qué se come", es el puente entre las dos.
     //
     // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
     // para arriba) y nunca se preguntaba. Pero el pax no lo sabe todo: con el mismo
@@ -445,6 +403,48 @@ export const PREGUNTAS = [
       },
     ],
     si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
+  },
+
+  // ── Cocina y equipamiento ──────────────────────────────────────────────────
+  {
+    // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
+    // poner tal cual sin traducir nada por el camino.
+    id: "nevera", tipo: "opciones", texto: "¿Qué nevera hace falta?",
+    opciones: [
+      { valor: "Mediana", texto: "Mediana" },
+      { valor: "Grande", texto: "Grande" },
+      { valor: "No lleva", texto: "No lleva" },
+    ],
+  },
+  {
+    id: "congelador", tipo: "opciones", texto: "¿Y congelador?",
+    opciones: [
+      { valor: "Mediana", texto: "Mediano" },
+      { valor: "Grande", texto: "Grande" },
+      { valor: "No lleva", texto: "No lleva" },
+    ],
+  },
+  {
+    // Antes el hielo se cargaba siempre, sin preguntar: en un sitio que ya lo da o
+    // en un evento que no lo necesita, sobraban kilos, bolsas y taxis enteros. Pero
+    // si SÍ se lleva congelador no hace falta ni preguntarlo: no tiene sentido llevar
+    // congelador y no querer hielo, así que la pregunta solo sale sin congelador.
+    id: "hielo", tipo: "opciones", texto: "¿Llevamos hielo?",
+    nota: "Si el sitio ya lo da, o no hace falta, di que no: así no se carga ni un taxi de más.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No hace falta" },
+    ],
+    si: (r) => r.congelador === "No lleva",
+  },
+  {
+    id: "horno", tipo: "opciones", texto: "¿Qué horno hace falta?",
+    opciones: [
+      { valor: "Pequeño", texto: "Pequeño" },
+      { valor: "Grande", texto: "Grande" },
+      { valor: "Ambos", texto: "Los dos" },
+      { valor: "No lleva", texto: "No lleva" },
+    ],
   },
   {
     // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y

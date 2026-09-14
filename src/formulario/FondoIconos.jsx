@@ -12,7 +12,7 @@ import {
   Heart, Church, Cake, Briefcase, Clapperboard, MapPin, CalendarDays, Clock,
   Users, Sun, Tent, Zap, Plug, Martini, Beer, GlassWater, Wine, Utensils,
   UtensilsCrossed, ChefHat, CookingPot, Flame, Armchair, Coffee, Package,
-  StickyNote, CupSoda, Wind, Table2, Droplet, Refrigerator, Snowflake,
+  StickyNote, CupSoda, Wind, Table, Table2, Droplet, Refrigerator, Snowflake,
   Sparkles, Printer, Shirt, Flower2, PartyPopper, ShoppingCart, AlertTriangle,
 } from "lucide-react";
 
@@ -31,7 +31,11 @@ const ICONOS_POR_PREGUNTA = {
   parabanes: [Wind, Tent],
   generador: [Zap, Plug],
   sillas: [Armchair, Package],
-  tipoMesa: [Table2, Armchair],
+  // Las 4 opciones son mesas (una rectangular propia + tres redondas de alquiler):
+  // con solo 2 iconos aquí, el tercero y el cuarto repetían el juego desde el
+  // principio y la primera redonda de alquiler salía con un sofá (Armchair, que
+  // "sillas" sí usa bien) en vez de una mesa. Las 4 explícitas, sin ciclo.
+  tipoMesa: [Table2, Table, Table, Table],
   coctel: [Martini, GlassWater, Wine],
   copas: [Beer, Martini, Wine, GlassWater],
   aguaPequena: [Droplet, GlassWater],
