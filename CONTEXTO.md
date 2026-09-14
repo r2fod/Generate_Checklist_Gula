@@ -1390,6 +1390,28 @@ más ancha que la de las pruebas volvía a desbordar.
 - Verificación: medido con Playwright a 1280/1440/1920px (0 desbordamiento, ~76px de
   margen en los tres) y a 320px (la página entera sigue sin desbordar).
 
+**Calendario: casillas del mes desbocadas en desktop con un día muy cargado — HECHO**:
+el dueño lo vio con los 359 apuntes reales ya pegados (captura de septiembre 2026):
+días con seis apuntes estiraban su casilla —y su fila entera de la rejilla— mucho más
+que las de al lado, mientras días vacíos se quedaban en el mínimo. Causa: en
+`Mes()` (`Calendario.jsx`), a partir de 560px (`.cal-chip{display:flex}`) se pintaba
+UN chip por apunte sin límite; `min-height` en `.cal-celda` es un suelo, no un techo,
+y `overflow:hidden` no recorta nada porque el alto natural de la columna flex ya
+cuenta con cada chip.
+- Tope de `CHIPS_VISIBLES = 3` por casilla (constante junto a `ICONOS`); a partir del
+  cuarto apunte sale un `+N más` (`.cal-chip-mas`, mismo trato visual que `.cal-mas`
+  en móvil). Como `del` ya viene con los eventos primero (`porDia()`), lo que se
+  recorta es siempre lo menos importante del día. Nada se pierde: la casilla entera
+  ya era (y sigue siendo) un botón que abre `PanelDia` con la lista completa.
+- Solo desktop (≥560px): en móvil el problema no existía — ahí siempre se enseñó el
+  resumen compacto de iconos (`.cal-puntos`, ya capado a 1 icono+"×N" bajo 420px) y
+  la casilla es cuadrada (`aspect-ratio: 1/1`), así que su alto no depende del
+  contenido.
+- Verificado con el banco de pruebas (`pruebas/calendario.html`, datos inventados:
+  tres eventos + dos vacaciones el mismo día, el mismo caso que el del dueño) a
+  360/1280/1920px: la casilla cargada ya no desborda su fila, se ve "+2 más" y el
+  resto de casillas de la semana quedan a la misma altura.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").

@@ -21,6 +21,10 @@ import { personalNecesario, resumenAsignados, personalQueFalta, horasEntre, ROLE
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
+// Chips que se enseñan de golpe en una casilla del mes (≥560px) antes de resumir el
+// resto en "+N más". Con el mínimo de casilla a 92px caben tres cómodos; ver Mes().
+const CHIPS_VISIBLES = 3;
+
 // El icono del tipo. Va con su clase de color, así que hereda el mismo tono que el
 // punto y el chip: un solo color por tipo en todas partes.
 function IconoTipo({ tipo, size = 13, className = "" }) {
@@ -228,7 +232,13 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                   </span>
                 )}
                 {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
-                {del.map(a => (
+                {/* Máximo 3 chips por casilla: un día con seis apuntes no puede estirar su
+                    fila del mes seis veces más alta que las de al lado. Lo que sobra se
+                    resume en "+N más" — el resto está a un clic, abriendo el día (PanelDia
+                    ya enseña la lista entera con sitio, pax y editar). Como "del" ya viene
+                    con los eventos primero (porDia, en apuntes.js), lo que se recorta es
+                    siempre lo menos importante del día (vacaciones, tareas...). */}
+                {del.slice(0, CHIPS_VISIBLES).map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
                     <span className="cal-chip-texto">
@@ -237,6 +247,9 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                     {a.pax ? <span className="cal-chip-pax">{a.pax}</span> : null}
                   </span>
                 ))}
+                {del.length > CHIPS_VISIBLES && (
+                  <span className="cal-chip-mas">+{del.length - CHIPS_VISIBLES} más</span>
+                )}
               </button>
             );
           })}
