@@ -293,6 +293,17 @@
   font-weight: 800;
 }
 
+/* El resumen de lo que no cabe en los CHIPS_VISIBLES chips (Calendario.jsx). Mismo
+   trato que .cal-mas en móvil: no es un botón aparte, toda la casilla ya abre el día
+   al pulsar en cualquier sitio. */
+.cal-chip-mas {
+  display: none; /* de 560px para arriba, junto con los chips */
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  padding: 1px 5px 0;
+}
+
 /* ─── COLOR POR TIPO ──────────────────────────────────────────────────────────
    Cinco tipos de evento y tres capas que NO son eventos (vacaciones, recogidas y días
    cerrados). Los eventos van en colores llenos y las capas en gris o rayado: de un
@@ -635,6 +646,7 @@
     min-height: 92px;
   }
   .cal-chip { display: flex; }
+  .cal-chip-mas { display: block; }
   .cal-puntos { display: none; }
   .cal-numero { font-size: 0.82rem; }
 }
