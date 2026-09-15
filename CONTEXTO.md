@@ -1027,10 +1027,30 @@ tres hallazgos reales, los dos primeros con la misma causa de fondo:
 - Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
   terminar, sin tocar código.
 
+**Nueva pieza planificada, sin código todavía — vista de logística por persona +
+asistente integrado** (`PLAN_LOGISTICA.md`, mismo criterio de siempre: "nada se
+arranca sin mostrarle antes una preview"). El dueño pidió una pantalla para ver/elegir
+a cada persona de logística (ejemplo suyo: alguien conductor, el resto de reparto) y
+pedirle cambios al asistente ahí mismo ("cambia el horario a fulano", "añade tal
+tarea"). Investigado antes de diseñar: hoy no hay un roster de logística como
+concepto propio — `logisticaEquipo` (checklist, por evento, sin desplegable),
+`apunte.personal` (calendario, por apunte) y `EQUIPO` (`calendario/apuntes.js`, el
+único roster persistente, hoy solo nombre+apodos) se pisan a medias sin resolver
+"quién es esta persona en general". Diseño propuesto: `EQUIPO` gana un `rol` opcional
+(se dice una vez, no por evento); pestaña "Personal" nueva en el calendario con
+selector + agenda de esa persona (función pura `apuntesDePersona()`, reutiliza los
+apuntes ya cargados, cero peticiones nuevas); las tareas de una persona usan el
+`tipo: "tarea"` que YA existe (sin colección nueva) rellenando su `personal`; y dos
+tools nuevas del asistente desde el principio (`asignar_tarea_personal`,
+`cambiar_horario_personal`, conector propio, ambas por `onEscribir` como el resto —
+nada de una tool genérica "modifica personal"). No toca `logisticaEquipo` ni
+`personal.js`/`ROLES` (cálculos de coste/plantilla ya en producción). Pendiente de
+que el dueño lo revise y dé el visto bueno antes de tocar código.
+
 **"Ya configurado" mentía en el formulario: decía que el evento estaba listo pero al
-entrar preguntaba todo de cero — HECHO, revierte a propósito una garantía de privacidad
-anterior, requiere revisión del dueño antes de fusionar (regla de `CLAUDE.md`: "AI
-Branches: Human security review required before main merge")**:
+entrar preguntaba todo de cero — HECHO, revisado y aprobado por el dueño antes de
+fusionar (movía a propósito una garantía de privacidad anterior, regla de
+`CLAUDE.md`: "AI Branches: Human security review required before main merge")**:
 
 - **El conflicto que vio el dueño**: en "¿De qué evento son los datos?"
   (`Formulario.jsx`), un evento marcado "Ya configurado" (`sinConfigurar: false` en la
@@ -1076,9 +1096,35 @@ Branches: Human security review required before main merge")**:
   mano no filtra nada. Al lado, un test nuevo demuestra el caso contrario a propósito:
   un evento CON `formularioRespuestas` sí lleva `respuestasPrevias`, filtradas.
 - **Verificación**: `npm run test:rapido` en verde (filtro puro + integración con
-  `resumirParaOficina`); `npm run test` completo antes de fusionar. Dado que esto mueve
-  una frontera de privacidad documentada a propósito, se deja SIN FUSIONAR hasta que el
-  dueño lo revise él mismo (no se auto-fusiona como el resto de PRs de esta sesión).
+  `resumirParaOficina`); `npm run test` completo dos veces (2375 comprobaciones, 0
+  fallidas cada vez) antes de fusionar.
+- **De paso, revisado con el dueño**: el filtro de fecha que ya existía
+  (`resumirParaOficina()` solo incluye eventos con `fecha >= hoy`, máximo 8) acota la
+  exposición al periodo en que el evento sigue por venir — un evento deja de estar en
+  el enlace público en cuanto pasa su fecha, no se queda expuesto para siempre.
+- **El "Ya configurado" pasó de gris a verde con su ✓, para cualquier evento
+  configurado** — antes ese verde (`es-enviado`, `mios.js`) solo se veía desde el móvil
+  que había mandado el envío; con varias personas usando el mismo formulario, el resto
+  veía el mismo evento en gris sin saber si ya estaba resuelto o no.
+
+**Auditoría a fondo del formulario, pedida por el dueño ("que configure bien la
+checklist")** — con cita exacta fichero:línea, sin tocar código todavía:
+- **Orden**: `buffets` mueve un número real (`numMesasBuffet`) pero vive en "Cierre"
+  en vez de junto a `extras`, su pariente de patrón. `tarta` vive en el bloque de "lo
+  que genera una recogida" (flores/minutas) pero no genera ninguna.
+- **Duplicación real**: `barril30`/`barril50` (dentro de `extras`, de marcar-varios)
+  comparten el mismo `campoNumero` — marcar los dos descarta en silencio el número de
+  uno de ellos.
+- **Huérfanas / datos que faltan**: `numBarras` se pregunta en cumpleaños pero
+  cumpleaños no calcula "Mesa alta". Peor: **`entrante`, `armarioCaliente` y todo el
+  bloque `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en
+  producción, pero `buildChecklistProduccion` SÍ usa esos datos** — un rodaje no puede
+  configurar bien su propia checklist en estas tres cosas desde el formulario.
+- **Dependencias `si:`**: sin hallazgos, las 8 condicionales del fichero están todas
+  bien ordenadas.
+- Pendiente: arreglar orden + bug de barriles + `numBarras` huérfano (seguro, sin
+  decisión de producto); añadir las preguntas que faltan a producción es una laguna
+  real pero más grande, a decidir con el dueño antes de tocarla.
 
 **Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
 caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
