@@ -1412,6 +1412,31 @@ cuenta con cada chip.
   360/1280/1920px: la casilla cargada ya no desborda su fila, se ve "+2 más" y el
   resto de casillas de la semana quedan a la misma altura.
 
+**Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
+por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
+otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba
+CAMPO a campo contra el `baseline` (PR previo, ver más abajo), pero `checkeados` /
+`preparados` / `vueltos` / `roturas` / `marcasRevisar` / `notasCheck` son cada uno
+UN SOLO campo con las marcas de TODOS los items (`{"categoría::item": true, ...}`).
+Con dos personas marcando ítems DISTINTOS del mismo camión casi a la vez, las dos
+tocan ese mismo campo — así que se subía la copia entera del mapa de quien guardara,
+que todavía no sabía nada de la marca de la otra persona, y se la comía.
+- La fusión ahora entra una clave más adentro para cualquier campo que sea un objeto
+  plano (no un array: mezclar por índice no tiene sentido ahí): solo se sube encima
+  la clave-item que ESTE aparato cambió de verdad (comparada contra su propio
+  `baseline`); el resto de items —los que pueda haber marcado otra persona mientras
+  tanto— se quedan tal cual están en el servidor. Dos personas marcando el MISMO
+  item a la vez siguen resolviéndose "gana el último" (no hay forma de saber cuál es
+  la verdad), pero ya no se lleva por delante los items de los demás.
+- Nueva función `fusionaCampo()` en `nube.js`, usada automáticamente para cualquier
+  campo con esa forma — no hace falta listar `checkeados`/`preparados`/etc. a mano,
+  así que un campo nuevo del mismo tipo queda protegido sin tocar este fichero otra
+  vez.
+- Test nuevo en `sincronizacion.test.mjs` ("Modo carga: varios marcando items
+  DISTINTOS del mismo camión"): dos marcas distintas no se pisan, desmarcar tampoco
+  arrastra a los demás, y el mismo item a la vez sigue resolviéndose por orden de
+  llegada sin tocar el resto.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").
