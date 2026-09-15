@@ -1437,6 +1437,53 @@ que todavía no sabía nada de la marca de la otra persona, y se la comía.
   arrastra a los demás, y el mismo item a la vez sigue resolviéndose por orden de
   llegada sin tocar el resto.
 
+**Auditoría a fondo de cálculos automáticos: 7 bugs reales cazados — HECHO**: pedida
+por el dueño ("algunas cosas no las está calculando bien"), sin tocar nada hasta
+confirmar cada hallazgo con un caso numérico concreto. Dos pasadas de solo lectura
+(generadores de checklist + `calculos.js`; formulario + tiempos/personal/precios) y
+tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
+- **Montaje se dividía por la gente de logística** (`tiempos-carga.js`), en contra de
+  su propio comentario ("tiempo de todo el equipo, no se divide"): pasaba por la
+  misma `reparte()` que carga/descarga. Con poca gente de logística salía disparado
+  (3h31 con 1 persona, 1h47 con 3, para el mismo evento). Ahora se calcula aparte,
+  sin dividir.
+- **Corporativo con tarta no cargaba la mesa** (`checklist-generadores.js`): boda,
+  comunión y cumpleaños sí generaban su línea de mesa; corporativo cargaba pala y
+  cuchillo (sin condición de tipo) pero nunca la mesa donde ponerla, aunque el
+  formulario pregunta por la tarta en los cuatro tipos desde siempre.
+- **Cumpleaños: "Descansadores de paella" fijo en 2**, sin mirar cuántas paelleras
+  había de verdad (boda sí escalaba). Con muchas paelleras a la vez faltaban
+  soportes.
+- **Producción: "Trípode" fijo en 1** (+ frituras), cuando debía escalar con el nº de
+  paelleras igual que "Paravientos", calculado justo al lado con la misma cuenta.
+- **`personasPorPlatoEntrante` sin valor por defecto** en los tres generadores puros:
+  llamado sin pasar por el `useState` de App.jsx (p.ej. al recalibrar un evento
+  guardado sin ese campo) daba "cada undefined pax" en vez de caer al mismo 4 de la
+  UI. Añadido `= 4` en el destructuring de `opts`, igual que ya hacía la interfaz.
+- **Producción de varios días: los vasos del personal no se multiplicaban por
+  `nDias`**, mientras que el agua de la misma gente sí. Un rodaje de 3 días se
+  quedaba con los vasos desechables de uno solo.
+- **"Agua con gas" y "Cerveza 0,0" no se pedían en cajas de 24** pese a que su propio
+  comentario lo decía ("cajas de 24, 1 caja mínimo real") — salían como botellas
+  sueltas sin redondear ni tener suelo. La Cerveza 0,0 además ignoraba las horas de
+  barra libre, a diferencia de la cerveza con alcohol de al lado (media hora de
+  cóctel pedía lo mismo que una barra libre entera). Las dos ahora redondean a caja
+  de 24 con mínimo de una, y la 0,0 ya responde a las horas de barra como su hermana
+  con alcohol (la temporada se deja fuera a propósito: no hay dato real que diga que
+  el 0,0 se beba distinto en verano).
+- Confirmado con el dueño y dejado tal cual, tras revisar el porqué: el ratio de
+  logística SÍ debe escalar con pax (2 en 100, 3 en 150, 4 en 300) — solo se corrigió
+  el comentario de cabecera, que se había quedado con la versión vieja ("2 siempre").
+- Revisado y descartado como bug (documentado a propósito, con test que lo prueba):
+  el redondeo simétrico de la cerveza normal a cajas de 24 (`Math.round`, no
+  `Math.ceil` — ±12 tercios de margen aceptado); los ratios de personal de los tres
+  generadores; `conMargen()`; las fórmulas de champaneras/alturas de buffet/mesas
+  altas/calientes.
+- Test nuevo en `calculos.test.mjs` ("Auditoría de cálculos: 6 bugs reales cazados
+  sin llegar a un evento"): uno por hallazgo, cada uno con el caso numérico que lo
+  demuestra.
+- Verificación: `npm run test` completo antes de fusionar.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").

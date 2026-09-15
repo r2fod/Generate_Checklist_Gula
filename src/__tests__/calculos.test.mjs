@@ -37,6 +37,7 @@ import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
   esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
+import { estimarTiemposCarga } from "../tiempos-carga.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
@@ -2864,6 +2865,98 @@ console.log("\n══ Mesas calientes y taxis de hielo, como funciones sueltas �
   ok(taxisDeHielo(24) === 1 && taxisDeHielo(25) === 2,
     `24kg entran en 1 taxi, 25kg ya piden 2 (${taxisDeHielo(24)}, ${taxisDeHielo(25)})`);
   ok(taxisDeHielo(0) === 1, "sin kg, el mínimo sigue siendo 1 taxi, no 0");
+}
+
+console.log("\n══ Auditoría de cálculos: 6 bugs reales cazados sin llegar a un evento ══");
+{
+  // El dueño pidió una revisión a fondo de los cálculos automáticos sin tocar nada
+  // hasta confirmar cada hallazgo. Estos seis venían de fórmulas que no hacían lo que
+  // su propio comentario decía, o que no seguían el mismo patrón que su fórmula
+  // hermana en el fichero de al lado.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return it[1];
+    }
+    return null;
+  };
+  // Como cantidadItem pero para las líneas envueltas en conSufijo() ({u, sufijo}),
+  // como los packs de vasos: devuelve el número puro, no el objeto.
+  const unidadesItem = (cats, label) => {
+    const v = cantidadItem(cats, label);
+    return v && typeof v === "object" ? v.u : parseInt(v, 10);
+  };
+
+  // 1) Montaje es tiempo de TODO el equipo (camareros y cocina incluidos), no solo de
+  // logística — lo dice el propio comentario de tiempos-carga.js. Pasaba por la misma
+  // reparte() que carga/descarga, así que con poca gente de logística se disparaba.
+  const conUnaPersona = estimarTiemposCarga({ totalItems: 140, pax: 100, numLogistica: 1, horasJornada: 0 });
+  const conTresPersonas = estimarTiemposCarga({ totalItems: 140, pax: 100, numLogistica: 3, horasJornada: 0 });
+  ok(conUnaPersona.montajeMin === conTresPersonas.montajeMin,
+    `el montaje no cambia con el nº de logística, es tiempo de todo el equipo (1 persona: ${conUnaPersona.montajeMin}min, 3 personas: ${conTresPersonas.montajeMin}min)`);
+  ok(conUnaPersona.cargaMin > conTresPersonas.cargaMin,
+    "la carga SÍ se reparte entre la gente de logística, eso no cambia");
+
+  // 2) Un corporativo con tarta cargaba pala y cuchillo pero nunca la mesa: la
+  // pregunta del formulario incluye "corporativo" desde siempre, el generador no.
+  const corpConTarta = buildChecklist("corporativo", 80, 2, 4, 0, { llevaTarta: true });
+  ok(cantidadItem(corpConTarta, "Pala de tarta") === "1" && cantidadItem(corpConTarta, "Cuchillo de tarta") === "1",
+    "un corporativo con tarta ya cargaba pala y cuchillo");
+  ok(cantidadItem(corpConTarta, "Mesa redonda (tarta corporativo)") === "1",
+    "y ahora también carga la mesa donde ponerla, como boda/comunión/cumpleaños");
+
+  // 3) Cumpleaños: "Descansadores de paella" salía fijo en 2 sin mirar cuántas
+  // paelleras había de verdad — con muchas paelleras a la vez, faltaban soportes.
+  const nPaellasGrande = calcPaella(210, "Auto", 0, "cumpleanos").n;
+  ok(nPaellasGrande > 2, `hace falta un cumpleaños con más de 2 paelleras para que el bug se note (aquí: ${nPaellasGrande})`);
+  const cumpleConPaella = buildChecklist("cumpleanos", 210, 0, 0, 0, { llevaPaella: true });
+  ok(cantidadItem(cumpleConPaella, "Descansadores de paella") === String(nPaellasGrande),
+    `los descansadores escalan con el nº de paelleras, como en boda (${cantidadItem(cumpleConPaella, "Descansadores de paella")} para ${nPaellasGrande} paelleras)`);
+
+  // 4) Producción: "Trípode" salía fijo en 1 (+ frituras), cuando debía escalar con
+  // el nº de paelleras igual que "Paravientos", calculado justo al lado con la misma
+  // cuenta y que sí estaba bien.
+  const prodConPaella = buildChecklist("produccion", 100, 0, 0, 0, { llevaPaella: true });
+  const nPaellasProd = calcPaella(100, "Auto", 0, "produccion").n;
+  ok(nPaellasProd > 1, `hace falta un rodaje con más de 1 paellera para que el bug se note (aquí: ${nPaellasProd})`);
+  ok(cantidadItem(prodConPaella, "Trípode") === String(nPaellasProd)
+    && cantidadItem(prodConPaella, "Paravientos") === String(nPaellasProd),
+    `el trípode escala con el nº de paelleras, igual que ya hacían los paravientos (${cantidadItem(prodConPaella, "Trípode")} para ${nPaellasProd} paelleras)`);
+
+  // 5) personasPorPlatoEntrante sin valor por defecto en el generador puro: llamado
+  // sin pasar por el useState de App.jsx (p.ej. al recalibrar un evento guardado sin
+  // ese campo) daba "cada undefined pax" en vez de caer al mismo 4 de la UI.
+  const sinCampoAlDia = buildChecklist("boda", 100, 2, 4, 0, { entranteCompartido: true, llevaEntrante: true });
+  const sufijoEntrante = cantidadItem(sinCampoAlDia, "Platos extra entrante");
+  ok(sufijoEntrante && sufijoEntrante.sufijo && !/undefined/.test(sufijoEntrante.sufijo),
+    `sin personasPorPlatoEntrante, cae al 4 por defecto en vez de "undefined pax": ${JSON.stringify(sufijoEntrante)}`);
+
+  // 6) Producción de varios días: los vasos desechables del personal se calculaban
+  // UNA vez para todo el rodaje, mientras que el agua de la misma gente ya se
+  // multiplicaba por jornada — un rodaje de 3 días se quedaba con los vasos de uno.
+  const unDia = buildChecklist("produccion", 40, 0, 0, 0, { diasProduccion: ["40"] });
+  const tresDias = buildChecklist("produccion", 40, 0, 0, 0, { diasProduccion: ["40", "40", "40"] });
+  const vasosUnDia = unidadesItem(unDia, "Vasos de plástico (personal)");
+  const vasosTresDias = unidadesItem(tresDias, "Vasos de plástico (personal)");
+  ok(vasosTresDias === vasosUnDia * 3,
+    `los vasos de plástico del personal se multiplican por los días de rodaje, como el agua (1 día: ${vasosUnDia}, 3 días: ${vasosTresDias})`);
+  const cafeUnDia = unidadesItem(unDia, "Vasos de cartón café mini (personal)");
+  const cafeTresDias = unidadesItem(tresDias, "Vasos de cartón café mini (personal)");
+  ok(cafeTresDias === cafeUnDia * 3, "y lo mismo con los vasos de café del personal");
+
+  // 7) "Agua con gas" y "Cerveza 0,0": su propio comentario decía "se piden en cajas
+  // de 24 (1 caja mínimo real)", pero el número que salía eran botellas sueltas sin
+  // redondear a caja ni tener suelo. La cerveza 0,0 además ignoraba las horas de
+  // barra, a diferencia de la cerveza con alcohol de al lado.
+  const b = calcBebidas(20, 2, true, false);
+  ok(b.aguaConGas % 24 === 0 && b.aguaConGas >= 24,
+    `agua con gas sale en cajas de 24 completas, con un mínimo de una caja (evento pequeño: ${b.aguaConGas})`);
+  ok(b.cerveza00 % 24 === 0 && b.cerveza00 >= 24,
+    `cerveza 0,0 también, mismo criterio (${b.cerveza00})`);
+  const cerveza00ConBarra = calcBebidas(100, 4, true, false).cerveza00;
+  const cerveza00MediaHora = calcBebidas(100, 0.5, true, false).cerveza00;
+  ok(cerveza00ConBarra > cerveza00MediaHora,
+    `la cerveza 0,0 ya responde a las horas de barra libre, como la cerveza normal (4h: ${cerveza00ConBarra}, media hora: ${cerveza00MediaHora})`);
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

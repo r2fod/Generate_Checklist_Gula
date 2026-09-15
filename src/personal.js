@@ -88,9 +88,9 @@ function cocinaNecesaria(pax) {
   return Math.max(5, Math.ceil(pax / 55));
 }
 
-// Logística es el número más estable de toda la hoja: 2 personas en casi todo, sea de
-// 40 o de 150 pax, y 1 en lo pequeño. No escala con los comensales porque no depende de
-// ellos, sino del camión: cargarlo y descargarlo cuesta lo mismo con 60 que con 140.
+// Logística es de los números más estables de la hoja: 2 personas en casi todo, sea de
+// 40 o de 100 pax, y 1 en lo pequeño — no depende tanto de los comensales como del
+// camión. Pero SÍ sube, despacio, en lo grande: ver el porqué en el return de abajo.
 function logisticaNecesaria(pax) {
   if (pax <= 0) return 0;
   if (pax <= 30) return 1;
