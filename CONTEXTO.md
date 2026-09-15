@@ -1008,20 +1008,18 @@ tres hallazgos reales, los dos primeros con la misma causa de fondo:
    líneas) y a 375px cabe entero, pero a 320px el texto seguía necesitando algo
    más de 2 líneas y se cortaba justo antes de la hora y el sitio. Arreglado con
    `-webkit-line-clamp:3` solo por debajo de 340px (a partir de 375px sigue en 2).
-3. **PENDIENTE, necesita decisión del dueño — Modo carga tapa el primer ítem con
-   su propia cabecera a 320px (78% de una pantalla de móvil real, 844px, antes de
-   ver el primer checkbox)**. Ya se había medido y arreglado esto una vez
-   (compactar los cronómetros a una línea, documentado en `.carga-modal` en
-   `index.css`), pero la tarjeta "Escaleta del día" (añadida después de aquella
-   medición) se suma al título + contador + barra de progreso + tiempos estimados
-   + los cronómetros de Salida, y entre todos vuelven a tapar la lista — peor que
-   antes de aquel arreglo. La escaleta YA está plegada por defecto
-   (`Escaleta.jsx`, `useState(false)`), así que no es "una cosa más sin plegar":
-   es que hay demasiadas cosas plegadas-pero-visibles apiladas antes de la lista.
-   Arreglarlo bien significa decidir QUÉ información deja de verse por defecto en
-   la pantalla que usa quien está cargando el camión en vivo — una decisión de
-   producto, no un bug de CSS suelto. Se deja sin tocar hasta hablarlo con el
-   dueño.
+3. **PARCIAL — Modo carga tapaba el primer ítem con su propia cabecera a 320px
+   (78% de una pantalla de móvil real, 844px, antes de ver el primer checkbox)**.
+   La Escaleta ya se plegaba por defecto (`Escaleta.jsx`, `useState(false)`); el
+   bloque "Tiempos estimados" (Prep/Carga/Descarga/Montaje/Total) NO — siempre
+   visible en un bloque de 2 líneas. Plegado ahora con el mismo patrón
+   (`cal-ratios`/`cal-ratios-cab`, mismo componente que ya usa la Escaleta): el
+   total se ve en la cabecera colapsada, el desglose solo si se despliega. Medido:
+   baja de 78% a 76% — mejora real pero pequeña, porque el verdadero peso son los
+   DOS cronómetros grandes (Carga/Montaje), y esos no se plegaron a propósito: son
+   la razón de estar en Modo carga (el número legible mientras se trabaja).
+   Comprimirlos más es otra decisión de producto (¿número más pequeño para ganar
+   alto?), pendiente de hablarlo con el dueño si quiere ir más allá de esto.
 - Test nuevo en `app.test.mjs` para los dos hechos: contador/flecha de TODAS las
   categorías visible a 320px, y el subtítulo con hora+sitio incluidos.
 - Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al

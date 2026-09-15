@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
-  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag,
+  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag, ChevronDown,
 } from "lucide-react";
 import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
 import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from "../checklist-format.js";
@@ -197,6 +197,11 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   );
   const [modo, setModo] = useState("salida"); // preparacion | salida | vuelta
   const [verResumen, setVerResumen] = useState(false);
+  // Plegado por defecto, mismo criterio que la Escaleta: a 320px el título + contador +
+  // barra + esto + escaleta + cronómetros tapaban el primer ítem casi entero (~78% de
+  // pantalla antes de ver la primera casilla). Quien está cargando en vivo no necesita
+  // el desglose, solo el total; quien lo necesita, lo despliega.
+  const [tiemposAbierto, setTiemposAbierto] = useState(false);
   const [precios, setPrecios] = useState(() => leerPrecios());
   const [editandoPrecios, setEditandoPrecios] = useState(false);
   const totalItems = checklist.reduce((acc, c) => acc + c.items.length, 0);
@@ -509,29 +514,42 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
             ))}
             <div className="carga-progreso"><div className="carga-progreso-fill" style={{ width: `${pct}%` }} /></div>
             {totalItems > 0 && (
-              <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.\nMontaje in situ (todo el equipo) = 45 + pax × 1,1 + ítems × 0,4.`}>
-                <Clock size={13} />
-                <span><strong>Prep</strong> ~{fmtMin(prepMin)}</span>
-                <span className="carga-tiempos-sep">·</span>
-                <span><strong>Carga</strong> ~{fmtMin(cargaMin)}</span>
-                <span className="carga-tiempos-sep">·</span>
-                <span><strong>Descarga</strong> ~{fmtMin(descargaMin)}{fatiga > 0 ? " ⚠️" : ""}</span>
-                <span className="carga-tiempos-sep">·</span>
-                <span><strong>Montaje</strong> ~{fmtMin(montajeMin)}</span>
-                <span className="carga-tiempos-sep">·</span>
-                <span className="carga-tiempos-total"><strong>Total</strong> ~{fmtMin(totalMin)}</span>
-                <span className="carga-tiempos-nota">
-                  ({numLogistica} logística{meta.logisticaReal ? "" : ", estimado"})
-                  {/* Si ya hay eventos cronometrados, el ajuste que se está aplicando se
-                      dice en voz alta: nada de corregir los tiempos por detrás. */}
-                  {meta.calibracion && (
-                    <span className="carga-calibrado" title="Los tiempos estimados están ajustados con los cronómetros de tus eventos anteriores">
-                      · ajustado con {meta.calibracion.nMedidos} eventos medidos
-                      {FASES_TIEMPO.filter(f => meta.calibracion.factores[f]).map(f =>
-                        ` · ${f} ×${meta.calibracion.factores[f].toFixed(2).replace(".", ",")}`).join("")}
-                    </span>
-                  )}
-                </span>
+              <div className="cal-ratios">
+                <button
+                  type="button"
+                  className="cal-ratios-cab"
+                  aria-expanded={tiemposAbierto}
+                  onClick={() => setTiemposAbierto(v => !v)}
+                >
+                  <Clock size={13} aria-hidden="true" />
+                  <span className="cal-ratios-titulo">
+                    Tiempos estimados
+                    <em> · Total ~{fmtMin(totalMin)} ({numLogistica} logística{meta.logisticaReal ? "" : ", estimado"})</em>
+                  </span>
+                  <ChevronDown size={16} aria-hidden="true" className={`cal-ratios-flecha${tiemposAbierto ? " es-abierta" : ""}`} />
+                </button>
+                {tiemposAbierto && (
+                  <div className="cal-ratios-cuerpo">
+                    <div className="carga-tiempos" title={`Estimado a partir de ${totalItems} ítems y ${numLogistica} de logística${meta.logisticaReal ? " (del Equipo de logística)" : " (1 cada 60 pax)"}.\nPreparación = (30 + pax × 1 + ítems × 0,5) ÷ logística.\nCarga = (20 + ítems × 1,5) ÷ logística.\nDescarga ≈ 60% de la carga${fatiga > 0 ? ` +${Math.round(fatiga * 100)}% por fatiga (jornada de ${String(horasJornada).replace(".", ",")}h)` : ""}.\nMontaje in situ (todo el equipo) = 45 + pax × 1,1 + ítems × 0,4.`}>
+                      <span><strong>Prep</strong> ~{fmtMin(prepMin)}</span>
+                      <span className="carga-tiempos-sep">·</span>
+                      <span><strong>Carga</strong> ~{fmtMin(cargaMin)}</span>
+                      <span className="carga-tiempos-sep">·</span>
+                      <span><strong>Descarga</strong> ~{fmtMin(descargaMin)}{fatiga > 0 ? " ⚠️" : ""}</span>
+                      <span className="carga-tiempos-sep">·</span>
+                      <span><strong>Montaje</strong> ~{fmtMin(montajeMin)}</span>
+                      {/* Si ya hay eventos cronometrados, el ajuste que se está aplicando se
+                          dice en voz alta: nada de corregir los tiempos por detrás. */}
+                      {meta.calibracion && (
+                        <span className="carga-calibrado" title="Los tiempos estimados están ajustados con los cronómetros de tus eventos anteriores">
+                          · ajustado con {meta.calibracion.nMedidos} eventos medidos
+                          {FASES_TIEMPO.filter(f => meta.calibracion.factores[f]).map(f =>
+                            ` · ${f} ×${meta.calibracion.factores[f].toFixed(2).replace(".", ",")}`).join("")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* Debajo de los tiempos estimados porque sale de ellos: primero cuánto se
