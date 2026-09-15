@@ -40,7 +40,14 @@ export function estimarTiemposCarga({ totalItems = 0, pax = 0, numLogistica = 1,
   // La recogida va más rápida que la carga (todo va a granel a las cajas), pero lleva
   // recargo por fatiga: es lo último de una jornada larga.
   const descargaMin = Math.round(cargaMin * DESCARGA_FACTOR * (1 + fatiga) * (f("descarga") / f("carga")));
-  const montajeMin = totalItems > 0 ? reparte(MONTAJE_BASE_MIN, pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM * vol, "montaje") : 0;
+  // Montaje NO pasa por reparte(): esa entra dividiendo entre nEf, y el montaje es de
+  // TODO el equipo (camareros y cocina incluidos), no solo de logística — es justo lo
+  // que dice el comentario de cabecera. Pasaba por reparte() igual que carga/descarga,
+  // así que con poca gente de logística el montaje salía disparado (3h30 con 1 persona
+  // en un evento donde el resto del equipo también está montando).
+  const montajeMin = totalItems > 0
+    ? Math.round((MONTAJE_BASE_MIN + pax * MONTAJE_MIN_POR_PAX + totalItems * MONTAJE_MIN_POR_ITEM * vol) * f("montaje"))
+    : 0;
   return { prepMin, cargaMin, descargaMin, montajeMin, fatiga, totalMin: prepMin + cargaMin + descargaMin + montajeMin };
 }
 

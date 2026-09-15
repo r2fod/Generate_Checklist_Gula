@@ -342,9 +342,17 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
     aquarius:     Math.round(refrescoTotal * 0.05),
     sprite:     Math.round(refrescoTotal * 0.05),
     nestea:     Math.round(refrescoTotal * 0.025),
-    // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real)
-    aguaConGas: Math.round(pax * 0.37),
-    cerveza00:  Math.round(alcoholPax * 0.37),
+    // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real):
+    // el comentario ya lo decía, pero el número que salía era de botellas sueltas, sin
+    // redondear a caja ni tener suelo — así que un evento pequeño podía pedir "3
+    // botellas de agua con gas", que no es lo que se compra ni lo que se manda.
+    aguaConGas: Math.max(24, Math.round((pax * 0.37) / 24) * 24),
+    // Cerveza 0,0: misma bebida que la de arriba, en la misma barra, pero con un ratio
+    // fijo que no miraba ni las horas de barra ni el suelo de 2h — media hora de
+    // cóctel pedía lo mismo que una barra libre entera. Mismo Math.min(1, barFactor)
+    // que la cerveza con alcohol (la temporada se deja fuera a propósito: no hay dato
+    // real de que el 0,0 se beba distinto en verano, solo de que dependa de las horas).
+    cerveza00: Math.max(24, Math.round((alcoholPax * 0.37 * Math.min(1, barFactor)) / 24) * 24),
     sinGluten:  Math.round(alcoholPax * 0.3),
     taxisHielo, hieloKg: hielo.kg, hieloBolsas: hielo.bolsas,
   };

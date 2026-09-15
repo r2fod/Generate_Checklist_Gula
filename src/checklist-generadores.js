@@ -239,7 +239,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     llevaChillOut, numChillOut = 1,
     llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados = true, llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
-    personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    // = 4, mismo valor por defecto que el useState de App.jsx: sin esto, un generador
+    // llamado sin pasar por ahí (ej. la recalibración en calibracion.js, con un evento
+    // guardado que no trajera este campo) dividía entre "undefined" y daba NaN.
+    personasPorPlatoEntrante = 4, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaHielo = true, tipoPaella, numPaellas = 0, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
@@ -370,6 +373,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esComunion, ["Candy bar / mesa dulce", "—"]),
     opt(esComunion, ["Photocall / atrezzo", "—"]),
     // Propio de Evento corporativo
+    // La pregunta de tarta (preguntas.js) se hace en los cuatro tipos, pero esta mesa
+    // solo se generaba en boda/comunión/cumpleaños: un corporativo con tarta cargaba
+    // la pala y el cuchillo (más abajo, sin condición de tipo) pero nunca la mesa.
+    opt(esCorporativo && llevaTarta, ["Mesa redonda (tarta corporativo)", "1"]),
     opt(esCorporativo, ["Señalética / cartelería con logo", "—"]),
     opt(esCorporativo, ["Porta-nombres / acreditaciones", "—"]),
     opt(esCorporativo, ["Atril + micrófono", "—"]),
@@ -557,7 +564,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera, cafeParaInvitados = true,
     tamanoBarril = "No lleva", numBarriles = 1,
-    llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
+    llevaJamonero, personasPorPlatoEntrante = 4, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
@@ -639,7 +646,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   if (llevaPaella) {
     const p = calcPaella(pax, tipoPaella, numPaellas, "cumpleanos");
     // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode", String(p.n + numFritura)]);
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", String(p.n)], ["Trípode", String(p.n + numFritura)]);
   }
   if (tieneFrituras) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)], ["Paravientos", "1"]);
@@ -768,7 +775,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     llevaPaella, tieneFrituras, numFrituras, tipoCafetera, cafeParaInvitados = true, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos, numPlanchasGas = 1,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
-    soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    soloBandeja, personasPorPlatoEntrante = 4, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
     tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
@@ -907,7 +914,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     const p = calcPaella(pax, tipoPaella, numPaellas, "produccion");
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
   }
-  paellaItems.push(["Trípode", String(1 + numFritura)]);
+  paellaItems.push(["Trípode", String(numPaellaProd + numFritura)]);
   if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
   if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)]);
   // En producción la plancha de gas va fija, pero puede ir más de una: cada una lleva
@@ -1009,9 +1016,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // Antes salía 1 solo paquete para 25 pax, que son 2 vasos por persona en toda la
     // jornada.
     ["Vasos de cartón (L/M/S)", conSufijo(Math.max(2, Math.ceil(paxConsumo * (4 + (hayDesayuno ? 1.2 : 0)) / 50)), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
-    // Los vasos del personal van aquí, con el resto de vasos, y no en Limpieza
-    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
-    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
+    // Los vasos del personal van aquí, con el resto de vasos, y no en Limpieza. ×nDias
+    // como el agua de la misma gente (líneas de abajo): un rodaje de varios días gasta
+    // vasos desechables cada jornada, no una sola vez para todo el rodaje.
+    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks * nDias, "packs (50 uds)")],
+    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks * nDias, "packs (50 uds)")],
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
     // en cada bebida por separado en vez de en dos líneas combinadas.
     // El rodaje no pasa por calcBebidas (no hay barra ni alcohol), así que su factor de
