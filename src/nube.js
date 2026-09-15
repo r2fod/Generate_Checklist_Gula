@@ -66,10 +66,42 @@ export function nuevoIdEvento(largo = 8) {
 // vez o aplicar un formulario) se compara contra el propio servidor: sigue siendo un
 // guardado de "gana el último", igual que antes, pero ya no peor que antes.
 //
+// PERO campo a campo no basta para Modo carga: `checkeados`, `preparados`, `vueltos`,
+// `roturas`, `marcasRevisar` y `notasCheck` son cada uno UN SOLO campo que guarda las
+// marcas de TODOS los items ({ "categoría::item": true, ... }). Con dos personas
+// marcando casillas DISTINTAS del mismo camión casi a la vez, las dos cambian ese
+// mismo campo (aunque en items distintos), así que el `if` de arriba lo trataba como
+// "este aparato lo ha tocado" y subía su copia entera del mapa — que todavía no sabía
+// nada de la marca de la otra persona, y la borraba. Ese era justo el bug: "se les
+// desmarca a otros".
+//
+// Por eso estos campos (cualquier valor que sea un objeto plano, no un array: un
+// array es una lista con orden/posición, mezclarlo por índice no tiene sentido) se
+// fusionan una clave más adentro: solo se sube encima la clave-item que este aparato
+// ha cambiado de verdad (comparada contra su propio baseline), y el resto de items
+// —los que puedan haber marcado otras personas mientras tanto— se quedan tal cual
+// están en el servidor. Si dos personas marcan EL MISMO item casi a la vez, ahí sí
+// gana el último en escribir (no hay forma de saber cuál es "la verdad"), pero ya no
+// se lleva por delante los items que nadie más ha tocado.
+//
 // Devuelve { actualizado, fusion }: la marca de tiempo (para reconocer el propio eco
 // al volver por la suscripción) y el estado tal como ha quedado de verdad en el
 // servidor — puede traer campos que este aparato no tenía, si alguien cambió algo
 // que este aparato no tocó mientras tanto.
+const esMapaPlano = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+function fusionaCampo(local, antes, enServidor) {
+  const combinadoSub = { ...(enServidor || {}) };
+  const antesObj = antes || {};
+  const subclaves = new Set([...Object.keys(local), ...Object.keys(antesObj)]);
+  subclaves.forEach((sk) => {
+    if (JSON.stringify(local[sk]) === JSON.stringify(antesObj[sk])) return; // este aparato no ha tocado este item
+    if (local[sk] === undefined) delete combinadoSub[sk];
+    else combinadoSub[sk] = local[sk];
+  });
+  return combinadoSub;
+}
+
 export async function guardarEventoNube(id, estado, baseline = null) {
   const conexion = await getDb();
   if (!conexion) return null;
@@ -82,7 +114,13 @@ export async function guardarEventoNube(id, estado, baseline = null) {
     const base = baseline || servidor;
     const combinado = { ...servidor };
     Object.keys(estado).forEach((clave) => {
-      if (JSON.stringify(estado[clave]) !== JSON.stringify(base[clave])) combinado[clave] = estado[clave];
+      const local = estado[clave];
+      const antes = base[clave];
+      if (JSON.stringify(local) === JSON.stringify(antes)) return;
+      const enServidor = servidor[clave];
+      combinado[clave] = (esMapaPlano(local) && (antes === undefined || esMapaPlano(antes)) && (enServidor === undefined || esMapaPlano(enServidor)))
+        ? fusionaCampo(local, antes, enServidor)
+        : local;
     });
     tx.set(ref, { estado: JSON.stringify(combinado), actualizado });
     return combinado;

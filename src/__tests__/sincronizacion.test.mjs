@@ -157,6 +157,60 @@ console.log('\n══ El evento compartido: dos personas guardando casi a la vez
     'mismo campo, misma base: gana el último en escribir, pero solo ahí — lo demás no se toca');
 }
 
+// ── Modo carga: dos personas marcando casillas DISTINTAS del mismo camión ────────
+// El bug real (reportado por el dueño): con varios marcando en Modo carga a la vez,
+// a unos se les desmarcaba lo que acababan de marcar otros. `checkeados` (y
+// preparados/vueltos/roturas/marcasRevisar/notasCheck) es UN SOLO campo con las
+// marcas de TODOS los items ({ "categoría::item": true }), así que el merge
+// campo-a-campo de arriba no bastaba: las dos personas tocan ese mismo campo, y
+// aunque en items distintos, se trataba como "lo ha cambiado este aparato" y subía
+// su copia entera del mapa — todavía sin la marca de la otra persona.
+console.log('\n══ Modo carga: varios marcando items DISTINTOS del mismo camión ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const id = 'evt_carga';
+  const base = { pax: 100, checkeados: { 'Bebida::Copas de vino': true }, preparados: {}, vueltos: {}, roturas: {} };
+
+  const primero = await N.guardarEventoNube(id, base);
+  const baseline = primero.fusion;
+
+  // A marca "Vasos" y B marca "Jarras", casi a la vez, los dos partiendo de la MISMA
+  // base — ninguno sabe todavía lo que ha marcado el otro.
+  const localA = { ...baseline, checkeados: { ...baseline.checkeados, 'Cocina::Vasos': true } };
+  const localB = { ...baseline, checkeados: { ...baseline.checkeados, 'Cocina::Jarras': true } };
+
+  const rA = await N.guardarEventoNube(id, localA, baseline);
+  ok(rA.fusion.checkeados['Cocina::Vasos'] === true && rA.fusion.checkeados['Bebida::Copas de vino'] === true,
+    'A guarda su marca sin perder lo que ya había');
+
+  const rB = await N.guardarEventoNube(id, localB, baseline);
+  ok(rB.fusion.checkeados['Cocina::Jarras'] === true,
+    'B guarda su propia marca');
+  ok(rB.fusion.checkeados['Cocina::Vasos'] === true,
+    `B NO le borra a A lo que acaba de marcar, aunque B ni sabía que existía: ${JSON.stringify(rB.fusion.checkeados)}`);
+
+  const final = JSON.parse(almacen.get(`eventos/${id}`).estado);
+  ok(final.checkeados['Cocina::Vasos'] === true && final.checkeados['Cocina::Jarras'] === true
+    && final.checkeados['Bebida::Copas de vino'] === true,
+    `en el documento final están las marcas de los dos, nadie ha perdido la suya: ${JSON.stringify(final.checkeados)}`);
+
+  // Desmarcar también cuenta como "lo he tocado" (false es un valor real, no ausencia)
+  const baseline2 = rB.fusion;
+  const localC = { ...baseline2, checkeados: { ...baseline2.checkeados, 'Cocina::Vasos': false } };
+  const rC = await N.guardarEventoNube(id, localC, baseline2);
+  ok(rC.fusion.checkeados['Cocina::Vasos'] === false && rC.fusion.checkeados['Cocina::Jarras'] === true,
+    'desmarcar un item tampoco toca las marcas de los demás');
+
+  // El mismo item, dos personas a la vez (aquí, las roturas del mismo item: cada una
+  // cuenta un número distinto sin saber de la otra): ahí sí gana el último — no hay
+  // forma de saber cuál de los dos es "la verdad" — pero solo en ESE item.
+  const baseline3 = rC.fusion;
+  await N.guardarEventoNube(id, { ...baseline3, roturas: { ...baseline3.roturas, 'Cocina::Vasos': '2' } }, baseline3);
+  const rMismoItem = await N.guardarEventoNube(id, { ...baseline3, roturas: { ...baseline3.roturas, 'Cocina::Vasos': '3' } }, baseline3);
+  ok(rMismoItem.fusion.roturas['Cocina::Vasos'] === '3' && rMismoItem.fusion.checkeados['Cocina::Jarras'] === true,
+    'mismo item, misma base: gana el último en escribir, pero el resto (Jarras) sigue intacto');
+}
+
 console.log('\n══ El calendario se muda a su carpeta propia ══');
 {
   almacen.clear(); limpiarPrevios(); setSesion(true);
