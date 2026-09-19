@@ -2062,8 +2062,13 @@ async function main() {
     // uno distinto (no con .fill(), que sustituye el valor de golpe sin pasar por
     // onChange como hace un dedo de verdad) volvía a poner un 1 solo, tecla a tecla,
     // sin dejar terminar de escribir el número bueno.
+    //
+    // "ControlOrMeta" y no "Control" a secas: en macOS seleccionar todo es Cmd+A, y
+    // Ctrl+A mueve el cursor al principio de la línea. Con "Control" el Delete de abajo
+    // se llevaba UN carácter en vez del número entero ("11"→"1"), así que al teclear el
+    // 7 quedaba "71" y la prueba fallaba solo en el Mac del dueño, nunca en el CI.
     await numero.click();
-    await p.keyboard.press("Control+a");
+    await p.keyboard.press("ControlOrMeta+a");
     await p.keyboard.press("Delete");
     await p.waitForTimeout(150);
     ok((await numero.inputValue()) === "", "borrar el número entero lo deja vacío, no en 1");
@@ -2074,7 +2079,7 @@ async function main() {
     // Vacío y sin tocar nada más: al salir del campo recupera algo válido, no se
     // queda en blanco para siempre.
     await numero.click();
-    await p.keyboard.press("Control+a");
+    await p.keyboard.press("ControlOrMeta+a");
     await p.keyboard.press("Delete");
     await p.waitForTimeout(150);
     await p.locator(".form-titulo").click();
