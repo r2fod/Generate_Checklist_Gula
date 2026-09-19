@@ -646,7 +646,12 @@ español, repo público sin PII, y una prueba por cada fallo arreglado.
   salieron de una estimación, no de una medición.
 - **Contrastar los ratios con lo que usa el sector**, para no cargar de más ni quedarse
   corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
-  camión, no una constante cualquiera.
+  camión, no una constante cualquiera. **Hecho ya el de refrescos** (las Fantas, ver
+  "Hecho"); faltan los demás.
+- **Calibrar la bebida por bebida INDIVIDUAL, no por grupo.** Hoy `calibracion.js` mide el
+  grupo entero con un solo factor y es ciego a que una bebida del grupo se agote mientras
+  otra vuelve llena — que es justo lo que pasaba con la Fanta. Es el arreglo de fondo del
+  apartado de las Fantas en "Hecho".
 
 **2. Del dueño, en la app** (necesita su sesión):
 - Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
@@ -1424,6 +1429,103 @@ con el asistente cada día.
    timeouts raros; no era un fallo de verdad, así que se verificó por
    consulta directa al DOM en vez de perseguir la causa exacta del lío de
    Playwright.
+
+**Las Fantas se quedaban cortas: era la MEZCLA, no el volumen.** El dueño lo vio en
+eventos de verdad ("las fantas de naranja o limón se queda corto"). Confirmado ejecutando
+el código: para 100 pax salían 30 Fanta naranja y 26 limón (6,7% y 5,8% del mix) contra
+185 Coca normal (41,6%) — y el **Sprite (8,3%) pesaba más que cualquiera de las dos Fantas
+por separado**. La causa está documentada en el propio comentario de `calculos.js`: los
+cuatro refrescos sin calibrar (las dos Fantas, Aquarius, Sprite) se bajaron a la mitad en
+su día porque SUMABAN un 84% por encima de su fuente de calibración. Esa bajada estaba
+bien, pero **se aplicó a los cuatro por igual**, y ahí se coló el fallo: trató a la Fanta
+(que se bebe mucho) igual que al Sprite (que se bebe poco), dejando el reparto del revés
+respecto al mercado.
+
+Arreglado corrigiendo la mezcla **sin tocar el volumen**: los cuatro siguen sumando lo
+mismo (0,175 → 84 uds para 65 pax, idéntico a antes), así que el camión no lleva ni una
+unidad más y la Coca sigue clavada en su calibración (120/72/12). Fanta naranja 0,04→0,058
+y limón 0,035→0,051 (+47% cada una, 19→28 y 17→25 en el evento de 65 pax), a costa de
+Aquarius (0,05→0,030) y Sprite (0,05→0,036). Fuente: **Fanta lidera el segmento de cítricos
+en España con el 48,3% de cuota** (Nielsen IQ, cierre 2025) y cítricos es el segundo
+segmento tras las colas; como aquí solo se sirven tres cítricos (las dos Fantas y el
+Sprite), a Fanta le toca bastante más que ese 48,3%. Esa derivación vive en `sector.js`
+(`refrescos_citricos`, banda 70-85%) con su fuente y con el aviso de que es derivación, no
+dato directo — la prueba lee la banda de ahí en vez de repetirla, así que corregir el
+sector corrige la prueba sola. Cuatro pruebas nuevas: cada Fanta por encima del Sprite,
+naranja por encima de limón, la suma de los cuatro sin cambiar, y el % dentro de la banda.
+
+**La calibración ya alcanza a 8 bebidas, no a 4 (paso 1 de "ajustar al sector").** El
+comentario de `bebida.js` decía que "la tónica, el Red Bull o el vermut se mueven con
+estas". **No era verdad**, y es lo que hacía incontestable la pregunta del dueño "¿me sobra
+tónica?": al no estar en `BEBIDAS`, esas líneas no se podían medir de ninguna manera —
+por muchos eventos que se apuntaran con la vuelta puesta, `calibracionBebida` ni las
+miraba. Añadidos cuatro grupos: `tonica`, `vermut`, `tintoVerano` y `redbull`. **Ni una
+cantidad cambia**: el factor por defecto es 1 y multiplicar por 1 no mueve nada
+(confirmado — la tónica sigue en 23 para la boda de 100, la ginebra en 14/3).
+
+Dos decisiones de diseño que conviene no deshacer:
+
+1. **Los grupos van PEQUEÑOS a propósito** (una o dos líneas). `consumoDeBebida` descarta
+   el evento entero si falta la vuelta de UNA sola línea del grupo, así que un grupo
+   grande casi nunca junta los 3 eventos que hacen falta — el refresco, con sus 7 líneas,
+   es el que menos posibilidades tiene de todos. Meter las nuevas en un cajón de sastre
+   habría sido repetir ese error.
+2. **Cada grupo nuevo se cableó también en `calcBebidas`**, no solo en `BEBIDAS`. Si se
+   añade el grupo sin el cableado, aparece su casilla en el panel, se puede escribir un
+   número, se guarda en la nube… y la carga no cambia: **un control que miente**, que es
+   peor que no tenerlo. Hay una prueba estructural nueva que recorre `CLAVES_BEBIDA`, pone
+   cada factor a 0,5 y falla si alguno no mueve la carga — así el día que se añada el
+   noveno grupo, el olvido salta solo.
+
+Ojo con las etiquetas, que no se escriben como uno esperaría: la línea es **`Redbull`**
+(junta) y el tinto lleva el formato dentro, **`Tinto de verano (1,5L)`**. Un carácter de
+más y la calibración deja de encontrar la línea, en silencio.
+
+**Comprobado en pantalla** con un banco de pruebas temporal (borrado después, no se sube;
+el panel vive en Modo carga → Resumen, detrás del login, y no tenía banco propio). Los 8
+chips envuelven en 3 filas a 320px, 0 texto cortado y 0 desbordamiento horizontal a 320,
+390 y 1280px, sin errores de consola.
+
+**Y ahí salió un fallo visual de verdad que nadie había visto nunca.** Al pintar por
+primera vez una fila CON medición (`✓ 1,4 · 3 ev.`), a 320px el nombre del tipo de evento
+se quedaba en **0 píxeles de ancho** —medido, no a ojo— y se leía "Boc" en vez de "Boda".
+Causa: `.cal-ratio-nombre` llevaba `min-width: 0` (encoge hasta cero) y la insignia es
+`flex: 0 0 auto` (no encoge nunca), así que la insignia se quedaba con todo el sitio.
+**No lo había visto nadie porque esa insignia solo aparece con 3 eventos medidos, y nunca
+ha habido ninguno** — es decir, habría aparecido justo el día que la calibración
+empezara a servir para algo.
+
+Arreglado con `flex-wrap: wrap` en `.cal-ratio` y, en el nombre, `flex: 1 1 0` con
+`min-width: 5rem`. **El `1 1 0` es la parte que importa y costó dos intentos**: con
+`flex: 1 1 auto` (el primer intento) el navegador decide los saltos de línea mirando el
+tamaño NATURAL de cada hijo, y un nombre largo como "Producción / rodaje" mide 250px, así
+que empujaba el campo y el botón a una segunda línea en TODAS las filas —también en las
+normales, dejando el botón de volver huérfano y descolgado—. Con base 0 el nombre no
+fuerza ningún salto: las filas sin medición quedan exactamente como estaban (104px de
+nombre, 58px de alto, igual que antes de tocar nada) y solo baja la insignia cuando de
+verdad no cabe.
+
+**Sigue SIN medir en casa, y hay un motivo estructural por el que nunca se iba a medir.**
+`calibracion.js` mide el grupo `refresco` ENTERO —sus 7 líneas— con **un solo factor**: si
+la Fanta se agota (100% consumida) y el Sprite vuelve lleno (20%), la media sale ≈1 y la
+app dice "todo correcto". **El factor corrige volumen, no mezcla**, y subirlo para arreglar
+la Fanta inflaría también la Coca, que está calibrada exacta. Encima `refresco` exige las 7
+líneas con la vuelta apuntada o descarta el evento (vino exige 2; cerveza y cava, 1), así
+que es con diferencia el grupo que menos probable es que llegue a los 3 eventos mínimos —
+probablemente no ha disparado nunca. **Calibrar por bebida individual está sin hacer** y es
+lo que cerraría esto de verdad.
+
+**Y los niños no mueven el reparto de refrescos.** Un evento de 100 pax con 30 niños da
+EXACTAMENTE los mismos 30 Fanta naranja y 111 Coca Zero que uno de 100 adultos: el total sí
+crece con ellos (`refrescoTotal` va sobre `pax`), pero la mezcla no sabe que existen, y un
+niño bebe Fanta, no Coca Zero. Sin tocar: es el punto de "coeficientes de niños" que sigue
+en Pendiente, y toca cantidades de camión.
+
+**`setsid` no existe en macOS.** `CLAUDE.md` manda lanzar la batería con `setsid nohup …`,
+que es de Linux (el contenedor de trabajo original). En el Mac del dueño devuelve
+`command not found` y **la batería no llega a arrancar, en silencio** — parece que corre y
+no corre nada. Con `nohup … &` a secas funciona igual de bien. Sin corregir la regla
+todavía.
 
 ## Decidido NO hacer (y por qué)
 

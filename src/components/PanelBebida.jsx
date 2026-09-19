@@ -56,8 +56,9 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
             para usarlo.
           </p>
 
-          {/* La bebida primero y los tipos después: son 4 × 5 casillas, y enseñarlas todas
-              a la vez llena la pantalla de un móvil de números que no se están mirando. */}
+          {/* La bebida primero y los tipos después: son 8 × 5 casillas, y enseñarlas todas
+              a la vez llena la pantalla de un móvil de números que no se están mirando.
+              Los chips envuelven solos en varias filas, igual que los de la voz. */}
           <div className="bebida-chips" role="tablist" aria-label="Bebida a ajustar">
             {CLAVES_BEBIDA.map(k => (
               <button

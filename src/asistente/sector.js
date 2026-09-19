@@ -61,6 +61,21 @@ export const SECTOR = {
     banda: [0.3, 0.5],
     fuente: "sin barra o en invierno, fuentes públicas del sector (ya citado en el comentario de calculos.js)",
   },
+  refrescos_citricos: {
+    nombre: "Refrescos cítricos (cuánto de ellos es Fanta)",
+    unidad: "% de los cítricos servidos",
+    // Fanta lidera el segmento de cítricos en España con un 48,3% de cuota (Nielsen IQ,
+    // cierre 2025), y cítricos es el segundo segmento del mercado por detrás de las
+    // colas. Ese 48,3% es contra TODO el segmento —Schweppes, Kas, marca blanca y el
+    // resto—, pero aquí solo se sirven tres cítricos: Fanta naranja, Fanta limón y
+    // Sprite. Quitando del segmento a los que no se compran, a Fanta le corresponde
+    // bastante más que ese 48,3%, porque el Sprite es un actor menor en España. La banda
+    // es esa DERIVACIÓN, no un dato de sector tal cual: por eso va ancha y por eso se
+    // dice aquí. Lo que sí es dato duro es el orden — Fanta por delante de Sprite—, y es
+    // lo único que hacía falta para ver que el reparto de calculos.js estaba del revés.
+    banda: [70, 85],
+    fuente: "derivado de: Fanta 48,3% del segmento cítricos en España (Nielsen IQ, cierre 2025), restringido a los tres cítricos que se sirven aquí — SIN medir en casa",
+  },
   paella: {
     nombre: "Paella",
     unidad: "personas por paellera",

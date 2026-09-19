@@ -26,13 +26,24 @@ export const RATIOS_BEBIDA = {
   refresco: 7.4,                               // unidades brutas por comensal (ver calculos.js)
 };
 
-// Las cuatro bebidas que se calibran. No están todas a propósito: son las que mueven
-// dinero y sitio en el camión, las que llevan precio en el catálogo y las que se
-// apuntan a la vuelta. La tónica, el Red Bull o el vermut se mueven con estas.
+// Las bebidas que se calibran. Empezaron siendo cuatro —vino, cerveza, cava y refresco—
+// y el comentario decía que "la tónica, el Red Bull o el vermut se mueven con estas".
+// No era verdad, y costó caro: al no estar aquí, esas líneas **no se podían medir de
+// ninguna manera**. Por muchos eventos que se apuntaran con la vuelta puesta, la
+// calibración ni las miraba, así que a la pregunta "¿sobra tónica?" la app no podía
+// contestar nunca. Ahora cada una tiene su grupo y sí se mide.
+//
+// **Los grupos se mantienen PEQUEÑOS a propósito.** `consumoDeBebida` descarta el evento
+// entero si falta la vuelta de UNA sola línea del grupo, así que cuantas más líneas tiene
+// un grupo, menos probable es que llegue a juntar los tres eventos que hacen falta. El
+// refresco, con siete líneas, es el que menos posibilidades tiene de todos — por eso los
+// nuevos van de una o dos, no metidos en un cajón de sastre.
 //
 // "items" son las líneas EXACTAS de la checklist de las que sale el consumo medido; si
 // alguna se renombra aquí, la calibración de esa bebida deja de encontrarla (por eso la
-// prueba unitaria comprueba que todas existen en una checklist de verdad).
+// prueba unitaria comprueba que todas existen en una checklist de verdad). Ojo con dos
+// que no se escriben como uno esperaría: la línea es "Redbull" (junta) y el tinto lleva
+// el formato dentro, "Tinto de verano (1,5L)".
 // "sobre" dice a quién se le reparte: el alcohol solo a los adultos, el refresco a todos
 // (los niños son justo los que más refresco beben).
 /** @type {Record<string, { nombre: string, sobre: "adultos"|"todos", items: string[] }>} */
@@ -44,6 +55,10 @@ export const BEBIDAS = {
     "Coca-Cola normal", "Coca-Cola Zero", "Fanta naranja", "Fanta limón",
     "Aquarius", "Sprite", "Nestea",
   ] },
+  tonica:      { nombre: "Tónica",          sobre: "adultos", items: ["Tónica"] },
+  vermut:      { nombre: "Vermut",          sobre: "adultos", items: ["Vermut rojo", "Vermut blanco"] },
+  tintoVerano: { nombre: "Tinto de verano", sobre: "adultos", items: ["Tinto de verano (1,5L)"] },
+  redbull:     { nombre: "Red Bull",        sobre: "adultos", items: ["Redbull"] },
 };
 
 export const TIPOS_BEBIDA = ["boda", "comunion", "corporativo", "cumpleanos", "produccion"];
