@@ -9,6 +9,7 @@ import { chromium } from "playwright-core";
 import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
 import { recogidasConAlquileres } from "../alquileres.js";
 import { enDiasISO } from "../fecha.js";
+import { CLAVES_BEBIDA } from "../bebida.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
@@ -372,7 +373,12 @@ async function main() {
     ok(await panelBebida.count() === 1, "el panel de bebida sale en el Resumen");
     await panelBebida.locator(".cal-ratios-cab").click(); await p0.waitForTimeout(350);
     const chips = await p0.locator(".bebida-chip").allInnerTexts();
-    ok(chips.length === 4, `con las cuatro bebidas → ${chips.join(", ")}`);
+    // Contra CLAVES_BEBIDA, no contra un número a mano: este test decía "las cuatro
+    // bebidas" y se quedó obsoleto en cuanto se añadieron la tónica, el vermut, el tinto
+    // de verano y el Red Bull. Lo que importa es que el panel enseñe TODAS las que se
+    // pueden calibrar, sean las que sean — si alguien añade la novena, esto sigue valiendo.
+    ok(chips.length === CLAVES_BEBIDA.length,
+      `el panel enseña las ${CLAVES_BEBIDA.length} bebidas calibrables → ${chips.join(", ")}`);
     // Cambiar un factor tiene que cambiar la checklist de verdad, no solo la casilla
     const vinoAntes = await p0.evaluate(() => {
       const f = [...document.querySelectorAll(".carga-row, .item-row")]

@@ -3500,6 +3500,14 @@ hr {
 .carga-row-principal {
   display: flex;
   align-items: center;
+  /* Envuelve cuando la cantidad es larga. `.carga-cantidad` es flex: 0 0 auto (no encoge
+     nunca) y hay items cuya cantidad trae coletilla — "475 (19 bateas de 25)" son 155px
+     de los 264 que tiene la fila en un móvil de 320px—, así que al nombre le quedaban 27
+     y el texto se veía a 4px: "Vasos de agua", "Vasos de cubata" y "Copas de vino" eran
+     ilegibles cargando el camión, que es justo cuando más falta hacen. Con wrap, la
+     cantidad baja a una segunda línea y se leen las dos cosas enteras; las filas que
+     caben (la inmensa mayoría) no cambian de alto. */
+  flex-wrap: wrap;
   gap: 14px;
   padding: 14px 16px;
   cursor: pointer;
@@ -3933,7 +3941,9 @@ hr {
 
 .carga-nombre {
   flex: 1;
-  min-width: 0;
+  /* Suelo para que la cantidad no lo aplaste hasta hacerlo ilegible (ver
+     .carga-row-principal). Con min-width: 0 pelado se quedaba en 27px. */
+  min-width: 6rem;
   font-size: 0.9rem;
   color: var(--text-main);
   display: inline-flex;

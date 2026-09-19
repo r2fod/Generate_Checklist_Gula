@@ -1505,6 +1505,24 @@ fuerza ningún salto: las filas sin medición quedan exactamente como estaban (1
 nombre, 58px de alto, igual que antes de tocar nada) y solo baja la insignia cuando de
 verdad no cabe.
 
+**La batería completa cazó dos cosas que la rápida no ve.** Merece anotarse porque es
+justo el argumento de por qué existe el barrido de 45 minutos:
+
+1. **Una regresión de verdad, mía**: `app.test.mjs` afirmaba `chips.length === 4` ("con
+   las cuatro bebidas"). Al pasar a 8 se quedó obsoleto. Arreglado comparando contra
+   `CLAVES_BEBIDA.length` en vez de contra un número a mano — si algún día hay una novena
+   bebida, el test sigue valiendo en lugar de volver a romperse.
+2. **Un fallo PREEXISTENTE, no mío**, en Modo carga a 320px. Comprobado desactivando mis
+   dos reglas de CSS en caliente: los tres nombres seguían rotos igual, así que no era
+   una regresión. `.carga-cantidad` es `flex: 0 0 auto` (no encoge nunca) y hay items cuya
+   cantidad trae coletilla: **"475 (19 bateas de 25)" ocupa 155px de los 264 de la fila**,
+   dejando 27px para el nombre — que se veía a **4px**. "Vasos de agua", "Vasos de cubata"
+   y "Copas de vino" eran ilegibles justo cargando el camión. Arreglado con el mismo
+   patrón que el panel de bebida (`flex-wrap: wrap` en la fila + suelo de `min-width` en
+   el nombre): la cantidad baja a una segunda línea y se leen las dos cosas enteras.
+   Verificado en la app de verdad (no en un banco aislado): **0 nombres cortados de 134**,
+   sin desbordamiento, y las filas que ya cabían no cambian de alto.
+
 **Sigue SIN medir en casa, y hay un motivo estructural por el que nunca se iba a medir.**
 `calibracion.js` mide el grupo `refresco` ENTERO —sus 7 líneas— con **un solo factor**: si
 la Fanta se agota (100% consumida) y el Sprite vuelve lleno (20%), la media sale ≈1 y la
