@@ -14,12 +14,16 @@ import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, Cli
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
   aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
-  turnosDe, DIAS_ANTICIPACION, apuntesPorPromover,
+  turnosDe, DIAS_ANTICIPACION, apuntesPorPromover, numeraRepetidos,
 } from "./apuntes.js";
 import { hoyISO } from "../fecha.js";
-import { personalNecesario, resumenAsignados, loQueFalta, horasEntre, ROLES } from "../personal.js";
+import { personalNecesario, resumenAsignados, personalQueFalta, horasEntre, ROLES } from "../personal.js";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
+
+// Chips que se enseñan de golpe en una casilla del mes (≥560px) antes de resumir el
+// resto en "+N más". Con el mínimo de casilla a 92px caben tres cómodos; ver Mes().
+const CHIPS_VISIBLES = 3;
 
 // El icono del tipo. Va con su clase de color, así que hereda el mismo tono que el
 // punto y el chip: un solo color por tipo en todas partes.
@@ -44,10 +48,18 @@ export default function Calendario({
   onAbrirEvento,
   soloVer = false,
   soloAnadir = false,
+  // Con qué mes se abre la vista Mes. Por defecto el de hoy, que es lo que quiere
+  // cualquier persona de verdad abriendo el calendario. Existe SOLO para el banco de
+  // pruebas (ver prueba.jsx): sus apuntes de mentira son "dentro de N días" a partir de
+  // hoy, así que en los últimos días de cada mes caían casi todos en el mes siguiente y
+  // la vista por defecto (el de hoy) se veía vacía — no un fallo de cálculo, un banco de
+  // pruebas enseñando el mes que no tocaba.
+  mesInicial = null,
 }) {
   const hoy = hoyISO();
   const [vista, setVista] = useState("mes");
   const [cursor, setCursor] = useState(() => {
+    if (mesInicial && Number.isFinite(mesInicial.anio) && Number.isFinite(mesInicial.mes)) return mesInicial;
     const f = new Date();
     return { anio: f.getFullYear(), mes: f.getMonth() + 1 };
   });
@@ -155,6 +167,7 @@ export default function Calendario({
       {editando && (
         <EditorApunte
           apunte={editando}
+          equipo={equipo}
           onCerrar={() => setEditando(null)}
           onGuardar={(a) => { onGuardar && onGuardar(a); setEditando(null); }}
           onBorrar={onBorrar && editando.id ? () => { onBorrar(editando.id); setEditando(null); } : null}
@@ -194,6 +207,9 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             // apunte: si no, un día con una boda y unas vacaciones se pintaría del gris
             // de las vacaciones y la boda desaparecería del mes.
             const dominante = (del.find(a => esTipoEvento(a.tipo)) || del[0] || {}).tipo || "";
+            // Dos apuntes con el mismo título el mismo día ("Camión Covey" dos veces)
+            // se numeran para poder distinguirlos de un vistazo, sin abrir el día.
+            const numero = numeraRepetidos(del);
             return (
               <button
                 type="button"
@@ -216,13 +232,24 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                   </span>
                 )}
                 {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
-                {del.map(a => (
+                {/* Máximo 3 chips por casilla: un día con seis apuntes no puede estirar su
+                    fila del mes seis veces más alta que las de al lado. Lo que sobra se
+                    resume en "+N más" — el resto está a un clic, abriendo el día (PanelDia
+                    ya enseña la lista entera con sitio, pax y editar). Como "del" ya viene
+                    con los eventos primero (porDia, en apuntes.js), lo que se recorta es
+                    siempre lo menos importante del día (vacaciones, tareas...). */}
+                {del.slice(0, CHIPS_VISIBLES).map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
-                    <span className="cal-chip-texto">{a.titulo}</span>
+                    <span className="cal-chip-texto">
+                      {a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}
+                    </span>
                     {a.pax ? <span className="cal-chip-pax">{a.pax}</span> : null}
                   </span>
                 ))}
+                {del.length > CHIPS_VISIBLES && (
+                  <span className="cal-chip-mas">+{del.length - CHIPS_VISIBLES} más</span>
+                )}
               </button>
             );
           })}
@@ -252,26 +279,31 @@ function PanelDia({ dia, apuntes, puedeEditar, soloAnadir, onCerrar, onEditar, o
 
         {apuntes.length === 0
           ? <div className="cal-dia-vacio">No hay nada apuntado este día.</div>
-          : apuntes.map(a => (
-            <div className={`cal-dia-item tipo-${a.tipo}`} key={a.id}>
-              <IconoTipo tipo={a.tipo} size={17} />
-              <span className="cal-dia-item-texto">
-                <strong>{a.titulo}</strong>
-                <small>
-                  {TIPOS[a.tipo].nombre}
-                  {a.sitio ? ` · ${a.sitio}` : ""}
-                  {a.pax ? ` · ${a.pax} pax` : ""}
-                  {a.hasta && a.hasta !== a.fecha ? ` · hasta el ${Number(a.hasta.slice(8))}` : ""}
-                </small>
-              </span>
-              {a.evento && onAbrirEvento && (
-                <button className="btn btn-outline cal-dia-btn" onClick={() => onAbrirEvento(a.evento)}>Abrir</button>
-              )}
-              {puedeEditar && !soloAnadir && (
-                <button className="btn btn-outline cal-dia-btn" onClick={() => onEditar(a)}>Editar</button>
-              )}
-            </div>
-          ))}
+          : (() => {
+            // Dos apuntes con el mismo título el mismo día ("Camión Covey" dos veces)
+            // se numeran para poder distinguirlos, igual que en el chip del mes.
+            const numero = numeraRepetidos(apuntes);
+            return apuntes.map(a => (
+              <div className={`cal-dia-item tipo-${a.tipo}`} key={a.id}>
+                <IconoTipo tipo={a.tipo} size={17} />
+                <span className="cal-dia-item-texto">
+                  <strong>{a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}</strong>
+                  <small>
+                    {TIPOS[a.tipo].nombre}
+                    {a.sitio ? ` · ${a.sitio}` : ""}
+                    {a.pax ? ` · ${a.pax} pax` : ""}
+                    {a.hasta && a.hasta !== a.fecha ? ` · hasta el ${Number(a.hasta.slice(8))}` : ""}
+                  </small>
+                </span>
+                {a.evento && onAbrirEvento && (
+                  <button className="btn btn-outline cal-dia-btn" onClick={() => onAbrirEvento(a.evento)}>Abrir</button>
+                )}
+                {puedeEditar && !soloAnadir && (
+                  <button className="btn btn-outline cal-dia-btn" onClick={() => onEditar(a)}>Editar</button>
+                )}
+              </div>
+            ));
+          })()}
 
         {puedeEditar && (
           <button className="btn btn-green cal-dia-anadir" onClick={onAnadir}>+ Añadir a este día</button>
@@ -407,10 +439,17 @@ function ChoquesAviso({ choques: lista, apuntes, equipo, onIr }) {
 // Lo mínimo: qué día, qué es y cómo se llama. El resto es opcional a propósito — la
 // gracia del calendario es poder apuntar "boda Marina" en cuanto te dan la fecha, sin
 // saber todavía ni el pax ni el sitio.
-function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
+function EditorApunte({ apunte, equipo, onCerrar, onGuardar, onBorrar }) {
   const [f, setF] = useState(apunte);
   const pon = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }));
   const listo = saneaApunte({ ...f, pax: Number(f.pax) || undefined });
+  const turnos = turnosDe({ hora: f.hora });
+  // Quién va a este evento (Asignados, más abajo) no depende de la fecha: a diferencia
+  // de la Vista de equipo (que solo mira los próximos 14 días, para planificar quién
+  // falta por buscar), aquí se puede apuntar o revisar el personal de CUALQUIER apunte,
+  // pasado incluido — que es justo lo que hacía falta para ver quién trabajó un evento
+  // ya cerrado (el dato que pide el presupuesto/margen: horas e importe por persona).
+  const necesario = personalNecesario(f.tipo, Number(f.pax) || 0);
 
   return (
     <div className="cal-editor-fondo" onClick={onCerrar}>
@@ -461,14 +500,22 @@ function EditorApunte({ apunte, onCerrar, onGuardar, onBorrar }) {
                 <span>Hora del banquete <em>(para los turnos)</em></span>
                 <input type="time" value={f.hora} onChange={pon("hora")} />
               </label>
-              {turnosDe({ hora: f.hora })
+              {turnos
                 ? <span className="cal-turnos-pista">
-                    Sala entra a las <strong>{turnosDe({ hora: f.hora }).sala}</strong>
-                    {turnosDe({ hora: f.hora }).salaVispera ? " (víspera)" : ""}
-                    {" · logística a las "}<strong>{turnosDe({ hora: f.hora }).logistica}</strong>
+                    Sala entra a las <strong>{turnos.sala}</strong>
+                    {turnos.salaVispera ? " (víspera)" : ""}
+                    {" · logística a las "}<strong>{turnos.logistica}</strong>
                   </span>
                 : <span className="cal-turnos-pista es-vacia">Sin hora no se pueden proponer turnos.</span>}
             </div>
+
+            <Asignados
+              apunte={f}
+              equipo={equipo}
+              necesario={necesario}
+              turnos={turnos}
+              onCambiar={(personal) => setF(x => ({ ...x, personal }))}
+            />
           </>
         )}
 
@@ -644,7 +691,7 @@ function Asignados({ apunte, equipo, necesario, turnos, onCambiar }) {
   const lista = borrador;
   const aplicar = (siguiente) => { setBorrador(siguiente); onCambiar(siguiente); };
   const r = resumenAsignados(lista);
-  const falta = loQueFalta(necesario, lista);
+  const falta = personalQueFalta(necesario, lista);
   const faltanTotal = falta.sala + falta.cocina + falta.logistica;
 
   const cambiar = (i, campo, valor) => aplicar(lista.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
@@ -659,13 +706,26 @@ function Asignados({ apunte, equipo, necesario, turnos, onCambiar }) {
   return (
     <div className="cal-asignados">
       <button type="button" className="cal-asignados-cab" aria-expanded={abierto} onClick={() => setAbierto(v => !v)}>
-        <span>
-          {r.total > 0
-            ? <>Asignados <b>{r.total}</b> de <b>{necesario.total}</b></>
-            : <>Sin nadie asignado <b>({necesario.total} por cubrir)</b></>}
+        <span className="cal-asignados-cab-fila">
+          <span>
+            {r.total > 0
+              ? <>Asignados <b>{r.total}</b> de <b>{necesario.total}</b></>
+              : <>Sin nadie asignado <b>({necesario.total} por cubrir)</b></>}
+          </span>
+          {faltanTotal > 0 && <span className="cal-asignados-falta">faltan {faltanTotal}</span>}
+          <ChevronDown size={15} aria-hidden="true" className={`cal-asignados-flecha${abierto ? " es-abierta" : ""}`} />
         </span>
-        {faltanTotal > 0 && <span className="cal-asignados-falta">faltan {faltanTotal}</span>}
-        <ChevronDown size={15} aria-hidden="true" className={`cal-asignados-flecha${abierto ? " es-abierta" : ""}`} />
+        {/* De un vistazo, sin desplegar: cuánto de la plantilla necesaria ya está
+            cubierta. Se ve incluso cerrado, que es como se abre este panel la mayoría
+            de las veces — para mirar, no para tocar. */}
+        {necesario.total > 0 && (
+          <span className="cal-asignados-barra" aria-hidden="true">
+            <span
+              className={`cal-asignados-barra-relleno${r.total >= necesario.total ? " es-completo" : ""}`}
+              style={{ width: `${Math.min(100, Math.round((r.total / necesario.total) * 100))}%` }}
+            />
+          </span>
+        )}
       </button>
 
       {abierto && (

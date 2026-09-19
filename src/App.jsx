@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useDeferredValue } from "react";
+import React, { useState, useMemo, useEffect, useDeferredValue, useCallback } from "react";
 
 import {
   Heart, Church, Cake, Briefcase, Clapperboard,
@@ -30,11 +30,18 @@ import {
   resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
+  cargarHieloNube, guardarHieloNube, suscribirHieloNube,
+  cargarComidaNube, guardarComidaNube, suscribirComidaNube,
+  cargarEstrategiaNube, guardarEstrategiaNube, suscribirEstrategiaNube,
   cargarMemoriaNube, guardarMemoriaNube, suscribirMemoriaNube,
   cargarObjetivosNube, guardarObjetivosNube, suscribirObjetivosNube,
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
+  cargarRatiosNube, guardarRatiosNube, suscribirRatiosNube,
+  cargarCristaleriaNube, guardarCristaleriaNube, suscribirCristaleriaNube,
 } from "./nube.js";
-import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas } from "./formulario/preguntas.js";
+import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
+import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
+import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio, notasFusionadas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
 // solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se
@@ -66,16 +73,25 @@ import { alSobrarTiempo } from "./precarga.js";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
 import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
-import { buildChecklist, enlaceMapa } from "./checklist-generadores.js";
+import { buildChecklist, enlaceMapa, GASTROS_MINIMO } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
-import { calcularCalibracion, calibracionBebida } from "./calibracion.js";
-import { ponFactores, leerFactores, factoresCambiados } from "./bebida.js";
+import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida,
+  calibracionPersonal, huecosDeCatalogo } from "./calibracion.js";
+import { ponFactores, leerFactores, factoresCambiados, conFactor } from "./bebida.js";
+import { ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo } from "./calculos.js";
+import { ponFactoresComida, leerFactoresComida, factoresComidaCambiados, conFactorComida } from "./comida.js";
+import { saneaEstrategia } from "./asistente/estrategia.js";
+import { oportunidadesNegocio } from "./asistente/revision.js";
+import { aplicarEnAjustes } from "./asistente/escrituraAjustes.js";
 import { saneaMemoria, recordar, olvidar, refuerza } from "./asistente/memoria.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo } from "./asistente/objetivos.js";
 import { saneaTareas, marcarTarea, quitarTarea, limpiarViejas } from "./asistente/tareas.js";
 import { aplicarEnTareas, encadenar } from "./asistente/escrituraTareas.js";
 import { aplicarEnChecklists } from "./asistente/escrituraChecklists.js";
 import { aplicarEnCalendario } from "./asistente/escrituraCalendario.js";
+import { aplicarEnRatios } from "./asistente/escrituraRatios.js";
+import { aplicarEnBebida } from "./asistente/escrituraBebida.js";
+import { aplicarEnCristaleria } from "./asistente/escrituraCristaleria.js";
 
 // El calendario del equipo, dentro de la checklist: del mes a la boda sin cambiar de
 // app. Va con import() perezoso a propósito — quien no lo abra no se descarga nada de
@@ -203,15 +219,21 @@ const ETIQUETAS_CAMPO = {
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   diasProduccion: "Días de producción",
   dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
+  dobleTenedor: "Doble tenedor", dobleCuchillo: "Doble cuchillo", dobleCuchara: "Doble cuchara",
+  dobleVino: "Doble copa de vino", dobleAgua: "Doble vaso de agua", dobleCava: "Doble copa de cava",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas",
+  llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros", numMesasBuffet: "Nº de mesas de buffet",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
-  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", tipoCafetera: "Cafetera",
+  llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", llevaCristaleria: "Llevamos cristalería", llevaHielo: "Llevamos hielo", llevaBebida: "La bebida la pone Gula", tipoCafetera: "Cafetera",
+  cafeParaInvitados: "Café para invitados",
   llevaCarpas: "Carpas", llevaGenerador: "Generador",
-  llevaMobiliarioAlquiler: "Mobiliario de alquiler", alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
+  llevaMobiliarioAlquiler: "Mobiliario de alquiler", proveedorMobiliarioAlquiler: "Proveedor del mobiliario",
+  archivosAlquiler: "Documentos de alquiler",
+  alquilaCarpas: "Carpas de alquiler", numCarpas: "Nº de carpas",
+  llevaParabanes: "Parabanes", numParabanes: "Nº de parabanes", numBarras: "Nº de barras",
   extraBandejasMadera: "Bandejas madera extra", extraBandejasPlata: "Bandejas plata extra",
   llevaJamonero: "Jamonero", llevaTarta: "Lleva tarta", personasPorPlatoEntrante: "Personas por plato de entrante",
   entranteCompartido: "Entrante compartido", numEntrantesCompartir: "Nº de entrantes a compartir",
@@ -234,7 +256,7 @@ function resumirCambios(prev, nuevo) {
   const cambios = [];
   const claves = new Set([...Object.keys(prev || {}), ...Object.keys(nuevo || {})]);
   claves.forEach(k => {
-    if (k === "eventoNubeId") return;
+    if (k === "eventoNubeId" || k === "formularioRespuestas") return;
     const a = prev?.[k], b = nuevo?.[k];
     if (JSON.stringify(a) === JSON.stringify(b)) return;
     const etiqueta = ETIQUETAS_CAMPO[k] || k;
@@ -441,6 +463,17 @@ export default function App({ onCerrarSesion } = {}) {
   const [barraCopas, setBarraCopas]   = useState(estadoInicial.barraCopas ?? false);
   const [horasCopas, setHorasCopas]   = useState(estadoInicial.horasCopas ?? 4);
   const [dobleServicio, setDobleServicio]             = useState(estadoInicial.dobleServicio ?? false);
+  // Qué dobla en concreto con "primero + segundo": cubiertos y cristalería por
+  // separado, en vez de todo atado al mismo dobleServicio (que ahora solo manda en
+  // el plato). Sin contestar la pregunta de seguimiento del formulario (eventos de
+  // antes de esta tarea), cae al propio dobleServicio — comportamiento de siempre.
+  // La cava nunca dobló con dobleServicio, así que su fallback es fijo a false.
+  const [dobleTenedor, setDobleTenedor] = useState(estadoInicial.dobleTenedor ?? estadoInicial.dobleServicio ?? false);
+  const [dobleCuchillo, setDobleCuchillo] = useState(estadoInicial.dobleCuchillo ?? estadoInicial.dobleServicio ?? false);
+  const [dobleCuchara, setDobleCuchara] = useState(estadoInicial.dobleCuchara ?? estadoInicial.dobleServicio ?? false);
+  const [dobleVino, setDobleVino] = useState(estadoInicial.dobleVino ?? estadoInicial.dobleServicio ?? false);
+  const [dobleAgua, setDobleAgua] = useState(estadoInicial.dobleAgua ?? estadoInicial.dobleServicio ?? false);
+  const [dobleCava, setDobleCava] = useState(estadoInicial.dobleCava ?? false);
   // Barril de cerveza (30L/50L, con tirador): descuenta esos litros de los tercios
   // necesarios en vez de sustituirlos del todo — puede haber tercios y barril a la
   // vez (el barril cubre parte y el resto se completa con botellín), solo barril
@@ -472,6 +505,18 @@ export default function App({ onCerrarSesion } = {}) {
   // no trae ya un estilo guardado.
   const [estiloPlatoPostre, setEstiloPlatoPostre]       = useState(estadoInicial.estiloPlatoPostre ?? (estadoInicial.evento === "produccion" ? "Negro/gris" : "Blanco"));
   const [llevaArmarioCaliente, setLlevaArmarioCaliente] = useState(estadoInicial.llevaArmarioCaliente ?? false);
+  // En producción siempre llevaba mesas calientes, sin preguntar (rodajes largos, el
+  // pase se mantiene caliente todo el día); en el resto no existían ni se ofrecían.
+  // Mismo criterio que llevaCarpas: el "casi siempre sí" de producción no lo pierde
+  // ningún evento ya guardado antes de esto.
+  const [llevaMesasCalientes, setLlevaMesasCalientes] = useState(estadoInicial.llevaMesasCalientes ?? ((estadoInicial.evento ?? "boda") === "produccion"));
+  // 0 = el mínimo de serie (GASTROS_MINIMO en checklist-generadores.js); un número
+  // manda sobre esa cuenta, igual que numPaellas.
+  const [numGastros, setNumGastros] = useState(estadoInicial.numGastros ?? 0);
+  // 0 = sin buffets contestados en el formulario (no aparece la línea en la
+  // checklist); un número manda y en producción sube el mínimo de siempre por pax,
+  // nunca lo baja (ver checklist-generadores.js).
+  const [numMesasBuffet, setNumMesasBuffet] = useState(estadoInicial.numMesasBuffet ?? 0);
   // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
   const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
   // Cada plancha lleva SU bombona: antes la plancha era un sí/no y sumaba una sola, así
@@ -507,25 +552,54 @@ export default function App({ onCerrarSesion } = {}) {
   const [numChillOut, setNumChillOut]           = useState(estadoInicial.numChillOut ?? 1);
   const [fuerzaTextilTela, setFuerzaTextilTela] = useState(estadoInicial.fuerzaTextilTela ?? false);
   const [llevaPalomitera, setLlevaPalomitera]       = useState(estadoInicial.llevaPalomitera ?? false);
-  // En producciones casi siempre van carpas y generador, así que empiezan activados:
-  // el interruptor está para los sitios que ya tienen sombra o luz propia.
-  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? true);
+  // En producciones casi siempre van carpas (sitio al aire libre de por sí), así que
+  // ahí empiezan activadas — el interruptor está para los sitios que ya tienen sombra
+  // propia. En el resto de eventos es la excepción (fincas con nave o interior), así
+  // que empiezan apagadas: nadie que abra una boda de antes de esta pregunta se
+  // encuentra carpas que no pidió.
+  const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? ((estadoInicial.evento ?? "boda") === "produccion"));
   const [llevaGenerador, setLlevaGenerador]         = useState(estadoInicial.llevaGenerador ?? true);
   // Mobiliario de alquiler (Event Style): mesas altas, sofás, muebles de barra... No es
   // material nuestro, así que además de salir en la carga hay que ir a por él y devolverlo.
   const [llevaMobiliarioAlquiler, setLlevaMobiliarioAlquiler] = useState(estadoInicial.llevaMobiliarioAlquiler ?? false);
+  // Si no se dice proveedor, conceptoAlquiler() usa el fijo de siempre (Event Style).
+  const [proveedorMobiliarioAlquiler, setProveedorMobiliarioAlquiler] = useState(estadoInicial.proveedorMobiliarioAlquiler ?? "");
+  // Hojas de alquiler adjuntadas desde el formulario (Dealde, Event Style...), para tener
+  // registro. Se acumulan; handleAplicarEnvio() decide cuáles son nuevas al llegar un envío.
+  const [archivosAlquiler, setArchivosAlquiler] = useState(estadoInicial.archivosAlquiler ?? []);
   // Carpas de alquiler (SOS): las 8 del almacén cubren casi todo, pero cuando el cálculo
   // pide más hay que alquilar las que falten. Solo en producciones.
   const [alquilaCarpas, setAlquilaCarpas] = useState(estadoInicial.alquilaCarpas ?? false);
   // Cuántas carpas hacen falta. 0 = las que salgan de la cuenta por pax; cualquier
   // otro número manda sobre ella (lo pone quien ha visto el sitio, o el formulario).
   const [numCarpas, setNumCarpas] = useState(estadoInicial.numCarpas ?? 0);
+  // Parabanes: mobiliario de exterior nuevo, sin fórmula propia por pax (a diferencia
+  // de las carpas) — la cantidad la pone quien ha visto el sitio. Excepción en los
+  // cinco tipos de evento, así que empieza apagado siempre.
+  const [llevaParabanes, setLlevaParabanes] = useState(estadoInicial.llevaParabanes ?? false);
+  const [numParabanes, setNumParabanes] = useState(estadoInicial.numParabanes ?? 0);
+  // Mesas altas: 2 por barra, 4 si son 100 pax o más. Sin barras contestadas (0), cae
+  // sola al cálculo viejo por pax — ver calcMesasAltas en calculos.js.
+  const [numBarras, setNumBarras] = useState(estadoInicial.numBarras ?? 0);
   // Color de los manteles. Vacío = el de siempre según el tipo de evento, para que un
   // evento guardado antes de existir esta opción cargue exactamente lo mismo.
   const [colorManteles, setColorManteles] = useState(estadoInicial.colorManteles ?? "");
   const [porcentajeBeige, setPorcentajeBeige] = useState(estadoInicial.porcentajeBeige ?? 50);
   const [llevaJarrasCristal, setLlevaJarrasCristal] = useState(estadoInicial.llevaJarrasCristal ?? false);
+  // Independiente de si hay barra libre: puede que no haya cóctel ni copas y aun así
+  // se sirva vino/agua/cava con la comida. Por defecto SÍ, como se calculaba siempre
+  // antes de existir esta pregunta.
+  const [llevaCristaleria, setLlevaCristaleria]     = useState(estadoInicial.llevaCristaleria ?? true);
+  // Por defecto SÍ, como se calculaba siempre antes de existir esta pregunta — un
+  // evento guardado antes de esto sigue pidiendo hielo igual que siempre.
+  const [llevaHielo, setLlevaHielo]                 = useState(estadoInicial.llevaHielo ?? true);
+  // "No" significa que la trae el cliente/la finca (bebida aparte); por defecto SÍ
+  // (la pone Gula), igual que se calculaba siempre antes de existir esta pregunta.
+  const [llevaBebida, setLlevaBebida]               = useState(estadoInicial.llevaBebida ?? true);
   const [tipoCafetera, setTipoCafetera]             = useState(estadoInicial.tipoCafetera ?? "Nespresso");
+  // Por defecto SÍ es para invitados (como se calculaba siempre antes de esta
+  // pregunta): un evento guardado antes de existir esto carga exactamente lo mismo.
+  const [cafeParaInvitados, setCafeParaInvitados]   = useState(estadoInicial.cafeParaInvitados ?? true);
   const [extraBandejasMadera, setExtraBandejasMadera] = useState(estadoInicial.extraBandejasMadera ?? 0);
   const [extraBandejasPlata, setExtraBandejasPlata]   = useState(estadoInicial.extraBandejasPlata ?? 0);
   const [llevaJamonero, setLlevaJamonero]             = useState(estadoInicial.llevaJamonero ?? false);
@@ -541,7 +615,13 @@ export default function App({ onCerrarSesion } = {}) {
   const [hayDesayuno, setHayDesayuno]                 = useState(estadoInicial.hayDesayuno ?? false);
   const [tipoNevera, setTipoNevera]         = useState(estadoInicial.tipoNevera ?? "Mediana");
   const [tipoCongelador, setTipoCongelador] = useState(estadoInicial.tipoCongelador ?? "Mediana");
-  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? "Dealde"); // Dealde | Carvillo | Nuestras | No llevan
+  // Sin proveedor por defecto a propósito: un evento recién creado desde el calendario no
+  // ha decidido nada de esto todavía, y darle "Dealde" de fábrica colaba ese proveedor en
+  // la checklist (y en su recogida) sin que nadie lo hubiera elegido. Con "" no sale
+  // ningún botón marcado en el selector (SegmentedControl no resalta nada que no
+  // coincida con ninguna opción) y checklist-generadores.js lo llama "sin elegir" en vez
+  // de inventarse un proveedor.
+  const [origenSillas, setOrigenSillas]     = useState(estadoInicial.origenSillas ?? ""); // "" (sin elegir) | Dealde | Carvillo | Nuestras | No llevan
   // De qué tipo son las mesas donde SE SIENTA la gente. Las de cocina no se eligen: son
   // siempre rectangulares de 1,80, que es sobre lo que se prepara el servicio.
   // Las redondas no son nuestras, van de alquiler.
@@ -807,6 +887,13 @@ export default function App({ onCerrarSesion } = {}) {
   // alguien dice que ya está. Se guarda con el evento, así que se ve desde cualquier
   // dispositivo y no solo en el que la creó.
   const [sinConfigurar, setSinConfigurar] = useState(estadoInicial.sinConfigurar ?? false);
+  // Lo último que mandó la oficina por el formulario, tal cual lo contestó — no entra
+  // en ningún cálculo ni se ve en ninguna pantalla de la checklist. Solo sirve para que
+  // el propio formulario se rellene solo si vuelven a elegir este evento (ver
+  // resumirParaOficina/respuestasParaOficina en formulario/envios.js): sin esto, un
+  // evento "ya configurado" seguía preguntándolo todo de cero, aunque ya se hubiera
+  // contestado una vez.
+  const [formularioRespuestas, setFormularioRespuestas] = useState(estadoInicial.formularioRespuestas ?? null);
   const [nombreOcupado, setNombreOcupado] = useState(false);
   const [historial, setHistorial] = useState([]);
   const ultimaClaveEditadaRef = React.useRef(null);
@@ -817,19 +904,22 @@ export default function App({ onCerrarSesion } = {}) {
     sinConfigurar,
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
-    dobleServicio, tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
+    dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
+    tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas,
+    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler, alquilaCarpas, numCarpas, tieneBrindisCava, colorManteles, porcentajeBeige,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
+    alquilaCarpas, numCarpas, llevaParabanes, numParabanes, numBarras, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, tipoMesa, itemsManuales, overridesManuales,
     itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
+    formularioRespuestas,
   });
   const estadoActualJSON = JSON.stringify(getEstadoActual());
 
@@ -906,35 +996,32 @@ export default function App({ onCerrarSesion } = {}) {
     nuestrosGuardadosRef.current = [...nuestrosGuardadosRef.current.slice(-9), ts];
   };
 
-  // Cada cambio local se sube a la nube con un pequeño retardo (evita subir por cada tecla)
-  useEffect(() => {
-    if (!nubeActiva() || !eventoNubeId) return;
-    const t = setTimeout(() => {
-      ultimoGuardadoNubeRef.current = estadoActualJSON;
-      guardarEventoNube(eventoNubeId, getEstadoActual())
-        .then((ts) => { apuntarGuardadoPropio(ts); setErrorNube(null); })
-        .catch(avisarFalloNube);
-    }, 1200);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estadoActualJSON, eventoNubeId]);
-
-  // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página
+  // Setters de cada campo, para poder aplicar un estado remoto SIN recargar la página.
+  // Va ANTES del guardado (justo debajo) porque ahora el guardado también los usa: si
+  // la fusión en el servidor trae un campo que este aparato no tenía (otra persona lo
+  // cambió mientras tanto), se aplica aquí mismo, con el mismo setter que usa el aviso
+  // de "cambios remotos".
   const SETTERS_SYNC = {
     sinConfigurar: setSinConfigurar,
     evento: setEvento, nombreEvento: setNombreEvento, fechaEvento: setFechaEvento,
     horaInicio: setHoraInicio, ubicacion: setUbicacion, notasEvento: setNotasEvento, pax: setPax, ninos: setNinos,
     barraCoctel: setBarraCoctel, horasCoctel: setHorasCoctel, barraCopas: setBarraCopas, horasCopas: setHorasCopas, diasProduccion: setDiasProduccion,
-    dobleServicio: setDobleServicio, tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
+    dobleServicio: setDobleServicio, dobleTenedor: setDobleTenedor, dobleCuchillo: setDobleCuchillo, dobleCuchara: setDobleCuchara,
+    dobleVino: setDobleVino, dobleAgua: setDobleAgua, dobleCava: setDobleCava,
+    tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
-    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas,
+    llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros, numMesasBuffet: setNumMesasBuffet,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
-    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, tipoCafetera: setTipoCafetera,
+    llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, llevaCristaleria: setLlevaCristaleria, llevaHielo: setLlevaHielo, llevaBebida: setLlevaBebida, tipoCafetera: setTipoCafetera,
+    cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
-    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
+    llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, proveedorMobiliarioAlquiler: setProveedorMobiliarioAlquiler,
+    archivosAlquiler: setArchivosAlquiler,
+    alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
+    llevaParabanes: setLlevaParabanes, numParabanes: setNumParabanes, numBarras: setNumBarras,
     colorManteles: setColorManteles, porcentajeBeige: setPorcentajeBeige,
     extraBandejasMadera: setExtraBandejasMadera, extraBandejasPlata: setExtraBandejasPlata, llevaJamonero: setLlevaJamonero, llevaTarta: setLlevaTarta,
     personasPorPlatoEntrante: setPersonasPorPlatoEntrante, llevaAguasPequenas: setLlevaAguasPequenas, tipoAguaPequena: setTipoAguaPequena, hayDesayuno: setHayDesayuno,
@@ -946,9 +1033,42 @@ export default function App({ onCerrarSesion } = {}) {
     itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, marcasRevisar: setMarcasRevisar, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
+    formularioRespuestas: setFormularioRespuestas,
   };
   const settersSyncRef = React.useRef(SETTERS_SYNC);
   settersSyncRef.current = SETTERS_SYNC;
+
+  // Cada cambio local se sube a la nube con un pequeño retardo (evita subir por cada
+  // tecla). Se manda el estado local Y el último que se sabe que tenía el servidor
+  // (`ultimoGuardadoNubeRef`): guardarEventoNube solo escribe encima los campos que
+  // hayan cambiado entre esos dos, así que un campo que este aparato no ha tocado
+  // nunca pisa lo que haya puesto otra persona (ver el porqué largo en nube.js).
+  useEffect(() => {
+    if (!nubeActiva() || !eventoNubeId) return;
+    const t = setTimeout(() => {
+      const local = getEstadoActual();
+      const baseline = ultimoGuardadoNubeRef.current ? JSON.parse(ultimoGuardadoNubeRef.current) : null;
+      guardarEventoNube(eventoNubeId, local, baseline)
+        .then(({ actualizado, fusion }) => {
+          ultimoGuardadoNubeRef.current = JSON.stringify(fusion);
+          apuntarGuardadoPropio(actualizado);
+          setErrorNube(null);
+          // La fusión puede traer un campo que este aparato no tenía —alguien lo
+          // cambió mientras el guardado estaba en camino—: se aplica aquí mismo, sin
+          // esperar al eco por la suscripción (ese eco, al ser nuestro, no se vuelve a
+          // aplicar más abajo — ver "es mío, no hay nada que aplicar").
+          Object.entries(fusion).forEach(([k, v]) => {
+            if (k === "nombreEvento" && !v && local.nombreEvento) return;
+            if (JSON.stringify(local[k]) !== JSON.stringify(v) && settersSyncRef.current[k]) {
+              settersSyncRef.current[k](v);
+            }
+          });
+        })
+        .catch(avisarFalloNube);
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estadoActualJSON, eventoNubeId]);
 
   // Escucha los guardados de otras personas en este evento: cuando llega uno que
   // no es nuestro se aplica AL INSTANTE (sin recargar) y se muestra un aviso con
@@ -1119,6 +1239,18 @@ export default function App({ onCerrarSesion } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [origenSillas, fechaEvento]);
 
+  // Si cambia el proveedor del mobiliario de alquiler, se refresca el nombre de su
+  // recogida ya creada — el interruptor de arriba es quien decide si existe o no,
+  // esto solo mantiene el texto a juego con quién lo presta de verdad.
+  const proveedorMobiliarioVistoRef = React.useRef(proveedorMobiliarioAlquiler);
+  useEffect(() => {
+    if (proveedorMobiliarioVistoRef.current === proveedorMobiliarioAlquiler) return;
+    proveedorMobiliarioVistoRef.current = proveedorMobiliarioAlquiler;
+    if (!llevaMobiliarioAlquiler) return;
+    sincronizaAlquiler("mobiliario", true, conceptoAlquiler("mobiliario", proveedorMobiliarioAlquiler));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proveedorMobiliarioAlquiler]);
+
   // El generador de las producciones viene marcado de serie (siempre se lleva uno), así
   // que su recogida se crea al elegir el tipo de evento, que es cuando entra en juego —
   // si no, el único alquiler que nadie llega a pulsar sería justo el que más se olvida.
@@ -1127,6 +1259,13 @@ export default function App({ onCerrarSesion } = {}) {
   const handleCambiarTipoEvento = (tipo) => {
     setEvento(tipo);
     if (tipo === "produccion") {
+      // Un rodaje es casi siempre al aire libre: si nadie las ha tocado, las carpas
+      // empiezan activadas al entrar en producción, igual que el generador — el
+      // interruptor sigue estando para el sitio puntual que ya tiene sombra propia.
+      // Fuera de producción empiezan apagadas (estado inicial de llevaCarpas), así que
+      // sin este empujón un evento que arrancó boda y cambia a rodaje se quedaría sin
+      // ellas aunque siempre las llevara.
+      if (!llevaCarpas) setLlevaCarpas(true);
       if (llevaGenerador) sincronizaAlquiler("generador", true, conceptoAlquiler("generador"));
       // En un rodaje no se alquila mobiliario: si venía marcado, se apaga con su recogida
       if (llevaMobiliarioAlquiler) {
@@ -1201,7 +1340,7 @@ export default function App({ onCerrarSesion } = {}) {
         avisarCompartir("Copiado, pero el evento aún NO ha subido ⚠", 9000, 1);
       }, ESPERA_SUBIDA_LINK);
       guardarEventoNube(id, estado)
-        .then((ts) => { apuntarGuardadoPropio(ts); resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
+        .then(({ actualizado }) => { apuntarGuardadoPropio(actualizado); resuelto = true; clearTimeout(aTiempo); setErrorNube(null); })
         .catch((e) => {
           resuelto = true;
           clearTimeout(aTiempo);
@@ -1829,17 +1968,14 @@ export default function App({ onCerrarSesion } = {}) {
         // Y aquí deja de estar "sin configurar": esto es exactamente lo que le faltaba.
         // El aviso existe para que nadie cargue un camión con los valores de fábrica;
         // una vez llegan los datos de la oficina, seguir avisando sería ruido.
-        const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false };
-        // Las notas se SUMAN, no se sustituyen: las del evento suelen ser tuyas (a quién
-        // llamar, qué recoger) y las del formulario vienen del cliente. Perder unas por
-        // las otras es justo lo que no puede pasar.
-        const notasAntes = (base.notasEvento || "").trim();
-        const notasNuevas = (cambios.notasEvento || "").trim();
-        if (notasAntes && notasNuevas && !notasAntes.includes(notasNuevas)) {
-          estado.notasEvento = `${notasAntes}\n${notasNuevas}`;
-        } else if (notasAntes && !notasNuevas) {
-          estado.notasEvento = base.notasEvento;
-        }
+        // formularioRespuestas guarda lo último que contestó la oficina tal cual: es lo
+        // que el propio formulario recupera si vuelven a elegir este evento (ver
+        // resumirParaOficina), para no preguntarlo todo de cero un evento que "ya
+        // configurado" decía tener resuelto.
+        const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false, formularioRespuestas: envio.respuestas || {} };
+        // Las notas se SUMAN, no se sustituyen (ver notasFusionadas en preguntas.js,
+        // que explica por qué se compara línea a línea y no el bloque entero).
+        estado.notasEvento = notasFusionadas(base.notasEvento, cambios.notasEvento);
         // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
         // si no, la app cargaría el material y nadie iría a buscarlo.
         estado.recogidas = recogidasConAlquileres(estado);
@@ -1858,6 +1994,15 @@ export default function App({ onCerrarSesion } = {}) {
           if (estado.compras.some(x => (x.concepto || "").trim().toLowerCase() === c.concepto.toLowerCase())) return;
           estado.compras = [...estado.compras, c];
         });
+        // Las hojas de alquiler (Dealde, Event Style...) se ACUMULAN, no se sustituyen:
+        // el spread de arriba ya puso las del envío nuevo, aquí se le suman las que ya
+        // hubiera guardadas. Se limita a las últimas TOPE_ARCHIVOS_ALQUILER para no
+        // acercarse al límite de 1 MiB por documento de Firestore.
+        const TOPE_ARCHIVOS_ALQUILER = 8;
+        const archivosAntes = Array.isArray(base.archivosAlquiler) ? base.archivosAlquiler : [];
+        const archivosNuevos = Array.isArray(cambios.archivosAlquiler) ? cambios.archivosAlquiler : [];
+        const yaEstaba = a => archivosAntes.some(x => x.origen === a.origen && x.nombre === a.nombre && x.peso === a.peso);
+        estado.archivosAlquiler = [...archivosAntes, ...archivosNuevos.filter(a => !yaEstaba(a))].slice(-TOPE_ARCHIVOS_ALQUILER);
         const siguiente = { ...guardados, [nombre]: estado };
         guardarEventos(siguiente);
         // No se borra: queda guardado como revisado, con a qué evento fue a parar
@@ -1996,6 +2141,45 @@ export default function App({ onCerrarSesion } = {}) {
       .catch(() => { /* sin conexión */ });
   }, [escribirEnCalendario]);
 
+  // Mismo patrón que factoresBebida (justo debajo): esta pantalla SÍ necesita estado de
+  // ratios de verdad, y no solo leerRatios() al vuelo, porque el panel de "gente por
+  // comensal" del Modo carga (ver Ratios.jsx / calibracionPersonal) tiene que enterarse
+  // cuando cambian, sea porque llegan de la nube o porque los toca el asistente.
+  //
+  // Bug real que arregla este efecto: sin él, la checklist arrancaba SIEMPRE con los
+  // ratios de fábrica (9/10/20) hasta que algo —el asistente, o abrir el calendario—
+  // los pusiera en memoria; el ajuste del equipo guardado en Firestore nunca llegaba
+  // aquí solo. En la práctica caducaba rápido porque baseChecklist recalcula en cuanto
+  // se toca cualquier campo del evento (pax, tipo…), pero un checklist generado sin
+  // tocar nada antes sí podía salir con el ratio equivocado.
+  const [ratiosPersonal, setRatiosPersonal] = useState(() => leerRatios());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setRatiosPersonal(ponRatios(remotos)); };
+    cargarRatiosNube().then(aplicar).catch(() => { /* sin conexión: los de fábrica */ });
+    const corta = suscribirRatiosNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  // Para el asistente (ver escrituraRatios.js) y para el panel manual de Ratios.jsx en
+  // el Modo carga: el mismo ponRatios que deja el valor puesto para TODA la app, más la
+  // subida a la nube (antes solo miraba nubeActiva(), sin haySesionEquipo — igual que
+  // los demás ajustes compartidos, para que el asistente no intente escribir en
+  // Firestore sin sesión de equipo) y ahora también el aviso al estado de este
+  // componente para que el panel se entere sin esperar a otro recálculo.
+  const guardarRatiosAsistente = React.useCallback((siguiente) => {
+    setRatiosPersonal(ponRatios(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarRatiosNube(ratiosCambiados(siguiente)).catch(() => { /* se reintenta al siguiente cambio */ });
+    }
+  }, [haySesionEquipo]);
+
+  // Lo que dicen los eventos con el número de camareros puesto a mano (ver
+  // calibracionPersonal en calibracion.js): se recalcula solo cuando cambia el archivo,
+  // que es lo único de lo que depende.
+  const personalMedido = useMemo(() => calibracionPersonal(eventosGuardados), [eventosGuardados]);
+
   const [factoresBebida, setFactoresBebida] = useState(() => leerFactores());
   useEffect(() => {
     if (!nubeActiva() || !haySesionEquipo) return;
@@ -2003,6 +2187,18 @@ export default function App({ onCerrarSesion } = {}) {
     const aplicar = (remotos) => { if (vivo && remotos) setFactoresBebida(ponFactores(remotos)); };
     cargarBebidaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
     const corta = suscribirBebidaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  // Lo mismo que la bebida, para el hielo: el factor por tipo de evento que calibra la
+  // merma (una estimación) contra lo que de verdad volvió. Mismo equipo, misma regla.
+  const [factoresHielo, setFactoresHielo] = useState(() => leerFactoresHielo());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresHielo(ponFactoresHielo(remotos)); };
+    cargarHieloNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirHieloNube(aplicar);
     return () => { vivo = false; corta(); };
   }, [haySesionEquipo]);
 
@@ -2086,6 +2282,76 @@ export default function App({ onCerrarSesion } = {}) {
     }
   };
 
+  // Mismo patrón que factoresBebida, para la cristalería (ver cristaleria.js). Sin
+  // panel manual todavía: hoy solo lo toca el asistente (aplicar_factor_cristaleria),
+  // pero vive aquí y no solo en memoria para que el equipo entero cargue lo mismo.
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) ponFactoresCristaleria(remotos); };
+    cargarCristaleriaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirCristaleriaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarCristaleria = (siguiente) => {
+    ponFactoresCristaleria(siguiente);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarCristaleriaNube(factoresCristaleriaCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+  const handleCambiarHielo = (siguiente) => {
+    setFactoresHielo(ponFactoresHielo(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarHieloNube(factoresHieloCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+
+  // Lo mismo que la bebida y el hielo, para la comida (paella y bandejas): cuánto se
+  // usó de verdad por tipo, con la convención "lo vuelto es lo no usado" (ver comida.js).
+  const [factoresComida, setFactoresComida] = useState(() => leerFactoresComida());
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remotos) => { if (vivo && remotos) setFactoresComida(ponFactoresComida(remotos)); };
+    cargarComidaNube().then(aplicar).catch(() => { /* sin conexión: todos a 1 */ });
+    const corta = suscribirComidaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+
+  const handleCambiarComida = (siguiente) => {
+    setFactoresComida(ponFactoresComida(siguiente));
+    if (nubeActiva() && haySesionEquipo) {
+      guardarComidaNube(factoresComidaCambiados(siguiente))
+        .catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+  };
+
+  // La estrategia de captación: documento de equipo (no por aparato), lo lee y lo
+  // actualiza el asistente. Sin conexión o sin sesión, null: el asistente lo dice.
+  const [estrategia, setEstrategia] = useState(null);
+  useEffect(() => {
+    if (!nubeActiva() || !haySesionEquipo) return;
+    let vivo = true;
+    const aplicar = (remota) => { if (vivo) setEstrategia(remota || null); };
+    cargarEstrategiaNube().then(aplicar).catch(() => { /* sin conexión: sin estrategia */ });
+    const corta = suscribirEstrategiaNube(aplicar);
+    return () => { vivo = false; corta(); };
+  }, [haySesionEquipo]);
+  const handleCambiarEstrategia = (nueva) => {
+    const sana = saneaEstrategia(nueva);
+    if (!sana) return { error: "Esa no tiene forma de estrategia: faltan canales, contenido, puertas o fase." };
+    setEstrategia(sana);
+    if (nubeActiva() && haySesionEquipo) {
+      guardarEstrategiaNube(sana).catch(() => { /* sin conexión: queda aquí y sube al siguiente cambio */ });
+    }
+    return { guardada: true, actualizada: sana.actualizada };
+  };
+
   // Lo que dice el histórico: de cada evento con la vuelta apuntada sale cuánto se bebió
   // de verdad. Se recalcula solo cuando cambia el archivo o los factores, que es caro
   // —reconstruye la checklist de cada evento guardado— y no cambia por escribir un pax.
@@ -2093,6 +2359,41 @@ export default function App({ onCerrarSesion } = {}) {
     () => calibracionBebida(eventosGuardados, factoresBebida),
     [eventosGuardados, factoresBebida],
   );
+
+  // Lo mismo que la bebida, con la vuelta del hielo: cuánto se usó de verdad por tipo.
+  const hieloMedido = useMemo(
+    () => calibracionHielo(eventosGuardados, factoresHielo),
+    [eventosGuardados, factoresHielo],
+  );
+
+  // Paella y bandejas con la vuelta marcada: el dato real manda sobre el ratio fijo.
+  const comidaMedida = useMemo(
+    () => calibracionComida(eventosGuardados, factoresComida),
+    [eventosGuardados, factoresComida],
+  );
+
+  // La auditoría de negocio: lo que los datos ya saben y todavía no se ha hecho
+  // (medidas sin aplicar, roturas sin precio, eventos sin vuelta, huecos del
+  // catálogo). Se calcula aquí porque la app es quien lo tiene todo en memoria —
+  // precios, factores y medidas — y se la pasa al asistente y a Cerebro. Los
+  // huecos del catálogo van aparte porque reconstruyen la checklist (calibracion.js
+  // es quien importa el generador; revision.js no, para no engordar el Worker).
+  const oportunidades = useMemo(() => {
+    const precios = leerPrecios();
+    return [
+      ...oportunidadesNegocio({
+        eventosGuardados, precios,
+        calibracionBebida: bebidaMedida, calibracionHielo: hieloMedido, calibracionComida: comidaMedida,
+        factoresBebida, factoresHielo, factoresComida,
+      }),
+      ...huecosDeCatalogo(eventosGuardados, precios).map(h => ({
+        tono: "oportunidad",
+        texto: `En "${h.nombre}" (${h.fecha}), ${h.sinPrecio} de ${h.total} líneas no tienen precio (${h.ejemplos.join(", ")}${h.sinPrecio > 3 ? "…" : ""}): el Resumen va a quedarse corto.`,
+        comoSeArregla: "Ponlos en Modo carga → Resumen → precios.",
+        propuesta: null,
+      })),
+    ];
+  }, [eventosGuardados, factoresBebida, factoresHielo, factoresComida, bebidaMedida, hieloMedido, comidaMedida, preciosAlDia]);
 
   // Guardar un precio lo deja en este navegador Y lo sube. Se suben SOLO los cambiados,
   // no el catálogo entero: si no, el día que se corrija un precio de partida en una
@@ -2259,11 +2560,12 @@ export default function App({ onCerrarSesion } = {}) {
   // CADA tecla que se pulsara en cualquier campo. Memorizado por su contenido, solo
   // se rehace cuando de verdad cambia algo que afecta a las cantidades.
   const opts = useMemo(() => ({
-    dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
+    dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
+    tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaCarpas, llevaGenerador,
-    llevaMobiliarioAlquiler,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
+    llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
@@ -2276,12 +2578,13 @@ export default function App({ onCerrarSesion } = {}) {
     numLogisticaEquipo: logisticaEquipo.filter(p => (p.nombre && p.nombre.trim()) || p.inicio || p.fin).length,
   }), [
     notasEvento,
-    dobleServicio, tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
+    dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
+    tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
-    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
-    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, llevaPalomitera, llevaJarrasCristal,
-    llevaCarpas, llevaGenerador, llevaMobiliarioAlquiler,
-    tipoCafetera, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
+    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida,
+    llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
+    tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
     tipoCongelador, tipoPaella, numPaellas, origenSillas, estiloPlatoPrincipal, estiloPlatoPostre, tipoMesa,
     diasProduccion, paxPorCamarero, logisticaEquipo,
@@ -2352,11 +2655,18 @@ export default function App({ onCerrarSesion } = {}) {
           const esAlquilerFijo = extra === true;
           const key = `${cat.nombre}::${label}`;
           // qty puede venir como { u, sufijo } (conSufijo): se separa el número editable
-          // del texto fijo del envase, que se conserva aparte aunque se edite el número
+          // del texto fijo del envase, que se conserva aparte aunque se edite el número.
+          // El sufijo casi siempre es un texto fijo (packs, cajas...), pero en un par de
+          // casos (hielo, carpas) tiene un número propio DERIVADO del de delante — "kg ·
+          // N taxis", "faltan N, hay que alquilarlas" — que antes se quedaba con el texto
+          // de cuando se generó la checklist: editar el número de delante no lo tocaba.
+          // Ahí conSufijo() recibe una función en vez de un texto, y se llama aquí con el
+          // número YA resuelto (con el override aplicado si lo hay).
           const esObjetoConSufijo = qty && typeof qty === "object";
           const valorBase = esObjetoConSufijo ? qty.u : qty;
-          const sufijo = esObjetoConSufijo ? qty.sufijo : undefined;
+          const sufijoBruto = esObjetoConSufijo ? qty.sufijo : undefined;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
+          const sufijo = typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto;
           return [nombresManuales[key] ?? label, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo];
         });
     });
@@ -2452,26 +2762,41 @@ export default function App({ onCerrarSesion } = {}) {
     });
   };
   // Tocar la casilla es haberlo revisado: se le quita el aviso de "la cantidad cambió"
-  const revisado = (key) => setMarcasRevisar(prev => {
+  //
+  // Con useCallback y sin depender de nada que cambie con cada marca (todo lo de dentro
+  // es setState funcional, sin leer estado de fuera): es lo que hace falta para que las
+  // filas de Modo carga (memoizadas, ver ModalModoCarga.jsx) puedan saltarse un
+  // re-render cuando NO son ellas las que han cambiado. Con una función nueva en cada
+  // pulsación —lo normal sin useCallback— React.memo no sirve de nada: todas las filas
+  // reciben una prop "distinta" aunque el contenido sea el mismo. Medido con Playwright
+  // en Modo carga con 111 items: marcar una casilla tardaba 50-140ms en repintar
+  // (CPU ×4) porque la lista ENTERA se reconciliaba en cada marca.
+  const revisado = useCallback((key) => setMarcasRevisar(prev => {
     if (!prev[key]) return prev;
     const next = { ...prev };
     delete next[key];
     return next;
-  });
-  const handleTogglePreparado = (key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); };
+  }), []);
+  const handleTogglePreparado = useCallback((key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); }, [revisado]);
   // Si algo sale en el camión es porque estaba preparado: marcarlo en Salida lo da
   // por preparado también. Antes las dos listas podían contradecirse —"cargado" pero
   // "sin preparar"— y quien miraba la de preparación volvía a buscar por el almacén
   // algo que ya iba dentro del camión.
   // Al revés NO: desmarcar la salida (se baja algo del camión) no deshace el trabajo
   // de haberlo preparado, que sigue hecho.
-  const handleToggleCheckCarga = (key) => {
+  //
+  // "marcando" se calcula DENTRO del updater de setCheckeados, no leyendo `checkeados`
+  // de fuera: así la función no depende de checkeados y useCallback la deja estable de
+  // verdad (ver la nota en `revisado`, arriba, de por qué importa para Modo carga).
+  const handleToggleCheckCarga = useCallback((key) => {
     revisado(key);
-    const marcando = !checkeados[key];
-    if (marcando) setPreparados(prev => (prev[key] ? prev : { ...prev, [key]: true }));
-    setCheckeados(prev => ({ ...prev, [key]: marcando }));
-  };
-  const handleToggleNotaCarga = (texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] }));
+    setCheckeados(prev => {
+      const marcando = !prev[key];
+      if (marcando) setPreparados(p => (p[key] ? p : { ...p, [key]: true }));
+      return { ...prev, [key]: marcando };
+    });
+  }, [revisado]);
+  const handleToggleNotaCarga = useCallback((texto) => setNotasCheck(prev => ({ ...prev, [texto]: !prev[texto] })), []);
   // Cronómetro de carga/descarga: arrancar acumula desde ahora, pausar suma el tramo
   // corrido al acumulado, reiniciar lo pone a cero. Se guarda/sincroniza con el evento.
   const handleCronoStart = (fase) => setCronos(prev => {
@@ -2489,18 +2814,18 @@ export default function App({ onCerrarSesion } = {}) {
   // A diferencia de roturas, "0" en vuelve es un dato real (confirmado: no ha vuelto
   // nada), distinto de "todavía no se ha revisado" (sin entrada) — solo se borra la
   // clave si se deja el campo vacío del todo.
-  const handleVuelveCarga = (key, valor) => setVueltos(prev => {
+  const handleVuelveCarga = useCallback((key, valor) => setVueltos(prev => {
     const next = { ...prev };
     if (valor === "") delete next[key];
     else next[key] = valor;
     return next;
-  });
-  const handleRoturasCarga = (key, valor) => setRoturas(prev => {
+  }), []);
+  const handleRoturasCarga = useCallback((key, valor) => setRoturas(prev => {
     const next = { ...prev };
     if (!valor || valor === "0") delete next[key];
     else next[key] = valor;
     return next;
-  });
+  }), []);
 
   // Quita de la lista un item calculado (los manuales se borran de itemsManuales)
   // Items quitados con la ✕, agrupados por categoría. Antes solo se podían recuperar con
@@ -2871,6 +3196,16 @@ export default function App({ onCerrarSesion } = {}) {
           factoresBebida={factoresBebida}
           calibracionBebida={bebidaMedida}
           onCambiarBebida={handleCambiarBebida}
+
+          factoresHielo={factoresHielo}
+          calibracionHielo={hieloMedido}
+          onCambiarHielo={handleCambiarHielo}
+          factoresComida={factoresComida}
+          calibracionComida={comidaMedida}
+          onCambiarComida={handleCambiarComida}
+          ratiosPersonal={ratiosPersonal}
+          calibracionPersonal={personalMedido}
+          onCambiarRatios={guardarRatiosAsistente}
           checklist={checklist}
           preparados={preparados}
           marcasRevisar={marcasRevisar}
@@ -3050,6 +3385,9 @@ export default function App({ onCerrarSesion } = {}) {
                   memoria,
                   objetivos,
                   tareas,
+                  // La estrategia de captación, si la hay: para proponer marketing sin
+                  // contradecir lo acordado (ver asistente/estrategia.js).
+                  estrategia,
                   // Mismos números que la ficha del Resumen (totalConceptos/itemsCargados/
                   // itemsPreparados/itemsVueltos): así el asistente puede contestar "cuánto
                   // llevo cargado" con lo que hay de verdad en pantalla, no un recuento
@@ -3071,6 +3409,27 @@ export default function App({ onCerrarSesion } = {}) {
                     aplicarEnTareas({ tareas: tareasRef.current, guardar: guardarTareas }),
                     aplicarEnChecklists({ apuntes: apuntesCalendario, promover: promoverApuntes }),
                     aplicarEnCalendario({ apuntes: apuntesCalendario, guardar: guardarApunte, borrar: borrarApunte }),
+                    aplicarEnRatios({ guardar: guardarRatiosAsistente }),
+                    aplicarEnBebida({ guardar: handleCambiarBebida }),
+                    aplicarEnCristaleria({ guardar: handleCambiarCristaleria }),
+
+                    // Un factor medido se aplica por la MISMA puerta que el botón del
+                    // panel: mismo ponFactores, misma subida a la nube, mismo saneado.
+                    aplicarEnAjustes({
+                      aplicarBebida: (tipo, clave, factor) => {
+                        handleCambiarBebida(conFactor(factoresBebida, tipo, clave, factor));
+                        return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
+                      },
+                      aplicarHielo: (tipo, factor) => {
+                        handleCambiarHielo(conFactorHielo(factoresHielo, tipo, factor));
+                        return { aplicado: `factor ${factor} para el hielo en ${tipo}` };
+                      },
+                      aplicarComida: (tipo, clave, factor) => {
+                        handleCambiarComida(conFactorComida(factoresComida, tipo, clave, factor));
+                        return { aplicado: `factor ${factor} para ${clave} en ${tipo}` };
+                      },
+                      aplicarEstrategia: (datos) => handleCambiarEstrategia(datos),
+                    }),
                   ),
                   onPonerObjetivo: (texto, porQue) => guardarObjetivos(ponerObjetivo(objetivosRef.current, texto, { porQue }).objetivos),
                   onCambiarEstadoObjetivo: (id, estado) => guardarObjetivos(cambiarEstado(objetivosRef.current, id, estado)),
@@ -3086,6 +3445,10 @@ export default function App({ onCerrarSesion } = {}) {
                   avisoActualizacion: actualizacionAplicada
                     ? { cambios: actualizacionAplicada, aplicada: true }
                     : (versionNueva && cambiosNuevaVersion.length ? { cambios: cambiosNuevaVersion, aplicada: false } : null),
+                  // Lo que los datos ya saben y no se ha hecho. Solo la checklist lo
+                  // calcula (es quien tiene precios y medidas); el calendario no pasa
+                  // nada y ver_auditoria le dice la verdad en vez de inventar.
+                  oportunidades,
                 })}
               />
             )}
@@ -3782,22 +4145,95 @@ export default function App({ onCerrarSesion } = {}) {
                 />
                 <span className="checkbox-texto">Armario caliente <span className="checkbox-sub">· Dealde</span></span>
               </label>
+              {/* En producción se cargan solas, sin preguntar (rodajes largos, el pase se
+                  mantiene caliente todo el día): no tiene sentido ofrecer aquí lo que ya
+                  se añade automáticamente. */}
+              {evento !== "produccion" && (
+                <label className="checkbox-label-normal">
+                  <input
+                    type="checkbox"
+                    checked={llevaMesasCalientes}
+                    onChange={e => setLlevaMesasCalientes(e.target.checked)}
+                  />
+                  <span className="checkbox-texto">Mesas calientes</span>
+                </label>
+              )}
+              {/* Gastros: cumpleaños no los usa (todo en bandejas) y producción los calcula
+                  solo (2 por chafer), así que aquí solo se ofrece en el resto. En blanco
+                  sale el mínimo de serie (GASTROS_MINIMO). */}
+              {evento !== "cumpleanos" && evento !== "produccion" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº de gastros</span>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={numGastros || ""}
+                    min="1"
+                    placeholder={String(GASTROS_MINIMO)}
+                    onChange={e => setNumGastros(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                </div>
+              )}
+              {/* Mesas de buffet: la suma de lo contestado en el formulario (quesos, dulce...).
+                  En blanco no sale ninguna línea, salvo en producción, que sigue con su mínimo
+                  de siempre por pax aunque esto esté a 0. */}
+              <div className="form-group controls-mini">
+                <span className="form-label">Nº de mesas de buffet</span>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={numMesasBuffet || ""}
+                  min="0"
+                  placeholder="0"
+                  onChange={e => setNumMesasBuffet(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+              </div>
+              {/* Mesas altas: 2 por barra, 4 con 100 pax o más. En blanco, con barra libre
+                  cae sola al cálculo viejo por pax; sin barra libre (el cliente trae su
+                  bebida) se queda a 0 salvo que se conteste aquí a mano — es el único
+                  interruptor para llevar mesas altas sin barra (ver calcMesasAltas).
+                  Solo boda/comunión/corporativo: cumpleaños y producción no llevan
+                  "Mesa alta" en su checklist. */}
+              {evento !== "cumpleanos" && evento !== "produccion" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Nº de barras</span>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={numBarras || ""}
+                    min="0"
+                    placeholder="según pax"
+                    onChange={e => setNumBarras(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                </div>
+              )}
               {/* Mobiliario EXTRA, el que no tenemos: se alquila a Event Style cuando el
                   cliente pide más de lo nuestro. En un rodaje no se lleva, así que ahí no
                   se ofrece. Los chill out son nuestros y se configuran en Extras: esos no
                   hay que devolverlos. */}
               {evento !== "produccion" && (
-                <label className="checkbox-label-normal">
-                  <input
-                    type="checkbox"
-                    checked={llevaMobiliarioAlquiler}
-                    onChange={e => {
-                      setLlevaMobiliarioAlquiler(e.target.checked);
-                      sincronizaAlquiler("mobiliario", e.target.checked, conceptoAlquiler("mobiliario"));
-                    }}
-                  />
-                  <span className="checkbox-texto">Mobiliario extra <span className="checkbox-sub">· Event Style, lo que no es nuestro</span></span>
-                </label>
+                <>
+                  <label className="checkbox-label-normal">
+                    <input
+                      type="checkbox"
+                      checked={llevaMobiliarioAlquiler}
+                      onChange={e => {
+                        setLlevaMobiliarioAlquiler(e.target.checked);
+                        sincronizaAlquiler("mobiliario", e.target.checked, conceptoAlquiler("mobiliario", proveedorMobiliarioAlquiler));
+                      }}
+                    />
+                    <span className="checkbox-texto">Mobiliario extra <span className="checkbox-sub">· Event Style si no se dice otro proveedor</span></span>
+                  </label>
+                  {llevaMobiliarioAlquiler && (
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Proveedor (vacío = Event Style)"
+                      value={proveedorMobiliarioAlquiler}
+                      onChange={e => setProveedorMobiliarioAlquiler(e.target.value)}
+                    />
+                  )}
+                </>
               )}
               {/* Las 8 carpas del almacén cubren casi todo; cuando el cálculo pide más hay
                   que alquilar las que falten, y esas también se van a buscar y se devuelven. */}
@@ -3817,6 +4253,29 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
             {!fechaEvento && recogidas.some(r => r.auto) && (
               <p className="alquileres-aviso">Pon la fecha del evento y las de recogida y devolución se rellenan solas.</p>
+            )}
+            {archivosAlquiler.length > 0 && (
+              <div className="form-archivo-lista">
+                <span className="form-label">DOCUMENTOS DE ALQUILER (subidos desde el formulario)</span>
+                {archivosAlquiler.map((a, i) => (
+                  <div className="form-archivo-puesto" key={i}>
+                    {/^image\//.test(a.tipo)
+                      ? <img src={a.datos} alt="" className="form-archivo-miniatura" />
+                      : <span className="form-archivo-icono">PDF</span>}
+                    <span className="form-archivo-nombre">
+                      {a.etiqueta || a.nombre}
+                      <em>{a.nombre}</em>
+                    </span>
+                    <a href={a.datos} download={a.nombre} className="form-btn-atras">Descargar</a>
+                    <button
+                      className="form-archivo-quitar"
+                      onClick={() => setArchivosAlquiler(prev => prev.filter((_, idx) => idx !== i))}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="logistica-block">
@@ -4008,7 +4467,18 @@ export default function App({ onCerrarSesion } = {}) {
           <div className="section-title">Extras</div>
           <div className="checkbox-grid">
             {[
-              [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla cubierto, copa y plato"],
+              [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla el plato"],
+              // Qué dobla en concreto (cubiertos y cristalería), aparte del plato de
+              // arriba: por defecto caen en dobleServicio (ver useState), pero cada uno
+              // es su propia casilla — no todo tiene por qué doblar a la vez.
+              ...(evento !== "produccion" ? [
+                [dobleTenedor, setDobleTenedor, "Doble tenedor", "primero + segundo"],
+                [dobleCuchillo, setDobleCuchillo, "Doble cuchillo", "primero + segundo"],
+                [dobleCuchara, setDobleCuchara, "Doble cuchara", "primero + segundo"],
+                [dobleVino, setDobleVino, "Doble copa de vino", "no suele doblar: se rellena la misma"],
+                [dobleAgua, setDobleAgua, "Doble vaso de agua", "no suele doblar: se rellena el mismo"],
+                [dobleCava, setDobleCava, "Doble copa de cava", "no suele doblar: se rellena la misma"],
+              ] : []),
               [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
               [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
               /* "Lleva canapés" ya no existe: las bandejas para pasar comida van siempre,
@@ -4037,11 +4507,19 @@ export default function App({ onCerrarSesion } = {}) {
                 ? [[llevaAguasPequenas, setLlevaAguasPequenas, "Aguas pequeñas", "botellas individuales 33cl"]]
                 : []),
               [hayDesayuno,          setHayDesayuno,          "Hay desayuno",             "sandwichera + más tazas de café"],
+              [cafeParaInvitados,    setCafeParaInvitados,    "Café para invitados",      "desmárcalo si el café es solo para el personal"],
               ...(evento !== "boda"
                 ? [[fuerzaTextilTela, setFuerzaTextilTela, "Servilletas de tela", "añade tela y reduce las de papel grandes"]]
                 : []),
               ...(evento !== "cumpleanos" && evento !== "produccion"
                 ? [[llevaJarrasCristal, setLlevaJarrasCristal, "Jarras de cristal", "para agua/zumos en mesa"]]
+                : []),
+              ...(evento !== "produccion"
+                ? [[llevaCristaleria, setLlevaCristaleria, "Llevamos cristalería", "desmárcalo si no se sirve vino/agua/cava en vaso o copa"]]
+                : []),
+              [llevaHielo, setLlevaHielo, "Llevamos hielo", "desmárcalo si el sitio ya lo da o no hace falta"],
+              ...(evento !== "produccion"
+                ? [[llevaBebida, setLlevaBebida, "La bebida la pone Gula", "desmárcalo si la trae el cliente/la finca (bebida aparte)"]]
                 : []),
             ].map(([val, fn, lab, sub]) => (
               <label key={lab} className="checkbox-label-normal">
@@ -4085,11 +4563,11 @@ export default function App({ onCerrarSesion } = {}) {
                       className="form-input"
                       value={numPaellas || ""}
                       min="1"
-                      placeholder={String(calcPaella(pax, tipoPaella, 0).n)}
+                      placeholder={String(calcPaella(pax, tipoPaella, 0, evento).n)}
                       onChange={e => setNumPaellas(Math.max(0, parseInt(e.target.value) || 0))}
                     />
                     <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                      En blanco salen {calcPaella(pax, tipoPaella, 0).n} por la gente
+                      En blanco salen {calcPaella(pax, tipoPaella, 0, evento).n} por la gente
                     </span>
                   </div>
                 </>
@@ -4204,10 +4682,11 @@ export default function App({ onCerrarSesion } = {}) {
               <div className="equip-aviso">Con "Solo bandeja" la comida va toda en bandeja, así que los platos no se cargan aunque aquí tengan estilo elegido.</div>
             )}
             <SegmentedControl label="Cubiertos" value={llevaCubiertos ? "Llevan" : "No llevan"} onChange={v => setLlevaCubiertos(v === "Llevan")} options={["Llevan", "No llevan"]} />
-            {/* Carpas y generador son equipo estándar de rodaje, no un extra que se
-                añade: van aquí con el resto del equipamiento y las cantidades se
-                calculan solas. El "No llevan" es para el sitio puntual que ya tiene
-                sombra o luz propia. */}
+            {/* Carpas es equipo estándar de rodaje (van con el resto del equipamiento,
+                cantidades solas); en el resto de eventos es la excepción — fincas con
+                nave o interior — así que ahí empieza apagado. El "No llevan" es para
+                el sitio puntual que ya tiene sombra propia, en cualquiera de los dos
+                casos. El generador, en cambio, sigue siendo solo de producción. */}
             {/* El generador está en ALQUILERES: siempre viene de SOS. Las carpas son
                 nuestras (8 en almacén), así que su interruptor se queda aquí; si hacen
                 falta más, se marcan como alquiler en ese bloque. */}
@@ -4219,25 +4698,23 @@ export default function App({ onCerrarSesion } = {}) {
                 options={["Plástico", "Cartón", "Sin decir"]}
               />
             )}
-            {evento === "produccion" && (
-              <SegmentedControl
-                label="Carpas"
-                value={llevaCarpas ? "Llevan" : "No llevan"}
-                onChange={v => {
-                  setLlevaCarpas(v === "Llevan");
-                  // Sin carpas no hay carpas que alquilar: se apaga también su recogida
-                  if (v !== "Llevan" && alquilaCarpas) {
-                    setAlquilaCarpas(false);
-                    sincronizaAlquiler("carpas", false);
-                  }
-                }}
-                options={["Llevan", "No llevan"]}
-              />
-            )}
+            <SegmentedControl
+              label="Carpas"
+              value={llevaCarpas ? "Llevan" : "No llevan"}
+              onChange={v => {
+                setLlevaCarpas(v === "Llevan");
+                // Sin carpas no hay carpas que alquilar: se apaga también su recogida
+                if (v !== "Llevan" && alquilaCarpas) {
+                  setAlquilaCarpas(false);
+                  sincronizaAlquiler("carpas", false);
+                }
+              }}
+              options={["Llevan", "No llevan"]}
+            />
             {/* Cuántas. Vacío = las que salen de la cuenta por pax; un número manda
                 sobre ella, porque el sitio lo ha visto una persona y la cuenta no.
                 Si pasa de las 8 del almacén, se dice aquí mismo cuántas alquilar. */}
-            {evento === "produccion" && llevaCarpas && (
+            {llevaCarpas && (
               <div className="form-group">
                 <span className="form-label">Nº DE CARPAS</span>
                 <input
@@ -4262,6 +4739,27 @@ export default function App({ onCerrarSesion } = {}) {
                     Tenemos {CARPAS_EN_ALMACEN}: hay que alquilar {carpasPorAlquilar(numCarpas || carpasRecomendadas(paxCarpas))} a Support On Set
                   </span>
                 )}
+              </div>
+            )}
+            {/* Mobiliario de exterior, junto a las carpas. Sin fórmula propia (no hay
+                un "uno cada X pax" fiable): la cantidad la pone quien ha visto el
+                sitio, "—" hasta entonces, igual que otros items manuales de la app. */}
+            <SegmentedControl
+              label="Parabanes"
+              value={llevaParabanes ? "Llevan" : "No llevan"}
+              onChange={v => setLlevaParabanes(v === "Llevan")}
+              options={["Llevan", "No llevan"]}
+            />
+            {llevaParabanes && (
+              <div className="form-group">
+                <span className="form-label">Nº DE PARABANES</span>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="0"
+                  value={numParabanes || ""}
+                  onChange={e => setNumParabanes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                />
               </div>
             )}
           </div>
@@ -4348,7 +4846,7 @@ export default function App({ onCerrarSesion } = {}) {
           return (
             <div key={cat.nombre} className={`category-section animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, borderTopColor: infoCat.color, borderTopWidth: 3 }}>
               <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
-                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span>{cat.nombre}</span>
+                <span className="cat-name"><span className="cat-icon" style={{ background: infoCat.color, color: infoCat.texto }}>{infoCat.Comp && <infoCat.Comp size={16} strokeWidth={2.2} />}</span><span className="cat-name-texto">{cat.nombre}</span></span>
                 <span className="cat-count">
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, -1); }} disabled={idx === 0} title="Subir esta categoría" aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={13} /></button>
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, 1); }} disabled={idx === checklist.length - 1} title="Bajar esta categoría" aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={13} /></button>

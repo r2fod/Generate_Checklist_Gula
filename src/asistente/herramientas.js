@@ -6,12 +6,14 @@
 //
 // Esa es toda la seguridad del asunto, y por eso está escrita así:
 //
-//   · Todas son de SOLO LECTURA. Ninguna escribe nada. Las de escribir vendrán después,
-//     con confirmación en pantalla, y aun así habrá cuatro que no se expondrán nunca:
-//     marcar cargado, marcar preparado, marcar vuelto y apuntar roturas. La identidad de
-//     un item es "categoría::etiqueta"; renombrar o marcar por su cuenta destruiría el
-//     trabajo de quien está cargando el camión, que es lo único que esta app no puede
-//     permitirse perder.
+//   · Las que escriben (tareas, apuntes del calendario, calibraciones) llevan
+//     escribe: true y las gobierna permisos.js: en "Solo consultar" ni se
+//     ofrecen, en "Con permiso" se proponen y se aprueban, en "Confianza" se
+//     aplican y se cuentan. Y hay una lista que no se expone en NINGUN nivel
+//     (ver NUNCA en permisos.js): marcar cargado, preparado o vuelto, roturas,
+//     renombrar item o categoría, borrar evento o archivo. La identidad de un
+//     item es "categoría::etiqueta"; tocarla destruye el trabajo de quien está
+//     cargando el camión, que es lo único que esta app no puede permitirse perder.
 //
 //   · Cada una dice si sus datos son SENSIBLES. Las que devuelven nombres de clientes,
 //     fechas o sitios llevan datos: true, y el cliente se niega a mandarlas a un
@@ -26,9 +28,11 @@ import { calcBebidas, calcHielo, KG_HIELO_POR_PAX } from "../calculos.js";
 import { buildChecklist } from "../checklist-generadores.js";
 import { escaletaDelEvento, resumenEscaleta } from "../escaleta.js";
 import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
-import { personalNecesario, leerRatios } from "../personal.js";
+import { personalNecesario, leerRatios, saneaRatios } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
-import { RATIOS_BEBIDA } from "../bebida.js";
+import { RATIOS_BEBIDA, TIPOS_BEBIDA, CLAVES_BEBIDA, esFactorValido, leerFactores, FACTOR_NEUTRO } from "../bebida.js";
+import { CLAVES_COMIDA } from "../comida.js";
+import { CLAVES_CRISTALERIA, esFactorValido as esFactorCristaleriaValido, leerFactoresCristaleria, factorCristaleria } from "../cristaleria.js";
 import { PERSONAS_POR_PAELLA } from "../paella.js";
 import { compararRatios } from "./sector.js";
 import { TEMAS, CLAVES_TEMA, porTemas } from "./memoria.js";
@@ -43,6 +47,7 @@ import "./conectores/whatsapp.js";
 import "./conectores/correo.js";
 import "./conectores/calendario.js";
 import "./conectores/checklists.js";
+import "./conectores/marketing.js";
 
 // Los nombres se comparan sin tildes, sin mayúsculas y sin sobrar espacios: quien
 // pregunta escribe "la boda de fulanita", no "Boda Fulanita y Mengano".
@@ -61,6 +66,13 @@ function coincide(nombre, busca) {
 
 // El evento que se está pidiendo. Sin nombre devuelve el que está abierto: "¿cuánto
 // hielo llevo?" casi siempre se pregunta con el evento delante.
+//
+// Con nombre, devuelve lo encontrado — o lo que hay que resolver ANTES de
+// encontrarlo: dos candidatos empatados al top no se adivinan. Adivinar entre dos
+// "Boda García" es jugársela con los datos de alguien; el conector de calendario ya
+// lo hacía ("Hay X que se parecen… dime cuál"), y esto lo iguala. Un empate en la
+// primera posición es ambigüedad; un nombre EXACTO (puntos 2) no lo es: es EL
+// nombre, no uno parecido.
 function buscaEvento(ctx, nombre) {
   const archivo = ctx.eventosGuardados || {};
   if (!nombre || !String(nombre).trim()) {
@@ -70,7 +82,12 @@ function buscaEvento(ctx, nombre) {
     .map(([n, d]) => ({ nombre: n, datos: d, puntos: coincide(n, nombre) }))
     .filter(c => c.puntos > 0)
     .sort((a, b) => b.puntos - a.puntos);
-  return candidatos.length ? candidatos[0] : null;
+  if (!candidatos.length) return null;
+  const [primero, segundo] = candidatos;
+  if (segundo && primero.puntos < 2 && segundo.puntos === primero.puntos) {
+    return { error: `Hay ${candidatos.length} que se parecen a "${nombre}": ${candidatos.slice(0, 3).map(c => c.nombre).join(", ")}. Dime cuál con más detalle.` };
+  }
+  return primero;
 }
 
 const noEncontrado = (nombre) => ({
@@ -135,6 +152,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       return ev ? resumeEvento(ev.nombre, ev.datos) : noEncontrado(nombre);
     },
   },
@@ -153,6 +171,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "", categoria = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       if (!ev) return noEncontrado(nombre);
       let cats;
       try { cats = catsDeEventoGuardado(ev.datos); } catch (e) { return { error: "No he podido reconstruir esa checklist." }; }
@@ -206,6 +225,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       if (!ev) return noEncontrado(nombre);
       const e = ev.datos;
       let totalItems = 0;
@@ -267,7 +287,7 @@ export const HERRAMIENTAS = {
   calcular_hielo: {
     datos: false,
     esquema: {
-      description: "Los kilos, bolsas y sacas de hielo que hacen falta. Depende de la temporada, de si hay barra y de si en el sitio hay congelador donde guardarlo.",
+      description: "Los kilos, bolsas y sacas de hielo que hacen falta. Depende de la temporada, de si hay barra y de si en el sitio hay congelador donde guardarlo. Pasa 'tipo' para que salga el mismo número que la checklist (aplicado el factor que el equipo tenga medido para ese tipo).",
       parameters: {
         type: "object",
         properties: {
@@ -275,14 +295,15 @@ export const HERRAMIENTAS = {
           verano: { type: "boolean" },
           horasBarra: { type: "number", description: "Horas de barra en total. 0 si no hay." },
           hayCongelador: { type: "boolean" },
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion. Vacío si no se sabe." },
         },
         required: ["comensales"],
       },
     },
-    corre: (ctx, { comensales = 0, verano = false, horasBarra = 0, hayCongelador = false } = {}) => {
+    corre: (ctx, { comensales = 0, verano = false, horasBarra = 0, hayCongelador = false, tipo = "" } = {}) => {
       const n = Math.max(0, Math.round(comensales) || 0);
       if (!n) return { error: "Hacen falta los comensales." };
-      return calcHielo(n, { mesVerano: !!verano, horasBarra: Number(horasBarra) || 0, tieneCongelador: !!hayCongelador });
+      return calcHielo(n, { mesVerano: !!verano, horasBarra: Number(horasBarra) || 0, tieneCongelador: !!hayCongelador, tipo: String(tipo) });
     },
   },
 
@@ -312,7 +333,7 @@ export const HERRAMIENTAS = {
   comparar_con_sector: {
     datos: false,
     esquema: {
-      description: "Compara los ratios propios de la casa (camareros, vino, cerveza, cava, hielo, paella) contra bandas públicas del sector de catering/eventos, para saber si un número está dentro de lo normal, por encima o por debajo. OJO: los ratios medidos con eventos reales (camareros de boda/comunión, hielo, bebida) pueden estar fuera de la banda A PROPÓSITO — no es un fallo, es cómo se trabaja aquí, y ese motivo suele estar comentado en el propio fichero del ratio. Sirve sobre todo para lo que NADIE ha medido todavía (paella, cumpleaños, producción): ahí el sector es la única referencia que hay. Los números del sector son de fuentes públicas, sin validar contra el equipo — dilo si alguien pregunta por su fiabilidad.",
+      description: "Compara los ratios propios de la casa (camareros, vino, cerveza, cava, hielo, paella) contra bandas públicas del sector de catering/eventos, para saber si un número está dentro de lo normal, por encima o por debajo. OJO: los ratios medidos con eventos reales (camareros de boda/comunión, hielo, bebida) pueden estar fuera de la banda A PROPÓSITO — no es un fallo, es cómo se trabaja aquí, y ese motivo suele estar comentado en el propio fichero del ratio. Sirve sobre todo para lo que NADIE ha medido todavía (paella, cumpleaños, producción): ahí el sector es la única referencia que hay. Los números del sector son de fuentes públicas, sin validar contra el equipo — dilo si alguien pregunta por su fiabilidad. Al contestar sé breve: destaca primero lo que está por encima, por debajo o sin dato (con su número); lo que esté dentro de rango resúmelo en una frase sin repetir cifra por cifra, salvo que pidan el detalle de todos.",
       parameters: {
         type: "object",
         properties: {
@@ -336,6 +357,108 @@ export const HERRAMIENTAS = {
         .filter(r => !ratio || normaliza(r.nombre).includes(normaliza(ratio)) || normaliza(r.id).includes(normaliza(ratio)));
       if (!comparados.length) return { error: `No hay ningún ratio del sector que se parezca a "${ratio}".` };
       return { ratios: comparados };
+    },
+  },
+
+  // La otra mitad de comparar_con_sector: no solo decir si un ratio se sale de rango,
+  // también poder cambiarlo cuando el dueño lo pida. Escribe, así que pasa por
+  // ctx.onEscribir como todo lo demás — en "confianza" se aplica sola, en "con permiso"
+  // se enseña antes. El valor vale para TODA la app desde ya (checklist y calendario
+  // leen el mismo leerRatios()) y se guarda para el equipo entero, no solo este
+  // dispositivo — eso lo hace el aplicador (escrituraRatios.js), no esta herramienta.
+  aplicar_ratio: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuántos comensales lleva un camarero para un tipo de evento (boda, comunion, corporativo, cumpleanos o produccion). El nuevo número vale para TODA la app desde ya —la checklist provisiona delantales, bandejas y menús de personal a partir de esta cifra— y se guarda para el equipo entero, no solo para este dispositivo. Úsalo solo cuando te lo pidan a ti (\"ponlo a X\", \"ajústalo tú\"), nunca por iniciativa propia solo porque comparar_con_sector diga que os salís de la banda: eso puede ser intencional.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
+          paxPorCamarero: { type: "number", description: "Comensales por cada camarero, entre 1 y 60." },
+        },
+        required: ["tipo", "paxPorCamarero"],
+      },
+    },
+    corre: (ctx, { tipo = "", paxPorCamarero = 0 } = {}) => {
+      const actuales = leerRatios();
+      if (!Object.prototype.hasOwnProperty.call(actuales, tipo)) {
+        return { error: `"${tipo}" no es un tipo de evento con ratio de camareros. Los tipos son: ${Object.keys(actuales).join(", ")}.` };
+      }
+      const limpio = saneaRatios({ [tipo]: paxPorCamarero });
+      if (!limpio[tipo]) return { error: `${paxPorCamarero} no es un número válido de comensales por camarero (tiene que estar entre 1 y 60).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los ratios." };
+      return ctx.onEscribir({
+        que: "aplicar_ratio",
+        resumen: `Cambiar ${tipo}: ${actuales[tipo]} → ${limpio[tipo]} comensales por camarero (para toda la app)`,
+        datos: { tipo, paxPorCamarero: limpio[tipo] },
+      });
+    },
+  },
+
+  // La misma idea que aplicar_ratio, para el otro ajuste que ya vivía en el panel del
+  // calendario: cuánto se bebe de cada cosa por tipo de evento. Un factor y no una
+  // cantidad — 1 es "como siempre", 0,6 es "un 40% menos" — porque así es como ya lo
+  // guarda bebida.js (esparcido: lo que no se toca se queda en 1, sin necesidad de saber
+  // el litro exacto de partida).
+  aplicar_factor_bebida: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuánto se bebe de una bebida (vino, cerveza, cava o refresco) en un tipo de evento, como múltiplo de lo de siempre: 1 es \"como siempre\", 0.6 es \"un 40% menos\", 1.3 es \"un 30% más\". El nuevo factor vale para TODA la app desde ya y se guarda para el equipo entero, no solo para este dispositivo. Úsalo solo cuando te lo pidan a ti (\"pon el vino de las comuniones a...\", \"ajústalo tú\"), nunca por iniciativa propia.",
+      parameters: {
+        type: "object",
+        properties: {
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
+          bebida: { type: "string", description: "vino, cerveza, cava o refresco." },
+          factor: { type: "number", description: "Múltiplo sobre lo de siempre, entre 0.3 y 2. 1 es sin cambios." },
+        },
+        required: ["tipo", "bebida", "factor"],
+      },
+    },
+    corre: (ctx, { tipo = "", bebida = "", factor = 0 } = {}) => {
+      if (!TIPOS_BEBIDA.includes(tipo)) return { error: `"${tipo}" no es un tipo de evento. Los tipos son: ${TIPOS_BEBIDA.join(", ")}.` };
+      if (!CLAVES_BEBIDA.includes(bebida)) return { error: `"${bebida}" no es una bebida que se calibre. Las bebidas son: ${CLAVES_BEBIDA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los factores de bebida." };
+      const filaActual = leerFactores()[tipo] || {};
+      const antes = filaActual[bebida] || FACTOR_NEUTRO;
+      return ctx.onEscribir({
+        que: "aplicar_factor_bebida",
+        resumen: `Cambiar ${bebida} en ${tipo}: ×${antes} → ×${limpio} (para toda la app)`,
+        datos: { tipo, bebida, factor: limpio },
+      });
+    },
+  },
+
+  // Mismo patrón, para la cristalería. Sin tipo de evento: calcCristaleria calcula
+  // igual para todos, así que el ajuste tampoco distingue boda de comunión.
+  aplicar_factor_cristaleria: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Cambia cuánta cristalería se carga (copas de vino, agua, cava o cubata), como múltiplo de lo de siempre: 1 es \"como siempre\", 0.8 es \"un 20% menos\". Hoy la cristalería va fija al extremo alto del sector con un 10% de margen para roturas, sin dato propio detrás — este ajuste es para cuando el dueño ya sabe, por experiencia, que sobra o falta. Vale para TODA la app desde ya y se guarda para el equipo entero. Úsalo solo cuando te lo pidan a ti, nunca por iniciativa propia.",
+      parameters: {
+        type: "object",
+        properties: {
+          clave: { type: "string", description: "vino, agua, cava o cubata." },
+          factor: { type: "number", description: "Múltiplo sobre lo de siempre, entre 0.3 y 2. 1 es sin cambios." },
+        },
+        required: ["clave", "factor"],
+      },
+    },
+    corre: (ctx, { clave = "", factor = 0 } = {}) => {
+      if (!CLAVES_CRISTALERIA.includes(clave)) return { error: `"${clave}" no es cristalería que se ajuste así. Las claves son: ${CLAVES_CRISTALERIA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorCristaleriaValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los factores de cristalería." };
+      const antes = factorCristaleria(leerFactoresCristaleria(), clave);
+      return ctx.onEscribir({
+        que: "aplicar_factor_cristaleria",
+        resumen: `Cambiar cristalería (${clave}): ×${antes} → ×${limpio} (para toda la app)`,
+        datos: { clave, factor: limpio },
+      });
     },
   },
 
@@ -480,6 +603,7 @@ export const HERRAMIENTAS = {
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
+      if (ev && ev.error) return ev;   // empatados: se listan y se pide, no se adivina
       if (!ev) return noEncontrado(nombre);
       const r = revisarEvento(ev.nombre, ev.datos);
       return r.todoEnOrden
@@ -626,6 +750,77 @@ export const HERRAMIENTAS = {
           .map(it => `${it[0]}: ${it[1] && it[1].u ? it[1].u : it[1]}`) }))
         .filter(c => c.items.length);
       return { tipo, comensales: a + (ninos || 0), categorias: salida };
+    },
+  },
+
+  // ─── LA AUDITORÍA ────────────────────────────────────────────────────────────
+  // El equivalente de "¿cómo va el negocio?" a nivel de negocio, no de un evento.
+  // Lo que devuelve no lo opina el modelo: lo calculan las reglas de revision.js con
+  // los datos que la app ya tiene, y aquí solo se leen. La diferencia con revisar_todo
+  // (que mira si un evento está listo) es que esto mira si el negocio está perdiendo
+  // dinero o dejando de aprender.
+  ver_auditoria: {
+    datos: true,
+    esquema: {
+      description: "La auditoría de negocio: lo que los datos ya saben y todavía no se ha hecho — medidas sin aplicar, roturas sin precio, eventos de los que no se puede aprender, huecos del catálogo. Úsala cuando pregunten '¿cómo va el negocio?', '¿qué se puede mejorar?', '¿qué debería mirar?'. Si alguna dice que se puede aplicar un factor medido, se ofrece con aplicar_calibracion (lo aprueba la persona).",
+      parameters: { type: "object", properties: {} },
+    },
+    corre: (ctx) => {
+      const lista = ctx.oportunidades;
+      if (lista === undefined || lista === null) {
+        return { error: "En esta pantalla no hay auditoría de negocio: se hace desde la checklist, donde están los precios y las medidas." };
+      }
+      if (!lista.length) return { todoEnOrden: true, mensaje: "No hay nada pendiente de los datos: ni medidas sin aplicar ni fugas que ver." };
+      return {
+        total: lista.length,
+        oportunidades: lista.map(a => ({
+          texto: a.texto,
+          comoSeArregla: a.comoSeArregla || "",
+          // El valor exacto para aplicar_calibracion, para que el modelo no lo saque de
+          // la cabeza: se copia, no se redondea ni se adivina.
+          datos: a.propuesta ? a.propuesta.datos : undefined,
+        })),
+      };
+    },
+  },
+
+  // Aplica un factor medido. Escribe, así que va con permiso como todo lo demás, y la
+  // propuesta sale por onEscribir igual que el resto (tarjeta "Hacerlo" en "Con
+  // permiso", directo en "Confianza"). El número TIENE que ser el que dio ver_auditoria
+  // o el panel: si la persona pide un número de la nada, eso se hace en el panel, no
+  // por aquí.
+  aplicar_calibracion: {
+    datos: false,
+    escribe: true,
+    esquema: {
+      description: "Aplica un factor medido (el que sale del histórico de lo que volvió) a la bebida, el hielo o la comida de un tipo de evento. Solo con el factor que dio ver_auditoria o el panel del Modo carga: no se inventan números.",
+      parameters: {
+        type: "object",
+        properties: {
+          area: { type: "string", description: "bebida, hielo o comida." },
+          tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
+          clave: { type: "string", description: "bebida: vino, cerveza, cava o refresco. comida: paella o bandejas. Para hielo se deja vacío." },
+          factor: { type: "number", description: "El factor medido, con dos decimales." },
+        },
+        required: ["area", "tipo", "factor"],
+      },
+    },
+    corre: (ctx, { area = "", tipo = "", clave = "", factor = 1 } = {}) => {
+      // La misma sanidad que aplicar_factor_bebida: una clave inventada no se guarda
+      // como factor fantasma que ningún cálculo lee, y un tipo inválido no crea filas.
+      if (area !== "bebida" && area !== "hielo" && area !== "comida")
+        return { error: `"${area}" no es un área: bebida, hielo o comida.` };
+      if (!TIPOS_BEBIDA.includes(tipo)) return { error: `"${tipo}" no es un tipo de evento. Los tipos son: ${TIPOS_BEBIDA.join(", ")}.` };
+      const limpio = Number(factor);
+      if (!esFactorValido(limpio)) return { error: `${factor} no es un factor válido (tiene que estar entre 0,3 y 2).` };
+      if (area === "bebida" && !CLAVES_BEBIDA.includes(clave)) return { error: `"${clave}" no es una bebida que se calibre: ${CLAVES_BEBIDA.join(", ")}.` };
+      if (area === "comida" && !CLAVES_COMIDA.includes(clave)) return { error: `"${clave}" no es una comida que se calibre: ${CLAVES_COMIDA.join(", ")}.` };
+      if (!ctx.onEscribir) return { error: "Esta pantalla no deja cambiar los ajustes." };
+      return ctx.onEscribir({
+        que: "aplicar_calibracion",
+        resumen: `Aplicar el factor ${limpio} a ${clave || "hielo"} en ${tipo}`,
+        datos: { area, tipo, clave, factor: limpio },
+      });
     },
   },
 };

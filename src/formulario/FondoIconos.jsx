@@ -12,29 +12,64 @@ import {
   Heart, Church, Cake, Briefcase, Clapperboard, MapPin, CalendarDays, Clock,
   Users, Sun, Tent, Zap, Plug, Martini, Beer, GlassWater, Wine, Utensils,
   UtensilsCrossed, ChefHat, CookingPot, Flame, Armchair, Coffee, Package,
-  StickyNote, CupSoda,
+  StickyNote, CupSoda, Wind, Table, Table2, Droplet, Refrigerator, Snowflake,
+  Sparkles, Printer, Shirt, Flower2, PartyPopper, ShoppingCart, AlertTriangle,
 } from "lucide-react";
 
 // Qué flota en cada pregunta. Si una pregunta no está aquí, se usa el juego de
 // siempre: es un fondo, no puede fallar nada por no tener su icono.
 const ICONOS_POR_PREGUNTA = {
-  tipo: [Heart, Church, Cake, Briefcase, Clapperboard],
+  // En el mismo orden que TIPOS_EVENTO (boda, comunión, empresa, cumpleaños,
+  // producción): este juego también se usa de icono fijo por opción en el
+  // título/botones, no solo para el fondo, así que el orden aquí SÍ importa.
+  tipo: [Heart, Church, Briefcase, Cake, Clapperboard],
   nombreYsitio: [MapPin, Tent, Heart],
   cuando: [CalendarDays, Clock, Sun],
   gente: [Users, Utensils, Armchair],
   dias: [Clapperboard, CalendarDays, Coffee],
-  sombra: [Sun, Tent],
-  carpasAlquiler: [Tent, Package],
+  carpas: [Tent, Package],
+  parabanes: [Wind, Tent],
   generador: [Zap, Plug],
+  sillas: [Armchair, Package],
+  // Las 4 opciones son mesas (una rectangular propia + tres redondas de alquiler):
+  // con solo 2 iconos aquí, el tercero y el cuarto repetían el juego desde el
+  // principio y la primera redonda de alquiler salía con un sofá (Armchair, que
+  // "sillas" sí usa bien) en vez de una mesa. Las 4 explícitas, sin ciclo.
+  tipoMesa: [Table2, Table, Table, Table],
   coctel: [Martini, GlassWater, Wine],
   copas: [Beer, Martini, Wine, GlassWater],
+  aguaPequena: [Droplet, GlassWater],
   servicio: [Utensils, UtensilsCrossed, Package],
   menu: [ChefHat, CookingPot, Flame],
+  tamanoPaella: [CookingPot, Flame, ChefHat],
+  cuantasPaellas: [CookingPot, Flame],
   entrante: [CupSoda, Utensils, ChefHat],
   entrantePersonas: [Users, Utensils],
+  cafe: [Coffee, CupSoda],
+  nevera: [Refrigerator, Snowflake],
+  congelador: [Snowflake, Refrigerator],
+  hielo: [Snowflake, GlassWater],
   horno: [Flame, ChefHat, CookingPot],
+  armarioCaliente: [Flame, Package],
+  mesasCalientes: [Flame, Utensils],
+  cuantosGastros: [CookingPot, Package],
   extras: [Package, Coffee, Beer, Armchair],
-  sillas: [Armchair, Package],
+  mobiliarioAlquiler: [Armchair, Package],
+  otroAlquiler: [Package, StickyNote],
+  distinto: [Sparkles, Package],
+  imprimirMenu: [Printer, StickyNote],
+  etiquetas: [Printer, Package],
+  manteles: [Package, Sparkles],
+  servilletasTela: [Shirt, Package],
+  estiloPlato: [Utensils, UtensilsCrossed],
+  estiloPlatoPostre: [UtensilsCrossed, Cake],
+  flores: [Flower2, Heart],
+  tarta: [Cake, PartyPopper],
+  minutas: [StickyNote, MapPin],
+  comprar: [ShoppingCart, Package],
+  alergias: [AlertTriangle, Heart],
+  excepcionesMesa: [Utensils, StickyNote],
+  buffets: [ChefHat, Utensils, CookingPot],
   notas: [StickyNote, Clock],
   // Las pantallas que no son una pregunta también llevan el suyo
   elegir: [CalendarDays, MapPin, Heart],
@@ -42,6 +77,18 @@ const ICONOS_POR_PREGUNTA = {
   fin: [Heart, Cake, Martini],
 };
 const POR_DEFECTO = [Utensils, GlassWater, ChefHat];
+
+// El mismo juego de iconos por pregunta sirve también en primer plano: uno fijo
+// junto al título, y uno por cada opción (repitiendo el juego si hay más
+// opciones que iconos) — así el formulario queda coherente sin mantener un
+// segundo mapa aparte.
+export function iconoDePregunta(idPregunta) {
+  return (ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO)[0];
+}
+export function iconoDeOpcion(idPregunta, indice) {
+  const juego = ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO;
+  return juego[indice % juego.length];
+}
 
 // Sitios fijos (en %), tamaños y ritmos. Van a mano y no al azar para que el fondo
 // quede repartido y no se amontone en una esquina, y para que sea siempre igual.

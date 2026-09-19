@@ -121,6 +121,16 @@ export function idDeApunte(fecha, titulo) {
   return `${fecha}_${limpio}`;
 }
 
+// Une una lista traída de golpe (la hoja de pared, otro calendario) con la que ya
+// había, SIN pisar nada: un id (fecha+título, ver idDeApunte) que ya existiera se
+// descarta de los nuevos y gana el que ya estaba. Lo usa "Traer" (Traer.jsx) cuando el
+// calendario ya no está vacío — pegar de más nunca puede sustituir un apunte que
+// alguien ya haya editado a mano (personal asignado, notas, hora...).
+export function mezclaApuntes(existentes, nuevos) {
+  const yaEstan = new Set(existentes.map(a => a.id));
+  return nuevos.filter(a => !yaEstan.has(a.id));
+}
+
 // Descarta lo que no vale y quita repetidos, quedándose con el último de cada id: dos
 // dispositivos pueden haber tocado el mismo apunte.
 export function saneaLista(lista) {
@@ -186,6 +196,21 @@ export function porDia(apuntes) {
     mapa[dia].sort((x, y) => (esTipoEvento(y.tipo) ? 1 : 0) - (esTipoEvento(x.tipo) ? 1 : 0));
   }
   return mapa;
+}
+
+// Cuando dos apuntes del mismo día se llaman exactamente igual ("Camión Covey" dos
+// veces, dos furgonetas el mismo día...) se ven idénticos en el chip del mes: no hay
+// forma de saber que son dos cosas distintas sin abrir el día uno a uno. Aquí se
+// numeran SOLO los que de verdad se repiten (comparando el título tal cual); el resto
+// no se toca, así un día sin repetidos se ve exactamente igual que siempre.
+export function numeraRepetidos(lista) {
+  const porTitulo = {};
+  for (const a of lista) (porTitulo[a.titulo] ||= []).push(a);
+  const numero = {};
+  for (const grupo of Object.values(porTitulo)) {
+    if (grupo.length > 1) grupo.forEach((a, i) => { numero[a.id] = i + 1; });
+  }
+  return numero;
 }
 
 // Lo que viene: los eventos de los próximos N días, ordenados por lo que queda. Solo

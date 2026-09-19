@@ -11,16 +11,14 @@
 import { useState } from "react";
 import { Wine, ChevronDown, RotateCcw, Check } from "lucide-react";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, FACTOR_NEUTRO, factorDe, conFactor } from "../bebida.js";
+import { enTexto, enNumero } from "../texto.js";
 
-const NOMBRE_TIPO = {
+// Los nombres como los lee quien ajusta: la MISMA lista para los dos paneles de ratios
+// (bebida y hielo) — una sola fuente, no dos que se separen.
+export const NOMBRE_TIPO = {
   boda: "Boda", comunion: "Comunión / bautizo", corporativo: "Corporativo",
   cumpleanos: "Cumpleaños", produccion: "Producción / rodaje",
 };
-
-// 0,85 y no 85% ni 0.85: es el mismo formato que ya se escribe en toda la app y el que
-// se teclea en un móvil español sin pelearse con el punto.
-const enTexto = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
-const enNumero = (t) => Number(String(t).replace(",", "."));
 
 export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar }) {
   const [abierto, setAbierto] = useState(false);

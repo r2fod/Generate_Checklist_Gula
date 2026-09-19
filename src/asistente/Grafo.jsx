@@ -10,72 +10,18 @@
 // enfoque encaja aquí sin traer nada nuevo: es la misma idea que Jarvis o
 // Companero, geometría calculada en vez de un fichero que cargar.
 //
-// La física es una relajación de muelles+repulsión que corre UNA VEZ, síncrona,
-// antes de pintar —no una animación en marcha—: con 40 nodos como mucho (el mismo
-// tope que ya tenía la lista) son unas pocas decenas de miles de operaciones,
-// nada que note ni un móvil viejo, y sin nada que limpiar al desmontar ni que
-// apagar con prefers-reduced-motion, porque no se mueve nada después de pintar.
-import { useMemo, useState } from "react";
-
-const ANCHO = 600;
-const ALTO = 420;
-
-/**
- * @param {Array<{id:string,tipo:string,nombre:string,peso:number}>} nodos
- * @param {Array<{de:string,a:string,por:string}>} enlaces
- */
-function relajar(nodos, enlaces) {
-  const indice = new Map(nodos.map((n, i) => [n.id, i]));
-  const sim = nodos.map((n, i) => {
-    // Arrancan repartidos en un círculo, no todos amontonados en el centro: así la
-    // repulsión tiene desde el primer instante en qué apoyarse para separarlos.
-    const angulo = (i / nodos.length) * Math.PI * 2;
-    const radio = 90 + (i % 5) * 22;
-    return {
-      ...n,
-      x: ANCHO / 2 + Math.cos(angulo) * radio,
-      y: ALTO / 2 + Math.sin(angulo) * radio,
-      vx: 0, vy: 0,
-    };
-  });
-  const bordes = enlaces
-    .map(e => [indice.get(e.de), indice.get(e.a)])
-    .filter(([a, b]) => a !== undefined && b !== undefined);
-
-  const REPULSION = 900, MUELLE = 0.05, LARGO = 46, CENTRO = 0.004, FRICCION = 0.85;
-  const cx = ANCHO / 2, cy = ALTO / 2;
-  for (let iter = 0; iter < 200; iter++) {
-    for (let i = 0; i < sim.length; i++) {
-      for (let j = i + 1; j < sim.length; j++) {
-        const a = sim[i], b = sim[j];
-        const dx = a.x - b.x, dy = a.y - b.y;
-        const d2 = dx * dx + dy * dy + 0.01;
-        const f = REPULSION / d2;
-        const d = Math.sqrt(d2);
-        const fx = (dx / d) * f, fy = (dy / d) * f;
-        a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-      }
-    }
-    for (const [ai, bi] of bordes) {
-      const a = sim[ai], b = sim[bi];
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const d = Math.sqrt(dx * dx + dy * dy) + 0.01;
-      const delta = (d - LARGO) * MUELLE;
-      const fx = (dx / d) * delta, fy = (dy / d) * delta;
-      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
-    }
-    for (const n of sim) {
-      n.vx += (cx - n.x) * CENTRO;
-      n.vy += (cy - n.y) * CENTRO;
-      n.vx *= FRICCION; n.vy *= FRICCION;
-      // Sin esto un nodo suelto (sin enlaces, cerca del borde) podía acabar fuera
-      // del viewBox tras 200 vueltas de repulsión sin nada que lo frenase.
-      n.x = Math.min(ANCHO - 14, Math.max(14, n.x + n.vx));
-      n.y = Math.min(ALTO - 14, Math.max(14, n.y + n.vy));
-    }
-  }
-  return { sim, bordes };
-}
+// La física es la misma relajación de muelles+repulsión de siempre, pero ahora
+// repartida en fotogramas con requestAnimationFrame en vez de las 200 vueltas de
+// golpe: se ve a los nodos buscar su sitio, no aparecer ya colocados. Con 40 nodos
+// como mucho (el mismo tope que ya tenía la lista) cada fotograma es barato — el
+// coste total es el mismo de siempre, solo que repartido en el tiempo. Se apaga
+// con prefers-reduced-motion (las 200 vueltas corren de golpe, como antes) y el
+// bucle se limpia al desmontar o si cambian los nodos a mitad de animación.
+//
+// Las funciones puras (nada de JSX) viven en grafoFisica.js, aparte: así se prueban
+// con node de verdad en calculos.test.mjs, sin levantar un navegador.
+import { useEffect, useMemo, useState } from "react";
+import { ANCHO, ALTO, ITERACIONES, ITERACIONES_POR_FOTOGRAMA, estadoInicial, paso, bordesDe } from "./grafoFisica.js";
 
 const RADIO_MIN = 5, RADIO_MAX = 15;
 
@@ -85,14 +31,56 @@ export default function Grafo({ nodos, enlaces, colores }) {
   const idsLimitados = new Set(limitados.map(n => n.id));
   const enlacesLimitados = enlaces.filter(e => idsLimitados.has(e.de) && idsLimitados.has(e.a));
 
-  // Memoizado por los propios datos: recalcular la física en cada pulsación de tecla
-  // de otra pestaña sería trabajo tirado, ya que las posiciones no dependen de nada
-  // más que de qué nodos y enlaces hay.
-  const { sim, bordes } = useMemo(
-    () => relajar(limitados, enlacesLimitados),
+  const clave = JSON.stringify(limitados.map(n => n.id)) + "|" + JSON.stringify(enlacesLimitados);
+
+  // Los bordes son solo índices (qué posición del array conecta con cuál): no se
+  // mueven fotograma a fotograma, así que se memoizan aparte de las posiciones.
+  const bordes = useMemo(
+    () => bordesDe(limitados, enlacesLimitados),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(limitados.map(n => n.id)), JSON.stringify(enlacesLimitados)],
+    [clave],
   );
+
+  // `sim` (las posiciones) y `bordes` (a qué índice apunta cada enlace) tienen que
+  // tener siempre la MISMA forma o pintar una línea revienta con un índice que ya
+  // no existe. Si `clave` cambió, se resetean las posiciones aquí mismo, durante
+  // el render (el patrón de React para estado derivado de las props) — así nunca
+  // hay un fotograma de por medio con `sim` viejo y `bordes` nuevo a la vez.
+  const [sim, setSim] = useState(() => estadoInicial(limitados));
+  const [claveDeSim, setClaveDeSim] = useState(clave);
+  if (clave !== claveDeSim) {
+    setClaveDeSim(clave);
+    setSim(estadoInicial(limitados));
+  }
+
+  useEffect(() => {
+    const propios = estadoInicial(limitados);
+
+    // Quien prefiere menos movimiento se lleva el mismo resultado, pero de golpe:
+    // ni una animación de por medio ni un bucle que limpiar después.
+    const menosMovimiento = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (menosMovimiento) {
+      for (let i = 0; i < ITERACIONES; i++) paso(propios, bordes);
+      setSim(propios);
+      return;
+    }
+
+    let vivo = true;
+    let hecho = 0;
+    let idFotograma;
+    const fotograma = () => {
+      if (!vivo) return;
+      for (let i = 0; i < ITERACIONES_POR_FOTOGRAMA && hecho < ITERACIONES; i++, hecho++) {
+        paso(propios, bordes);
+      }
+      setSim([...propios]);
+      if (hecho < ITERACIONES) idFotograma = requestAnimationFrame(fotograma);
+    };
+    idFotograma = requestAnimationFrame(fotograma);
+
+    return () => { vivo = false; cancelAnimationFrame(idFotograma); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clave]);
 
   const pesoMax = Math.max(1, ...limitados.map(n => n.peso));
   const radioDe = (n) => RADIO_MIN + (RADIO_MAX - RADIO_MIN) * (Math.min(n.peso, pesoMax) / pesoMax);

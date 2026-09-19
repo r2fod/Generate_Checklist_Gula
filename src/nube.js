@@ -44,19 +44,88 @@ export function nuevoIdEvento(largo = 8) {
   return Array.from({ length: largo }, () => abc[Math.floor(Math.random() * abc.length)]).join("");
 }
 
-// Devuelve la marca de tiempo con la que se ha guardado. Quien llama la apunta para
-// reconocer DESPUÉS su propio eco cuando vuelva por la suscripción: es la única forma
-// de distinguir "esto lo escribí yo hace un momento" de "esto lo ha cambiado otro".
-export async function guardarEventoNube(id, estado) {
+// Guarda el evento SIN pisar lo que haya cambiado otra persona mientras tanto. Antes
+// esto era un setDoc liso: subía SIEMPRE el estado local entero, los sesenta y pico
+// campos, aunque solo se hubiera tocado una casilla. Con dos personas cargando el
+// mismo camión a la vez eso pisaba de verdad: si A marca una casilla y, casi a la vez,
+// B guarda un cambio en OTRO campo (pax, una nota, lo que sea) antes de enterarse por
+// el aviso en tiempo real de la marca de A, el guardado de B sube su copia entera —
+// que todavía no sabe nada de la casilla de A— y la casilla marcada desaparece, sin
+// que B haya tocado Modo carga en ningún momento.
+//
+// Ahora se hace en una transacción: se lee lo que HAY en el servidor en ESE instante
+// (no la copia local, que puede llevar un rato desfasada) y se le aplican encima SOLO
+// los campos que este aparato ha cambiado de verdad desde la última vez que sincronizó
+// (comparado contra `baseline`, no contra el propio `estado`: sin baseline no hay forma
+// de distinguir "esto lo he cambiado yo" de "esto lo ha cambiado el servidor desde la
+// última vez que miré"). El resto de campos —los que este aparato no ha tocado— se
+// quedan con el valor que YA tenía el servidor, así que un cambio ajeno a un campo
+// distinto nunca se pierde.
+//
+// Sin `baseline` (los sitios que guardan de una sola vez, como compartir por primera
+// vez o aplicar un formulario) se compara contra el propio servidor: sigue siendo un
+// guardado de "gana el último", igual que antes, pero ya no peor que antes.
+//
+// PERO campo a campo no basta para Modo carga: `checkeados`, `preparados`, `vueltos`,
+// `roturas`, `marcasRevisar` y `notasCheck` son cada uno UN SOLO campo que guarda las
+// marcas de TODOS los items ({ "categoría::item": true, ... }). Con dos personas
+// marcando casillas DISTINTAS del mismo camión casi a la vez, las dos cambian ese
+// mismo campo (aunque en items distintos), así que el `if` de arriba lo trataba como
+// "este aparato lo ha tocado" y subía su copia entera del mapa — que todavía no sabía
+// nada de la marca de la otra persona, y la borraba. Ese era justo el bug: "se les
+// desmarca a otros".
+//
+// Por eso estos campos (cualquier valor que sea un objeto plano, no un array: un
+// array es una lista con orden/posición, mezclarlo por índice no tiene sentido) se
+// fusionan una clave más adentro: solo se sube encima la clave-item que este aparato
+// ha cambiado de verdad (comparada contra su propio baseline), y el resto de items
+// —los que puedan haber marcado otras personas mientras tanto— se quedan tal cual
+// están en el servidor. Si dos personas marcan EL MISMO item casi a la vez, ahí sí
+// gana el último en escribir (no hay forma de saber cuál es "la verdad"), pero ya no
+// se lleva por delante los items que nadie más ha tocado.
+//
+// Devuelve { actualizado, fusion }: la marca de tiempo (para reconocer el propio eco
+// al volver por la suscripción) y el estado tal como ha quedado de verdad en el
+// servidor — puede traer campos que este aparato no tenía, si alguien cambió algo
+// que este aparato no tocó mientras tanto.
+const esMapaPlano = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+function fusionaCampo(local, antes, enServidor) {
+  const combinadoSub = { ...(enServidor || {}) };
+  const antesObj = antes || {};
+  const subclaves = new Set([...Object.keys(local), ...Object.keys(antesObj)]);
+  subclaves.forEach((sk) => {
+    if (JSON.stringify(local[sk]) === JSON.stringify(antesObj[sk])) return; // este aparato no ha tocado este item
+    if (local[sk] === undefined) delete combinadoSub[sk];
+    else combinadoSub[sk] = local[sk];
+  });
+  return combinadoSub;
+}
+
+export async function guardarEventoNube(id, estado, baseline = null) {
   const conexion = await getDb();
   if (!conexion) return null;
   const { db, fs } = conexion;
   const actualizado = Date.now();
-  await fs.setDoc(fs.doc(db, "eventos", id), {
-    estado: JSON.stringify(estado),
-    actualizado,
+  const ref = fs.doc(db, "eventos", id);
+  const fusion = await fs.runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const servidor = snap.exists() ? JSON.parse(snap.data().estado) : {};
+    const base = baseline || servidor;
+    const combinado = { ...servidor };
+    Object.keys(estado).forEach((clave) => {
+      const local = estado[clave];
+      const antes = base[clave];
+      if (JSON.stringify(local) === JSON.stringify(antes)) return;
+      const enServidor = servidor[clave];
+      combinado[clave] = (esMapaPlano(local) && (antes === undefined || esMapaPlano(antes)) && (enServidor === undefined || esMapaPlano(enServidor)))
+        ? fusionaCampo(local, antes, enServidor)
+        : local;
+    });
+    tx.set(ref, { estado: JSON.stringify(combinado), actualizado });
+    return combinado;
   });
-  return actualizado;
+  return { actualizado, fusion };
 }
 
 // Borra la copia compartida de un evento. Se llama al borrar el evento guardado: sin
@@ -249,20 +318,21 @@ export function suscribirArchivoNube(cb) {
 }
 
 // ─── LOS AJUSTES QUE SON DEL EQUIPO, NO DE UN MÓVIL ───────────────────────────
-// Precios, ratios de personal y factores de bebida son la misma cosa tres veces: un
-// puñado de números que tienen que valer lo mismo para todo el mundo. Si cada uno
-// tuviera los suyos, dos personas mirando el mismo sábado verían que hacen falta 22
-// personas o 28 según quién mire, y el mismo evento costaría 340€ o 410€.
+// Precios, ratios de personal y factores de bebida, hielo y comida son la misma
+// cosa cinco veces: un puñado de números que tienen que valer lo mismo para todo
+// el mundo. Si cada uno tuviera los suyos, dos personas mirando el mismo sábado
+// verían que hacen falta 22 personas o 28 según quién mire, y el mismo evento
+// costaría 340€ o 410€.
 //
-// Los tres cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
+// Los cinco cuelgan de "indice/", que las reglas ya abren solo al equipo con sesión: no
 // hace falta tocar firestore.rules, y es lo correcto —esto son ajustes internos, no algo
 // que deba leer quien entra por un enlace compartido. Guardan SOLO lo que
 // alguien ha cambiado, para que una corrección de los valores de partida en una versión
-// nueva siga llegando a todo lo que nadie ha tocado. Y los tres llegan solos desde otro
+// nueva siga llegando a todo lo que nadie ha tocado. Y los cinco llegan solos desde otro
 // dispositivo: un catálogo que hay que recargar para ver al día es otra vez una hoja
 // suelta.
 //
-// Estaban escritos tres veces, palabra por palabra salvo el nombre del documento y el
+// Estaban escritos cinco veces, palabra por palabra salvo el nombre del documento y el
 // del campo. Aquí se escriben una.
 function ajusteCompartido(ruta, campo) {
   return {
@@ -319,6 +389,61 @@ const BEBIDA = ajusteCompartido("indice/bebida", "bebida");
 export const guardarBebidaNube = BEBIDA.guardar;
 export const cargarBebidaNube = BEBIDA.cargar;
 export const suscribirBebidaNube = BEBIDA.suscribir;
+
+// Cuánta cristalería se carga respecto a lo de siempre (ver cristaleria.js). A
+// diferencia de la bebida, no va por tipo de evento: calcCristaleria calcula igual
+// para todos, así que el ajuste tampoco distingue.
+const CRISTALERIA = ajusteCompartido("indice/cristaleria", "cristaleria");
+export const guardarCristaleriaNube = CRISTALERIA.guardar;
+export const cargarCristaleriaNube = CRISTALERIA.cargar;
+export const suscribirCristaleriaNube = CRISTALERIA.suscribir;
+
+// Cuánto hielo por tipo de evento respecto a lo que la app carga hoy (ver el factor de
+// calculos.js). La merma por derretimiento salió de una estimación; esto es lo que la
+// vuelve medición: sale del histórico de lo que volvió (en kilos), igual que la bebida.
+const HIELO = ajusteCompartido("indice/hielo", "hielo");
+export const guardarHieloNube = HIELO.guardar;
+export const cargarHieloNube = HIELO.cargar;
+export const suscribirHieloNube = HIELO.suscribir;
+
+// La estrategia de captación (ver asistente/estrategia.js). Mismo patrón: ajuste de
+// equipo en indice/, lo lee y lo actualiza el asistente, y lo ve todo el equipo.
+const MARKETING = ajusteCompartido("indice/marketing", "estrategia");
+export const guardarEstrategiaNube = MARKETING.guardar;
+export const cargarEstrategiaNube = MARKETING.cargar;
+export const suscribirEstrategiaNube = MARKETING.suscribir;
+
+// ─── SUSCRIPCIONES DE AVISOS (PUSH), POR APARATO ──────────────────────────────
+// La suscripción de push de un teléfono, para que el Worker (ver worker/index.js)
+// sepa a quién empujar un recordatorio al que le llega el día. Vive en
+// indice/push-<id> —no en una colección nueva— porque la regla de indice/{doc}
+// ya lo cubre con sesión, y el Worker la lee igual que lee los eventos: lista
+// indice y filtra por prefijo (push- como evt_). Por aparato, no por persona: el
+// aviso lo recibe el teléfono.
+export async function guardarSuscripcionNube(idAparato, suscripcion) {
+  const conexion = await getDb();
+  if (!conexion) return 0;
+  const { db, fs } = conexion;
+  const actualizado = Date.now();
+  await fs.setDoc(fs.doc(db, "indice", `push-${idAparato}`),
+    { suscripcion: JSON.stringify(suscripcion), actualizado });
+  return actualizado;
+}
+export async function borrarSuscripcionNube(idAparato) {
+  const conexion = await getDb();
+  if (!conexion) return;
+  const { db, fs } = conexion;
+  await fs.deleteDoc(fs.doc(db, "indice", `push-${idAparato}`));
+}
+
+// Cuánta paella y bandejas por tipo de evento respecto a lo que la app carga hoy (ver
+// comida.js). Mismo patrón: sale del histórico de lo que volvió sin usar, así que tiene
+// que verlo el equipo entero o cada móvil cargaría un camión distinto.
+const COMIDA = ajusteCompartido("indice/comida", "comida");
+export const guardarComidaNube = COMIDA.guardar;
+export const cargarComidaNube = COMIDA.cargar;
+export const suscribirComidaNube = COMIDA.suscribir;
+
 
 // Lo que el asistente ha aprendido del equipo (ver asistente/memoria.js). Es el ajuste
 // compartido más claro de todos: si cada móvil recordara sus cosas, el asistente sabría

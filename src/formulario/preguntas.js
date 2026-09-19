@@ -44,8 +44,23 @@ export const TIPOS_EVENTO = [
 
 const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 
+// Mismo valor que GASTROS_MINIMO en checklist-generadores.js — ver el porqué de la
+// duplicación en la pregunta "cuantosGastros", más abajo.
+const GASTROS_MINIMO = 4;
+
+// El orden de aquí abajo es solo el recorrido del formulario — se agrupa por tema
+// (el sitio, la barra, la cocina...) para no saltar de un tema a otro y volver más
+// tarde. NINGÚN otro fichero depende de este orden: aRespuestasDeLaApp() lee cada
+// respuesta por su id, y Formulario.jsx navega el array con preguntas[paso] y
+// findIndex(id), nunca con una posición fija. Reordenar aquí es seguro para la
+// checklist — lo único que hay que respetar son las dependencias `si:` (una
+// pregunta condicional tiene que seguir viniendo DESPUÉS de la que necesita:
+// tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
+// entrante, estiloPlatoPostre después de estiloPlato, hielo después de
+// congelador, bebidaAparte/cristaleria después de coctel/copas, queDobla después de
+// menu). numBarras ya no depende de coctel/copas: se pregunta siempre.
 export const PREGUNTAS = [
-  // ── Tronco común ───────────────────────────────────────────────────────────
+  // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
     id: "tipo", tipo: "opciones", texto: "¿Qué tipo de evento es?",
     opciones: TIPOS_EVENTO, noSe: false,
@@ -80,23 +95,27 @@ export const PREGUNTAS = [
     ],
     soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
   },
-
-  // ── Producción ─────────────────────────────────────────────────────────────
   {
     id: "dias", tipo: "dias", texto: "¿Cuántos días y cuánta gente cada día?",
     nota: "El equipo se calcula para el día de más gente y la comida para la suma de todos.",
     soloEn: ["produccion"],
   },
+
+  // ── El sitio y su mobiliario de exterior ──────────────────────────────────
   {
     // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
     // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
     // número que sale de la gente, que se puede cambiar: quien rellena esto no tiene
-    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos.
+    // por qué saber la cuenta, pero sí sabe si el sitio pide más o menos. Antes solo
+    // se preguntaba en producción (sitio al aire libre por defecto); en el resto es la
+    // excepción (finca con nave o interior), pero cuando hace falta es la misma cuenta
+    // — paxDeLaGente ya sabe qué pax usar según el tipo (día grande en rodajes, los
+    // adultos en el resto), así que no hace falta reinventar nada aquí.
     id: "carpas", tipo: "opciones", texto: "¿Hacen falta carpas?",
     nota: (r) => {
-      const pax = paxDelDiaGrande(r.dias);
+      const pax = paxDeLaGente(r);
       if (!pax) return `Tenemos ${CARPAS_EN_ALMACEN} en el almacén; de las que falten se avisa para alquilarlas.`;
-      return `Con ${pax} personas el día de más gente salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
+      return `Con ${pax} personas salen ${carpasRecomendadas(pax)} (una cada 12 de pie, más la del buffet y la del camión). Se puede cambiar.`;
     },
     opciones: [
       { valor: "no", texto: "No hacen falta" },
@@ -104,15 +123,127 @@ export const PREGUNTAS = [
         valor: "si", texto: "Sí",
         conNumero: "¿Cuántas?",
         campoNumero: "numCarpas",
-        sugerido: (r) => carpasRecomendadas(paxDelDiaGrande(r.dias)),
+        sugerido: (r) => carpasRecomendadas(paxDeLaGente(r)),
         // Lo que pase de las del almacén hay que alquilarlo, y eso se dice aquí en vez
-        // de descubrirlo el día del rodaje
+        // de descubrirlo el día del evento
         avisoNumero: (n) => (carpasPorAlquilar(n) > 0
           ? `Tenemos ${CARPAS_EN_ALMACEN}: hay que alquilar ${carpasPorAlquilar(n)} a Support On Set, con su recogida.`
           : `Caben en el almacén (tenemos ${CARPAS_EN_ALMACEN}), no hay que alquilar ninguna.`),
       },
     ],
+  },
+  {
+    // Mobiliario de exterior nuevo, sin nada que reutilizar y sin fórmula propia por
+    // pax (a diferencia de las carpas, aquí no hay un "uno cada X" fiable): la
+    // cantidad la pone quien ha visto el sitio, así que sin número se deja en blanco
+    // en la checklist en vez de inventar una.
+    id: "parabanes", tipo: "opciones", texto: "¿Hacen falta parabanes?",
+    opciones: [
+      { valor: "no", texto: "No hacen falta" },
+      { valor: "si", texto: "Sí", conNumero: "¿Cuántos?", campoNumero: "numParabanes" },
+    ],
+  },
+  {
+    id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
+    nota: "Se pide a Support On Set, con su recogida y su devolución.",
+    opciones: [{ valor: "si", texto: "Sí" }, { valor: "no", texto: "No hace falta" }],
     soloEn: ["produccion"],
+  },
+  {
+    id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
+    // Cuántas no se pregunta: salen del pax. A quién se alquilan sí, porque cada
+    // proveedor es una recogida distinta y es lo único que la app no puede deducir.
+    //
+    // En un rodaje TAMBIÉN se pregunta. Antes se daba por supuesto que eran nuestras y
+    // ni se preguntaba: el formulario forzaba "Nuestras" al aplicar el envío, así que
+    // si en la app habías puesto un alquiler te lo borraba, y con él su recogida.
+    nota: "Si las alquilamos, se crea sola su recogida y su devolución.",
+    opciones: [
+      { valor: "finca", texto: "Las pone el sitio" },
+      { valor: "Dealde", texto: "Las alquilamos a Dealde" },
+      { valor: "Carvillo", texto: "Las alquilamos a Carvillo" },
+      { valor: "Nuestras", texto: "Llevamos las nuestras" },
+    ],
+    soloEn: [...CON_BARRA, "produccion"],
+  },
+  {
+    id: "tipoMesa", tipo: "opciones", texto: "¿Cómo son las mesas donde come la gente?",
+    // Cuántas no se pregunta: salen del pax. De qué tipo sí, porque las redondas no son
+    // nuestras y cada alquiler es una recogida — y porque entran más comensales por
+    // mesa, así que el número cambia.
+    //
+    // Las de cocina y las de las barras van aparte y son siempre nuestras rectangulares
+    // de 1,80: eso no se pregunta porque no cambia nunca.
+    nota: "Las redondas son de alquiler: se crea sola su recogida y su devolución. Las de cocina y barras van aparte, siempre de 1,8m.",
+    opciones: [
+      { valor: "Rectangular 1,8m", texto: "Las nuestras, rectangulares de 1,8m" },
+      { valor: "Redonda 1,5m", texto: "Redondas de 1,5m (alquiler)" },
+      { valor: "Redonda 1,8m", texto: "Redondas de 1,8m (alquiler)" },
+      { valor: "Redonda 2m", texto: "Redondas de 2m (alquiler)" },
+    ],
+    soloEn: [...CON_BARRA, "produccion"],
+  },
+
+  // ── Barra y bebida ─────────────────────────────────────────────────────────
+  {
+    id: "coctel", tipo: "horas", texto: "¿Hay cóctel o aperitivo? ¿Cuántas horas?",
+    soloEn: CON_BARRA,
+  },
+  {
+    id: "copas", tipo: "horas", texto: "¿Hay barra libre de copas? ¿Cuántas horas?",
+    soloEn: CON_BARRA,
+  },
+  {
+    // Con barra libre (cóctel o copas) la respuesta es obvia: la bebida y la
+    // cristalería las pone Gula, así que no hace falta preguntar — se calculan
+    // solas. Esto solo tiene sentido SIN barra libre, que es cuando de verdad puede
+    // ser que el cliente/la finca traiga su propia bebida.
+    id: "bebidaAparte", tipo: "opciones", texto: "¿La bebida la trae el cliente/la finca, o la sirve Gula?",
+    nota: "Si la trae el cliente, no se calculan refrescos ni alcohol — el agua del personal no se toca, esa es aparte.",
+    opciones: [
+      { valor: "no", texto: "La sirve Gula" },
+      { valor: "si", texto: "La trae el cliente/la finca" },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => !(Number(r.coctel) > 0) && !(Number(r.copas) > 0),
+  },
+  {
+    // Independiente de si hay barra libre a propósito: puede que no haya cóctel ni
+    // copas y aun así se sirva vino/agua/cava con la comida (cristalería de mesa,
+    // no de barra). Pero con barra libre la respuesta es obvia (hace falta sí o sí),
+    // así que solo se pregunta cuando NO hay barra — igual que "bebidaAparte".
+    id: "cristaleria", tipo: "opciones", texto: "¿Llevamos cristalería?",
+    nota: "Sin barra libre puede que aun así se sirva vino o agua con la comida — o que no haga falta ni un vaso.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No hace falta" },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => !(Number(r.coctel) > 0) && !(Number(r.copas) > 0),
+  },
+  {
+    // Con esto se calculan las mesas altas (2 por barra, 4 si son 100 pax o más) en
+    // vez de una fórmula fija por pax. Antes solo se preguntaba con barra libre de
+    // verdad — pero hay eventos sin barra (el cliente trae su bebida) que igual llevan
+    // mesas altas y cristalería (checklist-generadores.js ya lo respeta: sin barra,
+    // esto manda igual si se contesta). Por eso ya no lleva `si:`: se pregunta siempre
+    // en los tipos con barra, la haya montado o no.
+    id: "numBarras", tipo: "opciones", texto: "¿Cuántas barras hacen falta para las mesas altas?",
+    nota: "2 mesas altas por barra, o 4 si son 100 pax o más. Se pregunta aunque no haya barra libre: puede que igual llevéis mesas altas.",
+    opciones: [
+      { valor: 1, texto: "1 barra" },
+      { valor: 2, texto: "2 barras" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cuántas barras?",
+        campoNumero: "numBarrasOtras",
+        sugerido: (r) => (paxDeLaGente(r) >= 100 ? 2 : 1),
+      },
+    ],
+    // No CON_BARRA a secas: "Mesa alta" solo lo calcula buildChecklistBoda (boda,
+    // comunión y corporativo comparten ese generador) — en cumpleaños contestar esto
+    // no movía nada de la checklist.
+    soloEn: ["boda", "comunion", "corporativo"],
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
@@ -125,47 +256,118 @@ export const PREGUNTAS = [
     ],
     soloEn: ["produccion"],
   },
-  {
-    id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
-    nota: "Se pide a Support On Set, con su recogida y su devolución.",
-    opciones: [{ valor: "si", texto: "Sí" }, { valor: "no", texto: "No hace falta" }],
-    soloEn: ["produccion"],
-  },
 
-  // ── Barra ──────────────────────────────────────────────────────────────────
+  // ── Cómo se come y el menú ─────────────────────────────────────────────────
   {
-    id: "coctel", tipo: "horas", texto: "¿Hay cóctel o aperitivo? ¿Cuántas horas?",
-    soloEn: CON_BARRA,
-  },
-  {
-    id: "copas", tipo: "horas", texto: "¿Hay barra libre de copas? ¿Cuántas horas?",
-    soloEn: CON_BARRA,
-  },
-
-  // ── Cómo se come ───────────────────────────────────────────────────────────
-  {
+    // También en producción: buildChecklistProduccion ya sabe ocultar platos/hondos/
+    // metálicos con soloBandeja (opts.soloBandeja), pero nadie podía contestarlo desde
+    // el formulario — un rodaje se quedaba siempre con lo que ya tuviera la app. Aquí
+    // el ratio de camareros no se toca (ver aRespuestasDeLaApp): producción ya tiene
+    // el suyo propio (1 cada 20, leerRatios().produccion), y el 25/12 de un banquete
+    // sentado no pinta nada en un rodaje.
     id: "servicio", tipo: "opciones", texto: "¿Cómo se come?",
     nota: "Si es todo en bandeja no se cargan platos de ningún tipo, solo bandejas y cubiertos.",
     opciones: [
       { valor: "sentados", texto: "Sentados, con platos" },
       { valor: "bandeja", texto: "De pie, todo en bandeja" },
     ],
-    soloEn: CON_BARRA,
+    soloEn: [...CON_BARRA, "produccion"],
   },
-
-  // ── Menú ───────────────────────────────────────────────────────────────────
   {
     id: "menu", tipo: "marcar", texto: "¿Qué lleva el menú?",
+    // "Primero + segundo" dobla platos siempre, y cubiertos/cristalería según se
+    // conteste en la pregunta de seguimiento "queDobla" (justo debajo). Es para
+    // cuando se sirven LOS DOS platos a cada invitado, uno detrás de otro — no para
+    // un menú que simplemente deja elegir uno entre dos opciones (eso no dobla nada,
+    // cada invitado come un plato).
+    nota: "\"Primero + segundo\" es cuando se sirven los DOS a todo el mundo (dos pases seguidos): dobla el plato siempre, y cubiertos/cristalería según se conteste después. Si el menú solo deja elegir uno de los dos, no marques esto.",
     opciones: [
       { valor: "paella", texto: "Paella" },
       // Cuántas sartenes parisiene, que no es lo mismo un frito que tres a la vez: cada
       // una lleva su difusor, su trípode y su bombona, y la app se quedaba siempre en una.
       { valor: "frito", texto: "Algo frito", conNumero: "¿Cuántas sartenes parisiene?", campoNumero: "numFrituras" },
-      { valor: "jamonero", texto: "Jamonero", soloEn: CON_BARRA },
-      { valor: "dosPlatos", texto: "Dos platos principales", soloEn: CON_BARRA },
+      { valor: "dosPlatos", texto: "Primero + segundo (se sirven los dos)", soloEn: CON_BARRA },
     ],
   },
   {
+    // Cubiertos SIEMPRE doblan con "primero + segundo" (premarcado, editable); la
+    // cristalería normalmente NO — la misma copa se rellena durante toda la comida,
+    // así que sale sin marcar por defecto, pero se puede marcar si hace falta.
+    id: "queDobla", tipo: "marcar", texto: "¿Qué se dobla?",
+    nota: "Los cubiertos ya vienen marcados (lo normal). La cristalería no suele doblar —se rellena la misma copa—, márcala si hace falta.",
+    opciones: [
+      { valor: "tenedor", texto: "Tenedor" },
+      { valor: "cuchillo", texto: "Cuchillo" },
+      { valor: "cuchara", texto: "Cuchara" },
+      { valor: "vino", texto: "Copa de vino" },
+      { valor: "agua", texto: "Vaso de agua" },
+      { valor: "cava", texto: "Copa de cava" },
+    ],
+    porDefecto: ["tenedor", "cuchillo", "cuchara"],
+    soloEn: CON_BARRA,
+    si: (r) => Array.isArray(r.menu) && r.menu.includes("dosPlatos"),
+  },
+  {
+    // Los dos entrantes NO son excluyentes: en la app son dos interruptores distintos
+    // (el de chupito carga vasos de chupito, el compartido carga platos extra) y hay
+    // menús que llevan los dos. Antes esta pregunta obligaba a elegir uno y se perdía
+    // el otro. Muchas veces tampoco es un entrante para compartir, son dos: por eso
+    // lleva su número, y cada uno multiplica sus platos.
+    id: "entrante", tipo: "marcar", texto: "¿Lleva entrante?",
+    // "Individual" no es un caso raro de "para compartir" (no tiene sentido elegir
+    // "compartir" para decir que NO se comparte): es su propio botón, con ratio 1
+    // fijo y sin preguntar nada más después — antes había que marcar "compartir" y
+    // esperar a la siguiente pantalla para decir "en realidad es individual".
+    nota: "Puede llevar varios a la vez: de chupito, individual y/o para compartir entre varios.",
+    opciones: [
+      { valor: "chupito", texto: "De chupito" },
+      { valor: "individual", texto: "Individual (un plato por persona)", conNumero: "¿Cuántos entrantes distintos?" },
+      { valor: "compartir", texto: "Para compartir (varias personas por plato)", conNumero: "¿Cuántos entrantes distintos?" },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // Solo si hay entrante para compartir: es lo que decide cuántos platos extra se
+    // cargan (un plato cada 3 personas no es lo mismo que cada 4).
+    id: "entrantePersonas", tipo: "opciones", texto: "El entrante para compartir, ¿cada cuántas personas?",
+    // "Individual" no es un caso raro que tocara meter en "Otro número" escribiendo un
+    // 1: pasa bastante — el "compartir" era para llevar la cuenta de cuántos entrantes
+    // distintos hay, no que tengan que repartirse entre varios comensales.
+    opciones: [
+      { valor: 1, texto: "Individual (un plato por persona)" },
+      { valor: 3, texto: "Un plato cada 3 personas" },
+      { valor: 4, texto: "Un plato cada 4 personas" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cada cuántas personas?",
+        campoNumero: "entrantePersonasOtras",
+        sugerido: () => 3,
+      },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
+  },
+  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
+  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
+  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
+  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
+  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
+  // a los invitados.
+  {
+    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
+    opciones: [
+      { valor: "invitados", texto: "Para los invitados" },
+      { valor: "personal", texto: "Solo para el personal" },
+    ],
+  },
+  {
+    // Es el equipo para HACER la paella (paellera, trípode, bombona), no qué hay de
+    // comer — por eso no va pegada a "menu" cortando el hilo de "qué se come" (menú
+    // → paella → cuántas → entrante → café), pero tampoco va enterrada varias
+    // preguntas dentro de "Cocina y equipamiento" (nevera/congelador/hielo/horno son
+    // de CUALQUIER menú, no tienen nada que ver con haber dicho paella hace un
+    // momento). Aquí, justo al cerrar "qué se come", es el puente entre las dos.
+    //
     // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
     // para arriba) y nunca se preguntaba. Pero el pax no lo sabe todo: con el mismo
     // número de gente cocina puede querer una talla u otra según el arroz y el sitio,
@@ -175,10 +377,10 @@ export const PREGUNTAS = [
       const pax = paxDeLaGente(r);
       return pax
         ? `Con ${pax} personas saldría ${tallaPorPax(pax)}. Solo hay que tocarlo si cocina quiere otra.`
-        : "Si no lo sabes, se pone la que salga por la gente.";
+        : "Si no lo sabes, se pone la que salga según la gente.";
     },
     opciones: [
-      { valor: "Auto", texto: "La que salga por la gente" },
+      { valor: "Auto", texto: "La que salga según la gente" },
       { valor: "Pequeña", texto: "Pequeña" },
       { valor: "Mediana", texto: "Mediana" },
       { valor: "Grande", texto: "Grande" },
@@ -194,45 +396,22 @@ export const PREGUNTAS = [
     nota: (r) => {
       const pax = paxDeLaGente(r);
       return pax
-        ? `Con ${pax} personas salen ${paellasPorPax(pax)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
+        ? `Con ${pax} personas salen ${paellasPorPax(pax, r.tipo)} (una cada 30). Cada una lleva su paleta, su trípode y su bombona.`
         : "Cada paella lleva su paleta, su trípode y su bombona.";
     },
     opciones: [
-      { valor: "auto", texto: "Las que salgan por la gente" },
+      { valor: "auto", texto: "Las que salgan según la gente" },
       {
         valor: "otras", texto: "Otro número",
         conNumero: "¿Cuántas?",
         campoNumero: "numPaellas",
-        sugerido: (r) => paellasPorPax(paxDeLaGente(r)) || 1,
+        sugerido: (r) => paellasPorPax(paxDeLaGente(r), r.tipo) || 1,
       },
     ],
     si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
   },
-  {
-    // Los dos entrantes NO son excluyentes: en la app son dos interruptores distintos
-    // (el de chupito carga vasos de chupito, el compartido carga platos extra) y hay
-    // menús que llevan los dos. Antes esta pregunta obligaba a elegir uno y se perdía
-    // el otro. Muchas veces tampoco es un entrante para compartir, son dos: por eso
-    // lleva su número, y cada uno multiplica sus platos.
-    id: "entrante", tipo: "marcar", texto: "¿Lleva entrante?",
-    nota: "Puede llevar los dos: el de chupito y uno (o varios) para compartir.",
-    opciones: [
-      { valor: "chupito", texto: "De chupito" },
-      { valor: "compartir", texto: "Para compartir", conNumero: "¿Cuántos entrantes distintos?" },
-    ],
-    soloEn: CON_BARRA,
-  },
-  {
-    // Solo si hay entrante para compartir: es lo que decide cuántos platos extra se
-    // cargan (un plato cada 3 personas no es lo mismo que cada 4).
-    id: "entrantePersonas", tipo: "opciones", texto: "El entrante para compartir, ¿cada cuántas personas?",
-    opciones: [
-      { valor: 3, texto: "Un plato cada 3 personas" },
-      { valor: 4, texto: "Un plato cada 4 personas" },
-    ],
-    soloEn: CON_BARRA,
-    si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
-  },
+
+  // ── Cocina y equipamiento ──────────────────────────────────────────────────
   {
     // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
     // poner tal cual sin traducir nada por el camino.
@@ -252,6 +431,19 @@ export const PREGUNTAS = [
     ],
   },
   {
+    // Antes el hielo se cargaba siempre, sin preguntar: en un sitio que ya lo da o
+    // en un evento que no lo necesita, sobraban kilos, bolsas y taxis enteros. Pero
+    // si SÍ se lleva congelador no hace falta ni preguntarlo: no tiene sentido llevar
+    // congelador y no querer hielo, así que la pregunta solo sale sin congelador.
+    id: "hielo", tipo: "opciones", texto: "¿Llevamos hielo?",
+    nota: "Si el sitio ya lo da, o no hace falta, di que no: así no se carga ni un taxi de más.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No hace falta" },
+    ],
+    si: (r) => r.congelador === "No lleva",
+  },
+  {
     id: "horno", tipo: "opciones", texto: "¿Qué horno hace falta?",
     opciones: [
       { valor: "Pequeño", texto: "Pequeño" },
@@ -260,6 +452,54 @@ export const PREGUNTAS = [
       { valor: "No lleva", texto: "No lleva" },
     ],
   },
+  {
+    // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
+    // devolverlo. Al marcarlo se crea su recogida sola. En un rodaje no se lleva.
+    id: "armarioCaliente", tipo: "opciones", texto: "¿Lleva armario caliente?",
+    nota: "Se alquila a Dealde: se crea sola su recogida y su devolución.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // En producción ya se cargan solas (automáticas por pax, sin preguntar): son
+    // rodajes largos donde el pase siempre se mantiene caliente. En el resto de
+    // eventos no se cargaba ninguna, ni se preguntaba: se echaban en falta en el
+    // servicio y no había forma de que el formulario avisara.
+    id: "mesasCalientes", tipo: "opciones", texto: "¿Lleva mesas calientes?",
+    nota: "Para mantener el pase caliente hasta que se sirve. 1 por cada ~40 pax.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // Antes se dejaba en blanco para que cocina lo apuntara a mano; ahora sale con un
+    // mínimo de serie y aquí se puede subir si el menú lleva más. Cumpleaños no usa
+    // gastros (todo va en bandejas) y producción los calcula solo, por chafer.
+    //
+    // El número (4) se repite a mano en vez de importarse de GASTROS_MINIMO
+    // (checklist-generadores.js): ese fichero es el motor de cálculo entero de la
+    // checklist, con sus propias dependencias pesadas, y el formulario es una app
+    // aparte (otra carpeta, otro manifest de PWA) — importar de ahí aunque sea solo
+    // una constante mete el motor entero en el bundle del formulario. Si el mínimo
+    // cambia, se cambia en los dos sitios.
+    id: "cuantosGastros", tipo: "opciones", texto: "¿Cuántos gastros hacen falta?",
+    nota: `Lo de siempre son ${GASTROS_MINIMO}. Se puede subir si el menú lleva más.`,
+    opciones: [
+      { valor: "auto", texto: `Los de siempre (${GASTROS_MINIMO})` },
+      {
+        valor: "otros", texto: "Otro número",
+        conNumero: "¿Cuántos?",
+        campoNumero: "numGastros",
+        sugerido: () => GASTROS_MINIMO,
+      },
+    ],
+    soloEn: ["boda", "comunion", "corporativo"],
+  },
 
   // ── Lo que se haya presupuestado ───────────────────────────────────────────
   {
@@ -267,18 +507,97 @@ export const PREGUNTAS = [
     opciones: [
       { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
       { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
-      // Cuántos barriles: hasta ahora se daba por hecho que era uno
-      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
-      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", soloEn: CON_BARRA },
+      // Cuántos barriles: hasta ahora se daba por hecho que era uno. Los dos comparten
+      // campoNumero (la checklist solo soporta UN tamaño de barril a la vez, ver
+      // tamanoBarril en checklist-generadores.js) — "excluye" evita marcar los dos a la
+      // vez, que antes perdía en silencio cuál de los dos tamaños era el real.
+      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril50"], soloEn: CON_BARRA },
+      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril30"], soloEn: CON_BARRA },
       // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
       // se añade otra pantalla a un formulario que ya tiene quince
       { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
       { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
-      { valor: "mobiliario", texto: "Mobiliario extra de alquiler", soloEn: CON_BARRA },
+      // El mobiliario de alquiler tiene su propia pregunta (mobiliarioAlquiler): aquí
+      // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
+      // El interruptor real que enseña la línea "Aguas pequeñas (33cl)" en la checklist
+      // (llevaAguasPequenas) no lo preguntaba nadie: en un banquete se quedaba siempre
+      // apagado salvo que alguien se acordara de tocarlo a mano en la app. En producción
+      // esto no hace falta: las aguas pequeñas van siempre (ver "aguaPequena", más abajo).
+      { valor: "aguasPequenas", texto: "Aguas pequeñas (botellines individuales)", soloEn: CON_BARRA },
+      // Estaba en "¿Qué lleva el menú?", junto a la paella y el frito, pero no es
+      // comida del menú: es un servicio que se presupuesta aparte y que carga platos
+      // extra de postre — igual que el desayuno, justo aquí arriba (mismo cálculo en
+      // checklist-generadores.js: platosPostreExtra suma jamonero + tarta + desayuno).
+      { valor: "jamonero", texto: "Jamonero", soloEn: CON_BARRA },
     ],
   },
+  {
+    // Antes era una casilla suelta dentro de "extras": marcaba sí/no pero no dejaba
+    // decir qué mobiliario es, y el proveedor estaba fijo a Event Style en el motor
+    // de alquileres (alquileres.js). Con pantalla propia (como flores/minutas) se
+    // puede decir qué es, a quién se le alquila si no es Event Style, y adjuntar la
+    // hoja del alquiler para tener registro.
+    id: "mobiliarioAlquiler", tipo: "opciones", texto: "¿Lleva mobiliario extra de alquiler?",
+    nota: "Mesas altas, sofás, barra... Si no dices proveedor, se alquila a Event Style, como siempre.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Que", etiqueta: "¿Qué mobiliario?", ejemplo: "Mesas altas, sofás, barra..." },
+          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila? (vacío = Event Style)", ejemplo: "Event Style" },
+        ],
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
+      },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // Cajón de sastre para alquileres sueltos que no tengan ya su propia pregunta
+    // (sillas, armario caliente, mobiliario, carpas...): vajilla especial,
+    // decoración, sonido... Mismo patrón que el mobiliario —qué, a quién, y la hoja
+    // del alquiler si hace falta tener registro— para no inventar una pregunta nueva
+    // por cada cosa suelta que pueda presupuestarse.
+    id: "otroAlquiler", tipo: "opciones", texto: "¿Algo más presupuestado como alquiler?",
+    nota: "Vajilla especial, decoración, sonido... lo que no tenga ya su propia pregunta arriba.",
+    opciones: [
+      { valor: "no", texto: "No hay nada más" },
+      {
+        valor: "si", texto: "Sí",
+        conCampos: [
+          { sufijo: "Que", etiqueta: "¿Qué es?", ejemplo: "Vajilla especial, altavoces..." },
+          { sufijo: "Proveedor", etiqueta: "¿A quién se le alquila?", ejemplo: "Nombre del proveedor" },
+        ],
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la hoja del alquiler o hazle una foto" },
+      },
+    ],
+  },
+  {
+    // Antes era texto libre a las notas, sin mover ni un número de la checklist:
+    // decir "buffet de quesos" no cargaba ninguna mesa. Ahora es marcado múltiple
+    // con su número de mesas cada uno (mismo patrón que chillout/barril30/barril50
+    // dentro de "extras"), y ese total sí llega a la checklist como Mesas de
+    // buffet. "Otro" no lleva descripción propia: para eso está el comentario
+    // libre de la propia pregunta (+ ¿algo más que aclarar aquí?). Va aquí, junto
+    // a "extras" y no en el cierre: es lo mismo, presupuestado que mueve un número
+    // real de la checklist, no una excepción suelta como excepcionesMesa.
+    id: "buffets", tipo: "marcar", texto: "¿Lleva buffet(s) aparte del servicio principal?",
+    nota: "Cada uno con sus mesas — una por defecto, se puede subir.",
+    opciones: [
+      { valor: "quesos", texto: "Buffet de quesos", conNumero: "¿Cuántas mesas?" },
+      { valor: "dulce", texto: "Mesa dulce / candy bar", conNumero: "¿Cuántas mesas?" },
+      { valor: "ibericos", texto: "Ibéricos", conNumero: "¿Cuántas mesas?" },
+      { valor: "croquetas", texto: "Croquetas / frito", conNumero: "¿Cuántas mesas?" },
+      { valor: "fruta", texto: "Fruta", conNumero: "¿Cuántas mesas?" },
+      // "Otro" no es UN buffet más: son los que no están en la lista (gildas, un
+      // photocall de gin-tonics...) y pueden ser varios distintos el mismo evento, cada
+      // uno con su propio nombre y sus propias mesas — por eso lleva lista, no número.
+      { valor: "otro", texto: "Otro", conLista: true, campoLista: "buffetsOtros" },
+    ],
+  },
+
   // ── Lo que se sale de lo normal ────────────────────────────────────────────
   // Platos, platos de postre, cubiertos y bandejas mixtas van SIEMPRE salvo que se diga
   // lo contrario, y la plancha de gas no va salvo que se diga que sí. El formulario no
@@ -308,82 +627,8 @@ export const PREGUNTAS = [
     ],
     // En todos los tipos: un rodaje también carga platos, cubiertos y bandejas.
   },
-  {
-    // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
-    // devolverlo. Al marcarlo se crea su recogida sola. En un rodaje no se lleva.
-    id: "armarioCaliente", tipo: "opciones", texto: "¿Lleva armario caliente?",
-    nota: "Se alquila a Dealde: se crea sola su recogida y su devolución.",
-    opciones: [
-      { valor: "si", texto: "Sí" },
-      { valor: "no", texto: "No lleva" },
-    ],
-    soloEn: CON_BARRA,
-  },
-  {
-    id: "sillas", tipo: "opciones", texto: "¿Las sillas quién las pone?",
-    // Cuántas no se pregunta: salen del pax. A quién se alquilan sí, porque cada
-    // proveedor es una recogida distinta y es lo único que la app no puede deducir.
-    //
-    // En un rodaje TAMBIÉN se pregunta. Antes se daba por supuesto que eran nuestras y
-    // ni se preguntaba: el formulario forzaba "Nuestras" al aplicar el envío, así que
-    // si en la app habías puesto un alquiler te lo borraba, y con él su recogida.
-    nota: "Si las alquilamos, se crea sola su recogida y su devolución.",
-    opciones: [
-      { valor: "finca", texto: "Las pone el sitio" },
-      { valor: "Dealde", texto: "Las alquilamos a Dealde" },
-      { valor: "Carvillo", texto: "Las alquilamos a Carvillo" },
-      { valor: "Nuestras", texto: "Llevamos las nuestras" },
-    ],
-    soloEn: [...CON_BARRA, "produccion"],
-  },
 
-  {
-    id: "tipoMesa", tipo: "opciones", texto: "¿De qué son las mesas donde come la gente?",
-    // Cuántas no se pregunta: salen del pax. De qué tipo sí, porque las redondas no son
-    // nuestras y cada alquiler es una recogida — y porque entran más comensales por
-    // mesa, así que el número cambia.
-    //
-    // Las de cocina y las de las barras van aparte y son siempre nuestras rectangulares
-    // de 1,80: eso no se pregunta porque no cambia nunca.
-    nota: "Las redondas son de alquiler: se crea sola su recogida y su devolución. Las de cocina y barras van aparte, siempre de 1,8m.",
-    opciones: [
-      { valor: "Rectangular 1,8m", texto: "Las nuestras, rectangulares de 1,8m" },
-      { valor: "Redonda 1,5m", texto: "Redondas de 1,5m (alquiler)" },
-      { valor: "Redonda 1,8m", texto: "Redondas de 1,8m (alquiler)" },
-      { valor: "Redonda 2m", texto: "Redondas de 2m (alquiler)" },
-    ],
-    soloEn: [...CON_BARRA, "produccion"],
-  },
-
-  // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
-  // En un rodaje el menú se imprime y se ponen etiquetas: si el archivo no viaja con
-  // los datos, acaba en un WhatsApp perdido y el día del rodaje no lo encuentra nadie.
-  // Va dentro del propio envío, así que la foto se encoge antes de subirse.
-  {
-    id: "imprimirMenu", tipo: "opciones", texto: "¿Hay que imprimir el menú?",
-    opciones: [
-      { valor: "no", texto: "No hace falta" },
-      {
-        valor: "si", texto: "Sí",
-        conArchivo: { sufijo: "Archivo", etiqueta: "Sube el menú o hazle una foto" },
-      },
-    ],
-    soloEn: ["produccion"],
-  },
-  {
-    id: "etiquetas", tipo: "opciones", texto: "¿Hay que imprimir etiquetas?",
-    nota: "La imagen que va en la máquina de etiquetas.",
-    opciones: [
-      { valor: "no", texto: "No hace falta" },
-      {
-        valor: "si", texto: "Sí",
-        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la imagen o hazle una foto" },
-      },
-    ],
-    soloEn: ["produccion"],
-  },
-
-  // ── Mantelería y platos ────────────────────────────────────────────────────
+  // ── Mantelería y vajilla ───────────────────────────────────────────────────
   // Cuántos manteles lo calcula la app por las mesas: aquí solo se elige de cuáles.
   {
     id: "manteles", tipo: "opciones", texto: "¿De qué color los manteles?",
@@ -428,14 +673,20 @@ export const PREGUNTAS = [
     ],
     soloEn: CON_BARRA,
   },
-
   {
     // Solo si han dicho el plato principal: si no lo saben, tampoco van a saber el de
     // postre, y sería una pantalla de más.
     id: "estiloPlatoPostre", tipo: "opciones", texto: "¿Y el plato de postre?",
     opciones: [
+      // Muchas veces el postre va en el MISMO plato que el principal (grande), no en
+      // uno pequeño aparte — de ahí esta opción primero, en vez de forzar a repetir a
+      // mano el mismo color/estilo que ya se contestó arriba.
+      { valor: "Mismo que el principal", texto: "El mismo que el principal (no uno pequeño de postre)" },
       { valor: "Blanco", texto: "Blanco" },
+      { valor: "Azul", texto: "Azul" },
+      { valor: "Naranja", texto: "Naranja" },
       { valor: "Verde", texto: "Verde" },
+      { valor: "Relieve blanco", texto: "Relieve blanco" },
       { valor: "Negro/gris", texto: "Negro o gris" },
       {
         valor: "Otro", texto: "Otro (escribirlo)",
@@ -444,6 +695,22 @@ export const PREGUNTAS = [
     ],
     soloEn: CON_BARRA,
     si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null,
+  },
+  {
+    // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
+    // tarta o no; en un cumpleaños no se cargaba mesa ninguna; y la pala y el cuchillo
+    // con los que se corta no se cargaban nunca en ningún sitio. Con esta pregunta la
+    // mesa va donde hay tarta y no va donde no la hay. Va aquí, cerrando mantelería y
+    // vajilla, y no junto a flores/minutas: a diferencia de esas dos, no genera
+    // recogida (no tiene quién/fecha) — es una mesa más que montar, no un encargo que
+    // ir a buscar.
+    id: "tarta", tipo: "opciones", texto: "¿Lleva tarta?",
+    nota: "Si la lleva, se carga su mesa redonda con la pala y el cuchillo.",
+    opciones: [
+      { valor: "si", texto: "Sí" },
+      { valor: "no", texto: "No lleva" },
+    ],
+    soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
   },
 
   // ── Lo que hay que ir a buscar ─────────────────────────────────────────────
@@ -465,19 +732,6 @@ export const PREGUNTAS = [
     ],
   },
   {
-    // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
-    // tarta o no; en un cumpleaños no se cargaba mesa ninguna; y la pala y el cuchillo
-    // con los que se corta no se cargaban nunca en ningún sitio. Con esta pregunta la
-    // mesa va donde hay tarta y no va donde no la hay.
-    id: "tarta", tipo: "opciones", texto: "¿Lleva tarta?",
-    nota: "Si la lleva, se carga su mesa redonda con la pala y el cuchillo.",
-    opciones: [
-      { valor: "si", texto: "Sí" },
-      { valor: "no", texto: "No lleva" },
-    ],
-    soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
-  },
-  {
     id: "minutas", tipo: "opciones", texto: "¿Lleva minutas?",
     nota: "Igual que las flores: se añade a las recogidas con su día.",
     opciones: [
@@ -494,6 +748,35 @@ export const PREGUNTAS = [
     soloEn: CON_BARRA,
   },
 
+  // ── Lo que hay que imprimir (rodajes) ──────────────────────────────────────
+  // En un rodaje el menú se imprime y se ponen etiquetas: si el archivo no viaja con
+  // los datos, acaba en un WhatsApp perdido y el día del rodaje no lo encuentra nadie.
+  // Va dentro del propio envío, así que la foto se encoge antes de subirse.
+  {
+    id: "imprimirMenu", tipo: "opciones", texto: "¿Hay que imprimir el menú?",
+    opciones: [
+      { valor: "no", texto: "No hace falta" },
+      {
+        valor: "si", texto: "Sí",
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube el menú o hazle una foto" },
+      },
+    ],
+    soloEn: ["produccion"],
+  },
+  {
+    id: "etiquetas", tipo: "opciones", texto: "¿Hay que imprimir etiquetas?",
+    nota: "La imagen que va en la máquina de etiquetas.",
+    opciones: [
+      { valor: "no", texto: "No hace falta" },
+      {
+        valor: "si", texto: "Sí",
+        conArchivo: { sufijo: "Archivo", etiqueta: "Sube la imagen o hazle una foto" },
+      },
+    ],
+    soloEn: ["produccion"],
+  },
+
+  // ── Cierre ─────────────────────────────────────────────────────────────────
   {
     // Lo que hay que comprar (hielo, hielo seco, algo del súper) no es material de
     // almacén: alguien tiene que pasar a comprarlo. Va a Compras, que ya tiene su
@@ -503,8 +786,6 @@ export const PREGUNTAS = [
     campo: "comprar",
     ejemplo: "20 sacos de hielo\nHielo seco",
   },
-
-  // ── Cierre ─────────────────────────────────────────────────────────────────
   {
     // Las alergias iban dentro del cajón de "algo que tener en cuenta", entre la
     // petición del cliente y con quién hablar al llegar. Ahí se leen en diagonal y se
@@ -515,6 +796,26 @@ export const PREGUNTAS = [
     nota: "Cuántos comensales y de qué, si se sabe. Si no hay ninguna, se deja en blanco y se pasa.",
     ejemplo: "Ej: 2 celíacos, 1 alérgico al marisco en la mesa 4, 1 vegano...",
     noSe: false,
+  },
+  {
+    // "Por mesa" no significa un editor mesa a mesa (dispararía la complejidad para
+    // lo que es la excepción, no la norma): casillas con cuántas mesas afecta cada
+    // una, que viajan a las notas del evento igual que antes en texto libre — sin
+    // tocar el cálculo agregado por pax que ya existe, lo complementa. Antes era
+    // "texto-largo" a mano ("cubiertos de pescado en la mesa 4..."), lo que se
+    // escribiera ahí no se leía dos veces igual; con casillas se lee siempre igual
+    // y con su número, mismo patrón que buffets/extras (marcar + conNumero).
+    // "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" vivían aquí, pero eran
+    // una excepción de mesa cuando en realidad el dueño quería el default de TODO el
+    // evento — eso ya lo cubre "queDobla" (arriba, en el menú). Esto es solo para una
+    // mesa CONCRETA que necesita algo que el resto no — el caso raro de "una mesa
+    // suelta con doble cubierto" se resuelve editando la línea a mano en la app.
+    id: "excepcionesMesa", tipo: "marcar", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
+    nota: "Marca lo que aplique y di en cuántas mesas. Si no hay ninguna excepción, se deja sin marcar.",
+    opciones: [
+      { valor: "menuInfantil", texto: "Menú infantil", conNumero: "Cantidad en mesa" },
+      { valor: "otro", texto: "Otro", conNumero: "Cantidad en mesa" },
+    ],
   },
   {
     id: "notas", tipo: "texto-largo", texto: "¿Algo más que haya que tener en cuenta?",
@@ -578,9 +879,17 @@ export function resumirRespuesta(p, r, tipo) {
     if (!v.length) return "nada";
     // Con su número si lo lleva: "Algo frito (3)" dice lo que hay que cargar, "Algo
     // frito" a secas no, y esto es lo último que se lee antes de darle a enviar.
-    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).map(o => {
+    return opcionesDe(p, tipo).filter(o => v.includes(o.valor)).flatMap(o => {
+      // conLista es varias cosas distintas bajo la misma casilla (los "otro" de un
+      // buffet: gildas, un rincón de gin-tonics...), cada una con su propio nombre —
+      // por eso sale como varias líneas, no como una sola con un número.
+      if (o.conLista) {
+        return (Array.isArray(r[o.campoLista]) ? r[o.campoLista] : [])
+          .filter(x => (x.nombre || "").trim())
+          .map(x => `${x.nombre.trim()} (${x.mesas || 1})`);
+      }
       const n = o.conNumero ? r[o.campoNumero || `${o.valor}Numero`] : null;
-      return n ? `${o.texto} (${n})` : o.texto;
+      return [n ? `${o.texto} (${n})` : o.texto];
     }).join(", ");
   }
   const op = (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).find(o => o.valor === v);
@@ -603,6 +912,29 @@ export function resumirRespuesta(p, r, tipo) {
     if (n) extra.push(String(n));
   }
   return extra.length ? `${op.texto} · ${extra.join(" · ")}` : op.texto;
+}
+
+// Cómo llamar a un envío en un aviso o en la bandeja: el evento al que ya está
+// asociado si lo tiene, si no el nombre que puso quien rellenó el formulario, y si
+// tampoco hay eso, un texto genérico — nunca vacío.
+export function nombreDelEnvio(e) {
+  return e.eventoDestino || (e.respuestas && e.respuestas.nombre) || "evento nuevo";
+}
+
+// El texto del aviso de WhatsApp cuando llega un envío nuevo o corregido: qué ha
+// cambiado, y un resumen corto de quién/cuándo para reconocerlo sin abrir la bandeja.
+export function textoAvisoEnvio(e) {
+  const r = e.respuestas || {};
+  const trozos = [];
+  if (r.fecha) trozos.push(fmtFechaCorta(r.fecha));
+  if (r.sitio) trozos.push(r.sitio);
+  const gente = [r.adultos && `${r.adultos} adultos`, r.ninos && `${r.ninos} niños`, r.staff && `${r.staff} staff`]
+    .filter(Boolean).join(" + ");
+  if (gente) trozos.push(gente);
+  const cabecera = e.corregido
+    ? `Han CAMBIADO los datos de "${nombreDelEnvio(e)}"`
+    : `Datos nuevos de "${nombreDelEnvio(e)}"`;
+  return `${cabecera}${trozos.length ? `\n${trozos.join(" · ")}` : ""}\nEstá en el formulario, sin aplicar todavía.`;
 }
 
 // El envío entero en palabras, para la bandeja: pregunta y respuesta, en el orden en
@@ -641,21 +973,107 @@ export function aRespuestasDeLaApp(r = {}) {
   // es por donde le llegan a quien está en el sitio. Y van arriba porque una alergia
   // leída después de servir no sirve de nada.
   const alergias = (r.alergias || "").trim();
+  // "Excepciones de mesa" y "Buffets" pasaron de texto libre a marcado múltiple (con
+  // su número de mesas cada una), pero la línea de notas se ve igual que antes — se
+  // reconstruye con resumirRespuesta(), que ya sabe formatear una pregunta "marcar"
+  // como "Doble tenedor (2), Cristalería aparte (1)". El detalle de "Otro" (qué es)
+  // va aparte, en su comentario libre de pregunta, como cualquier otra aclaración —
+  // no hace falta tratarlo distinto aquí.
+  const excepcionesMesa = Array.isArray(r.excepcionesMesa) && r.excepcionesMesa.length
+    ? resumirRespuesta(PREGUNTAS.find(p => p.id === "excepcionesMesa"), r, tipo)
+    : "";
+  const buffets = Array.isArray(r.buffets) && r.buffets.length
+    ? resumirRespuesta(PREGUNTAS.find(p => p.id === "buffets"), r, tipo)
+    : "";
+  // Qué es cada alquiler, para quien monta el evento: el proveedor y el sí/no van al
+  // estado (abajo, con el resto de lo que se contesta siempre igual); esto es solo
+  // la descripción libre, que no tiene otro sitio donde vivir.
+  const mobiliarioQue = (r.mobiliarioAlquilerQue || "").trim();
+  const otroQue = (r.otroAlquilerQue || "").trim();
+  const otroProveedor = (r.otroAlquilerProveedor || "").trim();
   const otras = (r.notas || "").trim();
-  const juntas = [alergias ? `⚠️ ALERGIAS: ${alergias}` : "", otras].filter(Boolean).join("\n");
+  // Comentario libre por pregunta (id + "_comentario", puesto desde ComentarioPregunta
+  // en Formulario.jsx): cada uno se anexa como una línea propia, con el texto de la
+  // pregunta delante para no perder de vista a qué aclara. notasFusionadas (en
+  // App.jsx, al aplicar el envío) ya compara línea a línea, así que reenviar el
+  // formulario sin cambiar un comentario no lo duplica.
+  const comentarios = preguntasDe(tipo, r)
+    .map(p => ({ texto: p.texto, valor: (r[`${p.id}_comentario`] || "").trim() }))
+    .filter(x => x.valor)
+    .map(x => `· ${x.texto} ${x.valor}`);
+  const juntas = [
+    alergias ? `⚠️ ALERGIAS: ${alergias}` : "",
+    excepcionesMesa ? `🍽️ EXCEPCIONES DE MESA: ${excepcionesMesa}` : "",
+    buffets ? `🥐 BUFFETS: ${buffets}` : "",
+    mobiliarioQue ? `🪑 MOBILIARIO ALQUILADO: ${mobiliarioQue}${(r.mobiliarioAlquilerProveedor || "").trim() ? ` (${r.mobiliarioAlquilerProveedor.trim()})` : ""}` : "",
+    otroQue ? `🔑 OTRO ALQUILER: ${otroQue}${otroProveedor ? ` (${otroProveedor})` : ""}` : "",
+    otras, ...comentarios,
+  ].filter(Boolean).join("\n");
   pon("notasEvento", juntas);
+
+  // Café para invitados por defecto (estadoInicial.cafeParaInvitados ?? true en
+  // calcCafe): así ningún evento guardado antes de esta pregunta cambia de cantidad.
+  if (puesto(r.cafe)) estado.cafeParaInvitados = r.cafe !== "personal";
+
+  // Carpas: antes solo se preguntaba en producción (siempre al aire libre); ahora se
+  // pregunta en todos los tipos, así que sale del bloque de producción y va aquí, con
+  // el resto de lo que se contesta siempre igual.
+  if (puesto(r.carpas)) {
+    estado.llevaCarpas = r.carpas === "si";
+    if (r.numCarpas > 0) {
+      estado.numCarpas = r.numCarpas;
+      // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
+      // hace falta preguntarlo aparte, se sabe con el número.
+      estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
+    }
+  }
+
+  // Mobiliario y otros alquileres: el proveedor manda sobre el fijo de siempre
+  // (Event Style) cuando se dice uno; la hoja adjunta, si la hay, se junta con las
+  // de otros envíos al aplicar (ver App.jsx, que es quien conoce el evento entero y
+  // decide cuáles ya estaban).
+  const archivosAlquiler = [];
+  if (puesto(r.mobiliarioAlquiler)) {
+    estado.llevaMobiliarioAlquiler = r.mobiliarioAlquiler === "si";
+    if ((r.mobiliarioAlquilerProveedor || "").trim()) estado.proveedorMobiliarioAlquiler = r.mobiliarioAlquilerProveedor.trim();
+    if (r.mobiliarioAlquilerArchivo && r.mobiliarioAlquilerArchivo.datos) {
+      archivosAlquiler.push({ ...r.mobiliarioAlquilerArchivo, origen: "mobiliarioAlquiler", etiqueta: mobiliarioQue || "Mobiliario extra" });
+    }
+  }
+  if (r.otroAlquilerArchivo && r.otroAlquilerArchivo.datos) {
+    archivosAlquiler.push({ ...r.otroAlquilerArchivo, origen: "otroAlquiler", etiqueta: otroQue || "Otro alquiler" });
+  }
+  if (archivosAlquiler.length) estado.archivosAlquiler = archivosAlquiler;
+
+  // Parabanes: sin fórmula propia, el número (si lo hay) manda tal cual.
+  if (puesto(r.parabanes)) {
+    estado.llevaParabanes = r.parabanes === "si";
+    if (r.numParabanes > 0) estado.numParabanes = r.numParabanes;
+  }
+
+  // Buffets: la suma de las mesas de cada uno marcado (1 por defecto si no se puso
+  // número, mismo mínimo que ya aplica el propio campo en Formulario.jsx). En los
+  // tres tipos de evento, no solo en producción: buildChecklistBoda/Cumpleanos no
+  // tenían ninguna línea de mesa de buffet hasta ahora.
+  //
+  // Array.isArray(r.buffets), NO ".length": si la pantalla se contestó desmarcando
+  // todos los buffets, r.buffets llega como [] — un evento que ya tenía mesas de un
+  // envío anterior tiene que bajar a 0, no quedarse con el número viejo. Solo si la
+  // pantalla NUNCA se contestó (r.buffets === undefined) se deja lo que ya hubiera.
+  if (Array.isArray(r.buffets)) {
+    // "otro" no tiene un solo número: son las mesas de todos los buffets sin lista
+    // propia que se hayan añadido (gildas, rincón de gin-tonics...), sumadas.
+    estado.numMesasBuffet = r.buffets.length ? r.buffets.reduce((acc, v) => {
+      if (v === "otro") {
+        const lista = Array.isArray(r.buffetsOtros) ? r.buffetsOtros : [];
+        return acc + lista.reduce((s, x) => s + (Number(x.mesas) || 1), 0);
+      }
+      return acc + (Number(r[`${v}Numero`]) || 1);
+    }, 0) : 0;
+  }
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
-    if (puesto(r.carpas)) {
-      estado.llevaCarpas = r.carpas === "si";
-      if (r.numCarpas > 0) {
-        estado.numCarpas = r.numCarpas;
-        // Lo que pasa de lo que hay en almacén se alquila solo, con su recogida: no
-        // hace falta preguntarlo aparte, se sabe con el número.
-        estado.alquilaCarpas = carpasPorAlquilar(r.numCarpas) > 0;
-      }
-    }
     if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
     if (puesto(r.aguaPequena)) estado.tipoAguaPequena = r.aguaPequena;
     // Las sillas de un rodaje se preguntan igual que en el resto. Antes se forzaban a
@@ -664,6 +1082,10 @@ export function aRespuestasDeLaApp(r = {}) {
     // contestar no se toca nada, como todo lo demás del formulario.
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
+    // Solo soloBandeja: el ratio de camareros de "servicio" (25/12, pensado para un
+    // banquete) no pinta nada aquí — producción ya tiene el suyo propio, ver
+    // buildChecklistProduccion (leerRatios().produccion).
+    if (puesto(r.servicio)) estado.soloBandeja = r.servicio === "bandeja";
   } else {
     pon("pax", r.adultos);
     pon("ninos", r.ninos);
@@ -677,32 +1099,56 @@ export function aRespuestasDeLaApp(r = {}) {
       // 100 personas son seis camareros donde se ponen tres o cuatro.
       estado.paxPorCamarero = r.servicio === "bandeja" ? 25 : 12;
     }
-    // Los dos entrantes son independientes: un menú puede llevar chupito Y compartido
+    // Los tres entrantes son independientes: un menú puede llevar chupito, individual
+    // y compartido a la vez
     if (Array.isArray(r.entrante)) {
       estado.llevaEntrante = marcado("entrante", "chupito");
-      estado.entranteCompartido = marcado("entrante", "compartir");
+      const entranteIndividual = marcado("entrante", "individual");
+      const entranteCompartir = marcado("entrante", "compartir");
+      estado.entranteCompartido = entranteIndividual || entranteCompartir;
       if (estado.entranteCompartido) {
-        // Cada cuántas personas va un plato, y cuántos entrantes distintos hay (lo
-        // normal es 1, pero hay menús con 2). Si no lo contestan, manda el valor de
-        // siempre de la app.
-        if (puesto(r.entrantePersonas)) estado.personasPorPlatoEntrante = r.entrantePersonas;
-        if (r.compartirNumero > 0) estado.numEntrantesCompartir = r.compartirNumero;
+        // El ratio de "individual" es 1 fijo, sin preguntar nada más. El de "compartir"
+        // lo pregunta aparte (entrantePersonas). Si se marcan los dos a la vez manda el
+        // de "compartir": la checklist solo tiene una línea con un ratio, no dos.
+        if (entranteCompartir && puesto(r.entrantePersonas)) {
+          estado.personasPorPlatoEntrante = r.entrantePersonas === "otras"
+            ? r.entrantePersonasOtras : r.entrantePersonas;
+        } else if (entranteIndividual) {
+          estado.personasPorPlatoEntrante = 1;
+        }
+        // Los entrantes distintos de cada tipo se suman: da igual si son individuales
+        // o para compartir, todos cargan su propio plato extra.
+        const numIndividual = entranteIndividual ? (r.individualNumero > 0 ? r.individualNumero : 1) : 0;
+        const numCompartir = entranteCompartir ? (r.compartirNumero > 0 ? r.compartirNumero : 1) : 0;
+        if (numIndividual + numCompartir > 0) estado.numEntrantesCompartir = numIndividual + numCompartir;
       }
     }
     // "finca" = no las llevamos nosotros; el resto es literalmente el valor que usa la
     // app (Dealde / Carvillo / Nuestras), y solo los dos primeros crean recogida
     if (puesto(r.armarioCaliente)) estado.llevaArmarioCaliente = r.armarioCaliente === "si";
+    if (puesto(r.mesasCalientes)) estado.llevaMesasCalientes = r.mesasCalientes === "si";
+    if (puesto(r.cuantosGastros)) {
+      estado.numGastros = r.cuantosGastros === "otros" && r.numGastros > 0 ? r.numGastros : 0;
+    }
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
     if (Array.isArray(r.extras)) {
       estado.tieneBrindisCava = marcado("extras", "brindis");
       estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";
-      estado.llevaMobiliarioAlquiler = marcado("extras", "mobiliario");
       estado.hayDesayuno = marcado("extras", "desayuno");
       estado.tamanoBarril = marcado("extras", "barril50") ? "50L"
         : marcado("extras", "barril30") ? "30L" : "No lleva";
       if (estado.tamanoBarril !== "No lleva" && r.numBarriles > 0) estado.numBarriles = r.numBarriles;
       estado.llevaJarrasCristal = marcado("extras", "jarras");
+      // Estaba en "menu" (aRespuestasDeLaApp lo leía de "menu"/"jamonero"), pero no es
+      // comida del menú: es un servicio presupuestado, como el desayuno justo arriba.
+      estado.llevaJamonero = marcado("extras", "jamonero");
+      // El interruptor real de la checklist (llevaAguasPequenas) no lo preguntaba nadie
+      // en un banquete: se quedaba siempre en su valor por defecto (apagado).
+      estado.llevaAguasPequenas = marcado("extras", "aguasPequenas");
+      estado.llevaChillOut = marcado("extras", "chillout");
+      if (estado.llevaChillOut && r.chilloutNumero > 0) estado.numChillOut = r.chilloutNumero;
+      estado.llevaPalomitera = marcado("extras", "palomitera");
     }
   }
 
@@ -742,20 +1188,39 @@ export function aRespuestasDeLaApp(r = {}) {
   }
   if (puesto(r.estiloPlatoPostre)) {
     const suyo = (r.estiloPlatoPostreCual || "").trim();
-    if (r.estiloPlatoPostre !== "Otro") estado.estiloPlatoPostre = r.estiloPlatoPostre;
+    // "Mismo que el principal": la pregunta de arriba (estiloPlato) ya se procesó, así
+    // que estado.estiloPlatoPrincipal ya está puesto — se copia tal cual, sin inventar
+    // un plato "de postre" que en realidad no existe como pieza aparte.
+    if (r.estiloPlatoPostre === "Mismo que el principal") estado.estiloPlatoPostre = estado.estiloPlatoPrincipal;
+    else if (r.estiloPlatoPostre !== "Otro") estado.estiloPlatoPostre = r.estiloPlatoPostre;
     else if (suyo) estado.estiloPlatoPostre = suyo;
   }
   if (puesto(r.horno)) estado.tipoHorno = r.horno;
   if (puesto(r.nevera)) estado.tipoNevera = r.nevera;
   if (puesto(r.congelador)) estado.tipoCongelador = r.congelador;
+  if (puesto(r.hielo)) estado.llevaHielo = r.hielo === "si";
+  if (puesto(r.cristaleria)) estado.llevaCristaleria = r.cristaleria === "si";
+  if (puesto(r.bebidaAparte)) estado.llevaBebida = r.bebidaAparte === "no";
+  if (puesto(r.numBarras)) {
+    estado.numBarras = r.numBarras === "otras" ? r.numBarrasOtras : r.numBarras;
+  }
   if (Array.isArray(r.menu)) {
     estado.llevaPaella = marcado("menu", "paella");
     estado.tieneFrituras = marcado("menu", "frito");
     if (estado.tieneFrituras && r.numFrituras > 0) estado.numFrituras = r.numFrituras;
-    estado.llevaJamonero = marcado("menu", "jamonero");
     if (tipo !== "produccion") estado.dobleServicio = marcado("menu", "dosPlatos");
   }
-  // Talla y número de paellas. "Auto" y "las que salgan por la gente" son respuestas de
+  // Qué dobla en concreto: cubiertos y cristalería por separado, en vez de todo
+  // atado al mismo "dobleServicio" de siempre (que sigue mandando solo en el plato).
+  if (Array.isArray(r.queDobla)) {
+    estado.dobleTenedor = r.queDobla.includes("tenedor");
+    estado.dobleCuchillo = r.queDobla.includes("cuchillo");
+    estado.dobleCuchara = r.queDobla.includes("cuchara");
+    estado.dobleVino = r.queDobla.includes("vino");
+    estado.dobleAgua = r.queDobla.includes("agua");
+    estado.dobleCava = r.queDobla.includes("cava");
+  }
+  // Talla y número de paellas. "Auto" y "las que salgan según la gente" son respuestas de
   // verdad: dicen "déjalo como lo calcula la app", y por eso se escriben (Auto y 0) en
   // vez de no tocar nada — si el evento traía una talla puesta a mano y ahora dicen que
   // vale la de siempre, hay que quitarla.
@@ -764,11 +1229,6 @@ export function aRespuestasDeLaApp(r = {}) {
   if (puesto(r.tamanoPaella)) estado.tipoPaella = r.tamanoPaella;
   if (puesto(r.cuantasPaellas)) {
     estado.numPaellas = r.cuantasPaellas === "otras" && r.numPaellas > 0 ? r.numPaellas : 0;
-  }
-  if (Array.isArray(r.extras)) {
-    estado.llevaChillOut = marcado("extras", "chillout");
-    if (estado.llevaChillOut && r.chilloutNumero > 0) estado.numChillOut = r.chilloutNumero;
-    estado.llevaPalomitera = marcado("extras", "palomitera");
   }
 
   return estado;
@@ -812,6 +1272,8 @@ export function archivosDelEnvio(r = {}) {
   return [
     { id: "imprimirMenuArchivo", etiqueta: "Menú para imprimir" },
     { id: "etiquetasArchivo", etiqueta: "Imagen de etiquetas" },
+    { id: "mobiliarioAlquilerArchivo", etiqueta: "Hoja de alquiler (mobiliario)" },
+    { id: "otroAlquilerArchivo", etiqueta: "Hoja de alquiler (otro)" },
   ]
     .map(x => ({ ...x, archivo: r[x.id] }))
     .filter(x => x.archivo && x.archivo.datos);
@@ -834,11 +1296,34 @@ export function cambiosEntreRespuestas(antes = {}, ahora = {}) {
 
 // Lo que falta por contestar y no se puede dejar en blanco. Devuelve [{ id, aviso }]
 // para poder llevar a esa pregunta desde el repaso en vez de solo decir "falta algo".
-export function loQueFalta(respuestas = {}) {
+export function respuestasQueFaltan(respuestas = {}) {
   const tipo = respuestas.tipo || "boda";
   return preguntasDe(tipo, respuestas)
     .map(p => ({ id: p.id, aviso: p.falta ? p.falta(respuestas) : "" }))
     .filter(x => !!x.aviso);
+}
+
+// Las notas del evento, al aplicar un envío: se SUMAN, no se sustituyen — las que ya
+// hubiera suelen ser tuyas (a quién llamar, qué recoger) y las del formulario vienen
+// del cliente. Perder unas por las otras es justo lo que no puede pasar.
+//
+// Se compara LÍNEA A LÍNEA, no el bloque entero: la oficina, al corregir el
+// formulario, normalmente no borra lo que ya había escrito — lo deja tal cual y añade
+// algo detrás. Eso deja "nuevas" con una copia completa de "antes" dentro, más lo
+// añadido. Comparando el bloque entero el texto viejo, más corto, nunca puede
+// "incluir" al nuevo, más largo con la copia dentro — así que se concatenaba OTRA VEZ:
+// viejo, viejo, y lo nuevo. Y como ModalModoCarga.jsx convierte cada línea de las
+// notas en un recordatorio con su propio check ("Recordatorios del evento"), ese
+// texto duplicado salía como filas duplicadas en Modo carga.
+export function notasFusionadas(antes, nuevas) {
+  const a = String(antes || "").trim();
+  const n = String(nuevas || "").trim();
+  if (!a) return n;
+  if (!n) return a;
+  const lineasAntes = a.split("\n").map(l => l.trim()).filter(Boolean);
+  const lineasNuevas = n.split("\n").map(l => l.trim()).filter(Boolean)
+    .filter(l => !lineasAntes.some(x => x.toLowerCase() === l.toLowerCase()));
+  return lineasNuevas.length ? `${a}\n${lineasNuevas.join("\n")}` : a;
 }
 
 // Lo que hay que comprar, en líneas, tal como las guarda la app en Compras. Va aparte

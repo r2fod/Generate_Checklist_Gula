@@ -32,3 +32,13 @@ export const limpiaTexto = (t, max = Infinity) =>
 /** @param {unknown} texto @param {number} [max] @returns {string} */
 export const claveDeTexto = (texto, max = 60) => sinTildes(limpiaTexto(texto))
   .replace(/[^a-z0-9ñ ]/g, "").replace(/\s+/g, "-").slice(0, max);
+
+// ─── NÚMERO A TEXTO, AL GUSTO DE LA CASA ──────────────────────────────────────
+// 0,85 y no 85% ni 0.85: es el mismo formato que ya se escribe en toda la app y el que
+// se teclea en un móvil español sin pelearse con el punto. Vivía copiado en
+// PanelBebida; los paneles hermanos de ratios (hielo) lo necesitan también, y dos
+// copias de un formato es la misma trampa que cuatro copias de una identidad.
+/** @param {number} n @returns {string} */
+export const enTexto = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
+/** @param {unknown} t @returns {number} */
+export const enNumero = (t) => Number(String(t).replace(",", "."));

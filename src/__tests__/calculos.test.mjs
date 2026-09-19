@@ -16,13 +16,14 @@ import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras,
   terciosConBarril, conMargen, bateas, BATEA, calcBandejas,
   BOTELLAS_AGUA_POR_PAX, RESPALDO_TERCIOS_CON_BARRIL, RENDIMIENTO_BARRIL,
-  calcHielo, KG_POR_TAXI, KG_POR_BOLSA,
+  calcHielo, KG_POR_TAXI, KG_POR_BOLSA, taxisDeHielo, calcMesasCalientes, calcMesasAltas,
+  ponFactoresHielo, leerFactoresHielo, factoresHieloCambiados, conFactorHielo, factorHieloDe,
 } from "../calculos.js";
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear } from "../calendario/apuntes.js";
-import { personalNecesario, horasEntre, resumenAsignados, loQueFalta, saneaAsignados,
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
+import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
 import { mesasComensales, lineasDeMesas, mesasParaVestir, tipoMesaValido, TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "../mesas.js";
@@ -30,19 +31,26 @@ import { leerPrecios, guardarPrecios, fusionarPreciosNube, parsePreciosPegados }
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
-import { calibracionBebida, catsDeEventoGuardado } from "../calibracion.js";
+import { calibracionBebida, calibracionHielo, calibracionComida, calibracionPersonal,
+  catsDeEventoGuardado } from "../calibracion.js";
+import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
+  esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
-import { buildChecklist } from "../checklist-generadores.js";
+import { estimarTiemposCarga } from "../tiempos-carga.js";
+import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
+import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
 import { leerTexto, guardarTexto, leerJSON, guardarJSON, borrar as borrarDelAlmacen } from "../almacen.js";
 import { aplicarTemaInicial } from "../tema.js";
 import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESOS, MAX_APUNTES } from "../diario.js";
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
-import { PERSONAS_POR_PAELLA } from "../paella.js";
+import { PERSONAS_POR_PAELLA, paellasPorPax, calcPaella } from "../paella.js";
+import { ponFactoresComida, leerFactoresComida, conFactorComida } from "../comida.js";
 import { SECTOR, compararRatios } from "../asistente/sector.js";
 import { CAMBIOS, ultimoCambio } from "../cambios.js";
+import { ANCHO, ALTO, ITERACIONES, estadoInicial, paso, bordesDe } from "../asistente/grafoFisica.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 
 let pasan = 0;
@@ -256,6 +264,50 @@ console.log("\n══ Cristalería ══");
     `y el brindis sube las de cava a 1,5 por cabeza (${normal.cava.u} → ${conBrindis.cava.u})`);
   ok(normal.chupito === null && calcCristaleria(100, 5, false, false, true).chupito !== null,
     "los vasos de chupito solo salen si hay entrante de chupito");
+
+  // dobleCopa también acepta un objeto {vino, agua, cava}: un flag por tipo, para
+  // "primero + segundo" con doblado granular editable (task #26). El booleano de
+  // siempre sigue funcionando igual (probado arriba) — esto es aditivo.
+  const soloVino = calcCristaleria(100, 5, { vino: true, agua: false, cava: false }, false, false);
+  ok(soloVino.vino.u > normal.vino.u && soloVino.agua.u === normal.agua.u,
+    "granular de verdad: solo el vino dobla, el agua se queda igual");
+  const soloCava = calcCristaleria(100, 5, { vino: false, agua: false, cava: true }, false, false);
+  ok(soloCava.cava.u > normal.cava.u,
+    "y la cava SÍ puede doblar con el objeto — con el booleano de siempre, nunca podía");
+  const ningunoDobla = calcCristaleria(100, 5, { vino: false, agua: false, cava: false }, false, false);
+  ok(ningunoDobla.vino.u === normal.vino.u && ningunoDobla.agua.u === normal.agua.u && ningunoDobla.cava.u === normal.cava.u,
+    "objeto con todo a false es exactamente el comportamiento de siempre, sin doblar nada");
+}
+
+console.log("\n══ Factores de cristalería (cristaleria.js) ══");
+{
+  // No es que "se comporten igual" por casualidad: es LA MISMA función, compartida
+  // por factorAjuste.js. Si esto fallara, alguien habría vuelto a copiar el rango en
+  // vez de importarlo, y los dos podrían acabar diciendo cosas distintas sin que se
+  // notara hasta que alguien pusiera un 0,25 y colara por un lado y no por el otro.
+  ok(esFactorCristaleriaValido === esFactorValido,
+    "esFactorValido de cristalería y de bebida son la misma función, no una copia");
+  ok(esFactorCristaleriaValido(1) && !esFactorCristaleriaValido(0.1) && !esFactorCristaleriaValido(5),
+    "el rango válido es 0,3-2, igual que bebida");
+  ok(Object.keys(saneaFactoresCristaleria({ vino: 0.8, unicornio: 2 })).join() === "vino",
+    "una clave que no existe se descarta, no se cuela");
+  ok(factorCristaleria({}, "vino") === FACTOR_NEUTRO, "sin tocar nada, el factor es neutro (1)");
+
+  // El efecto real: con el factor a 1 (de partida) el número tiene que ser EXACTAMENTE
+  // el mismo de siempre — la prueba de arriba ya fija 144 copas de cava para 100 pax,
+  // sin brindis, 5h. Si esto cambiara, cualquiera que no haya tocado el ajuste vería
+  // su camión cambiar de un día para otro sin haber pedido nada.
+  const sinTocar = calcCristaleria(100, 5, false, false, false);
+  ok(sinTocar.cava.u === 144, "de partida, calcCristaleria da lo de siempre");
+
+  ponFactoresCristaleria({ cava: 0.5 });
+  const conFactorBajo = calcCristaleria(100, 5, false, false, false);
+  ok(conFactorBajo.cava.u < sinTocar.cava.u,
+    `con el factor de cava a la mitad, salen menos copas de cava (${sinTocar.cava.u} → ${conFactorBajo.cava.u})`);
+  ok(conFactorBajo.vino.u === sinTocar.vino.u,
+    "y el vino no se toca: cada clave de cristalería es su propio ajuste");
+
+  ponFactoresCristaleria({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n══ Champaneras ══");
@@ -613,6 +665,385 @@ console.log("\n══ Cuánta gente hace falta: contra lo que se puso de verdad 
     "cumpleaños y producción se marcan como no medidos: nadie ha comprobado su ratio");
 }
 
+console.log("\n══ El ratio ajustable llega de verdad a la checklist (bug real, cazado) ══");
+{
+  // personalNecesario() (arriba) SÍ leía leerRatios() desde siempre — la usan el
+  // calendario y calcular_personal del asistente. Pero buildChecklist(), la que genera
+  // la checklist DE VERDAD, tenía su propio 9/10/20 escrito en checklist-generadores.js
+  // sin mirar leerRatios() para nada: cambiar el ratio desde el panel del calendario (o
+  // desde el asistente con aplicar_ratio) movía la previsión, pero la checklist seguía
+  // cargando con el número de fábrica. Se cazó al conectar el asistente y comprobar a
+  // fondo que el cambio llegaba a todas partes.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return parseInt(String(it[1]), 10);
+    }
+    return null;
+  };
+
+  // Antes del arreglo esto daría SIEMPRE 15 (135/9), pasase lo que pasase con el ratio.
+  ponRatios({ boda: 15 });
+  ok(cantidadItem(buildChecklist("boda", 135, 2, 4, 0, {}), "Camareros") === 9,
+    "con el ratio de boda a 15 (a mano), la checklist pide 9 camareros para 135 pax, no los 15 de fábrica");
+  ponRatios({});
+  ok(cantidadItem(buildChecklist("boda", 135, 2, 4, 0, {}), "Camareros") === 15,
+    "y al quitar el ajuste, vuelve a los 15 de fábrica (135/9)");
+
+  // El mismo bug, en la otra rama de código (cumpleanos no recibe evtKey: usa una
+  // clave fija "cumpleanos", no el parámetro, así que es un arreglo aparte).
+  ponRatios({ cumpleanos: 10 });
+  ok(cantidadItem(buildChecklist("cumpleanos", 100, 0, 3, 0, {}), "Camareros") === 10,
+    "y lo mismo en cumpleaños: con el ratio a 10, pide 10 camareros para 100 pax");
+  ponRatios({});   // se dejan como estaban para el resto de la batería
+}
+
+console.log("\n══ Las tronas siguen al número de niños ══");
+{
+  // El dueño reportó tronas desactualizadas al corregir el número de niños desde el
+  // formulario. No se reprodujo: buildChecklist() recibe `ninos` como parámetro propio
+  // (no algo que haya que "recalcular" aparte) y "Tronas" sale directamente de él en
+  // los tres builders (checklist-generadores.js). Confirmado también con Playwright de
+  // verdad, en los dos caminos posibles — un arranque fresco con el ninos nuevo (lo que
+  // hace la app tras aplicar un envío: guarda el estado y recarga entera) y cambiar el
+  // campo Niños en caliente sin recargar — Tronas se actualiza sola en los dos, sin
+  // pulsar "Recalcular cantidades". Se deja esta prueba para que, si el fallo vuelve a
+  // aparecer, sea por otra vía (por ejemplo un valor puesto a mano que pisa el cálculo
+  // a propósito) y no por esto.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return it[1];
+    }
+    return undefined;
+  };
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 5, {}), "Tronas") === "5",
+    "con 5 niños, la checklist de boda pide 5 tronas");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 10, {}), "Tronas") === "10",
+    "y con 10, pide 10 — sin nada guardado de antes que pueda quedarse atrás");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 0, {}), "Tronas") === "—",
+    "y sin niños, no se piden tronas");
+  ok(cantidadItem(buildChecklist("cumpleanos", 60, 0, 0, 8, {}), "Tronas") === "8",
+    "y en cumpleaños igual: 8 niños, 8 tronas");
+}
+
+console.log("\n══ El café, para invitados o solo para el personal ══");
+{
+  // El café se pedía SIEMPRE para los invitados, sin preguntar: cafeParaInvitados
+  // (por defecto true, para no cambiar ni un evento guardado antes de esta pregunta)
+  // apaga solo la parte que se sirve a los invitados — el café del personal (aparte,
+  // en Servicio y limpieza) no depende de esto, tenga la cafetera de invitados o no.
+  const catCafe = (cats) => cats.find(c => c.nombre === "Café");
+  const vasosPersonal = (cats) => cats.find(c => c.nombre === "Servicio y limpieza")
+    .items.find(x => x[0] === "Vasos de cartón café mini (personal)")[1];
+
+  const conInvitados = buildChecklist("boda", 100, 2, 4, 0, { cafeParaInvitados: true });
+  ok(catCafe(conInvitados).items.some(x => x[0] === "Cafetera Nespresso"),
+    "con café para invitados, sale la cafetera de servicio de siempre");
+  ok(catCafe(conInvitados).items.some(x => /Tazas café/.test(x[0])),
+    "y las tazas para los invitados");
+  // El café de invitados y el del personal son independientes, no "uno u otro": con
+  // café para invitados marcado, el personal (que curra las mismas horas) TAMBIÉN
+  // lleva su propia cafetera — antes se quedaba sin nada, dando por hecho que
+  // "tomaba prestado" de la de invitados.
+  ok(catCafe(conInvitados).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
+    "y con café para invitados TAMBIÉN se calcula el del personal, no uno u otro");
+
+  // Sin invitados, el personal se queda sin la cafetera de la que "tomar prestado":
+  // hace falta una propia, aunque modesta (nada de tazas ni platos, eso sí es de
+  // invitados) — con cápsulas contadas por personal, no por pax del evento.
+  const soloPersonal = buildChecklist("boda", 100, 2, 4, 0, { cafeParaInvitados: false });
+  ok(!catCafe(soloPersonal).items.some(x => /Tazas café|Platos de café|Infusiones|Jarras de leche/.test(x[0])),
+    "sin invitados no se piden tazas, platos, infusiones ni jarras — eso es de invitados");
+  ok(catCafe(soloPersonal).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
+    "pero si el personal sí toma café, se lleva su propia cafetera");
+  ok(JSON.stringify(vasosPersonal(conInvitados)) === JSON.stringify(vasosPersonal(soloPersonal)),
+    "y los vasos de cartón del personal no cambian: son aparte, no dependen de esto");
+  ok(JSON.stringify(catCafe(conInvitados).items.find(x => x[0] === "Cápsulas café (para el personal)"))
+    === JSON.stringify(catCafe(soloPersonal).items.find(x => x[0] === "Cápsulas café (para el personal)")),
+    "y las cápsulas del personal son las mismas con o sin café de invitados: el mismo personal");
+
+  const sinContestar = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(catCafe(sinContestar).items.length === catCafe(conInvitados).items.length,
+    "sin contestar la pregunta, un evento de siempre pide café de invitados igual que antes");
+
+  // En producción, la cafetera de mantenimiento del equipo (todo el día encendida)
+  // no es para invitados: se añade pase lo que pase, aunque el resto se apague.
+  const prodConInvitados = catCafe(buildChecklist("produccion", 40, 0, 0, 0, { cafeParaInvitados: true }));
+  const prodSinInvitados = catCafe(buildChecklist("produccion", 40, 0, 0, 0, { cafeParaInvitados: false }));
+  const tieneMantenimiento = (cat) => cat.items.some(x => /mantenimiento/.test(x[0]));
+  ok(tieneMantenimiento(prodConInvitados) && tieneMantenimiento(prodSinInvitados),
+    "en producción, la cafetera de mantenimiento no depende de si el café es para invitados");
+  ok(prodSinInvitados.items.length === 1,
+    "y sin invitados, en un rodaje solo queda esa línea de mantenimiento");
+}
+
+console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
+{
+  // Antes las carpas solo existían en producción (siempre al aire libre). En el resto
+  // es la excepción, no la norma —fincas con nave o interior— así que sin contestar
+  // nada no aparecen (opt() deja la fila con cantidad null, como el resto de items
+  // condicionales de esta app: no se borra la fila, se apaga la cantidad).
+  const catMobiliario = (cats) => cats.find(c => c.nombre.startsWith("Mobiliario"));
+  const item = (cats, label) => catMobiliario(cats).items.find(x => x[0] === label);
+
+  const sinCarpas = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(sinCarpas, "Carpas")[1] === null,
+    "sin decir nada, una boda no pide carpas (es la excepción, no la norma)");
+
+  const conCarpas = buildChecklist("boda", 100, 2, 4, 0, { llevaCarpas: true });
+  ok(item(conCarpas, "Carpas")[1] !== null, "con llevaCarpas, una boda SÍ las pide");
+
+  // La cuenta es la MISMA función compartida (calcCarpas, en carpas.js) que usa
+  // producción: mismo pax, mismo resultado, para no arriesgar la única lógica que ya
+  // funcionaba al extraerla del generador de producción.
+  const prod = buildChecklist("produccion", 100, 0, 0, 0, {});
+  ok(JSON.stringify(item(conCarpas, "Carpas")[1]) === JSON.stringify(item(prod, "Carpas")[1]),
+    `boda y producción con el mismo pax piden las mismas carpas → ${JSON.stringify(item(conCarpas, "Carpas")[1])}`);
+  ok(item(conCarpas, "Paredes de carpas")[1] === item(prod, "Paredes de carpas")[1]
+    && item(conCarpas, "Pesas (15kg)")[1] === item(prod, "Pesas (15kg)")[1],
+    "y las mismas paredes y pesas");
+
+  // Producción sigue funcionando exactamente igual que antes de compartir la cuenta
+  // con boda/cumpleaños: sin decir nada, sigue llevando carpas (era su valor de
+  // siempre) con el número de fábrica.
+  ok(item(prod, "Carpas")[1].u === 8 && item(prod, "Paredes de carpas")[1] === "24" && item(prod, "Pesas (15kg)")[1] === "6",
+    `producción, sin tocar nada, sigue pidiendo lo mismo de siempre (100 pax → 8 carpas/24 paredes/6 pesas) → ${JSON.stringify(item(prod, "Carpas")[1])}`);
+
+  // Un número puesto a mano (formulario o a mano en la app) manda sobre la
+  // recomendación, en cualquiera de los dos tipos.
+  const numeroAMano = buildChecklist("boda", 30, 2, 4, 0, { llevaCarpas: true, numCarpas: 2 });
+  ok(item(numeroAMano, "Carpas")[1] === "2",
+    "un número puesto a mano manda sobre la recomendación, también fuera de producción");
+
+  // Cumpleaños también lo tiene (categoría "Mobiliario", no "Mobiliario, sala y decoración")
+  const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { llevaCarpas: true });
+  ok(item(cumple, "Carpas")[1] !== null, "y en cumpleaños igual");
+}
+
+console.log("\n══ Parabanes: mobiliario nuevo, sin fórmula propia ══");
+{
+  // Sin fórmula por pax (a diferencia de las carpas): sin número puesto, la fila
+  // queda en "—" para que lo rellene quien ha visto el sitio, no un cero inventado.
+  const catMobiliario = (cats) => cats.find(c => c.nombre.startsWith("Mobiliario"));
+  const item = (cats, label) => catMobiliario(cats).items.find(x => x[0] === label);
+
+  const sinDecir = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(sinDecir, "Parabanes")[1] === null, "sin decir nada, no piden parabanes");
+
+  const sinNumero = buildChecklist("boda", 100, 2, 4, 0, { llevaParabanes: true });
+  ok(item(sinNumero, "Parabanes")[1] === "—", "con parabanes pero sin número, se deja en blanco (—)");
+
+  const conNumero = buildChecklist("boda", 100, 2, 4, 0, { llevaParabanes: true, numParabanes: 4 });
+  ok(item(conNumero, "Parabanes")[1] === "4", "y con número, ese manda");
+
+  ok(item(buildChecklist("cumpleanos", 60, 0, 0, 8, { llevaParabanes: true }), "Parabanes")[1] === "—",
+    "en cumpleaños igual");
+  ok(item(buildChecklist("produccion", 40, 0, 0, 0, { llevaParabanes: true, numParabanes: 2 }), "Parabanes")[1] === "2",
+    "y en producción también, con su propio número");
+}
+
+console.log("\n══ Mesas calientes: antes solo en producción, sin preguntar ══");
+{
+  // En producción se cargaban solas (rodajes largos, el pase se mantiene caliente
+  // todo el día); en el resto no existían ni se ofrecían, aunque en un banquete largo
+  // hacen la misma falta.
+  const item = (cats, cat, label) => cats.find(c => c.nombre === cat).items.find(x => x[0] === label);
+
+  const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinContestar, "Cocina", "Mesas calientes") === undefined,
+    "sin contestar, una boda no lleva mesas calientes (no existía la pregunta)");
+
+  const conMesasCalientes = buildChecklist("boda", 90, 2, 4, 0, { llevaMesasCalientes: true });
+  ok(item(conMesasCalientes, "Cocina", "Mesas calientes")[1] === String(calcMesasCalientes(90)),
+    `con la pregunta contestada, sale 1 por cada ~40 pax (90 → ${calcMesasCalientes(90)})`);
+
+  // Cumpleaños igual, en su categoría propia
+  const cumple = buildChecklist("cumpleanos", 90, 0, 3, 8, { llevaMesasCalientes: true });
+  ok(item(cumple, "Cocina y Electro", "Mesas calientes")[1] === String(calcMesasCalientes(90)),
+    "y en cumpleaños, misma cuenta");
+
+  // Producción no cambia: sigue con su línea fija de siempre, sin depender de esta
+  // pregunta (no la usa, la carga siempre)
+  const prod = buildChecklist("produccion", 90, 0, 0, 0, {});
+  ok(item(prod, "Cocina y sala", "Mesas calientes")[1] === String(calcMesasCalientes(90)),
+    "producción las sigue llevando siempre, sin preguntar nada");
+}
+
+console.log("\n══ Gastros: un mínimo de serie en vez de dejarlo en blanco ══");
+{
+  // Antes se dejaba en "—" para que cocina lo apuntara a mano. Cumpleaños no usa
+  // gastros (todo en bandejas) y producción los calcula solos (2 por chafer): esto
+  // solo toca la línea de boda/comunión/corporativo.
+  const item = (cats, cat, label) => cats.find(c => c.nombre === cat).items.find(x => x[0] === label);
+
+  const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinContestar, "Cocina", "Gastros")[1] === String(GASTROS_MINIMO),
+    `sin contestar, sale el mínimo de serie (${GASTROS_MINIMO}), no en blanco`);
+
+  const conNumero = buildChecklist("boda", 90, 2, 4, 0, { numGastros: 8 });
+  ok(item(conNumero, "Cocina", "Gastros")[1] === "8", "y un número puesto a mano manda sobre el mínimo");
+
+  // Lo que ya funcionaba, intacto: producción sigue con su propia cuenta (2 por chafer)
+  const prod = buildChecklist("produccion", 40, 0, 0, 0, {});
+  const numChafersEsperado = Math.max(2, Math.ceil(40 / 40));
+  ok(item(prod, "Menaje y Utensilios", "Gastros")[1] === String(numChafersEsperado * 2),
+    `producción sigue con su propia cuenta (2 por chafer), sin tocar (${item(prod, "Menaje y Utensilios", "Gastros")[1]})`);
+}
+
+console.log("\n══ Mesas de buffet: de texto libre a un número real en la checklist ══");
+{
+  // Antes "buffets" era texto libre a las notas, sin mover nada de la checklist —
+  // ni boda ni cumpleaños tenían ninguna línea de mesa de buffet. Ahora el total
+  // que suma el formulario (numMesasBuffet) sí carga una línea de verdad.
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : undefined;
+  };
+
+  const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinContestar, "Mobiliario, sala y decoración", "Mesas de buffet") === null,
+    "sin contestar, la fila de mesas de buffet se queda apagada (cantidad null), como el resto de mobiliario condicional");
+
+  const conBuffet = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 3 });
+  ok(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de buffet") === "3",
+    "con el total del formulario, sale la línea con ese número");
+
+  const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { numMesasBuffet: 2 });
+  ok(item(cumple, "Mobiliario", "Mesas de buffet") === "2", "y en cumpleaños igual, en su categoría");
+
+  // Producción: el mínimo de siempre por pax se mantiene si el formulario dice
+  // menos (o no dice nada); una respuesta detallada solo puede subirlo.
+  const prodSinContestar = buildChecklist("produccion", 40, 0, 0, 0, {});
+  ok(item(prodSinContestar, "Mobiliario", "Mesas de 1,8m") !== undefined,
+    "producción sigue generando su línea de mesas de 1,8m de siempre");
+  const prodPorDebajo = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 1 });
+  const prodSinTocar = buildChecklist("produccion", 40, 0, 0, 0, {});
+  ok(item(prodPorDebajo, "Mobiliario", "Mesas de 1,8m") === item(prodSinTocar, "Mobiliario", "Mesas de 1,8m"),
+    "con menos buffets que el mínimo de pax, la cuenta no baja del mínimo de siempre");
+  const prodPorEncima = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 20 });
+  ok(Number(item(prodPorEncima, "Mobiliario", "Mesas de 1,8m")) > Number(item(prodSinTocar, "Mobiliario", "Mesas de 1,8m")),
+    "y con más buffets de los que caben en el mínimo, sí sube");
+
+  // Cajas de madera para alturas: iba fija a "—" pasara lo que pasara. En el almacén
+  // hay 4 de madera y 2 de plástico (6 en total), así que con buffet nunca puede pedir
+  // más de eso; sin buffet se queda igual que siempre.
+  ok(item(sinContestar, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "—",
+    "sin buffet, las cajas de alturas se quedan en \"—\" como siempre");
+  ok(item(conBuffet, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "3",
+    "con 3 mesas de buffet, pide 3 cajas");
+  const unBuffet = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 1 });
+  ok(item(unBuffet, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "2",
+    "con solo 1 mesa, no baja de 2 (hace falta al menos una altura de verdad)");
+  const buffetEnorme = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 20 });
+  ok(item(buffetEnorme, "Mobiliario, sala y decoración", "Cajas de madera para alturas") === "6",
+    "y no pasa de 6, que es todo lo que hay en el almacén (4 madera + 2 plástico)");
+  const prodConBuffet = buildChecklist("produccion", 40, 0, 0, 0, { numMesasBuffet: 3 });
+  ok(item(prodConBuffet, "Mobiliario", "Cajas de madera para alturas") === "3",
+    "y en producción, misma cuenta");
+}
+
+console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax ══");
+{
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : undefined;
+  };
+
+  // Sin barra libre (cóctel y copas a 0), ni se calcula
+  const sinBarra = buildChecklist("boda", 90, 0, 0, 0, {});
+  ok(item(sinBarra, "Mobiliario, sala y decoración", "Mesa alta") === "—",
+    "sin cóctel ni copas, no hay mesas altas que montar");
+
+  // Con barra pero sin contestar numBarras, cae al cálculo viejo por pax
+  const sinNumBarras = buildChecklist("boda", 90, 2, 4, 0, {});
+  ok(item(sinNumBarras, "Mobiliario, sala y decoración", "Mesa alta") === String(calcMesasAltas(90)),
+    `con barra pero sin contestar barras, cae al cálculo viejo por pax (90 → ${calcMesasAltas(90)})`);
+
+  // Con numBarras contestado, manda esa cuenta (2 por barra bajo 100 pax)
+  const conUnaBarra = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 1 });
+  ok(item(conUnaBarra, "Mobiliario, sala y decoración", "Mesa alta") === "2",
+    "1 barra bajo 100 pax → 2 mesas altas");
+  const conDosBarras = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 2 });
+  ok(item(conDosBarras, "Mobiliario, sala y decoración", "Mesa alta") === "4",
+    "2 barras bajo 100 pax → 4 mesas altas");
+
+  // Con 100 pax o más, 4 por barra
+  const conBarraPaxAlto = buildChecklist("boda", 120, 2, 4, 0, { numBarras: 1 });
+  ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "4",
+    "1 barra con 120 pax → 4 mesas altas");
+
+  // Sin barra libre (el cliente trae su bebida) pero SÍ se llevan mesas altas: antes se
+  // ignoraba "Nº de barras" del todo si no había barra — un evento real así se quedaba
+  // en "—" aunque en la app se hubiera contestado. Contestar a mano manda igual.
+  const sinBarraConMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 1 });
+  ok(item(sinBarraConMesas, "Mobiliario, sala y decoración", "Mesa alta") === "2",
+    "sin barra pero con 'Nº de barras' contestado a mano, sí se calculan mesas altas");
+  const sinBarraSinMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 0 });
+  ok(item(sinBarraSinMesas, "Mobiliario, sala y decoración", "Mesa alta") === "—",
+    "y sin barra Y sin contestar, se queda en '—' como siempre (no cambia el caso normal)");
+}
+
+console.log("\n══ Primero + segundo: cubiertos y cristalería doblan por separado ══");
+{
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : undefined;
+  };
+
+  // Sin dobleServicio ni granular, nada dobla (comportamiento de siempre)
+  const sinDoblar = buildChecklist("boda", 100, 2, 4, 0, { llevaCubiertos: true });
+  const base = item(sinDoblar, "Vajilla", "Tenedores grandes");
+
+  // dobleServicio a secas (eventos de antes de esta tarea, sin campos granulares):
+  // TODOS los cubiertos doblan y vino/agua también, cava nunca — exactamente el
+  // comportamiento viejo, para no romper nada ya guardado.
+  const soloDobleServicio = buildChecklist("boda", 100, 2, 4, 0, { llevaCubiertos: true, dobleServicio: true });
+  ok(Number(item(soloDobleServicio, "Vajilla", "Tenedores grandes")) > Number(base),
+    "dobleServicio solo (sin granular) sigue doblando los tenedores, como siempre");
+  ok(item(soloDobleServicio, "Vajilla", "Tenedores grandes") === item(soloDobleServicio, "Vajilla", "Cuchillos grandes"),
+    "y cuchillos igual que tenedores: cae al mismo dobleServicio en los tres");
+  const cristalConDobleServicio = calcCristaleria(100, 4, true, false, false);
+  ok(cristalConDobleServicio.cava.u === calcCristaleria(100, 4, false, false, false).cava.u,
+    "y la cava, con el booleano de siempre, nunca dobla (ni con dobleServicio)");
+
+  // Granular DE VERDAD: solo el tenedor dobla, cuchillo y cuchara no
+  const soloTenedor = buildChecklist("boda", 100, 2, 4, 0, {
+    llevaCubiertos: true, dobleServicio: true, dobleTenedor: true, dobleCuchillo: false, dobleCuchara: false,
+  });
+  ok(Number(item(soloTenedor, "Vajilla", "Tenedores grandes")) > Number(base),
+    "con el follow-up contestado, el tenedor dobla si se marcó");
+  ok(item(soloTenedor, "Vajilla", "Cuchillos grandes") === base,
+    "pero el cuchillo NO dobla si no se marcó, aunque dobleServicio sea true");
+
+  // Cristalería granular: solo el vino dobla — la etiqueta lleva "(doble)" solo en
+  // la línea que de verdad dobla, no en las otras (antes el sufijo iba atado al
+  // dobleServicio de todo el evento, ahora va con el tipo concreto).
+  const soloVinoDobla = buildChecklist("boda", 100, 2, 4, 0, {
+    dobleServicio: true, dobleVino: true, dobleAgua: false, dobleCava: false,
+  });
+  const cristalBase = calcCristaleria(100, 4, false, false, false);
+  ok(item(soloVinoDobla, "Cristalería", "Copas de vino") === undefined,
+    "la línea de vino cambia de etiqueta a \"(doble)\" cuando dobla, no se queda con la de siempre");
+  ok(Number(item(soloVinoDobla, "Cristalería", "Copas de vino (doble)")) > cristalBase.vino.u,
+    "el vino dobla si se marcó en el follow-up");
+  ok(Number(item(soloVinoDobla, "Cristalería", "Vasos de agua")) === cristalBase.agua.u,
+    "pero el agua no, aunque dobleServicio sea true, y mantiene su etiqueta sin \"(doble)\"");
+
+  // Mismo hilo en cumpleaños (comparte la misma fórmula de cubiertos/cristalería)
+  const cumpleGranular = buildChecklist("cumpleanos", 80, 0, 3, 8, {
+    llevaCubiertos: true, dobleServicio: true, dobleTenedor: true, dobleCuchillo: false, dobleCuchara: false,
+  });
+  const cumpleBase = buildChecklist("cumpleanos", 80, 0, 3, 8, { llevaCubiertos: true });
+  ok(Number(item(cumpleGranular, "Vajilla, Cubertería y Cristalería", "Tenedores grandes")) > Number(item(cumpleBase, "Vajilla, Cubertería y Cristalería", "Tenedores grandes")),
+    "cumpleaños: el tenedor dobla si se marcó");
+  ok(item(cumpleGranular, "Vajilla, Cubertería y Cristalería", "Cuchillos grandes") === item(cumpleBase, "Vajilla, Cubertería y Cristalería", "Cuchillos grandes"),
+    "cumpleaños: pero el cuchillo no, si no se marcó");
+}
+
 console.log("\n══ Quién va a cada evento: horas e importe ══");
 {
   // Una boda acaba de madrugada. Entrar a las 17:00 y salir a las 3:00 son DIEZ horas,
@@ -644,10 +1075,10 @@ console.log("\n══ Quién va a cada evento: horas e importe ══");
     "y se avisa de cuántos van sin horario y sin importe");
 
   // Lo que falta por cubrir, contra lo que hace falta de verdad
-  const falta = loQueFalta(personalNecesario("boda", 135), gente);
+  const falta = personalQueFalta(personalNecesario("boda", 135), gente);
   ok(falta.sala === 14 && falta.cocina === 4 && falta.logistica === 2,
     `de una boda de 135 pax, con tres asignados faltan ${falta.sala} de sala y ${falta.logistica} de logística`);
-  ok(loQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
+  ok(personalQueFalta({ sala: 2, cocina: 1, logistica: 1 }, gente).sala === 1,
     "y si sobra gente de un rol, no sale un número negativo");
 }
 
@@ -672,6 +1103,58 @@ console.log("\n══ Tareas: tienen fecha, pero no son eventos ══");
   // Y un tipo que no existe cae en boda, que es el comportamiento de siempre
   ok(saneaLista([{ fecha: "2026-09-03", titulo: "X", tipo: "inventado" }])[0].tipo === "boda",
     "un tipo desconocido sigue cayendo en boda, como antes");
+}
+
+console.log("\n══ Traer apuntes de golpe sobre un calendario que ya tiene datos ══");
+{
+  // "Traer" (Traer.jsx) solo salía abierto con el calendario vacío: con datos ya
+  // puestos no había forma de pegar una hoja entera sin borrar lo que ya había primero.
+  // mezclaApuntes es lo que deja añadir sin pisar: un id que ya estuviera (misma fecha
+  // y título) se descarta de los nuevos, gana el que ya estaba.
+  const yaHabia = saneaLista([
+    { fecha: "2026-09-12", titulo: "Boda Ana y Luis", tipo: "boda", pax: 120, notas: "Ya confirmado el menú" },
+    { fecha: "2026-09-20", titulo: "Comunión García", tipo: "comunion" },
+  ]);
+  const traidos = saneaLista([
+    { fecha: "2026-09-12", titulo: "Boda Ana y Luis", tipo: "boda" }, // mismo id: sin pax ni notas
+    { fecha: "2026-10-05", titulo: "Cumpleaños Marta", tipo: "cumpleanos" },
+  ]);
+  const nuevos = mezclaApuntes(yaHabia, traidos);
+  ok(nuevos.length === 1 && nuevos[0].titulo === "Cumpleaños Marta",
+    "solo entra el que de verdad es nuevo, no el que ya estaba con otro id igual");
+  const final = saneaLista([...yaHabia, ...nuevos]);
+  const boda = final.find(a => a.id === yaHabia[0].id);
+  ok(boda.pax === 120 && boda.notas === "Ya confirmado el menú",
+    "y lo que ya había NO se pisa: el pax y las notas puestas a mano se quedan");
+  ok(final.length === 3, `el total suma bien: 2 que ya había + 1 nuevo → ${final.length}`);
+
+  // Traer la MISMA hoja dos veces (el caso normal de "se me olvidó algo, la peno otra
+  // vez") no debe duplicar nada de lo que ya se trajo la primera vez.
+  const reenviado = mezclaApuntes(saneaLista([...yaHabia, ...nuevos]), traidos);
+  ok(reenviado.length === 0, "repetir el mismo pegado no añade nada de segundas");
+}
+
+console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");
+{
+  // "Camión Covey" pedido dos veces el mismo día se veía idéntico en el chip del
+  // mes: sin abrir el día, no había forma de saber que eran dos furgonetas y no una
+  // repetida por error.
+  const dia = [
+    { id: "a1", titulo: "Camión Covey", tipo: "logistica" },
+    { id: "a2", titulo: "Boda Marina", tipo: "boda" },
+    { id: "a3", titulo: "Camión Covey", tipo: "logistica" },
+  ];
+  const numero = numeraRepetidos(dia);
+  ok(numero.a1 === 1 && numero.a3 === 2 && numero.a2 === undefined,
+    `solo se numeran los que de verdad se repiten → ${JSON.stringify(numero)}`);
+
+  // Un día sin nada repetido no numera a nadie: no hay que ir arrastrando un "1"
+  // detrás de cada apunte que no lo necesita.
+  const sinRepetidos = numeraRepetidos([
+    { id: "b1", titulo: "Boda Ana", tipo: "boda" },
+    { id: "b2", titulo: "Camión Covey", tipo: "logistica" },
+  ]);
+  ok(Object.keys(sinRepetidos).length === 0, "sin repetidos, no se numera nada");
 }
 
 console.log("\n══ Los dos enlaces del calendario ══");
@@ -1085,6 +1568,97 @@ console.log("\n══ Los niños beben agua y refresco, no vino ══");
     "sin niños no cambia nada de lo de siempre");
 }
 
+console.log("\n══ Hielo: se puede decir que no hace falta ══");
+{
+  // Antes se cargaba siempre, sin preguntar: un sitio que ya lo da, o un evento que no
+  // lo necesita, se quedaba con kilos, bolsas y taxis enteros de más.
+  const con = calcBebidas(100, 4, true, false, false, 4, { llevaHielo: true });
+  ok(con.hieloKg > 0 && con.taxisHielo > 0, `por defecto sigue calculando hielo → ${con.hieloKg}kg`);
+  const sin = calcBebidas(100, 4, true, false, false, 4, { llevaHielo: false });
+  ok(sin.hieloKg === 0 && sin.taxisHielo === 0, "y con \"no hace falta\", se queda a cero");
+
+  // Y en la checklist, la línea entera desaparece (no se queda en "0 kg")
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === "Hielo");
+    return it ? it[1] : it;
+  };
+  const bodaConHielo = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(bodaConHielo, "Bebidas frías"), `boda: con hielo por defecto sale la línea → ${item(bodaConHielo, "Bebidas frías").u} kg`);
+  const bodaSinHielo = buildChecklist("boda", 100, 2, 4, 0, { llevaHielo: false });
+  ok(item(bodaSinHielo, "Bebidas frías") === null, "boda: sin hielo, la línea se apaga (null), no se queda en 0");
+  const prodSinHielo = buildChecklist("produccion", 40, 0, 0, 0, { llevaHielo: false });
+  ok(item(prodSinHielo, "Desechables y Bebidas") === null, "y en producción igual, con su propia fórmula de taxis");
+}
+
+console.log("\n══ Cristalería: independiente de la barra, apagable del todo ══");
+{
+  // Igual que el hielo: por defecto se sigue calculando todo como siempre.
+  const con = calcCristaleria(100, 4, false, true, false);
+  ok(con.agua.u > 0 && con.vino.u > 0 && con.cava.u > 0, "por defecto sigue calculando cristalería");
+  const sin = calcCristaleria(100, 4, false, true, false, 0, false);
+  ok(sin.agua.u === 0 && sin.vino.u === 0 && sin.cava.u === 0 && sin.cubata.u === 0 && sin.chupito === null,
+    "y con \"no hace falta\", todo a cero (chupito directamente null)");
+
+  // Y en la checklist, las líneas de cristalería desaparecen (no se quedan en "0")
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : it;
+  };
+  const bodaConCristaleria = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(bodaConCristaleria, "Cristalería", "Copas de vino"), "boda: con cristalería por defecto sale la línea de vino");
+  const bodaSinCristaleria = buildChecklist("boda", 100, 2, 4, 0, { llevaCristaleria: false });
+  ok(item(bodaSinCristaleria, "Cristalería", "Copas de vino") === null, "boda: sin cristalería, vino se apaga (null)");
+  ok(item(bodaSinCristaleria, "Cristalería", "Vasos de agua") === null, "boda: sin cristalería, agua se apaga (null)");
+  ok(item(bodaSinCristaleria, "Cristalería", "Copas de cava") === null, "boda: sin cristalería, cava se apaga (null)");
+
+  // Independiente de la barra: sin cóctel ni copas (0 horas), la cristalería de mesa
+  // sigue calculándose igual — es justo lo que pedía el dueño.
+  const bodaSinBarra = buildChecklist("boda", 100, 0, 0, 0, {});
+  ok(item(bodaSinBarra, "Cristalería", "Copas de vino"), "boda sin barra libre: la cristalería de mesa no depende de ella");
+
+  const cumpleConCristaleria = buildChecklist("cumpleanos", 80, 0, 3, 8, {});
+  ok(item(cumpleConCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de vino"), "cumpleaños: con cristalería por defecto sale la línea");
+  const cumpleSinCristaleria = buildChecklist("cumpleanos", 80, 0, 3, 8, { llevaCristaleria: false });
+  ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de vino") === null, "cumpleaños: sin cristalería, vino se apaga");
+  ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Vasos de agua") === null, "cumpleaños: sin cristalería, agua se apaga");
+  ok(item(cumpleSinCristaleria, "Vajilla, Cubertería y Cristalería", "Copas de cava") === null, "cumpleaños: sin cristalería, cava se apaga");
+}
+
+console.log("\n══ Bebida aparte: el cliente la trae, Gula no pone nada de beber ══");
+{
+  // Por defecto (llevaBebida no puesto o true) se calcula todo como siempre.
+  const con = calcBebidas(100, 4, true, false, false, 4, { llevaBebida: true });
+  ok(con.vinoBlanco > 0 && con.cerveza > 0 && con.agua15 > 0, "por defecto sigue calculando bebida");
+
+  // Con llevaBebida: false, todo el alcohol/refrescos a cero...
+  const sin = calcBebidas(100, 4, true, false, false, 4, { llevaBebida: false, llevaHielo: true });
+  ok(sin.vinoBlanco === 0 && sin.vinoTinto === 0 && sin.cava === 0 && sin.cerveza === 0 && sin.agua15 === 0
+    && sin.cocaNormal === 0 && sin.tonica === 0 && sin.redbull === 0,
+    "y con bebida aparte, todo a cero");
+  // ...pero el hielo, que es aparte, se sigue calculando igual (tiene su propio interruptor).
+  ok(sin.hieloKg > 0 && sin.taxisHielo > 0, `el hielo no se toca → ${sin.hieloKg}kg`);
+  const sinNiHielo = calcBebidas(100, 4, true, false, false, 4, { llevaBebida: false, llevaHielo: false });
+  ok(sinNiHielo.hieloKg === 0, "salvo que tampoco se quiera hielo, claro (su propio interruptor)");
+
+  // Y en la checklist, las líneas de bebida quedan a "0" (no null): aquí siempre se ha
+  // visto el número, nunca una línea que desaparece.
+  const item = (cats, cat, label) => {
+    const c = cats.find(x => x.nombre === cat);
+    const it = c && c.items.find(x => x[0] === label);
+    return it ? it[1] : it;
+  };
+  const bodaConBebida = buildChecklist("boda", 100, 2, 4, 0, {});
+  ok(item(bodaConBebida, "Bebidas frías", "Vino blanco").u > 0, "boda: con bebida por defecto sale vino");
+  const bodaSinBebida = buildChecklist("boda", 100, 2, 4, 0, { llevaBebida: false });
+  ok(item(bodaSinBebida, "Bebidas frías", "Vino blanco").u === 0, "boda: bebida aparte, vino queda a 0 botellas");
+  ok(item(bodaSinBebida, "Bebidas frías", "Hielo"), "boda: bebida aparte, el hielo sigue saliendo");
+
+  const cumpleSinBebida = buildChecklist("cumpleanos", 80, 0, 3, 8, { llevaBebida: false });
+  ok(item(cumpleSinBebida, "Bebidas", "Vino blanco").u === 0, "cumpleaños: bebida aparte, vino a 0 también");
+}
+
 console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
 {
   // Coca normal, Zero y Nestea cuadran EXACTOS con el evento de 65 pax del que salieron
@@ -1384,6 +1958,271 @@ console.log("\n══ Las mesas de los comensales ══");
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
 }
 
+
+// ─── CUÁNTO HIELO SE USÓ DE VERDAD ────────────────────────────────────────────
+{
+  console.log("\n── Calibración de hielo con lo que volvió ──");
+  ponFactoresHielo({});
+
+  // La línea "Hielo" tiene que existir DE VERDAD en una checklist. Si alguien la renombra
+  // en el generador, la calibración deja de encontrarla y se queda callada para siempre —
+  // un fallo que no da error, solo silencio. La misma trampa que las líneas de bebida.
+  const catsH = buildChecklist("boda", 100, 2, 4, 0, { mesVerano: true });
+  const etiquetasH = new Set(catsH.flatMap(c => c.items.filter(Boolean).map(it => it[0])));
+  ok(etiquetasH.has("Hielo"), "la línea de hielo existe en la checklist de verdad");
+
+  // El factor de hielo guarda las mismas reglas que el de bebida: esparcido, acotado, y
+  // poner el neutro lo quita en vez de congelar un 1.
+  const puestoH = conFactorHielo({}, "boda", 1.2);
+  ok(puestoH.boda === 1.2, "conFactorHielo pone el factor");
+  ok(Object.keys(conFactorHielo(puestoH, "boda", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  ok(Object.keys(ponFactoresHielo({ boda: 9, comunion: 1.1 })).length === 1
+      && leerFactoresHielo().comunion === 1.1,
+    "fuera de 0,3–2 se rechaza (un 9 es un dedo resbalando, no un evento)");
+  ok(factoresHieloCambiados({ boda: 0.8 }).boda === 0.8, "y lo sube a la nube limpio");
+  ok(factorHieloDe() === 1 && factorHieloDe("boda") === 1, "sin tocar, todo arranca en 1");
+  ponFactoresHielo({});
+
+  // calcHielo aplica el factor SOLO al tipo al que se le pasó, no a los demás:
+  // dos bodas de 100 pax no pueden cargar hielo distinto por quién las mire.
+  const kgNeutro = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "boda" }).kg;
+  ponFactoresHielo({ boda: 2 });
+  const kgFactor = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "boda" }).kg;
+  const kgOtroTipo = calcHielo(100, { mesVerano: true, horasBarra: 4, tipo: "comunion" }).kg;
+  ok(kgFactor > kgNeutro, `con factor 2 el kilo sube (${kgNeutro} → ${kgFactor})`);
+  ok(kgOtroTipo === kgNeutro, "y no se lo lleva a otro tipo que nadie ha medido");
+  ponFactoresHielo({});
+
+  // Un evento con la vuelta del hielo apuntada: sale X, vuelve la mitad → se usó la mitad.
+  // La vuelta puede ser en kilos (no solo "true = todo"), y esa es la ventaja frente a
+  // una caja: el hielo se pesa.
+  const eventoH = { evento: "boda", pax: 100, ninos: 0, fechaEvento: "2026-07-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4,
+    mesVerano: true, tipoCongelador: "Mediana" };
+  const catsBodaH = catsDeEventoGuardado(eventoH);
+  const conVueltaHielo = (frac) => {
+    const vueltos = {};
+    catsBodaH.forEach(c => c.items.filter(Boolean).forEach(it => {
+      if (it[0] !== "Hielo") return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${it[0]}`] = String(Math.round(qty * frac));
+    }));
+    return { ...eventoH, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada: dos son una anécdota.
+  const dosH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5) };
+  ok(Object.keys(calibracionHielo(dosH, {})).length === 0, "con dos eventos no se pronuncia");
+
+  const tresH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) };
+  const calH = calibracionHielo(tresH, {});
+  ok(calH.boda && Math.abs(calH.boda.factor - 0.5) < 0.03,
+    `con tres, vuelve la mitad → factor ~0,5 (${calH.boda && calH.boda.factor})`);
+  ok(calH.boda && calH.boda.nEventos === 3, "y dice en cuántos eventos se ha medido");
+
+  // La mediana, no la media: un evento en el que no volvió nada no arrastra al resto.
+  const raroH = { a: conVueltaHielo(0.5), b: conVueltaHielo(0.5), c: conVueltaHielo(0.5), d: conVueltaHielo(0) };
+  ok(Math.abs(calibracionHielo(raroH, {}).boda.factor - 0.5) < 0.03,
+    "un evento en el que no volvió nada no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+  // Si no, cada visita al panel bajaría el hielo otro tanto hasta dejarlo en nada.
+  ponFactoresHielo({ boda: 0.5 });
+  const yaAjustadoH = { a: conVueltaHielo(0), b: conVueltaHielo(0), c: conVueltaHielo(0) };
+  const segH = calibracionHielo(yaAjustadoH, { boda: 0.5 });
+  ok(segH.boda && Math.abs(segH.boda.factor - 0.5) < 0.03,
+    `con el factor ya puesto y consumo clavado, se queda en 0,5 (${segH.boda && segH.boda.factor})`);
+  ponFactoresHielo({});
+
+  // Sin la vuelta del hielo apuntada no dice nada: adivinar cuánta se usó es peor que
+  // callarse. Y "vuelven más kilos de los que salieron" es imposible y no se cuenta.
+  const sinVueltaH = { ...eventoH, vueltos: { "Bebidas frías::Cava": true } };
+  ok(Object.keys(calibracionHielo({ a: sinVueltaH, b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) }, {})).length === 0,
+    "un evento sin la vuelta del hielo se descarta y quedan dos");
+  const masQueSalió = {};
+  catsBodaH.forEach(c => c.items.filter(Boolean).forEach(it => {
+    if (it[0] === "Hielo") masQueSalió[`${c.nombre}::${it[0]}`] = "9999";
+  }));
+  ok(Object.keys(calibracionHielo({ a: { ...eventoH, vueltos: masQueSalió }, b: conVueltaHielo(0.5), c: conVueltaHielo(0.5) }, {})).length === 0,
+    "y volver más de lo que salió tira el evento entero");
+
+  ponFactoresHielo({});
+}
+
+// ─── CUÁNTA COMIDA SE USÓ DE VERDAD (PAELLA Y BANDEJAS) ────────────────────────
+{
+  console.log("\n── Calibración de comida con lo que volvió ──");
+  ponFactoresComida({});
+
+  // Anti-silencio: las líneas que busca la calibración tienen que existir DE VERDAD
+  // en una checklist. La paella tiene etiqueta dinámica ("Paella <talla>"), así que va
+  // por matcher — y el matcher no puede pisar "Paletas de paella" ni "Descansadores".
+  const catsComida = buildChecklist("boda", 100, 2, 4, 0, { mesVerano: true, llevaPaella: true });
+  const etiquetasC = catsComida.flatMap(c => c.items.filter(Boolean).map(it => it[0]));
+  const lineasPaella = etiquetasC.filter(l => l.startsWith("Paella "));
+  ok(lineasPaella.length === 1 && lineasPaella[0] === "Paella grande",
+    "con 100 pax hay una línea de paella (grande) y el matcher la encuentra");
+  ok(etiquetasC.includes("Paletas de paella") && etiquetasC.includes("Descansadores de paella"),
+    "las líneas que comparten el nombre existen y el matcher no las cuenta");
+  ok(etiquetasC.includes("Bandejas de madera") && etiquetasC.includes("Bandejas de plata"),
+    "y las dos líneas de bandejas existen");
+
+  // El factor de comida guarda las mismas reglas que los demás: esparcido, acotado,
+  // y poner el neutro lo quita.
+  const puestoC = conFactorComida({}, "boda", "paella", 1.2);
+  ok(puestoC.boda.paella === 1.2, "conFactorComida pone el factor");
+  ok(Object.keys(conFactorComida(puestoC, "boda", "paella", 1)).length === 0,
+    "y volver a 1 lo borra en vez de guardar un 1");
+  ok(Object.keys(ponFactoresComida({ boda: { paella: 9, bandejas: 1.1 } })).length === 1
+      && leerFactoresComida().boda.bandejas === 1.1,
+    "fuera de 0,3–2 se rechaza (un 9 es un dedo resbalando, no un evento)");
+  ponFactoresComida({});
+
+  // calcPaella aplica el factor por tipo, y el número a mano manda sobre él.
+  const neutraC = paellasPorPax(100, "boda");
+  ponFactoresComida({ boda: { paella: 2 } });
+  const conFactorC = paellasPorPax(100, "boda");
+  const otroTipoC = paellasPorPax(100, "comunion");
+  ok(conFactorC > neutraC, `con factor 2 la cuenta de paella sube (${neutraC} → ${conFactorC})`);
+  ok(otroTipoC === neutraC, "y no se lo lleva a otro tipo que nadie ha medido");
+  ok(calcPaella(100, "Auto", 3, "boda").n === 3, "y el número a mano manda sobre el factor");
+  ponFactoresComida({});
+
+  // calcBandejas escala la cuenta por pax, NO los extras manuales: los extras son una
+  // decisión puntual de este evento, no el ratio.
+  const bandejasNeutras = calcBandejas(100, {});
+  ponFactoresComida({ boda: { bandejas: 2 } });
+  const bandejasFactor = calcBandejas(100, { tipo: "boda" });
+  const bandejasExtra = calcBandejas(100, { tipo: "boda", extraMadera: 5 });
+  ok(bandejasFactor.madera > bandejasNeutras.madera, "con factor 2 las bandejas de madera suben");
+  ok(bandejasExtra.madera - bandejasFactor.madera === 5, "y los extras manuales no se escalan");
+  ponFactoresComida({});
+
+  // Un evento con la vuelta marcada: salen 4 paellas, vuelven 2 SIN USAR → se usaron
+  // 2 de 4. La convención (la que el panel de comida dice en pantalla) es la que la
+  // bebida ya usa: lo vuelto es lo no usado.
+  const eventoC = { evento: "boda", pax: 100, ninos: 0, fechaEvento: "2026-07-01",
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4,
+    mesVerano: true, tipoCongelador: "Mediana", llevaPaella: true };
+  const catsC = catsDeEventoGuardado(eventoC);
+  // La vuelta se construye contra la reconstrucción ACTUAL (refleja el factor
+  // vigente): en la prueba de convergencia eso importa de verdad.
+  const conVueltaComida = (fracPaella, fracBandeja, extra = {}) => {
+    const cats = catsDeEventoGuardado({ ...eventoC, ...extra });
+    const vueltos = {};
+    cats.forEach(c => c.items.filter(Boolean).forEach(it => {
+      const label = it[0];
+      const esPaella = label.startsWith("Paella ");
+      const esBandeja = label === "Bandejas de madera" || label === "Bandejas de plata";
+      if (!esPaella && !esBandeja) return;
+      const qty = parseFloat(String(it[1] && it[1].u ? it[1].u : it[1]).replace(",", "."));
+      vueltos[`${c.nombre}::${label}`] = String(Math.round(qty * (esPaella ? fracPaella : fracBandeja)));
+    }));
+    return { ...eventoC, ...extra, vueltos };
+  };
+
+  // Con menos de tres eventos NO dice nada (ni de la paella ni de las bandejas).
+  ok(Object.keys(calibracionComida({ a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "con dos eventos no se pronuncia");
+
+  const tresC = { a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) };
+  const calC = calibracionComida(tresC, {});
+  ok(calC.boda?.paella && Math.abs(calC.boda.paella.factor - 0.5) < 0.03,
+    `con tres y media vuelta de paellas, factor de paella ~0,5 (${calC.boda?.paella?.factor})`);
+  ok(calC.boda?.bandejas && Math.abs(calC.boda.bandejas.factor - 0.5) < 0.03,
+    `y las bandejas se calibran en paralelo (${calC.boda?.bandejas?.factor})`);
+  ok(calC.boda?.paella && calC.boda.paella.nEventos === 3, "y dice en cuántos eventos se ha medido");
+
+  // La mediana, no la media: un evento en el que no salió ninguna paella no arrastra.
+  const raroC = { a: conVueltaComida(0.5, 0.5), b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5), d: conVueltaComida(0, 0.5) };
+  ok(Math.abs(calibracionComida(raroC, {}).boda.paella.factor - 0.5) < 0.03,
+    "un evento en el que no salió ninguna paella no arrastra la mediana");
+
+  // Converge: aplicar la sugerencia y volver a medir da 1, no otra corrección encima.
+  ponFactoresComida({ boda: { paella: 0.5 } });
+  const yaAjustadoC = { a: conVueltaComida(0, 0), b: conVueltaComida(0, 0), c: conVueltaComida(0, 0) };
+  const segC = calibracionComida(yaAjustadoC, { boda: { paella: 0.5 } });
+  ok(segC.boda?.paella && Math.abs(segC.boda.paella.factor - 0.5) < 0.03,
+    `con el factor ya puesto y todo usado, se queda en 0,5 (${segC.boda?.paella?.factor})`);
+  ponFactoresComida({});
+
+  // Las paellas a mano NO cuentan: ese número no es el ratio, y medirlo contra el
+  // ratio sesgaría el factor para siempre. Las bandejas del mismo evento sí.
+  const tresManual = { a: conVueltaComida(0.5, 0.5, { numPaellas: 3 }), b: conVueltaComida(0.5, 0.5, { numPaellas: 3 }), c: conVueltaComida(0.5, 0.5, { numPaellas: 3 }) };
+  const calManual = calibracionComida(tresManual, {});
+  ok(!calManual.boda?.paella, "tres eventos con paella a mano no calibran la paella");
+  ok(calManual.boda?.bandejas, "pero sí calibran las bandejas");
+
+  // Sin la vuelta marcada no dice nada, y "vuelven más de las que salieron" es
+  // imposible y tira el evento entero.
+  ok(Object.keys(calibracionComida({ a: { ...eventoC, vueltos: { "Bebidas frías::Cava": true } }, b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "un evento sin la vuelta marcada se descarta y con dos no se pronuncia");
+  const masQueSalióC = {};
+  catsC.forEach(c => c.items.filter(Boolean).forEach(it => {
+    const label = it[0];
+    if (label.startsWith("Paella ") || label === "Bandejas de madera" || label === "Bandejas de plata") masQueSalióC[`${c.nombre}::${label}`] = "9999";
+  }));
+  ok(Object.keys(calibracionComida({ a: { ...eventoC, vueltos: masQueSalióC }, b: conVueltaComida(0.5, 0.5), c: conVueltaComida(0.5, 0.5) }, {})).length === 0,
+    "y volver más de lo que salió tira el evento entero");
+
+  ponFactoresComida({});
+}
+
+// ─── CUÁNTA GENTE HIZO FALTA DE VERDAD (calibracionPersonal) ──────────────────
+{
+  console.log("\n══ El ratio de personal también se calibra con lo puesto a mano ══");
+
+  // Tres bodas de 140 pax con 10 camareros puestos a mano: 140/10 = 14 exacto en las
+  // tres, sin ambigüedad de redondeo.
+  const boda140con10 = { evento: "boda", pax: 140, numCamareros: 10 };
+
+  // Con menos de tres eventos no se pronuncia: dos son anécdota.
+  ok(Object.keys(calibracionPersonal({ a: boda140con10, b: boda140con10 })).length === 0,
+    "con dos eventos no se pronuncia");
+
+  const tres = { a: boda140con10, b: boda140con10, c: boda140con10 };
+  const cal = calibracionPersonal(tres);
+  ok(cal.boda && cal.boda.ratio === 14, `con tres eventos a 140/10, sugiere 1 cada 14 (${cal.boda && cal.boda.ratio})`);
+  ok(cal.boda.nEventos === 3, "y dice en cuántos eventos se ha medido");
+  ok(!cal.comunion && !cal.corporativo, "y de los tipos sin datos no dice nada");
+
+  // La mediana, no la media: un evento raro (un cliente que pidió el doble de gente)
+  // no se lleva por delante el ratio de todos los demás.
+  const conRaro = { a: boda140con10, b: boda140con10, c: boda140con10, d: { evento: "boda", pax: 140, numCamareros: 70 } };
+  ok(calibracionPersonal(conRaro).boda.ratio === 14, "un evento suelto no arrastra la mediana");
+
+  // Sin numCamareros puesto (0, o sin campo), el evento no cuenta como medida: es
+  // exactamente el mismo caso que "nadie ha tocado el automático".
+  const sinNumCamareros = { a: boda140con10, b: boda140con10, c: { evento: "boda", pax: 140 } };
+  ok(Object.keys(calibracionPersonal(sinNumCamareros)).length === 0,
+    "sin numCamareros puesto a mano, ese evento no es una medida");
+
+  // Un evento que ADEMÁS tiene paxPorCamarero puesto a mano no cuenta: ya es "aquí quiero
+  // un ratio distinto a propósito", no "el de serie se quedó corto".
+  const conRatioPropio = { a: boda140con10, b: boda140con10, c: { ...boda140con10, paxPorCamarero: 20 } };
+  ok(Object.keys(calibracionPersonal(conRatioPropio)).length === 0,
+    "un evento con su propio ratio puesto a mano no cuenta como medida del ratio de serie");
+
+  // Cada tipo de evento se mide por su cuenta.
+  const comunion140con10 = { evento: "comunion", pax: 140, numCamareros: 10 };
+  const dosTypos = { a: boda140con10, b: boda140con10, c: boda140con10, d: comunion140con10, e: comunion140con10, f: comunion140con10 };
+  const calDos = calibracionPersonal(dosTypos);
+  ok(calDos.boda.ratio === 14 && calDos.comunion.ratio === 14, "boda y comunión se miden cada una por su lado");
+
+  // Un ratio que saliera fuera de lo razonable (1-60, ver saneaRatios) no se sugiere:
+  // sería un dato mal metido, no una medida real.
+  const disparatado = { a: { evento: "boda", pax: 6000, numCamareros: 10 }, b: { evento: "boda", pax: 6000, numCamareros: 10 }, c: { evento: "boda", pax: 6000, numCamareros: 10 } };
+  ok(!calibracionPersonal(disparatado).boda, "un ratio fuera de 1-60 no se sugiere, aunque haya tres eventos");
+
+  // Eventos sin datos, de un tipo que no existe, o sin pax no revientan nada
+  ok(Object.keys(calibracionPersonal({
+    x: { evento: "boda", numCamareros: 10 },
+    y: {},
+    z: { evento: "inventado", pax: 100, numCamareros: 10 },
+  })).length === 0, "eventos sin pax, vacíos o de un tipo que no existe se ignoran sin reventar");
+}
+
 // ─── LOS MENÚS QUE HAY QUE HACER APARTE ───────────────────────────────────────
 {
   console.log("\n── Menús especiales a partir de las alergias ──");
@@ -1650,9 +2489,43 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
   ok(copiasUTC.length === 0,
     `el día de hoy sale siempre de src/fecha.js, nunca de toISOString (copias: ${copiasUTC.join(", ") || "ninguna"})`);
 
+  // ─── Repo público: ningún dato real ────────────────────────────────────────
+  // Ya se colaron tres nombres reales una vez (ver CONTEXTO) y el catálogo de
+  // precios de compra vivió en el código, revelando márgenes en un repo público.
+  // El barrido automático es el único cierre que no depende de que alguien se
+  // acuerde. Lo que NO se barre y por qué: __tests__ (los fixtures son
+  // ficticios A PROPÓSITO y los patrones viven ahí para probar
+  // sinDatosPersonales); los € sueltos (hay ejemplos redondos en comentarios;
+  // el riesgo real era el catálogo, que se comprueba abajo); worker/pegar.js
+  // (generado; el CI lo compara byte a byte contra la fuente).
+  const telefono = /(^|[^\d])(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}([^\d]|$)/;
+  const correo = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
+  const correoFicticio = /@(ejemplo\.com|example\.\w+|gula\.local)\b|equipo@gula\.com/;
+  const datosReales = [];
+  ficheros.forEach(f => {
+    readFileSync(f, "utf8").split("\n").forEach((linea, i) => {
+      if (telefono.test(linea)) datosReales.push(`${f}:${i + 1} (teléfono)`);
+      if (correo.test(linea) && !correoFicticio.test(linea)) datosReales.push(`${f}:${i + 1} (correo)`);
+    });
+  });
+  ok(datosReales.length === 0,
+    `ningún teléfono ni correo real en src/ (barrido: ${datosReales.slice(0, 3).join("; ") || "limpio"})`);
+  ok(ficheros.every(f => !readFileSync(f, "utf8").includes("PRECIOS_BASE")),
+    "PRECIOS_BASE no existe en el código: los precios de compra viven en Firestore (ver \"Hecho\")");
+
   const copiasTema = ficheros.filter(f => f !== "src/tema.js"
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));
   ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);
+
+  // El calendario arrancaba SIEMPRE en claro: aplicarTemaInicial() se llamaba en el
+  // arranque de la checklist y del formulario, pero se quedó fuera cuando el calendario
+  // se separó en su propia carpeta/app (ni el automático por horario ni "oscuro" puesto
+  // a mano desde otra app llegaban ahí). Se comprueba en LOS TRES arranques a la vez
+  // para que una cuarta app que se añada algún día no repita el mismo olvido.
+  const arranquesSinTema = ["src/main.jsx", "src/formulario/main.jsx", "src/calendario/main.jsx"]
+    .filter(f => !/aplicarTemaInicial\(\)/.test(readFileSync(f, "utf8")));
+  ok(arranquesSinTema.length === 0,
+    `los tres arranques llaman a aplicarTemaInicial() (sin llamarla: ${arranquesSinTema.join(", ") || "ninguno"})`);
 
   // pruebas/medir.mjs lanzaba su Vite con `npx vite`, y `.kill()` solo mata a npx: el
   // Vite de verdad se quedaba huérfano y con el puerto ocupado para la siguiente vez.
@@ -1892,6 +2765,237 @@ console.log("\n══ Las pantallas gordas llegan tarde, pero con red debajo ═
   // sola en el primer rato muerto en vez de esperar al dedo sobre el botón.
   ok(/alSobrarTiempo\(traerModoCarga/.test(app),
     "Modo carga se precarga en el rato muerto: en el almacén no se espera a la red");
+}
+
+console.log("\n══ La física del grafo de Cerebro (grafoFisica.js) ══");
+{
+  const nodos = [
+    { id: "a", tipo: "finca", nombre: "Finca X", peso: 3 },
+    { id: "b", tipo: "aviso", nombre: "Sin enchufe", peso: 1 },
+    { id: "c", tipo: "tipo-evento", nombre: "Comunión", peso: 5 },
+    { id: "d", tipo: "aviso", nombre: "3 de cocina", peso: 1 },
+  ];
+  const enlaces = [
+    { de: "a", a: "b", por: "finca-aviso" },
+    { de: "c", a: "d", por: "tipo-aviso" },
+    // Uno que apunta a un nodo que no está en la lista: bordesDe tiene que
+    // descartarlo, no reventar con un índice undefined.
+    { de: "a", a: "fantasma", por: "roto" },
+  ];
+
+  const bordes = bordesDe(nodos, enlaces);
+  ok(bordes.length === 2, `bordesDe descarta el enlace a un nodo que no existe (${bordes.length} de 3)`);
+  ok(bordes.every(([i, j]) => nodos[i] && nodos[j]),
+    "y los índices que deja apuntan de verdad a nodos de la lista");
+
+  const dentroDeLaCaja = (sim) => sim.every(n =>
+    Number.isFinite(n.x) && Number.isFinite(n.y) &&
+    n.x >= 14 && n.x <= ANCHO - 14 && n.y >= 14 && n.y <= ALTO - 14);
+
+  const inicial = estadoInicial(nodos);
+  ok(dentroDeLaCaja(inicial), "estadoInicial reparte los nodos dentro del viewBox, sin NaN");
+
+  // De golpe (lo que corre con prefers-reduced-motion): las 200 vueltas seguidas.
+  const deGolpe = estadoInicial(nodos);
+  for (let i = 0; i < ITERACIONES; i++) paso(deGolpe, bordes);
+  ok(dentroDeLaCaja(deGolpe), "tras las 200 vueltas de golpe, nadie se sale del viewBox ni da NaN");
+
+  // Repartido en fotogramas (lo que corre normalmente): mismos nodos, mismos bordes,
+  // pero la relajación llamada 4 en 4 como hace la animación. Tiene que llegar EXACTO
+  // al mismo sitio que de golpe — la animación reparte el trabajo en el tiempo, no
+  // cambia la física. Si algún día divergen, es que se ha colado un salto de estado
+  // entre fotogramas (justo el bug que este refactor tenía que evitar).
+  const porFotogramas = estadoInicial(nodos);
+  let hecho = 0;
+  while (hecho < ITERACIONES) {
+    for (let i = 0; i < 4 && hecho < ITERACIONES; i++, hecho++) paso(porFotogramas, bordes);
+  }
+  const iguales = deGolpe.every((n, i) =>
+    Math.abs(n.x - porFotogramas[i].x) < 1e-9 && Math.abs(n.y - porFotogramas[i].y) < 1e-9);
+  ok(iguales, "repartir las 200 vueltas en fotogramas de 4 da EXACTO el mismo resultado que de golpe");
+
+  // Un nodo sin ningún enlace (el aviso "b" no conecta con nadie salvo por su propio
+  // borde con "a") también tiene que acabar dentro de la caja: es el caso que el
+  // término CENTRO existe para cubrir.
+  const suelto = [{ id: "solo", tipo: "aviso", nombre: "Nadie me conecta", peso: 1 }];
+  const simSuelto = estadoInicial(suelto);
+  for (let i = 0; i < ITERACIONES; i++) paso(simSuelto, []);
+  ok(dentroDeLaCaja(simSuelto), "un nodo sin ningún enlace también queda atraído al centro, no se escapa");
+}
+
+// Bug real, cazado por el dueño en producción: en Modo carga → Vuelta, apuntar "0" en
+// lo que ha vuelto de Hielo (fundido/gastado entero, lo normal) sugería marcarlo como
+// rotura ("faltan 70"). El hielo no se rompe, se consume — igual que toda bebida,
+// comida, combustible o desechable.
+console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
+{
+  ok(esConsumible("Bebidas frías", "Hielo") === true, "el hielo se consume, no se rompe");
+  ok(esConsumible("Bebidas", "Vino tinto") === true, "una bebida entera también");
+  ok(esConsumible("Bebidas frías", "Barril de cerveza (30L)") === true,
+    "aunque el nombre lleve el tamaño metido dentro (categoría entera consumible)");
+  ok(esConsumible("Alcoholes y licores", "Ginebra (Seagrams/Tanqueray)") === true,
+    "los licores también: si no vuelven es porque se han servido");
+  ok(esConsumible("Desechables y Bebidas", "Vasos de cartón (L/M/S)") === true,
+    "los desechables de producción, por definición");
+
+  // Herramientas de verdad que se cuelan dentro de una categoría consumible: esas SÍ
+  // pueden romperse o perderse, no se beben ni se comen.
+  ok(esConsumible("Bebidas frías", "Tirador de cerveza") === false,
+    "el tirador de cerveza no se bebe: es la herramienta, no la bebida");
+  ok(esConsumible("Desechables y Bebidas", "Calentador de agua") === false,
+    "el calentador tampoco: es un aparato, no algo que se reparte y se gasta");
+
+  // Sueltos consumibles dentro de categorías por lo demás reutilizables
+  ok(esConsumible("Café", "Cápsulas café (estándar/descafeinado)") === true,
+    "las cápsulas se gastan aunque la cafetera (misma categoría) no");
+  ok(esConsumible("Café", "Cafetera Nespresso") === false,
+    "la cafetera en sí sí es reutilizable: si falta, es una pérdida de verdad");
+  ok(esConsumible("Paella y fuego", "Carbón") === true, "el carbón se quema");
+  ok(esConsumible("Paella y fuego", "Paella grande") === false,
+    "la paellera no se quema: si no vuelve, es una rotura o una pérdida");
+  // El envase no es el contenido: el gas se gasta, pero la bombona (vacía) es la que se
+  // espera que vuelva con el equipo — si falta la bombona entera, sigue siendo pérdida.
+  ok(esConsumible("Electricidad y otros", "Garrafa gasolina (llena)") === false,
+    "la garrafa vuelve vacía, no es ella la que se gasta, es lo de dentro");
+  ok(esConsumible("Paella y fuego", "Bombonas llenas") === false,
+    "mismo caso que la garrafa: la bombona vuelve, el gas de dentro no");
+  ok(esConsumible("Cristalería", "Vasos de chupito de plástico (barra libre)") === true,
+    "estos sí son de usar y tirar (van en bolsas de 80), a diferencia del resto de barware");
+  ok(esConsumible("Servicio y limpieza", "Fairy") === true, "el jabón se gasta");
+  ok(esConsumible("Servicio y limpieza", "Escoba") === false,
+    "la escoba es una herramienta, no algo que se gasta con el uso de una noche");
+  ok(esConsumible("Mantelería y textiles", "Servilletas grandes") === true,
+    "servilletas de PAPEL: se tiran, no vuelven");
+  ok(esConsumible("Mantelería y textiles", "Servilletas de tela") === false,
+    "las de TELA sí vuelven y se lavan: no son lo mismo que las de papel");
+  ok(esConsumible("Electricidad y camión", "Bridas") === true, "las bridas se cortan al usarlas");
+  ok(esConsumible("Electricidad y camión", "Walkies") === false,
+    "los walkies son equipo, no algo que se gaste con un uso");
+
+  // Lo que no es ni una cosa ni la otra (vajilla, cristalería, mobiliario): por
+  // defecto NO es consumible, que es lo seguro — si algo no vuelve, se sigue pudiendo
+  // apuntar como rotura, que es justo el comportamiento de siempre para estas.
+  ok(esConsumible("Cristalería", "Copas de vino") === false, "la cristalería, de toda la vida, se rompe");
+  ok(esConsumible("Vajilla", "Platos trinchero (Blanco liso)") === false, "la vajilla también");
+  ok(esConsumible("Mobiliario, sala y decoración", "Mesa alta") === false, "y el mobiliario");
+}
+
+console.log("\n══ Mesas calientes y taxis de hielo, como funciones sueltas ══");
+{
+  // Extraídas de dentro de sus builders para que las tres checklists (boda, cumpleaños,
+  // producción) usen la misma cuenta en vez de repetirla — y aquí se prueban sin montar
+  // ningún builder.
+  ok(calcMesasCalientes(40) === 1 && calcMesasCalientes(41) === 2,
+    `1 mesa caliente por cada ~40 pax: 40 → 1, 41 → 2 (${calcMesasCalientes(40)}, ${calcMesasCalientes(41)})`);
+  ok(calcMesasCalientes(0) === 1, "sin pax puesto, el mínimo es 1, no 0");
+
+  // Mesas altas: antes pax/15 fijo; ahora depende de cuántas barras se van a montar
+  // (2 por barra, 4 con 100 pax o más), y sin contestar cae sola al cálculo viejo.
+  ok(calcMesasAltas(99, 1) === 2 && calcMesasAltas(99, 2) === 4,
+    `2 mesas por barra bajo 100 pax: 1 barra → 2, 2 barras → 4 (${calcMesasAltas(99, 1)}, ${calcMesasAltas(99, 2)})`);
+  ok(calcMesasAltas(120, 1) === 4 && calcMesasAltas(120, 2) === 8,
+    `4 mesas por barra con 100 pax o más: 1 barra → 4, 2 barras → 8 (${calcMesasAltas(120, 1)}, ${calcMesasAltas(120, 2)})`);
+  ok(calcMesasAltas(99, 3) === 6, "el salto de 2 a 4 es por pax, no por nº de barras (99 pax, 3 barras → 6)");
+  ok(calcMesasAltas(100, 0) === Math.max(2, Math.ceil(100 / 15)),
+    "sin barras contestadas (0), cae al cálculo viejo por pax");
+  ok(calcMesasAltas(100, undefined) === Math.max(2, Math.ceil(100 / 15)),
+    "y sin el campo siquiera (undefined), igual — eventos guardados antes de esta pregunta");
+
+  ok(taxisDeHielo(24) === 1 && taxisDeHielo(25) === 2,
+    `24kg entran en 1 taxi, 25kg ya piden 2 (${taxisDeHielo(24)}, ${taxisDeHielo(25)})`);
+  ok(taxisDeHielo(0) === 1, "sin kg, el mínimo sigue siendo 1 taxi, no 0");
+}
+
+console.log("\n══ Auditoría de cálculos: 6 bugs reales cazados sin llegar a un evento ══");
+{
+  // El dueño pidió una revisión a fondo de los cálculos automáticos sin tocar nada
+  // hasta confirmar cada hallazgo. Estos seis venían de fórmulas que no hacían lo que
+  // su propio comentario decía, o que no seguían el mismo patrón que su fórmula
+  // hermana en el fichero de al lado.
+  const cantidadItem = (cats, label) => {
+    for (const c of cats) {
+      const it = c.items.filter(Boolean).find(x => x[0] === label);
+      if (it) return it[1];
+    }
+    return null;
+  };
+  // Como cantidadItem pero para las líneas envueltas en conSufijo() ({u, sufijo}),
+  // como los packs de vasos: devuelve el número puro, no el objeto.
+  const unidadesItem = (cats, label) => {
+    const v = cantidadItem(cats, label);
+    return v && typeof v === "object" ? v.u : parseInt(v, 10);
+  };
+
+  // 1) Montaje es tiempo de TODO el equipo (camareros y cocina incluidos), no solo de
+  // logística — lo dice el propio comentario de tiempos-carga.js. Pasaba por la misma
+  // reparte() que carga/descarga, así que con poca gente de logística se disparaba.
+  const conUnaPersona = estimarTiemposCarga({ totalItems: 140, pax: 100, numLogistica: 1, horasJornada: 0 });
+  const conTresPersonas = estimarTiemposCarga({ totalItems: 140, pax: 100, numLogistica: 3, horasJornada: 0 });
+  ok(conUnaPersona.montajeMin === conTresPersonas.montajeMin,
+    `el montaje no cambia con el nº de logística, es tiempo de todo el equipo (1 persona: ${conUnaPersona.montajeMin}min, 3 personas: ${conTresPersonas.montajeMin}min)`);
+  ok(conUnaPersona.cargaMin > conTresPersonas.cargaMin,
+    "la carga SÍ se reparte entre la gente de logística, eso no cambia");
+
+  // 2) Un corporativo con tarta cargaba pala y cuchillo pero nunca la mesa: la
+  // pregunta del formulario incluye "corporativo" desde siempre, el generador no.
+  const corpConTarta = buildChecklist("corporativo", 80, 2, 4, 0, { llevaTarta: true });
+  ok(cantidadItem(corpConTarta, "Pala de tarta") === "1" && cantidadItem(corpConTarta, "Cuchillo de tarta") === "1",
+    "un corporativo con tarta ya cargaba pala y cuchillo");
+  ok(cantidadItem(corpConTarta, "Mesa redonda (tarta corporativo)") === "1",
+    "y ahora también carga la mesa donde ponerla, como boda/comunión/cumpleaños");
+
+  // 3) Cumpleaños: "Descansadores de paella" salía fijo en 2 sin mirar cuántas
+  // paelleras había de verdad — con muchas paelleras a la vez, faltaban soportes.
+  const nPaellasGrande = calcPaella(210, "Auto", 0, "cumpleanos").n;
+  ok(nPaellasGrande > 2, `hace falta un cumpleaños con más de 2 paelleras para que el bug se note (aquí: ${nPaellasGrande})`);
+  const cumpleConPaella = buildChecklist("cumpleanos", 210, 0, 0, 0, { llevaPaella: true });
+  ok(cantidadItem(cumpleConPaella, "Descansadores de paella") === String(nPaellasGrande),
+    `los descansadores escalan con el nº de paelleras, como en boda (${cantidadItem(cumpleConPaella, "Descansadores de paella")} para ${nPaellasGrande} paelleras)`);
+
+  // 4) Producción: "Trípode" salía fijo en 1 (+ frituras), cuando debía escalar con
+  // el nº de paelleras igual que "Paravientos", calculado justo al lado con la misma
+  // cuenta y que sí estaba bien.
+  const prodConPaella = buildChecklist("produccion", 100, 0, 0, 0, { llevaPaella: true });
+  const nPaellasProd = calcPaella(100, "Auto", 0, "produccion").n;
+  ok(nPaellasProd > 1, `hace falta un rodaje con más de 1 paellera para que el bug se note (aquí: ${nPaellasProd})`);
+  ok(cantidadItem(prodConPaella, "Trípode") === String(nPaellasProd)
+    && cantidadItem(prodConPaella, "Paravientos") === String(nPaellasProd),
+    `el trípode escala con el nº de paelleras, igual que ya hacían los paravientos (${cantidadItem(prodConPaella, "Trípode")} para ${nPaellasProd} paelleras)`);
+
+  // 5) personasPorPlatoEntrante sin valor por defecto en el generador puro: llamado
+  // sin pasar por el useState de App.jsx (p.ej. al recalibrar un evento guardado sin
+  // ese campo) daba "cada undefined pax" en vez de caer al mismo 4 de la UI.
+  const sinCampoAlDia = buildChecklist("boda", 100, 2, 4, 0, { entranteCompartido: true, llevaEntrante: true });
+  const sufijoEntrante = cantidadItem(sinCampoAlDia, "Platos extra entrante");
+  ok(sufijoEntrante && sufijoEntrante.sufijo && !/undefined/.test(sufijoEntrante.sufijo),
+    `sin personasPorPlatoEntrante, cae al 4 por defecto en vez de "undefined pax": ${JSON.stringify(sufijoEntrante)}`);
+
+  // 6) Producción de varios días: los vasos desechables del personal se calculaban
+  // UNA vez para todo el rodaje, mientras que el agua de la misma gente ya se
+  // multiplicaba por jornada — un rodaje de 3 días se quedaba con los vasos de uno.
+  const unDia = buildChecklist("produccion", 40, 0, 0, 0, { diasProduccion: ["40"] });
+  const tresDias = buildChecklist("produccion", 40, 0, 0, 0, { diasProduccion: ["40", "40", "40"] });
+  const vasosUnDia = unidadesItem(unDia, "Vasos de plástico (personal)");
+  const vasosTresDias = unidadesItem(tresDias, "Vasos de plástico (personal)");
+  ok(vasosTresDias === vasosUnDia * 3,
+    `los vasos de plástico del personal se multiplican por los días de rodaje, como el agua (1 día: ${vasosUnDia}, 3 días: ${vasosTresDias})`);
+  const cafeUnDia = unidadesItem(unDia, "Vasos de cartón café mini (personal)");
+  const cafeTresDias = unidadesItem(tresDias, "Vasos de cartón café mini (personal)");
+  ok(cafeTresDias === cafeUnDia * 3, "y lo mismo con los vasos de café del personal");
+
+  // 7) "Agua con gas" y "Cerveza 0,0": su propio comentario decía "se piden en cajas
+  // de 24 (1 caja mínimo real)", pero el número que salía eran botellas sueltas sin
+  // redondear a caja ni tener suelo. La cerveza 0,0 además ignoraba las horas de
+  // barra, a diferencia de la cerveza con alcohol de al lado.
+  const b = calcBebidas(20, 2, true, false);
+  ok(b.aguaConGas % 24 === 0 && b.aguaConGas >= 24,
+    `agua con gas sale en cajas de 24 completas, con un mínimo de una caja (evento pequeño: ${b.aguaConGas})`);
+  ok(b.cerveza00 % 24 === 0 && b.cerveza00 >= 24,
+    `cerveza 0,0 también, mismo criterio (${b.cerveza00})`);
+  const cerveza00ConBarra = calcBebidas(100, 4, true, false).cerveza00;
+  const cerveza00MediaHora = calcBebidas(100, 0.5, true, false).cerveza00;
+  ok(cerveza00ConBarra > cerveza00MediaHora,
+    `la cerveza 0,0 ya responde a las horas de barra libre, como la cerveza normal (4h: ${cerveza00ConBarra}, media hora: ${cerveza00MediaHora})`);
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

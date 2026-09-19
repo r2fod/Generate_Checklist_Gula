@@ -243,6 +243,41 @@ async function main() {
     await ctx.close();
   }
 
+  // ── A 320px no se pierde nada por overflow:hidden invisible ─────────────────
+  // Dos hallazgos de la misma auditoría visual en móvil, los dos por la misma causa
+  // de fondo: un flex item sin min-width:0 no encoge por debajo de su contenido, así
+  // que a 320px algo tenía que desbordar — y como las tarjetas redondeadas recortan
+  // con overflow:hidden, el desborde se perdía en silencio, sin scroll ni aviso.
+  console.log("\n── A 320px no se pierde nada por overflow oculto ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // Hallazgo 1: el contador de items y la flecha ▼/▲ de CADA categoría tienen que
+    // seguir visibles dentro de su tarjeta — antes se recortaban en 9 de cada 10
+    // categorías porque el nombre no cedía sitio a la píldora del contador.
+    const categorias = await p.evaluate(() => [...document.querySelectorAll(".category-header")].map(r => {
+      const box = r.getBoundingClientRect();
+      const pill = r.querySelector(".cat-count").getBoundingClientRect();
+      return pill.right <= box.right + 0.5 && pill.left >= box.left - 0.5;
+    }));
+    ok(categorias.length > 5 && categorias.every(Boolean),
+      `el contador y la flecha de las ${categorias.length} categorías caben dentro de su tarjeta`);
+
+    // Hallazgo 2: el subtítulo de la cabecera tiene que traer la hora y el sitio, no
+    // solo el día — antes se cortaba con "…" justo antes de llegar a ellos.
+    const subtitulo = await p.locator(".header-info p").innerText();
+    ok(subtitulo.includes(EVENTO_COMPLETO.horaInicio) && subtitulo.includes(EVENTO_COMPLETO.ubicacion),
+      `el subtítulo trae la hora y el sitio a 320px → "${subtitulo.replace(/\n/g, " / ")}"`);
+
+    ok((await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0,
+      "y nada de esto desborda la pantalla");
+    await c.close();
+  }
+
   // ── Cada tipo de evento genera una checklist coherente y usable ─────────────
   console.log("\n── Los cinco tipos de evento ──");
   const ctx = await navegador.newContext({ viewport: { width: 1440, height: 1100 }, acceptDownloads: true });
@@ -267,6 +302,23 @@ async function main() {
     const resumen = await page.locator(".resumen-tabla").first().innerText();
     ok(items > 20 && iconos === items && invalidas === 0 && selectores === 2 && marcados === filas && !/NaN/.test(resumen),
       `${tipo}: ${items} items · ${iconos} iconos · ${invalidas} inválidas · ${selectores} selectores · ${marcados}/${filas} vueltos · Resumen sin NaN`);
+    // La tabla del Resumen no debe arañar el ancho del modal (antes se ajustaba al
+    // pixel justo y una fuente un pelín más ancha que la de las pruebas ya la hacía
+    // desbordar y obligar a arrastrar para ver el coste total). Con margen real de
+    // verdad no debería pasar por poco.
+    if (tipo === "boda") {
+      const margen = await page.evaluate(() => {
+        const w = document.querySelector(".resumen-tabla-wrap");
+        const t = document.querySelector(".resumen-tabla");
+        // clientWidth - scrollWidth nunca mide margen real: scrollWidth nunca baja
+        // del propio clientWidth cuando NO hay overflow, así que esa resta siempre
+        // da ≤0 aunque sobre sitio de verdad. Lo que hace falta es comparar el hueco
+        // disponible contra el ancho que la tabla ocupa de verdad.
+        return w && t ? w.clientWidth - t.getBoundingClientRect().width : null;
+      });
+      ok(margen !== null && margen >= 40,
+        `y la tabla del Resumen deja margen real sin arrastrar (${margen}px, ≥40)`);
+    }
   }
 
   // ── EL PANEL DEL ASISTENTE ESCAPA DEL HEADER ────────────────────────────────
@@ -790,6 +842,91 @@ async function main() {
     }
   }
 
+  // ── En Vuelta, la pastilla "todo" no puede aplastar el nombre ──────────────
+  // A 320px la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de 80px
+  // de los 264 de la fila: hasta "Regletas" se partía a media palabra
+  // ("Regleta" / "s"), aunque overflow-wrap: anywhere hacía exactamente lo que tiene
+  // que hacer con ese poco sitio. El nombre no necesitaba partirse, necesitaba sitio
+  // — la pastilla es la que tiene que caer a su propia línea cuando no cabe.
+  // Se comprueba el ANCHO del contenedor del nombre, no si el texto envuelve: contar
+  // líneas con getClientRects() salió inconsistente entre la captura y la medición en
+  // este entorno (posible carrera de layout con la fuente del sistema), mientras que
+  // el ancho de la caja es geometría de CSS pura y no tiene ese problema.
+  console.log("\n── Vuelta a 320px: el nombre tiene sitio de sobra ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1200);
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(900);
+    const anchoNombre = await p.evaluate(() =>
+      document.querySelector(".carga-row-vuelta .carga-nombre").getBoundingClientRect().width);
+    ok(anchoNombre >= 100,
+      `a 320px el nombre tiene al menos 100px (no los ~74px que dejaba la pastilla) → ${Math.round(anchoNombre)}px`);
+    await c.close();
+  }
+
+  // ── Modo carga también avisa de los items de alquiler ───────────────────────
+  // La lista normal (FilaItem.jsx) pinta de amarillo y pone el cartelito "ALQUILER"
+  // en items de un proveedor externo (por nombre, o marcados a mano con el ✎), pero
+  // Modo carga los pintaba como cualquier otro: se descartaba ese dato de la tupla
+  // del item al desestructurar ([label, qty, , labelOriginal, , sufijo]), la casilla
+  // de en medio. El dueño lo pilló en un evento real con sillas de Dealde.
+  console.log("\n── Modo carga: los items de alquiler también llevan su aviso ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    // "Dealde" en el nombre lo detecta solo (origenSillas); el candy bar se marca a
+    // mano con itemsAlquilerManual, que es justo el camino que no lleva ningún
+    // proveedor en el nombre y por eso no se detecta solo.
+    await p.goto(url({
+      evento: "boda", pax: 80, nombreEvento: "Boda alquiler",
+      origenSillas: "Dealde",
+      itemsManuales: [{ categoria: "Mobiliario, sala y decoración", label: "Candy bar", cantidad: "1" }],
+      itemsAlquilerManual: { "Mobiliario, sala y decoración::Candy bar": true },
+    }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(1200);
+
+    const contarAlquiler = () => p.evaluate(() => ({
+      filas: document.querySelectorAll(".carga-row.is-alquiler").length,
+      tags: document.querySelectorAll(".carga-row .tag-alquiler").length,
+    }));
+    const enSalida = await contarAlquiler();
+    ok(enSalida.filas >= 2 && enSalida.tags >= 2,
+      `en Salida, sillas (por nombre) y candy bar (marcado a mano) llevan el aviso → ${JSON.stringify(enSalida)}`);
+
+    // El fondo de verdad se pinta, no solo la clase: mismo color que la lista normal
+    const fondoDeUnaFila = await p.evaluate(() => {
+      const fila = document.querySelector(".carga-row.is-alquiler");
+      return fila ? getComputedStyle(fila).backgroundColor : null;
+    });
+    ok(!!fondoDeUnaFila && fondoDeUnaFila !== "rgba(0, 0, 0, 0)" && fondoDeUnaFila !== "transparent",
+      `y el fondo amarillo se pinta de verdad, no solo la clase → ${fondoDeUnaFila}`);
+
+    // Y en Vuelta, sin que el cartelito le robe el sitio al nombre (a 320px sobre
+    // todo: ver el test de arriba de "la pastilla todo no puede aplastar el nombre")
+    await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: "Vuelta" }).first().click();
+    await p.waitForTimeout(900);
+    const enVuelta = await contarAlquiler();
+    ok(enVuelta.filas >= 2 && enVuelta.tags >= 2,
+      `y en Vuelta también, no solo en Prep./Salida → ${JSON.stringify(enVuelta)}`);
+    // Mismo umbral que el test de arriba ("Vuelta a 320px: el nombre tiene sitio de
+    // sobra"): >=100px es lo que se considera "con sitio", no una cifra inventada
+    // aparte para este caso.
+    const anchoNombreConTag = await p.evaluate(() =>
+      document.querySelector(".carga-row.is-alquiler .carga-nombre").getBoundingClientRect().width);
+    ok(anchoNombreConTag >= 100,
+      `y a 390px el nombre conserva sitio de sobra, el cartelito no se lo come → ${Math.round(anchoNombreConTag)}px`);
+    await c.close();
+  }
+
   // ── El botón "Recalcular cantidades" ────────────────────────────────────────
   // Compara el cálculo de AHORA con la foto que se guardó (valoresCalculados) y ofrece,
   // una por una, mantener lo que hay o coger lo nuevo. Es el botón que salva a los
@@ -1150,7 +1287,11 @@ async function main() {
   console.log("\n── Los selectores cambian la checklist ──");
   const escapa = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   for (const tipo of TIPOS) {
-    await page.goto(url({ evento: tipo, pax: 100, ninos: 10 }), { waitUntil: "domcontentloaded" });
+    // origenSillas puesto a propósito: sin proveedor por defecto (ver "Sillas sin
+    // proveedor por defecto", más abajo) ningún botón del selector sale activo, y este
+    // barrido necesita un "activo" real del que partir para poder volver a él tras
+    // probar cada opción.
+    await page.goto(url({ evento: tipo, pax: 100, ninos: 10, origenSillas: "Dealde" }), { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(1900);
     const grupos = await page.locator(".segment-group").evaluateAll(gs => gs.map(g => ({
       label: (g.querySelector(".segment-label") || {}).textContent || "",
@@ -1177,6 +1318,44 @@ async function main() {
       }
     }
     ok(mudos.length === 0, `${tipo}: los ${grupos.length} controles cambian la checklist${mudos.length ? ` → sin efecto: ${mudos.join(", ")}` : ""}`);
+  }
+
+  // "Llevamos hielo" y "La bebida la pone Gula": dos casillas que existían solo a
+  // medias — el formulario y calculos.js las tenían enteras, pero App.jsx nunca las
+  // cableaba (ni useState, ni opts, ni la propia casilla), así que desmarcarlas en
+  // la app de verdad no cambiaba nada. Se prueba con la app real, no con buildChecklist
+  // directo, que es justo lo que no habría cazado este fallo.
+  console.log("\n── 'Llevamos hielo' y 'La bebida la pone Gula' cambian la checklist de verdad ──");
+  {
+    await page.goto(url({ evento: "boda", pax: 100, barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4 }),
+      { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1900);
+    const casilla = (txt) => page.locator(".checkbox-label-normal", { hasText: txt }).locator("input");
+    const filaDe = async (trozo) => (await listaItems(page)).find(i => i.startsWith(trozo)) || "";
+    // La cantidad va entre el "=" y un posible "|sufijo": comparar la fila entera
+    // fallaba con el sufijo detrás ("...=0|= 0 cajas de 6" no acaba en "=0").
+    const cantidad = (fila) => fila.split("=")[1].split("|")[0];
+
+    const hieloAntes = await filaDe("Hielo=");
+    ok(hieloAntes.length > 0 && cantidad(hieloAntes) !== "0" && cantidad(hieloAntes) !== "",
+      `por defecto lleva hielo, con una cantidad real → ${hieloAntes}`);
+    await casilla("Llevamos hielo").uncheck();
+    await page.waitForTimeout(420);
+    ok(!(await listaItems(page)).some(i => i.startsWith("Hielo=")),
+      "desmarcar 'Llevamos hielo' quita la línea de verdad");
+    await casilla("Llevamos hielo").check();
+    await page.waitForTimeout(420);
+    ok((await filaDe("Hielo=")) === hieloAntes, "y volver a marcarla la trae de vuelta igual que antes");
+
+    const vinoAntes = await filaDe("Vino blanco=");
+    ok(vinoAntes.length > 0 && cantidad(vinoAntes) !== "0", `por defecto la bebida se calcula → ${vinoAntes}`);
+    await casilla("La bebida la pone Gula").uncheck();
+    await page.waitForTimeout(420);
+    ok(cantidad(await filaDe("Vino blanco=")) === "0",
+      "desmarcarla (bebida aparte) deja el vino a 0 de verdad, no solo en el formulario");
+    await casilla("La bebida la pone Gula").check();
+    await page.waitForTimeout(420);
+    ok((await filaDe("Vino blanco=")) === vinoAntes, "y volver a marcarla lo recalcula igual que antes");
   }
 
   // Los campos NUMÉRICOS de la configuración no entran en el barrido de arriba, que solo
@@ -1740,9 +1919,10 @@ async function main() {
     };
 
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
-    // puede dejar el formulario atascado en ninguna pregunta
+    // puede dejar el formulario atascado en ninguna pregunta. Mismo margen que el
+    // otro recorrido de más abajo (45, no pegado al número real de preguntas).
     let vueltas = 0;
-    while (vueltas++ < 32) {
+    while (vueltas++ < 45) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -1760,6 +1940,75 @@ async function main() {
       "y el repaso enseña lo contestado y lo que se dejó en blanco");
     ok(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth) === 0,
       "sin desbordamiento en el móvil");
+
+    // "Ir al resumen" desde cualquier pregunta, y el comentario libre por pregunta:
+    // arranque limpio para no arrastrar el estado del recorrido de arriba.
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(500);
+    await p.locator(".form-input").first().fill("Boda de Resumen");
+    await p.locator(".form-input").nth(1).fill("Finca de prueba");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(500);
+    ok(/Qué día/i.test(await p.locator(".form-titulo").innerText()), "llega a la pregunta del día");
+
+    // La cabecera de cualquier pregunta lleva los dos botones: resumen e inicio.
+    ok(await p.locator(".form-cabecera-acciones button").count() === 2,
+      "la cabecera lleva el botón de ir al resumen junto al de inicio");
+    await p.locator(".form-btn-resumen").click();
+    await p.waitForTimeout(500);
+    ok(/Está todo bien/i.test(await p.locator(".form-titulo").innerText()),
+      "el botón de resumen salta directo al repaso, sin contestar el resto");
+    ok(/Falta algo/i.test(await p.locator(".form-btn-principal").innerText()),
+      "y como falta el día, el repaso lo dice en vez de dejar enviar");
+    const filasRepaso = await p.locator(".form-repaso-fila").allInnerTexts();
+    ok(filasRepaso.some(t => /Boda de Resumen/.test(t)),
+      "lo ya contestado sigue ahí: no se pierde nada al saltar al resumen");
+
+    // El comentario libre por pregunta: arranque limpio otra vez, para no depender
+    // de por dónde deja "Atrás" tras saltar al repaso (ese vuelve a la ÚLTIMA
+    // pregunta, no a esta — es el mismo comportamiento que ya usa reabrir un envío).
+    await p.evaluate(() => localStorage.clear());
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(400);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(500);
+    await p.locator(".form-input").first().fill("Boda del Comentario");
+    await p.locator(".form-input").nth(1).fill("Finca de prueba");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(500);
+    await p.locator('input[type="date"]').first().fill("2027-08-11");
+    await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(500);
+    ok(/Cuánta gente/i.test(await p.locator(".form-titulo").innerText()), "llega a la pregunta de cuánta gente");
+
+    // Colapsado hasta que se pulsa, y lo escrito sigue ahí al volver a la MISMA
+    // pregunta (aunque de por medio se haya pasado por la siguiente).
+    ok(await p.locator(".form-comentario-textarea").count() === 0,
+      "el comentario empieza colapsado, no es lo primero que se ve");
+    await p.locator(".form-comentario-abrir").click();
+    await p.waitForTimeout(200);
+    await p.locator(".form-comentario-textarea").fill("20 son mayores de 70 años");
+    await p.waitForTimeout(200);
+    const tituloConGente = await p.locator(".form-titulo").innerText();
+    const nose = p.locator(".form-btn-nose");
+    if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
+    await p.waitForTimeout(400);
+    ok((await p.locator(".form-titulo").innerText()) !== tituloConGente, "avanza a la siguiente pregunta");
+    await p.locator(".form-btn-atras").click();
+    await p.waitForTimeout(400);
+    ok((await p.locator(".form-titulo").innerText()) === tituloConGente,
+      "\"Atrás\", de una en una, vuelve a la MISMA pregunta de antes");
+    ok(await p.locator(".form-comentario-textarea").count() === 1,
+      "el comentario sale ya abierto solo, sin tener que pulsar otra vez");
+    ok((await p.locator(".form-comentario-textarea").inputValue()) === "20 son mayores de 70 años",
+      "y con lo escrito antes, no en blanco");
 
     // Las carpas: se propone un número sacado de la gente y se puede cambiar. Si pasa
     // de las 8 del almacén, tiene que decirlo AHÍ, no descubrirse el día del rodaje.
@@ -1809,6 +2058,30 @@ async function main() {
     ok(/alquilar 3/i.test(await p.locator(".form-nota-aviso").innerText()),
       `si se piden 11 dice cuántas hay que alquilar → "${await p.locator(".form-nota-aviso").innerText()}"`);
 
+    // Bug real, cazado por el dueño en producción: borrar el número para escribir
+    // uno distinto (no con .fill(), que sustituye el valor de golpe sin pasar por
+    // onChange como hace un dedo de verdad) volvía a poner un 1 solo, tecla a tecla,
+    // sin dejar terminar de escribir el número bueno.
+    await numero.click();
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.waitForTimeout(150);
+    ok((await numero.inputValue()) === "", "borrar el número entero lo deja vacío, no en 1");
+    await p.keyboard.type("7");
+    await p.waitForTimeout(150);
+    ok((await numero.inputValue()) === "7",
+      `y se puede escribir el nuevo número sin que salte solo a otra cosa → "${await numero.inputValue()}"`);
+    // Vacío y sin tocar nada más: al salir del campo recupera algo válido, no se
+    // queda en blanco para siempre.
+    await numero.click();
+    await p.keyboard.press("Control+a");
+    await p.keyboard.press("Delete");
+    await p.waitForTimeout(150);
+    await p.locator(".form-titulo").click();
+    await p.waitForTimeout(200);
+    ok(Number(await numero.inputValue()) > 0,
+      `dejarlo vacío y salir del campo recupera un número válido, no queda en blanco → "${await numero.inputValue()}"`);
+
     // El borrador sobrevive a cerrar el navegador a media pregunta
     await p.evaluate(() => localStorage.clear());
     await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
@@ -1823,9 +2096,12 @@ async function main() {
     await p.waitForTimeout(400);
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
-    // en vez de fallar y decir por qué.
+    // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
+    // encima del número de preguntas de una boda (34 hoy, `preguntasDe("boda", {})`),
+    // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
+    // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;
-    while (vueltasBorrador++ < 32) {
+    while (vueltasBorrador++ < 45) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -1833,7 +2109,7 @@ async function main() {
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
-    ok(vueltasBorrador < 32, "el recorrido llega al repaso sin quedarse atascado");
+    ok(vueltasBorrador < 45, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
@@ -2413,6 +2689,10 @@ async function main() {
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const estado = {
       evento: "produccion", pax: 25, nombreEvento: "Produ kitten", fechaEvento: dia(1),
+      // Puesto a propósito: las sillas ya no llevan proveedor por defecto (ver "Sillas
+      // sin proveedor por defecto"), y aquí se quiere probar precisamente que un
+      // alquiler de sillas trae su recogida sola.
+      origenSillas: "Dealde",
       recogidas, compras: [{ concepto: "Aguas", cantidad: "5 cajas", fecha: dia(0) }],
     };
     await c.addInitScript(e => {
@@ -2436,9 +2716,10 @@ async function main() {
   };
 
   // 1) Recogida pendiente → se avisa de la recogida, NO de la devolución.
-  // Ojo: en la lista sale también la recogida de las sillas, que ahora se crea sola
-  // porque son de alquiler de serie. Es correcto que esté, así que las comprobaciones
-  // van sobre el generador por su nombre en vez de contar cuántos avisos hay.
+  // Ojo: en la lista sale también la recogida de las sillas (el estado de arriba las
+  // pone de alquiler a propósito), que se crea sola en cuanto el alquiler está puesto.
+  // Es correcto que esté, así que las comprobaciones van sobre el generador por su
+  // nombre en vez de contar cuántos avisos hay.
   const a1 = await abrirConAvisos([{ concepto: "Recoger generador", fecha: dia(0), fechaDevolucion: dia(2) }]);
   let t = await chips(a1.p);
   ok(t.some(x => /Recogida: "Recoger generador"/.test(x)) && !t.some(x => /Devoluci/.test(x)),
@@ -2519,7 +2800,9 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" };
+    // origenSillas puesto a propósito (ya no hay proveedor por defecto): este bloque
+    // prueba justo que un alquiler sale destacado arriba en la hoja.
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano", origenSillas: "Dealde" };
 
     await p.goto(url(evento) + "&solo=1&vista=1", { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
@@ -2736,6 +3019,37 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo que se gasta no sugiere rotura, pero sí confirma el consumo ──────────
+  // Bug real, cazado por el dueño en producción: apuntar la vuelta de una bebida y no
+  // ver nada más (ni "faltan", que no pinta nada ahí, ni ninguna otra confirmación) no
+  // dejaba claro que la app se hubiera enterado del consumo.
+  console.log("\n── Lo que se gasta, en la vuelta ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }) + "&solo=1&carga=1",
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2400);
+    await p.locator(".segment-btn", { hasText: "Vuelta" }).click();
+    await p.waitForTimeout(700);
+
+    const fila = p.locator(".carga-row").filter({ hasText: "Vino tinto" }).first();
+    const textoCantidad = await fila.locator(".carga-cantidad").innerText();
+    const salieron = Number((textoCantidad.match(/de\s+([\d.,]+)/) || [])[1]?.replace(/[.,]/g, "") || 0);
+    ok(salieron > 0, `de partida salen ${salieron} botellas de vino tinto`);
+
+    await fila.locator(".carga-vuelve-cantidad input").fill(String(salieron - 4));
+    await p.waitForTimeout(700);
+    ok(await fila.locator(".carga-faltan").count() === 0,
+      "una bebida no sugiere rotura: no es una rotura, es lo normal");
+    ok(/4 gastados/.test(await fila.locator(".carga-consumido").innerText()),
+      "pero sí confirma que se ha contado el consumo, para que no parezca que no ha pasado nada");
+    ok(await fila.locator(".carga-roturas-input").last().inputValue() === "",
+      "y no se rellena sola la casilla de roturas: eso sigue siendo una decisión de quien descarga");
+    await c.close();
+  }
+
   // ── Escribir una cantidad no puede ir por detrás de los dedos ──────────────
   // Cada tecla escribía en el estado del evento entero: reconstruir 150 filas,
   // guardar y programar la subida. Unos 100ms por pulsación, que escribiendo rápido
@@ -2890,6 +3204,51 @@ async function main() {
     const agua = await infoDe("Agua 1,5L");
     ok(agua.length > 0 && !/^=/.test(agua),
       `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+
+    await c.close();
+  }
+
+  // ── El sufijo que depende del número de delante (hielo, carpas) ────────────
+  // "Hielo" guarda cuántos taxis hacen falta y "Carpas" cuántas quedan por alquilar,
+  // los dos calculados a partir del número de la izquierda cuando se generó la
+  // checklist. Editar ese número a mano no los recalculaba: el texto se quedaba
+  // pegado al de cuando se abrió el evento, así que subir el hielo a mano seguía
+  // diciendo los taxis de antes.
+  console.log("\n── El sufijo que depende del número de delante ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, llevaCarpas: true }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+
+    // Por nombre exacto: "Hielo" es substring de "Pinzas de hielo", y con el texto de
+    // toda la fila (cantidad y botones incluidos) un simple hasText los confundiría.
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
+    const sufijoDe = async (nombre) => {
+      const i = filaExacta(nombre).locator(".item-batea-info");
+      return await i.count() ? (await i.innerText()).trim() : "";
+    };
+
+    await filaExacta("Hielo").locator(".item-qty-input").fill("48");
+    await p.waitForTimeout(900);
+    ok(/2 taxis/.test(await sufijoDe("Hielo")),
+      `48 kg de hielo (24kg por taxi) → 2 taxis (${await sufijoDe("Hielo")})`);
+    await filaExacta("Hielo").locator(".item-qty-input").fill("100");
+    await p.waitForTimeout(900);
+    ok(/5 taxis/.test(await sufijoDe("Hielo")),
+      `y al subir a 100kg pasan a ser 5: no se quedan pegados los de cuando se generó (${await sufijoDe("Hielo")})`);
+
+    // 100 pax piden 11 carpas (carpasRecomendadas): caben 8 en almacén, faltan 3 por alquilar
+    const inicial = await sufijoDe("Carpas");
+    ok(/de 8 en almacén/.test(inicial) && /faltan 3/.test(inicial),
+      `arrancan con las 8 del almacén y avisan de las 3 que faltan (${inicial})`);
+    await filaExacta("Carpas").locator(".item-qty-input").fill("5");
+    await p.waitForTimeout(900);
+    ok(/faltan 6, hay que alquilarlas/.test(await sufijoDe("Carpas")),
+      `cargar solo 5 de las 8 recalcula cuántas faltan por alquilar, no se queda en 3 (${await sufijoDe("Carpas")})`);
 
     await c.close();
   }
@@ -3212,10 +3571,11 @@ async function main() {
     ok(await p.locator(".item-row").filter({ hasText: "Armario caliente de Dealde" }).count() === 1,
       "el nombre corregido de un item de alquiler se queda puesto");
 
-    // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo aparecía si
-    // alguien tocaba el selector con el dedo. Un evento nuevo —o uno que llega del
-    // formulario de la oficina con las sillas ya puestas— se quedaba con sillas de
-    // alquiler y sin recogida: nadie sabía cuándo ir a por ellas ni cuándo devolverlas.
+    // Las sillas NO tienen proveedor por defecto (antes salían con "Dealde" de fábrica
+    // en cuanto se creaba el evento, sin que nadie lo hubiera pedido, y su recogida se
+    // colaba con ellas). En cuanto SÍ se elige uno de los dos alquileres —a mano o
+    // porque llega puesto de fuera, del formulario de la oficina— su recogida aparece
+    // sola: eso es lo que hay que seguir garantizando.
     {
       const c2 = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
       for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
@@ -3226,13 +3586,22 @@ async function main() {
           fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),
         })));
 
-      // Un evento nuevo, sin tocar nada: las sillas vienen de Dealde de serie
+      // Un evento nuevo, sin tocar nada: sin proveedor elegido no se inventa ninguna
+      // recogida ni ningún nombre de proveedor de mentira en la checklist.
       await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin tocar nada", fechaEvento: "2027-08-11" }),
+        { waitUntil: "domcontentloaded" });
+      await p2.waitForTimeout(2400);
+      ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
+        "sin elegir proveedor de sillas, no se inventa ninguna recogida");
+
+      // Pero con el proveedor ya puesto (como llega de un formulario ya contestado, o
+      // de un evento guardado), su recogida sí aparece sola
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda con Dealde puesto", fechaEvento: "2027-08-11", origenSillas: "Dealde" }),
         { waitUntil: "domcontentloaded" });
       await p2.waitForTimeout(2400);
       const conSillas = (await tarj()).filter(x => /Sillas/i.test(x.concepto));
       ok(conSillas.length === 1,
-        `sin tocar el selector, las sillas de alquiler ya traen su recogida → ${JSON.stringify((await tarj()).map(x => x.concepto))}`);
+        `con el proveedor ya puesto, las sillas de alquiler traen su recogida → ${JSON.stringify((await tarj()).map(x => x.concepto))}`);
       ok(conSillas[0].fechas[0] === "2027-08-10" && conSillas[0].fechas[1] === "2027-08-12",
         `con el día de ir y el de devolver sacados de la fecha del evento → ${JSON.stringify(conSillas[0].fechas)}`);
 
@@ -3254,7 +3623,9 @@ async function main() {
       // Sin fecha de evento tampoco: una recogida sin día no responde a "¿cuándo hay
       // que ir?", que es para lo único que existe, y encima saldría contada como
       // pendiente en el resumen. Al poner la fecha, aparece con sus dos días.
-      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin fecha" }), { waitUntil: "domcontentloaded" });
+      // origenSillas puesto a propósito (ya no hay proveedor por defecto): lo que se
+      // prueba aquí es la fecha, no si el alquiler está elegido.
+      await p2.goto(url({ evento: "boda", pax: 80, nombreEvento: "Boda sin fecha", origenSillas: "Dealde" }), { waitUntil: "domcontentloaded" });
       await p2.waitForTimeout(2400);
       ok((await tarj()).filter(x => /Sillas/i.test(x.concepto)).length === 0,
         "sin fecha de evento no se crea todavía: no sabría qué día decir");
@@ -3311,7 +3682,9 @@ async function main() {
     await p.waitForTimeout(600);
     await p.locator("button", { hasText: "Modo carga" }).first().click();
     await p.waitForTimeout(1400);
-    const enCarga = async () => (await p.locator(".carga-nombre").allInnerTexts()).map(x => x.trim());
+    // El nombre puro va en .carga-nombre-texto; .carga-nombre (su contenedor) puede
+    // llevar también el cartelito "ALQUILER" al lado, que no es parte del nombre.
+    const enCarga = async () => (await p.locator(".carga-nombre-texto").allInnerTexts()).map(x => x.trim());
     let cargaSalida = await enCarga();
     const debenEstar = ["Generador", "Armario caliente (alquiler Dealde)", "Carpas"];
     const faltan = debenEstar.filter(n => !cargaSalida.some(x => x === n));
@@ -3816,6 +4189,19 @@ async function main() {
         return fuera === 0;
       }), `${w}px · ni los iconos ni el número se salen de su casilla`);
 
+      // Un día con muchos apuntes no puede estirar su casilla —y su fila entera de
+      // la rejilla— mucho más que las de al lado. A partir de 560px (donde salen los
+      // chips en vez de los puntos), cada casilla enseña como mucho CHIPS_VISIBLES (3,
+      // Calendario.jsx) y resume el resto en "+N más": el día completo sigue a un
+      // clic, en PanelDia.
+      if (w >= 560) {
+        ok(await p.evaluate(() =>
+          [...document.querySelectorAll(".cal-celda")].every(c => c.querySelectorAll(".cal-chip").length <= 3)),
+          `${w}px · ninguna casilla enseña más de 3 chips de golpe`);
+        ok(await p.locator(".cal-chip-mas").count() > 0,
+          `${w}px · el día con más de 3 apuntes resume el resto en "+N más"`);
+      }
+
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda
       ok(/4 personas/.test(await p.locator(".cal-equipo-titulo").innerText()),
         `${w}px · la barra del equipo dice cuánta gente hay configurada`);
@@ -3963,6 +4349,94 @@ async function main() {
       await c.close();
     }
 
+    // Bug real: en ancho de escritorio (>=560px, una sola fila) "horario" reclamaba
+    // todo su ancho SIN encoger antes de que "nombre" (1fr) viera un solo píxel —
+    // con el modal a su ancho normal, rol+horario+quitar ya sumaban más que la fila
+    // entera, y el campo del nombre se quedaba invisible (0px), no encogido.
+    console.log("\n══ El nombre de quien trabaja no desaparece en desktop ══");
+    {
+      const c = await navegador.newContext({ viewport: { width: 900, height: 1000 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`nombre asignado desktop: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+      await p.locator(".segment-btn", { hasText: "Equipo" }).click();
+      await p.waitForSelector(".cal-jornada");
+      await p.locator(".cal-asignados-cab").first().click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      await p.locator(".cal-asignados-anadir .btn").first().click();
+      await p.waitForTimeout(200);
+
+      const ancho = await p.locator(".cal-asignado-nombre").first().evaluate(e => e.getBoundingClientRect().width);
+      ok(ancho > 100, `el campo del nombre tiene un ancho de verdad en desktop, no 16px → ${ancho}px`);
+      await p.locator(".cal-asignado-nombre").first().fill("Fulanita");
+      ok(await p.locator(".cal-asignado-nombre").first().inputValue() === "Fulanita",
+        "y se puede escribir en él con normalidad");
+      await c.close();
+    }
+
+    // ── El personal de un evento YA PASADO, desde el editor genérico ──
+    // Bug real: la Vista de equipo (arriba) es la ÚNICA pantalla de toda la app que
+    // enseñaba/editaba quién va a un evento, y solo mira los próximos DIAS_ANTICIPACION
+    // días — pasado o muy lejos en el futuro, se salta. El editor genérico de un apunte
+    // (el que sí se abre para cualquier fecha, incluida "pasado" en el panel del día)
+    // no llevaba ese apartado en absoluto: el personal de un evento ya cerrado era
+    // invisible en TODA la app, justo cuando hace falta para calcular lo que costó.
+    console.log("\n══ Personal de un evento pasado, desde el editor de apunte ══");
+    {
+      const c = await navegador.newContext({ viewport: { width: 500, height: 1000 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`personal evento pasado: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+
+      const hoy = new Date();
+      const pasada = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 40);
+      const isoPasada = `${pasada.getFullYear()}-${String(pasada.getMonth() + 1).padStart(2, "0")}-${String(pasada.getDate()).padStart(2, "0")}`;
+      const TITULO = "Boda ya cerrada (prueba)";
+
+      await p.locator(".cal-nuevo").click();
+      await p.waitForSelector(".cal-editor");
+      await p.locator(".cal-editor select").first().selectOption("boda");
+      await p.locator(".cal-editor input").nth(0).fill(TITULO);
+      await p.locator('.cal-editor input[type="date"]').first().fill(isoPasada);
+      await p.locator('.cal-editor input[type="number"]').first().fill("120");
+      await p.waitForTimeout(300);
+
+      ok(await p.locator(".cal-asignados-cab").count() === 1,
+        "el editor de apunte SÍ tiene apartado de personal, con una fecha de hace 40 días");
+
+      await p.locator(".cal-asignados-cab").click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      await p.locator(".cal-asignados-anadir .btn").first().click();
+      await p.locator(".cal-asignado-nombre").first().fill("Marta");
+      await p.waitForTimeout(300);
+      ok(/Asignados 1 de/.test((await p.locator(".cal-asignados-cab").innerText()).replace(/\s+/g, " ")),
+        "y se puede añadir gente igual que en la Vista de equipo");
+
+      await p.locator(".cal-editor button", { hasText: "Guardar" }).click();
+      await p.waitForTimeout(400);
+
+      // Se reabre desde CERO —Año → el mes de hace 40 días → el día → Editar— para
+      // comprobar que lo guardado de verdad se quedó, no solo que se veía en pantalla.
+      await p.locator(".cal-vistas .segment-btn", { hasText: "Año" }).click();
+      await p.waitForTimeout(300);
+      await p.locator(".cal-mini").nth(pasada.getMonth()).click();
+      await p.waitForTimeout(300);
+      await p.locator(`[aria-label^="${pasada.getDate()}: "]`).first().click();
+      await p.waitForSelector(".cal-dia-panel");
+      await p.locator(".cal-dia-item", { hasText: TITULO }).locator("button", { hasText: "Editar" }).click();
+      await p.waitForSelector(".cal-editor");
+
+      ok(/Asignados 1 de/.test((await p.locator(".cal-asignados-cab").innerText()).replace(/\s+/g, " ")),
+        "al reabrir el apunte pasado, el personal guardado sigue ahí");
+      await p.locator(".cal-asignados-cab").click();
+      await p.waitForSelector(".cal-asignados-cuerpo");
+      ok(await p.locator(".cal-asignado-nombre").first().inputValue() === "Marta",
+        "con el nombre de verdad, no solo el número");
+      await c.close();
+    }
+
     // ── "FALTA CONFIGURAR ESTE EVENTO" ──
     // Una checklist creada por el calendario se ve EXACTAMENTE igual que una terminada:
     // mismo aspecto, mismos valores por defecto. Quien la abra puede leer el pax de
@@ -4034,7 +4508,14 @@ async function main() {
         // Humano en medio, el "gasto" que apuntaba a la cuarta pasó a abrir Tareas sin
         // que saltara nada — la prueba seguía verde mirando otra pantalla.
         ["asistente humano", BANCO + "?asistente=1", ['.asis-pestana:has-text("Humano")']],
-        ["asistente cerebro", BANCO + "?asistente=1", ['.asis-pestana:has-text("Cerebro")']],
+        // Ajustes empieza abierto y SUSTITUYE la pestaña activa (asis-panel es-ajustes):
+        // hay que cerrarlo antes de que se vea Cerebro de verdad, si no el chip de Grafo
+        // ni siquiera está en la página y este paso no hace nada. El Grafo se anima con
+        // requestAnimationFrame al montarse (ver Grafo.jsx): se abre su chip el último
+        // para que el barrido pille la animación en marcha, no solo el resultado asentado.
+        ["asistente cerebro", BANCO + "?asistente=1",
+          ['.asis-icono[aria-label="Ajustes del asistente"]', '.asis-pestana:has-text("Cerebro")',
+            'button[role="tab"]:has-text("Grafo")']],
         ["asistente tareas", BANCO + "?asistente=1", ['.asis-pestana:has-text("Tareas")']],
         ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:has-text("Gasto")']],
       ];
@@ -4045,7 +4526,7 @@ async function main() {
         // Y los dos elegidores nuevos de la pestaña Humano: siete muñecos y cuatro tonos
         // son muchas casillas para una columna de 320px.
         ".asis-panel", ".asis-pestanas", ".hum", ".asis-proveedores", ".asis-gasto-cifras",
-        ".cer-objetivos", ".hum-ajustes", ".hum-elegir"];
+        ".cer-objetivos", ".hum-ajustes", ".hum-elegir", ".cer-grafo-svg-wrap"];
 
       for (const tema of ["claro", "oscuro"]) {
         const malos = [];
@@ -4074,6 +4555,122 @@ async function main() {
         ok(malos.length === 0,
           `${tema}: todo lo nuevo cabe en los ${ANCHOS.length} anchos${malos.length ? ` → ${malos.slice(0, 4).join(" | ")}${malos.length > 4 ? ` (y ${malos.length - 4} más)` : ""}` : ""}`);
       }
+    }
+
+    // ── "CON PERMISO": APROBAR UNA PROPUESTA LA APLICA DE VERDAD ────────────────
+    // El asistente pide sesión de equipo para salir en App.jsx de verdad, así que su
+    // escritura real (onEscribir, cableado con aplicarEnTareas/encadenar) tampoco
+    // llegaba nunca a esta batería — nadie comprobaba que "Hacerlo" cambia el estado
+    // real de la app y no es solo la burbuja del chat diciendo "Hecho" de mentira. Se
+    // cablea aquí, en este banco, el mismo onEscribir de mentira (misma
+    // aplicarEnTareas/encadenar que usa App.jsx, no una reimplementada) para poder
+    // probarlo sin login. El Worker se sustituye por dos respuestas fijas: una que pide
+    // apuntar_tarea, otra que cierra en texto — así no hace falta clave de ningún
+    // proveedor.
+    console.log('\n── "Con permiso": aprobar una propuesta la aplica de verdad ──');
+    {
+      const c = await navegador.newContext({ viewport: { width: 1024, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const WORKER = "https://worker-de-prueba.invalido/chat";
+      let vuelta = 0;
+      await c.route(`${WORKER}*`, async route => {
+        vuelta++;
+        if (vuelta === 1) {
+          await route.fulfill({
+            status: 200, contentType: "application/json",
+            body: JSON.stringify({
+              texto: "", proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 120, salida: 30 },
+              llamadas: [{ id: "call1", nombre: "apuntar_tarea", argumentos: { texto: "Comprar velas de sobremesa" } }],
+            }),
+          });
+        } else {
+          await route.fulfill({
+            status: 200, contentType: "application/json",
+            body: JSON.stringify({ texto: "Te lo dejo propuesto en pantalla para que lo confirmes.", proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 90, salida: 20 }, llamadas: [] }),
+          });
+        }
+      });
+      await c.addInitScript(w => {
+        localStorage.setItem("gula_asistente_url", w);
+        localStorage.setItem("gula_asistente_nivel", "permiso");
+      }, WORKER);
+      const p = await nuevaPagina(c);
+      await p.goto(BANCO + "?asistente=1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1500);
+
+      await p.locator('.asis-escribir input[type="text"]').fill("Apunta que hay que comprar velas de sobremesa");
+      await p.locator('.asis-escribir button[type="submit"]').click();
+      await p.waitForTimeout(1500);
+
+      const pendiente = await p.locator(".asis-pendiente-texto").innerText().catch(() => "");
+      ok(/Apuntar/i.test(pendiente) && /velas/i.test(pendiente),
+        `propone sin aplicar todavía → "${pendiente}"`);
+
+      await p.locator('.asis-pestana:has-text("Tareas")').click();
+      await p.waitForTimeout(400);
+      const antesDeAprobar = await p.locator(".asis-recuerdo-texto").allInnerTexts();
+      ok(!antesDeAprobar.some(t => /velas/i.test(t)),
+        `antes de aprobar, no está en Tareas de verdad → ${JSON.stringify(antesDeAprobar)}`);
+
+      await p.locator('.asis-pestana:has-text("Charla")').click();
+      await p.waitForTimeout(300);
+      await p.locator(".asis-si").click();
+      await p.waitForTimeout(1000);
+
+      const textoHilo = await p.locator(".asis-hilo").first().innerText().catch(() => "");
+      ok(/Hecho:.*velas/i.test(textoHilo), `el chat dice "Hecho: ..." → "${textoHilo.slice(-200)}"`);
+
+      await p.locator('.asis-pestana:has-text("Tareas")').click();
+      await p.waitForTimeout(500);
+      const despuesDeAprobar = await p.locator(".asis-recuerdo-texto").allInnerTexts();
+      ok(despuesDeAprobar.some(t => /velas/i.test(t)),
+        `y AHORA sí está en Tareas de verdad, no es un falso positivo → ${JSON.stringify(despuesDeAprobar)}`);
+
+      await c.close();
+    }
+
+    // ── LA LISTA DE PROVEEDORES SOBREVIVE A CERRAR Y VOLVER A ABRIR ─────────────
+    // Bug real: "disponibles" (lo que el Worker dice que tiene configurado) solo
+    // vivía en estado de React, sin guardarse en ningún sitio — a diferencia de la
+    // URL del proxy o el proveedor elegido a mano, que sí se guardan. Cada vez que
+    // se recargaba la página se perdía la lista real y el selector volvía a
+    // enseñar solo Gemini hasta la siguiente pregunta.
+    console.log("\n── La lista de proveedores no se resetea al recargar ──");
+    {
+      const c = await navegador.newContext({ viewport: { width: 1024, height: 900 } });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const WORKER = "https://worker-de-prueba-2.invalido/chat";
+      await c.route(`${WORKER}*`, r => r.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({
+          texto: "Hola.", proveedor: "gemini",
+          disponibles: ["gemini", "groq", "claude"], uso: { entrada: 10, salida: 5 }, llamadas: [],
+        }),
+      }));
+      await c.addInitScript(w => {
+        localStorage.setItem("gula_asistente_url", w);
+        localStorage.setItem("gula_asistente_nivel", "permiso");
+      }, WORKER);
+      const p = await nuevaPagina(c);
+      await p.goto(BANCO + "?asistente=1", { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1000);
+
+      await p.locator('.asis-escribir input[type="text"]').fill("Hola");
+      await p.locator('.asis-escribir button[type="submit"]').click();
+      await p.waitForTimeout(1000);
+
+      await p.locator('.asis-icono[aria-label="Ajustes del asistente"]').click();
+      ok(await p.locator(".asis-proveedores .bebida-chip").count() === 3,
+        "tras preguntar, el selector ya enseña los tres proveedores configurados");
+
+      // Se recarga la página entera (misma URL, con ?asistente=1: se reabre solo)
+      // sin volver a preguntar nada
+      await p.reload({ waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(800);
+      await p.locator('.asis-icono[aria-label="Ajustes del asistente"]').click();
+      ok(await p.locator(".asis-proveedores .bebida-chip").count() === 3,
+        "y tras recargar sin preguntar nada, la lista sigue siendo la de verdad, no solo Gemini");
+      await c.close();
     }
 
     // ── AJUSTAR LA GENTE POR COMENSAL ──

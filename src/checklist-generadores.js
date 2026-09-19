@@ -4,15 +4,22 @@
 // resultado — por eso vive aparte de App.jsx y se puede probar sin montar nada.
 import {
   calcBebidas, calcDestilados, calcCristaleria, champaneras, calcBandejas,
-  terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen,
+  terciosConBarril, BOTELLAS_AGUA_POR_PAX, conMargen, taxisDeHielo, calcMesasCalientes,
+  calcMesasAltas, alturasBuffet, calcLogistica,
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
 import { conSufijo } from "./checklist-format.js";
-import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
+import { calcCarpas, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { calcPaella } from "./paella.js";
+import { leerRatios } from "./personal.js";
+
+// Antes "Gastros" se dejaba en blanco ("—") para que cocina apuntara la cantidad a
+// mano; con un mínimo de serie ya sale algo cargado desde el principio, y la pregunta
+// del formulario permite subirlo si el menú lleva más.
+export const GASTROS_MINIMO = 4;
 
 // Item "opcional": SIEMPRE ocupa su sitio en el array (nunca se quita del todo con un
 // spread condicional), aunque la condición sea falsa — con cantidad null en ese caso.
@@ -22,6 +29,37 @@ import { calcPaella } from "./paella.js";
 // haya una edición manual, ver el useMemo de "checklist").
 function opt(condicion, tupla) {
   return condicion ? tupla : [tupla[0], null, ...tupla.slice(2)];
+}
+
+// El nombre y la etiqueta ALQUILER de la línea de sillas. Solo "Dealde" y "Carvillo" son
+// alquiler de verdad — "Nuestras" y "No llevan" no lo son, y así hay que tratar también
+// un origen sin elegir todavía (cadena vacía, un evento recién creado desde el
+// calendario): antes de esto un origen vacío heredaba el nombre de un proveedor de
+// mentira ("Sillas (alquiler )"), porque el único caso aparte era "Nuestras". Mismo
+// criterio que ya usan App.jsx (esAlquiler, al sincronizar la recogida) y alquileres.js.
+function sillasAlquiler(origenSillas, incluyeCojines = false) {
+  if (origenSillas === "Nuestras") return { label: "Sillas (nuestras)", esAlquiler: false };
+  if (origenSillas === "Dealde" || origenSillas === "Carvillo") {
+    return { label: `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`, esAlquiler: true };
+  }
+  return { label: "Sillas (proveedor sin elegir)", esAlquiler: false };
+}
+
+// El sufijo de "Carpas" cuando hace falta alquilar de más ("faltan N, hay que
+// alquilarlas"): antes era un texto fijo, calculado una vez al generar la checklist,
+// que se quedaba igual aunque se editara el número de carpas a mano en Modo carga.
+// Se guarda como FUNCIÓN (ver conSufijo/App.jsx, que la llama con el número YA
+// resuelto, con el override aplicado si lo hay) para que "faltan N" se recalcule.
+// Cuando faltanCarpas > 0, calcCarpas() ha topado numCarpas en CARPAS_EN_ALMACEN
+// (usa Math.min), así que el total que hacía falta de verdad es ese tope más lo que
+// faltaba — de ahí sale cuánto falta si se carga un número distinto.
+function sufijoCarpas(faltanCarpas) {
+  return (numCargado) => {
+    const faltanAhora = Math.max(0, CARPAS_EN_ALMACEN + faltanCarpas - numCargado);
+    return faltanAhora > 0
+      ? `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanAhora}, hay que alquilarlas`
+      : `de ${CARPAS_EN_ALMACEN} en almacén`;
+  };
 }
 
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
@@ -88,8 +126,18 @@ function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20, minimoSala 
 // el ratio se pasa desde fuera en vez de salir del interruptor de desayuno.
 const CAPSULAS_POR_PAX_PRODUCCION = 5.5;
 
-function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false, ratioCapsulas = null) {
+function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, sinVajilla = false, ratioCapsulas = null, paraInvitados = true, numPersonal = 0) {
   const items = [];
+  // El café de invitados y el del personal son independientes, no "uno u otro": el
+  // personal curra las mismas horas haya o no café de invitados, así que su parte
+  // (más abajo, `numPersonal > 0`) se calcula siempre que haya plantilla, no solo
+  // cuando los invitados no lo piden — antes se pisaban (con invitados marcado, el
+  // personal se quedaba sin nada, dando por hecho que "tomaba prestado" de la
+  // máquina de invitados). Los vasos de cartón del personal son aparte y no
+  // dependen de nada de esto (calcPersonal, en Servicio y limpieza). En producción
+  // no hace falta nada de esto: ya lleva su propia cafetera de mantenimiento sin
+  // depender de calcCafe (ver buildChecklistProduccion).
+  if (paraInvitados) {
   // paxConsumo ≠ totalPax solo en producciones de varios días: lo que se gasta
   // (cápsulas, café, infusiones, azúcar, leches) se calcula sobre la suma de pax
   // de todos los días; lo reutilizable (tazas, platos, jarras) sobre el día mayor.
@@ -122,6 +170,17 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
     [`Leches variadas (entera/desnatada/sin lactosa/avena)${hayDesayuno ? " (desayuno)" : ""}`, String(Math.max(4, Math.ceil(paxConsumo / (hayDesayuno ? 8 : 40))))],
     ["Jarras de leche", String(Math.max(2, Math.ceil(totalPax / (hayDesayuno ? 20 : 40))))],
   );
+  }
+  if (numPersonal > 0) {
+    // El personal quiere su café aunque haya (o no) café de invitados: su propia
+    // máquina, aunque sea modesta. ~2 cápsulas por persona cubren un par de rondas
+    // durante el turno — muchas menos que las de invitados (2,2-3,2/pax), porque aquí
+    // no hay sobremesa ni tarta, solo cortar el cansancio.
+    items.push(
+      ["Cafetera Nespresso (para el personal)", "1"],
+      ["Cápsulas café (para el personal)", conSufijo(Math.max(2, Math.ceil(numPersonal * 2)), `para ${numPersonal} personas`)],
+    );
+  }
   return { nombre: "Café", items };
 }
 
@@ -173,31 +232,40 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ = "", tipoHorno = "",
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
-    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    numGastros = 0,
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
     llevaChillOut, numChillOut = 1,
-    llevaPalomitera, llevaJarrasCristal, tipoCafetera, llevaMobiliarioAlquiler,
+    llevaPalomitera, llevaJarrasCristal, tipoCafetera, cafeParaInvitados = true, llevaMobiliarioAlquiler,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta = true,
-    personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno,
+    // = 4, mismo valor por defecto que el useState de App.jsx: sin esto, un generador
+    // llamado sin pasar por ahí (ej. la recalibración en calibracion.js, con un evento
+    // guardado que no trajera este campo) dividía entre "undefined" y daba NaN.
+    personasPorPlatoEntrante = 4, llevaAguasPequenas, hayDesayuno,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoNevera = "Mediana", tipoCongelador = "Mediana", tipoPaella, numPaellas = 0, origenSillas = "Dealde",
+    tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaHielo = true, tipoPaella, numPaellas = 0, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
     paxPorCamarero = 0, numLogisticaEquipo = 0,
+    llevaCarpas = false, llevaParabanes = false, numParabanes,
+    numMesasBuffet = 0, llevaCristaleria = true, numBarras,
+    dobleTenedor = dobleServicio, dobleCuchillo = dobleServicio, dobleCuchara = dobleServicio,
+    dobleVino = dobleServicio, dobleAgua = dobleServicio, dobleCava = false,
+    llevaBebida = true,
   } = opts;
   // Nº de logística para la lista de Personal: la gente real que hayas añadido en el
   // "Equipo de logística"; si no hay nadie, el recomendado (1 cada 60 pax).
-  const numLogistica = numLogisticaEquipo > 0 ? numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60));
+  const numLogistica = calcLogistica(pax, numLogisticaEquipo);
   // El origen de las sillas (alquiler Dealde/Carvillo o propias) se refleja en el
   // nombre del item — el tag ALQUILER sale solo al detectar la palabra en el nombre.
   // Los cojines vienen incluidos con la silla de alquiler en bodas (no es un item
   // aparte que se pueda pedir por separado), así que se anota en el propio nombre
   // en vez de generar una línea "Cojines para sillas" suelta.
   const incluyeCojines = (origenSillas === "Dealde" || origenSillas === "Carvillo") && evtKey === "boda";
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas}${incluyeCojines ? ", con cojines" : ""})`;
-  // Las nuestras no son alquiler, así que no llevan el tag ni generan recogida
-  const esAlquilerSillas = origenSillas !== "Nuestras";
+  // Las nuestras (y un origen aún sin elegir) no son alquiler, así que no llevan el tag
+  // ni generan recogida — ver sillasAlquiler(), arriba.
+  const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas, incluyeCojines);
 
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
@@ -226,17 +294,25 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   //
   // La excepción son los almuerzos ligeros (1 cada 22 medido). Para eso está el ratio
   // a mano del formulario, que sigue mandando sobre esto.
-  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (esCorporativo ? 10 : 9);
+  //
+  // Bug real, cazado al conectar el asistente: esto leía un 9/10 escrito aquí mismo,
+  // sin mirar el ratio que ya se podía ajustar desde el panel del calendario
+  // (leerRatios(), en personal.js) — cambiarlo ahí movía la previsión del calendario y
+  // lo que calculaba el asistente, pero NUNCA la checklist de verdad. leerRatios()
+  // siempre trae los 9/10/20 de fábrica si nadie ha tocado nada, así que esto no
+  // cambia ni un número de los que ya salían — solo hace que ajustar el ratio, por fin,
+  // llegue también aquí.
+  const divisorCam = paxPorCamarero > 0 ? paxPorCamarero : (leerRatios()[evtKey] || (esCorporativo ? 10 : 9));
 
   // El agua, los refrescos y el hielo van sobre TODOS (los niños beben); el alcohol solo
   // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
   // faltaba agua y refresco para veinticinco personas.
-  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey });
+  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey, llevaHielo, llevaBebida });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
   // se bebe el mismo vino con la misma comida haya barra detrás o no.
-  const cristal    = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal    = calcCristaleria(totalPax, horasCopas, { vino: dobleVino, agua: dobleAgua, cava: dobleCava }, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0, llevaCristaleria);
   const usaTela    = evtKey === "boda" || fuerzaTextilTela;
   const cats       = [];
 
@@ -261,11 +337,31 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
-    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
-  // Mesas altas (cóctel de pie): solo hacen falta si hay barra libre/aperitivo con la gente de pie
-  const mesasAltas = hayBarra ? Math.max(2, Math.ceil(pax / 15)) : 0;
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: evtKey });
+  // Mesas altas (cóctel de pie): lo normal es que hagan falta solo con barra
+  // libre/aperitivo con la gente de pie, pero hay eventos sin barra (el cliente trae su
+  // propia bebida) que igual llevan mesas altas — para eso está "Nº de barras" en la
+  // app, visible siempre: si se contesta a mano, manda aunque no haya barra. Por nº de
+  // barras si se contestó (calcMesasAltas cae sola al cálculo viejo por pax si no).
+  const mesasAltas = (hayBarra || numBarras) ? calcMesasAltas(pax, numBarras) : 0;
+  // Carpas: antes solo existían en producción (sitios siempre al aire libre). Aquí son
+  // la excepción, no la norma (fincas con nave/interior), de ahí que lleguen apagadas
+  // por defecto — mismo cálculo compartido que producción (carpas.js), con el pax
+  // normal del evento en vez de paxDelDiaGrande.
+  const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } =
+    llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
     ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    opt(llevaCarpas, ["Carpas", faltanCarpas > 0
+      ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
+      : String(numCarpas)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
+    opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
+    // Sin fórmula propia: el número lo pone quien ha visto el sitio.
+    opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
+    // Suma de las mesas de cada buffet marcado en el formulario (quesos, dulce...),
+    // no una constante — antes esta línea no existía en absoluto para boda/cumpleaños.
+    opt(numMesasBuffet > 0, ["Mesas de buffet", String(numMesasBuffet)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
@@ -277,12 +373,17 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esComunion, ["Candy bar / mesa dulce", "—"]),
     opt(esComunion, ["Photocall / atrezzo", "—"]),
     // Propio de Evento corporativo
+    // La pregunta de tarta (preguntas.js) se hace en los cuatro tipos, pero esta mesa
+    // solo se generaba en boda/comunión/cumpleaños: un corporativo con tarta cargaba
+    // la pala y el cuchillo (más abajo, sin condición de tipo) pero nunca la mesa.
+    opt(esCorporativo && llevaTarta, ["Mesa redonda (tarta corporativo)", "1"]),
     opt(esCorporativo, ["Señalética / cartelería con logo", "—"]),
     opt(esCorporativo, ["Porta-nombres / acreditaciones", "—"]),
     opt(esCorporativo, ["Atril + micrófono", "—"]),
     opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
-    ["Cajas de madera para alturas", "—"], ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
-    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas).n)]),
+    ["Cajas de madera para alturas", alturasBuffet(numMesasBuffet) > 0 ? String(alturasBuffet(numMesasBuffet)) : "—"],
+    ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
+    opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas, evtKey).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
     opt(tipoNevera !== "No lleva", [tipoNevera === "Grande" ? "Nevera roja (grande)" : `Nevera (${tipoNevera})`, "1"]),
@@ -293,7 +394,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
   ]});
 
-  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
+  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, evtKey).n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
   const nPlanchas  = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
@@ -302,7 +403,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas);
+    const p = calcPaella(pax, tipoPaella, numPaellas, evtKey);
     // Difusor y trípode se comparten con las frituras (misma herramienta), se suman en vez de listar aparte
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusor", String(p.n + numFritura)], ["Trípode", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
   }
@@ -320,12 +421,13 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   const cocinaItems = [];
-  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", "—"], ["Plancha (cocina)", "—"]);
+  cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", String(numGastros > 0 ? numGastros : GASTROS_MINIMO)], ["Plancha (cocina)", "—"]);
   if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
+  if (llevaMesasCalientes) cocinaItems.push(["Mesas calientes", String(calcMesasCalientes(pax))]);
   cats.push({ nombre: "Cocina", items: cocinaItems });
 
   cats.push({ nombre: "Menaje y utensilios", items: [
@@ -339,11 +441,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Cristalería", items: [
-    [`Vasos de agua${dobleServicio ? " (doble)" : ""}`,  String(cristal.agua.u)],
+    opt(llevaCristaleria, [`Vasos de agua${dobleAgua ? " (doble)" : ""}`,  String(cristal.agua.u)]),
     opt(cristal.cubata.u > 0, ["Vasos de cubata", String(cristal.cubata.u)]),
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
-    [`Copas de vino${dobleServicio ? " (doble)" : ""}`,  String(cristal.vino.u)],
-    ["Copas de cava",                                     String(cristal.cava.u)],
+    opt(llevaCristaleria, [`Copas de vino${dobleVino ? " (doble)" : ""}`,  String(cristal.vino.u)]),
+    opt(llevaCristaleria, [`Copas de cava${dobleCava ? " (doble)" : ""}`,   String(cristal.cava.u)]),
     ["Copa martini", "—"], ["Vaso whiskey", "—"],
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(llevaJarrasCristal, ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))]),
@@ -371,7 +473,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
-  const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
+  const tenedorDoble = conMargen(dobleTenedor ? totalPax * 2 + 70 : totalPax);
+  const cuchilloDoble = conMargen(dobleCuchillo ? totalPax * 2 + 70 : totalPax);
+  const cucharaDoble = conMargen(dobleCuchara ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla", items: [
     ...((!soloBandeja && llevaPlatos) ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)],
@@ -381,9 +485,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     // resto vaya en bandeja (y al revés), así que tiene su propio "No llevan".
     opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
     ...(llevaCubiertos ? [
-      ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
+      ["Tenedores grandes", String(tenedorDoble + (hayDesayuno ? totalPax : 0))],
+      ["Cuchillos grandes", String(cuchilloDoble + (hayDesayuno ? totalPax : 0))],
+      ["Cucharas grandes", String(cucharaDoble + (hayDesayuno ? totalPax : 0))],
       ["Cucharas postre", String(conMargen(totalPax))],
       ["Cucharas café", String(conMargen(totalPax * 0.8))],
     ] : []),
@@ -402,7 +506,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Hojas de fichaje", "1"],
   ]});
 
-  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
+  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno, totalPax, false, null, cafeParaInvitados, personal.n));
 
   // El barril de cerveza (30L/50L) descuenta esos litros de los tercios necesarios en
   // vez de sustituirlos del todo: puede haber tercios + barril (el barril cubre parte
@@ -436,7 +540,10 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua con gas", String(bebidas.aguaConGas)],
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
     ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
-    ["Hielo", conSufijo(bebidas.hieloKg, `kg · ${bebidas.taxisHielo} taxis`)],
+    // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
+    // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
+    // el número de cuando se generó, ver App.jsx donde se resuelve).
+    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)]),
     opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
@@ -455,30 +562,36 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
-    tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera,
+    tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera, cafeParaInvitados = true,
     tamanoBarril = "No lleva", numBarriles = 1,
-    llevaJamonero, personasPorPlatoEntrante, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
+    llevaJamonero, personasPorPlatoEntrante = 4, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
     entranteCompartido, numEntrantesCompartir = 1,
-    llevaArmarioCaliente, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, llevaPalomitera, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Blanco",
-    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaTarta = true, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, tipoNevera = "Mediana", tipoCongelador = "Mediana", llevaHielo = true, llevaTarta = true, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1,
+    llevaCarpas = false, llevaParabanes = false, numParabanes,
+    numMesasBuffet = 0, llevaCristaleria = true,
+    dobleTenedor = dobleServicio, dobleCuchillo = dobleServicio, dobleCuchara = dobleServicio,
+    dobleVino = dobleServicio, dobleAgua = dobleServicio, dobleCava = false,
+    llevaBebida = true,
   } = opts;
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
-  const esAlquilerSillas = origenSillas !== "Nuestras";
+  const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const horasBarraTotal = horasCoctel + horasCopas;
   const hayBarra = horasBarraTotal > 0;
   const totalPax = pax + ninos;
   const hayCongelador = tipoCongelador !== "No lleva";
-  // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio.
-  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
+  // Cumpleaños: formato informal, 1 camarero cada 20 pax salvo que se fije otro ratio
+  // (a mano en el formulario, o el ajustable en leerRatios() — mismo bug y mismo
+  // arreglo que en buildChecklistBoda, ver el comentario de allí).
+  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : (leerRatios().cumpleanos || 20);
 
-  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos" });
+  const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos", llevaHielo, llevaBebida });
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
-  const cristal = calcCristaleria(totalPax, horasCopas, dobleServicio, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0);
+  const cristal = calcCristaleria(totalPax, horasCopas, { vino: dobleVino, agua: dobleAgua, cava: dobleCava }, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0, llevaCristaleria);
   // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
   // dimensionan por pax, además de las que salgan por el tipo de bandeja elegido para
   // el servicio. Antes solo salían si marcabas "lleva canapés", y como en casi todos
@@ -486,7 +599,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
-    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: "cumpleanos" });
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -498,13 +611,22 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // 60 pax (carga/transporte), cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, opts.numCamareros, divisorCam))],
-    ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
+    ["Logística", String(calcLogistica(pax, opts.numLogisticaEquipo))],
     ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
   ]});
 
+  const { numCarpas: numCarpasCumple, faltanCarpas: faltanCarpasCumple,
+    paredes: paredesCarpasCumple, pesas: pesasCarpasCumple } = llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   cats.push({ nombre: "Mobiliario", items: [
     // Igual que un banquete: las de cocina más las de la gente que se sienta
     ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    opt(llevaCarpas, ["Carpas", faltanCarpasCumple > 0
+      ? conSufijo(numCarpasCumple, sufijoCarpas(faltanCarpasCumple))
+      : String(numCarpasCumple)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpasCumple)]),
+    opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpasCumple)]),
+    opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
+    opt(numMesasBuffet > 0, ["Mesas de buffet", String(numMesasBuffet)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
@@ -522,9 +644,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo)
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas);
+    const p = calcPaella(pax, tipoPaella, numPaellas, "cumpleanos");
     // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", "2"], ["Trípode", String(p.n + numFritura)]);
+    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", String(p.n)], ["Trípode", String(p.n + numFritura)]);
   }
   if (tieneFrituras) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)], ["Paravientos", "1"]);
@@ -533,7 +655,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const nPlanchasCumple = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", String(nPlanchasCumple)]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0) + numFritura + nPlanchasCumple;
+  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "cumpleanos").n : 0) + numFritura + nPlanchasCumple;
   if (bombonasCumple > 0) paellaItems.push(["Bombonas llenas", String(bombonasCumple)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
@@ -542,6 +664,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
+  if (llevaMesasCalientes) cocinaItems.push(["Mesas calientes", String(calcMesasCalientes(pax))]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
   cats.push({ nombre: "Cocina y Electro", items: cocinaItems });
 
@@ -573,7 +696,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
-  const cubiertosDoble = conMargen(dobleServicio ? totalPax * 2 + 70 : totalPax);
+  const tenedorDoble = conMargen(dobleTenedor ? totalPax * 2 + 70 : totalPax);
+  const cuchilloDoble = conMargen(dobleCuchillo ? totalPax * 2 + 70 : totalPax);
+  const cucharaDoble = conMargen(dobleCuchara ? totalPax * 2 + 70 : totalPax);
   cats.push({ nombre: "Vajilla, Cubertería y Cristalería", items: [
     ...((!soloBandeja && llevaPlatos) ? [
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)], ["Platos metálicos", "—"],
@@ -581,14 +706,14 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))],
     ...(llevaCubiertos ? [
-      ["Tenedores grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cuchillos grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
-      ["Cucharas grandes", String(cubiertosDoble + (hayDesayuno ? totalPax : 0))],
+      ["Tenedores grandes", String(tenedorDoble + (hayDesayuno ? totalPax : 0))],
+      ["Cuchillos grandes", String(cuchilloDoble + (hayDesayuno ? totalPax : 0))],
+      ["Cucharas grandes", String(cucharaDoble + (hayDesayuno ? totalPax : 0))],
       ["Cucharas postre", String(conMargen(totalPax))],
     ] : []),
-    [`Copas de vino${dobleServicio ? " (doble)" : ""}`, String(cristal.vino.u)],
-    ["Vasos de agua", String(cristal.agua.u)],
-    ["Copas de cava", String(cristal.cava.u)],
+    opt(llevaCristaleria, [`Copas de vino${dobleVino ? " (doble)" : ""}`, String(cristal.vino.u)]),
+    opt(llevaCristaleria, ["Vasos de agua", String(cristal.agua.u)]),
+    opt(llevaCristaleria, ["Copas de cava", String(cristal.cava.u)]),
     opt(cristal.cubata.u > 0, ["Vasos de cubata", String(cristal.cubata.u)]),
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
@@ -598,9 +723,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Pinzas largas", "2"], ["Copas metálicas", "—"], ["Conchas", "—"],
   ]});
 
-  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno));
-
   const personal = calcPersonal(pax, opts.numCamareros, opts.numStaff, divisorCam);
+  cats.push(calcCafe(totalPax, tipoCafetera, hayDesayuno, totalPax, false, null, cafeParaInvitados, personal.n));
+
   // Faltaban el vino, la cerveza y el cava: se cargaban las copas de vino y de cava pero
   // no había nada que servir en ellas. Se calculan igual que en la boda: si hay barril,
   // los litros que da se descuentan de los tercios en vez de sumarse.
@@ -622,7 +747,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
-    ["Hielo", conSufijo(bebidas.hieloKg, `kg · ${bebidas.taxisHielo} taxis`)],
+    // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
+    // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
+    // el número de cuando se generó, ver App.jsx donde se resuelve).
+    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)]),
   ]});
 
   if (destilados) cats.push(categoriaAlcoholes(destilados));
@@ -644,18 +772,18 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 // Eventos corporativos / producciones — fiel a "Checklist de Carga – Producciones"
 function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
-    llevaPaella, tieneFrituras, numFrituras, tipoCafetera, dobleServicio, hayDesayuno,
+    llevaPaella, tieneFrituras, numFrituras, tipoCafetera, cafeParaInvitados = true, dobleServicio, hayDesayuno,
     llevaArmarioCaliente, llevaPalomitera, llevaJamonero, llevaPlatos, llevaCubiertos, numPlanchasGas = 1,
     llevaPlatosPostre = llevaPlatos, estiloPlatoPrincipal = "Blanco liso", estiloPlatoPostre = "Negro/gris",
-    soloBandeja, personasPorPlatoEntrante, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
+    soloBandeja, personasPorPlatoEntrante = 4, tipoBandejas, extraBandejasMadera, extraBandejasPlata,
     entranteCompartido, numEntrantesCompartir = 1,
-    tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "Dealde",
+    tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
-    llevaCarpas = true, llevaGenerador = true, mesVerano = true,
+    llevaCarpas = true, llevaGenerador = true, mesVerano = true, llevaParabanes = false, numParabanes,
+    numMesasBuffet = 0, llevaHielo = true,
   } = opts;
-  const labelSillas = origenSillas === "Nuestras" ? "Sillas (nuestras)" : `Sillas (alquiler ${origenSillas})`;
-  const esAlquilerSillas = origenSillas !== "Nuestras";
+  const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   const usaTela = fuerzaTextilTela;
   // Producción de varios días con pax distinto por día (ej. 12+17+12): el equipo
@@ -667,8 +795,10 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   if (diasPax.length) { pax = Math.max(...diasPax); ninos = 0; }
   const totalPax = pax + ninos;
   const paxConsumo = diasPax.length ? diasPax.reduce((a, b) => a + b, 0) : totalPax;
-  // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio.
-  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : 20;
+  // Producción: equipo de rodaje 1 cada 20 pax salvo que se fije otro ratio (a mano en
+  // el formulario, o el ajustable en leerRatios() — mismo bug y mismo arreglo que en
+  // buildChecklistBoda, ver el comentario de allí).
+  const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : (leerRatios().produccion || 20);
   // Producciones pequeñas (hasta 30 pax): 2 de sala/office y 1 de cocina. Estuvo en 1 y
   // 1 porque 2 y 2 parecía demasiado para un rodaje de 25 pax, pero al contar lo que se
   // puso de verdad salen 2 de sala en los dos casos medidos —un rodaje de 20 pax y una
@@ -688,7 +818,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // marcarlo. Si el servicio es entero de bandeja hacen falta unas cuantas más.
   // La fórmula vive en calculos.js: estaba escrita tres veces, una por generador
   const { madera: bandejasMadera, plata: bandejasPl } =
-    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata });
+    calcBandejas(pax, { soloBandeja, tipoBandejas, extraMadera: extraBandejasMadera, extraPlata: extraBandejasPlata, tipo: "produccion" });
   const cats = [];
 
   cats.push({ nombre: "Electricidad y otros", items: [
@@ -704,7 +834,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Personal de rodaje: equipo de sala/office (1:20) y cocina ~2 cada 50 pax.
   cats.push({ nombre: "Personal", items: [
     ["Camareros / office", String(nSala)],
-    ["Logística", String(opts.numLogisticaEquipo > 0 ? opts.numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60)))],
+    ["Logística", String(calcLogistica(pax, opts.numLogisticaEquipo))],
     ["Cocina", String(nCocina)],
   ]});
 
@@ -718,14 +848,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Cuántas hacen falta: la cuenta de siempre a partir del pax, salvo que alguien haya
   // dicho un número (desde el formulario o a mano), que manda sobre el cálculo — el
   // sitio lo ha visto una persona y la cuenta no.
-  const carpasIdeal = opts.numCarpas > 0 ? opts.numCarpas : carpasRecomendadas(pax);
   // Lo que hay en almacén: no se puede cargar más de lo que se tiene. La cantidad que
   // sale es la que se coge del almacén, y si hacen falta más se avisa al lado para
-  // poder alquilar la diferencia a tiempo.
-  const PESAS_EN_ALMACEN = 6;
-  const numCarpas = Math.min(carpasIdeal, CARPAS_EN_ALMACEN);
-  const faltanCarpas = carpasPorAlquilar(carpasIdeal);
-  const PAREDES_POR_CARPA = 3;
+  // poder alquilar la diferencia a tiempo. Misma cuenta compartida que boda/cumpleaños
+  // (carpas.js), aquí con el pax del día grande (ya resuelto arriba).
+  const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } = calcCarpas(pax, opts.numCarpas);
   const numChafers = Math.max(2, Math.ceil(pax / 40));
   // Las mesas de 1,8m van todas en un único total: las del BUFFET (4 en rodajes
   // normales, 5 en los grandes) + 1 para el camión + las de la gente que se sienta a
@@ -734,7 +861,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
   // Antes la base salía de una tabla por pax (7/11/13, plantada en 13 por encima de 100)
   // y las de comer no se contaban: un rodaje de 25 personas cargaba 16 mesas sin que
   // ninguna fuera para sentarse. Ahora es al revés y cuadra con lo que se monta.
-  const MESAS_BUFFET = pax <= 100 ? 4 : 5;
+  //
+  // Si el formulario contestó qué buffets hay (quesos, dulce...) con sus mesas, ese
+  // número puede subir la base por pax, nunca bajarla: un rodaje sigue garantizando
+  // el mínimo de siempre aunque nadie haya contestado el detalle.
+  const MESAS_BUFFET = Math.max(pax <= 100 ? 4 : 5, numMesasBuffet);
   const MESA_CAMION = 1;
 
   // En rodajes siempre aparece gente que no estaba en la lista (técnicos, productora,
@@ -750,18 +881,21 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax + SILLAS_EXTRA), esAlquilerSillas]),
     // En un rodaje se separa mucho más residuo que en un banquete: van 3 de reciclaje
     ["Cubo basura reciclaje", "3"], ["Cubo basura cocina", "1"],
-    ["Cajas de madera para alturas", "—"], ["Marcos para menú", "—"],
+    ["Cajas de madera para alturas", alturasBuffet(numMesasBuffet) > 0 ? String(alturasBuffet(numMesasBuffet)) : "—"],
+    ["Marcos para menú", "—"],
     // Carpas, paredes y pesas en tres líneas: antes ponía "Carpas con paredes y pesas"
     // y más abajo otra línea de paredes, así que no se sabía si las de la primera
     // estaban incluidas o no. Tres paredes por carpa (tres caras cerradas y una
     // abierta para entrar) y dos pesas por carpa.
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
-      ? conSufijo(numCarpas, `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanCarpas}, hay que alquilarlas`)
+      ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
       : String(numCarpas)]),
-    opt(llevaCarpas, ["Paredes de carpas", String(numCarpas * PAREDES_POR_CARPA)]),
+    opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpas)]),
     // Las pesas son las que hay: se cargan todas y se reparten entre las carpas más
     // expuestas al viento, no van por carpa
-    opt(llevaCarpas, ["Pesas (15kg)", String(PESAS_EN_ALMACEN)]),
+    opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
+    // Sin fórmula propia: el número lo pone quien ha visto el sitio.
+    opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
     ["Moqueta", "—"],
     ["Cestas de mimbre", "—"],
     // Decoración del buffet: la cantidad se pone a mano según el sitio, igual que
@@ -773,14 +907,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo).
   // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco.
-  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas).n : 0;
+  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "produccion").n : 0;
   const numParavientos = numPaellaProd + numFritura;
   const paellaItems = [];
   if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas);
+    const p = calcPaella(pax, tipoPaella, numPaellas, "produccion");
     paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
   }
-  paellaItems.push(["Trípode", String(1 + numFritura)]);
+  paellaItems.push(["Trípode", String(numPaellaProd + numFritura)]);
   if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
   if (tieneFrituras) paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)]);
   // En producción la plancha de gas va fija, pero puede ir más de una: cada una lleva
@@ -799,7 +933,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // hacía nada.
     opt(tipoHorno === "pequeño" || tipoHorno === "ambos", ["Horno pequeño", "1"]),
     opt(tipoHorno === "grande" || tipoHorno === "ambos", ["Horno grande", "1"]),
-    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(Math.max(1, Math.ceil(pax / 40)))],
+    ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(calcMesasCalientes(pax))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)
     // "Butano" fuera: era la misma bombona que ya sale contada en "Paella y fuego"
     // (una por paella, una por sartén de fritura y una por plancha de gas), así que
@@ -882,9 +1016,11 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // Antes salía 1 solo paquete para 25 pax, que son 2 vasos por persona en toda la
     // jornada.
     ["Vasos de cartón (L/M/S)", conSufijo(Math.max(2, Math.ceil(paxConsumo * (4 + (hayDesayuno ? 1.2 : 0)) / 50)), "paq. (50 uds)")], ["Bolsas grandes de papel", conSufijo(1, "paq.")],
-    // Los vasos del personal van aquí, con el resto de vasos, y no en Limpieza
-    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks, "packs (50 uds)")],
-    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks, "packs (50 uds)")],
+    // Los vasos del personal van aquí, con el resto de vasos, y no en Limpieza. ×nDias
+    // como el agua de la misma gente (líneas de abajo): un rodaje de varios días gasta
+    // vasos desechables cada jornada, no una sola vez para todo el rodaje.
+    ["Vasos de cartón café mini (personal)", conSufijo(personal.vasosCartonPacks * nDias, "packs (50 uds)")],
+    ["Vasos de plástico (personal)", conSufijo(personal.vasosPlasticoPacks * nDias, "packs (50 uds)")],
     // Mismo volumen total que antes (1,5 Coca + 0,8 Fanta/Aquarius por pax), repartido
     // en cada bebida por separado en vez de en dos líneas combinadas.
     // El rodaje no pasa por calcBebidas (no hay barra ni alcohol), así que su factor de
@@ -907,12 +1043,14 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua 1,5L (extra: paella, lavar, personal)", conSufijo(2 * nDias, "packs")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks * nDias, "packs (6 uds)")],
     ["Agua con gas", String(Math.round(paxConsumo * 0.15))],
-    ["Hielo", conSufijo(Math.max(2, Math.ceil(paxConsumo / 30)), "taxis")],
+    opt(llevaHielo, ["Hielo", conSufijo(Math.max(2, Math.ceil(paxConsumo / 30)), "taxis")]),
   ]});
 
   // En producciones/rodajes va una cafetera de mantenimiento aparte, encendida todo el
   // día para el equipo (café continuo), además de la de servicio que calcula calcCafe.
-  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true, CAPSULAS_POR_PAX_PRODUCCION);
+  const cafeProduccion = calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo, true, CAPSULAS_POR_PAX_PRODUCCION, cafeParaInvitados);
+  // La de mantenimiento es del equipo, no de los invitados: se añade pase lo que pase,
+  // aunque el flag de arriba haya dejado sin items lo que sí es para invitados.
   cafeProduccion.items.push(["Cafetera de mantenimiento (rodaje, siempre encendida)", "1"]);
   cats.push(cafeProduccion);
 

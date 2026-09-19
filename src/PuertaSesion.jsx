@@ -12,7 +12,7 @@
 //   · Link de un evento (?evento=id o ?c=...) → acceso directo a ese evento SIN login
 //     (es el link que se manda al móvil del personal).
 //   · Resto de casos → hay que iniciar sesión con el correo/contraseña del equipo.
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { accesoActivo, iniciarSesion, cerrarSesion, observarSesion } from "./auth.js";
 import logoGula from "./assets/gula-logo.webp";
 
@@ -127,17 +127,21 @@ export default function PuertaSesion({ Contenido, sinLogin = false }) {
     return unsub;
   }, [omitirLogin]);
 
-  if (omitirLogin) return <Contenido />;
+  // El mismo "Cargando…" que ya se usa mientras se resuelve la sesión: si Contenido es
+  // perezoso (ver Acceso.jsx), es lo que se ve el instante en que se pide su trozo.
+  // Con un Contenido normal (el calendario, hoy) Suspense no hace nada — no hay
+  // fallback que mostrar porque no hay nada que esperar.
+  const respaldo = (
+    <div className="login-pantalla">
+      <div className="login-cargando">Cargando…</div>
+    </div>
+  );
 
-  if (sesion.cargando) {
-    return (
-      <div className="login-pantalla">
-        <div className="login-cargando">Cargando…</div>
-      </div>
-    );
-  }
+  if (omitirLogin) return <Suspense fallback={respaldo}><Contenido /></Suspense>;
+
+  if (sesion.cargando) return respaldo;
 
   if (!sesion.usuario) return <PantallaLogin />;
 
-  return <Contenido onCerrarSesion={cerrarSesion} />;
+  return <Suspense fallback={respaldo}><Contenido onCerrarSesion={cerrarSesion} /></Suspense>;
 }

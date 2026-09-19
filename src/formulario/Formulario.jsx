@@ -5,17 +5,24 @@
 //
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
-import { useState, useEffect, useMemo, useRef } from "react";
-import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, loQueFalta, fmtFechaCorta as fmtFecha } from "./preguntas.js";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
-import FondoIconos from "./FondoIconos.jsx";
+import FondoIconos, { iconoDePregunta, iconoDeOpcion } from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
-import { leerMios, apuntarEnvio, olvidarEnvio } from "./mios.js";
+import { leerMios, apuntarEnvio, olvidarEnvio, buscarEnvioPorNombre } from "./mios.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, silenciar } from "./instalar.js";
 import { leerJSON, guardarJSON, borrar } from "../almacen.js";
 
 const HORAS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+// Dónde NO tiene sentido el comentario libre: elegir el tipo de evento, escribir el
+// nombre/sitio (ya son texto libre, un comentario ahí sería una tercera caja
+// redundante) y la fecha/hora (un día es un día, no hay nada que aclarar). Se queda
+// en el resto —cantidades, opciones, marcados— donde de verdad puede aportar una
+// excepción o un porqué.
+const SIN_COMENTARIO = new Set(["texto-largo", "textos", "cuando"]);
 
 // La hora, con dos desplegables en vez del <input type="time">. El selector de reloj
 // de Android es un diálogo del sistema: con la letra grande se recorta el botón de
@@ -78,6 +85,50 @@ function IconoInicio() {
       <path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5" />
       <path className="icono-inicio-puerta" d="M9.5 21v-5.5h5V21" />
     </svg>
+  );
+}
+
+// El bloc con el visto de "ir al resumen": son quince pantallas y hasta ahora solo se
+// llegaba al repaso contestando todas seguidas. Con esto se salta desde cualquier
+// pregunta sin perder lo ya contestado (el repaso ya sabe pintar "sin contestar" lo
+// que falte, igual que con "No lo sé").
+function IconoResumen() {
+  return (
+    <svg className="icono-resumen" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"
+         fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 3.5h6a1 1 0 0 1 1 1V6H8V4.5a1 1 0 0 1 1-1Z" />
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path className="icono-resumen-visto" d="m8.5 13 2.3 2.3L15.5 11" />
+    </svg>
+  );
+}
+
+// Comentario libre por pregunta: colapsado si no hay nada escrito, para no llenar
+// las quince pantallas de cajas de texto que casi nadie va a usar. Si ya había algo
+// —se ha vuelto atrás, o se está corrigiendo un envío— sale abierto de una: si no,
+// parecería que lo escrito se ha perdido. El padre lo remonta al cambiar de pregunta
+// (misma key que el resto de ".form-campos"), así que "abierto" arranca de cero en
+// cada una sin tener que reiniciarlo a mano.
+function ComentarioPregunta({ valor, onChange }) {
+  const [abierto, setAbierto] = useState(!!valor);
+  if (!abierto) {
+    return (
+      <button type="button" className="form-comentario-abrir" onClick={() => setAbierto(true)}>
+        + ¿Algo más que aclarar aquí?
+      </button>
+    );
+  }
+  return (
+    <label className="form-comentario">
+      ¿Algo más que aclarar aquí?
+      <textarea
+        className="form-input form-textarea form-comentario-textarea"
+        rows={2}
+        value={valor}
+        onChange={e => onChange(e.target.value)}
+        autoFocus
+      />
+    </label>
   );
 }
 
@@ -431,13 +482,27 @@ export default function Formulario({ codigo }) {
 
   // ── Elegir a qué evento van los datos ──────────────────────────────────────
   if (paso === -1) {
-    const lista = (proximos || []).filter(e =>
-      !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()));
+    // Los que de verdad hace falta rellenar (el calendario los creó en blanco) van
+    // primero; los que ya tienen datos de verdad, al final — así no se elige uno ya
+    // configurado por error solo porque estaba más arriba. Dentro de cada grupo se
+    // respeta el orden por fecha que ya trae la lista.
+    const lista = (proximos || [])
+      .filter(e => !busca.trim() || `${e.nombre} ${e.sitio}`.toLowerCase().includes(busca.trim().toLowerCase()))
+      .slice()
+      .sort((a, b) => (a.configurado === b.configurado ? 0 : a.configurado ? 1 : -1));
+    // Dónde empieza el bloque de "ya configurados", para meter un separador ahí en
+    // vez de dejar los dos grupos pegados sin ningún corte visual. Si no hay mezcla
+    // (todos configurados, o ninguno) no hay nada que separar.
+    const primerConfiguradoIdx = lista.findIndex(e => e.configurado);
+    const IconoElegir = iconoDePregunta("elegir");
     return (
       <div className="form-pantalla">
         <FondoIconos pregunta="elegir" />
         <LogoGula grande />
-        <h1 className="form-titulo">¿De qué evento son los datos?</h1>
+        <h1 className="form-titulo">
+          <IconoElegir className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} />
+          ¿De qué evento son los datos?
+        </h1>
         {/* Si se ha venido al inicio a media pregunta, lo primero es poder volver:
             las respuestas siguen ahí y sin esto habría que recorrerlas otra vez. */}
         {pasoGuardado !== null && (
@@ -450,21 +515,67 @@ export default function Formulario({ codigo }) {
           <p className="form-nota">No hay eventos próximos guardados. Sigue y lo creamos nuevo.</p>
         )}
         <div className="form-lista-eventos">
-          {lista.map(e => (
-            <button
-              key={e.nombre}
-              className="form-evento"
-              onClick={() => {
-                setEventoDestino(e.nombre);
-                setRespuestas(r => ({ ...r, tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
-                setPasoGuardado(null);
-                setPaso(0);
-              }}
-            >
-              <span className="form-evento-nombre">{e.nombre}</span>
-              <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
-            </button>
-          ))}
+          {lista.map((e, i) => {
+            // El mismo icono que ya distingue el tipo en la pregunta "tipo": boda,
+            // comunión, empresa... así se reconoce de un vistazo sin leer el nombre.
+            const IconoEvento = iconoDeOpcion("tipo", Math.max(0, TIPOS_EVENTO.findIndex(t => t.valor === e.tipo)));
+            // Ya se le mandó algo desde este móvil: se distingue de un vistazo, sin
+            // tener que abrirlo. No lo saca de la lista —puede hacer falta mandarle
+            // una corrección o un dato más—, solo dice que ya tiene algo enviado.
+            const enviado = buscarEnvioPorNombre(mios, e.nombre);
+            // Separador entre "por configurar" y "ya configurados": solo si hay
+            // mezcla de los dos (primerConfiguradoIdx > 0, y no -1).
+            const esInicioDeConfigurados = i === primerConfiguradoIdx && primerConfiguradoIdx > 0;
+            return (
+              <Fragment key={e.nombre}>
+                {esInicioDeConfigurados && (
+                  <div className="form-separador-eventos" role="separator">Ya configurados</div>
+                )}
+                <button
+                className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}${e.configurado ? " es-configurado" : ""}`}
+                onClick={() => {
+                  setEventoDestino(e.nombre);
+                  // Si ya se aplicó un envío de esta oficina antes, sus respuestas
+                  // (filtradas, ver respuestasParaOficina) vienen puestas: así un
+                  // evento "Ya configurado" se rellena solo en vez de preguntarlo
+                  // todo de cero otra vez.
+                  setRespuestas(r => ({ ...r, ...(e.respuestasPrevias || {}), tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
+                  setPasoGuardado(null);
+                  setPaso(0);
+                }}
+              >
+                <IconoEvento className="form-evento-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                <span className="form-evento-texto">
+                  <span className="form-evento-nombre">{e.nombre}</span>
+                  <span className="form-evento-datos">{fmtFecha(e.fecha)}{e.sitio ? ` · ${e.sitio}` : ""}</span>
+                  {/* Ya tiene datos de verdad, no lo creó el calendario en blanco: lleva
+                      el mismo verde y check que "ya te mandé algo" (abajo), para que se
+                      vea igual desde cualquier móvil, no solo el que lo mandó. Si además
+                      hay respuestas guardadas de un envío anterior, se avisa de que
+                      vienen puestas: si no, "Ya configurado" sonaba a "no hace falta
+                      tocar nada" y luego, al entrar, preguntaba todo de cero igualmente. */}
+                  {e.configurado && (
+                    <span
+                      className="form-evento-configurado"
+                      title={e.respuestasPrevias
+                        ? "Este evento ya tiene datos en la app: las respuestas de la última vez vienen puestas, solo hay que revisarlas"
+                        : "Este evento ya tiene datos en la app, puestos a mano: el formulario no tiene respuestas de antes, así que las vuelve a preguntar todas"}
+                    >
+                      {e.respuestasPrevias ? "Ya configurado · se rellena solo" : "Ya configurado"}
+                    </span>
+                  )}
+                </span>
+                {(enviado || e.configurado) && (
+                  <span
+                    className="form-evento-check"
+                    title={enviado ? `Ya mandaste datos ${fmtCuando(enviado.enviado)}` : "Ya está configurado en la app"}
+                    aria-hidden="true"
+                  >✓</span>
+                )}
+                </button>
+              </Fragment>
+            );
+          })}
         </div>
         {(proximos || []).length > 4 && (
           <input
@@ -490,12 +601,9 @@ export default function Formulario({ codigo }) {
 
   // ── Repaso antes de enviar ─────────────────────────────────────────────────
   if (paso >= preguntas.length) {
-    const falta = loQueFalta(respuestas);
+    const falta = respuestasQueFaltan(respuestas);
     const sinContestar = (pr) => respuestas[pr.id] === undefined || respuestas[pr.id] === null;
-    const suNombre = (respuestas.nombre || eventoDestino || "").trim().toLowerCase();
-    const yaMandado = suNombre
-      ? mios.find(m => (m.eventoDestino || m.nombre || "").trim().toLowerCase() === suNombre)
-      : null;
+    const yaMandado = buscarEnvioPorNombre(mios, respuestas.nombre || eventoDestino);
     const enviar = async () => {
       setEnviando(true); setError("");
       try {
@@ -533,7 +641,7 @@ export default function Formulario({ codigo }) {
         <FondoIconos pregunta="repaso" />
         <div className="form-cabecera">
           <LogoGula />
-          <button className="form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
+          <button className="form-btn-cabecera form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
             <IconoInicio />
           </button>
         </div>
@@ -600,6 +708,7 @@ export default function Formulario({ codigo }) {
 
   // ── Una pregunta ───────────────────────────────────────────────────────────
   const p = preguntas[paso];
+  const IconoTitulo = iconoDePregunta(p.id);
   // "No lo sé" borra lo que hubiera puesto (es una respuesta, no un a medias), pero
   // si había algo escrito se ofrece deshacerlo: se pulsa sin querer más de lo que
   // parece, y volver a escribir 120 adultos molesta.
@@ -619,7 +728,7 @@ export default function Formulario({ codigo }) {
     const falta = p.falta ? p.falta(respuestas) : "";
     if (falta) { setAviso(falta); return; }
     setAviso("");
-    if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, []);
+    if (p.tipo === "marcar" && respuestas[p.id] === undefined) pon(p.id, p.porDefecto || []);
     siguiente();
   };
 
@@ -628,13 +737,20 @@ export default function Formulario({ codigo }) {
       <FondoIconos pregunta={p.id} />
       <div className="form-cabecera">
         <LogoGula pequeno />
-        {/* Volver al inicio de un toque. Son quince pantallas: sin esto, para mirar la
-            lista de eventos o lo que ya se había mandado había que darle a Atrás una
-            vez por pregunta. No borra nada — lo contestado sigue ahí y en el inicio
-            sale un botón para seguir por donde se iba. */}
-        <button className="form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
-          <IconoInicio />
-        </button>
+        <div className="form-cabecera-acciones">
+          {/* Ir al resumen sin contestar el resto: para cuando ya se sabe lo que falta
+              o se quiere revisar algo puesto antes sin avanzar pregunta a pregunta. */}
+          <button className="form-btn-cabecera form-btn-resumen" onClick={() => setPaso(999)} title="Ir al resumen" aria-label="Ir al resumen">
+            <IconoResumen />
+          </button>
+          {/* Volver al inicio de un toque. Son quince pantallas: sin esto, para mirar la
+              lista de eventos o lo que ya se había mandado había que darle a Atrás una
+              vez por pregunta. No borra nada — lo contestado sigue ahí y en el inicio
+              sale un botón para seguir por donde se iba. */}
+          <button className="form-btn-cabecera form-btn-inicio" onClick={irAlInicio} title="Volver al inicio" aria-label="Volver al inicio">
+            <IconoInicio />
+          </button>
+        </div>
       </div>
       <div className="form-progreso"><div style={{ width: `${avance}%` }} /></div>
       {/* De qué evento se está hablando. Son quince pantallas seguidas y sin esto es
@@ -649,7 +765,10 @@ export default function Formulario({ codigo }) {
       {/* La clave por pregunta hace que cada pantalla entre con su animación en vez
           de cambiar el texto de golpe: se nota que has pasado de pregunta. */}
       <div className="form-entra" key={p.id}>
-        <h1 className="form-titulo" tabIndex={-1} ref={tituloRef}>{p.texto}</h1>
+        <h1 className="form-titulo" tabIndex={-1} ref={tituloRef}>
+          <IconoTitulo className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} />
+          {p.texto}
+        </h1>
         {p.nota && <p className="form-nota">{typeof p.nota === "function" ? p.nota(respuestas) : p.nota}</p>}
       </div>
       {aviso && <p className="form-error" role="alert">{aviso}</p>}
@@ -665,12 +784,13 @@ export default function Formulario({ codigo }) {
       )}
 
       <div className="form-campos form-entra form-entra-tarde" key={`campos-${p.id}`}>
-        {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map(o => {
+        {p.tipo === "opciones" && (p.id === "tipo" ? TIPOS_EVENTO : opcionesDe(p, tipo)).map((o, i) => {
           const elegida = respuestas[p.id] === o.valor;
           // Las opciones que arrastran algo detrás (cuántos entrantes, a quién se le
           // piden las flores, el archivo del menú) no pasan solas de pantalla: hay que
           // dejar contestarlo antes.
           const arrastraAlgo = !!(o.conNumero || o.conCampos || o.conArchivo);
+          const IconoOpcion = iconoDeOpcion(p.id, i);
           return (
             <div key={o.valor}>
               <button
@@ -686,7 +806,10 @@ export default function Formulario({ codigo }) {
                   }
                   if (!arrastraAlgo) setTimeout(siguiente, 120);
                 }}
-              >{o.texto}</button>
+              >
+                <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                {o.texto}
+              </button>
               {elegida && o.conNumero && (() => {
                 // El campo se puede llamar como quiera la pregunta (numCarpas); si no,
                 // se apaña con el valor de la opción, como se ha hecho siempre.
@@ -700,7 +823,16 @@ export default function Formulario({ codigo }) {
                       <input
                         type="number" min="1" className="form-input form-input-corto"
                         value={valor}
-                        onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        onChange={e => {
+                          // Vacío es un paso de paso, no un valor: forzar aquí mismo un
+                          // mínimo de 1 hacía que borrar el "1" para escribir "15" saltara
+                          // sola de vuelta a "1" antes de dejar teclear el resto.
+                          const v = e.target.value;
+                          if (v === "") { pon(campo, ""); return; }
+                          const n = parseInt(v, 10);
+                          if (!Number.isNaN(n)) pon(campo, Math.max(1, n));
+                        }}
+                        onBlur={() => { if (respuestas[campo] === "") pon(campo, sugerido); }}
                       />
                     </div>
                     {o.avisoNumero && <p className="form-nota form-nota-aviso">{o.avisoNumero(valor)}</p>}
@@ -730,15 +862,35 @@ export default function Formulario({ codigo }) {
           );
         })}
 
-        {p.tipo === "marcar" && opcionesDe(p, tipo).map(o => {
-          const marcadas = respuestas[p.id] || [];
+        {p.tipo === "marcar" && opcionesDe(p, tipo).map((o, i) => {
+          // porDefecto: para preguntas donde lo normal es que casi todo venga
+          // marcado (ej. "qué dobla" con primero+segundo) — se muestra premarcado
+          // hasta que se toque algo, en vez de partir siempre de una lista vacía.
+          const marcadas = respuestas[p.id] !== undefined ? respuestas[p.id] : (p.porDefecto || []);
           const puesta = marcadas.includes(o.valor);
+          const IconoOpcion = iconoDeOpcion(p.id, i);
           return (
             <div key={o.valor}>
               <button
                 className={`form-opcion ${puesta ? "es-elegida" : ""}`}
-                onClick={() => pon(p.id, puesta ? marcadas.filter(v => v !== o.valor) : [...marcadas, o.valor])}
-              >{o.texto}</button>
+                onClick={() => {
+                  const activar = !puesta;
+                  // excluye: opciones que no tiene sentido llevar a la vez (barril de 30L
+                  // Y de 50L comparten el mismo campoNumero -son un único "cuántos
+                  // barriles"-, así que marcar los dos a la vez perdía en silencio cuál
+                  // de los dos tamaños era el de verdad).
+                  const sinExcluidas = o.excluye ? marcadas.filter(v => !o.excluye.includes(v)) : marcadas;
+                  pon(p.id, activar ? [...sinExcluidas, o.valor] : marcadas.filter(v => v !== o.valor));
+                  // Al marcar por primera vez una de lista, se ofrece ya una fila para
+                  // rellenar: una lista vacía recién abierta no invita a tocar nada.
+                  if (activar && o.conLista && !(respuestas[o.campoLista] || []).length) {
+                    pon(o.campoLista, [{ nombre: "", mesas: 1 }]);
+                  }
+                }}
+              >
+                <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                {o.texto}
+              </button>
               {/* El número se guarda donde diga la pregunta (campoNumero), como en las de
                   elegir. Antes esta rama lo escribía siempre en "<valor>Numero" y se
                   saltaba el campoNumero: los barriles decían guardarse en numBarriles,
@@ -752,8 +904,58 @@ export default function Formulario({ codigo }) {
                     <input
                       type="number" min="1" className="form-input form-input-corto"
                       value={respuestas[campo] ?? ""}
-                      onChange={e => pon(campo, Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      onChange={e => {
+                        // Mismo arreglo que en las de elegir: vacío es un paso de paso
+                        // mientras se escribe, no un valor que haya que corregir ya.
+                        const v = e.target.value;
+                        if (v === "") { pon(campo, ""); return; }
+                        const n = parseInt(v, 10);
+                        if (!Number.isNaN(n)) pon(campo, Math.max(1, n));
+                      }}
+                      onBlur={() => { if (respuestas[campo] === "") pon(campo, 1); }}
                     />
+                  </div>
+                );
+              })()}
+              {/* conLista: varias cosas distintas bajo la misma casilla ("otro" buffet
+                  puede ser gildas Y un rincón de gin-tonics, cada uno con sus mesas),
+                  no un número único como el resto de opciones. */}
+              {puesta && o.conLista && (() => {
+                const campo = o.campoLista;
+                const lista = respuestas[campo] || [];
+                const cambiarFila = (i, clave, valor) =>
+                  pon(campo, lista.map((f, j) => (j === i ? { ...f, [clave]: valor } : f)));
+                return (
+                  <div className="form-lista-otro">
+                    {lista.map((fila, i) => (
+                      <div className="form-lista-otro-fila" key={i}>
+                        <input
+                          type="text" className="form-input" placeholder="¿Qué es? (ej: gildas)"
+                          value={fila.nombre || ""}
+                          onChange={e => cambiarFila(i, "nombre", e.target.value)}
+                        />
+                        <input
+                          type="number" min="1" className="form-input form-input-corto" aria-label="¿Cuántas mesas?"
+                          value={fila.mesas ?? ""}
+                          onChange={e => {
+                            const v = e.target.value;
+                            if (v === "") { cambiarFila(i, "mesas", ""); return; }
+                            const n = parseInt(v, 10);
+                            if (!Number.isNaN(n)) cambiarFila(i, "mesas", Math.max(1, n));
+                          }}
+                          onBlur={() => { if (fila.mesas === "") cambiarFila(i, "mesas", 1); }}
+                        />
+                        <button
+                          type="button" className="form-lista-otro-quitar"
+                          aria-label={`Quitar ${fila.nombre || "esta fila"}`}
+                          onClick={() => pon(campo, lista.filter((_, j) => j !== i))}
+                        >✕</button>
+                      </div>
+                    ))}
+                    <button
+                      type="button" className="form-comentario-abrir"
+                      onClick={() => pon(campo, [...lista, { nombre: "", mesas: 1 }])}
+                    >+ Añadir otro</button>
                   </div>
                 );
               })()}
@@ -849,6 +1051,16 @@ export default function Formulario({ codigo }) {
             placeholder={p.ejemplo || "Peticiones del cliente, contacto en el sitio..."}
             value={respuestas[p.campo || "notas"] ?? ""}
             onChange={e => pon(p.campo || "notas", e.target.value)}
+          />
+        )}
+
+        {/* Ni en las de texto libre (sería una caja redundante), ni al elegir el tipo
+            de evento (id "tipo": es la primera pregunta, pura clasificación, nada que
+            aclarar todavía) ni en la fecha/hora. */}
+        {!SIN_COMENTARIO.has(p.tipo) && p.id !== "tipo" && (
+          <ComentarioPregunta
+            valor={respuestas[`${p.id}_comentario`] || ""}
+            onChange={v => pon(`${p.id}_comentario`, v)}
           />
         )}
       </div>

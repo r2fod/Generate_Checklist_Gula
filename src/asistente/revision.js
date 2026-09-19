@@ -19,6 +19,8 @@ import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
 import { PAX_POR_CAMARERO, leerRatios } from "../personal.js";
 import { TIPOS_MESA } from "../mesas.js";
 import { hoyISO, enDiasISO } from "../fecha.js";
+import { BEBIDAS, factorDe } from "../bebida.js";
+import { COMIDAS } from "../comida.js";
 
 // En el navegador es el día de quien mira; en el Worker, que va en UTC, es el mismo día
 // que daba antes. Una sola cuenta para los dos (ver src/fecha.js).
@@ -131,4 +133,136 @@ export function revisarProximos(eventosGuardados = {}, diasVista = 30) {
     .sort((a, b) => (a[1].fechaEvento || "").localeCompare(b[1].fechaEvento || ""))
     .map(([nombre, e]) => ({ fecha: e.fechaEvento || "", ...revisarEvento(nombre, e) }))
     .filter(r => r.avisos.length);
+}
+
+// ─── AUDITORÍA DE NEGOCIO: OPORTUNIDADES ──────────────────────────────────────
+// revisarEvento/revisarProximos contestan "¿este evento está listo?". Estas
+// contestan "¿el negocio está perdiendo dinero o dejando de aprender?": reglas
+// sobre el negocio entero, con la misma disciplina que las de siempre —sobre lo
+// que la app ya sabe, nada inventado, y cada una dice dónde se actúa.
+//
+// El tono es "oportunidad" y no "falta" ni "raro": nada está roto, pero se está
+// dejando dinero o aprendizaje en la mesa. La diferencia importa para leerlo:
+// falta bloquea, raro huele, oportunidad paga.
+//
+// Cada aviso lleva opcionalmente una "propuesta" con la MISMA forma que la app
+// usa para escribir ({ que, resumen, datos }): con eso la tarjeta de "Hacerlo"
+// que ya existe en Charla la aplica sin una línea de UI nueva, y el nivel de
+// permiso decide si se propone o se aplica.
+//
+// Sin React ni nube: entra un manojo de datos, sale una lista. La app la
+// calcula al tenerlo todo en memoria; aquí no se reconstruye checklist (eso
+// vive en calibracion.js, que es quien importa el generador).
+
+const TIPO_PLURAL = { boda: "bodas", comunion: "comuniones", corporativo: "corporativos", cumpleanos: "cumpleaños", produccion: "rodajes" };
+const TIPO_SINGULAR = { boda: "boda", comunion: "comunión", corporativo: "corporativo", cumpleanos: "cumpleaños", produccion: "producción" };
+
+export function oportunidadesNegocio({
+  eventosGuardados = {},
+  precios = {},
+  calibracionBebida = {},
+  calibracionHielo = {},
+  calibracionComida = {},
+  factoresBebida = {},
+  factoresHielo = {},
+  factoresComida = {},
+} = {}) {
+  const avisos = [];
+  const pon = (texto, comoSeArregla = "", propuesta = null) =>
+    avisos.push({ tono: "oportunidad", texto, comoSeArregla, propuesta });
+
+  // ── Medido y sin aplicar ──
+  // Las calibraciones (calibracion.js) ya dicen "esto es lo que de verdad se
+  // usó". Si el factor vigente es otro, la app sigue cargando la cantidad vieja:
+  // ahí es donde la medición deja de ser un número y se vuelve una decisión.
+  // Tope de 6: el panel los tiene todos y la auditoría no puede ser una pared
+  // de botones.
+  const medidas = [];
+  Object.entries(calibracionBebida).forEach(([tipo, porBebida]) => {
+    Object.entries(porBebida).forEach(([clave, m]) => {
+      const actual = factorDe(factoresBebida, tipo, clave);
+      if (Math.abs(m.factor - actual) > 0.005)
+        medidas.push({ area: "bebida", tipo, clave, nombre: BEBIDAS[clave].nombre.toLowerCase(), factor: m.factor, nEventos: m.nEventos, actual });
+    });
+  });
+  Object.entries(calibracionHielo).forEach(([tipo, m]) => {
+    const actual = Number(factoresHielo[tipo]) || 1;
+    if (Math.abs(m.factor - actual) > 0.005)
+      medidas.push({ area: "hielo", tipo, clave: "", nombre: "hielo", factor: m.factor, nEventos: m.nEventos, actual });
+  });
+  Object.entries(calibracionComida).forEach(([tipo, porClave]) => {
+    Object.entries(porClave).forEach(([clave, m]) => {
+      const actual = Number(factoresComida[tipo]?.[clave]) || 1;
+      if (Math.abs(m.factor - actual) > 0.005)
+        medidas.push({ area: "comida", tipo, clave, nombre: COMIDAS[clave].nombre.toLowerCase(), factor: m.factor, nEventos: m.nEventos, actual });
+    });
+  });
+  medidas.sort((a, b) => b.nEventos - a.nEventos || Math.abs(b.factor - b.actual) - Math.abs(a.factor - a.actual));
+  medidas.slice(0, 6).forEach(m => {
+    const pct = Math.round(m.factor * 100);
+    const dir = m.factor < 1
+      ? `solo se usó un ${pct} %: se carga de más`
+      : `se usó un ${pct} %: se carga de menos`;
+    const nombre = m.area === "hielo" ? "el hielo" : m.nombre;
+    pon(
+      `En ${m.nEventos} ${TIPO_PLURAL[m.tipo]} con la vuelta marcada, ${nombre} ${dir}. Aplicar ${m.factor} cargaría lo que de verdad se usa.`,
+      "En el panel del Modo carga hay un botón con el número medido, o me lo dices y lo aplico.",
+      {
+        que: "aplicar_calibracion",
+        resumen: `Aplicar el factor medido ${m.factor} a ${nombre} en ${TIPO_SINGULAR[m.tipo]} (${m.nEventos} eventos)`,
+        datos: { area: m.area, tipo: m.tipo, clave: m.clave, factor: m.factor },
+      },
+    );
+  });
+
+  // ── Roturas sin precio ──
+  // Las roturas se cobran cuando el item roto tiene precio (el Resumen cobra
+  // max(consumo, roturas) × precio). Una rotura sin precio es un daño que el
+  // cliente nunca paga: la fuga más cara, porque se ve como "gratis".
+  Object.entries(eventosGuardados).forEach(([nombre, e]) => {
+    const roturas = e && e.roturas;
+    if (!roturas || typeof roturas !== "object") return;
+    const sinPrecio = [];
+    let unidades = 0;
+    Object.entries(roturas).forEach(([key, n]) => {
+      const rotas = parseInt(n, 10) || 0;
+      if (!rotas) return;
+      // La clave es "categoría::etiquetaOriginal" (ver el estado de roturas): la
+      // etiqueta es la que busca el precio, así que la parte de después del "::".
+      const label = String(key).split("::").pop();
+      if (precios[label] === undefined) {
+        sinPrecio.push(label);
+        unidades += rotas;
+      }
+    });
+    if (sinPrecio.length) {
+      pon(
+        `En "${nombre}" hay ${unidades} roturas apuntadas sin precio (${sinPrecio.slice(0, 3).join(", ")}${sinPrecio.length > 3 ? "…" : ""}): ese daño no se le cobra a nadie.`,
+        "Ponle precio en Modo carga → Resumen → precios, y las roturas se cobran solas.",
+      );
+    }
+  });
+
+  // ── Eventos de los que no se puede aprender ──
+  // La calibración aprende de "lo que volvió". Un evento pasado sin la vuelta
+  // marcada es dato que nunca se usará: no es un aviso (nada se rompe), es
+  // aprendizaje perdido. Solo los últimos 30 días y a lo sumo 3 nombres: de
+  // más es ruido, y los eventos viejos ni se cargaban pensando en la vuelta.
+  const hoyStr = hoy();
+  const desde = enDiasISO(-30);
+  const sinVuelta = Object.entries(eventosGuardados)
+    .filter(([, e]) => e && e.evento && (Number(e.pax) > 0)
+      && (e.fechaEvento || "") < hoyStr && (e.fechaEvento || "") >= desde
+      && !(e.vueltos && Object.keys(e.vueltos).length))
+    .sort((a, b) => (b[1].fechaEvento || "").localeCompare(a[1].fechaEvento || ""));
+  if (sinVuelta.length) {
+    const nombres = sinVuelta.slice(0, 3).map(([n]) => n);
+    const resto = sinVuelta.length - nombres.length;
+    pon(
+      `Estos eventos ya pasaron y nadie les marcó la vuelta, así que no se puede aprender de ellos: ${nombres.join(", ")}${resto > 0 ? ` (y ${resto} más)` : ""}.`,
+      "En el Modo carga de cada uno, marca lo que volvió (puede ser en kilos o unidades) y la calibración se nutre.",
+    );
+  }
+
+  return avisos;
 }

@@ -13,8 +13,8 @@
 // Los tres ejes devuelven la misma forma, así que los pinta UN componente. Añadir un
 // cuarto eje mañana es una función en arbol.js, no una pantalla nueva aquí.
 import { useState } from "react";
-import { Trash2, Target, Plus, Check, Archive, Network, MoonStar, Settings } from "lucide-react";
-import { porTema, porFuente, porDia, grafo } from "./arbol.js";
+import { Trash2, Target, Plus, Check, Archive, Network, MoonStar, Settings, TrendingUp } from "lucide-react";
+import { porTema, porFuente, memoriaPorDia, grafo } from "./arbol.js";
 import { ESTADOS, MAX_OBJETIVOS, cuantosActivos } from "./objetivos.js";
 import { avisosConfig } from "./avisosConfig.js";
 import Grafo from "./Grafo.jsx";
@@ -22,7 +22,7 @@ import Grafo from "./Grafo.jsx";
 const VISTAS = [
   { id: "temas", nombre: "Temas", eje: porTema },
   { id: "fuentes", nombre: "Fuentes", eje: porFuente },
-  { id: "dias", nombre: "Días", eje: porDia },
+  { id: "dias", nombre: "Días", eje: memoriaPorDia },
   { id: "grafo", nombre: "Grafo", eje: null },
 ];
 
@@ -43,7 +43,7 @@ const COLOR_NODO = {
 };
 
 export default function Cerebro({
-  memoria = [], objetivos = [], eventosGuardados = {}, repaso = null,
+  memoria = [], objetivos = [], eventosGuardados = {}, repaso = null, oportunidades = null,
   onOlvidar, onPonerObjetivo, onCambiarEstadoObjetivo, onQuitarObjetivo,
 }) {
   const [vista, setVista] = useState("temas");
@@ -208,6 +208,35 @@ export default function Cerebro({
               </ul>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* La auditoría de negocio: lo que los datos ya saben y todavía no se ha hecho.
+          Sale de las reglas de revision.js (no del modelo), ya calculada por la app.
+          Sin avisos no se pinta nada: "todo en orden" cuando no se ha mirado nada
+          sería ruido, y el caso normal no debe sonar a aviso. null (otra app sin
+          datos) tampoco pinta: la sección es de la checklist, que es quien la calcula. */}
+      {Array.isArray(oportunidades) && oportunidades.length > 0 && (
+        <div className="cer-repaso">
+          <div className="cer-titulo">
+            <TrendingUp size={14} aria-hidden="true" />
+            <span>Oportunidades</span>
+            <em>{oportunidades.length}</em>
+          </div>
+          <p className="asis-explica">
+            Lo que los datos ya saben y todavía no se ha hecho: dinero o aprendizaje
+            pendiente. Sin esto no se pinta nada.
+          </p>
+          <div className="cer-repaso-evento">
+            <ul>
+              {oportunidades.map((a, i) => (
+                <li key={i} className={`cer-aviso es-${a.tono}`}>
+                  {a.texto}
+                  {a.comoSeArregla && <em> · {a.comoSeArregla}</em>}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 

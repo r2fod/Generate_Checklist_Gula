@@ -54,6 +54,36 @@ Firestore.
    | `PROVEEDOR_POR_DEFECTO` | Text | `gemini` (por defecto), `claude`, `openai` o `compatible` |
    | `GEMINI_MODEL` / `ANTHROPIC_MODEL` / `OPENAI_MODEL` | Text | Para fijar otro modelo |
 
+   Otros motores gratis, cada uno con nombre propio (no hace falta pasar por el hueco
+   `compatible`: la dirección ya va fija en el código, solo hace falta la clave). Igual
+   que con Gemini, en cuanto se pega la clave entra solo en la cascada del asistente
+   (`enrutado.js` decide cuándo lo usa):
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `GROQ_API_KEY` | Secret | [Groq](https://console.groq.com/keys) — gratis, rápido, no entrena con lo que recibe en ningún plan |
+   | `CEREBRAS_API_KEY` | Secret | [Cerebras](https://cloud.cerebras.ai/) — gratis, no entrena, no retiene nada |
+   | `ZAI_API_KEY` | Secret | [Z.AI / GLM](https://z.ai/manage-apikey/apikey-list) — tres modelos GLM-Flash gratis de verdad, no entrena |
+   | `MISTRAL_API_KEY` | Secret | [Mistral](https://console.mistral.ai/api-keys) — capa gratis "Experiment". **Ojo: por defecto SÍ entrena con lo que recibe la capa gratis; se desactiva a mano en su panel, Ajustes → Privacidad** |
+   | `OPENROUTER_API_KEY` | Secret | [OpenRouter](https://openrouter.ai/keys) — modelos gratis marcados `:free`. Algunos exigen activar "training y logging" en su panel para poder usarlos |
+   | `NVIDIA_API_KEY` | Secret | [NVIDIA NIM](https://build.nvidia.com/) — su política de privacidad dice que graba y usa lo que entra/sale para mejorar sus modelos, aunque sus términos digan lo contrario |
+   | `GROQ_MODEL` / `CEREBRAS_MODEL` / `ZAI_MODEL` / `MISTRAL_MODEL` / `OPENROUTER_MODEL` / `NVIDIA_MODEL` | Text | Para fijar otro modelo si el catálogo gratis cambia (pasa cada pocos meses, mismo motivo que `GEMINI_MODEL`) |
+
+   Los tres últimos (Mistral, OpenRouter, NVIDIA) pueden acabar entrenando con lo que
+   reciben en su capa gratis, así que `enrutado.js` los trata como a OpenAI: sirven para
+   preguntas sueltas (cálculos, ratios), nunca para las que llevan nombres, fechas o
+   sitios de un evento.
+
+   Y Cloudflare tiene su propio motor: **Workers AI**, gratis (10.000 "Neuronas" al día,
+   compartidas entre todos los modelos que uses en la cuenta) y este mismo Worker ya
+   vive ahí, así que no hace falta salir a buscar otra cuenta.
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `CLOUDFLARE_API_TOKEN` | Secret | Un TOKEN con permiso "Workers AI: Read" (Cloudflare → *My Profile* → *API Tokens* → *Create Token*). **No es la Global API Key de la cuenta**: esa da acceso a todo (DNS, facturación, otros Workers) y aquí solo hace falta poder llamar al modelo |
+   | `CLOUDFLARE_ACCOUNT_ID` | Text | El ID de tu cuenta de Cloudflare (está en la URL del panel, o en *Workers & Pages* → *Overview*, columna derecha) |
+   | `CLOUDFLARE_MODEL` | Text | Para fijar otro modelo del catálogo de Workers AI |
+
    > **Si sale un 404 diciendo que el modelo "is no longer available"**, Google lo ha
    > retirado. No hay que tocar el código: se añade `GEMINI_MODEL` con el nombre que
    > diga el propio error y se despliega. Pasa cada pocos meses.
@@ -91,6 +121,34 @@ Cambiar de modelo es cambiar estas tres variables. No hay que tocar la app.
 5. **Decirle a la app dónde está** — copia la URL del Worker
    (`https://asistente-gula.TUCUENTA.workers.dev`) y pégala en el ajuste del asistente
    dentro de la app.
+
+## Los avisos en el teléfono (push)
+
+Cuando un teléfono del equipo se suscribe desde Ajustes del asistente ("Activar avisos
+en este teléfono"), el cron de cada mañana —el mismo que corre el repaso de la noche—
+le manda por push cada recordatorio que toca ese día. Para poder CIFRAR el aviso, el
+Worker necesita un par de claves VAPID (el estándar de Web Push):
+
+1. **Generar el par** — en cualquier terminal: `npx web-push generate-vapid-keys`.
+   Contesta con dos cadenas, la pública y la privada. La app NO pega ninguna: la pública
+   se deriva de la privada dentro del Worker y se la pide en `/__vapid`. Solo se pega
+   la PRIVADA, y vive en el Worker: si el repo se queda, las claves no.
+
+2. **Dos variables más** en el Worker (*Settings* → *Variables and Secrets*):
+
+   | Nombre | Tipo | Qué es |
+   |---|---|---|
+   | `VAPID_CLAVE` | Secret | La clave PRIVADA del paso 1, tal cual |
+   | `VAPID_MAILTO` | Text | El "de" del aviso: una dirección `mailto:` (por ejemplo `mailto:hola@tunegocio.es`). Web Push lo exige y el teléfono la enseña |
+
+3. **UNA casilla que hay que marcar a mano** — en el Worker: *Settings* →
+   *Compatibility flags* → activar la compatibilidad con Node.js (`nodejs_compat`).
+   `web-push` usa `node:crypto`, y sin esa flag el Worker arranca bien pero falla al
+   enviar el primer aviso.
+
+Sin el par puesto, nada se rompe: el Worker lo DICE en `/__vapid` y el repaso lo apunta
+(`avisosDelDia` contesta el motivo en vez de fallar), y el aviso no se pierde de todos
+modos — al abrir la app, el recordatorio de hoy sale en su lista (`paraHoy`).
 
 ## Lo que protege
 

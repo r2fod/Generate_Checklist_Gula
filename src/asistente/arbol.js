@@ -56,7 +56,7 @@ export function porFuente(memoria) {
 
 // Por día, de lo más reciente hacia atrás. Se agrupa por el día en que se APRENDIÓ, no
 // en el que se usó: "qué me contasteis el martes" es la pregunta que se hace.
-export function porDia(memoria) {
+export function memoriaPorDia(memoria) {
   const lista = poda(memoria);
   const mapa = {};
   lista.forEach(r => {
@@ -69,7 +69,7 @@ export function porDia(memoria) {
 }
 
 export function arbol(memoria) {
-  return { temas: porTema(memoria), fuentes: porFuente(memoria), dias: porDia(memoria) };
+  return { temas: porTema(memoria), fuentes: porFuente(memoria), dias: memoriaPorDia(memoria) };
 }
 
 // ─── LO QUE VIAJA EN CADA PREGUNTA ────────────────────────────────────────────

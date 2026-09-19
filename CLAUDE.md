@@ -1,58 +1,43 @@
 # Gula Catering — CLAUDE.md
+> Live production app. Read `CONTEXTO.md` first.
 
-## CORE RULES
-<!-- Reglas principales de operación, idioma y respuestas -->
-- Pre-req: MUST read `CONTEXTO.md` before operating. Live production app (real truck dispatch).
-- Language: ALL code, comments, UI string literals, and git commits MUST be in SPANISH.
-- Output Style: DIRECT CODE ONLY. Zero preambles, zero summaries.
-- Privacy & Safety: PUBLIC REPO. NEVER leak real names, phones, €/pax, or buy prices. Use fake test data.
-- Context Sync: MUST update `CONTEXTO.md` within the exact SAME commit as code changes.
-- Standing Instructions: any new rule, workflow, or working style stated in conversation
-  MUST be added to THIS file when given — never left living only in chat history.
+## CORE
+- Lang: Spanish ONLY (code, comments, UI, commits).
+- Output: Direct code. No intro/outro text.
+- Privacy: Public repo. Fake test data only (no names/phones/€/buy prices).
+- Sync: Update `CONTEXTO.md` same commit. Chat rules -> append here.
 
-## DATA INTEGRITY (CRITICAL)
-<!-- Estructura de IDs clave: tocarlos destruye los checks de la app -->
-- Item ID Schema: `${categoría}::${labelOriginal}` (Renaming/moving destroys user checks).
-- Calendar ID Schema: `${fecha}_${slug}`.
-- State Parser: Use `estadoInicial.X ?? default` (Partial state payload is valid).
+## DATA SCHEMA
+- Item ID: `${categoría}::${labelOriginal}` (Renames require migration).
+- Calendar ID: `${fecha}_${slug}`
+- State: `estadoInicial.X ?? default`
 
-## CODE & UI/UX
-<!-- Criterios de desarrollo y verificación visual -->
-- Principles: DRY, scalable design. Minimal diffs — no block rewriting for minor edits.
-- UI: Fully responsive (320px–1920px). MUST include smooth CSS animations/transitions
-  (no flat layout jumps). No Framer Motion or any animation library — plain CSS only,
-  it's what the entire project already uses.
-- Verification: Passing `build` or unit tests DOES NOT confirm UI state. MUST verify visual screenshots (`CONTEXTO.md`).
+## CODE & UX
+- Minimal diffs. Responsive 320–1920px.
+- UI: Native CSS animations only (NO libraries/Framer).
+- Visual UI: Verify screenshots (`CONTEXTO.md`), not green tests.
+- Tests: Required per feature/fix same commit. Real API fixture shapes only.
+- SSRF Security: Check ALL redirect hops. Block `::ffff:a.b.c.d`.
+- AI Branches: Human security review required before main merge.
 
-## ORCHESTRATOR MODE
-<!-- Manejo de tareas complejas y subagentes -->
-- Treat phases as isolated modules. Clear internal context after phase verification. Auto-proceed unless blocked by errors.
-- Delegation (both subscriptions active — the point is fit, NOT saving quota; when it fits, use
-  full power, no cutting corners):
-  - USE Gemini MCP when its strength genuinely fits: very long docs/logs, several files at once
-    with no need to edit them (`gemini_team` with `file_paths` reads server-side), broad search
-    (`gemini_search`), image/audio/video (`gemini_analyze_media`), image generation
-    (`gemini_generate_image`). Pass the FULL task with all the context it needs to nail it first try.
-  - NEVER Gemini for: this repo's code (CLAUDE edits it with its own tools, verified on the spot),
-    small tasks where reading it myself is simplest, or anything needing exact-line code context.
-  - Read-only Gemini calls → no permission needed. Real effect (write/publish/execute) → normal
-    permission rules.
-  - NEVER ship Gemini output raw: contrast it against the real data when verifiable, correct what
-    doesn't hold up. CLAUDE does all code, tests, synthesis, and talking to the owner, with full
-    reasoning — and says in one line when Gemini was used.
-  - `openai-codex` MCP is NOT a code tool (only `get_costs`/`get_projects`, billing/admin) and is
-    now disconnected — never route code through it. Decided with the owner 2026-09-08/19.
+## WORKFLOW
+- File Lock: Do NOT edit source during test/deploy.
+- Async Test: `nohup npm run test > test.log 2>&1 &` | Check: `pgrep -f "npm [r]un test"`
+  (NO `setsid`: it does not exist on macOS — the battery dies with `command not found` and
+  looks like it ran)
+- Git: Auto commit+push on green test. Delete merged feature branches.
 
-## WORKFLOW & CLI
-<!-- Comandos de terminal, gestión de procesos y Git -->
-- File Lock: NEVER edit source files while `test` or `deploy` run (prevents deploying corrupt `dist/`).
-- Async Run: Run test suite via `setsid nohup … &` logging to file.
-  - DO NOT use `| tail`. DO NOT use short timeouts.
-  - Process check command: `pgrep -f "npm [r]un test"`
-- Git Operations: Commit + push IMMEDIATELY upon green test. Delete merged feature branches.
+## ORCHESTRATION
+- Phases as isolated modules. Auto-proceed unless blocked by errors.
+- Gemini MCP for: very long docs/logs, many files at once (`gemini_team` + `file_paths`, read
+  server-side), broad search (`gemini_search`), media (`gemini_analyze_media`). Pass the FULL
+  task with enough context to nail it first try. Read-only calls need no permission.
+- NEVER Gemini for: this repo's code, small lookups, anything needing exact-line context.
+- NEVER ship Gemini output raw: verify against the real data first. Claude does all code, tests,
+  synthesis and talking to the owner. Say in one line when Gemini was used.
+- `openai-codex` MCP is billing-only (`get_costs`/`get_projects`), NOT a code tool. Disconnected.
 
-## STRICT PROHIBITIONS
-<!-- Prohibiciones absolutas para evitar desastres en producción o filtraciones -->
-- NEVER commit real client/staff personal data or financial metrics.
-- NEVER rename/move item/category keys without explicitly handling migrations.
-- NEVER approve visual UI changes based solely on automated test passes.
+## PROHIBITED
+- Real user/financial data in commits.
+- Key renames without migrations.
+- Approving UI solely via auto tests.

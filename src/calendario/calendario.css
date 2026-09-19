@@ -293,6 +293,17 @@
   font-weight: 800;
 }
 
+/* El resumen de lo que no cabe en los CHIPS_VISIBLES chips (Calendario.jsx). Mismo
+   trato que .cal-mas en móvil: no es un botón aparte, toda la casilla ya abre el día
+   al pulsar en cualquier sitio. */
+.cal-chip-mas {
+  display: none; /* de 560px para arriba, junto con los chips */
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  padding: 1px 5px 0;
+}
+
 /* ─── COLOR POR TIPO ──────────────────────────────────────────────────────────
    Cinco tipos de evento y tres capas que NO son eventos (vacaciones, recogidas y días
    cerrados). Los eventos van en colores llenos y las capas en gris o rayado: de un
@@ -635,6 +646,7 @@
     min-height: 92px;
   }
   .cal-chip { display: flex; }
+  .cal-chip-mas { display: block; }
   .cal-puntos { display: none; }
   .cal-numero { font-size: 0.82rem; }
 }
@@ -661,8 +673,9 @@
   .cal-punto { width: 6px; height: 6px; }
 }
 
-/* Ofrecimiento de traer lo de la hoja de Google. Sale solo con el calendario vacío y
-   desaparece en cuanto hay algo: no es un ajuste, es un empujón de una vez. */
+/* Ofrecimiento de traer lo de la hoja de Google (u otro sitio). Con el calendario
+   vacío sale siempre abierto; con apuntes ya puestos, plegado detrás de .cal-traer-cab
+   — sigue disponible para AÑADIR más, pero no estorba el día a día. */
 .cal-traer {
   display: flex;
   flex-direction: column;
@@ -695,6 +708,30 @@
 }
 
 .cal-traer-error { color: var(--error-texto-fuerte); font-weight: 700; font-size: 0.82rem; }
+.cal-traer-ok { color: var(--ok-texto); font-weight: 700; font-size: 0.82rem; }
+.cal-traer-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* El disparador plegado, cuando ya hay apuntes: mismo patrón que "Compartir" (más
+   abajo) — se usa el día que hace falta traer más de golpe y luego estorba. */
+.cal-traer-cab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+.cal-traer-cab span { flex: 1 1 auto; }
 
 /* ─── ICONOS Y MOVIMIENTO ─────────────────────────────────────────────────────
    El icono lleva el color de su tipo, igual que el punto y el chip: un solo tono por
@@ -1399,8 +1436,8 @@ button.cal-turnos.es-vacia {
 
 .cal-asignados-cab {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 5px;
   width: 100%;
   min-height: 36px;
   padding: 0;
@@ -1413,8 +1450,27 @@ button.cal-turnos.es-vacia {
   cursor: pointer;
 }
 
-.cal-asignados-cab > span:first-child { flex: 1 1 auto; min-width: 0; }
+.cal-asignados-cab-fila { display: flex; align-items: center; gap: 8px; width: 100%; }
+.cal-asignados-cab-fila > span:first-child { flex: 1 1 auto; min-width: 0; }
 .cal-asignados-cab b { color: var(--text-main); }
+
+/* Cuánto de la plantilla necesaria está cubierta, de un vistazo y sin desplegar. */
+.cal-asignados-barra {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+.cal-asignados-barra-relleno {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.cal-asignados-barra-relleno.es-completo { background: var(--ok-texto); }
 
 .cal-asignados-falta {
   flex: 0 0 auto;
@@ -1448,7 +1504,14 @@ button.cal-turnos.es-vacia {
     "horario horario  horario";
   gap: 4px;
   align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
 }
+/* Sin este borde, cuando el horario de una persona baja a su propia línea (poco
+   ancho, o el navegador pinta la hora en 12h y ocupa más sitio) el "€"/"Nh" sueltos
+   quedaban pegados al nombre de la persona de ABAJO, sin nada que dijera de quién
+   eran — justo lo que el dueño vio en una captura real. Cada persona, su caja. */
+.cal-asignado:last-of-type { border-bottom: none; padding-bottom: 0; }
 
 .cal-asignado-nombre  { grid-area: nombre; }
 .cal-asignado-rol     { grid-area: rol; }
@@ -1465,8 +1528,23 @@ button.cal-turnos.es-vacia {
 
 @media (min-width: 560px) {
   .cal-asignado {
-    grid-template-columns: minmax(0, 1fr) 104px auto 32px;
+    /* "horario" con auto se comía todo el ancho que le hiciera falta ANTES de que
+       nombre (1fr) viera un solo píxel: con el modal a su ancho normal (~490px de
+       fila), rol(104) + horario sin tope(~342) + quitar(32) ya sumaban más que la
+       fila entera, y nombre se quedaba a 0 — un campo invisible, no encogido. Con
+       min-content, horario se ofrece encogido (lo que ya sabe hacer, envolviendo
+       sus campos en dos líneas) y nombre tiene un suelo de verdad. */
+    grid-template-columns: minmax(140px, 1fr) 104px minmax(0, min-content) 32px;
     grid-template-areas: "nombre rol horario quitar";
+    /* Si "horario" no cabe entero y envuelve dentro de su columna (encogida a
+       min-content), la fila se vuelve más alta que nombre/rol/quitar — con
+       align-items:center (el de arriba) esas tres celdas quedaban centradas
+       verticalmente contra un bloque de varias líneas, así que el nombre parecía
+       flotar a media altura, con la hora de entrada "por encima" y el importe/las
+       horas "por debajo" de una persona que en realidad era la de al lado. Arriba
+       del todo, junto a la primera línea de "horario" (entrada+salida), es lo que
+       se lee de corrido. */
+    align-items: start;
   }
 }
 

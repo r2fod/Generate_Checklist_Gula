@@ -5,26 +5,8 @@ import {
 } from "lucide-react";
 import { repartirEnvios, limpiarAvisos } from "../formulario/envios.js";
 import {
-  resumirEnvio, archivosDelEnvio, fmtFechaCorta,
+  resumirEnvio, archivosDelEnvio, nombreDelEnvio, textoAvisoEnvio,
 } from "../formulario/preguntas.js";
-
-function nombreDelEnvio(e) {
-  return e.eventoDestino || (e.respuestas && e.respuestas.nombre) || "evento nuevo";
-}
-
-function textoAvisoEnvio(e) {
-  const r = e.respuestas || {};
-  const trozos = [];
-  if (r.fecha) trozos.push(fmtFechaCorta(r.fecha));
-  if (r.sitio) trozos.push(r.sitio);
-  const gente = [r.adultos && `${r.adultos} adultos`, r.ninos && `${r.ninos} niños`, r.staff && `${r.staff} staff`]
-    .filter(Boolean).join(" + ");
-  if (gente) trozos.push(gente);
-  const cabecera = e.corregido
-    ? `Han CAMBIADO los datos de "${nombreDelEnvio(e)}"`
-    : `Datos nuevos de "${nombreDelEnvio(e)}"`;
-  return `${cabecera}${trozos.length ? `\n${trozos.join(" · ")}` : ""}\nEstá en el formulario, sin aplicar todavía.`;
-}
 
 function TarjetaEnvio({ e, fmtEnviado, revisado = false, avisos = [], children }) {
   return (

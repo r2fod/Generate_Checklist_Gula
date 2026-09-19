@@ -18,8 +18,10 @@
 // Va sin dependencias y en un fichero a propósito: así se pega tal cual en el panel de
 // Cloudflare sin instalar nada. Ver worker/README.md.
 
-import { repasar, DIAS_VISTA } from "./repaso.js";
+import { repasar, DIAS_VISTA, FIRESTORE, proyecto, campos, entrar } from "./repaso.js";
 import { CLAVES_VOZ_GEMINI } from "../src/asistente/vozGemini.js";
+import { hoyISO } from "../src/fecha.js";
+import { createECDH } from "node:crypto";
 
 const CORS = (origen) => ({
   "Access-Control-Allow-Origin": origen,
@@ -366,6 +368,97 @@ const PROVEEDORES = {
       modelo: env.COMPATIBLE_MODEL || "",
     }),
   },
+  // Motores gratis con nombre propio: la dirección va fija en el código (es pública, no
+  // hay nada que guardar) y solo hace falta pegar la clave para que entren en la
+  // cascada. Los modelos por defecto son los de su capa gratuita hoy; como cualquier
+  // catálogo, cambian sin avisar — el mismo arreglo que ya vale para GEMINI_MODEL: se
+  // pisa con la variable *_MODEL correspondiente sin tocar el código.
+  //
+  // Groq y Cerebras no entrenan con lo que reciben en NINGÚN plan (ni el gratis); Z.AI
+  // dice lo mismo de su API. Los tres pueden ver datos de clientes igual que Gemini o
+  // Claude. Mistral, OpenRouter y NVIDIA SÍ pueden acabar entrenando con lo que llega en
+  // su capa gratis (Mistral por defecto salvo que se desactive a mano en su panel;
+  // OpenRouter porque muchos modelos gratis lo exigen para poder usarlos; NVIDIA porque
+  // su política de privacidad lo dice, aunque sus términos digan lo contrario) — por eso
+  // están también en SIN_DATOS_DE_CLIENTES, en src/asistente/enrutado.js, igual que
+  // OpenAI: siguen sirviendo para preguntas sueltas, nunca para las que llevan nombres,
+  // fechas o sitios de un evento.
+  groq: {
+    clave: "GROQ_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.groq.com/openai/v1",
+      clave: env.GROQ_API_KEY,
+      modelo: env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    }),
+  },
+  cerebras: {
+    clave: "CEREBRAS_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.cerebras.ai/v1",
+      clave: env.CEREBRAS_API_KEY,
+      modelo: env.CEREBRAS_MODEL || "llama-3.3-70b",
+    }),
+  },
+  zai: {
+    clave: "ZAI_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.z.ai/api/paas/v4",
+      clave: env.ZAI_API_KEY,
+      modelo: env.ZAI_MODEL || "glm-4.5-flash",
+    }),
+  },
+  mistral: {
+    clave: "MISTRAL_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://api.mistral.ai/v1",
+      clave: env.MISTRAL_API_KEY,
+      modelo: env.MISTRAL_MODEL || "mistral-small-latest",
+    }),
+  },
+  openrouter: {
+    clave: "OPENROUTER_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://openrouter.ai/api/v1",
+      clave: env.OPENROUTER_API_KEY,
+      modelo: env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free",
+    }),
+  },
+  nvidia: {
+    clave: "NVIDIA_API_KEY",
+    habla: (env) => dialectoOpenAI({
+      base: "https://integrate.api.nvidia.com/v1",
+      clave: env.NVIDIA_API_KEY,
+      modelo: env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
+    }),
+  },
+  // Cloudflare tiene su propio motor (Workers AI) y este Worker YA vive en Cloudflare,
+  // así que hay una forma de usarlo sin ninguna clave: un "binding" nativo (Settings →
+  // Bindings → Add → Workers AI, con el nombre "AI") y `env.AI.run(...)` en vez de un
+  // fetch. No se ha hecho así — la forma de la respuesta de esa llamada nativa con
+  // herramientas no se ha podido probar contra una cuenta real, y adivinarla mal
+  // significa que las llamadas a herramientas se pierdan en silencio. Se usa en cambio
+  // su endpoint compatible con OpenAI, que es el MISMO camino que ya prueban los otros
+  // seis proveedores de aquí arriba — con eso sí hace falta un secreto, pero es la
+  // clave que YA se sabe que funciona.
+  //
+  // El secreto es un TOKEN de API con permiso "Workers AI: Read" (Perfil → API Tokens →
+  // Create Token), NO la Global API Key de la cuenta: esa da acceso a todo (DNS,
+  // facturación, otros Workers...) y aquí solo hace falta poder llamar al modelo.
+  //
+  // No entrena con lo que recibe (lo dice su política de privacidad: "Cloudflare no
+  // entrena sus modelos con tus datos ni tus conversaciones"), así que puede ver datos
+  // de clientes igual que Gemini o Claude.
+  cloudflare: {
+    clave: "CLOUDFLARE_API_TOKEN",
+    // Sin el ID de cuenta no hay a qué cuenta llamar, así que este también pide dos
+    // cosas — mismo motivo que "compatible", arriba.
+    ademas: "CLOUDFLARE_ACCOUNT_ID",
+    habla: (env) => dialectoOpenAI({
+      base: `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
+      clave: env.CLOUDFLARE_API_TOKEN,
+      modelo: env.CLOUDFLARE_MODEL || "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    }),
+  },
 };
 
 
@@ -379,7 +472,12 @@ const PROVEEDORES = {
 // contesta. No enseña ninguna clave —solo cuántos caracteres tiene y qué dice Google—,
 // así que se puede abrir desde el navegador sin miedo.
 async function estado(env) {
-  const claves = ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "FIREBASE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY"];
+  const claves = [
+    "GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "FIREBASE_API_KEY",
+    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY",
+    "GROQ_API_KEY", "CEREBRAS_API_KEY", "ZAI_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY",
+    "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID",
+  ];
   const puestas = {};
   claves.forEach(k => {
     const v = String(env[k] || "");
@@ -431,6 +529,198 @@ async function estado(env) {
   };
 }
 
+// ─── SALUD DE LOS PROVEEDORES ─────────────────────────────────────────────────
+// Google retiró gemini-2.5-flash "para cuentas nuevas" sin avisar, y el Worker
+// contestó un 404 que no decía nada por qué: el nombre del modelo había caducado.
+// La forma de enterarse es PREGUNTAR antes del sábado, no después: cada proveedor
+// configurado contesta a un mensaje de dos tokens y se ve si el modelo existe y la
+// clave vale. A demanda (alguien pulsa el botón de Ajustes), no en cada pregunta —
+// cada ping cuesta unos pocos tokens.
+//
+// Exportada para probarla en la batería: la parte de fetch se queda lo más fina
+// posible, y lo que sí se comprueba a fondo es lo que pasa cuando hay o no claves.
+export async function salud(env) {
+  const pings = [];
+  for (const [nombre, p] of Object.entries(PROVEEDORES)) {
+    const falta = [p.clave, p.ademas].filter(Boolean).filter(k => !env[k]);
+    if (falta.length) {
+      pings.push({ nombre, estado: "sin configurar", falta: falta.join(" y ") });
+      continue;
+    }
+    try {
+      const r = await p.habla(env)({
+        mensajes: [{ rol: "usuario", contenido: "Di solo: ok" }],
+        sistema: "",
+        herramientas: [],
+      });
+      pings.push({ nombre, estado: "ok", contesta: String(r.texto || "").slice(0, 40) });
+    } catch (e) {
+      // El motivo tal cual: "Gemini 404: … not found" dice por sí solo que el modelo
+      // ha cambiado, y un 401 que la clave no vale. Interpretarlo es peor que
+      // enseñarlo, que es lo que ha costado enterarse de las otras dos veces.
+      pings.push({ nombre, estado: "error", motivo: String(e && e.message ? e.message : e) });
+    }
+  }
+  return { pings };
+}
+
+// ─── ANALIZAR WEBS ─────────────────────────────────────────────────────────────
+// A4 del plan (v1): la herramienta analizar_web pide una dirección y el Worker la
+// trae y la reduce a lo que cuenta para captar clientes. Dos cosas la gobiernan:
+//
+//   · La dirección la elige la persona, así que se valida el destino antes de
+//     fetchear: nunca se mira red privada ni localhost. Esta ruta, abierta, sería
+//     un agujero para sondear redes desde dentro.
+//   · Sin dependencias (el Worker se pega tal cual, sin nada que instalar): la
+//     extracción va a regex, y extrae lo que importa, no el DOM entero.
+//
+// Redes sociales no por aquí (v2): Instagram y compañía no enseñan su contenido a
+// un scraper anónimo (muro de login), y lo que sirve allí es la captura del móvil
+// con visión, que es otro camino.
+//
+// Cuatro octetos contra los rangos privados/reservados de IPv4 — se comparan como
+// números, no como texto, porque el mismo rango se puede colar disfrazado de IPv6
+// (ver hostBloqueado). "0.x" también cae aquí: es la dirección "esta misma máquina".
+function ipv4Privada(a, b, c, d) {
+  return a === 127 || a === 0 || a === 10
+    || (a === 192 && b === 168)
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31);
+}
+
+// El hostname que da new URL() ya viene normalizado (decimal/octal/hex de un IPv4
+// se convierten a la forma con puntos), así que el único disfraz que sobrevive es
+// meter el IPv4 DENTRO de un IPv6 ("IPv4-mapeada": ::ffff:127.0.0.1, o su misma
+// forma en hexadecimal, ::ffff:7f00:1). Sin esta comprobación, [::ffff:127.0.0.1]
+// pasaba como dirección "pública" siendo el mismo loopback de siempre.
+function hostBloqueado(hostnameBruto) {
+  const h = String(hostnameBruto || "").toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  const v4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) return ipv4Privada(+v4[1], +v4[2], +v4[3], +v4[4]);
+  const v6 = h.replace(/^\[|\]$/g, "");
+  if (v6 === "::1" || v6 === "::") return true;              // loopback / sin especificar
+  if (/^fe80:/.test(v6)) return true;                         // link-local
+  if (/^f[cd][0-9a-f]{2}:/.test(v6)) return true;              // ULA, fc00::/7
+  const mapeadaDecimal = v6.match(/^::ffff:(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (mapeadaDecimal) return ipv4Privada(+mapeadaDecimal[1], +mapeadaDecimal[2], +mapeadaDecimal[3], +mapeadaDecimal[4]);
+  const mapeadaHex = v6.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mapeadaHex) {
+    const alto = parseInt(mapeadaHex[1], 16), bajo = parseInt(mapeadaHex[2], 16);
+    return ipv4Privada(alto >> 8, alto & 0xff, bajo >> 8, bajo & 0xff);
+  }
+  return false;
+}
+
+/** @param {unknown} url @returns {{ ok: boolean, url?: string, motivo?: string }} */
+export function urlAnalizable(url) {
+  try {
+    const u = new URL(String(url || ""));
+    if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, motivo: "Solo se analizan direcciones http o https." };
+    if (hostBloqueado(u.hostname)) return { ok: false, motivo: "Esa dirección no se analiza: es de red privada." };
+    return { ok: true, url: u.toString() };
+  } catch (e) {
+    return { ok: false, motivo: "Esa no parece una dirección completa (falta el https://)." };
+  }
+}
+
+// La comprobación de arriba solo vale para la URL de PARTIDA: una web pública puede
+// contestar con un redirect a una privada (169.254.169.254, localhost...) y fetch()
+// lo seguiría solo, coladero completo del filtro. Aquí se sigue A MANO, comprobando
+// CADA salto igual que el primero, hasta un tope — una cadena de redirects infinita
+// no puede colgar la petición.
+export async function fetchValidando(urlInicial, opciones, maxSaltos = 5) {
+  let actual = urlInicial;
+  for (let salto = 0; salto <= maxSaltos; salto++) {
+    const r = await fetch(actual, { ...opciones, redirect: "manual" });
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+      const destino = new URL(r.headers.get("location"), actual).toString();
+      const chequeo = urlAnalizable(destino);
+      if (!chequeo.ok) throw new Error(`Redirige a una dirección que no se analiza: ${chequeo.motivo}`);
+      actual = chequeo.url;
+      continue;
+    }
+    return r;
+  }
+  throw new Error("Demasiados redirects seguidos (más de 5): no se sigue.");
+}
+
+// Lo que cuenta para captar clientes, y no el DOM entero. Todo con tope: el
+// resultado viaja al modelo, y una página de 400 h2 no va a la conversación.
+export function extraerWeb(html, url) {
+  const texto = String(html);
+  const limpio = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const titulo = limpio(texto.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]).slice(0, 120);
+  const descripcion = limpio(
+    texto.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["']/i)?.[1]
+    || texto.match(/<meta[^>]+content=["']([\s\S]*?)["'][^>]+name=["']description["']/i)?.[1]);
+  const encabezados = (tag) => [...texto.matchAll(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi"))]
+    .map(m => limpio(m[1])).filter(Boolean);
+  const enlaces = [...texto.matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+    .map(m => ({ href: String(m[1]), texto: limpio(m[2]) }))
+    .filter(l => l.texto)
+    .slice(0, 60);
+  // Lo que dice "hazlo ya": un enlace con verbo de acción en el texto o en la
+  // dirección (wa.me, /contacto, /reservar...). Sin esto, "¿pueden pedirme
+  // presupuesto desde la web?" se contesta a ciegas.
+  const palabraCTA = /^(reserv|contact|presupuest|pedir|pedido|cotiz|solicita|informa|llamen|llama|escríben|escriben|visít|visita|booking|book|agenda|whatsapp|telegram|menu|menú)/i;
+  const ctas = enlaces
+    .filter(l => palabraCTA.test(l.texto) || palabraCTA.test(l.href.replace(/^https?:\/\//, "").split(/[?#]/)[0]))
+    .slice(0, 10)
+    .map(l => ({ texto: l.texto.slice(0, 60), href: l.href.slice(0, 120) }));
+  const whatsapp = (enlaces.find(l => /wa\.me|api\.whatsapp|whatsapp/i.test(l.href)) || {}).href || null;
+  return {
+    url,
+    titulo: titulo || "(sin título)",
+    descripcion: descripcion.slice(0, 300) || "(sin meta description)",
+    secciones: encabezados("h2").slice(0, 12),
+    tituloPrincipal: encabezados("h1").slice(0, 3),
+    movilAdaptado: /<meta[^>]+name=["']viewport["']/i.test(texto),
+    imagenesSinAlt: (texto.match(/<img(?![^>]*\balt=)[^>]*>/gi) || []).length,
+    nEnlaces: enlaces.length,
+    ctas,
+    whatsapp: whatsapp ? whatsapp.slice(0, 120) : null,
+    telefonos: (texto.match(/(?:\+34[\s.-]?)?[69]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}[\s.-]?\d{3}/g) || []).slice(0, 5),
+    preciosVisibles: (texto.match(/[0-9]{1,5}(?:[.,][0-9]{1,2})?\s*€|€\s*[0-9]{1,5}(?:[.,][0-9]{1,2})?/g) || []).slice(0, 10),
+  };
+}
+
+// ─── LA CAPTURA: OJO DE GEMINI ────────────────────────────────────────────────
+// El asistente no ve: Gemini ve por él. Y SOLO Gemini ve: la captura es de un
+// perfil propio, que puede mostrar clientes en las fotos, y OpenAI entrena con
+// lo que recibe — la barrera de datos (ver cliente.js) no se salta por la
+// puerta de atrás, aunque la captura no sea "datos de clientes" de formulario.
+// Mismas claves de siempre, con la rotación por cuota incluida.
+const PROMPT_OJO = `Eres el ojo del asistente de una empresa de catering. Describe esta captura para una estrategia de captación de clientes: de quién es el perfil o la página, cuántos seguidores si se llega a leer, qué tipo de contenido hay (platos, eventos, equipo, clientes, detrás de cámaras), qué se repite y qué falta para que alguien te pida presupuesto (forma de contactarse, reseñas, precios orientativos, llamada a la acción). En frases cortas y al grano, en español, y sin inventar lo que no se ve: si algo no se distingue, dilo.`;
+
+export async function visionGemini(pregunta, imagenBase64, mime, env) {
+  const claves = clavesGemini(env);
+  if (!claves.length) throw new Error("Sin GEMINI_API_KEY puesta no hay visión: la captura no tiene quién la mire.");
+  const modelo = env.GEMINI_MODEL || "gemini-3.6-flash";
+  const texto = pregunta ? `${PROMPT_OJO}\n\nLo que el usuario quiere saber de ella: ${pregunta}` : PROMPT_OJO;
+  let ultimoFallo;
+  for (const clave of claves) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${clave}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: texto }, { inline_data: { mime_type: mime || "image/jpeg", data: imagenBase64 } }] }],
+      }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      const partes = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+      const analisis = partes.filter(p => p.text).map(p => p.text).join(" ").trim();
+      if (!analisis) throw new Error("Gemini no ha devuelto nada que leer de la imagen.");
+      return analisis;
+    }
+    ultimoFallo = new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`);
+    // Como en el chat: solo la cuota merece cambiar de clave.
+    if (r.status !== 429) throw ultimoFallo;
+  }
+  throw ultimoFallo;
+}
+
 // Qué proveedores están de verdad utilizables con lo que hay configurado. La app lo
 // necesita para poder elegir sola: sin esto tendría que adivinar, y adivinar mal
 // significa mandar la pregunta a un proveedor sin clave y comerse el error.
@@ -438,6 +728,250 @@ const disponiblesEn = (env) =>
   Object.entries(PROVEEDORES)
     .filter(([, p]) => [p.clave, p.ademas].filter(Boolean).every(k => env[k]))
     .map(([nombre]) => nombre);
+
+// ─── LOS AVISOS DEL DÍA (PUSH): EL RECORDATORIO LLEGA AL TELÉFONO ─────────────
+// El cron de cada noche (el mismo que el repaso) empuja los recordatorios a los que
+// les llega el día a cada teléfono suscrito en indice/push-<id> (ver push.js en la
+// app). Sin modelo y sin tokens: es un aviso con título y cuerpo, y el teléfono lo
+// muestra con la app cerrada. Si el teléfono estaba apagado, no pasa nada grave: la
+// app enseña el mismo recordatorio al abrirse (paraHoy en tareas.js), así que el
+// aviso se retrasa, no se pierde.
+//
+// Las claves son VAPID (el estándar de Web Push): la PRIVADA vive aquí como secreto
+// del Worker (VAPID_CLAVE), el asunto (VAPID_MAILTO, un mailto: de dónde viene el
+// aviso) también, y la PÚBLICA se DERIVA de la privada — la app no pega nada, la pide
+// en /__vapid. Para generar el par: npx web-push generate-vapid-keys.
+//
+// web-push usa node:crypto, así que el Worker necesita la compatibilidad Node.js
+// (nodejs_compat) activada en la configuración de Cloudflare: es la única casilla
+// que hay que marcar a mano (ver worker/README.md).
+// Qué toca HOY: fecha === hoy, no < — el recordatorio es para su día y el cron corre
+// una vez al día; con < se reenviaría cada día hasta que se hiciera. Y sin fecha no es
+// recordatorio, es tarea suelta: no toca.
+export function tareasParaPush(tareas = [], hoy) {
+  return (Array.isArray(tareas) ? tareas : [])
+    .filter(t => t && t.fecha === hoy && !t.hecho)
+    .slice(0, 20);   // si el equipo apunta 200 recordatorios para el mismo día, el problema es del día, no 200 notificaciones
+}
+
+// Lo que ve el teléfono. Corto: una notificación es una campana, no un documento. La
+// url lleva a la checklist, donde el recordatorio espera en su lista.
+export function payloadDeRecordatorio(tarea) {
+  const cuerpo = tarea.evento ? `${tarea.texto} (${tarea.evento})` : tarea.texto;
+  return { titulo: "Gula · recordatorio", cuerpo: String(cuerpo).slice(0, 200), url: "./checklist/" };
+}
+
+// ─── EL AVISO CIFRADO, SIN LA LIBRERÍA web-push ───────────────────────────────
+// Esto usaba el paquete de npm `web-push`, y se quitó: parte de su árbol de
+// dependencias (el soporte de proxy de sendNotification, que aquí no hace falta — el
+// envío va por fetch, no por su sendNotification, ver avisosDelDia) llama a require()
+// de un modo que ningún bundler puede convertir a un import estático de verdad, así
+// que necesita emularlo con createRequire(import.meta.url) — y ESO falla siempre al
+// cargar el Worker en Cloudflare, porque import.meta.url llega undefined en su salida
+// empaquetada. No es un "a lo mejor falla": está confirmado y documentado (varios
+// casos iguales con otras librerías, mismo motivo exacto). El Worker entero dejaba de
+// cargar, no solo el aviso — "Uncaught Error: No such module 'web-push'" en cuanto se
+// pegaba el código, antes de que corriera una sola línea nuestra.
+//
+// Lo único que hacía falta de esa librería son dos cosas de pura criptografía, sin
+// nada de red: firmar el JWT de VAPID (RFC 8292, ECDSA P-256 + SHA-256) y cifrar el
+// aviso (RFC 8291, ECDH + HKDF + AES-128-GCM) — las dos las da la propia Web Crypto
+// API que trae Cloudflare Workers DE SERIE, sin ninguna dependencia, que es justo lo
+// que ya prometía el comentario de arriba del todo ("va sin dependencias").
+//
+// Verificado por fuera del código, no solo leído: cifrando con esto y descifrando con
+// la librería web-push de verdad (que aplica la RFC tal cual, igual que hace un
+// teléfono de verdad), el mensaje sale IDÉNTICO — y la firma del JWT verifica con
+// Web Crypto usando la clave pública correspondiente. Repetido varias veces con datos
+// al azar cada vez (claves, aviso, sal), no solo una.
+const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const deB64u = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+const concatBytes = (...trozos) => {
+  const r = new Uint8Array(trozos.reduce((n, t) => n + t.length, 0));
+  let o = 0;
+  trozos.forEach(t => { r.set(t, o); o += t.length; });
+  return r;
+};
+const hmacSHA256 = async (clave, datos) =>
+  new Uint8Array(await crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", clave, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]), datos));
+// HKDF-Expand con un solo bloque (T(1) = HMAC(PRK, info || 0x01)): de sobra para las
+// claves de 12 y 16 bytes que hacen falta aquí — nunca se necesita un segundo bloque.
+const hkdfExpand = async (prk, info, len) => (await hmacSHA256(prk, concatBytes(info, new Uint8Array([1])))).slice(0, len);
+const UTF8 = new TextEncoder();
+
+// El JWT de VAPID: cabecera y payload van tal cual pide RFC 8292; la firma ECDSA de
+// Web Crypto ya sale en el formato r||s crudo que pide JWS (ES256) — sin la vuelta por
+// ASN.1/PEM que hacía falta con node:crypto puro.
+async function firmarJWTVapid(audiencia, asunto, clavePublica, clavePrivada) {
+  const priv = deB64u(clavePrivada);           // 32 bytes: el escalar privado
+  const pub = deB64u(clavePublica);             // 65 bytes: 0x04 || x(32) || y(32)
+  const jwk = {
+    kty: "EC", crv: "P-256",
+    d: b64u(priv), x: b64u(pub.slice(1, 33)), y: b64u(pub.slice(33, 65)),
+  };
+  const clave = await crypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const cabecera = b64u(UTF8.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+  const cuerpo = b64u(UTF8.encode(JSON.stringify({
+    aud: audiencia, sub: asunto, exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60,
+  })));
+  const firma = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, clave, UTF8.encode(`${cabecera}.${cuerpo}`));
+  return `${cabecera}.${cuerpo}.${b64u(firma)}`;
+}
+
+// El aviso cifrado (RFC 8291, aes128gcm) + la cabecera VAPID, listos para el fetch de
+// avisosDelDia. Un aviso de recordatorio siempre cabe de sobra en un solo registro
+// (4096 bytes), así que no hace falta el trocear/paginar de la RFC para avisos largos.
+export async function peticionPushCifrada(subscripcion, payloadTexto, vapidDetails) {
+  const userPublicKey = deB64u(subscripcion.keys.p256dh); // 65 bytes
+  const userAuth = deB64u(subscripcion.keys.auth);        // 16 bytes
+
+  // Un par de claves ECDH NUEVO por cada aviso (nunca se reutiliza): es lo que exige
+  // la RFC para que dos avisos al mismo teléfono no compartan secreto.
+  const parEfimero = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const clavePublicaEfimera = new Uint8Array(await crypto.subtle.exportKey("raw", parEfimero.publicKey));
+  const claveDestino = await crypto.subtle.importKey("raw", userPublicKey, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const secretoCompartido = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: claveDestino }, parEfimero.privateKey, 256));
+
+  // Paso 1 (RFC 8291 §3.3): el "secreto de webpush" — HKDF con el auth secret del
+  // teléfono como sal, sobre el secreto ECDH.
+  const infoWebpush = concatBytes(UTF8.encode("WebPush: info\0"), userPublicKey, clavePublicaEfimera);
+  const secretoWebpush = await hkdfExpand(await hmacSHA256(userAuth, secretoCompartido), infoWebpush, 32);
+
+  // Paso 2 (RFC 8188): la clave y el nonce del registro — HKDF con una sal aleatoria
+  // NUEVA para este mensaje en concreto (no la del auth secret).
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const prk2 = await hmacSHA256(sal, secretoWebpush);
+  const claveCifrado = await hkdfExpand(prk2, UTF8.encode("Content-Encoding: aes128gcm\0"), 16);
+  const nonce = await hkdfExpand(prk2, UTF8.encode("Content-Encoding: nonce\0"), 12);
+
+  // Un solo registro: al texto se le añade el delimitador 0x02 de "es el último
+  // registro" (RFC 8188 §2) y se cifra entero de una vez con AES-128-GCM.
+  const claveAES = await crypto.subtle.importKey("raw", claveCifrado, "AES-GCM", false, ["encrypt"]);
+  const textoPlano = concatBytes(UTF8.encode(payloadTexto), new Uint8Array([2]));
+  const cifrado = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, claveAES, textoPlano));
+
+  // La cabecera del registro (RFC 8188 §2.1): sal(16) + tamaño de registro(4, uint32
+  // big-endian) + longitud del id de clave(1) + id de clave (nuestra pública efímera).
+  const rs = new Uint8Array(4);
+  new DataView(rs.buffer).setUint32(0, 4096);
+  const cabeceraRegistro = concatBytes(sal, rs, new Uint8Array([clavePublicaEfimera.length]), clavePublicaEfimera);
+  const cuerpo = concatBytes(cabeceraRegistro, cifrado);
+
+  const jwt = await firmarJWTVapid(new URL(subscripcion.endpoint).origin, vapidDetails.subject, vapidDetails.publicKey, vapidDetails.privateKey);
+
+  return {
+    method: "POST",
+    endpoint: subscripcion.endpoint,
+    body: cuerpo,
+    headers: {
+      TTL: "60",
+      "Content-Length": String(cuerpo.length),
+      "Content-Type": "application/octet-stream",
+      "Content-Encoding": "aes128gcm",
+      Urgency: "normal",
+      Authorization: `vapid t=${jwt}, k=${vapidDetails.publicKey}`,
+    },
+  };
+}
+
+// Las claves VAPID. Si faltan, el fallo DICE qué falta y con qué se arregla: un Worker
+// sin claves no puede adivinar que le falta una clave.
+export function vapidClaves(env) {
+  const clave = String(env.VAPID_CLAVE || "").trim();
+  const asunto = String(env.VAPID_MAILTO || "").trim();
+  if (!clave) return { fallo: "Falta VAPID_CLAVE en el Worker: generad el par con npx web-push generate-vapid-keys y ponedlo en Settings → Variables." };
+  if (!/^mailto:/i.test(asunto)) return { fallo: "Falta VAPID_MAILTO (una dirección mailto:) en el Worker: es el 'de' del aviso, y Web Push lo pide." };
+  // La pública se deriva de la privada (P-256): así solo se pega una clave y la app
+  // pide la pública en /__vapid. Si la privada no es un P-256 válido, el fallo lo dice.
+  let publico;
+  try {
+    const bytes = Buffer.from(clave, "base64url");
+    // La privada VAPID es un escalar de 256 bits: 32 bytes exactos. Node NO lo
+    // rechaza si es más corta (la rellena de ceros y "funciona"), pero con una
+    // clave DISTINTA a la generada: al corregir la copia truncada después, la
+    // pública derivada cambiaría y los teléfonos tendrían que re-suscribirse.
+    // Mejor rechazarla ya, con la dirección de la solución.
+    if (bytes.length !== 32) throw new Error("tamaño");
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(bytes);
+    publico = ecdh.getPublicKey().toString("base64url");
+  } catch (e) {
+    return { fallo: "VAPID_CLAVE no parece una clave privada VAPID válida (P-256 en base64url, 43 caracteres). Volved a copiarla entera de npx web-push generate-vapid-keys." };
+  }
+  return { publico, clave, asunto };
+}
+
+// Las suscripciones del equipo: los documentos de indice/ con prefijo push-, igual que
+// los eventos se leen con evt_ (mismo paginado que leerEventos en repaso.js).
+async function leerSuscripciones(env, token) {
+  const base = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice`;
+  const lista = [];
+  let pagina = "";
+  for (let vuelta = 0; vuelta < 20; vuelta++) {
+    const url = `${base}?pageSize=300${pagina ? `&pageToken=${encodeURIComponent(pagina)}` : ""}`;
+    const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`Firestore no deja leer las suscripciones (${(d.error && d.error.message) || r.status}).`);
+    (d.documents || []).forEach(doc => {
+      const id = String(doc.name || "").split("/").pop();
+      if (!id.startsWith("push-")) return;
+      const c = campos(doc);
+      try {
+        const s = JSON.parse(c.suscripcion || "null");
+        if (s && s.endpoint && s.keys) lista.push(s);
+      } catch (e) { /* un documento roto no es un push: se salta y se sigue */ }
+    });
+    if (!d.nextPageToken) break;
+    pagina = d.nextPageToken;
+  }
+  return lista;
+}
+
+// Las tareas apuntadas por el equipo: un único documento (indice/tareas, el mismo que
+// escribe la app). Que no exista todavía no es un fallo: es que nadie ha apuntado nada.
+async function leerTareas(env, token) {
+  const url = `${FIRESTORE}/projects/${proyecto(env)}/databases/(default)/documents/indice/tareas`;
+  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!r.ok) return [];
+  const c = campos(await r.json().catch(() => ({})));
+  try { return JSON.parse(c.tareas || "[]"); } catch (e) { return []; }
+}
+
+// Lo que corre el cron: cada recordatorio que toca hoy × cada teléfono suscrito, un
+// aviso. Que un teléfono no reciba (apagado, sin datos) no tumba el resto: se anota y
+// se sigue. TTL corto a propósito: es un aviso de esta mañana, no un correo que espera.
+export async function avisosDelDia(env) {
+  const token = await entrar(env);
+  const claves = vapidClaves(env);
+  if (claves.fallo) return { enviados: 0, fallos: [claves.fallo] };
+  const hoy = hoyISO();
+  const paraHoy = tareasParaPush(await leerTareas(env, token), hoy);
+  if (!paraHoy.length) return { enviados: 0, fallos: [] };
+  const aparatos = await leerSuscripciones(env, token);
+  if (!aparatos.length) return { enviados: 0, fallos: [] };
+  let enviados = 0;
+  const fallos = [];
+  for (const tarea of paraHoy) {
+    const payload = JSON.stringify(payloadDeRecordatorio(tarea));
+    for (const sus of aparatos) {
+      try {
+        // peticionPushCifrada hace la criptografía VAPID + RFC 8291 con Web Crypto
+        // (ver el porqué largo justo encima de vapidClaves) y devuelve la petición
+        // lista; el envío va por fetch, que es lo nativo de Workers.
+        const det = await peticionPushCifrada(sus, payload, {
+          subject: claves.asunto, publicKey: claves.publico, privateKey: claves.clave,
+        });
+        const r = await fetch(det.endpoint, { method: det.method, headers: det.headers, body: det.body });
+        if (r.ok) enviados++;
+        else fallos.push(`${String(tarea.texto).slice(0, 30)} → HTTP ${r.status}`);
+      } catch (e) {
+        fallos.push(`${String(tarea.texto).slice(0, 30)} → ${(e && e.message) || "fallo sin detalle"}`);
+      }
+    }
+  }
+  if (fallos.length) console.warn(`Avisos: ${fallos.length} sin entregar: ${fallos.slice(0, 5).join(" | ")}`);
+  return { enviados, aparatos: aparatos.length, fallos };
+}
 
 export default {
   // ─── EL REPASO DE LA NOCHE ──────────────────────────────────────────────────
@@ -452,6 +986,14 @@ export default {
       repasar(env)
         .then(r => console.log(`Repaso: ${r.eventos.length} eventos con avisos de ${r.mirados} mirados.`))
         .catch(e => console.error(`El repaso ha fallado: ${e && e.message ? e.message : e}`)),
+    );
+    // Los recordatorios a los que les llega el día, a los teléfonos suscritos. Fallar
+    // aquí no tumba el repaso: son dos waitUntils separados, como corresponde a dos
+    // trabajos distintos.
+    ctx.waitUntil(
+      avisosDelDia(env)
+        .then(r => console.log(`Avisos del día: ${r.enviados} avisos entregados${r.fallos && r.fallos.length ? `; ${r.fallos.length} sin entregar` : ""}.`))
+        .catch(e => console.error(`Los avisos del día han fallado: ${e && e.message ? e.message : e}`)),
     );
   },
 
@@ -485,6 +1027,80 @@ export default {
       } catch (e) {
         return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
       }
+    }
+
+    // ─── PROBAR LOS PROVEEDORES ──────────────────────────────────────────────
+    // Misma sesión que el resto, mismo patrón que /__repaso (y por las mismas
+    // razones: el navegador manda un OPTIONS antes, y la respuesta va por json()
+    // con sus cabeceras). Sirve para comprobar EL VIERNES que el modelo existe y
+    // la clave vale, no el sábado en plena carga del camión.
+    if (new URL(req.url).pathname === "/__salud") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      try {
+        return json(await salud(env), 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 500, origen);
+      }
+    }
+
+    // ─── ANALIZAR UNA WEB ──────────────────────────────────────────────────
+    // Misma sesión que el resto. El cuerpo lleva la url; la respuesta es la
+    // extracción estructurada (extraerWeb). No toca Firestore: lo que se mira
+    // es la web, no la app.
+    if (new URL(req.url).pathname === "/__analizar") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      let cuerpo;
+      try { cuerpo = JSON.parse(await req.text()); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+      const chequeo = urlAnalizable(cuerpo.url);
+      if (!chequeo.ok) return json({ error: chequeo.motivo }, 400, origen);
+      try {
+        const r = await fetchValidando(chequeo.url, {
+          signal: AbortSignal.timeout(8000),
+          headers: { "user-agent": "Mozilla/5.0 (compatible; GulaChecklist/1.0)" },
+        });
+        if (!r.ok) return json({ error: `La web contestó ${r.status}: no se ha podido analizar.` }, 502, origen);
+        const html = await r.text();
+        if (html.length > 2000000) return json({ error: "La página pesa demasiado para analizarla (más de 2 MB)." }, 413, origen);
+        return json(extraerWeb(html, chequeo.url), 200, origen);
+      } catch (e) {
+        return json({ error: `No se ha podido llegar a la web: ${String(e && e.message ? e.message : e).slice(0, 120)}` }, 502, origen);
+      }
+    }
+
+    // ─── LA CAPTURA: OJO DE GEMINI ──────────────────────────────────────────
+    // Misma sesión que el resto. La imagen viaja en base64 en el cuerpo y solo
+    // va a Gemini (ver visionGemini: la barrera de datos no se salta por la
+    // puerta de atrás).
+    if (new URL(req.url).pathname === "/__vision") {
+      if (req.method !== "POST") return json({ error: "Solo POST" }, 405, origen);
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      let cuerpo;
+      try { cuerpo = JSON.parse(await req.text()); } catch (e) { return json({ error: "Cuerpo ilegible" }, 400, origen); }
+      const b64 = String(cuerpo.imagen || "").replace(/^data:image\/\w+;base64,/, "");
+      if (!b64) return json({ error: "No hay ninguna imagen que analizar." }, 400, origen);
+      if (b64.length > 8000000) return json({ error: "La imagen pesa demasiado (más de ~6 MB): hazla en una o dos pantallas." }, 413, origen);
+      try {
+        return json({ analisis: await visionGemini(String(cuerpo.pregunta || ""), b64, String(cuerpo.mime || "image/jpeg"), env) }, 200, origen);
+      } catch (e) {
+        return json({ error: String(e && e.message ? e.message : e) }, 502, origen);
+      }
+    }
+
+    // ─── LA CLAVE PÚBLICA DE LOS AVISOS ──────────────────────────────────────
+    // La app la pide para suscribirse (ver push.js). No es un secreto —es la mitad
+    // pública del par VAPID— pero la pide con sesión como todo lo demás: no es de
+    // cualquiera. Si faltan las claves, el fallo dice con qué se arregla.
+    if (new URL(req.url).pathname === "/__vapid") {
+      const quienPide = await quienEs((req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""), env);
+      if (quienPide.fallo) return json({ error: quienPide.fallo }, 401, origen);
+      const claves = vapidClaves(env);
+      if (claves.fallo) return json({ error: claves.fallo }, 501, origen);
+      return json({ vapidPublico: claves.publico }, 200, origen);
     }
 
     // ─── LA VOZ NATURAL ───────────────────────────────────────────────────────

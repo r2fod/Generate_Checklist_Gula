@@ -75,7 +75,12 @@ export function pideConfirmacion(nivel, herramienta) {
 export function comoContarlo(nivel) {
   const n = NIVELES[nivelValido(nivel)];
   if (!n.escribe) {
-    return "No puedes cambiar nada: solo consultar y calcular. Si te piden modificar algo, dilo claro y explica dónde se hace en la app.";
+    // "de la app": su memoria (recordar/olvidar) está disponible en todos los
+    // niveles — no es un dato de la app, es su propio estado, y el equipo la lee
+    // y la borra a mano en Cerebro. Decir "no puedes cambiar nada" a secas
+    // contradecía a las herramientas que sí tenía (la trampa nº2 de CONTEXTO,
+    // que ya costó un bug).
+    return "No puedes cambiar nada de la app (eventos, checklists, calendario, tareas): solo consultar y calcular. Si te piden modificar algo de la app, dilo claro y explica dónde se hace. Tu propia memoria sí puedes guardarla (recordar/olvidar): es tuya, no es un dato de la app, y el equipo la lee y la borra a mano en Cerebro.";
   }
   return n.confirma
     ? "Puedes crear y editar cosas, pero cada cambio se le enseña a la persona y lo aprueba antes de aplicarse. Propón el cambio concreto, con los valores exactos."

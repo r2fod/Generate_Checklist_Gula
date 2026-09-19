@@ -5,71 +5,25 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 
 - Rama `main` · Firebase: `gula-checklist`
 - **Reglas del dueño → `CLAUDE.md`** (se carga solo en cada sesión). Léelo primero.
-
-## ⚠ El plan N1–N6 (CI, dedup, rendimiento, reglas, diario, tipado) ya está en `main`
-
-Se verificó entero (`npm run test` 711/711, `TZ=Pacific/Auckland npm run test:rapido`,
-`npm run reglas:emulador` 28/28 contra el motor real), se fusionó y **ya está publicado
-en producción**. La rama `arena/01a02ba9-…` sigue existiendo en el remoto (fusión
-limpia, sin nada que perder si se borra) por decisión del dueño, no porque falte algo
-por traer de ella.
-
-**CI y publicación, funcionando de verdad**: `.github/workflows/test.yml` y `deploy.yml`
-corren solos en cada push, y `main` está protegida (PR + los dos checks obligatorios).
-Un fallo real de CI ya cazado con esto en marcha: `gh-pages -u "github-actions[bot] <...>"`
-—el email de bot de GitHub, sin comillas— no pasa el parser RFC 5322 estricto que usa
-`gh-pages` (paquete `email-addresses`): rechaza el corchete suelto tanto en el nombre
-como en la parte local de la dirección. Se entrecomilla dos veces (nombre Y dirección) y
-pasa. Sin este fix, `deploy.yml` corría la batería entera (verde) y fallaba SOLO en el
-último paso, el de publicar — dos veces seguidas, siempre igual, siempre instantáneo.
-
-Por el camino de la verificación de esa rama aparecieron dos fallos reales más, los dos
-arreglados y con su prueba:
-
-1. **`pruebas/medir.mjs` tumbaba la batería completa si se lanzaba antes que `npm run
-   test` en la misma sesión.** Usaba el mismo puerto (4179) que la prueba de "la app
-   instalada" de `app.test.mjs`, y lanzaba Vite por `npx` — `vite.kill()` solo mata a
-   `npx`, así que el Vite de verdad se quedaba huérfano ocupando el puerto. Arreglado:
-   puerto propio (4180) y Vite lanzado directo (`node_modules/.bin/vite`), con una
-   prueba en `calculos.test.mjs` que vigila que no vuelva a compartir puerto ni a
-   pasar por `npx`.
-2. **La prueba "la app instalada recibe los cambios" fallaba de verdad al lanzarla
-   —no era un problema de la app.** Simulaba un despliegue renombrando solo la entrada
-   y el chunk con el texto de prueba, pero no tenía en cuenta que Vite **encadena los
-   hashes**: si un chunk perezoso importa a otro que cambia, su propio contenido
-   cambia y por tanto también su hash. Con los tres perezosos nuevos (Modo carga, la
-   bandeja, añadir varios) reexportando cosas de la entrada, la prueba dejaba un chunk
-   con el nombre viejo pero el contenido tocado, y el service worker servía la copia
-   que ya tenía cacheada de ANTES del cambio. Arreglado con un barrido de punto fijo
-   que también renombra cualquier chunk que referencie a uno ya renombrado —así se
-   simula de verdad el encadenado de hashes—. Confirmado con y sin cobertura.
-
-**Lo que sigue pidiendo ojos humanos** (`CLAUDE.md` manda captura; ninguna prueba lo
-verifica a nivel de píxel):
-
-1. **Cerebro → El repaso de la noche, con aviso de documento cerca del MiB.** El JSX y
-   las clases CSS están comprobados (por código y por una prueba de estructura), pero
-   nadie ha visto la raya de color renderizada de verdad.
-2. **Modo carga, la bandeja y "añadir varios items"**: el barrido de 711 los abre y
-   comprueba que aparecen, pero un vistazo humano al respaldo perezoso (un instante la
-   primera vez) sigue sin hacerse.
-
-**c) Hecho por el dueño** (la API le devolvía `403` a esta sesión, así que lo hizo él a
-mano): `.github/workflows/test.yml` y `deploy.yml` movidos y corriendo solos, `main`
-protegida con los dos checks obligatorios, y `worker/pegar.js` vuelto a pegar en
-Cloudflare (confirmado con "Repasar los eventos ahora").
-
-**d) Lo que NO está hecho de lo que se pidió**: los coeficientes de niños y la
-calibración del hielo (ver "Pendiente", punto 2). Nadie ha tocado esos números todavía.
+- **Estado del plan de mejoras (N1–N6, A–D) → `PLAN_MEJORAS.md`.** No se repite aquí: ese
+  archivo lleva su propia tabla de hecho/pendiente por ítem, con su porqué y su tamaño, y
+  apunta de vuelta aquí (`Ver CONTEXTO.md, "..."`) para el detalle técnico de cada uno.
+- **Los tres planes grandes, sin código todavía → `PLAN_PRESUPUESTO.md`,
+  `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`.** En ese orden (cada uno reutiliza del
+  anterior). Presupuesto ya tiene su diseño fijado por la hoja de cálculo real que
+  usa hoy el negocio (capturas del dueño, no reproducidas aquí por ser el repo
+  público): cuatro partidas —Personal, Comida, Bebida, Otros— con líneas sueltas
+  concepto+total, y un balance final Presupuesto/Gastos/Margen. Ver el propio
+  fichero para el detalle.
 
 ## Orden de lectura
 
-0. **El bloque de aquí arriba**, si vas a fusionar o publicar.
 1. `CLAUDE.md` (ya lo has leído: se carga solo).
 2. "Conceptos que hay que respetar" — identidad de item/apunte. Tocarlos sin cuidado
    borra el trabajo de quien está cargando un camión.
 3. "Proceso" — cómo lanzar pruebas y deploy sin romperlo tú mismo.
-4. "Pendiente" + "Hecho" — qué falta de verdad, qué ya está cerrado.
+4. `PLAN_MEJORAS.md` — qué falta de verdad, qué ya está cerrado.
+5. "Qué queda pendiente ahora mismo", al final de este archivo — el estado de HOY.
 
 ## Mapa del repositorio
 
@@ -85,10 +39,10 @@ src/almacen.js                 localStorage con su try/catch, en un solo sitio
 src/diario.js                  últimos fallos de ESTE navegador, sin datos de nadie
 src/precarga.js                alSobrarTiempo(): trabajo para cuando el navegador está parado
 src/tema.js                    claro/oscuro + aplicarTemaInicial (la usan los dos arranques)
-src/precios.js                 catálogo de precios (vive en Firestore, ver "Hecho")
+src/precios.js                 catálogo de precios (vive en Firestore)
 src/checklist-generadores.js   qué material lleva cada tipo de evento
 src/asistente/revision.js      reglas de "esto no cuadra"
-worker/                        proxy de claves + repaso de la noche
+worker/                        proxy de claves + repaso de la noche + IA
 src/__tests__/                 las cuatro baterías
 pruebas/calendario.html        banco de pruebas sin nube, para lo que hay tras el login
 ```
@@ -111,29 +65,24 @@ await p.locator(".asis-panel").screenshot({ path: "x.png", animations: "disabled
 `animations: "disabled"` no es opcional: el compañero respira en bucle → sin eso,
 Playwright espera 30s a que "esté quieto" y revienta por timeout.
 
-Para lo automatizable (nada se sale del panel ni se monta sobre la cabecera): recorrer
-`.asis-panel *` comparando cada caja con la del panel.
-
 ## Cómo se escribe aquí
 
 Mira `src/asistente/` antes de escribir — el estilo es marcado y desentona rápido.
 
-- **Comentario = POR QUÉ, no qué.** `// suma los pax` sobra; `// se lee la nube antes de
-  escribir: partir de lo de pantalla pisaría lo que otro acaba de guardar` es el estilo.
-  Casi todos cuentan un fallo ya ocurrido — por eso valen.
+- **Comentario = POR QUÉ, no qué.** Casi todos cuentan un fallo ya ocurrido — por eso valen.
 - Cabecera por fichero: `// ─── TÍTULO ───`, explica por qué existe.
-- **Cero duplicación** — se extrae (`promoverApuntes`, `ajusteCompartido`,
-  `companeros.js`, `asistente/texto.js` y, en la última pasada, `fecha.js`, `texto.js`,
-  `almacen.js`, `tema.js`). Tres pruebas recorren `src/` y fallan si algo vuelve a
-  copiarse.
-- **Los avisos dicen qué hacer**, no solo qué pasó (el motivo del proveedor va tal cual,
-  ahorra abrir logs de Cloudflare).
-- Una prueba por fallo arreglado, con el porqué en su texto.
+- **Cero duplicación** — se extrae a un fichero compartido en cuanto se repite. Tres
+  pruebas recorren `src/` y fallan si algo vuelve a copiarse.
+- **Los avisos dicen qué hacer**, no solo qué pasó.
+- Una prueba por fallo arreglado **y por cada comportamiento nuevo**, con el porqué en su texto.
+- **Esta misma nota vale para `CONTEXTO.md`**: entradas cortas, con el porqué, no un
+  diario de "lo que se vio / lo que se probó" — eso es lo que hace crecer el archivo sin
+  añadir nada que una sesión nueva vaya a necesitar.
 
 ## Comandos
 
 ```
-npm run lint          # oxlint — ~108 warnings de catch(e) son de la casa; ERRORES: 0
+npm run lint          # oxlint — ERRORES: 0 (los warnings de catch(e) son de la casa)
 npm run tipos         # tsc --checkJs sobre los módulos puros con JSDoc (jsconfig.json)
 npm run test:rapido   # tipos + calculos + asistente + build + sincronizacion (~1 min)
 npm run test          # lo anterior + app.test.mjs (navegador, ~45 min)
@@ -143,59 +92,52 @@ npm run reglas:deploy # firebase deploy --only firestore:rules
 npm run deploy        # predeploy = test; no publica en rojo
 ```
 
-**387 (cálculos) + 420 (asistente) + 221 (sincronización) + 711 (navegador), 0 fallos.**
-Y aparte, `npm run reglas:emulador`: 28 comprobaciones de `firestore.rules` contra el
-motor real de Google (pide Java y el emulador; en el contenedor de trabajo original se
-saltaban — otra sesión, con Java y chromium disponibles, los ha lanzado los dos).
-Batería completa: **~45 min** (barrido responsive: 9 anchos × 2 temas × 10 pantallas =
-180 cargas). No está colgada.
-Confirmado en verde de punta a punta (ver "Estado de la rama" arriba del todo).
+**~2.000 comprobaciones entre las cuatro baterías rápidas + `app.test.mjs` (navegador,
+barrido responsive: 9 anchos × 2 temas × 10 pantallas).** Y aparte, `npm run
+reglas:emulador`: comprobaciones de `firestore.rules` contra el motor real de Google
+(pide Java y el emulador — no corre en todos los entornos de trabajo, por eso el trabajo
+`reglas` de CI es el sitio donde de verdad se comprueban siempre).
 
-### CI y publicación (`.github/workflows/*.yml`, ya en su sitio y corriendo solos)
+### CI y publicación (`.github/workflows/*.yml`)
 
-En cada push/PR: `npm ci` + `lint` + `test:rapido`, y un trabajo aparte que regenera
+En cada push/PR: `npm ci` + `lint` + `test:rapido`, más un trabajo que regenera
 `worker/pegar.js` y falla si sale distinto del subido (si la fuente cambió y nadie lo
-regeneró, el repo dice una cosa y Cloudflare corre otra). El barrido del navegador va en
-un tercer trabajo, solo de noche (04:00 UTC) o a mano: 45 min en cada empujón y nadie
-mira el resultado.
+regeneró, el repo dice una cosa y Cloudflare corre otra), y otro que pasa
+`firestore.rules` por el emulador real. El barrido del navegador va aparte: solo de
+noche (04:00 UTC) o a mano, 45 min.
 
-**`ci/deploy.yml`** publica en Pages al fusionar en `main` (y a mano con *Run workflow*).
-Copia la regla del `predeploy` de siempre —**no se publica en rojo**—: el trabajo que sube
-`dist/` depende de otro que lanza la batería ENTERA, barrido del navegador incluido
-(~45 min). Sigue empujando a la rama `gh-pages`, que es lo que hay configurado hoy en
-Settings → Pages, así que no cambia de sitio nada y publicar a mano con `npm run deploy`
-sigue funcionando igual. Usa `npm run build`, no `npm run deploy`, para no repetir los
-45 minutos que el trabajo anterior ya pasó.
+`deploy.yml` publica en `gh-pages` al fusionar en `main` (y a mano con *Run workflow*):
+**no se publica en rojo** — el trabajo que sube `dist/` depende de otro que lanza la
+batería ENTERA (~45 min) primero. Usa `npm run build`, no `npm run deploy`, para no
+repetir esos 45 min.
 
-**Ya movidos.** Vivían en `ci/` porque GitHub rechaza el push entero cuando una App sin
-permiso `workflows` toca `.github/workflows/` (*"refusing to allow a GitHub App to
-create or update workflow"*) — solo el dueño podía moverlos, y lo hizo a mano desde la
-web de GitHub.
+**Trampa ya cazada, por si se vuelve a tocar el workflow**: `gh-pages -u
+"github-actions[bot] <...>"` sin comillas no pasa el parser RFC 5322 estricto de
+`gh-pages` (rechaza el corchete suelto) — hay que entrecomillar dos veces, nombre Y
+dirección.
 
 ### Proceso — costó deploys rotos y trabajo perdido
 
 - **No editar mientras corre `test`/`deploy`**: `deploy` publica `dist/` al terminar →
   reconstruir a medias publica sin probar.
 - Una cosa a la vez: los dos usan el puerto 4178.
-- **Commit + push en cuanto está verde.** El contenedor se recicla; lo no subido se
-  pierde (ya pasó).
-- **Rama que abres, rama que borras al fusionar.** No la dejes "por si acaso" — se
-  acumulan (llegaron a juntarse 10, todas con 0 diferencias contra `main`).
+- **Commit + push en cuanto está verde.** El contenedor se recicla; lo no subido se pierde.
+- **Rama que abres, rama que borras al fusionar.** No la dejes "por si acaso".
   **Sin permiso en este entorno**: ni `git push origin --delete <rama>` ni el refspec
-  `git push origin :<rama>` — ambos dan `403`, y no hay herramienta de GitHub para
-  borrar refs. Pídeselo al dueño (Settings → Branches, papelera 🗑️).
+  `git push origin :<rama>` — ambos dan `403`. Pídeselo al dueño (Settings → Branches).
 - Matar procesos por PID; `pkill -f` se mata a sí mismo. `pgrep -f "npm run test"` **casa
   con su propio comando** → bucle infinito. Usar `pgrep -f "npm [r]un test"`.
 - Batería con `setsid nohup … &`, leer de fichero. `| tail` no muestra nada hasta el
-  final; un `timeout` corto mata sin rastro (pasó: exit 143).
+  final; un `timeout` corto mata sin rastro.
 - **El build NO caza errores de ejecución.** Un `useCallback` cuyas dependencias nombran
-  un `useState` declarado más abajo compila perfecto y revienta la app al pintar (página
-  en blanco; síntoma real: un locator del barrido esperando 30s a un botón inexistente).
+  un `useState` declarado más abajo compila perfecto y revienta la app al pintar.
 
 ## Arquitectura
 
 Tres apps, cada una en su carpeta (ámbitos PWA no se anidan): `checklist/` (login) ·
-`formulario/` (sin login, entra por código) · `calendario/` (login salvo enlace).
+`formulario/` (sin login, entra por código) · `calendario/` (login salvo enlace). Un solo
+`public/sw.js` en la raíz cubre las tres con una sola caché (ver "El service worker",
+más abajo).
 
 ### Firestore
 
@@ -203,7 +145,7 @@ Tres apps, cada una en su carpeta (ámbitos PWA no se anidan): `checklist/` (log
 indice/evt_<slug>-<hash>  archivo de checklists (un doc por evento)
 indice/eventosGuardados   doc antiguo: SOLO se lee, foto congelada de la migración
 indice/calendario         apuntes originales + los dos códigos del calendario
-indice/precios            catálogo ENTERO de precios (única fuente, ver "Hecho")
+indice/precios            catálogo ENTERO de precios (única fuente)
 indice/ratios             pax por camarero por tipo (solo lo cambiado)
 calendario/<codigo>       calendario real            — enlace "?cal="
 calendario/<ver>          copia de solo lectura       — enlace "?ver=" (OTRO documento)
@@ -211,29 +153,19 @@ publico/<codigo>          próximos eventos, ve la oficina
 envios/<id>               lo que manda la oficina
 ```
 
-`firestore.rules` ya **no se pega a mano**: hay `firebase.json` y se sube con
-`npm run reglas:deploy` (la primera vez: `npm i -g firebase-tools`, `firebase login`,
-`firebase use gula-checklist`). Solo despliega reglas — ni hosting ni funciones.
-Repo y consola se separaban en cuanto alguien tocaba una y olvidaba la otra.
+`firestore.rules` se sube con `npm run reglas:deploy` (no se pega a mano). Solo
+despliega reglas — ni hosting ni funciones.
 
 **Las reglas se prueban en dos sitios, y la diferencia importa:**
 
 - `src/__tests__/firestore-simulado.mjs` — las REESCRIBE en JavaScript. Rapidísimo y sin
-  red, y es lo que permite probar la sincronización entre dos dispositivos. Pero
-  comprueba lo que alguien creyó que dicen las reglas, no lo que dicen: un paréntesis mal
-  puesto en `firestore.rules` no lo caza. Ya cubre `publico/` y `envios/` (crear sí,
-  listar no, corregir solo mientras nadie lo haya revisado, fecha del servidor); antes las
-  denegaba todas, y eran las únicas colecciones a las que se llega SIN sesión.
-- `pruebas/reglas.test.mjs` — **el motor real de Google**, con
-  `@firebase/rules-unit-testing` cargando `firestore.rules` tal cual se despliega:
-  `npm run reglas:emulador` (o `npm run reglas:test` con el emulador ya levantado).
-  Necesita Java y bajar el JAR una vez; si no está, avisa y se salta en vez de fallar.
-  **En el contenedor de trabajo no corre** (sin Java y con la descarga cortada), así que
-  el único sitio donde de verdad se comprueban hoy es el trabajo `reglas` de CI.
+  red, permite probar la sincronización entre dos dispositivos, pero comprueba lo que
+  alguien CREYÓ que dicen las reglas, no lo que dicen de verdad.
+- `pruebas/reglas.test.mjs` — **el motor real de Google**
+  (`@firebase/rules-unit-testing`), vía `npm run reglas:emulador`. Necesita Java.
 
-Y para que los dos no se separen en silencio, hay una prueba —de las que corren
-siempre— que compara las colecciones de `firestore.rules` con las que el simulado
-declara cubrir, y que el "todo lo demás, denegado" del final sigue en su sitio.
+Una prueba compara siempre las colecciones de `firestore.rules` con las que el simulado
+declara cubrir, para que los dos no se separen en silencio.
 
 ### Conceptos que hay que respetar
 
@@ -254,164 +186,91 @@ hora, sitio, pax       marcada "sinConfigurar" equipamiento…
 **La lista de eventos de oficina sale del ARCHIVO, no del calendario.** Por eso la
 checklist se crea pronto — si no existe, oficina la escribe a mano y llega duplicada.
 
+### El service worker (`public/sw.js`)
+
+Un solo SW en la raíz, cubre las tres apps con una sola caché. Estrategia por tipo de
+petición: `version.json` solo red (nunca cacheado, es el que detecta versión nueva);
+documento (`index.html`) red primero con respaldo en caché; todo lo demás (assets con
+hash, iconos, manifests) caché primero.
+
+**Regla que ya costó un bug real (ver más abajo, "El aviso de arriba no bastaba"):
+subir `VERSION` en `sw.js` cada vez que cambie el CONTENIDO de un fichero SIN hash en el
+nombre** (iconos, `manifest.webmanifest`, `favicon.svg`) — aunque `sw.js` en sí no toque
+esos ficheros. El navegador solo relee `ESENCIALES` cuando estos BYTES cambian; si no,
+sigue sirviendo la versión vieja cacheada del origen para siempre, y ni reinstalar el
+acceso directo lo arregla (esa caché vive en el origen, no en el icono del sistema
+operativo).
+
 ## Lo hecho
 
 - Calendario en colección propia, **dos enlaces**: el de mirar es otro documento, no se
-  lee de vuelta → no puede tocar el real. Códigos en `indice/` (pide sesión): de ver no
-  se pasa a editar.
-- **Checklists creadas solas** a 14 días al abrir la app, `sinConfigurar`, aviso en
-  pantalla + etiqueta en archivo. Se apaga al aplicar el envío del formulario.
-- Enlaces rotos que se curan: borrar una checklist devuelve su apunte a pendiente. Lo
-  pasado no se resucita.
-- Precios y ratios en Firestore. Aviso "ratio sin comprobar" se apaga al ponerlo.
-- Responsive medido a 9 anchos con `revisaCaja()` de la batería.
-- Logo 67 → 11 kB (WebP 450px q80).
+  lee de vuelta → no puede tocar el real.
+- **Checklists creadas solas** a 14 días al abrir la app, `sinConfigurar`.
+- Enlaces rotos que se curan: borrar una checklist devuelve su apunte a pendiente.
+- Precios y ratios en Firestore.
 - **El asistente entero** (ver abajo): cerebro con memoria/árbol, subconsciente,
   objetivos, tareas, conversaciones, enrutado entre proveedores, tope de gasto, permisos
-  por nivel, ocho compañeros animados (7 gestos), voz, conectores, diario de gasto por
-  vuelta, cuatro personalidades.
-- **Sin markdown en respuestas**: se pide en el sistema Y se limpia en `sinMarcas()`
-  (pedirlo no basta — el modelo se olvida y no avisa).
+  por nivel, ocho compañeros animados + Jarvis, voz, conectores, diario de gasto.
 - **Repaso de la noche**: el Worker mira eventos aunque nadie abra la app.
-- **Limpieza del repo**: 3 nombres reales colados en pruebas, cambiados por inventados.
-  Fixtures nuevas → nombres inventados, siempre.
 
 ## Lo desduplicado (y lo que NO se unificó)
 
-- **`fecha.js`** — "hoy" estaba escrito de siete maneras y no todas daban el mismo día.
-  Ahora hay UNA, `hoyISO()`, y es la del calendario del dispositivo, porque las fechas de
-  esta app son días que escribe una persona ("la boda del 12"), no instantes. También
-  `enDiasISO(n)` (suma por días de calendario: los del cambio de hora tienen 23 y 25) y
-  `diaDeMs(ms)`. En el Worker no hay huso —Cloudflare va en UTC—, así que allí devuelve
-  exactamente lo que devolvía antes.
-
-  **Y unificarlas destapó un fallo que estaba en producción todos los días del año.** Los
-  avisos de recogidas hacían `hoy.setHours(0,0,0,0)` y luego `toISOString()`: poner el
-  reloj a medianoche LOCAL y pasarlo a UTC da el día ANTERIOR en cualquier huso por
-  delante de Greenwich, o sea siempre en España. La ventana de avisos iba corrida un día
-  y el "hoy" que viajaba a la interfaz era ayer. Arreglado, con prueba.
-
-  La batería se lanza ahora también con `TZ=Pacific/Auckland`: las fixtures que fijaban
-  fechas con `toISOString` mentían en husos por delante de Greenwich, y con eso se cazó.
-  Hay una prueba que prohíbe volver a sacar un día de calendario de `toISOString()`.
-- **`texto.js`** — `sinTildes` (3 conectores + `enrutado.js`, y con otro nombre en
-  herramientas, menús especiales, apuntes y checklist-format) y
-  `limpiaTexto`/`claveDeTexto` (memoria, objetivos, tareas, conversaciones). **No** se
-  tocaron `idDeApunte` ni `idDeNombreEvento`: ahí un carácter distinto es otro id y deja
+- **`fecha.js`** — "hoy" estaba escrito de siete maneras. Ahora hay UNA, `hoyISO()`, del
+  calendario del dispositivo. **Unificarla destapó un fallo en producción todos los días
+  del año**: los avisos hacían `hoy.setHours(0,0,0,0)` y `toISOString()` — poner el reloj
+  a medianoche LOCAL y pasarlo a UTC da el día ANTERIOR en cualquier huso por delante de
+  Greenwich (España incluida). Arreglado, con prueba, y la batería se lanza también con
+  `TZ=Pacific/Auckland` para cazar esto de nuevo si vuelve.
+- **`texto.js`** — `sinTildes`/`limpiaTexto`/`claveDeTexto`. **No** se tocaron
+  `idDeApunte` ni `idDeNombreEvento`: ahí un carácter distinto es otro id y deja
   huérfano lo guardado. La ñ se sigue perdiendo en las claves, por lo mismo.
-- **`almacen.js`** — los 13 `try/catch` de `localStorage`. `guardarJSON` devuelve si
-  pudo: lo necesitan las conversaciones para tirar la mitad vieja cuando no cabe.
-  Excepciones: `formulario/codigo.js` e `instalar.js` reciben el almacén COMO PARÁMETRO.
-- **`aplicarTemaInicial` → `tema.js`** — estaba copiada en los dos arranques.
-- Fallo que costó la tarde: `export { aISO } from "…"` reexporta pero **no define** el
-  nombre en el módulo, así que las funciones de `apuntes.js` que lo usaban reventaban al
-  ejecutarse. El build no lo caza. Tiene prueba.
+- **`almacen.js`** — los `try/catch` de `localStorage` en un sitio. Excepciones:
+  `formulario/codigo.js` e `instalar.js` reciben el almacén COMO PARÁMETRO.
+- Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el
+  nombre en el módulo — las funciones que lo usaban reventaban al ejecutarse. El build no
+  lo caza. Tiene prueba.
 
 ## Rendimiento: medido ANTES de tocar
 
-`npm run medir` (`pruebas/medir.mjs`). Las cuentas puras corren siempre; la parte de
-navegador necesita el chromium de `app.test.mjs` y, si no está, se salta y lo dice.
+`npm run medir` (`pruebas/medir.mjs`). Cuenta pura del calendario con 250 apuntes:
+~2,7 ms de aritmética. **La aritmética no es el problema, es React pintando** → nada de
+`useMemo` nuevos sin medición delante.
 
-Cuenta pura del calendario (node 22): con **250 apuntes**, una pintada entera del mes son
-**~2,7 ms** de aritmética (saneaLista 0,7 · porDia 0,46 · próximos 0,18 · choques 0,31 ·
-rejilla+disponibles 1,75). Con 500, ~5,7 ms. **La aritmética no es el problema**, lo es
-React pintando casillas → **nada de `useMemo` nuevos aquí**.
+- **El asistente se precarga en el rato muerto** (`precarga.js`).
+- **La rejilla no se repinta con cada foto de Firestore idéntica** (`mismaLista()`).
+- **El repaso de la noche avisa de documentos cerca del MiB** (`indice/calendario`).
+- **Modo carga, la bandeja y "añadir varios" van con `React.lazy`+`Suspense`** — no
+  viajan en el trozo que hay que esperar para ver la pantalla de acceso.
+- **`App` entera es perezosa desde `Acceso.jsx`**: la pantalla de login pasó de 755 kB /
+  293 ms a 513 kB / 95 ms `DOMContentLoaded`, porque antes `Acceso.jsx` importaba `App.jsx`
+  (6.600 líneas) con un `import` normal aunque solo se renderizara tras saber si hay
+  sesión — el empaquetador no ve condicionales en tiempo de ejecución.
+- **Cuatro suscripciones dejaron de competir con el arranque** (memoria, objetivos,
+  tareas, precios): entran en el primer rato muerto, no en el montaje.
+- **Lo que NO se tocó**: los iconos (`lucide-react`, 197 kB / 63 kB gzip) son 95 iconos
+  distintos de verdad usados — quitar peso ahí es una decisión de diseño, no una
+  optimización.
 
-Con esa medición delante se cambió solo esto:
-
-- **El asistente se precarga en el rato muerto** (`precarga.js`, `requestIdleCallback`
-  con respaldo `setTimeout`), llamado UNA vez desde `BotonAsistente.jsx`, que es el sitio
-  compartido por las dos apps. Quien lo abre ya no espera a la red de una finca.
-- **La rejilla no se repinta con cada foto de Firestore**: cada escritura dispara dos
-  (local y confirmada) con listas nuevas que dicen lo mismo. `mismaLista()` (pura, en
-  `apuntes.js`) compara por contenido y el hook deja el estado intacto si no hay novedad.
-- **Animaciones en bucle**: las 30 usan `transform`/`opacity` salvo tres de pintado (el
-  degradado del logo, la boca del muñeco, el aro del micro) que no provocan reflow. Hay
-  prueba que falla si alguien anima en bucle algo que mueva la maqueta.
-- **El repaso de la noche avisa de documentos cerca del MiB** (`indice/calendario` y
-  `indice/eventosGuardados`): al 75 % avisa, al 90 % urge, y dice qué hacer. Sale en
-  *Cerebro*. Sin esto el techo lo descubre quien no puede guardar una boda un sábado.
-
-Banco de pruebas, dos modos nuevos: `?muchos=250` (calendario lleno) y `?boton=1` (el
-botón del asistente, para cronometrar del clic al panel).
-
-### Lo que se descarga al abrir la checklist (medido en bytes, no a ojo)
-
-Las tres pantallas gordas ya no viajan en el trozo que hay que esperar mirando la
-pantalla: **Modo carga** (723 líneas, solo la ve quien carga un camión), **la bandeja de
-la oficina** y **añadir varios items** van con `React.lazy` + `Suspense`.
-
-| Trozo inicial de la checklist | Antes | Después |
-|---|---|---|
-| `checklist-*.js` | 168,4 kB (50,1 gzip) | **129,3 kB (39,3 gzip)** |
-
-Son 11 kB gzip menos que descargar, analizar y ejecutar antes de ver nada, y encima el
-JavaScript que se deja de ejecutar en el arranque es el que más pesa al pintar. Modo
-carga se precarga sola en el primer rato muerto (`alSobrarTiempo`): en el almacén, con la
-cobertura justa, no se espera a la red con el camión delante.
-
-**El respaldo de `Suspense` va con estilos EN LÍNEA** (`components/CargandoPanel.jsx`):
-las clases de esas pantallas viajan dentro del trozo que se está descargando, así que
-mientras carga todavía no existen y el respaldo saldría descolocado. Hay prueba de que
-ninguna pantalla perezosa se pinta sin su `Suspense` — sin él, React no avisa: lanza al
-pintar y deja la pantalla en blanco.
-
-**Cuatro suscripciones dejaron de competir con el arranque**: memoria, objetivos, tareas
-y precios no se ven en la primera pantalla, así que entran en el primer rato muerto
-(`asistente/suscripcionDiferida.js`, que además borra los cuatro efectos idénticos que
-había en `App.jsx`). Sin `clave` en `alSobrarTiempo` a propósito: la deduplicación es
-permanente y en StrictMode el efecto se monta dos veces, así que con clave la segunda
-vuelta se saltaba y la app se quedaba SIN suscripción.
-
-**Lo que NO se tocó, y por qué:** los iconos (`lucide-react`) son 197 kB / 63 kB gzip, el
-trozo más grande de todos — pero son **95 iconos distintos** de verdad usados, no un
-barril mal sacudido. Quitar peso ahí es quitar iconos, que es una decisión de diseño, no
-una optimización.
+**Respaldo de `Suspense` con estilos EN LÍNEA** (`CargandoPanel.jsx`): las clases de una
+pantalla perezosa viajan DENTRO del trozo que se está descargando, así que el respaldo no
+puede depender de clases que aún no existen.
 
 ## Saber qué falló, sin espiar a nadie
 
-`src/diario.js`. Antes, "esta mañana no me dejaba guardar" no se podía mirar: estaba en
-la consola de un móvil ya cerrado. Cada apunte va **estructurado y siempre igual**:
-hora · [en qué app y con qué compilación] · qué pasó · motivo limpio · datos.
-
-La compilación (`__BUILD_ID__`, el mismo que va en `version.json`) es lo que permite
-casar una queja con un despliegue concreto: un móvil de montaje puede llevar días con el
-bundle viejo en caché, porque los `.js` van con hash y un `index.html` antiguo sigue
-apuntando a la compilación antigua. El "dónde" sale de la CARPETA (checklist/,
-formulario/, calendario/), no de nada que escriba una persona.
-
-Qué queda apuntado hoy: los tres fallos de nube, el asistente cuando el proveedor
-falla, la pantalla rota, y **que el navegador no haya podido guardar el estado** — eso
-último es lo más grave que puede pasar en la checklist (el trabajo no se está guardando)
-y hasta ahora ocurría en silencio. Ahora los fallos de nube y los de pantalla quedan
-apuntados **en el navegador de quien los sufrió** (no se sube nada) y se copian de un
-toque desde la pantalla de fallo. Tres cierres para que no se escape un dato de persona:
-lista blanca de sucesos, lista blanca de datos (números, booleanos y etiquetas cortas —
-el texto libre no entra) y `sinDatosPersonales()`, que tacha lo entrecomillado (en esta
-app suele ser el nombre de un evento), correos, teléfonos y rutas de Firestore. 20
-apuntes como mucho.
+`src/diario.js`. Cada apunte: hora · app + compilación (`__BUILD_ID__`, permite casar una
+queja con un despliegue concreto) · qué pasó · motivo limpio · datos. Tres cierres para
+que no se escape un dato de persona: lista blanca de sucesos, lista blanca de datos, y
+`sinDatosPersonales()` (tacha entrecomillado, correos, teléfonos, rutas de Firestore).
+20 apuntes como mucho, todo en el navegador de quien los sufrió — no se sube nada.
 
 ## Tipos, solo donde salen gratis
 
-`jsconfig.json` + `npm run tipos` (tsc con `checkJs`, sin emitir). **No es una migración
-a TypeScript**: solo comprueba el JSDoc de los módulos puros. Hoy son **trece**: `fecha`,
-`texto`, `almacen`, `precarga`, `diario`, `tema` y los de cálculo — `calculos`, `bebida`,
-`mesas`, `manteles`, `carpas`, `paella`, `alquileres`. `App.jsx` de golpe daría cientos
-de avisos, y una lista que nadie mira tapa la que importa. Para añadir uno: que sea puro,
-meterlo en `include` y dejarlo verde en el MISMO commit.
-
-Los 91 avisos que salieron al meter los de cálculo eran casi todos "esto no dice qué
-recibe", pero **tres eran de verdad** y se arreglaron con el tipo delante:
-
-- `calcPaella` devolvía la CADENA `"3"` cuando el número de paelleras venía de un
-  `<input>` (`"3" > 0` es cierto, y se pasaba tal cual a la checklist).
-- `paxDelDiaGrande` hacía `parseInt` sobre algo que podía llegar como número.
-- `esFactorValido` se apoyaba en `Number.isFinite` con un valor sin tipo; ahora comprueba
-  también que sea un número de verdad y avisa a quien la llama (`n is number`), que es lo
-  que hacía falta para que `factorDe` no devolviera `null` disfrazado.
-
-`src/globales.d.ts` declara `__BUILD_ID__`, que no existe en ningún fichero: lo sustituye
-Vite al compilar.
+`jsconfig.json` + `npm run tipos` (tsc `checkJs`, sin emitir, **no** es migrar a
+TypeScript — solo comprueba el JSDoc de los módulos puros: fecha, texto, almacen,
+precarga, diario, tema y los de cálculo). `App.jsx` de golpe daría cientos de avisos que
+taparían los que importan. Tres bugs reales cazados con esto: `calcPaella` devolvía la
+CADENA `"3"` en vez del número, `paxDelDiaGrande` hacía `parseInt` sobre algo que ya
+podía ser número, y `esFactorValido` no comprobaba de verdad que fuera un número.
 
 ## EL ASISTENTE
 
@@ -433,138 +292,96 @@ formularios).
 | Fichero | Qué es |
 |---|---|
 | `cliente.js` | Bucle de herramientas + mensaje de sistema. Máx. 6 vueltas |
-| `herramientas.js` | 18 propias + conectores. Cada una declara `datos` y `escribe` |
-| `conectores/` | WhatsApp, correo, calendario, checklists — hueco por donde crece |
+| `herramientas.js` | Propias + conectores. Cada una declara `datos` y `escribe` |
+| `conectores/` | WhatsApp, correo, calendario, checklists, marketing |
 | `permisos.js` | 3 niveles + lista `NUNCA` |
 | `memoria.js` / `arbol.js` | Cerebro: recuerdos con fuente, árbol tema/fuente/día |
-| `subconsciente.js` | Repaso al abrir. Determinista, 0 tokens, sin red |
-| `objetivos.js` / `tareas.js` | Lo que importa / lo pendiente |
-| `enrutado.js` | Elige proveedor según la pregunta |
+| `subconsciente.js` | Qué ha cambiado / cómo van los objetivos / qué toca hoy. Determinista, 0 tokens. **Construido y probado, sin cablear a ninguna pantalla** — ver `PLAN_MEJORAS.md` |
+| `objetivos.js` / `tareas.js` | Lo que importa / lo pendiente (`fecha` opcional = recordatorio) |
+| `enrutado.js` | Elige proveedor según la pregunta, cascada gratis→pago, reintenta si falla |
 | `gasto.js` | Tokens/euros por proveedor, mes, día. Tope |
 | `personalidad.js` | Cuatro tonos — solo cambian CÓMO habla |
-| `texto.js` | `sinMarcas()` — quita markdown de las respuestas (lo genérico está en `src/texto.js`) |
 | `revision.js` | Reglas de "esto no cuadra". **Puro: lo reusa el Worker** |
 | `sector.js` | Banda del sector (fuentes públicas, sin validar) + `compararRatios()` |
 | `actualizacion.js` | Marca/confirma la actualización pendiente entre recarga y arranque |
 | `vozGemini.js` | 8 voces curadas + validación — la misma lista la usa el Worker |
 | `Humano.jsx` / `Companero.jsx` | Ocho oficios (cuerpo entero y busto) + Jarvis |
 | `Jarvis.jsx` | El aro: única excepción a "personas, no objetos", pedida así por el dueño |
-| `companeros.js` | LISTA de compañeros + `companeroValido()`, aparte para node |
 
 ### Los compañeros
 
-Ocho oficios con cuerpo: cocinera, cocinero, camarero, camarera, logística, parrillero,
-sumiller, repostera. **Comparten un mismo cuerpo**, cambian solo cabeza/manos/pecho —
-ocho torsos distintos se descuadran al tocar uno.
+Ocho oficios con cuerpo, **comparten un mismo cuerpo** (cambian solo cabeza/manos/pecho).
+Se dibujan dos veces: cuerpo entero en `Humano.jsx`, busto en `Companero.jsx` (30px). Una
+prueba de paridad compara ambos ficheros por las CLAVES de `OFICIOS`, no por texto.
 
-Empezaron como objetos con cara (gorro, cazuela, paella) y no funcionaban: un objeto
-solo se inclina, así que los 7 gestos se quedaban en un balanceo.
+**Jarvis rompe la regla, a propósito**: un aro HUD que gira y cambia de color, sin nada
+compartido con el cuerpo/busto de los otros ocho. Entiende los mismos cinco estados que
+el resto del asistente, con colores de tokens ya existentes. En Humano, tocarlo minimiza
+el panel entero (llama al mismo `onCerrar` que el aspa) — no un tamaño intermedio.
 
-Se dibujan **dos veces**: cuerpo entero en `Humano.jsx` (pestaña Humano), busto en
-`Companero.jsx` (cabecera, 30px — una persona entera ahí es una mancha). Lista en
-`companeros.js`; una prueba compara ambos ficheros (añadir en uno solo → desaparece en
-el otro al elegirlo).
+**Colores en tokens `--pj-*`, opacos, mezclados con el fondo — nunca la misma tinta a
+media opacidad**: con transparencia cada pieza solapada suma color y deja costura.
 
-**Y un noveno que rompe la regla, a propósito.** El dueño pidió un aro tipo HUD que gire
-y cambie de color en vez de una persona — justo lo que "objetos con cara" descartaba
-arriba. Vive en `Jarvis.jsx`, generado por número (marcas y barras en bucle, no a mano)
-y sin nada compartido con el CUERPO/BUSTO de los otros ocho: ni parpadeo, ni gestos por
-herramienta (esos son de alguien con brazos). Entiende los mismos cinco estados que ya
-usa el resto del asistente —quieto, pensando, oyendo, hablando, error— cada uno con su
-color, tomado de tokens que ya existían (`--pj-fuego`, `--accent`, `--green-qty`,
-`--error-texto`) para no inventar una paleta nueva. `Companero.jsx` y `Humano.jsx` lo
-detectan por `cual === "jarvis"` y devuelven `<Jarvis>` antes de tocar el resto del
-dibujo; en la prueba de paridad lleva una entrada `jarvis: null` en los dos `OFICIOS`
-—nunca se lee, solo está para que la prueba lo siga contando como "en los dos sitios"—.
+### Lecciones que no hay que repetir
 
-Colores en tokens `--pj-*`, con versión oscura (blanco sobre fondo oscuro deslumbra).
-**Opacos, mezclados con el fondo — nunca la misma tinta a media opacidad**: con
-transparencia cada pieza solapada sumaba color y dejaba costura (cuello a través de la
-chaquetilla).
-
-### Nueve trampas que no hay que repetir
-
-1. **Barrera de datos.** Cada herramienta declara `datos: true/false`. A un proveedor
-   que entrena con lo que recibe (OpenAI) solo se le ofrecen las de calcular, nunca las
-   que devuelven nombres — y si aun así pidiera una, el cliente la rechaza. Herramienta
-   desconocida = sensible por defecto.
-
-2. **El sistema no puede contradecir al nivel de permiso.** Había una línea suelta
-   ("No puedes cambiar nada todavía") de cuando de verdad no escribía. En Confianza el
-   modelo recibía las dos órdenes y obedecía la equivocada. Hay prueba que lo vigila.
-
-3. **Las dos apps deben encender los mismos conectores.** Calendario los tenía, checklist
-   no → mismo asistente, respuesta distinta según por dónde lo abrieras. Prueba compara
-   ambos ficheros.
-
-4. **El muñeco se dibuja en dos ficheros.** Añadir uno solo en uno → desaparece en el
-   otro al elegirlo. Prueba de paridad lee las CLAVES del objeto `OFICIOS`, no el texto
-   de la línea (mirar el formato exacto avisaba de fallos inexistentes).
-
+1. **Barrera de datos**: cada herramienta declara `datos: true/false`. Un proveedor que
+   entrena con lo que recibe solo ve las de calcular, nunca las de nombres. Desconocida
+   = sensible por defecto.
+2. **El sistema no puede contradecir al nivel de permiso** — probado.
+3. **Las dos apps deben encender los mismos conectores** — probado.
+4. **El muñeco se dibuja en dos ficheros; prueba de paridad por CLAVES, no por texto.**
 5. **Flex en columna centrado + contenido que desborda = hijos empujados fuera por
-   arriba**, sin llegar ni con scroll. `.hum` centrado + pantalla que crece → muñeco
-   218px fuera, invisible detrás de los ajustes. Centrar verticalmente algo que puede
-   crecer es una bomba de relojería.
-
-6. **Animar `max-height` obliga a `overflow: hidden`.** Los ajustes, siendo hijos flex
-   de un panel que los encogía, quedaban cortados sin forma de llegar (botón imposible
-   de pulsar). Ahora animan con opacidad + desplazamiento, con su propio scroll.
-
-7. **Los ajustes SUSTITUYEN a la pestaña, no se apilan encima.** Apilados se comían media
-   pantalla de móvil en las cinco pestañas a la vez.
-
-8. **Una ruta del Worker que llama la app va DESPUÉS del OPTIONS y del origen**, contesta
-   con `json()`. La app llama con `fetch` + cabecera `authorization` → el navegador manda
-   antes un OPTIONS. Puesta arriba, se tragaba ese OPTIONS y contestaba sin CORS →
-   `Failed to fetch` sin motivo visible. Prueba comprueba el ORDEN en el fichero.
-   `/__estado` no lo sufre: se abre como navegación, no como fetch.
-
-9. **En el móvil el panel es una hoja que crece con su contenido**, no pantalla completa
-   siempre (Gasto: 844px de panel para 296 de contenido → 426 en blanco parecían algo
-   sin cargar). Charla y Humano sí van enteras a propósito (evitan saltos). Lo decide la
-   clase `es-<pestaña>` del panel.
+   arriba**, sin scroll. Centrar verticalmente algo que puede crecer es una bomba de
+   relojería.
+6. **Animar `max-height` obliga a `overflow: hidden`** — si no, contenido cortado sin
+   forma de llegar. Mejor animar opacidad + desplazamiento, con scroll propio.
+7. **Los ajustes SUSTITUYEN a la pestaña, no se apilan encima.**
+8. **Una ruta del Worker que llama la app va DESPUÉS del OPTIONS y del origen** — si no,
+   se traga el preflight CORS y da `Failed to fetch` sin motivo visible.
+9. **En móvil, un panel es una hoja que crece con su contenido**, salvo Charla/Humano
+   (van enteras a propósito, evitan saltos).
+10. **Validar la URL de partida no basta si la ruta sigue redirects.** `analizar_web`
+    revalida CADA salto (`fetchValidando`), no solo el primero — una web pública puede
+    devolver un 302 a `169.254.169.254` o `localhost`.
+11. **Un filtro de "red privada" en IPv4 no cubre IPv6 que mapea esa IPv4**
+    (`http://[::ffff:127.0.0.1]/` es el mismo loopback). `hostBloqueado` decodifica
+    primero.
+12. **Un fixture de test tiene que reflejar el valor real de la API externa, no uno
+    cómodo.** `expirationTime: 123` en el test colaba un bug: el caso normal de un
+    `PushSubscription` real es `expirationTime: null`, y con eso "Activar avisos"
+    fallaba siempre en la práctica.
+13. **Un banco de pruebas con fechas "dentro de N días" se rompe en los últimos días del
+    mes** — si abre por defecto el mes de hoy y los datos de mentira caen todos en el
+    mes siguiente. Arreglado con un `mesInicial` fijo al mes con más apuntes de la demo.
 
 ### El proxy (Cloudflare Worker)
 
-Claves de API fuera del bundle (repo público) — viven como secretos del Worker, que
-comprueba sesión del equipo.
+Claves de API fuera del bundle (repo público) — viven como secretos del Worker.
 
-- `worker/index.js` — la fuente, se lee y edita.
-- `worker/pegar.js` — lo que se pega en Cloudflare (fuente + `revision.js` empaquetada,
-  `npm run worker:build`). Regenerar y repegar al tocar Worker o revisión.
-- **URL del Worker fuera del repo**, a propósito: vive en `indice/proxy`; el primero que
-  la configura la deja para el equipo. Decisión en `src/asistente/proxy.js` (probado).
-  **Trampa ya arreglada:** solo subía al teclearla → quien la puso antes de este reparto
-  se la quedaba para él, los demás veían el campo vacío. Ahora, si la nube no la tiene y
-  este navegador sí, se sube sola al abrir el asistente.
-
-**Varias claves de Gemini, una por cuenta de Google.** El dueño preguntó si se podían
-usar varias cuentas suyas de Gmail para no quedarse sin la cuota gratis de Gemini a
-media tarde. `GEMINI_API_KEY` sigue siendo la única obligatoria; `GEMINI_API_KEY_2` y
-`GEMINI_API_KEY_3`, opcionales, son claves de OTRAS cuentas de Google, cada una con su
-propia cuota gratis aparte (se sacan igual que la primera, en
-<https://aistudio.google.com/apikey>, iniciando sesión con esa cuenta). La función
-`gemini()` en `worker/index.js` prueba las que estén puestas en orden y solo pasa a la
-siguiente si el fallo es DE CUOTA (HTTP 429 / `RESOURCE_EXHAUSTED`) — un error de otro
-tipo (clave mal puesta, modelo retirado) es el mismo en las tres cuentas, así que
-insistir con otra clave solo tardaría más en decir lo mismo. `clavesGemini(env)` — el
-filtrado de qué claves hay puestas y en qué orden — está exportado y probado aparte
-(`src/__tests__/asistente.test.mjs`) porque el resto de `gemini()` necesitaría mockear
-`fetch` y la respuesta entera de la API para probarse de verdad. **Ojo con el ToS:**
-crear cuentas de Google SOLO para esquivar el límite de cuota suele ir contra las
-condiciones de uso de Gemini; con cuentas reales del negocio, sin ese propósito, no hay
-problema — se lo advertí al dueño antes de tocar nada.
+- `worker/index.js` — la fuente. `worker/pegar.js` — lo que se pega en Cloudflare
+  (`npm run worker:build`). Regenerar y repegar al tocar Worker o revisión.
+- **URL del Worker fuera del repo**, a propósito: vive en `indice/proxy`.
+- **Varias claves de Gemini, una por cuenta de Google** (`GEMINI_API_KEY_2/_3`,
+  opcionales): `gemini()` prueba en orden y solo pasa a la siguiente si el fallo es DE
+  CUOTA (429/`RESOURCE_EXHAUSTED`) — otro tipo de error es el mismo en las tres cuentas.
+  **Ojo con el ToS**: crear cuentas SOLO para esquivar el límite de cuota va contra las
+  condiciones de Gemini; con cuentas reales del negocio no hay problema.
+- **Motores gratis en la cascada** (`enrutado.js` → `ORDEN`): Gemini, Groq, Cerebras,
+  Z.AI, Cloudflare Workers AI, Claude, OpenAI, Mistral, OpenRouter, NVIDIA. Todos hablan
+  el dialecto de OpenAI (`dialectoOpenAI`) salvo Gemini/Claude, que tienen el suyo.
+  `SIN_DATOS_DE_CLIENTES` (OpenAI, Mistral, OpenRouter, NVIDIA) excluye a los
+  proveedores que pueden entrenar con lo recibido en su capa gratis — investigado con
+  fuentes antes de tocar código, tabla completa en `worker/README.md`. Cloudflare
+  Workers AI usa su endpoint compatible con OpenAI (no el binding nativo `env.AI.run`:
+  la forma de su respuesta CON herramientas no se pudo verificar contra una cuenta real).
 
 ### El repaso de la noche
 
 Cron del Worker: `revisarProximos()` sobre los próximos 30 días → `indice/avisos`; la
-app lo enseña en *Cerebro*. **No usa el modelo** (0 tokens, sin depender de proveedor).
-Entra con cuenta "robot" de Firebase (secretos del Worker) — las reglas de Firestore
-siguen pidiendo sesión, sin tocarlas.
+app lo enseña en *Cerebro*. **No usa el modelo** (0 tokens). Entra con cuenta "robot" de
+Firebase — las reglas de Firestore siguen pidiendo sesión, sin tocarlas.
 
-`/__repaso` a mano **pide sesión en cabecera**: no se abre en una pestaña del navegador
-(se documentó mal una vez). Botón "Repasar los eventos ahora" en ajustes del asistente,
-único sitio con el token.
+`/__repaso` a mano **pide sesión en cabecera**: no se abre en una pestaña del navegador.
 
 ### Lo que el asistente NO hace, en ningún nivel
 
@@ -572,1008 +389,1155 @@ siguen pidiendo sesión, sin tocarlas.
 `renombrar_item`, `renombrar_categoria`, `borrar_evento`, `borrar_archivo`.
 
 No es un permiso configurable: identidad de item = `categoría::etiqueta`, tocarlo
-destruye lo marcado en el camión, sin recuperación y sin saber por qué.
+destruye lo marcado en el camión, sin recuperación.
+
+**Tampoco hay una herramienta "modifica cualquier cosa de la app" genérica** — decisión
+tomada y ratificada, ver `PLAN_MEJORAS.md`, "No hacer". Cada ajuste escribible es su
+propia herramienta, con su propia validación.
 
 ### Tres guardias intocables (las cazaron las pruebas)
 
-1. **Esperar `archivoListo`** antes de crear checklists — con el archivo bajando, un
-   evento no consta aún; se crearía uno encima pisando la buena.
+1. **Esperar `archivoListo`** antes de crear checklists.
 2. **Apunte sin `id` no genera enlace** — `undefined` casa con todos los que tampoco lo
-   tengan, marca media lista con el nombre equivocado.
+   tengan.
 3. **Marcar apuntes en UNA sola escritura** — tres seguidas parten de la misma foto,
    solo sobrevive la última.
 
-## Plan de mejoras por niveles (N1–N6) — estado
-
-El plan lo dio el dueño en una sesión y **vivía solo en el chat**, que es justo lo que
-`CLAUDE.md` prohíbe. Queda aquí, con lo hecho, lo que falta y lo que se descartó **con su
-motivo**, para que la siguiente sesión no lo reinvente ni lo repita.
-
-Ojo con la numeración: el encargo llegó dos veces con el mismo trabajo en distinto orden
-(primero como "N1–N6", después como "Level 1–6" de un brief más largo). **La tabla va en
-el orden en que se ejecutó**, que es el del segundo. Lo que el segundo encargo añadía y
-el primero no tenía —el punto de logística— es la última fila, y es lo único sin empezar.
-
-| Nivel | Qué era | Estado |
-|---|---|---|
-| **N1** | CI en push/PR, check de `worker/pegar.js`, `deploy.yml`, proteger `main` | Código hecho. **Del dueño**: mover los dos `.yml` y proteger `main` |
-| **N2** | Desduplicar `texto`, `fecha`, `almacen`, `tema` + un solo `hoyISO()` | Hecho. Destapó un fallo de un día en los avisos, arreglado |
-| **N3** | Rendimiento: perezosas, suscripciones diferidas, jank | Hecho y medido: el arranque baja de 50,1 a 39,3 kB gzip. Barrido del navegador: verde |
-| **N4** | `firebase.json` + reglas contra el emulador de verdad | Hecho y comprobado contra el motor real (28/28) |
-| **N5** | Observabilidad sin PII, con `__BUILD_ID__` | Hecho: `src/diario.js`, estructurado y con la compilación |
-| **N6** | Tipado gradual (`checkJs`) en los módulos de cálculo | Hecho: 13 ficheros. Cazó tres fallos reales |
-| **—** | **Logística: niños, hielo y contraste con el sector** | **SIN EMPEZAR.** Es el punto 2 del encargo y toca cantidades que salen en el camión |
-
-**Reglas que puso el dueño para todo el plan** (siguen vigentes): no partir `App.jsx` ni
-`index.css`, no cambiar el sistema de estado, no tocar las tres guardias ni la identidad
-`categoría::etiqueta`, ni un `useMemo`/`useCallback` sin medición delante, todo en
-español, repo público sin PII, y una prueba por cada fallo arreglado.
-
-### Lo que queda abierto del plan
-
-1. **Las capturas.** Se arreglaron dos cosas de interfaz (el aviso de documentos, que era
-   un `<li>` suelto, y sus tonos) y se hicieron tres pantallas perezosas. El barrido de
-   711 confirma que todo aparece donde debe, pero el ojo humano sobre el respaldo
-   perezoso y la raya de color del aviso de documento sigue sin hacerse (ver "Estado de
-   la rama" arriba).
-2. **El punto 2 del encargo (logística) sin empezar**: coeficientes de niños en comida,
-   refrescos y equipamiento; hielo en kg y en taxis con margen de derretimiento cuando no
-   hay congelador; y contrastar los ratios con lo que usa el sector. Se ha dejado aparte a
-   propósito: cambia cantidades que se cargan en un camión, así que va con los números
-   delante y una prueba por ratio, no de propina al final de otro nivel.
-
-### Descartado en este plan, y por qué
-
-- ~~No unificar UTC y local~~ — **se hizo al revés de lo que decía este apartado, y menos
-  mal**: al unificar en `hoyISO()` local apareció un fallo que llevaba en producción todos
-  los días del año (la ventana de avisos, corrida un día). Ver "Lo desduplicado".
-- **Meter `useMemo` en el calendario**: medido, la aritmética son ~2,7 ms con 250
-  apuntes. El coste está en React pintando, y eso todavía no se ha medido.
-- **Cambiar las tres animaciones en bucle que no son `transform`/`opacity`** (degradado
-  del logo, boca del muñeco, aro del micro): son de pintado, no provocan reflow, y
-  tocarlas es riesgo visual a cambio de nada.
-- **Tipar `App.jsx`**: cientos de avisos que nadie miraría, tapando los que importan.
-
-## Pendiente
-
-**1. Logística: los números que se cargan en el camión — SIN EMPEZAR**
-- **Coeficientes de niños** en comida, refrescos y equipamiento (bodas, comuniones y
-  eventos familiares). Hoy los niños ya cuentan para agua y refresco (`alcoholPax`
-  separa a los adultos), pero comida y equipamiento van sobre el total sin distinguir.
-- **Hielo**: ya sale en kg, bolsas y taxis (1 taxi = 12 bolsas de 2 kg = 24 kg) y ya
-  aplica merma por derretimiento cuando no hay congelador (`MERMA_SIN_CONGELADOR`, 1,35
-  en verano y 1,2 en invierno). Falta **contrastar esos dos números con un evento real**:
-  salieron de una estimación, no de una medición.
-- **Contrastar los ratios con lo que usa el sector**, para no cargar de más ni quedarse
-  corto. Cada cambio, con su prueba y su porqué: son cantidades que alguien mete en un
-  camión, no una constante cualquiera. **Hecho ya el de refrescos** (las Fantas, ver
-  "Hecho"); faltan los demás.
-- **Calibrar la bebida por bebida INDIVIDUAL, no por grupo.** Hoy `calibracion.js` mide el
-  grupo entero con un solo factor y es ciego a que una bebida del grupo se agote mientras
-  otra vuelve llena — que es justo lo que pasaba con la Fanta. Es el arreglo de fondo del
-  apartado de las Fantas en "Hecho".
-
-**2. Del dueño, en la app** (necesita su sesión):
-- Apunte a **250 pax**; otro del **9 al 10 de octubre** (campo *Hasta*).
-- Ratios de cumpleaños/producción: panel existe, falta medir un evento real.
-- ~~Verificar los 53 precios en `indice/precios` desde otro dispositivo~~ — hecho,
-  confirmado por el dueño: llegaron los 53.
-
-**3. Tinyflows — decidido NO hacer por ahora.** Automatizaciones definidas por el dueño
-("cada lunes revisa la semana"). Necesitan editor de reglas + intérprete en el Worker →
-segundo motor de reglas junto a `revision.js` y el subconsciente; separados, uno avisa
-de cosas que el otro no. El repaso de la noche cubre el 80% del valor sin eso.
-
-## Hecho (referencia, no acción)
-
-**Migración de precios a Firestore — cerrada, los tres pasos.** `src/precios.js` tenía
-53 precios de compra en el código (repo público → revelaban márgenes). Subidos desde
-💶 Precios, comprobados los 53, `PRECIOS_BASE` fuera del código junto al botón de
-migración (ya usado). Nube = única fuente: navegador que nunca se conectó se queda sin
-precios hasta la primera vez. `handleGuardarPrecios` sube el catálogo entero en cada
-corrección — con `setDoc`, subir solo la diferencia sobrescribiría el documento.
-
-**Repaso de la noche — montado y probado en producción.** Mira 11 eventos, escribe en
-`indice/avisos`; cron a las 05:00 UTC.
-
-**Ajustes del asistente, sin texto de instalación.** El párrafo de "las claves no viven
-aquí… `worker/README.md`…" era para quien monta el Worker, no para quien usa la app cada
-día — el dueño lo vio y no le aportaba nada. Se quitó de `Asistente.jsx`; se quedan solo
-las dos notas de privacidad por proveedor (automático / OpenAI), que sí son del día a
-día. La razón de por qué la clave no vive en la app pasó a comentario de código.
-
-**`.asis-explica` / `.asis-vacio`, con tarjeta de verdad.** Primer intento: solo
-`background: var(--bg-subtle)`, sin borde. Insuficiente — el dueño lo volvió a ver en el
-móvil real y seguía sin gustarle: en claro, `bg-subtle` (#f8fafc) casi no se distingue de
-`card-bg` (#fff), así que la "tarjeta" seguía leyéndose como una mancha, no como una
-forma. Segundo intento, el que quedó: `border: 1px solid var(--border-color)` en las dos
-—igual que ya llevan `.asis-recuerdo` y `.asis-gasto-cifras`, así que ahora es
-consistente con el resto del panel—, y `.asis-explica` además con
-`border-left: 3px solid var(--accent)` para distinguir "nota del asistente" de "tarjeta
-de datos" de un vistazo; `.asis-vacio` suma `box-shadow: var(--shadow-sm)` por ser lo
-primero que se ve al abrir una pestaña vacía. Como las usan Charla vacía, Tareas, Gasto y
-Cerebro, una sola clase mejora las cuatro pantallas a la vez. Comprobado con capturas en
-los dos temas, en móvil (390/412px) y en escritorio, antes de subirlo.
-
-**El Gasto es por aparato, y ahora lo dice claro.** El dueño vio números distintos en el
-móvil y en el ordenador y lo tomó por un fallo. No lo es: `gasto.js` lo dice desde
-siempre ("No va a la nube a propósito: subir un contador en cada pregunta serían
-escrituras constantes por un número que solo sirve para mirarlo"), pero el texto en
-pantalla solo decía "contado en este navegador", que no deja claro que el móvil y el
-ordenador van cada uno por su cuenta. Reescrito en `Asistente.jsx` para decirlo sin
-rodeos: "EN ESTE APARATO: el móvil y el ordenador cuentan cada uno el suyo, no se suman
-ni se ven entre sí". Sin tocar `gasto.js` — el diseño no cambia, solo se explica mejor.
-
-**El asistente, en una burbuja flotante (`BotonAsistente.jsx`).** Pedido tal cual: "el
-muñeco en la parte inferior derecha como si fuera el botón de WhatsApp". Antes era un
-botón de texto más entre los de la cabecera (`btn btn-ghost`, "Asistente"), a un scroll
-de distancia en una checklist larga. Ahora `BotonAsistente` se dibuja fijo en la esquina
-inferior derecha (`position: fixed`, `z-index: 55` — por debajo del panel y de Modo carga,
-que lo tapa solo al abrirse), con la cara del compañero elegido dentro (lee
-`gula_asistente_companero` del navegador directamente, porque tiene que enseñarla ANTES
-de que el panel —que es quien de verdad la guarda— llegue a cargarse; con "Ninguno"
-elegido o "Jarvis" cae en Sparkles / el aro, según toque). Fondo NEUTRO (`card-bg`), no de
-acento: el compañero está pensado para vivir sobre un fondo neutro —el traje ya es un
-tinte de acento mezclado con el fondo, ver `.comp-viste`— así que un círculo sólido en
-acento lo dejaba casi invisible; probado primero así y corregido antes de subirlo.
-
-Con posibilidad de esconderla, que era la otra mitad del encargo: una aspa pequeña en la
-esquina de la burbuja la esconde, guardado en `gula_asistente_flotante_escondido` (este
-navegador). Escondida no desaparece del todo — queda una pastilla mucho más discreta en
-el mismo sitio, para no dejar el asistente sin ninguna puerta de vuelta. Se esconde sola
-mientras el panel está abierto (ahí ya se ve el muñeco grande en la pestaña Humano).
-`className`/`etiqueta` salieron de las props: ya no hay texto que rotular. Comprobado con
-capturas: los dos temas, con compañero por defecto, "Ninguno" y "Jarvis", y el ciclo
-completo esconder → recargar (sigue escondida) → mostrar → abrir el panel (la burbuja se
-esconde sola).
-
-**Bug real en la burbuja, visto en producción y arreglado: se quedaba pegada a la
-cabecera, no a la pantalla.** El dueño mandó una captura real: la burbuja salía tapando
-el botón "Compartir", arriba del todo, en vez de en la esquina inferior. Causa: `.app-header`
-lleva `animation: slideUpFade ... both`, y `both` deja puesto el `transform:
-translateY(0)` del último fotograma PARA SIEMPRE, aunque la animación ya haya acabado —y
-eso convierte a la cabecera en el "contenedor" de cualquier descendiente con `position:
-fixed`, que deja de fijarse a la pantalla y pasa a fijarse a ELLA. Es el mismo bug que ya
-se había arreglado en el panel del asistente (con un portal a `document.body`, comentado
-en su día en el propio código) pero la burbuja se me había quedado fuera de ese portal al
-añadirla. Arreglado envolviéndola en el mismo `createPortal(..., document.body)`. El
-banco de pruebas que usé para las capturas de antes (`?boton=1`) no reproducía el bug
-porque no monta la cabecera real con su animación — para esta lo hice con un banco
-aparte que sí la incluye, medí la posición real de la burbuja con y sin portal, y hasta
-entonces no se veía. Buena lección: probar el componente aislado no basta cuando el bug
-depende de un antepasado que el aislado no tiene.
-
-**El arrastre de la burbuja (pedido tal cual: "que pueda moverla donde quiera").**
-`pointerdown`/`pointermove`/`pointerup` en vez de `onClick` — un solo gesto sirve para
-abrir con un toque y mover con un arrastre, y hay que decidir cuál fue DESPUÉS de ver si
-hubo más de 6px de movimiento (menos que eso es el pulso de la mano al pulsar, no una
-intención de arrastrar). La posición se guarda en `gula_asistente_flotante_pos` (este
-navegador) solo cuando SÍ hubo arrastre; un toque simple sigue abriendo el panel y no
-toca la posición. Se reencaja dentro de la pantalla si la ventana cambia de tamaño (girar
-el móvil), pero sin guardar ese reencaje — así el teclado del móvil, que también cambia
-el alto de la ventana al abrirse, no pisa "donde la dejó" la próxima vez.
-
-**El Grafo, de verdad, con líneas (`Grafo.jsx`).** La pestaña Grafo de Cerebro llevaba
-tiempo siendo una lista de píldoras sueltas con un número de conexiones al lado, por
-decisión consciente de entonces: "en un móvil un grafo con aristas de verdad no se lee".
-El dueño pidió lo de OpenHuman, así que antes de construir nada se comprobó en su código
-de verdad (clonado en modo lectura) si existe — y SÍ: `MemoryGraph.tsx`, un grafo de
-fuerzas en SVG puro, sin ninguna librería, con una relajación de muelles+repulsión que
-corre una vez y ya. Traído aquí con el mismo enfoque: `Grafo.jsx` recibe los `nodos` y
-`enlaces` que ya calculaba `arbol.js` (no cambia ese fichero, los datos ya estaban
-listos) y los coloca con la misma física, dentro de un `viewBox` que escala solo con el
-ancho del panel — se lee igual a 320px que en escritorio, que es justo lo que preocupaba
-en su día. Clic en un nodo abre un detalle DEBAJO del dibujo (nombre, tipo, conexiones),
-no un tooltip flotando encima que en el móvil tapa lo que se acaba de tocar. Memoizado
-por el contenido de los datos (no por su referencia, que cambia en cada render de
-Cerebro): sin eso, el grafo se hubiera reordenado solo cada vez que algo ajeno
-cambiara arriba.
-
-**Avisos de lo que falta por configurar (`avisosConfig.js`) — primera pieza de "que el
-asistente avise solo".** El repaso de la noche ya avisaba de lo que le falta a un
-EVENTO; esto es lo mismo pero para el NEGOCIO: si no hay proxy puesto (el asistente no
-puede contestar nada) o no hay ningún precio cargado (el Resumen calcula a 0€), sale un
-aviso en Cerebro, con la MISMA tarjeta que ya usa el repaso (`.cer-aviso`, tono
-"falta") — no una nueva. Sin avisos no se pinta nada, ni un "todo en orden": eso sería
-ruido en el caso normal. A propósito NO avisa de "ratios de personal sin ajustar":
-comprobado en `personal.js`, los de boda/comunión/corporativo son datos MEDIDOS de
-verdad, no un hueco — avisar de eso habría sido decir que falta algo que ya está bien
-puesto. "Equipo del calendario sin cargar" se queda fuera por ahora: vive solo en
-Firestore + estado de React (`useCalendarioNube.js`), sin lectura local como
-`leerPrecios()`, así que traerlo aquí pide enhebrar datos entre apps y no es tan barato
-como esto. Con tests (`avisosConfig` en `asistente.test.mjs`): los dos avisos a la vez,
-uno solo cuando falta uno, ninguno con las dos cosas puestas, y que un catálogo de
-precios vacío cuenta igual que no tenerlo.
-
-**Bug real, visto en producción: "eventos próximos" traía TODOS los guardados, pasados
-incluidos.** El dueño mandó una captura: pidió los próximos y salió una lista empezando
-en julio, con hoy ya pasado agosto. Causa raíz: el modelo no tiene ni idea de qué día es
-—`SISTEMA`, en `cliente.js`, nunca se lo decía—, así que cuando `buscar_eventos` o
-`ver_calendario` se llaman sin `desde`/`hasta` (porque el modelo no puede calcular una
-fecha relativa sin saber la de hoy) devuelven TODO sin filtrar, del más antiguo al más
-nuevo. Además, `buscar_eventos` lee el archivo de checklists GUARDADAS de esta app, no
-la agenda real del equipo (`ver_calendario`, sobre `apuntes`) — la pregunta pedía la
-agenda y el modelo cogió el archivo.
-
-Arreglado en dos sitios:
-- `cliente.js` calcula `Hoy es ${hoyISO()}` EN CADA PREGUNTA (no una vez al cargar el
-  módulo: una charla puede seguir abierta al cruzar la medianoche) y se lo dice al
-  modelo, con instrucciones de pasarlo como `desde`/`hasta` para "próximos", "esta
-  semana", etc.
-- Las descripciones de `buscar_eventos` y `ver_calendario` en `herramientas.js` ahora
-  dejan claro cuál es cuál: una es el archivo de la checklist (no filtra si no se le
-  pide), la otra es la agenda de verdad del equipo — y cada una menciona a la otra para
-  que el modelo elija bien.
-
-Con test en `asistente.test.mjs`: capturado el `sistema` que de verdad se manda al
-Worker (mockeando `fetch`) y comprobado que lleva `Hoy es` con la fecha calculada de
-verdad (`hoyISO()`), no un valor puesto a mano que se quedaría obsoleto el día siguiente.
-
-**El asistente habla primero, si hay algo pendiente (`saludoPendientes`).** Segunda
-pieza de "que el asistente esté integrado, sepa qué hace y avise solo" — pedido tal
-cual: que hable primero en vez de obligar a ir a mirar Cerebro. `saludoPendientes`, en
-`avisosConfig.js`, junta las dos fuentes que YA existían —`avisosConfig()` (el negocio) y
-el repaso de la noche (cada evento)— en una frase, no un informe. Se pinta como una
-burbuja del asistente ENCIMA del saludo de bienvenida de Charla, pero solo con el hilo
-vacío (una charla nueva): repetirlo en cada respuesta sería spam. Es un mensaje de
-mentira — no entra en `mensajes` (lo que se manda al modelo, así que no cuesta ni un
-token) ni se guarda en el historial de conversaciones. Con test: sin nada pendiente no
-dice nada (el caso normal no suena a aviso), cuenta bien singular/plural, y con las dos
-fuentes a la vez las junta en una frase.
-
-**El asistente sabe cuánto llevas cargado (`progreso_carga`).** Tercera pieza: "que
-sepa en cada momento qué haces". Resultó que la pieza más razonable no era rastrear la
-pantalla entera —frágil, y Modo carga ni se puede abrir con la burbuja encima, que la
-tapa—, sino algo concreto y ya medido: cuánto llevas cargado del evento abierto. Los
-números NO se recalculan en `herramientas.js` reconstruyendo la checklist desde lo
-guardado (`catsDeEventoGuardado`): eso podría no coincidir con lo que se ve en pantalla
-si hay categorías o items renombrados a mano (vive en este navegador, no en el evento).
-En su lugar, `App.jsx` pasa los mismos números que ya calculaba para la ficha del
-Resumen (`totalConceptos`/`itemsCargados`/`itemsPreparados`, más un `itemsVueltos`
-nuevo que no existía) a través de `contexto.progresoCarga`, y la herramienta solo hace
-el porcentaje. Sin nombre a propósito: solo tiene sentido para el evento delante ahora
-mismo, nadie carga dos camiones a la vez. Con test: cuenta bien, y sin checklist abierta
-(o con una a cero items) lo dice en vez de calcular un porcentaje sobre cero.
-
-**El panel del asistente, más grande en escritorio.** El dueño lo vio pequeño de más en
-un monitor de escritorio, apretado en una esquina. Era 440×660px fijos; ahora
-`min(520px, 92vw)` × `min(760px, 88vh)` — en vw/vh y no en px sueltos, para que crezca de
-verdad en una pantalla grande sin desbordar una portátil pequeña (a 768px de alto sigue
-cabiendo entero, ~676px). Comprobado en capturas a 1280×900, 1920×1080 y una portátil de
-1366×768, con Charla y Gasto (la pestaña con más contenido de las cinco): cabe entero en
-las tres, sin recortes ni scroll de más.
-
-**"Poner el contador a cero" ya no usa el `confirm()` del navegador.** El dueño lo vio y
-no le gustó: letra de sistema, sin tema oscuro, sin ni un borde redondeado — desentonaba
-con el resto del panel. Era el ÚNICO sitio de toda la app que todavía usaba el diálogo
-nativo; todo lo demás que borra algo (`handleNuevoEvento`, borrar plantillas, borrar
-envíos…) ya pasa por el `Dialogo` propio de `App.jsx` (`components/Dialogo.jsx`, con
-`tipo: "confirm"`). Se trae el mismo componente a `Asistente.jsx`, con su propio estado
-local — el panel vive en su propio portal, aparte del árbol de la checklist, así que no
-comparte el `dialogo` de `App.jsx`. De paso, el mensaje ahora dice explícitamente que es
-por aparato y que no se puede deshacer, cosas que el `confirm()` de una línea no dejaba
-sitio para decir. Comprobado con capturas (los dos temas) y el ciclo completo: Cancelar
-no toca el contador, Confirmar sí lo pone a cero.
-
-**Bug real y serio: "crear checklists" decía "Hecho" y no creaba nada.** El dueño le
-pidió crear 5 bodas de dentro de 19-26 días, aprobó la propuesta, el asistente contestó
-"Hecho: Crear 5 checklists…" y no apareció ninguna en "Eventos guardados". Causa raíz:
-`checklistsPorCrear` (`calendario/apuntes.js`) vuelve a filtrar por "próximo" —los 14
-días de `DIAS_ANTICIPACION`, pensados para el arranque automático, que SÍ tiene que
-decidir solo qué crear entre TODOS los apuntes— pero `crear_checklists` ya elige a mano,
-por id, exactamente cuáles crear (el modelo pudo haber buscado con un `dias` más grande,
-o por nombre con `cuales`, sin límite de fecha). Ese segundo filtro, oculto dentro de
-`promoverApuntes`, descartaba en silencio cualquier apunte a más de 14 días — los 5
-estaban a 19-26.
-
-Arreglado enhebrando un `opciones` opcional desde `escrituraChecklists.js` hasta
-`checklistsPorCrear`: `aplicarEnChecklists` ahora llama a `promover(elegidos, { dias:
-Infinity })`, ya que quien llama aquí ya ha decidido qué crear y no necesita un segundo
-filtro por fecha. El arranque automático (`App.jsx`) y `CalendarioEnChecklist` siguen
-llamando sin opciones, así que conservan los 14 días por defecto — es el comportamiento
-correcto ahí, comprobado con test (`checklistsPorCrear` con dias: Infinity SÍ crea una
-boda de dentro de dos meses; sin él, no).
-
-Segundo fallo, más pequeño pero relacionado: `resolver()` en `Asistente.jsx` decía
-"Hecho: …" SIEMPRE tras aprobar una propuesta, sin mirar lo que de verdad devolvía
-`contexto.onEscribir` — así que aunque `crear_checklists` hubiera devuelto un error o un
-`{ nada: "..." }` (sin lanzar ninguna excepción), el panel decía "Hecho" igual. Ahora
-mira el resultado: error → burbuja de error; `nada` → se dice tal cual; si no, "Hecho"
-con el `aviso` pegado si lo trae (por ejemplo, que a lo creado le faltan pax/sitio/horas
-del formulario, que antes se perdía sin más).
-
-**El asistente ya no "se reinicia" al cerrar y volver a abrir.** El dueño lo vio y
-preguntó si era así a propósito — no lo era. `BotonAsistente` desmonta `Asistente.jsx`
-entero al cerrar el panel (por diseño, para no dejar suscripciones a la nube corriendo
-de fondo), así que TODO su estado local se perdía, incluidos `hilo` y `mensajes` —
-aunque ya se guardaban en `conversaciones.js` con cada vuelta, y el propio comentario de
-cabecera de ese fichero dice que ese guardado es justo para esto ("Al cerrar el panel se
-perdía todo... así que hay que volver a preguntarlo, y se paga otra vez"). El botón
-"Conversación nueva" del Historial tampoco tendría sentido si cada apertura ya
-empezara en blanco. `hilo`, `mensajes` y `charlaId` ahora se inicializan desde la última
-charla guardada (`leerCharlas()[0]`) en vez de vacíos — reabrir retoma donde se dejó, y
-"Conversación nueva" sigue siendo la manera explícita de empezar de cero. Comprobado con
-capturas: abrir por primera vez ya retoma lo guardado, cerrar desmonta el panel de
-verdad, reabrir sigue la misma charla, y "Conversación nueva" limpia sin tocar lo
-guardado (al no mandar nada nuevo, no se sobrescribe nada).
-
-**Al abrir el Historial se veía la charla de detrás asomando, como texto rayado.**
-El dueño mandó una captura: al pulsar el icono de Historial, la lista de charlas
-guardadas aparecía con el hilo de la conversación (o la tarjeta de "Pregúntame por tus
-eventos" y el cuadro de escribir) superpuestos justo debajo, como dos capas de texto
-montadas una sobre otra. Causa: el bloque `{verHistorial && (...)}` de
-`Asistente.jsx` se añadió sin tocar la condición que pinta el cuerpo de cada pestaña
-(`{!ajustes && (pestana === "tareas" ? ... : ...)}`) ni la de los "pendientes" y el
-formulario de escribir (`{!ajustes && pestana === "charla" && ...}`) — todas ellas ya
-sabían apagarse por `ajustes` (el comentario decía explícitamente "los ajustes
-SUSTITUYEN a la pestaña, no se apilan encima"), pero nadie les enseñó a apagarse
-también por `verHistorial`, así que las tres seguían pintándose debajo de la lista.
-Arreglado añadiendo `!verHistorial` a esas tres condiciones, con el mismo criterio que
-ya se usaba para `ajustes`. Comprobado con Playwright: con el historial abierto,
-`.asis-hilo` y `.asis-vacio` no aparecen en la página (antes sí); al cerrarlo, el hilo
-vuelve a verse normal.
-
-**La burbuja flotante "casi no se notaba de lo que es".** A 56px de círculo con el
-compañero dibujado a 38px, el dueño la vio y no distinguía la ilustración. El propio
-`Companero.jsx` ya avisaba de esto en un comentario: por debajo de cierto tamaño el
-busto "se queda en una mancha" — 38px estaba pegado a ese límite. Subida a 68px de
-círculo con el compañero a 46px (Sparkles, para quien elige "ninguno", de 22 a 28);
-`TAMANO_BURBUJA` en `BotonAsistente.jsx` y el `width`/`height` de `.asis-flotante-boton`
-en `index.css` tienen que mantenerse iguales entre sí a propósito, porque ese número
-también acota hasta dónde se puede arrastrar la burbuja sin salirse de la pantalla.
-Comprobado con capturas: el busto (cara, gorro, hombros) ya se distingue con claridad
-en la esquina, sin invadir ni tapar nada de alrededor.
-
-**La burbuja, a 68px, TODAVÍA se veía pequeña.** El dueño insistió tras el arreglo
-anterior. La causa esta vez no era solo el tamaño: el borde de 1px en gris
-(`var(--border-color)`) apenas se distingue del fondo de la app en una esquina —
-poco contraste, no poco tamaño—. Subida otra vez, a 84px de círculo con el compañero
-a 54px, y el borde pasa de 1px gris a 2.5px en color de acento: un anillo que
-destaca por sí solo, sin llenar el círculo entero de color (eso ya se había
-descartado antes — ver el comentario de "Fondo NEUTRO" un poco más arriba en
-`index.css` — porque tapa el traje del compañero). Comprobado con capturas en los
-dos temas.
-
-**Al aprobar una propuesta escribiendo en el chat en vez de pulsar el botón, salían
-dos mensajes que parecían llevarse la contraria.** El dueño mandó una captura:
-"Hecho: Crear 5 checklists... Creadas..." y, justo debajo, "Te he dejado en pantalla
-la propuesta... Solo tienes que confirmarla ahí para que se generen" — como si el
-propio asistente no supiera si ya estaba hecho o no. Causa: aprobar una propuesta
-tiene DOS caminos que no se hablan entre sí — pulsar "Hacerlo" en la tarjeta de
-`pendientes` (que llama a `resolver()`), o simplemente escribir "sí, créalos" en el
-chat (que el modelo interpreta como una petición nueva y vuelve a llamar a
-`crear_checklists`). Si se hacen las dos casi a la vez, `escribir()` en
-`Asistente.jsx` apilaba una SEGUNDA tarjeta idéntica sin saber que la primera ya
-estaba ahí — y el modelo, con la respuesta de esa segunda llamada, contestaba "te lo
-he dejado en pantalla" justo cuando la primera ya se había aplicado y dicho "Hecho".
-Arreglado en `escribir()`: si ya hay una propuesta pendiente con el mismo `que` y el
-mismo `resumen`, no se apila otra — se le dice al modelo que YA estaba propuesta y
-que no lo repita, para que no confunda al dueño. Comprobado con lint y test
-(`npm run test:rapido`); no tiene prueba automática propia porque `escribir()` vive
-dentro del componente `Asistente.jsx` y reproducirlo de verdad necesitaría simular
-dos vueltas al modelo casi simultáneas, no solo funciones puras.
-
-**La burbuja, a 84px, TODAVÍA se veía pequeña en escritorio — y el dueño pidió que
-"pareciera activa".** Tercera vuelta sobre lo mismo. Dos peticiones juntas:
-
-1. Más grande en escritorio en concreto (no en móvil, donde 84px ya iba sobrado de
-   sitio). Solución con el mismo criterio que ya se usó para el panel: un
-   `@media (min-width: 768px)` que sube el círculo a 108px. El truco es CÓMO se sube
-   el dibujo de dentro sin tocar React: el `<svg>` de `Companero.jsx` trae su tamaño
-   puesto por *atributo* (`width={size}`), y la propiedad CSS gana sobre el atributo,
-   así que `.asis-flotante-boton svg { width: 68px; height: 68px; }` basta.
-   `TAMANO_BURBUJA` en `BotonAsistente.jsx` se queda en 84 aposta: usarlo para acotar
-   el arrastre en escritorio sale un pelín corto de lo que ahora se ve (nunca largo),
-   así que como mucho se puede arrastrar un poco menos pegada al borde — nunca se sale
-   de la pantalla.
-
-2. Que se note que está activa incluso quieta: un pulso de 6s en bucle que cicla el
-   borde entre los mismos tres colores que ya usa Jarvis para sus estados (fuego,
-   acento, verde) — aquí no significan nada del asistente en concreto, es solo vida
-   visual, así que se reutiliza la paleta que ya existe. A propósito NO anima
-   `transform`: si lo hiciera, pisaría el `scale()` del `:hover`/`:active` y el hover
-   dejaría de notarse a mitad del pulso. Apagado en `prefers-reduced-motion: reduce`,
-   igual que el resto de animaciones del asistente.
-
-   La prueba "Las animaciones en bucle no pueden mover la maqueta"
-   (`calculos.test.mjs`) cazó esto al vuelo: `border-color` no estaba en su lista de
-   propiedades seguras (solo `color`, no `border-color`), aunque cambiar solo el color
-   de un borde —sin tocar su grosor— no dispara reflow, igual que `color` o `fill`.
-   Añadida a la lista con el resto, no ignorada.
-
-**"Recuérdame tal cosa tal día" — recordatorios con fecha, dichos al abrir (y en voz,
-si toca).** Pedido tal cual: que el asistente sea más "interactivo", que diga cosas
-para que no se te olviden, y que "recuérdame X el día Y" funcione de verdad. Antes de
-tocar código se le preguntó al dueño CÓMO, porque las dos formas razonables de
-hacerlo cambian el tamaño del trabajo en un orden de magnitud:
-
-- ¿Avisa aunque la app esté cerrada (notificación push de verdad) o solo al abrirla
-  ese día? — **Eligió: al abrirla.** No hay Service Worker con push en este repo
-  (comprobado: `public/sw.js` no tiene nada de `PushManager`/`Notification`), así que
-  push habría sido infraestructura nueva de cero (permiso del navegador, claves VAPID,
-  un disparador en el servidor a esa hora exacta) y no funciona igual en todos los
-  móviles. Al abrirla no necesita nada de eso.
-- ¿Solo escrito, o también en voz? — **Eligió: también en voz.**
-
-Con eso decidido, NO se monta un sistema nuevo de recordatorios: se estira `tareas.js`
-—que ya guarda en la nube, ya se agrupa, ya se limpia solo— con un campo `fecha`
-opcional ("AAAA-MM-DD"). Una tarea sin fecha sigue siendo una tarea normal; con fecha,
-es un recordatorio. `paraHoy(lista, hoy)` filtra las que tienen fecha ya cumplida
-(hoy o antes — una que se pasó por no abrir la app ese día sigue mereciendo decirse,
-no callarse sola) y no están hechas, la más atrasada primero.
-
-`saludoPendientes()` (`avisosConfig.js`) gana un tercer parámetro,
-`recordatoriosHoy`, y los dice PRIMERO —antes que los avisos genéricos de negocio o de
-evento—: es lo que alguien pidió que se le dijera A ÉL, perderlo entre avisos
-genéricos habría sido justo lo que se pidió que no pasara. La herramienta
-`apuntar_tarea` gana un parámetro `fecha` opcional, con su fecha calculada por el
-propio modelo desde el "Hoy es..." que ya lleva el sistema (`cliente.js`) — el mismo
-mecanismo que ya usan `buscar_eventos`/`ver_calendario` para "próximos" y demás
-fechas relativas.
-
-Lo de la voz salió gratis: `Humano.jsx` ya lee en voz alta `ultimaRespuesta` en
-cuanto llega, si la voz está activa — nunca tocado. Lo único que hacía falta era que
-`ultimaRespuesta`, con el hilo todavía vacío (antes de la primera pregunta de la
-charla), fuera el saludo en vez de una cadena vacía. Un solo `? :` en
-`Asistente.jsx`, cero cambios en `Humano.jsx`.
-
-Comprobado con capturas y con `speechSynthesis.speak` interceptado en Playwright (sin
-audio real, pero sí se ve el texto exacto que intentó decir): el saludo aparece en
-Charla, el mismo texto llega a la voz en Humano, y en Tareas cada recordatorio lleva
-su fecha en una etiqueta pequeña (reutilizado `.asis-recuerdo-puntos`, el mismo pill
-que ya usan el contador de "veces" en Cerebro y Gasto — sin CSS nuevo).
-
-**Jarvis, más parecido a la referencia del dueño ("un aro que gira y cambia de
-color", ver `Jarvis.jsx`) — quieto se veía apagado, y los arcos de dentro nunca se
-movían.** El dueño mandó una captura de un aro naranja tipo reactor y pidió que se
-pareciera, "que cambia líneas etc". La estructura ya era casi la misma (dial de
-marcas, aro de barras que gira, disco central que late) — lo que faltaba era esto:
-
-1. **Color de "quieto" apagado.** `.jarvis-aro` sin estado explícito caía en
-   `--pj-metal-oscuro` (gris), no en el ámbar de la referencia — quieto es como se ve
-   la mayor parte del tiempo, así que era la diferencia que más se notaba. Añadido
-   `.jarvis-aro.es-quieto { color: var(--pj-fuego); }`, el mismo tono que ya usa
-   "pensando" (se distinguen por ritmo, no por color — ver `jarvis-latido`/
-   `jarvis-girar` un poco más arriba en `index.css`).
-
-2. **Los arcos de dentro no giraban.** Había solo UNO (`jarvis-arco`), estático:
-   quieto se veía siempre exactamente igual, y la referencia no. Añadido un segundo
-   arco (`jarvis-arco2`, otro radio) y animados los dos con `jarvis-girar` —el mismo
-   keyframe que ya usa el aro de barras—, cada uno a su velocidad y en su sentido
-   (9s uno, 13s el otro y al revés) para que nunca lleguen a superponerse del todo,
-   que sería indistinguible de uno solo. Solo `transform`, mismo motivo de siempre
-   (ver "Las animaciones en bucle no pueden mover la maqueta").
-
-Comprobado con capturas en dos instantes seguidos: el arco visible cambia de
-posición entre una y otra, que es justo lo que antes no pasaba nunca.
-
-**En el móvil, el panel cambiaba de tamaño al cambiar de pestaña — y eso ya NO se
-quiere.** Era a propósito, de antes de esta sesión: Gasto (cuatro párrafos y un
-campo) a pantalla completa dejaba 426px en blanco debajo, así que en el móvil el
-panel se ajustaba al contenido en todas las pestañas menos Charla. El dueño lo vio y
-no le gustó — encogía y se estiraba al cambiar de pestaña, y no se parecía a cómo se
-ve en escritorio (que SIEMPRE mide lo mismo, 520×760 aprox., sin importar la
-pestaña). Pedido tal cual: el mismo tamaño en las cinco pestañas, también en el
-móvil. Quitada la regla `@media (max-width: 767px) { .asis-panel:not(.es-charla)
-{...} }` entera — se acepta el hueco en blanco de Gasto a cambio de que el panel no
-cambie de tamaño solo. Comprobado con Playwright: las cinco pestañas miden
-exactamente el alto de la pantalla (antes Gasto medía bastante menos).
-
-**El destello de la burbuja flotante dejaba ver un cuadrado que parpadeaba y
-desaparecía rápido.** Lo reportó el dueño viéndolo en el móvil. `asis-burbuja-viva`
-(el pulso de `.asis-flotante-boton`, ver más arriba) llevaba el halo del `box-shadow`
-de "sin blur ni spread" (`0 0 0 0`, en reposo) a "14px de blur, 3px de spread" (en el
-punto de más color) y vuelta a empezar. Animar un `box-shadow` con `border-radius`
-hasta un tamaño degenerado —blur y spread los dos en 0 a la vez— hace que algunos
-motores pierdan el recorte circular durante un frame y se vea el cuadrado de la caja
-de sombra sin recortar, justo en el instante en que el halo colapsa: coincide con "al
-finalizar el destello", que es lo que describió. Arreglado dejando el blur (14px) y
-el spread (3px) SIEMPRE fijos en las tres paradas del keyframe, y animando solo el
-color hasta `transparent` para el reposo en vez de hasta un tamaño de 0 — el halo se
-sigue viendo igual (invisible en reposo, con color en los otros dos tramos) pero el
-`box-shadow` nunca llega a un tamaño degenerado. Comprobado por Playwright leyendo el
-`box-shadow` calculado cada 150ms durante un ciclo entero (42 muestras): el blur y el
-spread del halo se quedan en 14px/3px en las 42, solo cambia el color/alpha.
-
-**La nota de ayuda del modal "Añadir varios items" salía partida en tres columnas en
-vez de fluir como un párrafo.** Lo reportó el dueño con una captura del móvil.
-`.agregar-nota` (y las hermanas `.agregar-ok`/`.agregar-error`, mismo grupo de
-clases) es `display: flex`, pensada para un icono + un bloque de texto. Pero el JSX
-metía el icono directamente seguido de texto suelto, un `<em>` y más texto suelto
-como hijos DIRECTOS del div: en React eso son varios nodos de texto hermanos, y cada
-nodo de texto que cuelga suelto de un contenedor flex se convierte en su propio
-elemento flex — así que el texto de antes del `<em>`, el `<em>` y el texto de después
-quedaban cada uno en su propia "columna" en vez de fluir en un único párrafo.
-Arreglado envolviendo todo el texto (incluido el `<em>` de en medio) en un único
-`<span>` en los tres casos (`agregar-nota`, `agregar-ok`, el `{error}` de
-`agregar-error`) — un solo hijo de texto, un solo elemento flex, fluye como párrafo
-normal. Comprobado con Playwright montando el modal en un banco de pruebas temporal
-(borrado después de comprobar, no se sube): antes el `<span>` de texto medía menos de
-la mitad del ancho de la nota; después ocupa el ancho completo disponible junto al
-icono.
-
-**La personalidad ("Directo", "Bromista"...) no se notaba al probarla en la pestaña
-Humano sin haber preguntado nada.** El dueño la cambiaba, le daba a "Contesta en voz
-alta" y sonaba siempre igual. No era un fallo de que la personalidad no llegara al
-modelo —sí llegaba, correctamente, a cada pregunta real (`cliente.js` ya se la pasaba
-al sistema)—: lo que se oye ahí SIN haber preguntado nada es el saludo automático
-(avisos pendientes / recordatorios de hoy, `saludoPendientes` en avisosConfig.js), y
-ese saludo está hecho a propósito SIN pasar por el modelo (mismo motivo de siempre:
-gratis y sin conexión). Por eso sonaba idéntico con cualquier personalidad puesta —
-nunca pasaba por el sistema que sí varía con ella. Arreglado con una envoltura por
-personalidad, a mano y sin modelo (`ENVOLTURA_SALUDO` en avisosConfig.js): el
-CONTENIDO del saludo no cambia nunca —son las mismas reglas duras de siempre—, pero
-"Directo" lo deja tal cual, "Cercano" lo abre con un "Oye, antes de nada:", "Bromista"
-le añade un cierre ligero, y "Parco" quita los puntos y los cambia por "·"
-(telegráfico, como pide su propia definición). Comprobado con Playwright cambiando de
-personalidad y leyendo el saludo en la pestaña Charla (que enseña el mismo texto que
-Humano lee en voz alta): las cuatro suenan distintas.
-
-**La voz sonaba "muy artificial".** El dueño lo pidió tal cual: más natural, más
-humana. `voz.js` usaba `SpeechSynthesisUtterance` sin elegir ninguna voz, así que el
-navegador cogía la que tuviera puesta por defecto — casi siempre la voz LOCAL del
-sistema, la más robótica de las que suele haber instaladas. Dos arreglos, uno gratis y
-uno de pago, con el gratis siempre activo y el de pago como mejora si hay conexión:
-
-1. **Elegir la mejor voz del propio navegador** (`mejorVoz` en voz.js): entre las
-   voces del idioma, prioriza las DE RED (`localService === false` — las de Google en
-   Android/Chrome, servidas por internet igual que el resto de voz de Google, y que se
-   nota de inmediato que suenan mejor) y si no hay, las que digan
-   "Enhanced"/"Premium"/"Neural" en el nombre (así marca iOS/Edge las suyas). Cuesta
-   cero, no necesita conexión ni proxy configurado, y es la que se usa siempre que la
-   de la nube (abajo) no esté disponible o no dé tiempo.
-2. **Voz de Gemini, si hay proxy y hay tiempo** (ruta nueva `/__voz` en
-   worker/index.js, llamada desde `hablar()` en voz.js con un tope de 4 segundos):
-   bastante más natural que cualquier voz del navegador. Reutiliza las MISMAS claves
-   de Gemini que ya usa el chat (`clavesGemini`) — no hace falta pegar ningún secreto
-   nuevo en Cloudflare si ya se tiene Gemini puesto para el chat. Gemini devuelve el
-   audio en PCM crudo, sin envolver; se envuelve en un WAV mínimo en el propio
-   navegador (`pcmAUrlDeAudio`) porque `<audio>` no reproduce PCM crudo tal cual.
-   Documentado en worker/README.md (dos variables opcionales: `GEMINI_TTS_MODEL` y
-   `GEMINI_TTS_VOZ`, ninguna obligatoria).
-
-Es un EXTRA sobre la voz del navegador, nunca una base: si no hay proxy, si no hay
-conexión, si el Worker tarda más del tope o si falla por lo que sea, se seguía con la
-voz local (mejorada por el punto 1) sin que se note la espera ni salga ningún error en
-pantalla — nadie se queda muda por esto. Al escribir el `useEffect` que dispara todo
-esto apareció un fallo real, no de la función en sí sino del cableado: `yaLeido.current`
-(la marca de "esto ya se ha dicho", para no repetir el saludo al volver a la pestaña) se
-ponía ANTES de esperar el token de sesión; con StrictMode (que monta-desmonta-remonta a
-propósito en desarrollo) el primer montaje marcaba la respuesta como "ya dicha" y se
-cancelaba antes de llegar a hablar, y el remontado de verdad ya no decía nada al
-encontrarla marcada — en producción (sin ese doble montaje) no se habría notado nunca,
-pero en `npm run dev` el asistente se habría quedado mudo en la pestaña Humano.
-Arreglado moviendo la marca a DESPUÉS de esperar el token, dentro del mismo guardián
-`vivo` que ya cancelaba intentos obsoletos. Comprobado con Playwright en tres escenarios:
-sin nube disponible (elige la voz de red, no la local por defecto), con el Worker
-devolviendo audio (se reproduce el de la nube y NO se cae también a la local) y con el
-Worker fallando (cae a la local sin ningún error de página sin capturar).
-
-**Jarvis: la animación no se parecía a la del vídeo de referencia (OpenHuman), y
-minimizar el reactor al tocarlo.** Dos pedidos seguidos, con vídeo de por medio en los
-dos (grabaciones de pantalla, extraídos los fotogramas con ffmpeg —no había en la
-imagen, se instaló solo para esto— porque una captura suelta no enseña el movimiento).
-
-1. **La animación.** Comparando fotograma a fotograma el vídeo contra capturas de
-   nuestro propio Jarvis (mismo tamaño, banco de pruebas temporal), la estructura ya
-   era la misma —dial de marcas, aro de barras girando, dos arcos a su propio ritmo,
-   núcleo con resplandor— pero el vídeo se ve mucho más vivo: arcos gruesos y bien
-   visibles, aro de barras tupido como una turbina. El nuestro tenía los arcos casi a
-   trazo fino (2px/1.5px) y solo 16 barras finas con hueco de sobra entre una y otra.
-   Arreglado subiendo el grosor de los arcos (3px/2.5px, más opacidad) y las barras a
-   24, más anchas (Jarvis.jsx, index.css) — nada de colores ni del resplandor tocado,
-   pedido tal cual ("sin quitar lo de que cambie de color y el resplandor"). Sigue
-   siendo SVG + CSS puro, cero librerías (confirmado al dueño, que preguntó por el
-   rendimiento).
-2. **Minimizar el reactor al tocarlo, en la pestaña Humano.** El segundo vídeo no
-   llegaba a enseñar ningún clic de verdad (7.7s enteros de la misma rotación en
-   reposo), así que se preguntó dónde quería el control antes de tocar nada — eligió
-   Humano. Primera versión: tocar a Jarvis encogía solo la caja del muñeco
-   (`.hum-escena`) y su `<svg>`, dejando todo lo demás del panel (el micro, "Cómo te
-   habla"…) del mismo tamaño de siempre. Un TERCER vídeo ("aquí se ve mejor") enseñó
-   que no era eso: en la referencia, minimizar hace desaparecer el panel ENTERO y deja
-   solo un reactor pequeño flotando en la esquina con una aspa para cerrarlo — que es
-   ni más ni menos que nuestra PROPIA burbuja flotante (BotonAsistente.jsx), ya hecha y
-   ya probada. Rehecho antes de fusionar nada: tocar a Jarvis en Humano llama al mismo
-   `onCerrar` de siempre (el que ya usa el aspa del panel), sin ningún tamaño
-   intermedio que inventar ni animar. La única pieza nueva de verdad: la pestaña activa
-   ahora se guarda (`gula_asistente_pestana`, Asistente.jsx) — antes el panel se
-   desmontaba entero al cerrarse y volvía a abrir siempre en Charla, así que "minimizar
-   y volver a abrir" habría aterrizado en el sitio equivocado sin esto. Solo Jarvis
-   tiene este botón —los demás compañeros no—. Comprobado con Playwright: tocar el
-   reactor en Humano cierra el panel y deja la burbuja (0 `.asis-panel`, 1
-   `.asis-flotante-boton`), y volver a tocar la burbuja reabre directamente en Humano
-   (`aria-selected="true"`), no en Charla.
-
-**Y encima, la burbuja flotante (54px) seguía sin el anillo ni los arcos.** El dueño
-preguntó directamente: "esa animación también tiene que tenerla la burbuja, ¿no?". El
-umbral que decide si Jarvis se dibuja simplificado (`compacto` en `conteos()`,
-Jarvis.jsx) estaba en `size < 80`, y la burbuja usa 54px —por debajo, así que caía del
-lado compacto y perdía el anillo y los dos arcos justo donde el asistente se ve todo
-el rato (la esquina de la pantalla). Bajado el umbral a `size < 50`: la cabecera
-(30px, el único sitio que de verdad necesita la versión simplificada) se queda igual,
-y la burbuja (54px) pasa a dibujarse con el mismo detalle que la pestaña Humano
-(170px), sin inventar un tercer nivel de detalle. Comprobado con Playwright a
-`deviceScaleFactor: 3` (como se ve en un móvil de verdad): el anillo y el arco
-aparecen en la burbuja y se leen limpios, no emborronados; la cabecera sigue sin
-ellos.
-
-**Una de las preguntas de ejemplo del chat vacío sonaba de trámite.** El dueño vio
-"¿A qué hora hay que salir del obrador?" y dijo que no le gustaba, sin especificar la
-forma nueva. Cambiada a "¿A qué hora salimos del obrador?" — quita el "hay que", que
-suena a obligación impuesta, por algo más directo, como lo preguntaría alguien del
-equipo de verdad (Asistente.jsx, la lista de `asis-vacio`).
-
-**En escritorio, la columna de configuración (izquierda) y la lista de conceptos
-(derecha) se mueven con dos scrolls distintos, y no se notaba.** El dueño mandó una
-captura: para ver el final de la configuración (equipamiento, bandejas, nevera...)
-hacía falta poner el ratón encima de esa columna y bajar AHÍ, un gesto distinto del
-que mueve la lista de la derecha (que es el scroll normal de la página). `.config-
-sidebar` es `position: sticky` con su propio `overflow-y: auto` — a propósito, para
-poder cambiar cualquier ajuste sin perder de vista dónde ibas en una lista de 135
-conceptos —, pero sin ningún aviso visual de que seguía habiendo más por debajo (o
-por encima), el panel parecía "cortado" en vez de "con más si sigues bajando".
-Antes de tocar nada se comprobó que no había un TERCER scroll escondido en ningún
-otro sitio de esta pantalla (`.main-layout`, `.checklist-main`, `.category-section`:
-los tres en `overflow-y: visible` o `hidden`, ninguno con scroll propio) — pedido
-explícito del dueño. Arreglado con el truco de "sombras de scroll" sin JS (dos capas
-que tapan el borde y se mueven CON el contenido, `background-attachment: local`, más
-dos sombras que se quedan fijas, `background-attachment: scroll`): la sombra solo
-asoma cuando la capa que la tapa ya se ha desplazado fuera de la vista, que es justo
-cuando de verdad queda algo por ver en esa dirección. Comprobado con Playwright
-leyendo `scrollTop`/`scrollHeight` del panel en tres puntos (arriba del todo, a
-mitad, abajo del todo) contra capturas: arriba del todo no sale sombra por arriba,
-abajo del todo no sale por abajo, y a mitad salen las dos.
-
-**La voz seguía sonando artificial en móvil, incluso después de lo de arriba.** El dueño
-avisó de que, pese al arreglo de `mejorVoz`/voz de Gemini, en su móvil (y quizás en PC)
-seguía sonando como la voz local de siempre. Sospecha directa: la voz de Gemini nunca
-llegaba a usarse y todo caía en silencio a la ruta 1 (voz del navegador) sin que se viera
-ningún aviso — exactamente el comportamiento "nadie se queda muda por esto" documentado
-arriba, que aquí jugaba en contra porque escondía el fallo real. Comprobado: el modelo
-por defecto de `vozDeGemini()` (worker/index.js) era `gemini-2.5-flash-preview-tts`, que
-ya no existe — la llamada fallaba con un 404 normal (no de cuota), `vozDeGemini()` lo
-lanzaba, el Worker contestaba 502 y `voz.js` caía a la local sin dejar rastro visible.
-Verificado contra fuentes en vivo de Google (con `ai.google.dev`, `firebase.google.com` y
-otros dominios de la documentación bloqueados por el proxy de este entorno, pero
-`raw.githubusercontent.com`/`github.com` sí accesibles): la forma del JSON de la llamada
-(`generationConfig.responseModalities`, `speechConfig.voiceConfig...`) seguía siendo
-correcta contra el `.proto` oficial de `googleapis/googleapis`, y `generateContent` (el
-endpoint que se usa) sigue totalmente soportado en agosto de 2026 pese a existir ya una
-"Interactions API" más nueva — no hacía falta ningún cambio de arquitectura, solo el
-nombre del modelo estaba caducado. Mismo motivo que ya obligó a separar `GEMINI_MODEL`
-para el chat (Google retira nombres de modelo sin avisar): cambiado el valor por defecto
-a `gemini-3.1-flash-tts-preview`, dejando `GEMINI_TTS_MODEL` (ya existía desde el punto 2
-de arriba) como la vía para pisarlo el día que esto vuelva a pasar. Sin verificar contra
-una clave real de Gemini desde este entorno —el mismo límite ya señalado al entregar lo
-de arriba—, así que queda pendiente de que el dueño confirme en su móvil tras el
-despliegue si ahora sí se nota la voz de la nube.
-
-**Primer punto del plan de mejoras: B1, dependencias.** Traído `ANALISIS.md` y
-`PLAN_MEJORAS.md` de la revisión a fondo (ver más abajo su propia entrada), y
-arrancado el "orden recomendado" por B1 (la dependencia más pequeña e
-independiente): `npm audit fix` quitó los 2 HIGH (`nanoid`, `postcss`, ambos
-solo de build, ninguno llega al bundle final) y `npm update` subió las
-versiones menores dentro de lo que ya permitía el rango de `package.json`
-(vite 8.1.1→8.2.2, react/react-dom 19.2.7→19.2.8, lucide-react 1.26.0→1.34.0,
-firebase 12.17.1→12.18.0, más `@types/react`, `@types/react-dom`,
-`@vitejs/plugin-react` y `oxlint`) — sin tocar `package.json` a mano, todo
-dentro del `^` que ya había. `typescript` (5.9.3→7.0.2, mayor) se deja fuera
-a propósito: no es "menor" y no estaba pedido. `npm audit`: 0
-vulnerabilidades. `test:rapido` (tipos, cálculos, asistente, build,
-sincronización) en verde. El lint sube de 116 a 126 avisos, pero son avisos
-NUEVOS que caza la versión más reciente de `oxlint` sobre código que ya
-estaba ahí (dos `set-state-in-effect` en `Formulario.jsx`) — 0 errores, nada
-que rompa, y no se tocan en este mismo PR para no mezclar "subir versiones"
-con "cambiar comportamiento"; quedan anotados para una pasada de limpieza
-aparte. El CI cazó algo que se me había escapado: `npm update` sube también
-`rolldown` como dependencia indirecta (1.1.3→1.2.5), y la nueva versión
-genera `worker/pegar.js` con una forma de código ligeramente distinta para
-el mismo `worker/index.js` (hoistea el `await` a una variable antes de
-esparcirlo, en vez de esparcir la promesa resuelta directamente) — mismo
-comportamiento, solo el CI de "regenerado" (compara `worker/pegar.js` byte a
-byte contra lo que saldría de compilar `worker/index.js` ahora mismo) lo
-cazó, y por eso hacía falta el commit de regeneración aparte.
-
-**A1 del plan: comparar los ratios propios con el sector.** Se preguntó si el
-asistente puede comparar los números de la casa con los del sector para
-saber si están dentro de lo normal — y, a raíz de eso, también si el
-asistente puede aprender de los datos reales de los eventos en vez de
-depender del sector, y qué "comida" se podría calibrar así (se acabó en la
-paella: es la cantidad que sí tiene un ratio fijo y calculable, `1 paellera
-cada 30 pax`). Nuevo `src/asistente/sector.js`: la tabla del sector como
-dato puro (`SECTOR`, con nombre, unidad, banda `[min, max]` y fuente por
-ratio) y `compararRatios(actuales)`, que devuelve tono `dentro` /
-`por-encima` / `por-debajo` / `sin-dato` y el delta % — sin inventar nada:
-un ratio sin `actual` que compararle sale marcado `sin-dato`, no se omite en
-silencio. Nueva herramienta de solo lectura `comparar_con_sector` en
-`herramientas.js` (sin dueño, no depende de ningún evento): junta los
-ratios EN VIVO de sus ficheros de siempre (`leerRatios()` de personal.js
-para camareros —así respeta cualquier ajuste guardado en Firestore, no el
-valor de fábrica—, `RATIOS_BEBIDA` de bebida.js, `KG_HIELO_POR_PAX` de
-calculos.js y `PERSONAS_POR_PAELLA` de paella.js, las dos últimas
-exportadas para esto) y los pasa por `compararRatios`. Con filtro opcional
-por nombre ("dime lo de la paella").
-
-**Ojo con lo que devuelve, a propósito.** La banda del sector NO es para
-pisar lo medido: la boda a 9 pax/camarero sigue midiendo 19 eventos reales
-y sale "por-debajo" de la banda del sector (12-15) porque aquí se pone MÁS
-gente que el sector, no menos — eso ya estaba documentado en personal.js
-como decisión intencional, y la propia descripción de la herramienta se lo
-dice al modelo para que no lo lea como un fallo a corregir. Los ratios que
-de verdad se benefician de esto son los que nadie ha medido todavía
-(paella, cumpleaños, producción): ahí el sector es la única referencia que
-hay. Los números de `SECTOR` son de fuentes públicas recogidas el
-2026-08-25, **sin validar contra el equipo** — se lo dice la propia
-descripción de la herramienta al modelo, para que lo diga si alguien
-pregunta por su fiabilidad. La banda de la paella en concreto es la más
-floja de todas: sale de una ración genérica de arroz por persona, no de
-paelleras reales, y así queda anotado en el propio `sector.js`.
-
-**Lo que se dejó fuera de este PR, a propósito.** El punto 4 del diseño
-(`aplicar_ratio`, escribir el ajuste en `indice/ratios`) y el 5 (aviso
-nocturno determinista) estaban marcados "opcional" en `PLAN_MEJORAS.md`;
-esto es solo la parte de LEER y comparar. Cocina y "margen" se quedan fuera
-de la comparación en vivo (están en la tabla del sector como referencia,
-pero cocina no tiene un ratio único con el que compararla — depende del
-tramo de pax — y margen no es un ratio de cantidad, es una recomendación de
-precio): forzar un número ahí habría sido inventarlo, justo lo que este
-fichero existe para no hacer.
-
-**El aviso de "hay una versión nueva" no decía QUÉ traía, y no se notaba que
-el clic en Actualizar hacía algo.** Dos pedidos seguidos del dueño: que el
-banner enseñe los cambios (bugs arreglados, cosas nuevas) antes de recargar,
-y que el asistente también avise de la actualización, lea los cambios y
-confirme cuando ya se ha aplicado — no solo el banner de arriba, que hay
-quien abre directamente la Charla.
-
-1. **De dónde sale el texto.** Nuevo `src/cambios.js`: una lista a mano, con
-   revisión, no generada — mismo estilo que `precios.js` y `sector.js`.
-   Frases para quien carga el camión ("la voz suena más natural"), no para
-   quien programa ("fix(worker): ..."). La entrada más reciente va primero;
-   `ultimoCambio()` la da suelta. `vite.config.js` la importa y publica sus
-   `cambios` dentro de `version.json` en cada build — solo la última
-   entrada, no el historial entero: es un aviso que se ve de pasada, no una
-   página de notas.
-2. **El banner (App.jsx).** El fetch que ya comparaba `__BUILD_ID__` ahora
-   también lee `cambios` de `version.json` y los pinta en una lista dentro
-   del aviso. El botón "Actualizar" tenía un fallo real de UX: llamaba a
-   `window.location.reload()` sin más, así que en una conexión lenta no se
-   notaba que el clic había hecho algo hasta que la pantalla cambiaba de
-   golpe. Ahora pone el botón en "Actualizando…" (con icono `RefreshCw`
-   girando, `.icono-gira` — genérico, reusa el mismo `@keyframes` que ya
-   tenía `.asis-gira` del asistente) y espera **medio segundo antes de
-   recargar de verdad**. Ese medio segundo no es capricho: la primera
-   versión usaba un doble `requestAnimationFrame` (dos fotogramas, ~32ms)
-   pensando que bastaba con pintar el cambio antes de navegar — y sí se
-   pintaba, pero 32ms es tan imperceptible para una persona como no poner
-   nada, así que no arreglaba lo que se pedía arreglar. `setTimeout(…, 500)`
-   sí se nota.
-3. **El asistente confirma la actualización de verdad, no solo avisa.**
-   Nuevo `src/asistente/actualizacion.js`: `marcarActualizando(id, cambios)`
-   se llama justo antes de recargar y deja dicho a qué build se está
-   actualizando (en `localStorage`, `gula_actualizando_a`); `confirmaSiActualizado(buildActual)`
-   se llama al arrancar y, SOLO si el build de esta carga es justo el que se
-   esperaba, devuelve los cambios y borra la marca — así no se repite la
-   confirmación en cada arranque siguiente, y si la recarga no llegó a
-   aplicar la versión nueva (sin conexión, caché) no se inventa una
-   confirmación que no ha pasado. `avisosConfig.js` → `saludoPendientes()`
-   gana un quinto parámetro, `avisoActualizacion` (`{ cambios, aplicada }`):
-   compone "Hay una actualización disponible: …" o "Me acabo de
-   actualizar: …" según el momento, y va el PRIMERO de todo el saludo — es
-   lo más reciente que le ha pasado a la app. Como el resto de este
-   fichero, es determinista y sin nube: si `vozActiva` está puesta, se lee
-   en voz alta igual que cualquier otro saludo, sin cablear nada nuevo para
-   eso.
-4. **Cableado.** `contextoDelAsistente()` (contexto.js) gana el campo
-   `avisoActualizacion`, sin recorte (no lleva nada sensible, son las
-   mismas frases del banner). App.jsx lo calcula: `actualizacionAplicada`
-   se comprueba UNA vez al montar (`useState(() => confirmaSiActualizado(__BUILD_ID__))`);
-   si no hay nada que confirmar, se mira si hay una versión nueva esperando
-   y se compone el aviso "pendiente" en su lugar — nunca los dos a la vez,
-   uno es consecuencia del otro.
-
-**Cazado en pruebas, no a ojo:** intentar anular `window.location.reload`
-desde un test (`window.location.reload = () => {}`) no lanza pero tampoco
-hace nada — Chromium lo trata como "unforgeable" (protección del propio
-navegador). La primera versión de la prueba se quedó callada ahí (el clic
-disparaba una recarga de verdad, la página volvía al estado inicial, y la
-prueba veía "Actualizar" en vez de "Actualizando…" sin explicar por qué).
-Arreglado aprovechando el medio segundo de margen real: el test pulsa,
-espera bien por debajo de esos 500ms y comprueba el estado intermedio, y
-LUEGO espera a que la recarga de verdad llegue sola.
-
-**Cada uno puede elegir su voz de Gemini, no una fija para todo el equipo.**
-Tras el arreglo del modelo de voz, el dueño notó que sonaba con "Kore" (voz
-femenina por defecto) y preguntó por una más parecida a Jarvis; buscada la
-tabla de las ~30 voces de Gemini con su carácter (fuente de terceros — los
-dominios oficiales de Google siguen bloqueados desde aquí), la más cercana
-es "Charon" ("informativa y clara"). En vez de solo decir cuál poner a mano
-en Cloudflare, se preguntó si el propio asistente podía dejar elegir, y
-tiene más sentido: antes era UNA voz igual para todo el equipo
-(`GEMINI_TTS_VOZ`), puesta por quien instala el Worker, no por quien habla
-con el asistente cada día.
-
-1. **`src/asistente/vozGemini.js`** (nuevo): un puñado CURADO de 8 voces (no
-   las ~30 — un desplegable con "Sadaltager" y "Zubenelgenubi" sin
-   explicación es ilegible para quien no sabe qué es eso), cada una con su
-   tono en una frase. A mano, con revisión, no generado — mismo estilo que
-   `precios.js`/`sector.js`/`cambios.js`. `vozGeminiValida()` sanea contra
-   la lista; lo que no está en ella cae en `""` ("automática").
-2. **El selector, en Ajustes** (Asistente.jsx): chips iguales a los de nivel
-   y proveedor, con "Automática" (deja mandar al Worker, es el estado de
-   siempre) más las 8 curadas. Se guarda en `localStorage`
-   (`gula_asistente_voz_gemini`), por dispositivo — igual que la
-   personalidad o el nivel de permiso, cada uno el suyo.
-3. **De Ajustes al Worker**: la voz elegida viaja en `nube.voz` (Humano.jsx
-   → `hablar()` → `pedirVozDeNube()`, voz.js) hasta el cuerpo del POST a
-   `/__voz`. En el Worker, **se vuelve a validar contra la MISMA lista**
-   (`worker/index.js` importa `CLAVES_VOZ_GEMINI` directamente de
-   `src/asistente/vozGemini.js` — un único sitio con la lista, sin
-   duplicarla; rolldown la deja inlineada en `pegar.js` igual que ya hace
-   con `repaso.js`): no basta con que el cliente ya la valide, un cliente
-   cualquiera podría mandar lo que quisiera, y colarle a Gemini un
-   `voiceName` inventado tira la petición entera. La lógica de "qué voz
-   manda" se sacó a `vozElegida(vozCliente, env)`, exportada aparte —mismo
-   motivo que `clavesGemini()`: para poder probarla sin llamar a Gemini de
-   verdad—: la del cliente si es válida, si no `GEMINI_TTS_VOZ`, si no
-   "Kore", en ese orden.
-4. **Verificado con capturas** (CLAUDE.md lo exige para cambios visuales):
-   el arnés aislado de Asistente.jsx de siempre, en móvil y escritorio —
-   los 9 chips (Automática + 8) caben en dos filas sin desbordar en
-   ninguno de los dos anchos. Comprobado también por DOM directo que elegir
-   una voz activa su chip, desactiva "Automática", cambia la nota
-   explicativa y se guarda — el primer intento con `getByRole` de
-   Playwright se hizo un lío con dos botones de nombre parecido
-   ("Automático" del proveedor de chat vs "Automática" de la voz) y daba
-   timeouts raros; no era un fallo de verdad, así que se verificó por
-   consulta directa al DOM en vez de perseguir la causa exacta del lío de
-   Playwright.
-
-**Las Fantas se quedaban cortas: era la MEZCLA, no el volumen.** El dueño lo vio en
-eventos de verdad ("las fantas de naranja o limón se queda corto"). Confirmado ejecutando
-el código: para 100 pax salían 30 Fanta naranja y 26 limón (6,7% y 5,8% del mix) contra
-185 Coca normal (41,6%) — y el **Sprite (8,3%) pesaba más que cualquiera de las dos Fantas
-por separado**. La causa está documentada en el propio comentario de `calculos.js`: los
-cuatro refrescos sin calibrar (las dos Fantas, Aquarius, Sprite) se bajaron a la mitad en
-su día porque SUMABAN un 84% por encima de su fuente de calibración. Esa bajada estaba
-bien, pero **se aplicó a los cuatro por igual**, y ahí se coló el fallo: trató a la Fanta
-(que se bebe mucho) igual que al Sprite (que se bebe poco), dejando el reparto del revés
-respecto al mercado.
-
-Arreglado corrigiendo la mezcla **sin tocar el volumen**: los cuatro siguen sumando lo
-mismo (0,175 → 84 uds para 65 pax, idéntico a antes), así que el camión no lleva ni una
-unidad más y la Coca sigue clavada en su calibración (120/72/12). Fanta naranja 0,04→0,058
-y limón 0,035→0,051 (+47% cada una, 19→28 y 17→25 en el evento de 65 pax), a costa de
-Aquarius (0,05→0,030) y Sprite (0,05→0,036). Fuente: **Fanta lidera el segmento de cítricos
-en España con el 48,3% de cuota** (Nielsen IQ, cierre 2025) y cítricos es el segundo
-segmento tras las colas; como aquí solo se sirven tres cítricos (las dos Fantas y el
-Sprite), a Fanta le toca bastante más que ese 48,3%. Esa derivación vive en `sector.js`
-(`refrescos_citricos`, banda 70-85%) con su fuente y con el aviso de que es derivación, no
-dato directo — la prueba lee la banda de ahí en vez de repetirla, así que corregir el
-sector corrige la prueba sola. Cuatro pruebas nuevas: cada Fanta por encima del Sprite,
-naranja por encima de limón, la suma de los cuatro sin cambiar, y el % dentro de la banda.
-
-**La calibración ya alcanza a 8 bebidas, no a 4 (paso 1 de "ajustar al sector").** El
-comentario de `bebida.js` decía que "la tónica, el Red Bull o el vermut se mueven con
-estas". **No era verdad**, y es lo que hacía incontestable la pregunta del dueño "¿me sobra
-tónica?": al no estar en `BEBIDAS`, esas líneas no se podían medir de ninguna manera —
-por muchos eventos que se apuntaran con la vuelta puesta, `calibracionBebida` ni las
-miraba. Añadidos cuatro grupos: `tonica`, `vermut`, `tintoVerano` y `redbull`. **Ni una
-cantidad cambia**: el factor por defecto es 1 y multiplicar por 1 no mueve nada
-(confirmado — la tónica sigue en 23 para la boda de 100, la ginebra en 14/3).
-
-Dos decisiones de diseño que conviene no deshacer:
-
-1. **Los grupos van PEQUEÑOS a propósito** (una o dos líneas). `consumoDeBebida` descarta
-   el evento entero si falta la vuelta de UNA sola línea del grupo, así que un grupo
-   grande casi nunca junta los 3 eventos que hacen falta — el refresco, con sus 7 líneas,
-   es el que menos posibilidades tiene de todos. Meter las nuevas en un cajón de sastre
-   habría sido repetir ese error.
-2. **Cada grupo nuevo se cableó también en `calcBebidas`**, no solo en `BEBIDAS`. Si se
-   añade el grupo sin el cableado, aparece su casilla en el panel, se puede escribir un
-   número, se guarda en la nube… y la carga no cambia: **un control que miente**, que es
-   peor que no tenerlo. Hay una prueba estructural nueva que recorre `CLAVES_BEBIDA`, pone
-   cada factor a 0,5 y falla si alguno no mueve la carga — así el día que se añada el
-   noveno grupo, el olvido salta solo.
-
-Ojo con las etiquetas, que no se escriben como uno esperaría: la línea es **`Redbull`**
-(junta) y el tinto lleva el formato dentro, **`Tinto de verano (1,5L)`**. Un carácter de
-más y la calibración deja de encontrar la línea, en silencio.
-
-**Comprobado en pantalla** con un banco de pruebas temporal (borrado después, no se sube;
-el panel vive en Modo carga → Resumen, detrás del login, y no tenía banco propio). Los 8
-chips envuelven en 3 filas a 320px, 0 texto cortado y 0 desbordamiento horizontal a 320,
-390 y 1280px, sin errores de consola.
-
-**Y ahí salió un fallo visual de verdad que nadie había visto nunca.** Al pintar por
-primera vez una fila CON medición (`✓ 1,4 · 3 ev.`), a 320px el nombre del tipo de evento
-se quedaba en **0 píxeles de ancho** —medido, no a ojo— y se leía "Boc" en vez de "Boda".
-Causa: `.cal-ratio-nombre` llevaba `min-width: 0` (encoge hasta cero) y la insignia es
-`flex: 0 0 auto` (no encoge nunca), así que la insignia se quedaba con todo el sitio.
-**No lo había visto nadie porque esa insignia solo aparece con 3 eventos medidos, y nunca
-ha habido ninguno** — es decir, habría aparecido justo el día que la calibración
-empezara a servir para algo.
-
-Arreglado con `flex-wrap: wrap` en `.cal-ratio` y, en el nombre, `flex: 1 1 0` con
-`min-width: 5rem`. **El `1 1 0` es la parte que importa y costó dos intentos**: con
-`flex: 1 1 auto` (el primer intento) el navegador decide los saltos de línea mirando el
-tamaño NATURAL de cada hijo, y un nombre largo como "Producción / rodaje" mide 250px, así
-que empujaba el campo y el botón a una segunda línea en TODAS las filas —también en las
-normales, dejando el botón de volver huérfano y descolgado—. Con base 0 el nombre no
-fuerza ningún salto: las filas sin medición quedan exactamente como estaban (104px de
-nombre, 58px de alto, igual que antes de tocar nada) y solo baja la insignia cuando de
-verdad no cabe.
-
-**La batería completa cazó dos cosas que la rápida no ve.** Merece anotarse porque es
-justo el argumento de por qué existe el barrido de 45 minutos:
-
-1. **Una regresión de verdad, mía**: `app.test.mjs` afirmaba `chips.length === 4` ("con
-   las cuatro bebidas"). Al pasar a 8 se quedó obsoleto. Arreglado comparando contra
-   `CLAVES_BEBIDA.length` en vez de contra un número a mano — si algún día hay una novena
-   bebida, el test sigue valiendo en lugar de volver a romperse.
-2. **Un fallo PREEXISTENTE, no mío**, en Modo carga a 320px. Comprobado desactivando mis
-   dos reglas de CSS en caliente: los tres nombres seguían rotos igual, así que no era
-   una regresión. `.carga-cantidad` es `flex: 0 0 auto` (no encoge nunca) y hay items cuya
-   cantidad trae coletilla: **"475 (19 bateas de 25)" ocupa 155px de los 264 de la fila**,
-   dejando 27px para el nombre — que se veía a **4px**. "Vasos de agua", "Vasos de cubata"
-   y "Copas de vino" eran ilegibles justo cargando el camión. Arreglado con el mismo
-   patrón que el panel de bebida (`flex-wrap: wrap` en la fila + suelo de `min-width` en
-   el nombre): la cantidad baja a una segunda línea y se leen las dos cosas enteras.
-   Verificado en la app de verdad (no en un banco aislado): **0 nombres cortados de 134**,
-   sin desbordamiento, y las filas que ya cabían no cambian de alto.
-
-**Sigue SIN medir en casa, y hay un motivo estructural por el que nunca se iba a medir.**
-`calibracion.js` mide el grupo `refresco` ENTERO —sus 7 líneas— con **un solo factor**: si
-la Fanta se agota (100% consumida) y el Sprite vuelve lleno (20%), la media sale ≈1 y la
-app dice "todo correcto". **El factor corrige volumen, no mezcla**, y subirlo para arreglar
-la Fanta inflaría también la Coca, que está calibrada exacta. Encima `refresco` exige las 7
-líneas con la vuelta apuntada o descarta el evento (vino exige 2; cerveza y cava, 1), así
-que es con diferencia el grupo que menos probable es que llegue a los 3 eventos mínimos —
-probablemente no ha disparado nunca. **Calibrar por bebida individual está sin hacer** y es
-lo que cerraría esto de verdad.
-
-**Y los niños no mueven el reparto de refrescos.** Un evento de 100 pax con 30 niños da
-EXACTAMENTE los mismos 30 Fanta naranja y 111 Coca Zero que uno de 100 adultos: el total sí
-crece con ellos (`refrescoTotal` va sobre `pax`), pero la mezcla no sabe que existen, y un
-niño bebe Fanta, no Coca Zero. Sin tocar: es el punto de "coeficientes de niños" que sigue
-en Pendiente, y toca cantidades de camión.
-
-**`setsid` no existe en macOS.** `CLAUDE.md` manda lanzar la batería con `setsid nohup …`,
-que es de Linux (el contenedor de trabajo original). En el Mac del dueño devuelve
-`command not found` y **la batería no llega a arrancar, en silencio** — parece que corre y
-no corre nada. Con `nohup … &` a secas funciona igual de bien. Sin corregir la regla
-todavía.
-
-## Decidido NO hacer (y por qué)
-
-- **Partir `App.jsx` (3.979 líneas) / `index.css` (5.806).** Mucho riesgo, ganancia que
-  nadie ve. Ahí vive todo el estado de la checklist.
-- **Optimizar React** (0 `useCallback`, `ModalModoCarga` sin `useMemo`): sigue sin
-  medirse en el navegador. Lo que SÍ se midió (ver "Rendimiento: medido ANTES de tocar")
-  dice que la aritmética del calendario no es el problema — así que ningún `useMemo`
-  nuevo hasta tener el número de React pintando delante.
-- **Partir el CSS**: 18 kB comprimidos, clases del tramo final compartidas con la
-  checklist (`btn`, `form-input`, `link-roto`, `envio-*`…). Partirlo rompe el diseño.
-- **Firebase**: ya carga con `import()` dinámico en los tres sitios. Nada que ganar.
-
-## Rendimiento real (4G, CPU ×4, gzip como sirve GitHub Pages)
-
-| App | Red | Primer pintado |
-|---|---|---|
-| Checklist | 167 kB | 0,76 s |
-| Calendario | 150 kB | 0,66 s |
-| Formulario | 101 kB | 0,65 s |
-
-## Cómo probar lo que está tras el login
-
-`pruebas/calendario.html` monta los mismos componentes con datos inventados, sin nube:
-`?vacio=1`, `?pantalla=1`, `?solover=1`, `?promover=1`.
-
-Lo de `App.jsx` se prueba **simulando el arranque** en `sincronizacion.test.mjs`, contra
-un Firestore en memoria con las mismas reglas.
-
-## Recomendación actual
-
-**Parar de añadir y usarlo una semana.** Lo nuevo está probado contra datos inventados,
-no contra un septiembre con tres bodas el mismo día.
+## Fallos reales cazados en producción (resumen — detalle en cada commit)
+
+Lista corta y con enlace mental al fichero, no la narrativa completa de cada uno (ya
+está en el historial de git y en las pruebas que los cubren):
+
+- **`buildChecklist()` no leía `leerRatios()`** — cambiar el ratio de personal (a mano o
+  con el asistente) nunca llegaba a la checklist real, solo a la previsión del
+  calendario. Tres generadores arreglados.
+- **`App.jsx` nunca cargaba el ratio de personal de la nube** — mismo hueco que el
+  anterior, en la pantalla de al lado.
+- **"Eventos próximos" traía TODOS los guardados, pasados incluidos** — el modelo no
+  sabía qué día era; `cliente.js` ahora manda "Hoy es..." en cada pregunta.
+- **"Crear checklists" decía "Hecho" sin crear nada** — un segundo filtro de "próximo a
+  14 días", pensado para el arranque automático, descartaba en silencio lo que el
+  asistente ya había elegido a mano por id.
+- **Voz de Gemini muda sin avisar, dos veces** — el modelo de TTS por defecto quedó
+  retirado (404 silencioso → 502 → caía a la voz local sin rastro). Mismo motivo que ya
+  obligó a separar `GEMINI_MODEL` del chat: Google retira nombres de modelo sin avisar.
+- **La burbuja flotante se fijaba a la cabecera, no a la pantalla** —
+  `animation: ... both` deja el `transform` del último fotograma puesto PARA SIEMPRE, lo
+  que convierte al ancestro en el contenedor de cualquier `position: fixed` descendiente.
+  Arreglado con portal a `document.body` (mismo patrón que ya tenía el panel).
+- **El halo de la burbuja dejaba ver un cuadrado un instante** — animar `box-shadow`
+  hasta blur+spread en `0 0` a la vez pierde el recorte circular en algunos motores.
+  Arreglado dejando blur/spread siempre fijos, animando solo el color.
+- **Texto partido en columnas dentro de una nota flex** — varios nodos de texto sueltos
+  como hijos directos de un `display: flex` se convierten cada uno en su propio elemento
+  flex. Arreglado envolviendo todo el texto en un único `<span>`.
+- **La voz se quedaba muda en desarrollo (StrictMode)** — una marca de "ya dicho" se
+  ponía ANTES de esperar el token de sesión; con el doble montaje de StrictMode, el
+  primer montaje la marcaba y el remontado de verdad ya no decía nada.
+- **`aplicar_calibracion` y `aplicar_factor_bebida` escriben el mismo dato por dos
+  herramientas distintas** (una de #154, otra de esta rama) — duplicación conocida,
+  documentada, decisión de unificar pendiente del dueño.
+- **El logotipo "gula" quedaba a distinta distancia del pictograma en cada icono** —
+  14px en checklist, 38px en calendario, 6px en formulario: cada pictograma se dibujó a
+  su propio tamaño sin mirar dónde caía el logotipo (fijo en `y=404` en los tres SVG
+  fuente). Arreglado envolviendo cada pictograma en su propio `translate` para igualar
+  el hueco a 14px en los tres, variantes maskable incluidas. `sw.js` sube a `gula-v7`
+  (mismo fichero sin hash de siempre: sin subir `VERSION` el navegador seguiría
+  sirviendo los iconos viejos en caché).
+- **Modo carga · Vuelta a 320px partía nombres a media palabra** ("Regleta"/"s") — la
+  pastilla "vino todo" (~105px fijos) le dejaba al nombre menos de 80px de los 264 de la
+  fila. `overflow-wrap: anywhere` hacía lo que tenía que hacer con ese poco sitio; el
+  fallo era el sitio, no la regla. Arreglado con `min-width: 110px` en
+  `.carga-row-vuelta .carga-nombre`: ahora es la pastilla la que cae a su propia línea
+  cuando no cabe.
+- **El calendario arrancaba SIEMPRE en claro** — `aplicarTemaInicial()` se llama en el
+  arranque de la checklist y del formulario, pero se quedó fuera cuando el calendario se
+  separó en su propia carpeta/app. Ni el automático por horario (oscuro de noche, justo
+  cuando más se usa para logística) ni "oscuro" puesto a mano llegaban nunca ahí.
+  Arreglado en `calendario/main.jsx` y en su banco de pruebas (que tenía el mismo hueco:
+  por eso las capturas "oscuro" salían idénticas a las "claro").
+- **Solo Gemini/Claude/OpenAI se podían elegir a mano en Ajustes del asistente** — los
+  siete proveedores gratis de la cascada automática (Groq, Cerebras, Z.AI, Cloudflare,
+  Mistral, OpenRouter, NVIDIA) no tenían botón, aunque estuvieran configurados: solo
+  entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
+  puesta (`proveedoresUI.js`), mismo orden que la cascada.
+- **Las Fantas se quedaban cortas, y era la MEZCLA, no el volumen** — reportado en
+  eventos reales. La bajada a la mitad de los cuatro refrescos sin calibrar se aplicó a
+  los cuatro POR IGUAL, y dejó al Sprite (0,05) pesando más que cada Fanta por separado
+  (0,04 y 0,035), al revés de lo que dice el mercado (Fanta lidera los cítricos en España
+  con el 48,3%, Nielsen IQ cierre 2025). Corregida la mezcla manteniendo la suma (0,175):
+  el camión no lleva ni una unidad más y la Coca sigue clavada en su calibración
+  (120/72/12). Naranja 19→28, limón 17→25 para 65 pax. Banda derivada en `sector.js`
+  (`refrescos_citricos`), marcada como derivación y no dato directo; la prueba la lee de
+  ahí en vez de repetirla.
+- **La calibración solo veía 4 bebidas de las 8 que importan** — es la razón de fondo por
+  la que lo de las Fantas no se detectó nunca. `BEBIDAS` cubría vino, cerveza, cava y
+  refresco; la tónica, el vermut, el tinto de verano y el Red Bull **no se podían medir
+  de ninguna manera**, por muchos eventos que se apuntaran con la vuelta puesta. Añadidos
+  como grupos propios —pequeños a propósito, que `consumoDeBebida` descarta el evento
+  entero si falta UNA vuelta— y cableados también en `calcBebidas`. Ni una cantidad
+  cambia (el factor por defecto es 1). Prueba estructural que pone cada factor a 0,5 y
+  falla si alguno no mueve la carga: un control que miente es peor que no tenerlo.
+- **Modo carga · Salida a 320px aplastaba el nombre hasta 4px** — el hermano del fallo de
+  la *Vuelta* de más arriba, pero en las filas normales y sin arreglar hasta ahora.
+  `.carga-cantidad` es `flex: 0 0 auto` y su texto con coletilla ("475 (19 bateas de 25)")
+  ocupa 155px de los 264 de la fila, así que "Vasos de agua", "Vasos de cubata" y "Copas
+  de vino" se pintaban a 4, 3 y 2px: ilegibles cargando el camión. Mismo patrón de arreglo
+  que la Vuelta (`flex-wrap` en la fila + suelo de `min-width` en el nombre). Verificado
+  en la app de verdad: 0 nombres cortados de 134.
+- **El panel de bebida aplastaba el nombre del tipo de evento hasta 0px** — solo en las
+  filas CON insignia de "medido", que **nunca se habían llegado a pintar** porque no ha
+  habido jamás un factor medido. Habría aparecido justo el día que la calibración
+  empezara a servir para algo. Ojo al arreglo: `flex: 1 1 auto` en el nombre parecía
+  válido y rompía las filas normales, porque con `flex-wrap` el navegador decide los
+  saltos mirando el tamaño NATURAL de cada hijo. Con `flex: 1 1 0` el nombre ya no fuerza
+  saltos.
+
+## Qué queda pendiente ahora mismo (2026-09-07)
+
+Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo, igualar
+el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
+despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
+tanda de fusiones.
+
+**De la revisión de bebida (PR #233), tres cosas abiertas que necesitan al dueño:**
+
+1. **La tónica parece corta y no hay dato.** Con 17 botellas de ginebra salen 23 tónicas
+   (1,35 por botella) y la app dimensiona cristalería para 4 cubatas por persona. El
+   0,15/adulto no tiene ningún comentario que diga de dónde sale, a diferencia de casi
+   todo lo demás del fichero. No se ha tocado: subirla mete material en el camión. Lo que
+   sí se ha hecho es que **ahora se pueda medir** — apuntando la vuelta de la tónica, a
+   los 3 eventos la app propone el factor.
+2. **Los niños no mueven el reparto de refrescos.** Un evento de 100 pax con 30 niños da
+   EXACTAMENTE los mismos 30 Fanta naranja y 111 Coca Zero que uno de 100 adultos: el
+   total sí crece con ellos (`refrescoTotal` va sobre `pax`), pero la mezcla no sabe que
+   existen, y un niño bebe Fanta, no Coca Zero. Toca cantidades de camión, así que va con
+   los números delante.
+3. **Los 20 factores por tipo de evento siguen todos a 1.** Comprobado comparando las 48
+   líneas de bebida entre boda, comunión, corporativo y cumpleaños: **47 son idénticas**
+   (la única que cambia es el agua del personal, y por el número de camareros). Una
+   comunión carga exactamente el mismo vino y la misma cerveza que una boda. Es la
+   decisión documentada en `bebida.js` —no inventar lo que nadie ha medido— pero conviene
+   saber que el tipo de evento hoy no mueve ni una botella.
+
+**Formulario: buffets configuran mesas de verdad, y reorden por bloques — HECHO
+(PR #184, tras #182/#183 ya fusionados)**:
+
+- **Buffets**: era texto libre a notas, sin mover ni un número de la checklist.
+  Ahora es marcado múltiple (quesos, dulce/candy bar, ibéricos, croquetas, fruta,
+  otro) con su nº de mesas cada uno; el total (`numMesasBuffet`) llega a la
+  checklist como línea nueva "Mesas de buffet" en boda/cumpleaños (que antes no
+  existía en absoluto) y en producción sube el mínimo de siempre por pax sin
+  bajarlo nunca. La línea de notas se sigue viendo igual que antes
+  (`resumirRespuesta()` la reconstruye).
+- **Reorden del formulario**: las ~44 preguntas de `PREGUNTAS`
+  (`src/formulario/preguntas.js`) se agruparon en 11 bloques temáticos
+  contiguos — antes cocina/equipamiento y mobiliario de exterior estaban partidos
+  en dos sitios distintos de la lista. Confirmado antes de tocar nada que el orden
+  es 100% independiente de cómo llega el dato a la checklist
+  (`aRespuestasDeLaApp()` lee por `id`, `Formulario.jsx` navega el array sin
+  ningún índice fijo) — solo hace falta respetar las dependencias `si:`
+  (tamanoPaella/cuantasPaellas tras menu, entrantePersonas tras entrante,
+  estiloPlatoPostre tras estiloPlato), que se mantienen.
+- Auditoría completa de integración formulario↔checklist a petición del dueño
+  ("que se auto-configure"): comparados los 92 campos que la app puede configurar
+  contra lo que ya rellena el formulario. Todo lo que falta está excluido a
+  propósito (personal, tarifas, logística — decisiones que la oficina no puede
+  saber) o ya se auto-deriva de un dato ya recogido (la temporada verano/invierno
+  sale sola de la fecha). El dueño confirmó que no hace falta subir de nivel nada
+  más por ahora.
+- **Iconos animados del formulario — HECHO**: `FondoIconos.jsx`
+  (`ICONOS_POR_PREGUNTA`) rellenado para las ~26 preguntas que caían en el icono
+  genérico por defecto (carpas, parabanes, buffets, alergias...), y quitadas las
+  dos entradas muertas (`sombra`, `carpasAlquiler`, preguntas que ya no existen).
+  La animación en sí (iconos flotando de fondo, cambian con la pregunta) ya
+  existía y ya es CSS puro y respeta `prefers-reduced-motion` — no hizo falta
+  construir nada nuevo, solo completar el mapa. Verificado con capturas en
+  `npm run dev`.
+- **Iconos en primer plano (título y opciones) — HECHO**: el mismo juego de
+  iconos por pregunta de `FondoIconos.jsx` se reutiliza ahora también delante:
+  `iconoDePregunta()` pone uno fijo junto al `<h1>` de cada pregunta, y
+  `iconoDeOpcion()` uno por cada botón de opción/casilla (rotando el juego si
+  hay más opciones que iconos) — nada nuevo que mantener, un solo mapa de datos
+  para fondo y primer plano. De paso se corrigió un desajuste: en `tipo` el
+  orden de iconos no coincidía con `TIPOS_EVENTO` (Cake y Briefcase estaban
+  cambiados), invisible mientras solo era fondo pero que se notaría de golpe en
+  un botón. Verificado con capturas en claro y oscuro.
+- **"El entrante para compartir, ¿cada cuántas?" ya no se queda solo en 3 o 4 —
+  HECHO**: tercera opción "Otro número" con su propio `conNumero`, mismo patrón
+  que "¿Cuántas paellas?". El número va a `entrantePersonasOtras` y
+  `aRespuestasDeLaApp()` lo usa en vez del valor fijo cuando se elige "otras".
+
+**Dos bugs reales encontrados por captura de pantalla del dueño — HECHO**:
+- **Calendario, campo "Nombre" de quien trabaja invisible en desktop**:
+  `.cal-asignado` (grid, `calendario.css`) daba a "horario" una columna `auto`
+  sin tope, que se comía todo su ancho de contenido ANTES de que "nombre" (1fr)
+  viera un solo píxel — con el modal a su ancho normal (~490px de fila),
+  rol+horario+quitar ya sumaban más que la fila entera, y el campo del nombre
+  se quedaba en 0px. Arreglado dándole a "horario" `minmax(0, min-content)`
+  (se ofrece encogido, envolviendo sus campos en dos líneas, que es lo que ya
+  sabía hacer) y a "nombre" un suelo de verdad (`minmax(140px, 1fr)`).
+- **Asistente, el selector de proveedores se reseteaba a solo Gemini**:
+  `disponibles` (lo que el Worker dice que tiene configurado) solo vivía en
+  estado de React, sin guardarse — a diferencia de la URL o el proveedor
+  elegido, que sí se guardan. Cada apertura del Asistente lo perdía hasta la
+  siguiente pregunta. Arreglado guardándolo con `leerJSON`/`guardarJSON`
+  (`gula_asistente_disponibles`), igual que el resto de ajustes.
+
+**Calendario, dos apuntes iguales el mismo día ahora se distinguen — HECHO**:
+pedido por el dueño ("dos camiones Covey" que se veían idénticos). Nueva
+`numeraRepetidos(lista)` en `apuntes.js`: numera SOLO los apuntes de un día que
+comparten título tal cual ("Camión Covey 1" / "Camión Covey 2"); un día sin
+repetidos no se toca. Se usa tanto en el chip del mes como en el panel del día.
+
+**Formulario, icono también en la pantalla de "qué evento es" — HECHO**: la
+pantalla de elegir evento (`paso === -1`) tenía su propio `<h1>`/botones, fuera
+del recorrido normal de preguntas, así que se había quedado sin el icono de
+título/opción de la ronda anterior. Título con `iconoDePregunta("elegir")`, y
+cada evento de la lista con el icono de su tipo (`iconoDeOpcion("tipo", ...)`,
+buscando el índice en `TIPOS_EVENTO`) — mismo Heart/Church/Briefcase/Cake/
+Clapperboard que ya se usa en la pregunta "tipo".
+
+**Buffets, "Otro" admite varios distintos con su propio nombre — HECHO**: antes
+"Otro" en la pregunta de buffets era una casilla más con un número, sin decir
+QUÉ era (había que aclararlo en el comentario libre). Ahora abre una lista
+(`conLista`/`campoLista`, nuevo en `preguntas.js` y `Formulario.jsx`): cada fila
+tiene su nombre ("gildas", "rincón de gin-tonics"...) y sus propias mesas,
+sumadas al total de `numMesasBuffet` igual que el resto. La nota del evento sale
+como "gildas (1), rincón de gin-tonics (2)" en vez de un número suelto.
+
+**Plato de postre: azul y naranja — HECHO**: pedido explícito, colores reales
+que antes solo se podían meter a mano en "Otro". Dos opciones más en
+`estiloPlatoPostre`, mismo mecanismo que las demás.
+
+**Iconos del formulario, también animados en primer plano — HECHO**: el icono
+del título y el de cada opción entran con un "pop" (escala + giro leve,
+`form-icono-entra`, 0.4s), con un pelín de escalonado entre opciones para que
+no salten todas a la vez. Respeta `prefers-reduced-motion`. El fondo flotante
+ya estaba animado; esto era lo que faltaba en primer plano.
+
+**Service worker: gula-v7 → gula-v8, sin cambiar iconos**: un dueño con la app
+instalada desde antes del arreglo de distancia (#173/v7) seguía viendo el
+icono viejo tras desinstalar y reinstalar el acceso directo. Medido píxel a
+píxel: los tres iconos (192, 512, maskable) ya tenían el mismo hueco — el
+problema era la caché del origen, que un acceso directo no toca. Subir la
+versión fuerza un purgado más para quien se haya quedado atascado.
+
+**Cajas de madera para alturas del buffet: de "—" fijo a un número real —
+HECHO**: iba siempre a ojo, hubiera buffet o no. Ahora con buffet calcula de
+verdad (`alturasBuffet()` en `calculos.js`): mínimo 2, y nunca más de 6 —
+en el almacén hay 4 de madera y 2 de plástico, así que no puede pedir más de
+lo que hay. Sin buffet se queda en "—" como siempre. En boda/comunión/
+corporativo y en producción (cumpleaños no tenía esta línea).
+
+**Hielo: se puede decir que no hace falta — HECHO**: antes se cargaba siempre,
+sin preguntar (kilos, bolsas y taxis enteros de más en un sitio que ya lo da,
+o en un evento que no lo necesita). Nueva pregunta "¿Llevamos hielo?" tras
+congelador; con "No hace falta" (`llevaHielo: false`), `calcBebidas()` no
+calcula nada y la línea "Hielo" se apaga en checklist (boda/comunión/
+corporativo, cumpleaños y producción, cada uno con su propia fórmula).
+
+**Elegir evento: distinguir los que ya se mandaron — HECHO**: en la pantalla de
+elegir evento, los que ya se enviaron desde este móvil se marcan con borde/fondo
+verde y un ✓ (mismo criterio que ya usaba el aviso "Ya mandaste datos de..." del
+repaso). Antes cada pantalla comparaba el nombre a su manera con el mismo código
+repetido dos veces; ahora ambas llaman a `buscarEnvioPorNombre()` (`mios.js`).
+De paso, aclarado: la lista de "Ver lo que he mandado" vive en el propio
+navegador (localStorage) — si se borran los datos del sitio (recomendado antes
+para forzar el icono nuevo) se pierde esa lista cómoda, aunque lo mandado sigue
+a salvo en la nube. Y confirmado que reenviar el mismo evento NO duplica: cada
+envío es un documento nuevo en `envios/`, y el aviso de "ya mandaste esto" es
+un recordatorio, no un bloqueo — mandar una corrección aposta es un caso válido.
+
+**Excepciones de mesa: de texto libre a casillas con su número de mesas —
+HECHO**: "cubiertos de pescado en la mesa 4, cristalería aparte en la 7..." se
+escribía a mano y se leía distinto cada vez. Ahora es una pregunta `marcar`
+(mismo patrón que buffets: doble tenedor, doble cuchillo, cristalería aparte,
+menú infantil, otro — cada una con "Cantidad en mesa"), y la línea de notas
+del evento se reconstruye con `resumirRespuesta()` igual que ya hace buffets,
+así que se lee siempre igual: "Doble tenedor (3), Cristalería aparte (2)". No
+toca el cálculo agregado por pax que ya existe (cubiertos/copas totales), lo
+complementa — sigue siendo una excepción sobre el aviso, no un editor mesa a
+mesa.
+
+**Menú: jamonero movido a "extras", "dos platos principales" aclarado —
+HECHO**: dos hallazgos revisando el formulario a fondo, a petición del dueño.
+(1) "Jamonero" vivía en "¿Qué lleva el menú?", junto a la paella, pero no es
+comida del menú — es un servicio que se presupuesta, como el desayuno, con
+quien además comparte fórmula (`platosPostreExtra` suma jamonero + tarta +
+desayuno en `checklist-generadores.js`). Movido a "¿Está presupuestado algo
+de esto?", junto al desayuno. De paso corregido un efecto secundario real:
+como la lectura de jamonero antes vivía FUERA del reparto boda/rodaje, un
+envío de producción sobreescribía `llevaJamonero` a `false` siempre —
+aunque se hubiera puesto a mano en la app — porque la opción no se ofrecía
+ahí (`soloEn` la excluye) y `marcado()` daba `false` igualmente. Ahora, al
+vivir dentro del bloque de "extras" (que ya no se procesa para producción),
+un envío de rodaje simplemente no lo toca, como el resto del formulario.
+(2) "Dos platos principales" dobla cubiertos, copas Y platos en toda la
+checklist (es el mismo interruptor "Doble servicio" de la app: "dobla
+cubierto, copa y plato") — para cuando se sirven los DOS platos a cada
+invitado, uno detrás de otro. El texto no lo dejaba claro y podía
+confundirse con un menú que simplemente deja elegir uno de los dos (que no
+dobla nada). Aclarado con nota en la pregunta y texto de la opción más
+explícito ("se sirven los dos"); el valor guardado (`dosPlatos`) no cambió.
+
+**Plato de postre: añadida "Relieve blanco" — HECHO**: ya existía en el plato
+principal (`estiloPlato`) pero faltaba en el de postre, para cuando el postre
+se sirve en el mismo plato grande en vez de uno pequeño aparte. "Verde" ya
+estaba en los dos desde antes. Sin tocar ningún valor existente (serían el
+label literal de la línea de checklist — un rename sin migración según
+CLAUDE.md), solo se añadió la opción nueva.
+
+**"¿Llevamos hielo?" solo si NO se lleva congelador — HECHO**: no tiene
+sentido llevar congelador y no querer hielo, así que la pregunta (justo
+después de "¿Y congelador?") ahora solo aparece cuando se contesta "No
+lleva" ahí. Con congelador (mediano o grande) se salta directo a la
+siguiente pregunta y se asume que sí hace falta hielo, como siempre.
+
+**Formulario reordenado en 11 bloques temáticos — HECHO**: repaso a fondo
+pedido por el dueño tras varias rondas añadiendo preguntas cerca de lo que
+había en cada momento, no según un mapa pensado de principio a fin. Solo
+cambia el ORDEN del array `PREGUNTAS` — ningún id/valor/campoNumero/soloEn/
+si/conNumero/conCampos/conArchivo se toca, así que es seguro por diseño
+(`aRespuestasDeLaApp()` lee por id, `Formulario.jsx` navega el array
+dinámicamente, ninguno de los dos depende de la posición). La mayoría del
+orden ya coincidía con el mapa de 11 bloques (sitio y mobiliario exterior,
+barra, menú, cocina, alquileres, excepciones, mantelería, recogidas,
+impresión de producción, cierre) de rondas anteriores; solo hacía falta
+mover "¿Hay que imprimir el menú?"/"¿etiquetas?" (solo producción) del
+hueco justo después de "¿Algo distinto de lo normal?" al final, junto a
+"comprar"/"alergias", que es donde de verdad encaja (justo antes del
+cierre, no en medio del bloque de mobiliario/cocina). Verificado con
+`npm run test:rapido` en verde SIN tocar `sincronizacion.test.mjs` (la
+prueba de que el orden no afecta al dato) y recorrido visual completo de
+los tres tipos de evento con Playwright.
+
+**Elegir evento: distinguir configurados de sin configurar — HECHO**: el
+evento ya llevaba la señal exacta que hacía falta —`sinConfigurar`
+(App.jsx): la pone el calendario al crear un evento en blanco (solo tipo/
+día/sitio/pax) y se quita sola al aplicar un formulario, o a mano con
+"Ya está configurado". `resumirParaOficina()` (envios.js) ahora también
+publica `configurado: !sinConfigurar` en la lista corta que ve el
+formulario. En "¿De qué evento son los datos?": los sin configurar salen
+primero (son los que de verdad hace falta rellenar) y los ya configurados
+al final, con un badge neutro "Ya configurado" — distinto del check verde
+de "ya te mandé algo" (PR #195), que es otra señal aparte y puede darse a
+la vez. Al vivir en el documento del evento en Firestore (no en
+localStorage de un móvil), sale igual para cualquiera que abra el enlace
+del formulario, sin depender de qué móvil lo mire.
+
+**Entrante: opción "Individual" — HECHO**: la pregunta "El entrante para
+compartir, ¿cada cuántas personas?" solo tenía 3, 4 u "otro número" —
+para un entrante que en realidad es individual (un plato por persona,
+no compartido) había que marcar "compartir" y escribir "1" a mano en
+"otro número", que no tiene sentido llamarlo "compartir". Añadida
+"Individual (un plato por persona)" como opción de serie (`valor: 1`),
+delante de las de 3/4 — usa el mismo cálculo que ya existía
+(`personasPorPlatoEntrante = 1` da exactamente un plato extra por
+persona), sin tocar la fórmula.
+
+**Cristalería: pregunta independiente de la barra libre — HECHO**: "Cristalería
+aparte" (en excepciones de mesa) confundía al dueño con otra cosa; lo que hacía falta
+era una pregunta nueva, "¿Llevamos cristalería?" (`preguntas.js`, tras "copas"),
+que a propósito NO depende de cóctel/copas (`si:` ninguno) — puede que no haya barra
+libre y aun así se sirva vino/agua/cava con la comida. `calcCristaleria()`
+(`calculos.js`) admite ahora `llevaCristaleria` (por defecto `true`, para no
+tocar ningún evento ya guardado); a `false` devuelve todo a cero y las líneas de
+"Vasos de agua", "Copas de vino" y "Copas de cava" desaparecen de la checklist
+(`opt(...)`, boda y cumpleaños — producción no lleva cristalería). Cableado igual
+que "Jarras de cristal": estado propio en `App.jsx` (con su casilla manual en
+Vajilla/Cristalería, por si hay que corregirlo a mano) y `getEstadoActual()`,
+para que lo que conteste el formulario se vea también en la checklist real, no
+solo en la calibración del asistente.
+
+**Buffets: desmarcar todos ahora baja las mesas a 0 — HECHO**: bug real, encontrado
+al auditar la checklist a fondo. `aRespuestasDeLaApp()` solo escribía
+`numMesasBuffet` cuando `r.buffets.length > 0` — si un evento ya tenía mesas de un
+envío anterior y llegaba una CORRECCIÓN desmarcando todos los buffets, `r.buffets`
+llegaba como `[]` (Formulario.jsx inicializa así una pantalla de "marcar" que se
+pasó sin marcar nada) pero el `if` no entraba, y `numMesasBuffet` se quedaba con el
+número viejo — la checklist seguía enseñando mesas de buffet que ya no había.
+Arreglado distinguiendo "nunca se contestó" (`r.buffets === undefined`, no se toca,
+igual que siempre) de "se contestó y no se marcó ninguno" (`Array.isArray(r.buffets)`
+aunque esté vacío → `numMesasBuffet = 0` explícito). Un test afirmaba a propósito el
+comportamiento viejo ("no se toca" con `buffets: []`); corregido para esperar `0`.
+
+**Mesa alta: por nº de barras, no una fórmula fija por pax — HECHO**: segundo punto
+de la misma tarea de buffets. Antes `mesasAltas = hayBarra ? Math.max(2, pax/15) :
+0` (solo en boda/comunión/corporativo, ni cumpleaños ni producción llevan "Mesa
+alta"). Ahora hay una pregunta "¿Cuántas barras se van a montar?" (tras
+"cristalería", solo si cóctel o copas tienen horas contestadas — sin barra no tiene
+sentido preguntarlo) y `calcMesasAltas(pax, numBarras)` en `calculos.js`: 2 mesas por
+barra, 4 si son 100 pax o más; sin contestar (`numBarras` a 0/undefined) cae sola al
+cálculo viejo por pax, así que un evento guardado antes de esto sigue dando el mismo
+número de siempre. Cableado en `App.jsx` igual que "Nº de mesas de buffet": estado
+propio con su casilla manual (solo boda/comunión/corporativo, gastado el mismo
+criterio que "Jarras de cristal"), y "pudiendo modificarlas" ya lo cubre el mecanismo
+genérico de `overridesManuales` que tiene toda la checklist — no hacía falta nada
+nuevo para eso.
+
+**Elegir evento: separar visualmente los configurados de los que no — HECHO**: el
+badge "Ya configurado" (PR #201) no era suficiente para el dueño — pidió primero
+colorear la tarjeta, y viendo la lista real, separar los dos grupos del todo. Ahora
+la tarjeta entera de un evento configurado lleva un fondo gris neutro (`.es-configurado`
+en `index.css`, a juego con el badge), y si además ya se le mandó algo desde este
+móvil manda el verde de `.es-enviado` (regla combinada, es la señal más útil ahora
+mismo). Y como `lista` ya venía ordenada (sin configurar primero — PR #201), se
+localiza dónde empieza el bloque de configurados (`primerConfiguradoIdx`) y se mete
+un separador con su rótulo justo ahí (`Formulario.jsx`, envolviendo cada fila en un
+`Fragment` con key para poder intercalarlo); si no hay mezcla de los dos grupos, no
+sale separador. Verificado con una maqueta estática cargando el CSS real compilado
+(la lista poblada de "próximos eventos" no se puede simular en este entorno — mismo
+límite ya documentado en PR #195/#201, Firestore no es alcanzable offline).
+
+**Elegir evento: el gris de "ya configurado" se veía casi invisible — HECHO**: el
+dueño mandó una captura real de producción — el 6% de opacidad de `.es-configurado`
+no se distinguía del resto en el tema oscuro, solo se notaba por la etiqueta y el
+separador, no por color. Subido a 16% de opacidad y borde `--border-color-strong`
+(mismo gris neutro, más fuerte); sigue sin competir con el verde de `.es-enviado`,
+que manda cuando se dan las dos cosas a la vez. Verificado con la misma maqueta
+estática, en claro y oscuro.
+
+**Plato de postre: "Mismo que el principal" — HECHO**: el dueño explicó que muchas
+veces el postre se sirve en el MISMO plato (grande) que el principal, no en uno
+pequeño aparte — obligar a repetir a mano el mismo color en la pregunta de postre no
+tenía sentido. Nueva opción, primera de la lista en `estiloPlatoPostre`: "El mismo
+que el principal (no uno pequeño de postre)". Al marcarla, `aRespuestasDeLaApp()`
+copia el valor ya resuelto de `estiloPlatoPrincipal` (la pregunta de arriba se
+procesa antes, así que ya está puesto — funciona igual si el principal se escribió
+a mano en "Otro"). Solo cambia la ETIQUETA del plato de postre en la checklist; la
+cantidad (`platosDoble + platosPostreExtra`) no se toca, sigue siendo un curso
+aparte que necesita sus propias unidades físicas.
+
+**"Primero + segundo": cubiertos y cristalería doblan por separado, no todo a la vez
+— HECHO**: había DOS mecanismos distintos sobre "doblar" que se pisaban: el menú
+("Dos platos principales") doblaba TODO (cubiertos+cristalería+plato) de golpe vía
+`dobleServicio`, y `excepcionesMesa` tenía "Doble tenedor"/"Doble cuchillo"/
+"Cristalería aparte" para UNA mesa concreta — el dueño pidió unificarlo:
+- La opción se renombra a "Primero + segundo (se sirven los dos)". Sigue doblando
+  el PLATO siempre (`dobleServicio`, sin tocar).
+- Nueva pregunta de seguimiento, "¿Qué se dobla?" (`queDobla`, tras el menú, solo si
+  se marcó "primero + segundo"): cubiertos (tenedor/cuchillo/cuchara) y cristalería
+  (vino/agua/cava), cada uno su propia casilla. Por defecto vienen marcados los
+  cubiertos (lo normal) y SIN marcar la cristalería — la misma copa se rellena
+  durante toda la comida, no suele doblar, pero se puede marcar si hace falta.
+  Nuevo mecanismo genérico en `Formulario.jsx`: `porDefecto` en una pregunta `marcar`
+  la muestra premarcada con esa lista en vez de partir siempre de `[]`.
+- `calcCristaleria()` (`calculos.js`): su parámetro `dobleCopa` ahora acepta también
+  un objeto `{vino, agua, cava}` con un flag por tipo (antes solo booleano, que dobla
+  vino+agua igual y nunca cava — ese comportamiento se conserva tal cual si se sigue
+  pasando un booleano, retrocompatible). `checklist-generadores.js`: `cubiertosDoble`
+  (una cuenta compartida) pasa a tres — `tenedorDoble`/`cuchilloDoble`/`cucharaDoble`
+  — cada una con su propio flag (`dobleTenedor`/`dobleCuchillo`/`dobleCuchara`, con
+  fallback a `dobleServicio` si no se contestó el seguimiento — eventos de antes de
+  esta tarea siguen calculando exactamente igual que siempre).
+- `excepcionesMesa` pierde "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" —
+  ya las cubre la pregunta de seguimiento (que es del evento entero, que es lo que
+  el dueño quería de verdad). Quedan solo "Menú infantil" y "Otro", genuinamente por
+  mesa; el caso raro de una mesa suelta con doble cubierto se resuelve editando la
+  línea a mano en la app (`overridesManuales`, ya existente).
+- Cableado en App.jsx: seis casillas nuevas junto a "Doble servicio" (que ahora dice
+  "dobla el plato", ya no "cubierto, copa y plato"), con el mismo fallback a
+  `dobleServicio` al cargar un evento antiguo.
+
+**"Bebida aparte": el cliente/la finca trae su propia bebida — HECHO**: con barra
+libre (cóctel o copas) la respuesta de quién pone la bebida y la cristalería es
+obvia — las pone Gula, siempre — así que las dos preguntas ("¿La bebida la trae el
+cliente/la finca, o la sirve Gula?", nueva, y "¿Llevamos cristalería?", de PR #203)
+ahora solo se hacen cuando NO hay barra libre (`si: (r) => !(coctel>0) &&
+!(copas>0)`, `preguntas.js`), que es el único caso realmente ambiguo. Con barra, se
+saltan y se calcula todo como siempre.
+- `calcBebidas()` (`calculos.js`) gana `llevaBebida = true`: a `false` pone a cero
+  TODO el alcohol y los refrescos (cerveza, vinos, cava, refrescos, tónica,
+  redbull...) — el hielo, que tiene su propio interruptor (`llevaHielo`) y es
+  aparte de la bebida, se sigue calculando igual (movido al principio de la
+  función, antes del corte, para que no dependa de `llevaBebida`). El agua para el
+  personal ya vivía en `calcPersonal()`, una función totalmente aparte — no hace
+  falta tocar nada ahí, ya estaba desacoplada.
+  Las líneas de bebida en la checklist quedan a "0" (no null): ahí siempre se ha
+  visto el número, nunca una línea que desaparece — a diferencia de cristalería o
+  hielo, que si se apagan sí quitan la línea entera.
+- Los vasos de cubata (ligados a horas de copas, no a esto) no se tocan.
+- `aRespuestasDeLaApp()`: `estado.llevaBebida = r.bebidaAparte === "no"` ("no" =
+  "la sirve Gula" = sí se calcula).
+
+**El aviso de "hay una versión nueva" llevaba dos semanas mostrando lo mismo —
+HECHO**: `cambios.js` se mantiene a mano (mismo estilo que `precios.js`/`sector.js`) y
+nadie la había tocado desde el 2026-08-25, así que el banner de la checklist llevaba
+~30 PRs de fondo sin decir nada de lo que de verdad había cambiado — el dueño lo cazó
+al ver siempre la misma nota. Añadida una entrada nueva con las mejoras reales más
+recientes, en el idioma de quien carga el camión, no del código. **A partir de
+ahora, tocar `cambios.js` en el mismo commit de cualquier cambio con impacto de
+usuario, igual que `CONTEXTO.md`** — si no, vuelve a quedarse atrás.
+
+**Calendario: la fila de "Asignados" se veía rota en pantallas anchas — HECHO**: el
+dueño mandó una captura real de producción — en "Editar apunte" el nombre de una
+persona parecía flotar entre la hora de entrada de ARRIBA y el importe/horas de
+ABAJO, como si fueran de otra persona. Causa real: a partir de 560px `.cal-asignado`
+pasa a una sola fila con `horario` encogido a `min-content` (`calendario.css`); si su
+contenido no cabe entero, envuelve en varias líneas dentro de esa columna, y con
+`align-items: center` las celdas nombre/rol/quitar (de una sola línea) quedaban
+centradas verticalmente contra ese bloque alto — el nombre acababa a media altura del
+horario de al lado. Con el modal a su ancho fijo (520px), esto pasa en CASI cualquier
+pantalla que no sea un móvil estrecho, no es un caso raro. Arreglado con
+`align-items: start` en ese breakpoint (todo se lee de arriba abajo, junto a la
+primera línea de horario) y un borde separador entre cada persona (`border-bottom` en
+`.cal-asignado`, quitado en la última) para que nunca se confundan dos filas
+distintas aunque una envuelva. Verificado en vivo con el banco de pruebas
+(`pruebas/calendario.html`), añadiendo gente de mentira a un evento y probando 320,
+390, 700 y 900px en claro y oscuro.
+
+**"Mesa alta" se quedaba en "—" sin barra libre aunque SÍ se llevaran — HECHO**: caso
+real del dueño ("Antoine y María" — bebida aparte, sin barra libre ni de cóctel ni de
+copas, pero sí lleva mesas altas y cristalería). La checklist tenía `mesasAltas =
+hayBarra ? calcMesasAltas(pax, numBarras) : 0` (`checklist-generadores.js`): sin
+barra, el "Nº de barras" contestado a mano en la app se ignoraba del todo — el único
+interruptor para pedir mesas altas sin barra no servía de nada. Arreglado a
+`(hayBarra || numBarras) ? calcMesasAltas(...) : 0`: con barra, igual que siempre (cae
+al cálculo por pax si no se contesta); sin barra, se queda en "—" salvo que se
+conteste "Nº de barras" a mano, que entonces manda igual que con barra. Nada nuevo que
+rellenar: ese campo ya estaba siempre visible en boda/comunión/corporativo, solo que
+no hacía nada sin barra. Verificado en vivo con un evento de mentira igual al real
+(sin cóctel ni copas, "Nº de barras": 1 → "Mesa alta: 2").
+
+**Y el formulario tampoco lo preguntaba sin barra libre — mismo commit, mismo hallazgo
+del dueño, HECHO**: el arreglo de arriba deja el campo funcionando en la app, pero la
+pregunta "numBarras" del formulario (`preguntas.js`) tenía `si: (r) => coctel>0 ||
+copas>0` — sin barra, la oficina no podía contestarlo desde el envío y alguien tenía
+que acordarse de rellenarlo a mano en la app después. Quitado el `si:`: ahora se
+pregunta siempre en los tipos con barra (`CON_BARRA`), texto reescrito para que tenga
+sentido sin barra libre ("¿Cuántas barras hacen falta para las mesas altas?", con nota
+aclarando que se pregunta aunque no haya barra libre). Sin contestar, sigue sin
+tocarse (mismo patrón de siempre) — un evento con barra de verdad se comporta
+exactamente igual que antes. Verificado en vivo: la pregunta sale con cóctel y copas a
+0 horas.
+
+**Auditoría a fondo pedida por el dueño (funcionalidad, duplicidad, escalabilidad,
+responsive) — HECHO, un fallo real encontrado y arreglado**:
+
+- **`llevaHielo` y `llevaBebida` nunca llegaban a la checklist real — el hallazgo
+  gordo**. `aRespuestasDeLaApp()` (`preguntas.js`) calculaba bien las dos, y
+  `calcBebidas()`/los tres generadores las aceptaban y usaban bien — pero `App.jsx`
+  no las tenía en NINGÚN sitio: ni `useState`, ni `SETTERS_SYNC` (el mapa que aplica
+  un envío del formulario), ni el objeto `opts` que de verdad llega a `buildChecklist`,
+  ni una casilla para tocarlo a mano. Resultado: contestar "no hace falta hielo" o
+  "la bebida la trae el cliente" en el formulario se guardaba, pero la checklist
+  seguía pidiendo hielo y bebida completos como si nadie hubiera contestado nada —
+  exactamente el mismo patrón de fallo silencioso que ya cazó antes "`buildChecklist()`
+  no leía `leerRatios()`". Arreglado replicando el cableado completo que ya tenía
+  `llevaCristaleria` (mismo patrón, en los mismos 6-7 sitios): `useState`, entrada en
+  `SETTERS_SYNC`, en `opts` y su array de dependencias, en `ETIQUETAS_CAMPO`, y una
+  casilla manual junto a "Llevamos cristalería" (`llevaBebida` no sale en producción,
+  que no usa `calcBebidas`; `llevaHielo` sí, en los cinco tipos). Nuevo test en
+  `app.test.mjs` que desmarca las dos casillas en la app REAL (no en `buildChecklist`
+  directo, que es justo lo que no habría cazado este fallo) y comprueba que la
+  checklist cambia de verdad — para que esta clase de fallo no vuelva a colarse en
+  silencio.
+- **Limpieza menor, de paso**: `calcCristaleria()` le faltaba la línea `@param` de
+  `llevaCristaleria` en el JSDoc (añadida). Y la fórmula de logística
+  (`numLogisticaEquipo > 0 ? ... : Math.max(1, Math.ceil(pax/60))`) estaba escrita
+  tres veces, una por generador — extraída a `calcLogistica()` en `calculos.js`,
+  mismo patrón que `calcMesasCalientes`/`calcMesasAltas`.
+- **Responsive**: barrido visual manual (no solo la batería automática, que ya cubre
+  9 anchos × 2 temas) por las pantallas más densas en campos de las tres apps — el
+  panel de configuración del evento con casi todo marcado, una lista de bebidas con
+  números de tres cifras, preguntas del formulario con muchas opciones, el equipo del
+  calendario — en 320/390/768/1280px, claro y oscuro. Sin desbordamiento ni solapes
+  en ninguna.
+- **Sin más hallazgos que mereciera la pena forzar**: código muerto (revisados los 28
+  exports de `calculos.js`/`checklist-generadores.js`, todos con uso real), render
+  sin memorizar, y duplicidad real entre `calculos.js` y los generadores — la
+  disciplina de extraer en cuanto algo se repite (bandejas, mesas calientes, mesas
+  altas, cristalería, alturas de buffet) se mantiene bien en el resto del código.
+
+**Café del personal: se pisaba con el de invitados, en vez de sumarse — HECHO**:
+encontrado por el dueño justo revisando la auditoría de arriba. `calcCafe()`
+(`checklist-generadores.js`) trataba "café para invitados" y "café del personal"
+como mutuamente excluyentes (`if (paraInvitados) {...} else if (numPersonal > 0)
+{...}`): con invitados marcado (el caso normal), el personal se quedaba sin su
+propia cafetera, dando por hecho que "tomaba prestado" de la de invitados. Pero el
+personal curra las mismas horas haya o no café de invitados — su parte tiene que
+calcularse SIEMPRE que haya plantilla, no solo cuando los invitados no lo piden.
+Arreglado quitando el `else`: los dos bloques son independientes ahora, y con
+invitados + personal a la vez salen las dos cafeteras y sus cápsulas por separado.
+Sin cambios en el caso "solo personal" (ya funcionaba bien) ni en producción (no usa
+`calcCafe` para el personal, tiene su propia cafetera de mantenimiento aparte).
+
+**Entrante "Individual" como su propia casilla, no un rodeo por "compartir" — HECHO**:
+el dueño señaló que en "¿Lleva entrante?" (`preguntas.js`) la única forma de decir "un
+plato por persona" era marcar "Para compartir" y, en la SIGUIENTE pantalla
+(`entrantePersonas`), elegir "Individual (un plato por persona)" — al revés de lo que
+dice la palabra "compartir". Añadida "Individual" como tercera casilla junto a
+"chupito"/"compartir" en la misma pregunta, con su propio número inline
+(`individualNumero`, mismo patrón que las demás casillas de `marcar`+`conNumero`).
+Al marcarla, `entranteCompartido` sale `true` con `personasPorPlatoEntrante` fijo a 1
+SIN preguntar nada más — la pantalla `entrantePersonas` sigue atada solo a "compartir"
+(su `si:` no cambia), así que elegir solo "individual" ya no mete una pantalla de más
+en medio. Si se marcan "individual" y "compartir" a la vez (raro, pero el marcar
+siempre ha permitido varias casillas), sus números se suman en una sola línea de
+"Platos extra entrante" con el ratio de "compartir" — la checklist solo tiene sitio
+para un ratio, no dos, limitación que ya existía antes de este cambio. Verificado en
+vivo con Playwright: marcar solo "individual" y pulsar "Siguiente" salta directo a la
+pregunta del café, sin pasar por "cada cuántas personas".
+
+De paso, revisado el aviso de que "seleccionar paella corta el hilo" (pregunta menú →
+tamaño → cuántas, cada una en su propia pantalla): `cuantasPaellas` tiene un porqué
+para seguir aparte y no meterse como número en la propia casilla "Paella" del menú —
+`calibracion.js` usa explícitamente que `numPaellas > 0` signifique "el número lo puso
+alguien a mano", para NO aprender de esos eventos y no torcer el ratio automático por
+pax. Si el número se autorrellenara nada más marcar "Paella" (como si fuera
+`conNumero` normal), CADA evento con paella pasaría a contar como "puesto a mano" y la
+calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Por
+eso NO se fusiona con la casilla del menú — pero el dueño siguió insistiendo en que
+"hay cosas donde no debería estar", y repasando el orden entero contra los 11 bloques
+del reorden de #184 apareció el problema real, que no era el número de pantallas sino
+DÓNDE estaban: **"¿Tamaño de paella?" y "¿Cuántas paellas?" — movidas primero a
+"Cocina y equipamiento" (justo después de horno), y CORREGIDO otra vez tras verlo el
+dueño en vivo**: quedaba demasiado lejos de haber dicho "llevamos paella" en el menú
+— entre medias había cinco preguntas de equipamiento genérico (queDobla, entrante,
+entrantePersonas, café, nevera, congelador, hielo, horno) sin nada que ver con la
+paella, así que llegar a "¿tamaño?" se sentía como una pregunta reaparecida de la
+nada, no como continuar algo. Movidas de nuevo, esta vez a justo después de "café"
+— cierran "qué se come" (siguen sin cortar entrante/café, la razón de no pegarlas a
+"menu") sin quedar enterradas entre preguntas de equipo que no tienen nada que ver
+con haber dicho paella. Mismo `id`, misma `si:` (`menu.includes("paella")`) — cero
+cambios de lógica ni de `calibracion.js`.
+Verificado en vivo: con "Paella" marcada, el recorrido para una boda ahora es
+menú → entrante → café → **tamaño → cuántas** → nevera → congelador → horno →
+armario caliente.
+`npm run test` completo en verde (2375 comprobaciones): ningún test de
+`aRespuestasDeLaApp()`/`resumirEnvio()` depende del orden del array, que es
+justo la prueba de que reordenar es seguro.
+
+**Modo carga nunca avisaba de los items de alquiler — HECHO**: el dueño lo encontró
+en un evento real (sillas de Dealde) — la lista normal (`FilaItem.jsx`) pinta de
+amarillo y pone el cartelito "ALQUILER" en los items de un proveedor externo (por
+nombre, o marcados a mano con el ✎), pero `ModalModoCarga.jsx` descartaba ese dato al
+desestructurar la tupla del item (`[label, qty, , labelOriginal, , sufijo]` — la
+coma vacía era justo la marca de alquiler) y por eso ningún evento la mostraba ahí,
+nunca. Arreglado:
+- Extraída `esItemDeAlquiler(label, esAlquilerManual)` a `checklist-format.js` — el
+  criterio (tag manual, o el nombre lleva Dealde/Carvillo/Novelda/alquiler) estaba
+  copiado a mano en `FilaItem.jsx` y en el exportador de Word; ahora los tres (los dos
+  de antes + Modo carga) llaman a la misma función.
+- `FilaCargaPrep`/`FilaCargaVuelta` reciben `esAlquiler` y pintan `.carga-row.is-alquiler`
+  (mismo `--alquiler-bg` que la lista normal) más el cartelito.
+- **Dos fallos de layout cazados por la propia batería, no a ojo**: (1) el cartelito
+  puesto como hermano directo del nombre le robaba ancho hasta partir palabras letra a
+  letra a 320px — arreglado agrupando icono+nombre en `.carga-nombre-lead` con
+  `flex-basis:100%`, que fuerza al cartelito a su propia línea sin tocar el nombre. (2)
+  el gris apagado de `.carga-cantidad` sobre el fondo amarillo bajaba a 4,48 de
+  contraste (el mínimo AA es 4,5) — la prueba de contraste automática lo cazó con la
+  cantidad "1" de un item real; arreglado con `var(--alquiler-text)` (el mismo ámbar
+  del cartelito) en vez del gris, que si sube a 4,65.
+- Un test ya existente ("los alquileres están en Modo carga para marcarlos") leía el
+  nombre completo de `.carga-nombre` esperando texto exacto — al añadir el cartelito
+  ahí al lado dejó de coincidir. No era un fallo del test: es que el cartelito ahora
+  vive en el mismo contenedor. Se corrigió apuntando a `.carga-nombre-texto` (el
+  nombre puro, sin el cartelito), que es lo que ese test siempre quiso comprobar.
+- Verificado con capturas en claro/oscuro a 320/390px, y `npm run test` completo:
+  761 comprobaciones, 0 fallidas.
+
+**Auditoría visual móvil pedida por el dueño ("hay cosas mal") — 2 de 3 HECHO,
+1 pendiente de una decisión suya**: sesión aparte con Playwright en 320/375/390/412px,
+dos temas, las tres apps. Formulario y calendario salieron limpios; en la checklist,
+tres hallazgos reales, los dos primeros con la misma causa de fondo:
+
+1. **HECHO — El contador de items y la flecha ▼/▲ de cada categoría desaparecían a
+   320px, en 9 de cada 10 categorías, sin dejar rastro (ni scroll ni aviso)**.
+   `.category-header` es un flex `space-between` con `.cat-name` (nombre) y
+   `.cat-count` (los 3 botones ✎/⌃/⌄ + el número + la flecha, con
+   `flex-shrink:0`). Sin `min-width:0`, un flex item no encoge por debajo de su
+   contenido — así que a 320px, con `.cat-count` fijo, algo tenía que desbordar, y
+   la tarjeta redondeada con `overflow:hidden` se lo tragaba en silencio. Arreglado
+   dándole a `.cat-name` `min-width:0` y envolviendo el texto en
+   `.cat-name-texto` con `text-overflow:ellipsis` — ahora el que cede es el
+   NOMBRE (se recorta con "…"), nunca la píldora del contador, que es la única
+   pista de cuántos items tiene la categoría y si está abierta.
+2. **HECHO — La cabecera perdía la hora y el sitio del evento a 320px**. Ya se
+   había arreglado una vez (ocultar cóctel/nº de conceptos en móvil, limitar a 2
+   líneas) y a 375px cabe entero, pero a 320px el texto seguía necesitando algo
+   más de 2 líneas y se cortaba justo antes de la hora y el sitio. Arreglado con
+   `-webkit-line-clamp:3` solo por debajo de 340px (a partir de 375px sigue en 2).
+3. **PENDIENTE, necesita decisión del dueño — Modo carga tapa el primer ítem con
+   su propia cabecera a 320px (78% de una pantalla de móvil real, 844px, antes de
+   ver el primer checkbox)**. Ya se había medido y arreglado esto una vez
+   (compactar los cronómetros a una línea, documentado en `.carga-modal` en
+   `index.css`), pero la tarjeta "Escaleta del día" (añadida después de aquella
+   medición) se suma al título + contador + barra de progreso + tiempos estimados
+   + los cronómetros de Salida, y entre todos vuelven a tapar la lista — peor que
+   antes de aquel arreglo. La escaleta YA está plegada por defecto
+   (`Escaleta.jsx`, `useState(false)`), así que no es "una cosa más sin plegar":
+   es que hay demasiadas cosas plegadas-pero-visibles apiladas antes de la lista.
+   Arreglarlo bien significa decidir QUÉ información deja de verse por defecto en
+   la pantalla que usa quien está cargando el camión en vivo — una decisión de
+   producto, no un bug de CSS suelto. Se deja sin tocar hasta hablarlo con el
+   dueño.
+- Test nuevo en `app.test.mjs` para los dos hechos: contador/flecha de TODAS las
+  categorías visible a 320px, y el subtítulo con hora+sitio incluidos.
+- Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
+  terminar, sin tocar código.
+
+**"Ya configurado" mentía en el formulario: decía que el evento estaba listo pero al
+entrar preguntaba todo de cero — HECHO, revierte a propósito una garantía de privacidad
+anterior, requiere revisión del dueño antes de fusionar (regla de `CLAUDE.md`: "AI
+Branches: Human security review required before main merge")**:
+
+- **El conflicto que vio el dueño**: en "¿De qué evento son los datos?"
+  (`Formulario.jsx`), un evento marcado "Ya configurado" (`sinConfigurar: false` en la
+  checklist) sonaba a "esto ya está resuelto, no hace falta tocarlo" — pero al entrar,
+  el formulario preguntaba las ~40 preguntas igual que a un evento nuevo. La etiqueta
+  hablaba de la CHECKLIST (`e.sinConfigurar`); el formulario nunca ha leído esos datos:
+  cada envío empezaba de cero por diseño — el enlace público (`publico/{codigo}`) solo
+  exponía `nombre/fecha/sitio/tipo/configurado`, nada de respuestas reales, A PROPÓSITO
+  (`resumirParaOficina()` llevaba un test explícito, `!('pax' in ...)`, verificando que
+  NADA de dentro del evento saliera por ese canal).
+- **Decisión del dueño, tras verle tres formas de arreglarlo** (solo aclarar el aviso /
+  recordar en este móvil con `mios.js` / traer lo real de la checklist): la tercera —
+  la que de verdad cumple lo pedido, a costa de mover esa frontera de privacidad.
+- **Qué viaja y qué NO**: cuando la oficina aplica un envío (`handleAplicarEnvio`),
+  `App.jsx` guarda ahora `formularioRespuestas` en el evento — las respuestas de esa
+  vez, tal cual, sin entrar en ningún cálculo (mismo patrón de metadato que
+  `eventoNubeId`: `useState` + `getEstadoActual()` + `SETTERS_SYNC`, fuera de
+  `ETIQUETAS_CAMPO`/`opts`). `resumirParaOficina()` (`envios.js`) las re-expone
+  filtradas por la nueva `respuestasParaOficina()`:
+  - Fuera `tipo`/`nombreYsitio`/`cuando` (ya viajan sueltos, no se duplican).
+  - Fuera `comprar`/`alergias`/`notas` (texto libre sin fondo — alergias es dato de
+    salud de un invitado — y cualquier `*_comentario` por pregunta): se quedan fuera
+    aunque cueste un poco más de tecleo volver a escribirlas.
+  - Fuera cualquier `*Archivo` (menú/hojas de alquiler subidas como foto o PDF): no
+    sirven para rellenar nada y pueden pesar.
+  - Tope duro de 20 KB tras filtrar: si algún día se cuela un campo pesado que no está
+    en la lista de arriba, se manda `null` en vez de arriesgarse a reventar el límite
+    de 1 MiB de `publico/{codigo}` (que lleva hasta 8 eventos en un solo documento) y
+    dejar a la oficina sin lista de próximos eventos — un fallo mucho peor que el que
+    se está arreglando.
+  - Solo se re-expone lo que YA viajó una vez por ese mismo canal público (una
+    respuesta de formulario que alguien mandó con ese código) — no se lee nunca nada
+    de lo que la checklist calcula o de lo que se edita a mano en la app.
+- **Lo que NO se arregla**: un evento configurado a mano en la app (sin pasar nunca por
+  el formulario, como parecían ser los ejemplos reales que vio el dueño) no tiene
+  `formularioRespuestas` que traer — sigue preguntando todo. Para no repetir el mismo
+  conflicto, la etiqueta ahora distingue los dos casos: "Ya configurado · se rellena
+  solo" (con respuestas de antes) frente a "Ya configurado" a secas (con un tooltip que
+  ya no promete que vengan puestas).
+- **Test que antes garantizaba lo contrario, ahora conviven los dos casos**: el test
+  original (`!('pax' in publicado.eventos[0])`, con un evento SIN `formularioRespuestas`)
+  se deja intacto sin tocar una línea — sigue demostrando que un evento configurado a
+  mano no filtra nada. Al lado, un test nuevo demuestra el caso contrario a propósito:
+  un evento CON `formularioRespuestas` sí lleva `respuestasPrevias`, filtradas.
+- **Verificación**: `npm run test:rapido` en verde (filtro puro + integración con
+  `resumirParaOficina`); `npm run test` completo antes de fusionar. Dado que esto mueve
+  una frontera de privacidad documentada a propósito, se deja SIN FUSIONAR hasta que el
+  dueño lo revise él mismo (no se auto-fusiona como el resto de PRs de esta sesión).
+
+**Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
+caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
+eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
+repetidas (9). Limpiado con backup previo del documento completo y verificación de que
+ningún otro campo cambió. El resto de eventos ya tenía las notas limpias.
+
+**Pendiente del dueño, no de código** — del contenido de #171 (motores gratis nuevos):
+pegar `worker/pegar.js` regenerado en el panel de Cloudflare y añadir como *Secret* la
+clave de cada proveedor que quiera usar — tabla completa en `worker/README.md`.
+
+**Dos piezas grandes, planificadas, sin código todavía** (el dueño pidió explícitamente
+"plan bien estructurado" para las dos — nada se arranca sin mostrarle antes una preview,
+mismo criterio que ya pedía para el formulario):
+
+1. **Cocina: escandallo → lista de la compra ("mise en place") + Presupuesto y margen
+   por evento.** Plan aprobado (ver el propio plan de la sesión). Orden decidido:
+   presupuesto/margen primero (reutiliza el motor de coste que YA existe en Resumen de
+   Modo Carga para comida/bebida, y `totalLogistica()` para logística — solo faltan
+   tarifas de sala/cocina y el presupuesto en sí), Cocina/escandallo después (parte de
+   cero: recetario, menú del evento, nada reutilizable todavía). Fase 3, el asistente,
+   al final. Piloto: el evento real "Aryan Campana" (ya limpio de notas duplicadas),
+   para probar con datos de verdad antes de generalizar.
+2. **Mejoras del formulario — HECHO, las seis.** Bug de las tronas: investigado a fondo
+   (reproducción real con Playwright por los dos caminos posibles) y no se reprodujo —
+   `Tronas` sale directo de `ninos` en los tres builders y ya estaba en las dependencias
+   del `useMemo`; se deja una prueba de guarda por si reaparece por otra vía. El resto,
+   implementado y con test: botón "ir al resumen" en cualquier pregunta; comentario libre
+   y colapsable por pregunta (a `notasEvento`, sin duplicar al reenviar); pregunta de
+   café (invitados/solo personal — `calcCafe` en `checklist-generadores.js`, con reserva
+   modesta para el personal cuando los invitados no toman); carpas ampliadas a los cinco
+   tipos de evento (cálculo compartido `calcCarpas()` en `carpas.js`, antes solo vivía en
+   producción); parabanes (mobiliario nuevo, sin fórmula por pax); excepciones de mesa y
+   buffets (texto libre a las notas, sin tocar el cálculo agregado todavía). Las
+   producciones se verificaron aparte en cada paso: mismo resultado antes/después de
+   compartir la lógica con el resto de tipos.
+
+**Revisión visual a fondo**: primera pasada hecha (checklist, calendario, la bienvenida
+del formulario) con los dos fallos de arriba. Queda el formulario paso a paso, las
+pestañas Año/Equipo del calendario, y los anchos intermedios de la batería que no se
+capturaron a mano.
+
+**PR #180, FUSIONADO Y DESPLEGADO** — el dueño pidió depurar el formulario en una
+ronda de revisión antes de volver a producción, en vez de fusionar commit a commit
+como el resto. Lo probó en el móvil recién publicado y salieron tres cosas; tras
+confirmar que la batería completa pasaba también contra el commit exacto ya en
+producción (para descartar que algo se hubiera roto entretanto), dio el visto bueno,
+se fusionó (`abb87eb`) y el despliegue (run #69 de "Publicar") terminó en verde:
+
+- **El campo numérico no dejaba borrar para escribir otro número** (`onChange` hacía
+  `Math.max(1, parseInt(v,10) || 1)`: vaciar el campo da `NaN`, y `NaN || 1` fuerza el 1
+  en cada pulsación de borrado). Arreglado en las dos rutas donde se repetía (opción
+  única y `marcar`): vacío pasa tal cual mientras se escribe, el mínimo se aplica solo
+  al salir del campo si se queda vacío. Con prueba que usa `Control+A`+`Delete`, no
+  `.fill()` (que sustituye el valor de golpe y no pasa por `onChange` como un dedo real).
+- **El comentario libre por pregunta salía hasta donde no aporta nada**: tipo de evento
+  (primera pregunta, pura clasificación), nombre/sitio (ya son texto libre, un
+  comentario ahí es una tercera caja redundante) y fecha/hora (un día es un día). Ahora
+  se oculta en esas tres con `SIN_COMENTARIO` (por `tipo` de pregunta) + un id suelto
+  para "tipo".
+- **"Mobiliario extra de alquiler" era un sí/no suelto sin decir qué es ni a quién se le
+  alquila** (proveedor fijo a Event Style en `alquileres.js`). Ahora es su propia
+  pregunta (como flores/minutas): qué mobiliario, a qué proveedor (vacío = Event Style,
+  que sigue mandando por defecto) y la hoja del alquiler adjunta. Se añadió también
+  "¿Algo más presupuestado como alquiler?" como cajón de sastre (vajilla especial,
+  decoración, sonido...) con el mismo qué+proveedor+adjunto, que solo va a
+  `notasEvento` — no crea una recogida automática, es la excepción que no tiene su
+  propia pregunta. Los adjuntos de las dos (`archivosAlquiler`) se acumulan en el
+  evento sin sustituirse al reenviar el formulario (tope de 8, por el límite de 1 MiB
+  por documento de Firestore); se listan en la bandeja (`archivosDelEnvio`) y en la
+  pantalla de Alquileres, con botón de quitar.
+- **Gap encontrado al mirarlo**: `tipo: "marcar"` (casillas múltiples) no soporta
+  `conCampos`/`conArchivo`, solo `conNumero` — por eso mobiliario/otro-alquiler son
+  preguntas `opciones` propias en vez de una casilla más dentro de "extras", mismo
+  patrón que ya usaban flores/minutas.
+
+`npm run test` en verde (735 comprobaciones navegador + el resto de baterías, sin
+errores de JS) antes de cada commit.
+
+**Bug real, cazado por el dueño en producción — HECHO, fusionado en el PR #180**: en
+Modo carga → Vuelta, apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero,
+lo normal) sugería marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N →
+apuntar como rotura" (`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER
+material que no volviera, sin distinguir lo que se gasta (bebida, hielo, comida,
+combustible, desechables) de lo que de verdad puede romperse o perderse (cristalería,
+vajilla, mobiliario, herramientas). Se repasó el catálogo entero de los tres
+generadores y se creó `src/consumibles.js` (`esConsumible(categoria, label)`, por
+categoría entera — Bebidas/Alcoholes/Desechables— más una lista corta de sueltos
+dentro de categorías reutilizables — cápsulas de café, carbón, jabón, servilletas de
+papel, bridas...— y sus excepciones inversas — el tirador de cerveza, el calentador de
+agua, la cafetera, no se gastan aunque vivan en esa categoría). Por defecto (nada en
+la lista) sigue sin ser consumible, que es el comportamiento de siempre: la sugerencia
+de rotura no desaparece por error en lo que sí puede romperse. De paso, "Menús
+especiales" (recuento de alergias) salió también de Modo carga: es informativo, no
+material que se cargue o vuelva, igual que ya pasaba con "Personal".
+
+**Segunda vuelta sobre lo mismo, pedida explícitamente ("revisa a fondo")** — dos
+afinamientos más, sin PR todavía:
+
+- **El envase no es el contenido**: "Bombonas llenas" y "Garrafa gasolina" estaban en
+  `consumibles.js` como fungibles, pero eso mezclaba dos cosas — se gasta el GAS de
+  dentro, no la bombona; la bombona (vacía) es justo lo que se espera que vuelva con
+  el equipo, y si no vuelve sigue siendo una pérdida de verdad (a diferencia de
+  carbón/leña/pastillas de encender, que no tienen envase que devolver: se queman
+  enteros). Sacadas de la lista. De paso, "Vasos de chupito de plástico (barra
+  libre)" —de usar y tirar, a diferencia del resto de barware— entra como fungible.
+- **"Marcar todo como vuelto" ponía la cantidad COMPLETA en todo**, hielo y bebidas
+  incluidos — justo lo contrario de lo normal para eso, obligando a corregir a mano
+  casi todas las líneas de golpe. Ahora lo fungible se marca por defecto como "no ha
+  vuelto nada" (que es su caso normal) y lo reutilizable sigue marcándose como
+  "volvió completo".
+- **Sin el chip "faltan N", lo fungible se quedaba sin ninguna confirmación visual**
+  de que la app se había enterado del consumo (apuntar la vuelta de una bebida y no
+  ver nada más no dejaba claro que hubiera pasado algo). Ahora sale un texto neutro
+  ("N gastados", `.carga-consumido`) que confirma el consumo sin invitar a marcarlo
+  como rotura, que ahí no pinta nada.
+
+**Calendario: personal de un evento pasado — HECHO**. La pantalla "Equipo"
+(`VistaEquipo`, `Calendario.jsx`) era la ÚNICA de toda la app que enseñaba/editaba
+`apunte.personal` ("HORARIO PERSONAL EN EVENTO": nombre, rol, horario, importe) — y
+solo mira los próximos `DIAS_ANTICIPACION` (14) días; el editor genérico de un apunte
+(`EditorApunte`, alcanzable también para eventos pasados desde la vista Año) no tenía
+ese apartado en absoluto. El personal de un evento ya cerrado (como "Aryan Campana",
+el piloto del plan de Presupuesto/margen) era invisible en toda la app. Arreglado
+reutilizando el mismo componente `Asignados` dentro de `EditorApunte` —funciona para
+cualquier fecha, pasado incluido—, guardado junto al resto del apunte (no aparte,
+para que "Cancelar" siga descartando todo el borrador de una vez). De paso, una
+barrita de progreso visible sin desplegar (cuánto de la plantilla necesaria está
+cubierta, `.cal-asignados-barra`) — pedido explícitamente ("que sea más visual").
+Con test de extremo a extremo: crear con fecha de hace 40 días → añadir gente →
+guardar → reabrir desde Año → sigue ahí.
+
+**Encontrado de paso, revisando Modo Carga y el formulario a fondo — LOS TRES, HECHOS**:
+
+- El interruptor de Ajustes del asistente que solo ofrece los proveedores que el Worker
+  dice tener configurados (`proveedoresUI.js`, de una sesión anterior) no es un fallo:
+  antes de la primera pregunta de la sesión no se sabe qué hay configurado, así que se
+  asume solo Gemini. Groq/Claude/Cerebras/etc. ya están implementados en el Worker —
+  para verse en Ajustes hace falta además tener su clave puesta como *Secret* en
+  Cloudflare (`worker/README.md`), que es infraestructura del dueño, no código.
+- **Sufijo con número derivado que no se recalculaba al editar a mano — HECHO**: Hielo
+  y Carpas calculaban su sufijo UNA VEZ al generar la checklist; editar la cantidad a
+  mano solo cambiaba el número de delante, el sufijo se quedaba con el texto viejo.
+  `conSufijo` (`checklist-format.js`) ahora también acepta una función en vez de un
+  texto fijo; se resuelve en un solo sitio (el `useMemo` de `checklist` en `App.jsx`,
+  justo donde la cantidad ya lleva aplicado el override manual), que es lo que
+  alimenta tanto Modo Carga como la exportación a Word. Encontrado de paso: el camino
+  del asistente (`catsDeEventoGuardado()` en `calibracion.js`) lee la checklist RAW sin
+  pasar por ese `useMemo` — sin el mismo arreglo ahí, `listar_checklist` habría
+  enseñado una función de JavaScript en vez del texto para cualquier evento con hielo o
+  carpas por alquilar. Arreglado aparte, resolviendo con el propio número del item.
+- **"Mesas calientes" — HECHO**: antes solo existía en producción (automático por
+  pax); ahora hay pregunta sí/no en el formulario para el resto de tipos, reusando la
+  misma fórmula ya existente (`calcMesasCalientes()`, extraída a `calculos.js` para
+  que los tres builders compartan la cuenta).
+- **"Gastros" — HECHO**: en boda/comunión/corporativo salía "—" (se apuntaba a mano).
+  Ahora sale con un mínimo de serie (`GASTROS_MINIMO`, 4) y una pregunta para subirlo
+  si el menú lleva más. Cumpleaños no lo usa (todo en bandejas) y producción sigue con
+  su propia cuenta (2 por chafer) — ninguno de los dos se tocó.
+
+**Regresión real, cazada por la propia batería antes de fusionar**: `preguntas.js`
+(la app del FORMULARIO) importaba `GASTROS_MINIMO` desde `checklist-generadores.js`
+(el motor de cálculo ENTERO de la checklist, con todas sus dependencias) solo para no
+repetir un número. Vite convirtió ese fichero en un chunk compartido entre las dos
+apps — cambia el mapa de bundles y rompió el test de versión-nueva del service worker
+y el recorrido del formulario (timing). Arreglado duplicando la constante como un
+número local en `preguntas.js` (con comentario explicando el porqué): las tres apps
+son builds separados a propósito (`vite.config.js`), y una constante suelta nunca
+justifica cruzar esa frontera. De paso, el tope del bucle de "recorrer el formulario
+contestando No lo sé" en `app.test.mjs` vivía pegado al número exacto de preguntas de
+una boda (32) — con dos preguntas más pasó a 34 y lo superó. Subido a 45, con margen
+de verdad en vez de ir pegado a la cifra exacta.
+
+**Formulario: "Ya configurado" se rellena solo, y en verde para todos — HECHO,
+con revisión de seguridad del dueño**: en "¿De qué evento son los datos?", un evento
+"Ya configurado" preguntaba las ~40 preguntas igual que uno nuevo — la etiqueta hablaba
+de la CHECKLIST, el formulario nunca había leído esos datos. Ahora `App.jsx` guarda las
+respuestas de cada envío aplicado en el propio evento (`formularioRespuestas`, metadato
+fuera de cualquier cálculo) y `resumirParaOficina()` las re-expone **filtradas**
+(`respuestasParaOficina()`): fuera tipo/nombreYsitio/cuando (ya viajan sueltos),
+comprar/alergias/notas/comentarios libres (texto sin fondo, alergias es dato de salud)
+y cualquier archivo adjunto; tope duro de 20 KB. Solo se re-expone lo que YA viajó una
+vez por ese mismo canal público — nunca lo que la checklist calcula. Esto mueve a
+propósito una frontera de privacidad que el código llevaba probada ("nada de dentro de
+un evento sale por el enlace público"), así que se dejó sin fusionar hasta que el dueño
+lo revisara y diera el visto bueno explícito (regla de este archivo: "AI Branches").
+De paso, el "Ya configurado" pasó de gris (visible solo desde el móvil que lo mandó,
+`es-enviado`/`mios.js`) a verde con su ✓ para CUALQUIER evento configurado, lo haya
+mandado ese teléfono o no — con varias personas usando el formulario, el gris no le
+decía nada al resto.
+
+**Auditoría a fondo del formulario, pedida por el dueño ("que configure bien la
+checklist")** — con cita exacta fichero:línea:
+- **Orden — HECHO**: `buffets` mueve un número real (`numMesasBuffet`) pero vivía en
+  "Cierre" en vez de junto a `extras`, su pariente de patrón — movida ahí. `tarta`
+  vivía en el bloque de "lo que genera una recogida" (flores/minutas) pero no genera
+  ninguna — movida a cerrar mantelería y vajilla (monta o no una mesa, no es un
+  encargo que ir a buscar).
+- **Duplicación real — HECHO**: `barril30`/`barril50` (dentro de `extras`, de
+  marcar-varios) compartían el mismo `campoNumero` — marcar los dos descartaba en
+  silencio cuál de los dos tamaños era el real (la checklist solo soporta uno).
+  Añadido un `excluye` genérico en el toggle de `marcar` (`Formulario.jsx`): marcar
+  uno desmarca el otro, ya no se puede llegar a ese estado ambiguo.
+- **Huérfana — HECHO**: `numBarras` se preguntaba en cumpleaños pero solo
+  `buildChecklistBoda` (boda/comunión/corporativo comparten ese generador) calcula
+  "Mesa alta" — restringida a esos tres tipos.
+- **Dependencias `si:`**: sin hallazgos, las 8 condicionales del fichero están todas
+  bien ordenadas.
+- **PENDIENTE, decisión del dueño**: `entrante`, `armarioCaliente` y todo el bloque
+  `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en producción,
+  pero `buildChecklistProduccion` SÍ usa esos datos — un rodaje no puede configurar
+  bien su propia checklist en estas tres cosas desde el formulario. Es una laguna
+  real pero más grande (añadir preguntas nuevas a producción), a decidir con el dueño
+  antes de tocarla.
+- Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
+
+**Dos hallazgos más, vistos por el dueño en la app real — HECHO**:
+- **"tipoMesa" con icono de sofá**: `ICONOS_POR_PREGUNTA.tipoMesa` solo tenía 2
+  iconos (`Table2, Armchair`) para 4 opciones — al repetir el juego (`indice %
+  juego.length`), la primera mesa redonda de alquiler salía con un icono de sofá
+  (`Armchair`, que sí es correcto en `sillas`/`gente`/`mobiliarioAlquiler`, pero no
+  aquí). Puestos los 4 explícitos, todos mesa.
+- **Esa misma pregunta preguntaba mal**: "¿De qué son las mesas donde come la
+  gente?" pide MATERIAL, pero las 4 opciones son forma+tamaño (rectangular 1,8m /
+  redondas 1,5m, 1,8m, 2m). Cambiado a "¿Cómo son las mesas donde come la gente?".
+- Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
+
+**Auditoría completa del formulario (49 preguntas, contraste con los tres generadores)
+— HECHO**: pedida por el dueño ("formulario inteligente": cada tipo de evento solo ve
+sus preguntas, no todas). Recorridas las 49 preguntas contra `aRespuestasDeLaApp()` y
+los tres `buildChecklist*`, confirmando que `soloEn`/`si:` ya scopea correctamente cada
+una a su tipo de evento. Dos hallazgos reales, arreglados en la misma pasada:
+- **Bloque `extras` duplicado en `aRespuestasDeLaApp()`**: se procesaba en DOS `if
+  (Array.isArray(r.extras))` distintos — uno dentro de la rama no-producción
+  (brindis/barbacoa/desayuno/barril/jarras/jamonero) y otro suelto al final del todo
+  (chillout/palomitera). No rompía nada hoy porque TODAS las opciones de `extras`
+  excluyen producción (`soloEn`), pero si algún día se añadiera una opción válida para
+  producción, la mitad de los campos se aplicarían y la otra mitad no, sin que se
+  notara. Unificado en un solo bloque.
+- **Aguas pequeñas en banquete, sin pregunta**: el interruptor real de la checklist
+  (`llevaAguasPequenas`, ya usado por `buildChecklistBoda`/`Cumpleanos` para enseñar
+  "Aguas pequeñas (33cl)") no lo preguntaba nadie fuera de producción — se quedaba
+  siempre apagado salvo tocarlo a mano en la app. Añadida como opción más de `extras`
+  (`aguasPequenas`, `soloEn: CON_BARRA`), mismo patrón que Chill out/Brindis — en
+  producción no hace falta, ahí ya van siempre (pregunta aparte, solo el envase).
+- **"¿Cómo se come?" nunca se preguntaba en producción**: `buildChecklistProduccion` ya
+  sabe ocultar platos trinchero/hondos/metálicos con `soloBandeja`, pero la pregunta
+  `servicio` tenía `soloEn: CON_BARRA` (sin producción) — un rodaje se quedaba siempre
+  con lo que ya tuviera la app. Extendido `soloEn` a `[...CON_BARRA, "produccion"]`.
+  Importante: el ratio de camareros que esa misma pregunta ajusta en banquetes (25/12)
+  NO se toca en producción — un rodaje ya tiene el suyo propio
+  (`leerRatios().produccion`, 1 cada 20), así que `aRespuestasDeLaApp()` solo pone
+  `soloBandeja` en la rama de producción, `paxPorCamarero` se queda fuera.
+- Sigue **PENDIENTE, decisión del dueño** (sin tocar en esta pasada, ver entrada
+  anterior): `entrante`/`armarioCaliente`/el resto de `extras`
+  (desayuno/jamonero/palomitera/chillout) sin preguntar en producción aunque
+  `buildChecklistProduccion` sí usa esos campos — laguna más grande, requiere decidir
+  qué preguntas nuevas añadir.
+- Tests nuevos en `sincronizacion.test.mjs`: el bloque "Jarras, aguas y barriles"
+  (antes afirmaba justo lo contrario: que las aguas pequeñas NO se ofrecían en un
+  banquete) y un bloque nuevo junto a las pruebas de carpas/parabanes que cubre
+  `servicio` en producción (`soloBandeja` sí, `paxPorCamarero` no).
+- Verificación: `npm run test` completo, 764 comprobaciones, 0 fallidas. Fusionado
+  (PR #225).
+
+**Calendario: "Traer" apuntes de golpe también con datos ya puestos — HECHO**: la
+pantalla de pegar una lista JSON (`Traer.jsx`) solo salía con el calendario vacío
+("un empujón de una vez, no un ajuste") — con apuntes ya cargados no había forma de
+añadir una tanda nueva (la hoja de pared, otro calendario) sin borrar antes lo que
+ya había. Pedido por el dueño tras encontrar que unos cambios recientes de la hoja de
+Google nunca habían llegado al calendario de la app.
+- Con el calendario vacío, se comporta exactamente igual que antes (abierto de
+  siempre). Con datos ya puestos, sale plegado detrás de un botón ("Añadir varios
+  apuntes de golpe", mismo patrón que "Compartir") y solo AÑADE: nueva función pura
+  `mezclaApuntes(existentes, nuevos)` en `apuntes.js` descarta de los nuevos
+  cualquier id (fecha+título, `idDeApunte`) que ya existiera — pegar de más nunca
+  puede pisar un apunte que alguien ya haya editado a mano (personal, notas, hora...).
+- Tests nuevos en `calculos.test.mjs`: pegar una hoja que se solapa con lo que ya
+  había solo añade lo de verdad nuevo, sin tocar lo existente; repetir el mismo
+  pegado dos veces no duplica nada.
+- Verificación: `npm run test` completo, 764 comprobaciones, 0 fallidas.
+- Aparte, sin tocar código: se extrajeron del "CALENDARIO GULA" de Google Sheets del
+  dueño (hoja "2026. EVENTOS" + lista "BODASGULA 2026") 359 apuntes de 2026 listos
+  para pegar aquí una vez esto esté desplegado — 32 bodas, 3 comuniones, 29
+  vacaciones, 9 días cerrados y 286 tareas/visitas. Los datos reales NO van en el
+  repo (viven en Firestore, no en el código): el JSON se le pasó al dueño aparte.
+  Excluidos de esta pasada por datos poco fiables en la hoja de origen: junio, julio
+  y diciembre (semanas mal cuadradas o contenido duplicado/vacío) — quedan
+  pendientes de repasar a mano.
+
+**Modo carga → Resumen: la tabla se ajustaba al pixel justo y podía obligar a
+arrastrar — HECHO**: el dueño lo vio en la app real (captura). `.resumen-tabla-producto`
+estaba tuneada a mano para medir exactamente los 810px disponibles dentro del modal
+(comentario en el código: "con 220 la tabla medía 813px... con 190 sobran ~33px");
+con `width: 100%` en la tabla, cualquier margen que se liberara (menos padding, menos
+max-width) el navegador se lo repartía entre las demás columnas hasta rellenar el
+ancho entero — no quedaba NUNCA margen real, así que una fuente de sistema un pelín
+más ancha que la de las pruebas volvía a desbordar.
+- Cambiado `.resumen-tabla` a `width: auto` (con `max-width: 100%` de tope): ahora la
+  tabla mide lo que de verdad necesita su contenido, no lo que quepa en el hueco —
+  733px de 810 disponibles, ~76px de margen real. Si algún día hiciera falta más
+  (nombres/sufijos más largos), cae en el scroll de `.resumen-tabla-wrap` como red,
+  no se rompe.
+  También menos padding por celda (12px → 8px) y `.resumen-tabla-producto` de 190px
+  a 165px, para no depender de un solo número exacto.
+- Test nuevo en `app.test.mjs`: el margen de la tabla del Resumen (boda) tiene que
+  ser de al menos 40px, no solo "no desborda" — así una vuelta a apretarla al pixel
+  justo se pilla en la próxima batería, no en una captura del dueño.
+- Verificación: medido con Playwright a 1280/1440/1920px (0 desbordamiento, ~76px de
+  margen en los tres) y a 320px (la página entera sigue sin desbordar).
+
+**Calendario: casillas del mes desbocadas en desktop con un día muy cargado — HECHO**:
+el dueño lo vio con los 359 apuntes reales ya pegados (captura de septiembre 2026):
+días con seis apuntes estiraban su casilla —y su fila entera de la rejilla— mucho más
+que las de al lado, mientras días vacíos se quedaban en el mínimo. Causa: en
+`Mes()` (`Calendario.jsx`), a partir de 560px (`.cal-chip{display:flex}`) se pintaba
+UN chip por apunte sin límite; `min-height` en `.cal-celda` es un suelo, no un techo,
+y `overflow:hidden` no recorta nada porque el alto natural de la columna flex ya
+cuenta con cada chip.
+- Tope de `CHIPS_VISIBLES = 3` por casilla (constante junto a `ICONOS`); a partir del
+  cuarto apunte sale un `+N más` (`.cal-chip-mas`, mismo trato visual que `.cal-mas`
+  en móvil). Como `del` ya viene con los eventos primero (`porDia()`), lo que se
+  recorta es siempre lo menos importante del día. Nada se pierde: la casilla entera
+  ya era (y sigue siendo) un botón que abre `PanelDia` con la lista completa.
+- Solo desktop (≥560px): en móvil el problema no existía — ahí siempre se enseñó el
+  resumen compacto de iconos (`.cal-puntos`, ya capado a 1 icono+"×N" bajo 420px) y
+  la casilla es cuadrada (`aspect-ratio: 1/1`), así que su alto no depende del
+  contenido.
+- Verificado con el banco de pruebas (`pruebas/calendario.html`, datos inventados:
+  tres eventos + dos vacaciones el mismo día, el mismo caso que el del dueño) a
+  360/1280/1920px: la casilla cargada ya no desborda su fila, se ve "+2 más" y el
+  resto de casillas de la semana quedan a la misma altura.
+
+**Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
+por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
+otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba
+CAMPO a campo contra el `baseline` (PR previo, ver más abajo), pero `checkeados` /
+`preparados` / `vueltos` / `roturas` / `marcasRevisar` / `notasCheck` son cada uno
+UN SOLO campo con las marcas de TODOS los items (`{"categoría::item": true, ...}`).
+Con dos personas marcando ítems DISTINTOS del mismo camión casi a la vez, las dos
+tocan ese mismo campo — así que se subía la copia entera del mapa de quien guardara,
+que todavía no sabía nada de la marca de la otra persona, y se la comía.
+- La fusión ahora entra una clave más adentro para cualquier campo que sea un objeto
+  plano (no un array: mezclar por índice no tiene sentido ahí): solo se sube encima
+  la clave-item que ESTE aparato cambió de verdad (comparada contra su propio
+  `baseline`); el resto de items —los que pueda haber marcado otra persona mientras
+  tanto— se quedan tal cual están en el servidor. Dos personas marcando el MISMO
+  item a la vez siguen resolviéndose "gana el último" (no hay forma de saber cuál es
+  la verdad), pero ya no se lleva por delante los items de los demás.
+- Nueva función `fusionaCampo()` en `nube.js`, usada automáticamente para cualquier
+  campo con esa forma — no hace falta listar `checkeados`/`preparados`/etc. a mano,
+  así que un campo nuevo del mismo tipo queda protegido sin tocar este fichero otra
+  vez.
+- Test nuevo en `sincronizacion.test.mjs` ("Modo carga: varios marcando items
+  DISTINTOS del mismo camión"): dos marcas distintas no se pisan, desmarcar tampoco
+  arrastra a los demás, y el mismo item a la vez sigue resolviéndose por orden de
+  llegada sin tocar el resto.
+
+**Auditoría a fondo de cálculos automáticos: 7 bugs reales cazados — HECHO**: pedida
+por el dueño ("algunas cosas no las está calculando bien"), sin tocar nada hasta
+confirmar cada hallazgo con un caso numérico concreto. Dos pasadas de solo lectura
+(generadores de checklist + `calculos.js`; formulario + tiempos/personal/precios) y
+tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
+- **Montaje se dividía por la gente de logística** (`tiempos-carga.js`), en contra de
+  su propio comentario ("tiempo de todo el equipo, no se divide"): pasaba por la
+  misma `reparte()` que carga/descarga. Con poca gente de logística salía disparado
+  (3h31 con 1 persona, 1h47 con 3, para el mismo evento). Ahora se calcula aparte,
+  sin dividir.
+- **Corporativo con tarta no cargaba la mesa** (`checklist-generadores.js`): boda,
+  comunión y cumpleaños sí generaban su línea de mesa; corporativo cargaba pala y
+  cuchillo (sin condición de tipo) pero nunca la mesa donde ponerla, aunque el
+  formulario pregunta por la tarta en los cuatro tipos desde siempre.
+- **Cumpleaños: "Descansadores de paella" fijo en 2**, sin mirar cuántas paelleras
+  había de verdad (boda sí escalaba). Con muchas paelleras a la vez faltaban
+  soportes.
+- **Producción: "Trípode" fijo en 1** (+ frituras), cuando debía escalar con el nº de
+  paelleras igual que "Paravientos", calculado justo al lado con la misma cuenta.
+- **`personasPorPlatoEntrante` sin valor por defecto** en los tres generadores puros:
+  llamado sin pasar por el `useState` de App.jsx (p.ej. al recalibrar un evento
+  guardado sin ese campo) daba "cada undefined pax" en vez de caer al mismo 4 de la
+  UI. Añadido `= 4` en el destructuring de `opts`, igual que ya hacía la interfaz.
+- **Producción de varios días: los vasos del personal no se multiplicaban por
+  `nDias`**, mientras que el agua de la misma gente sí. Un rodaje de 3 días se
+  quedaba con los vasos desechables de uno solo.
+- **"Agua con gas" y "Cerveza 0,0" no se pedían en cajas de 24** pese a que su propio
+  comentario lo decía ("cajas de 24, 1 caja mínimo real") — salían como botellas
+  sueltas sin redondear ni tener suelo. La Cerveza 0,0 además ignoraba las horas de
+  barra libre, a diferencia de la cerveza con alcohol de al lado (media hora de
+  cóctel pedía lo mismo que una barra libre entera). Las dos ahora redondean a caja
+  de 24 con mínimo de una, y la 0,0 ya responde a las horas de barra como su hermana
+  con alcohol (la temporada se deja fuera a propósito: no hay dato real que diga que
+  el 0,0 se beba distinto en verano).
+- Confirmado con el dueño y dejado tal cual, tras revisar el porqué: el ratio de
+  logística SÍ debe escalar con pax (2 en 100, 3 en 150, 4 en 300) — solo se corrigió
+  el comentario de cabecera, que se había quedado con la versión vieja ("2 siempre").
+- Revisado y descartado como bug (documentado a propósito, con test que lo prueba):
+  el redondeo simétrico de la cerveza normal a cajas de 24 (`Math.round`, no
+  `Math.ceil` — ±12 tercios de margen aceptado); los ratios de personal de los tres
+  generadores; `conMargen()`; las fórmulas de champaneras/alturas de buffet/mesas
+  altas/calientes.
+- Test nuevo en `calculos.test.mjs` ("Auditoría de cálculos: 6 bugs reales cazados
+  sin llegar a un evento"): uno por hallazgo, cada uno con el caso numérico que lo
+  demuestra.
+- Verificación: `npm run test` completo antes de fusionar.
+
+**Tres planes grandes, sin código todavía, guardados por si se retoman** —
+ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
+"Orden de lectura").
+
+**Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
+septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.

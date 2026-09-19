@@ -13,13 +13,22 @@ import { recordar, olvidar, refuerza, poda, parecido, paraElContexto, porTemas, 
 import { conectores, conectoresActivos, conHerramientasDeConectores, registrarConector } from "../asistente/conectores.js";
 import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
-import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN } from "../asistente/enrutado.js";
+import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN, SIN_DATOS_DE_CLIENTES } from "../asistente/enrutado.js";
+import { proveedoresElegibles, NOMBRE_PROVEEDOR, notaDe } from "../asistente/proveedoresUI.js";
 import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
 import { avisosConfig, saludoPendientes } from "../asistente/avisosConfig.js";
 import { marcarActualizando, confirmaSiActualizado } from "../asistente/actualizacion.js";
 import { NIVELES, CLAVES_NIVEL, NUNCA, puede as permite, pideConfirmacion, comoContarlo } from "../asistente/permisos.js";
-import { revisarEvento, revisarProximos } from "../asistente/revision.js";
+import { revisarEvento, revisarProximos, oportunidadesNegocio } from "../asistente/revision.js";
+import { huecosDeCatalogo, catsDeEventoGuardado } from "../calibracion.js";
+import { aplicarEnAjustes } from "../asistente/escrituraAjustes.js";
 import { aplicarEnCalendario } from "../asistente/escrituraCalendario.js";
+import { aplicarEnRatios } from "../asistente/escrituraRatios.js";
+import { aplicarEnBebida } from "../asistente/escrituraBebida.js";
+import { aplicarEnCristaleria } from "../asistente/escrituraCristaleria.js";
+import { leerRatios, ponRatios } from "../personal.js";
+import { leerFactores, ponFactores } from "../bebida.js";
+import { ponFactoresCristaleria } from "../cristaleria.js";
 import { contextoDelAsistente, eventoAbierto } from "../asistente/contexto.js";
 import { idDeApunte, saneaLista, mismaLista } from "../calendario/apuntes.js";
 // Las fechas de las fixtures salen de la MISMA función que usa la app: con toISOString
@@ -29,7 +38,9 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, fetchValidando, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves, peticionPushCifrada } from "../../worker/index.js";
+import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
+import { idDeAparato, CLAVE_ID, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "../asistente/push.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
 import { sinMarcas } from "../asistente/texto.js";
 import { queHacerConLaUrl } from "../asistente/proxy.js";
@@ -38,7 +49,7 @@ import { COMPANEROS, CLAVES_COMPANERO, CLAVES_DIBUJADAS, companeroValido, COMPAN
 import { comoHabla, PERSONALIDADES, CLAVES_PERSONALIDAD } from "../asistente/personalidad.js";
 import { saneaTareas, apuntarTarea, marcarTarea, quitarTarea, limpiarViejas, porEvento, sinHacer, paraHoy as recordatoriosDeHoy, paraElContexto as tareasContexto, MAX_TAREAS } from "../asistente/tareas.js";
 import { saneaObjetivos, ponerObjetivo, cambiarEstado, quitarObjetivo, paraElContexto as metasContexto, cuantosActivos, MAX_OBJETIVOS } from "../asistente/objetivos.js";
-import { arbol, contextoPlegado, grafo, porTema, porFuente, porDia } from "../asistente/arbol.js";
+import { arbol, contextoPlegado, grafo, porTema, porFuente, memoriaPorDia } from "../asistente/arbol.js";
 import { parte, foto, queHaCambiado, comoVanLosObjetivos } from "../asistente/subconsciente.js";
 import { tituloDe, saneaCharlas, guardarCharla, borrarCharla, cuandoFue } from "../asistente/conversaciones.js";
 import { aplicarEnTareas, encadenar } from "../asistente/escrituraTareas.js";
@@ -100,10 +111,19 @@ console.log("\n── Lo que el asistente NO puede hacer ──");
 console.log("\n── Los datos de clientes y quién puede verlos ──");
 {
   // El catálogo recortado es lo único que se le manda a un proveedor que entrena con lo
-  // que recibe. Si esto falla, se están regalando los clientes.
-  const recortado = catalogoParaModelo(true).map(h => h.name);
-  ok(recortado.length === SIN_DATOS.length && recortado.every(n => !HERRAMIENTAS[n].datos),
-    `el catálogo recortado son solo las de calcular → ${recortado.join(", ")}`);
+
+  // que recibe. Si esto falla, se están regalando los clientes. El nivel no importa en
+  // esta comprobación (con "consultar" caerían las de escribir y la comparación con
+  // SIN_DATOS sería otra cosa: los permisos), así que se pide con confianza: aquí se
+  // comprueba la barrera de datos, no los permisos.
+  // La comparación va contra el catálogo COMPLETO (de casa + conectores encendidos),
+  // no contra SIN_DATOS (solo de casa): un conector puede añadir herramientas sin
+  // datos de clientes (analizar_web mira webs públicas) y siguen siendo mandables.
+  const catalogoCompleto = todas({});
+  const recortado = catalogoParaModelo(true, {}, "confianza").map(h => h.name);
+  const sinDatosEsperado = Object.keys(catalogoCompleto).filter(n => !catalogoCompleto[n].datos);
+  ok(recortado.length === sinDatosEsperado.length && recortado.every(n => !catalogoCompleto[n].datos),
+    `el catálogo recortado son solo las que no llevan datos de clientes → ${recortado.join(", ")}`);
   ok(!recortado.includes("buscar_eventos") && !recortado.includes("ver_evento") && !recortado.includes("ver_calendario"),
     "y no lleva ninguna que devuelva nombres, fechas o sitios");
   // El catálogo entero lleva las de casa Y las de los conectores encendidos: si esto
@@ -155,6 +175,75 @@ console.log("\n── Consultar de verdad ──");
   const soloPaella = ejecutar("comparar_con_sector", { ratio: "paella" }, CTX);
   ok(soloPaella.ratios.length === 1 && soloPaella.ratios[0].id === "paella", "filtrando por nombre solo trae ese ratio");
   ok(ejecutar("comparar_con_sector", { ratio: "unicornios" }, CTX).error, "y un nombre que no existe lo dice, no se inventa una fila");
+
+  // aplicar_ratio: la otra mitad de comparar_con_sector. Escribe, así que el nivel manda
+  // igual que en crear_checklists — era exactamente lo que fallaba antes de que existiera
+  // esta herramienta: "confianza" puesto y el asistente contestando que no podía cambiar
+  // el ratio, porque no había ninguna herramienta para hacerlo.
+  ok(ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 12 }, { ...CTX, nivel: "consultar" }).error,
+    "en solo consultar no se puede cambiar un ratio");
+  let propuesto = null;
+  const conOnEscribir = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuesto = p; return { hecho: p.resumen }; } };
+  const r = ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 12 }, conOnEscribir);
+  ok(r.hecho && /boda: 9 → 12/.test(r.hecho), `el resumen dice antes y después → "${r.hecho}"`);
+  ok(propuesto.que === "aplicar_ratio" && propuesto.datos.tipo === "boda" && propuesto.datos.paxPorCamarero === 12,
+    "y lo que le llega a onEscribir trae el tipo y el número ya limpio");
+  ok(ejecutar("aplicar_ratio", { tipo: "unicornios", paxPorCamarero: 12 }, conOnEscribir).error,
+    "un tipo de evento que no existe lo dice, no inventa un ratio nuevo");
+  ok(ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 0 }, conOnEscribir).error,
+    "y un número fuera de rango (aquí, 0) tampoco se cuela");
+  ok(ejecutar("aplicar_ratio", { tipo: "boda", paxPorCamarero: 12 }, { ...CTX, nivel: "confianza" }).error,
+    "sin onEscribir en el contexto (una pantalla que no lo ofrece) lo dice, no revienta");
+
+  // aplicar_factor_bebida: mismo patrón, para lo que ya vivía en el panel del calendario
+  // como "gente por comensal, pero de beber". El factor es un múltiplo (1 = de siempre),
+  // no una cantidad — así lo guarda bebida.js.
+  ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "vino", factor: 0.6 }, { ...CTX, nivel: "consultar" }).error,
+    "en solo consultar tampoco se puede tocar la bebida");
+  let propuestoBebida = null;
+  const conOnEscribirBebida = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuestoBebida = p; return { hecho: p.resumen }; } };
+  const rb = ejecutar("aplicar_factor_bebida", { tipo: "comunion", bebida: "refresco", factor: 1.4 }, conOnEscribirBebida);
+  ok(rb.hecho && /×1 → ×1\.4/.test(rb.hecho), `sin tocar antes, parte de ×1 (de siempre) → "${rb.hecho}"`);
+  ok(propuestoBebida.datos.tipo === "comunion" && propuestoBebida.datos.bebida === "refresco" && propuestoBebida.datos.factor === 1.4,
+    "y lo que llega a onEscribir trae los tres datos limpios");
+  ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "cocacola", factor: 1 }, conOnEscribirBebida).error,
+    "una bebida que no se calibra (aquí, un item suelto) lo dice, no inventa una fila");
+  ok(ejecutar("aplicar_factor_bebida", { tipo: "boda", bebida: "vino", factor: 5 }, conOnEscribirBebida).error,
+    "y un factor fuera de 0,3-2 tampoco se cuela: un 5 pediría cinco veces la bebida de un evento entero");
+
+  // aplicar_factor_cristaleria: mismo patrón, sin tipo de evento (calcCristaleria
+  // calcula igual para todos).
+  ok(ejecutar("aplicar_factor_cristaleria", { clave: "vino", factor: 0.8 }, { ...CTX, nivel: "consultar" }).error,
+    "en solo consultar tampoco se puede tocar la cristalería");
+  let propuestoCristaleria = null;
+  const conOnEscribirCristaleria = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuestoCristaleria = p; return { hecho: p.resumen }; } };
+  const rc = ejecutar("aplicar_factor_cristaleria", { clave: "cava", factor: 0.7 }, conOnEscribirCristaleria);
+  ok(rc.hecho && /×1 → ×0\.7/.test(rc.hecho), `sin tocar antes, parte de ×1 → "${rc.hecho}"`);
+  ok(propuestoCristaleria.datos.clave === "cava" && propuestoCristaleria.datos.factor === 0.7,
+    "y lo que llega a onEscribir trae la clave y el factor limpio");
+  ok(ejecutar("aplicar_factor_cristaleria", { clave: "cuchara", factor: 1 }, conOnEscribirCristaleria).error,
+    "una clave que no es cristalería lo dice, no inventa una fila");
+  ok(ejecutar("aplicar_factor_cristaleria", { clave: "vino", factor: 5 }, conOnEscribirCristaleria).error,
+    "y un factor fuera de 0,3-2 tampoco se cuela");
+
+  // aplicar_calibracion: la puerta de "aplicar lo que midió la auditoría". La misma
+  // sanidad que las otras puertas de factores: una clave inventada no se guarda como
+  // factor fantasma que ningún cálculo lee.
+  let propuestoCal = null;
+  const conOnEscribirCal = { ...CTX, nivel: "confianza", onEscribir: (p) => { propuestoCal = p; return { hecho: p.resumen }; } };
+  const rcal = ejecutar("aplicar_calibracion", { area: "hielo", tipo: "boda", factor: 0.8 }, conOnEscribirCal);
+  ok(rcal.hecho && propuestoCal.que === "aplicar_calibracion" && propuestoCal.datos.factor === 0.8,
+    `lo válido pasa con los datos limpios → "${rcal.hecho}"`);
+  ok(ejecutar("aplicar_calibracion", { area: "cava", tipo: "boda", factor: 0.8 }, conOnEscribirCal).error,
+    "un área que no es bebida, hielo ni comida no es área");
+  ok(ejecutar("aplicar_calibracion", { area: "bebida", tipo: "unicornios", clave: "vino", factor: 0.8 }, conOnEscribirCal).error,
+    "y un tipo de evento que no existe no crea una fila nueva");
+  ok(ejecutar("aplicar_calibracion", { area: "bebida", tipo: "boda", clave: "vino", factor: 5 }, conOnEscribirCal).error,
+    "un factor fuera de 0,3-2 tampoco se cuela");
+  ok(ejecutar("aplicar_calibracion", { area: "bebida", tipo: "boda", clave: "cocacola", factor: 0.8 }, conOnEscribirCal).error,
+    "y una clave inventada no se guarda como factor fantasma que ningún cálculo lee");
+  ok(ejecutar("aplicar_calibracion", { area: "comida", tipo: "boda", clave: "gazpacho", factor: 0.8 }, conOnEscribirCal).error,
+    "lo mismo en comida: la clave tiene que ser una que se calibre (paella, bandejas)");
 
   const ch = ejecutar("ver_checklist", { nombre: "fulanita", categoria: "bebida" }, CTX);
   ok(ch.categorias && ch.categorias.length >= 1 && ch.categorias[0].items.length > 3,
@@ -538,6 +627,22 @@ console.log("\n── Quién contesta cada pregunta ──");
   ok(candidatos("lo que sea", tres).every(p => tres.includes(p)), "nunca sale uno de fuera de la lista");
   ok(ORDEN[0] === "gemini", "el orden de partida empieza por lo gratis");
 
+  // Los motores gratis nuevos: Groq, Cerebras y Z.AI no entrenan con lo que reciben en
+  // NINGÚN plan, así que pueden ver datos de clientes igual que Gemini o Claude.
+  // Mistral, OpenRouter y NVIDIA sí pueden acabar entrenando con la capa gratis, así que
+  // van con OpenAI: fuera en cuanto la pregunta lleva datos.
+  const gratisNuevos = ["gemini", "groq", "cerebras", "zai", "cloudflare", "mistral", "openrouter", "nvidia"];
+  ["groq", "cerebras", "zai", "cloudflare"].forEach(p =>
+    ok(candidatos("que eventos tengo en septiembre", gratisNuevos).includes(p),
+      `${p} no entrena con nada: puede ver datos de clientes`));
+  ["mistral", "openrouter", "nvidia"].forEach(p =>
+    ok(!candidatos("que eventos tengo en septiembre", gratisNuevos).includes(p),
+      `${p} sí puede entrenar en su capa gratis: fuera con datos de clientes`));
+  ok(candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("mistral") &&
+    candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("openrouter") &&
+    candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("nvidia"),
+    "pero para una cuenta suelta, sin datos, los tres sí pueden");
+
   // El respaldo: qué merece reintentar con otro y qué no
   ["429 Too Many Requests", "quota exceeded", "RESOURCE_HAS_BEEN_EXHAUSTED", "503 unavailable", "overloaded"]
     .forEach(m => ok(mereceOtroIntento(m), `"${m.slice(0, 28)}" merece probar con otro`));
@@ -620,6 +725,8 @@ console.log("\n── Qué se le deja hacer ──");
   // Un nivel inventado cae en el más prudente, no en el más permisivo
   ok(!permite("crear_apunte", "inventado", escribe).puede, "un nivel que no existe no abre la puerta");
   ok(comoContarlo("consultar").includes("No puedes cambiar nada"), "al modelo se le dice lo que puede");
+  ok(comoContarlo("consultar").includes("memoria"),
+    "y en consultar se le dice que su memoria sí puede guardarla: sin eso, la frase le contradecía las herramientas que tenía (recordar/olvidar)");
   ok(comoContarlo("permiso").includes("aprueba"), "y que en permiso hay que aprobarlo");
 }
 
@@ -1064,12 +1171,20 @@ console.log("\n── Hablarle y que conteste ──");
 {
   // El texto de una respuesta lleva markdown y símbolos que leídos en voz alta suenan
   // absurdos. Y las horas son el caso peor: "13:00" se lee "trece dos puntos cero cero".
-  const leido = paraLeerEnVozAlta("**Boda X** a las 13:00\n- ⚠️ 2 celíacos\n- `sin gluten`");
+  const leido = paraLeerEnVozAlta("**Boda X** a las 13:30\n- ⚠️ 2 celíacos\n- `sin gluten`");
   ok(!leido.includes("*") && !leido.includes("`"), "no lee los asteriscos ni las comillas");
   ok(!leido.includes("⚠️"), "ni los símbolos");
-  ok(/13 y 00/.test(leido), `las horas se leen como horas → "${leido}"`);
+  ok(/13 y 30/.test(leido), `las horas con minutos llevan el "y" → "${leido}"`);
   ok(!/\n/.test(leido), "y va en una sola línea");
   ok(paraLeerEnVozAlta("") === "" && paraLeerEnVozAlta(null) === "", "sin texto no dice nada");
+
+  // Una hora EN PUNTO no se dice "13 y 00" —nadie habla así—, se dice "a las 13": el
+  // "y 00" es leer el reloj, no hablar. Real de la escaleta: "Salida a las 08:15,
+  // llegada a las 09:00" tiene los dos casos a la vez.
+  const conHoraEnPunto = paraLeerEnVozAlta("Salida a las 08:15, llegada a las 09:00.");
+  ok(conHoraEnPunto.includes("08 y 15"), `con minutos, lleva el "y" → "${conHoraEnPunto}"`);
+  ok(conHoraEnPunto.includes("las 09.") && !conHoraEnPunto.includes("09 y 00"),
+    `en punto, sin minutos → "${conHoraEnPunto}"`);
 
   // Fuera del navegador no existe ninguna de las dos, y comprobarlo no puede reventar:
   // este módulo lo importa el panel entero.
@@ -1092,7 +1207,7 @@ console.log("\n── El árbol de la memoria ──");
       `el eje ${["temas", "fuentes", "días"][i]} devuelve la forma común`);
   });
   ok(a.temas.length === 3 && a.fuentes.length === 3, "tres temas y tres fuentes distintas");
-  ok(porDia(mem).length === 1, "y todo lo de hoy va en un día");
+  ok(memoriaPorDia(mem).length === 1, "y todo lo de hoy va en un día");
 
   // La fuente viaja pegada al recuerdo: es lo que permite contrastarlo
   const ctx = contextoPlegado(mem);
@@ -1318,6 +1433,76 @@ console.log("\n── Encadenar dónde se escribe ──");
     "y si no la sabe hacer nadie, se dice en vez de fallar en silencio");
   ok(encadenar(null, soloTareas)({ que: "apuntar_tarea", datos: { texto: "Otra cosa" } }).apuntado,
     "un aplicador vacío en la cadena no la rompe");
+}
+
+console.log("\n── El aplicador de ratios (escrituraRatios.js) ──");
+{
+  const antes = leerRatios();
+  let recibido = null;
+  const aplicar = aplicarEnRatios({ guardar: (siguiente) => { recibido = siguiente; } });
+
+  ok(aplicar({ que: "apuntar_tarea", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+
+  const r = aplicar({ que: "aplicar_ratio", datos: { tipo: "boda", paxPorCamarero: 12 } });
+  ok(r.cambiado === "boda" && r.antes === antes.boda && r.ahora === 12,
+    `dice qué cambió, de dónde venía y a dónde va → ${JSON.stringify(r)}`);
+  ok(recibido.boda === 12, "a guardar le llega el nuevo valor");
+  // El punto que costó pensarlo: si solo se mandara el campo que cambia, un "guardar" que
+  // parte de los valores de fábrica (como ponRatios) resetearía los demás sin que nadie
+  // lo pidiera. Por eso se manda el juego entero, con los valores ACTUALES de partida.
+  Object.keys(antes).filter(k => k !== "boda").forEach(tipo => {
+    ok(recibido[tipo] === antes[tipo], `y los demás ratios viajan sin tocar (${tipo}: ${recibido[tipo]})`);
+  });
+
+  ponRatios({});   // se dejan como estaban para el resto de la batería
+}
+
+console.log("\n── El aplicador de factores de bebida (escrituraBebida.js) ──");
+{
+  let recibido = null;
+  const aplicar = aplicarEnBebida({ guardar: (siguiente) => { recibido = siguiente; } });
+
+  ok(aplicar({ que: "aplicar_ratio", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+
+  const r1 = aplicar({ que: "aplicar_factor_bebida", datos: { tipo: "boda", bebida: "vino", factor: 0.6 } });
+  ok(r1.cambiado === "vino en boda" && r1.ahora === 0.6, `dice qué cambió y a qué valor → ${JSON.stringify(r1)}`);
+  ok(recibido.boda.vino === 0.6, "a guardar le llega el factor nuevo, esparcido por tipo");
+
+  // Segundo ajuste del MISMO tipo, otra bebida: no puede borrar el primero. Es justo lo
+  // que se probó a mano antes de escribir esto —cambiar el vino y luego la cerveza de la
+  // misma boda— y es donde un guardar() que solo mandara el campo tocado se habría
+  // comido el ajuste anterior.
+  const previos = { boda: { vino: 0.6 } };
+  const aplicar2 = aplicarEnBebida({
+    guardar: (siguiente) => { recibido = siguiente; },
+  });
+  ponFactores(previos);
+  const r2 = aplicar2({ que: "aplicar_factor_bebida", datos: { tipo: "boda", bebida: "cerveza", factor: 1.3 } });
+  ok(r2.ahora === 1.3 && recibido.boda.vino === 0.6 && recibido.boda.cerveza === 1.3,
+    `el ajuste anterior de la misma boda viaja intacto → ${JSON.stringify(recibido)}`);
+
+  ponFactores({});   // se dejan como estaban para el resto de la batería
+}
+
+console.log("\n── El aplicador de cristalería (escrituraCristaleria.js) ──");
+{
+  let recibido = null;
+  const aplicar = aplicarEnCristaleria({ guardar: (siguiente) => { recibido = siguiente; } });
+
+  ok(aplicar({ que: "aplicar_ratio", datos: {} }) === null, "y lo que no es suyo lo pasa al siguiente");
+
+  const r1 = aplicar({ que: "aplicar_factor_cristaleria", datos: { clave: "vino", factor: 0.8 } });
+  ok(r1.cambiado === "vino" && r1.ahora === 0.8, `dice qué cambió y a qué valor → ${JSON.stringify(r1)}`);
+  ok(recibido.vino === 0.8, "a guardar le llega el factor nuevo");
+
+  // Un segundo ajuste no puede borrar el primero: es plano, no por tipo de evento, así
+  // que aquí el riesgo es más simple que en bebida pero el motivo es el mismo.
+  ponFactoresCristaleria({ vino: 0.8 });
+  const r2 = aplicar({ que: "aplicar_factor_cristaleria", datos: { clave: "cava", factor: 1.2 } });
+  ok(r2.ahora === 1.2 && recibido.vino === 0.8 && recibido.cava === 1.2,
+    `el ajuste anterior viaja intacto → ${JSON.stringify(recibido)}`);
+
+  ponFactoresCristaleria({});   // se dejan como estaban para el resto de la batería
 }
 
 console.log("\n── Crear checklists desde el calendario ──");
@@ -1617,6 +1802,533 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     "una voz que el cliente manda pero NO está en la lista no se cuela a Gemini: se ignora, no se rechaza la petición entera");
   ok(vozElegida("", { GEMINI_TTS_VOZ: "Umbriel" }) === "Umbriel", "sin elegir ninguna, manda GEMINI_TTS_VOZ como hasta ahora");
   ok(vozElegida("", {}) === "Kore", "y sin nada de nada, cae en \"Kore\", el mismo por defecto de siempre");
+}
+
+// ─── DOS EVENTOS QUE SE PARECEN: NO SE ADIVINA ───────────────────────────────
+{
+  console.log("\n── Dos eventos que se parecen: no se adivina ──");
+  const ctxDos = { ...CTX, eventosGuardados: {
+    "Boda de García": { evento: "boda", pax: 100, ninos: 0, fechaEvento: enDiasISO(10), horaInicio: "13:00", ubicacion: "Finca A" },
+    "Boda García en la finca": { evento: "boda", pax: 80, ninos: 0, fechaEvento: enDiasISO(20), horaInicio: "14:00", ubicacion: "Finca B" },
+  }};
+  const ambiguo = ejecutar("ver_evento", { nombre: "boda garcia" }, ctxDos);
+  ok(ambiguo.error && ambiguo.error.includes("Boda de García") && ambiguo.error.includes("en la finca"),
+    "dos candidatos empatados: se listan y se pide detalle, no se adivina");
+  const exacto = ejecutar("ver_evento", { nombre: "Boda de García" }, ctxDos);
+  ok(!exacto.error && exacto.adultos === 100, "un nombre EXACTO se coge sin preguntar");
+  const unoSolo = ejecutar("ver_evento", { nombre: "garcía en la finca" }, ctxDos);
+  ok(!unoSolo.error && unoSolo.adultos === 80, "y con un solo candidato, se coge");
+  // La misma regla en todas las herramientas que buscan por nombre.
+  ok(ejecutar("ver_checklist", { nombre: "boda garcia" }, ctxDos).error, "ver_checklist no adivina");
+  ok(ejecutar("ver_escaleta", { nombre: "boda garcia" }, ctxDos).error, "ni ver_escaleta");
+  ok(ejecutar("revisar_evento", { nombre: "boda garcia" }, ctxDos).error, "ni revisar_evento");
+}
+
+// ─── LA AUDITORÍA DE NEGOCIO (OPORTUNIDADES) ──────────────────────────────────
+{
+  console.log("\n── La auditoría de negocio (oportunidades) ──");
+
+  // Sin datos no dice nada: una auditoría sin datos no es una auditoría.
+  ok(oportunidadesNegocio({}).length === 0, "sin datos no dice nada");
+
+  // Medido y sin aplicar: el corazón. La medida (0,5) y el factor vigente (1) no
+  // coinciden → oportunidad con propuesta que lleva los datos EXACTOS: el modelo
+  // los copia, no los saca de la cabeza.
+  const conMedida = oportunidadesNegocio({
+    calibracionBebida: { comunion: { vino: { factor: 0.5, nEventos: 3 } } },
+  });
+  ok(conMedida.length === 1 && conMedida[0].tono === "oportunidad", "una medida sin aplicada es una oportunidad");
+  ok(conMedida[0].texto.includes("50 %") && conMedida[0].texto.includes("de más"),
+    "y dice que se carga de más, con el porcentaje");
+  ok(conMedida[0].propuesta && conMedida[0].propuesta.que === "aplicar_calibracion"
+      && conMedida[0].propuesta.datos.area === "bebida"
+      && conMedida[0].propuesta.datos.clave === "vino"
+      && conMedida[0].propuesta.datos.factor === 0.5,
+    "y la propuesta lleva los datos exactos para aplicarlos");
+
+  // Ya aplicada: no se repite (eso es ruido, no auditoría).
+  ok(oportunidadesNegocio({
+    calibracionBebida: { comunion: { vino: { factor: 0.5, nEventos: 3 } } },
+    factoresBebida: { comunion: { vino: 0.5 } },
+  }).length === 0, "una medida ya aplicada no se repite");
+
+  // El hielo y la comida pasan por su área.
+  ok(oportunidadesNegocio({ calibracionHielo: { boda: { factor: 0.8, nEventos: 4 } } })[0]
+      ?.propuesta?.datos?.area === "hielo", "el hielo pasa por su área");
+  ok(oportunidadesNegocio({ calibracionComida: { boda: { paella: { factor: 0.5, nEventos: 3 } } } })[0]
+      ?.propuesta?.datos?.clave === "paella", "y la paella por su grupo");
+
+  // Tope de 6: el panel los tiene todos y la auditoría no es una pared de botones.
+  const muchasMedidas = { calibracionBebida: {}, calibracionHielo: {} };
+  ["boda", "comunion", "corporativo", "cumpleanos", "produccion"].forEach(t => {
+    muchasMedidas.calibracionBebida[t] = { vino: { factor: 0.9, nEventos: 3 }, cerveza: { factor: 0.9, nEventos: 3 } };
+    muchasMedidas.calibracionHielo[t] = { factor: 0.9, nEventos: 3 };
+  });
+  ok(oportunidadesNegocio(muchasMedidas).length === 6, "quince medidas no son quince botones (tope de 6)");
+
+  // Roturas sin precio: la fuga que se ve como "gratis".
+  const conRoturas = { "Boda García": { evento: "boda", pax: 100, fechaEvento: enDiasISO(-5),
+    roturas: { "Cristalería::Copa de vino": "3", "Cristalería::Vaso": "2" } } };
+  ok(oportunidadesNegocio({ eventosGuardados: conRoturas }).some(a => a.texto.includes("5 roturas")),
+    "cuenta todas las roturas sin precio (3 + 2)");
+  ok(!oportunidadesNegocio({ eventosGuardados: conRoturas, precios: { "Copa de vino": 2, Vaso: 1 } })
+      .some(a => a.texto.includes("roturas")),
+    "y con precio, la fuga desaparece");
+
+  // Eventos sin vuelta: aprendizaje perdido. Pasados de los últimos 30 días, a lo
+  // sumo 3 nombres; los futuros y los con vuelta no cuentan.
+  const sinVuelta = oportunidadesNegocio({ eventosGuardados: {
+    "Boda 1": { evento: "boda", pax: 80, fechaEvento: enDiasISO(-3) },
+    "Boda 2": { evento: "boda", pax: 60, fechaEvento: enDiasISO(-7) },
+    "Boda 3": { evento: "boda", pax: 90, fechaEvento: enDiasISO(-10) },
+    "Boda 4": { evento: "boda", pax: 50, fechaEvento: enDiasISO(-12) },
+    "Boda Futura": { evento: "boda", pax: 50, fechaEvento: enDiasISO(10) },
+    "Boda Con Vuelta": { evento: "boda", pax: 50, fechaEvento: enDiasISO(-5), vueltos: { "Bebidas frías::Cava": true } },
+  } });
+  const avisoSinVuelta = sinVuelta.find(a => a.texto.includes("vuelta"));
+  ok(avisoSinVuelta && avisoSinVuelta.texto.includes("Boda 1") && avisoSinVuelta.texto.includes("1 más"),
+    "los pasados sin vuelta se listan (3 nombres y el resto contado)");
+  ok(avisoSinVuelta && !avisoSinVuelta.texto.includes("Futura") && !avisoSinVuelta.texto.includes("Con Vuelta"),
+    "y no se lleva por delante a los futuros ni a los con vuelta");
+
+  // Huecos del catálogo: solo eventos de verdad, por etiqueta base, máximo 3.
+  const eventoHueco = { evento: "boda", pax: 100, ninos: 0, fechaEvento: enDiasISO(10),
+    barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4, mesVerano: true };
+  const huecos = huecosDeCatalogo({ "Boda Hueca": eventoHueco }, {});
+  ok(huecos.length === 1 && huecos[0].nombre === "Boda Hueca" && huecos[0].sinPrecio >= 5,
+    "un evento próximo sin catálogo aparece con sus huecos");
+  ok(huecosDeCatalogo({ "Boda Lejana": { ...eventoHueco, fechaEvento: enDiasISO(40) } }, {}).length === 0,
+    "y fuera de la ventana de 30 días no cuenta");
+  // Hueco pequeño no es noticia: catálogo casi completo (faltan 2 de 60 líneas) →
+  // el Resumen se queda 2 líneas corto, que se mira en el propio Resumen.
+  const catsHueco = catsDeEventoGuardado(eventoHueco);
+  const casiCompleto = Object.fromEntries(
+    catsHueco.flatMap(c => c.items.filter(Boolean)).map(it => [it[0], 1]));
+  const [quita1, quita2] = Object.keys(casiCompleto);
+  delete casiCompleto[quita1];
+  delete casiCompleto[quita2];
+  ok(huecosDeCatalogo({ "Boda Casi Completa": eventoHueco }, casiCompleto).length === 0,
+    "ni un hueco pequeño (2 de 60) es noticia: el umbral evita el ruido");
+
+  // ver_auditoria: lee, no opina. Y "no hay datos" no es "todo en orden".
+  const conLista = ejecutar("ver_auditoria", {}, { oportunidades: [{ tono: "oportunidad", texto: "t", comoSeArregla: "c",
+    propuesta: { que: "aplicar_calibracion", resumen: "r", datos: { area: "hielo", tipo: "boda", factor: 0.8 } } }] });
+  ok(conLista.total === 1 && conLista.oportunidades[0].datos.area === "hielo",
+    "devuelve la lista con sus datos de aplicación (se copian, no se recuerdan)");
+  ok(ejecutar("ver_auditoria", {}, { oportunidades: [] }).todoEnOrden,
+    "con lista vacía, dice todo en orden a conciencia");
+  ok(ejecutar("ver_auditoria", {}).error,
+    "y en una pantalla sin la auditoría lo dice, en vez de decir todo en orden");
+
+  // aplicar_calibracion: escribe por la misma puerta que el resto, y el nivel decide
+  // si ni siquiera se ofrece. (nivel: "confianza" — con "consultar" la ejecución se
+  // rechaza antes de tocar onEscribir, que es justo lo que las dos pruebas de abajo
+  // comprueban a nivel de catálogo.)
+  let escrita = null;
+  const rAplicar = ejecutar("aplicar_calibracion", { area: "bebida", tipo: "comunion", clave: "vino", factor: 0.5 },
+    { nivel: "confianza", onEscribir: (p) => { escrita = p; return { ok: true }; } });
+  ok(escrita && escrita.que === "aplicar_calibracion" && escrita.datos.factor === 0.5 && rAplicar.ok,
+    "la escritura pasa por onEscribir con { que, resumen, datos }");
+  ok(!catalogoParaModelo(false, {}, "consultar").some(t => t.name === "aplicar_calibracion"),
+    "en \"Solo consultar\" ni se ofrece");
+  ok(catalogoParaModelo(false, {}, "confianza").some(t => t.name === "aplicar_calibracion"),
+    "y en \"Confianza\" sí");
+
+  // aplicarEnAjustes: cada área a su puerta; lo que no es suyo, lo pasa (encadenar).
+  const hechos = [];
+  const ajustes = aplicarEnAjustes({
+    aplicarBebida: (t, c, f) => { hechos.push(["bebida", t, c, f]); return { ok: true }; },
+    aplicarHielo: (t, f) => { hechos.push(["hielo", t, f]); return { ok: true }; },
+    aplicarComida: (t, c, f) => { hechos.push(["comida", t, c, f]); return { ok: true }; },
+  });
+  ajustes({ que: "aplicar_calibracion", datos: { area: "bebida", tipo: "boda", clave: "vino", factor: 0.7 } });
+  ajustes({ que: "aplicar_calibracion", datos: { area: "hielo", tipo: "boda", factor: 0.8 } });
+  ajustes({ que: "aplicar_calibracion", datos: { area: "comida", tipo: "boda", clave: "paella", factor: 0.5 } });
+  ok(hechos.length === 3 && hechos[0][1] === "boda" && hechos[0][2] === "vino", "cada área va a su puerta");
+  ok(ajustes({ que: "apuntar_tarea" }) === null, "lo que no es suyo lo pasa al siguiente");
+  ok(ajustes({ que: "aplicar_calibracion", datos: { area: "inexistente", tipo: "boda", factor: 1 } }).error,
+    "y un área desconocida se dice, no se inventa");
+}
+
+// ─── SALUD DE LOS PROVEEDORES ─────────────────────────────────────────────────
+{
+  console.log("\n── Salud de los proveedores ──");
+  const fetchReal = globalThis.fetch;
+
+  // Nada configurado: ni siquiera pregunta — dice qué falta en cada uno (no ping,
+  // no coste).
+  let llamadas = 0;
+  globalThis.fetch = async () => { llamadas++; throw new Error("no debería llamar a nadie"); };
+  const sinNada = await salud({});
+  ok(sinNada.pings.length === 11 && sinNada.pings.every(p => p.estado === "sin configurar"),
+    "sin claves, dice qué falta en cada proveedor sin gastar ni un token");
+  ok(llamadas === 0, "y de verdad no llamó a nadie");
+
+  // Con la clave y el modelo respondiendo: ok, con la respuesta.
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: "ok" }] } }],
+    usageMetadata: { promptTokenCount: 2, candidatesTokenCount: 1 },
+  }), { status: 200 });
+  const bien = await salud({ GEMINI_API_KEY: "prueba" });
+  ok(bien.pings.find(p => p.nombre === "gemini")?.estado === "ok",
+    "con la clave puesta y el modelo respondiendo, ok");
+
+  // El caso que ha costado dos veces enterarse a ciegas: Google retira un nombre de
+  // modelo sin avisar. El 404 llega TAL CUAL, que es lo que dice qué ha cambiado.
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    error: { message: "models/gemini-9.9-flash is not found" },
+  }), { status: 404 });
+  const roto = await salud({ GEMINI_API_KEY: "prueba" });
+  const g = roto.pings.find(p => p.nombre === "gemini");
+  ok(g.estado === "error" && g.motivo.includes("404") && g.motivo.includes("not found"),
+    "modelo retirado: el 404 llega tal cual, sin interpretar");
+  ok(roto.pings.find(p => p.nombre === "claude").estado === "sin configurar",
+    "y el que no tiene clave sigue en su sitio, sin confundirse con el roto");
+
+  globalThis.fetch = fetchReal;
+}
+
+// ─── MARKETING: ANALIZAR WEBS (A4 v1) ─────────────────────────────────────────
+{
+  console.log("\n── Marketing: analizar webs (A4 v1) ──");
+
+  // La dirección la elige la persona: la ruta /__analizar fetchea lo que le den.
+  // Sin esta puerta, sería un agujero para sondear redes desde dentro.
+  ok(urlAnalizable("https://www.gula.es").ok, "una web normal se puede analizar");
+  ok(urlAnalizable("http://gula.es").ok, "http también (que el Worker decida el resto)");
+  ok(!urlAnalizable("ftp://gula.es").ok, "y no otros protocolos");
+  ok(!urlAnalizable("gula.es").ok, "ni una dirección sin protocolo");
+  ok(!urlAnalizable("https://localhost/x").ok, "localhost nunca");
+  ok(!urlAnalizable("https://127.0.0.1/x").ok, "ni loopback");
+  ok(!urlAnalizable("https://192.168.1.5").ok, "ni red doméstica");
+  ok(!urlAnalizable("https://10.0.0.7").ok, "ni corporativa");
+  ok(!urlAnalizable("https://172.16.5.5").ok, "ni privada 172.16-31");
+  ok(urlAnalizable("https://172.32.5.5").ok, "172.32 SÍ es pública (fuera del bloque)");
+  ok(!urlAnalizable("https://169.254.169.254/latest").ok, "ni la metadata de la máquina");
+  ok(!urlAnalizable("https://[::1]/x").ok, "ni el loopback ipv6");
+  // El mismo loopback disfrazado de IPv6 "mapeada": sin esto, [::ffff:127.0.0.1] pasaba
+  // como dirección pública siendo el mismo 127.0.0.1 de siempre.
+  ok(!urlAnalizable("https://[::ffff:127.0.0.1]/x").ok, "ni loopback mapeado en ipv6 (forma decimal)");
+  ok(!urlAnalizable("https://[::ffff:7f00:1]/x").ok, "ni loopback mapeado en ipv6 (forma hex, la misma dirección)");
+  ok(!urlAnalizable("https://[::ffff:192.168.1.5]/x").ok, "ni red doméstica mapeada en ipv6");
+
+  // urlAnalizable solo mira la dirección DE PARTIDA: una web pública puede contestar
+  // con un redirect a una privada, y fetch() lo seguiría solo — el coladero completo
+  // del filtro de arriba. fetchValidando tiene que revalidar CADA salto igual que el
+  // primero. Se sustituye fetch por uno falso (nada de red de verdad, como en el
+  // resto del fichero) para comprobar el bucle sin depender de un servidor.
+  {
+    const fetchReal = globalThis.fetch;
+    const falsa = (mapa) => async (url) => {
+      const r = mapa[String(url)];
+      if (!r) throw new Error(`sin mock para ${url}`);
+      return new Response(r.cuerpo || "", { status: r.status, headers: r.cabeceras || {} });
+    };
+    globalThis.fetch = falsa({
+      "https://gula.es/": { status: 302, cabeceras: { location: "http://169.254.169.254/latest/meta-data" } },
+    });
+    let falloRedirect = "";
+    try { await fetchValidando("https://gula.es/", {}); } catch (e) { falloRedirect = e.message; }
+    ok(falloRedirect.includes("no se analiza"), `un redirect a una privada se corta, no se sigue (${falloRedirect})`);
+
+    globalThis.fetch = falsa({
+      "https://gula.es/": { status: 301, cabeceras: { location: "https://www.gula.es/" } },
+      "https://www.gula.es/": { status: 200, cuerpo: "<title>Gula</title>" },
+    });
+    const r = await fetchValidando("https://gula.es/", {});
+    ok(r.status === 200 && (await r.text()).includes("Gula"), "un redirect a otra web pública sí se sigue");
+
+    let saltos = 0;
+    globalThis.fetch = async () => { saltos++; return new Response("", { status: 302, headers: { location: "https://gula.es/" } }); };
+    let falloBucle = "";
+    try { await fetchValidando("https://gula.es/", {}); } catch (e) { falloBucle = e.message; }
+    ok(falloBucle.includes("Demasiados redirects") && saltos <= 7, `una cadena de redirects sin fin no cuelga la petición (${saltos} saltos, ${falloBucle})`);
+    globalThis.fetch = fetchReal;
+  }
+
+  // La extracción: lo que cuenta para captar clientes, con topes y sin DOM.
+  const html = `
+    <html><head>
+      <title>Gula Catering · Catering en Sevilla</title>
+      <meta name="description" content="Catering para bodas y eventos en Sevilla.">
+      <meta name="viewport" content="width=device-width">
+    </head><body>
+      <h1>Catering de verdad</h1>
+      <h2>Nuestras bodas</h2><h2>Opiniones</h2>
+      <a href="/contacto">Contactar</a>
+      <a href="https://wa.me/34600000000">Pedir presupuesto</a>
+      <a href="/menú">Ver menú desde 35 €</a>
+      <a href="/privada">Zona privada</a>
+      <img src="a.jpg"><img src="b.jpg" alt="paella">
+    </body></html>`;
+  const extra = extraerWeb(html, "https://www.gula.es/");
+  ok(extra.titulo.includes("Gula Catering"), "saca el título");
+  ok(extra.descripcion.includes("Catering para bodas"), "y la meta description");
+  ok(extra.secciones.includes("Nuestras bodas") && extra.secciones.includes("Opiniones"), "las secciones (h2)");
+  ok(extra.movilAdaptado === true, "y si está adaptada a móvil (viewport)");
+  ok(extra.ctas.length >= 2 && extra.ctas.some(c => c.texto.includes("Contactar")),
+    "los botones de acción, con su texto");
+  ok(extra.whatsapp && extra.whatsapp.includes("wa.me"), "y el enlace de WhatsApp, que es la puerta de captación");
+  ok(extra.preciosVisibles.some(p => p.includes("35")), "los precios visibles");
+  ok(extra.imagenesSinAlt === 1, "cuántas imágenes no llevan alt (accesibilidad y buscadores)");
+
+  // Y una web sin nada de eso no inventa botones.
+  const vacia = extraerWeb("<html><head><title>Solo texto</title></head><body><p>Hola</p></body></html>", "https://vacia.es/");
+  ok(vacia.ctas.length === 0 && !vacia.whatsapp && vacia.descripcion.startsWith("(sin"),
+    "una web sin CTAs no sale con CTAs inventados");
+
+  // La herramienta: sin proxy configurado, lo dice; con proxy y la web contestando,
+  // devuelve la extracción; y el error del Worker va tal cual.
+  const fetchReal = globalThis.fetch;
+  ok((await ejecutar("analizar_web", { url: "https://gula.es" }, { ...CTX, urlProxy: "" })).error
+      .includes("no está configurado"), "sin Worker, lo dice en vez de fallar en silencio");
+  globalThis.fetch = async () => new Response(JSON.stringify(extra), { status: 200 });
+  const conProxy = await ejecutar("analizar_web", { url: "https://gula.es" }, { ...CTX, urlProxy: "http://falso.example" });
+  ok(conProxy.titulo.includes("Gula Catering"), "con el Worker contestando, devuelve la extracción");
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "La web contestó 404: no se ha podido analizar." }), { status: 502 });
+  const rota = await ejecutar("analizar_web", { url: "https://gula.es/bad" }, { ...CTX, urlProxy: "http://falso.example" });
+  ok(rota.error && rota.error.includes("404"), "y el fallo del Worker va tal cual, sin decorar");
+  globalThis.fetch = fetchReal;
+
+  // En el catálogo, como el resto de conectores: se enciende sola (no necesita nada).
+  ok(todas({}).analizar_web, "el conector de marketing encendido en el catálogo");
+  ok(!HERRAMIENTAS.analizar_web && todas({}).analizar_web.conector === "marketing",
+    "y se sabe que viene del conector, no de casa");
+
+  // ── La captura: el ojo es Gemini, y solo Gemini ──
+  // La captura es de un perfil propio, que puede mostrar clientes en las fotos:
+  // OpenAI entrena con lo que recibe, así que la imagen solo va a Gemini.
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    candidates: [{ content: { parts: [{ text: "Perfil de catering, 2.300 seguidores, platos y eventos." }] } }],
+  }), { status: 200 });
+  const ojo = await visionGemini("¿qué hace bien?", "aW1hZ2VuZmFr", "image/jpeg", { GEMINI_API_KEY: "prueba" });
+  ok(ojo.includes("Perfil de catering"), "Gemini describe la captura y lo que devuelve es lo que llega");
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: "models/bad-model is not found" } }), { status: 404 });
+  let falloOjo = "";
+  try { await visionGemini("", "x", "image/jpeg", { GEMINI_API_KEY: "prueba" }); } catch (e) { falloOjo = e.message; }
+  ok(falloOjo.includes("404") && falloOjo.includes("not found"), "y si el modelo no existe, el 404 llega tal cual");
+  let sinClaveOjo = "";
+  try { await visionGemini("", "x", "image/jpeg", {}); } catch (e) { sinClaveOjo = e.message; }
+  ok(sinClaveOjo.includes("GEMINI_API_KEY"), "sin clave, lo dice en vez de fallar a ciegas");
+
+  // analizar_captura: sin proxy, no configurado; sin captura, lo dice; con los dos,
+  // el análisis llega.
+  ok((await ejecutar("analizar_captura", {}, { ...CTX, captura: "aW1hZ2Vu" })).error
+      .includes("no está configurado"), "sin Worker, lo dice en vez de fallar en silencio");
+  globalThis.fetch = async () => new Response(JSON.stringify({ analisis: "Rejilla de platos y eventos." }), { status: 200 });
+  const sinCaptura = await ejecutar("analizar_captura", {}, { ...CTX, urlProxy: "http://falso.example" });
+  ok(sinCaptura.error && sinCaptura.error.toLowerCase().includes("no hay ninguna captura"), "sin captura, lo dice");
+  const conCaptura = await ejecutar("analizar_captura", { pregunta: "mi instagram" }, { ...CTX, urlProxy: "http://falso.example", captura: "aW1hZ2VuZmFr" });
+  ok(conCaptura.analisis && conCaptura.analisis.includes("Rejilla"), "con captura y proxy, el análisis llega");
+  globalThis.fetch = fetchReal;
+
+  // El sistema le dice al modelo que hay captura: él no la ve, la ve la herramienta.
+  let sistemaConCaptura = "";
+  globalThis.fetch = async (url, opciones) => {
+    sistemaConCaptura = JSON.parse(opciones.body).sistema;
+    return { ok: true, status: 200, json: async () => ({ texto: "Vale." }) };
+  };
+  await preguntar({ texto: "", contexto: { ...CTX, captura: "aW1hZ2Vu" }, url: "http://falso" });
+  ok(sistemaConCaptura.includes("captura") && sistemaConCaptura.includes("analizar_captura"),
+    "con captura adjunta, el sistema le dice que no la ve y qué herramienta la ve");
+  globalThis.fetch = fetchReal;
+}
+
+// ─── ESTRATEGIA DE CAPTACIÓN (A4 v2b) ─────────────────────────────────────────
+{
+  console.log("\n── Estrategia de captación ──");
+  const e = { canales: ["Instagram", "Google"], contenido: ["Reels de platos", "Antes/después de montajes"], puertas: ["WhatsApp"], fase: "Empezando: 3 reels por semana" };
+
+  // El modelo puede proponer cualquier cosa: aquí se le pone forma.
+  const sana = saneaEstrategia(e);
+  ok(sana && sana.canales.length === 2 && sana.actualizada, "una estrategia con forma sale sana, con su fecha");
+  ok(!saneaEstrategia({ ...e, fase: "" }), "sin fase, es un borrador, no una estrategia");
+  ok(!saneaEstrategia("no es un objeto"), "ni un texto a secas");
+  const larga = saneaEstrategia({ ...e, fase: "x".repeat(900), contenido: ["y".repeat(200)] });
+  ok(larga.fase.length <= 500 && larga.contenido[0].length <= 80, "y lo que se alarga, se corta");
+
+  ok(estrategiaEnFrase(null) === "", "sin estrategia, la frase está vacía");
+  ok(estrategiaEnFrase(sana).includes("Instagram") && estrategiaEnFrase(sana).includes("3 reels"),
+    "y en frase lleva lo acordado");
+
+  // ver_estrategia: sin ella, lo dice; con ella, la devuelve.
+  ok(ejecutar("ver_estrategia", {}, CTX).nada, "sin estrategia guardada, lo dice en vez de inventar una");
+  const conEstrategia = ejecutar("ver_estrategia", {}, { ...CTX, estrategia: sana });
+  ok(conEstrategia.canales && conEstrategia.canales[0] === "Instagram", "y guardada, la devuelve tal cual");
+
+  // guardar_estrategia: escribe por onEscribir, con la forma de siempre. Con nivel
+  // confianza: es una herramienta de escritura y con "consultar" (el por defecto)
+  // tiene que quedar bloqueada, que es lo que toca.
+  let escrita = null;
+  const rGuardar = ejecutar("guardar_estrategia", e, { nivel: "confianza", onEscribir: (p) => { escrita = p; return { guardada: true }; } });
+  ok(escrita && escrita.que === "guardar_estrategia" && escrita.datos.fase === e.fase && rGuardar.guardada,
+    "la escritura pasa por onEscribir con los datos intactos");
+  ok(ejecutar("guardar_estrategia", e, {}).error, "y sin puerta de escritura, lo dice");
+
+  // El aplicador sanea por la puerta de la app: lo que no tiene forma, no se guarda.
+  const hechos = [];
+  const ajustes = aplicarEnAjustes({
+    aplicarEstrategia: (datos) => { hechos.push(datos); return saneaEstrategia(datos) ? { guardada: true } : { error: "sin forma" }; },
+  });
+  ok(ajustes({ que: "guardar_estrategia", datos: e }).guardada, "el aplicador guarda lo que tiene forma");
+  ok(ajustes({ que: "guardar_estrategia", datos: { fase: "sin canales" } }).error, "y rechaza lo que no la tiene");
+  ok(ajustes({ que: "apuntar_tarea" }) === null, "lo que no es suyo sigue pasándolo a la cadena");
+}
+
+// ─── AVISOS EN ESTE TELÉFONO: LO PURO DEL PUSH (D1a) ──────────────────────────
+{
+  console.log("\n── Avisos en este teléfono (lo puro del push) ──");
+  const almacenFalso = () => {
+    const d = new Map();
+    return { getItem: (k) => (d.has(k) ? d.get(k) : null), setItem: (k, v) => d.set(k, String(v)), removeItem: (k) => d.delete(k) };
+  };
+
+  // El id del aparato: uno por aparato, estable, y no depende de la persona que lo
+  // use (el aviso lo recibe el teléfono, no la cuenta).
+  const a = almacenFalso();
+  const id1 = idDeAparato(a);
+  ok(id1.length >= 8, "el id del aparato se genera");
+  ok(idDeAparato(a) === id1, "y es estable: el mismo teléfono, el mismo id");
+  ok(idDeAparato(almacenFalso()) !== id1, "otro teléfono, otro id");
+  const roto = almacenFalso();
+  roto.setItem(CLAVE_ID, "corto");
+  const regenerado = idDeAparato(roto);
+  ok(regenerado !== "corto" && regenerado.length >= 8, "y un id corrompido se regenera");
+  ok(typeof CLAVE_SUSC === "string" && CLAVE_SUSC.startsWith("gula_push_"), "la suscripción vive en su clave de almacén");
+
+  // La clave pública: base64url → bytes, con el padding repuesto. 65 bytes es lo que
+  // da una clave P-256 sin comprimir, que es lo que pide el navegador.
+  const bytes = new Uint8Array(65);
+  for (let i = 0; i < 65; i++) bytes[i] = i;
+  const b64 = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const deVuelta = clavePúblicaABytes(b64);
+  ok(deVuelta.length === 65 && deVuelta[64] === 64, "la clave pública vuelve a bytes con su longitud (65 de P-256)");
+  ok(clavePúblicaABytes("").length === 0, "y sin clave, cero bytes, no un fallo");
+
+  // Una suscripción usable tiene los tres pedazos que hacen falta; sin uno, empujar a
+  // ella es tirar el aviso a la basura. expirationTime null (el caso normal, sin
+  // caducidad) tiene que valer: exigir un número ahí rechazaba TODA suscripción real.
+  const susOk = { endpoint: "https://fcm.ejemplo/x", expirationTime: null, keys: { p256dh: "a", auth: "b" } };
+  ok(suscripcionLista(susOk), "una suscripción completa, sin caducidad (el caso normal), vale");
+  ok(suscripcionLista({ ...susOk, expirationTime: 123 }), "y con caducidad puesta también vale");
+  ok(!suscripcionLista({ ...susOk, keys: { p256dh: "a" } }), "sin auth, no vale");
+  ok(!suscripcionLista({ ...susOk, endpoint: "" }), "sin endpoint, no vale");
+  ok(!suscripcionLista(null), "y sin suscripción, no vale");
+}
+
+// ─── WORKER: LOS AVISOS DEL DÍA (D1b) ─────────────────────────────────────────
+{
+  console.log("\n── Worker: los avisos del día ──");
+  const hoy = hoyISO();
+  const tareas = [
+    { id: "1", texto: "Comprar hielo", evento: "Boda de prueba", fecha: hoy, hecho: false },
+    { id: "2", texto: "Ya hecha", fecha: hoy, hecho: true },
+    { id: "3", texto: "Para mañana", fecha: enDiasISO(1), hecho: false },
+    { id: "4", texto: "Sin fecha", fecha: "", hecho: false },
+    { id: "5", texto: "De ayer", fecha: enDiasISO(-1), hecho: false },
+  ];
+  const paraHoy = tareasParaPush(tareas, hoy);
+  ok(paraHoy.length === 1 && paraHoy[0].texto === "Comprar hielo",
+    "solo lo que toca HOY y no está hecho: ni lo de mañana, ni el de ayer, ni lo hecho, ni lo sin fecha");
+  ok(tareasParaPush([], hoy).length === 0, "y sin tareas, cero avisos");
+
+  const payload = payloadDeRecordatorio(tareas[0]);
+  ok(payload.url === "./checklist/", "el aviso lleva a la checklist, donde el recordatorio espera en su lista");
+  ok(payload.cuerpo.includes("Boda de prueba"), "y lleva el evento entre paréntesis, para saber de qué es sin abrir la app");
+  ok(payloadDeRecordatorio({ texto: "x".repeat(300) }).cuerpo.length <= 200,
+    "y el cuerpo va acotado: una notificación es una campana, no un documento");
+
+  // Las claves VAPID: sin ellas, el fallo DICE con qué se arregla; con ellas, la
+  // pública sale derivada de la privada (la app no pega nada).
+  ok(vapidClaves({}).fallo, "sin VAPID_CLAVE, lo dice en vez de fallar a ciegas");
+  // El par se genera como lo genera Cloudflare (npx web-push generate-vapid-keys):
+  // base64url, no DER — la privada se pega tal cual y la pública sale derivada.
+  const webpush = (await import("web-push")).default;
+  const par = webpush.generateVAPIDKeys();
+  const pub = vapidClaves({ VAPID_CLAVE: par.privateKey, VAPID_MAILTO: "mailto:gula@ejemplo.com" });
+  ok(pub.publico === par.publicKey,
+    "con el par, la derivada es la MISMA pública que venía en el par (si no, el teléfono no descifra nada)");
+  ok(vapidClaves({ VAPID_CLAVE: par.privateKey.slice(0, 20), VAPID_MAILTO: "mailto:gula@ejemplo.com" }).fallo,
+    "y con una copia TRUNCADA, lo dice en vez de aceptarla: Node la rellenaría de ceros y 'funcionaría' con una clave distinta a la generada (al corregirla después, los teléfonos tendrían que re-suscribirse)");
+  ok(vapidClaves({ VAPID_CLAVE: par.privateKey, VAPID_MAILTO: "gula@ejemplo.com" }).fallo,
+    "y sin el mailto: en el asunto, lo pide en vez de intentarlo a ciegas");
+
+  // El aviso cifrado, sin la librería: worker/index.js dejó de usar el paquete
+  // web-push (su árbol de dependencias no se puede empaquetar para un Worker, ver el
+  // porqué largo en el comentario de peticionPushCifrada) y reimplementa las dos
+  // piezas que hacían falta —firmar el JWT de VAPID y cifrar el aviso— con la propia
+  // Web Crypto API. Aquí se comprueba contra la librería DE VERDAD: el abonado (un par
+  // ECDH + un secreto de auth, como los que manda un navegador de verdad al
+  // suscribirse) descifra con http_ece —la misma pieza que usa web-push por dentro—
+  // lo que ha cifrado peticionPushCifrada, y tiene que salir el payload EXACTO.
+  {
+    const crypto = await import("node:crypto");
+    const ece = (await import("http_ece"));
+    const abonado = crypto.createECDH("prime256v1");
+    abonado.generateKeys();
+    const authSecretRaw = crypto.randomBytes(16);
+    const subscripcion = {
+      endpoint: "https://fcm.googleapis.com/fcm/send/prueba123",
+      keys: { p256dh: abonado.getPublicKey("base64url"), auth: authSecretRaw.toString("base64url") },
+    };
+    const payload = JSON.stringify({ titulo: "Gula · recordatorio", cuerpo: "Prueba de cifrado" });
+    const det = await peticionPushCifrada(subscripcion, payload, {
+      subject: "mailto:hola@gula-catering.es", publicKey: par.publicKey, privateKey: par.privateKey,
+    });
+    ok(det.method === "POST" && det.endpoint === subscripcion.endpoint, "la petición va a POST y al endpoint del abonado");
+    ok(det.headers["Content-Encoding"] === "aes128gcm" && det.headers["Content-Length"] === String(det.body.length),
+      "las cabeceras dicen la codificación de verdad y el tamaño de verdad del cuerpo");
+    const claro = ece.decrypt(Buffer.from(det.body), { version: "aes128gcm", privateKey: abonado, authSecret: authSecretRaw });
+    ok(claro.toString("utf8") === payload,
+      "descifrado con http_ece (la pieza de verdad que usa un navegador), el aviso sale IDÉNTICO al que se mandó a cifrar");
+
+    // El JWT de VAPID: cabecera "vapid t=<jwt>, k=<pública>", firma ECDSA que verifica
+    // con la clave pública del par — es justo lo que un servidor de push comprueba
+    // antes de aceptar el aviso.
+    const m = det.headers.Authorization.match(/^vapid t=([^,]+), k=(.+)$/);
+    ok(m && m[2] === par.publicKey, "la cabecera lleva la pública del par tal cual, sin tocar");
+    const [cabecera64, cuerpo64, firma64] = m[1].split(".");
+    const pubBytes = Buffer.from(par.publicKey, "base64url");
+    const jwk = { kty: "EC", crv: "P-256", x: pubBytes.slice(1, 33).toString("base64url"), y: pubBytes.slice(33, 65).toString("base64url") };
+    const claveVerif = await crypto.webcrypto.subtle.importKey("jwk", jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["verify"]);
+    const firmaValida = await crypto.webcrypto.subtle.verify(
+      { name: "ECDSA", hash: "SHA-256" }, claveVerif,
+      Buffer.from(firma64, "base64url"), Buffer.from(`${cabecera64}.${cuerpo64}`),
+    );
+    ok(firmaValida, "la firma ECDSA del JWT verifica con la clave pública del par: no está mal formada ni firmada con otra clave");
+    const claims = JSON.parse(Buffer.from(cuerpo64, "base64url").toString("utf8"));
+    ok(claims.sub === "mailto:hola@gula-catering.es" && claims.aud === "https://fcm.googleapis.com",
+      `el JWT lleva el asunto y la audiencia correctos (el origen del endpoint, no el endpoint entero) → ${JSON.stringify(claims)}`);
+  }
+}
+
+// ─── LOS PROVEEDORES QUE SE PUEDEN ELEGIR A MANO ──────────────────────────────
+// Antes la lista de Ajustes era fija (Gemini/Claude/OpenAI): los siete proveedores
+// gratis nuevos de la cascada automática (Groq, Cerebras, Z.AI, Cloudflare, Mistral,
+// OpenRouter, NVIDIA) no tenían forma de elegirse uno a uno, aunque estuvieran
+// configurados. Ahora se ofrecen los que el Worker diga que tienen clave puesta.
+{
+  console.log("\n── Proveedores elegibles a mano en Ajustes ──");
+
+  ok(proveedoresElegibles([]).map(p => p.id).join(",") === "gemini",
+    "sin saber qué hay configurado (antes de la primera respuesta) se asume Gemini, no una pantalla vacía");
+
+  const todos = proveedoresElegibles(ORDEN);
+  ok(todos.length === ORDEN.length && todos.every((p, i) => p.id === ORDEN[i]),
+    "con todo configurado, salen los once en el MISMO orden que usa el enrutado automático");
+
+  const soloDos = proveedoresElegibles(["claude", "groq"]);
+  ok(soloDos.map(p => p.id).join(",") === "groq,claude",
+    "con solo dos configurados, salen esos dos y en el orden de la cascada (groq antes que claude), no el orden en que llegaron");
+
+  ok(ORDEN.every(id => NOMBRE_PROVEEDOR[id]),
+    "todos los proveedores del enrutado tienen nombre para pantalla (nadie se queda con el id en crudo)");
+
+  ok(notaDe("gemini") === "gratis" && notaDe("groq") === "gratis" && notaDe("claude") === "de pago"
+    && notaDe("compatible") === "tu proveedor",
+    "la nota de cada uno dice lo que es: gratis, de pago, o el hueco abierto");
+  ok(SIN_DATOS_DE_CLIENTES.every(id => notaDe(id) === "sin clientes"),
+    "y los que no pueden ver datos de clientes lo dicen en su nota, para que se sepa antes de elegirlos a mano");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

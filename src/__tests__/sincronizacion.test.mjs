@@ -108,6 +108,109 @@ ok(Object.keys(sinSesion.local).length===1, 'lo local NO se pierde aunque la nub
 ok(sinSesion.errores.length>0, `y el error se detecta para poder avisar: ${JSON.stringify(sinSesion.errores)}`);
 setSesion(true);
 
+// ── El evento compartido: dos personas guardando casi a la vez ───────────────
+// El bug real: dos móviles con la checklist del mismo evento abierta. Antes,
+// guardarEventoNube sobrescribía el documento ENTERO con el estado local de quien
+// guardara último, así que el segundo guardado borraba lo que el primero acababa
+// de escribir aunque tocaran campos distintos. La solución: una transacción que
+// solo escribe encima los campos que de verdad cambiaron respecto a la base común
+// (`baseline`), campo a campo — no el documento entero.
+console.log('\n══ El evento compartido: dos personas guardando casi a la vez ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const id = 'evt_compartido';
+  const base = { pax: 100, checkeados: ['mesas'], notasEvento: 'Sin gluten mesa 4' };
+
+  const primero = await N.guardarEventoNube(id, base);
+  ok(primero && primero.actualizado > 0, 'el primer guardado (sin baseline) crea el documento');
+
+  // Dispositivo A marca un ítem nuevo, dispositivo B cambia el pax — ambos partiendo
+  // de la MISMA base (`primero.fusion`), sin saber del otro.
+  const baseline = primero.fusion;
+  const localA = { ...baseline, checkeados: ['mesas', 'sillas'] };
+  const localB = { ...baseline, pax: 120 };
+
+  const rA = await N.guardarEventoNube(id, localA, baseline);
+  ok(JSON.stringify(rA.fusion.checkeados) === JSON.stringify(['mesas', 'sillas']) && rA.fusion.pax === 100,
+    'A guarda su check nuevo sin tocar el pax, que sigue en 100');
+
+  const rB = await N.guardarEventoNube(id, localB, baseline);
+  ok(rB.fusion.pax === 120 && JSON.stringify(rB.fusion.checkeados) === JSON.stringify(['mesas', 'sillas']),
+    'B guarda su pax nuevo Y CONSERVA el check de A, que B ni sabía que existía');
+
+  const final = JSON.parse(almacen.get(`eventos/${id}`).estado);
+  ok(final.pax === 120 && JSON.stringify(final.checkeados) === JSON.stringify(['mesas', 'sillas']),
+    `en el documento final no se ha perdido nada de ninguno de los dos: ${JSON.stringify(final)}`);
+
+  // Sin baseline (p. ej. el primer guardado de una sesión que no llegó a cargar
+  // nada antes): se compara contra lo que ya hay en el servidor, no se pierde.
+  const sinBaseline = await N.guardarEventoNube(id, { ...final, notasEvento: 'Sin gluten mesa 4 y mesa 7' });
+  ok(sinBaseline.fusion.pax === 120 && sinBaseline.fusion.notasEvento === 'Sin gluten mesa 4 y mesa 7',
+    'sin baseline explícito, se compara contra el servidor y tampoco se pierde nada');
+
+  // Conflicto de verdad: los DOS tocan el mismo campo desde la misma base. Aquí sí
+  // gana el último en escribir, pero SOLO en ese campo — el resto sigue a salvo.
+  const baseline2 = sinBaseline.fusion;
+  await N.guardarEventoNube(id, { ...baseline2, pax: 150 }, baseline2);
+  const rConflicto = await N.guardarEventoNube(id, { ...baseline2, pax: 200 }, baseline2);
+  ok(rConflicto.fusion.pax === 200 && JSON.stringify(rConflicto.fusion.checkeados) === JSON.stringify(['mesas', 'sillas']),
+    'mismo campo, misma base: gana el último en escribir, pero solo ahí — lo demás no se toca');
+}
+
+// ── Modo carga: dos personas marcando casillas DISTINTAS del mismo camión ────────
+// El bug real (reportado por el dueño): con varios marcando en Modo carga a la vez,
+// a unos se les desmarcaba lo que acababan de marcar otros. `checkeados` (y
+// preparados/vueltos/roturas/marcasRevisar/notasCheck) es UN SOLO campo con las
+// marcas de TODOS los items ({ "categoría::item": true }), así que el merge
+// campo-a-campo de arriba no bastaba: las dos personas tocan ese mismo campo, y
+// aunque en items distintos, se trataba como "lo ha cambiado este aparato" y subía
+// su copia entera del mapa — todavía sin la marca de la otra persona.
+console.log('\n══ Modo carga: varios marcando items DISTINTOS del mismo camión ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const id = 'evt_carga';
+  const base = { pax: 100, checkeados: { 'Bebida::Copas de vino': true }, preparados: {}, vueltos: {}, roturas: {} };
+
+  const primero = await N.guardarEventoNube(id, base);
+  const baseline = primero.fusion;
+
+  // A marca "Vasos" y B marca "Jarras", casi a la vez, los dos partiendo de la MISMA
+  // base — ninguno sabe todavía lo que ha marcado el otro.
+  const localA = { ...baseline, checkeados: { ...baseline.checkeados, 'Cocina::Vasos': true } };
+  const localB = { ...baseline, checkeados: { ...baseline.checkeados, 'Cocina::Jarras': true } };
+
+  const rA = await N.guardarEventoNube(id, localA, baseline);
+  ok(rA.fusion.checkeados['Cocina::Vasos'] === true && rA.fusion.checkeados['Bebida::Copas de vino'] === true,
+    'A guarda su marca sin perder lo que ya había');
+
+  const rB = await N.guardarEventoNube(id, localB, baseline);
+  ok(rB.fusion.checkeados['Cocina::Jarras'] === true,
+    'B guarda su propia marca');
+  ok(rB.fusion.checkeados['Cocina::Vasos'] === true,
+    `B NO le borra a A lo que acaba de marcar, aunque B ni sabía que existía: ${JSON.stringify(rB.fusion.checkeados)}`);
+
+  const final = JSON.parse(almacen.get(`eventos/${id}`).estado);
+  ok(final.checkeados['Cocina::Vasos'] === true && final.checkeados['Cocina::Jarras'] === true
+    && final.checkeados['Bebida::Copas de vino'] === true,
+    `en el documento final están las marcas de los dos, nadie ha perdido la suya: ${JSON.stringify(final.checkeados)}`);
+
+  // Desmarcar también cuenta como "lo he tocado" (false es un valor real, no ausencia)
+  const baseline2 = rB.fusion;
+  const localC = { ...baseline2, checkeados: { ...baseline2.checkeados, 'Cocina::Vasos': false } };
+  const rC = await N.guardarEventoNube(id, localC, baseline2);
+  ok(rC.fusion.checkeados['Cocina::Vasos'] === false && rC.fusion.checkeados['Cocina::Jarras'] === true,
+    'desmarcar un item tampoco toca las marcas de los demás');
+
+  // El mismo item, dos personas a la vez (aquí, las roturas del mismo item: cada una
+  // cuenta un número distinto sin saber de la otra): ahí sí gana el último — no hay
+  // forma de saber cuál de los dos es "la verdad" — pero solo en ESE item.
+  const baseline3 = rC.fusion;
+  await N.guardarEventoNube(id, { ...baseline3, roturas: { ...baseline3.roturas, 'Cocina::Vasos': '2' } }, baseline3);
+  const rMismoItem = await N.guardarEventoNube(id, { ...baseline3, roturas: { ...baseline3.roturas, 'Cocina::Vasos': '3' } }, baseline3);
+  ok(rMismoItem.fusion.roturas['Cocina::Vasos'] === '3' && rMismoItem.fusion.checkeados['Cocina::Jarras'] === true,
+    'mismo item, misma base: gana el último en escribir, pero el resto (Jarras) sigue intacto');
+}
+
 console.log('\n══ El calendario se muda a su carpeta propia ══');
 {
   almacen.clear(); limpiarPrevios(); setSesion(true);
@@ -388,6 +491,17 @@ console.log("\n══ Alquileres → recogidas, sin pantalla ══");
   ok(recogidasConAlquileres({ evento: "produccion", llevaCarpas: true }).length === 0,
     "las carpas del almacén no crean recogida: solo las alquiladas");
 
+  // Mobiliario: si se dice proveedor, manda sobre el fijo de siempre (Event Style)
+  const conProveedorPropio = recogidasConAlquileres({
+    evento: "boda", fechaEvento: "2027-08-11",
+    llevaMobiliarioAlquiler: true, proveedorMobiliarioAlquiler: "Decoraciones Ruiz",
+  });
+  ok(conceptos(conProveedorPropio)[0] === "Mobiliario (Decoraciones Ruiz)",
+    `sin proveedor propio se queda en Event Style, con él manda el nuevo → ${JSON.stringify(conceptos(conProveedorPropio))}`);
+  const sinProveedorPropio = recogidasConAlquileres({ evento: "boda", llevaMobiliarioAlquiler: true });
+  ok(conceptos(sinProveedorPropio)[0] === "Mobiliario (Event Style)",
+    "sin decir proveedor, sigue siendo Event Style de toda la vida");
+
   // Lo escrito a mano no se toca NUNCA, y lo ya recogido tampoco se borra
   const conManual = recogidasConAlquileres({
     evento: "boda", fechaEvento: "2027-08-11", origenSillas: "Dealde",
@@ -436,8 +550,12 @@ console.log("\n══ Cómo se lee un envío en la bandeja ══");
     `lo contestado se lee entero → "${de("gente").respuesta}"`);
   ok(de("cuando").respuesta.includes("12:30") && de("cuando").respuesta.includes("a 02:00"),
     `la hora de fin se enseña aunque no configure nada → "${de("cuando").respuesta}"`);
-  ok(!filas.some(f => f.id === "dias") && !filas.some(f => f.id === "carpas"),
-    "y de una boda no se enseñan las preguntas de rodaje");
+  ok(!filas.some(f => f.id === "dias"),
+    "y de una boda no se enseña la de los días, que es solo de rodaje");
+  // Las carpas SÍ se preguntan en una boda (dejó de ser solo de producción): es la
+  // excepción, no la norma, pero cuando hace falta se pregunta igual.
+  ok(filas.some(f => f.id === "carpas"),
+    "pero las carpas sí, aunque sea la excepción en una boda");
 }
 
 // ── Aplicar un envío no puede pisar lo que ya había ───────────────────────────
@@ -504,6 +622,47 @@ console.log("\n══ Entrante de chupito Y para compartir ══");
   const filasSin = resumirEnvio({ tipo: "boda", entrante: ["chupito"] });
   ok(filasCon.some(f => f.id === "entrantePersonas") && !filasSin.some(f => f.id === "entrantePersonas"),
     "y lo de cada cuántas personas solo se pregunta si hay entrante para compartir");
+
+  // No hace falta quedarse en 3 o 4: se puede poner cualquier número
+  const otroNumero = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["compartir"],
+    entrantePersonas: "otras", entrantePersonasOtras: 7,
+  });
+  ok(otroNumero.personasPorPlatoEntrante === 7,
+    `"Otro número" manda su propia cifra, no solo 3 o 4 → cada ${otroNumero.personasPorPlatoEntrante}`);
+
+  // "Individual" no es un entrante compartido de verdad — es un plato por persona,
+  // sin tener que marcar "compartir" y poner "otro número: 1" a mano.
+  const individual = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["compartir"], entrantePersonas: 1,
+  });
+  ok(individual.personasPorPlatoEntrante === 1,
+    `"Individual" manda 1 persona por plato → cada ${individual.personasPorPlatoEntrante}`);
+
+  // Ahora "individual" es su propia casilla en "¿Lleva entrante?", no hay que pasar
+  // por "compartir" para decir que en realidad no se comparte.
+  const individualDirecto = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["individual"], individualNumero: 2,
+  });
+  ok(individualDirecto.entranteCompartido === true && individualDirecto.personasPorPlatoEntrante === 1,
+    "\"Individual\" directo también da ratio 1, sin marcar \"compartir\"");
+  ok(individualDirecto.numEntrantesCompartir === 2,
+    `y con su propio número de entrantes distintos → ${individualDirecto.numEntrantesCompartir}`);
+
+  // Y no hace falta preguntar "cada cuántas personas" si solo es individual: por eso
+  // esa pantalla sigue atada solo a "compartir", no a cualquier entrante.
+  const filasSoloIndividual = resumirEnvio({ tipo: "boda", entrante: ["individual"] });
+  ok(!filasSoloIndividual.some(f => f.id === "entrantePersonas"),
+    "con solo \"individual\" no se pregunta cada cuántas personas: el ratio ya es 1");
+
+  // Individual y compartir a la vez: los dos cuentan, cada uno con su número de
+  // entrantes distintos (la checklist solo tiene una línea, así que se suman).
+  const ambos = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, entrante: ["individual", "compartir"],
+    individualNumero: 1, compartirNumero: 2, entrantePersonas: 4,
+  });
+  ok(ambos.numEntrantesCompartir === 3 && ambos.personasPorPlatoEntrante === 4,
+    `individual + compartir se suman → ${ambos.numEntrantesCompartir} entrantes, ratio de "compartir" (cada ${ambos.personasPorPlatoEntrante})`);
 }
 
 // ── El staff se pregunta con los adultos y los niños ──────────────────────────
@@ -545,6 +704,109 @@ console.log("\n══ Borrar un evento ══");
   const paraOficina = resumirParaOficina(despues, "2027-01-01").map(e => e.nombre);
   ok(!paraOficina.includes("Cumple Marta") && paraOficina.includes("Boda Ana"),
     `y desaparece de los próximos que ve la oficina → ${JSON.stringify(paraOficina)}`);
+}
+
+// "configurado" viaja en la lista corta, para que el formulario distinga los
+// eventos que el calendario creó en blanco (sinConfigurar) de los que ya tienen
+// datos de verdad — sin depender de si ESTE móvil mandó algo antes (eso es aparte,
+// mios.js/localStorage).
+console.log("\n══ 'configurado' en la lista corta de la oficina ══");
+{
+  const { resumirParaOficina } = await import("../formulario/envios.js");
+  const eventos = {
+    "Boda sin configurar": { pax: 100, fechaEvento: "2027-08-11", sinConfigurar: true },
+    "Boda ya configurada": { pax: 100, fechaEvento: "2027-08-12", sinConfigurar: false },
+    "Boda de siempre": { pax: 100, fechaEvento: "2027-08-13" },
+  };
+  const lista = resumirParaOficina(eventos, "2027-01-01");
+  const de = (nombre) => lista.find(e => e.nombre === nombre);
+  ok(de("Boda sin configurar").configurado === false,
+    "sinConfigurar:true → configurado:false");
+  ok(de("Boda ya configurada").configurado === true,
+    "sinConfigurar:false → configurado:true");
+  ok(de("Boda de siempre").configurado === true,
+    "sin el campo (eventos de siempre, montados a mano) cuenta como configurado");
+}
+
+// ── Un evento "ya configurado" se rellena solo si vino de un envío anterior ───────
+// El dueño avisó de un conflicto: la lista decía "Ya configurado" pero al entrar
+// preguntaba todo de cero — la etiqueta hablaba de la CHECKLIST, no del formulario.
+// Si ese evento se configuró aplicando un envío, App.jsx guarda las respuestas de
+// aquella vez en `formularioRespuestas`; ahora viajan de vuelta (filtradas) para que
+// el formulario se rellene solo. Si se configuró a mano en la app (sin pasar nunca
+// por el formulario), no hay nada que traer — sigue preguntando todo, pero al menos
+// ya no promete lo que no puede cumplir (ver el texto distinto en Formulario.jsx).
+console.log("\n══ 'respuestasPrevias': el formulario se rellena solo si ya se aplicó un envío ══");
+{
+  const { resumirParaOficina, respuestasParaOficina } = await import("../formulario/envios.js");
+
+  // Filtro puro: qué pasa y qué se queda fuera
+  const filtradas = respuestasParaOficina({
+    tipo: "boda", nombreYsitio: {}, cuando: {}, // ya viajan sueltos (nombre/fecha/sitio/tipo)
+    adultos: 120, ninos: 5, menu: ["paella"], entrante: ["individual"],
+    comprar: "una escalera", alergias: "1 celíaco", notas: "llamar antes",
+    menu_comentario: "sin cebolla", imprimirMenuArchivo: "data:image/png;base64,AAAA",
+  });
+  ok(filtradas.adultos === 120 && filtradas.ninos === 5 && JSON.stringify(filtradas.menu) === '["paella"]'
+     && JSON.stringify(filtradas.entrante) === '["individual"]',
+    `las respuestas de verdad se quedan → ${JSON.stringify(filtradas)}`);
+  ok(!("tipo" in filtradas) && !("nombreYsitio" in filtradas) && !("cuando" in filtradas),
+    "lo que ya viaja suelto (tipo/nombre/sitio/fecha) no se duplica aquí");
+  ok(!("comprar" in filtradas) && !("alergias" in filtradas) && !("notas" in filtradas),
+    "el texto libre (comprar/alergias/notas) se queda fuera: puede llevar cualquier cosa");
+  ok(!("menu_comentario" in filtradas) && !("imprimirMenuArchivo" in filtradas),
+    "los comentarios por pregunta y los archivos subidos tampoco viajan de vuelta");
+
+  ok(respuestasParaOficina(null) === null && respuestasParaOficina(undefined) === null,
+    "sin respuestas guardadas, no hay nada que filtrar");
+  ok(respuestasParaOficina({ comprar: "algo", notas: "algo" }) === null,
+    "si tras filtrar no queda nada de verdad, se manda null, no un objeto vacío");
+  ok(respuestasParaOficina({ notasLargas: "x".repeat(30_000) }) === null,
+    "y si lo que queda pesa demasiado (tope de 20 KB), tampoco se manda: mejor eso que reventar publico/{codigo}");
+
+  // Integrado en resumirParaOficina: solo los eventos con formularioRespuestas llevan
+  // respuestasPrevias; los configurados a mano (sin ese campo) no la llevan
+  const eventos = {
+    "Boda con envío aplicado": {
+      pax: 120, fechaEvento: "2027-08-11", sinConfigurar: false,
+      formularioRespuestas: { adultos: 120, menu: ["paella"], comprar: "no repetir esto" },
+    },
+    "Boda a mano": { pax: 80, fechaEvento: "2027-08-12", sinConfigurar: false },
+  };
+  const lista = resumirParaOficina(eventos, "2027-01-01");
+  const conEnvio = lista.find(e => e.nombre === "Boda con envío aplicado");
+  const aMano = lista.find(e => e.nombre === "Boda a mano");
+  ok(!!conEnvio.respuestasPrevias && conEnvio.respuestasPrevias.adultos === 120,
+    `el evento configurado por un envío trae sus respuestas → ${JSON.stringify(conEnvio.respuestasPrevias)}`);
+  ok(!("comprar" in conEnvio.respuestasPrevias),
+    "filtradas también aquí: \"no repetir esto\" (comprar) no debería aparecer");
+  ok(aMano.respuestasPrevias === undefined,
+    "el configurado a mano, sin formularioRespuestas, no lleva la clave ni vacía");
+  ok(!("pax" in conEnvio) && !("pax" in aMano),
+    "y lo que la checklist calcula por su cuenta (pax del evento, no de un envío) sigue sin viajar aquí");
+}
+
+// ── "Ya mandaste esto" — mismo buscador para el repaso y la lista de elegir evento ──
+// Antes cada pantalla comparaba nombres a su manera, con el mismo código repetido dos
+// veces. Ahora las dos llaman a buscarEnvioPorNombre: si el emparejamiento cambia (por
+// ejemplo, a tener en cuenta acentos) solo hay que tocarlo una vez.
+console.log("\n══ buscarEnvioPorNombre: sin mayúsculas ni espacios de sobra ══");
+{
+  const { buscarEnvioPorNombre } = await import("../formulario/mios.js");
+  const mios = [
+    { id: "a1", eventoDestino: "Boda Ana", nombre: "Boda Ana", enviado: 1 },
+    { id: "a2", eventoDestino: "", nombre: "Cumple Marta", enviado: 2 },
+  ];
+  ok(buscarEnvioPorNombre(mios, "Boda Ana")?.id === "a1",
+    "encuentra por eventoDestino");
+  ok(buscarEnvioPorNombre(mios, "  boda ana  ")?.id === "a1",
+    "sin fijarse en mayúsculas ni espacios de sobra");
+  ok(buscarEnvioPorNombre(mios, "Cumple Marta")?.id === "a2",
+    "y si no hay eventoDestino, cae al nombre");
+  ok(buscarEnvioPorNombre(mios, "Boda Que No Existe") === null,
+    "nada si no hay envío con ese nombre");
+  ok(buscarEnvioPorNombre(mios, "") === null && buscarEnvioPorNombre(mios, undefined) === null,
+    "y sin nombre que buscar, tampoco hay falso positivo");
 }
 
 // ── Flores y minutas: no son material, son un sitio y un día ──────────────────
@@ -610,7 +872,7 @@ console.log("\n══ Flores y minutas → recogidas ══");
 console.log("\n══ Cuántas carpas y cuántas alquilar ══");
 {
   const { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } = await import("../carpas.js");
-  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, resumirEnvio, opcionesDe, PREGUNTAS, preguntasDe } = await import("../formulario/preguntas.js");
 
   ok(carpasRecomendadas(40) === 6, `40 pax → 6 carpas (4 de comer + buffet + camión): ${carpasRecomendadas(40)}`);
   ok(carpasRecomendadas(12) === 3, `12 pax → 3: ${carpasRecomendadas(12)}`);
@@ -630,17 +892,193 @@ console.log("\n══ Cuántas carpas y cuántas alquilar ══");
   ok(ninguna.llevaCarpas === false && ninguna.numCarpas === undefined,
     "y si no hacen falta, no se lleva ninguna");
 
+  // Las carpas dejaron de ser solo de producción: la misma pregunta, contestada en
+  // una boda, tiene que volcarse igual (antes vivía dentro del "if produccion" y no
+  // se leía nunca fuera de ahí).
+  const bodaConCarpas = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, carpas: "si", numCarpas: 3 });
+  ok(bodaConCarpas.llevaCarpas === true && bodaConCarpas.numCarpas === 3,
+    "una boda que contesta carpas también las guarda");
+
+  // Parabanes: mismo patrón que carpas pero sin cuenta propia — el número, si lo hay,
+  // se guarda tal cual.
+  const conParabanes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, parabanes: "si", numParabanes: 3 });
+  ok(conParabanes.llevaParabanes === true && conParabanes.numParabanes === 3,
+    "contestar que sí, con número, guarda los dos campos");
+  const sinNumeroParabanes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, parabanes: "si" });
+  ok(sinNumeroParabanes.llevaParabanes === true && sinNumeroParabanes.numParabanes === undefined,
+    "sí pero sin número: se queda sin número, no se inventa uno");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaParabanes === undefined,
+    "sin contestar, no se toca");
+
+  // "¿Cómo se come?" también en producción: buildChecklistProduccion ya sabía ocultar
+  // platos/hondos/metálicos con soloBandeja, pero nadie podía contestarlo desde el
+  // formulario para un rodaje. El ratio de camareros (paxPorCamarero) NO se toca aquí:
+  // producción tiene el suyo propio (leerRatios().produccion), y el 25/12 de un
+  // banquete sentado no pinta nada en un rodaje.
+  ok(preguntasDe("produccion", {}).some(p => p.id === "servicio"),
+    "la pregunta ahora también sale en un rodaje");
+  const produBandeja = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], servicio: "bandeja" });
+  ok(produBandeja.soloBandeja === true && produBandeja.paxPorCamarero === undefined,
+    "en producción activa soloBandeja pero no toca el ratio de camareros");
+  const produSentados = aRespuestasDeLaApp({ tipo: "produccion", dias: [30], servicio: "sentados" });
+  ok(produSentados.soloBandeja === false,
+    "y \"sentados\" lo deja en false, no sin contestar");
+  const bodaBandeja = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, servicio: "bandeja" });
+  ok(bodaBandeja.soloBandeja === true && bodaBandeja.paxPorCamarero === 25,
+    "en una boda sigue ajustando también el ratio de camareros, como siempre");
+
+  // Mesas calientes: antes se cargaban solas en producción y en el resto ni existían
+  // ni se preguntaban.
+  const conMesasCalientes = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, mesasCalientes: "si" });
+  ok(conMesasCalientes.llevaMesasCalientes === true, "contestar que sí lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, mesasCalientes: "no" }).llevaMesasCalientes === false,
+    "y que no, también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaMesasCalientes === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+
+  // Gastros: "auto" no manda ningún número (se queda con el mínimo de serie que pone
+  // el builder), "otros" con número sí manda.
+  const gastrosAuto = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cuantosGastros: "auto" });
+  ok(gastrosAuto.numGastros === 0, `"los de siempre" no fuerza ningún número (${gastrosAuto.numGastros})`);
+  const gastrosOtros = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cuantosGastros: "otros", numGastros: 6 });
+  ok(gastrosOtros.numGastros === 6, "otro número sí se guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).numGastros === undefined,
+    "sin contestar, no se toca");
+
+  // Hielo: antes se cargaba siempre, sin preguntar
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, hielo: "si" }).llevaHielo === true,
+    "contestar que sí lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, hielo: "no" }).llevaHielo === false,
+    "y que no hace falta, también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaHielo === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+
+  // Con congelador no hace falta ni preguntar: no tiene sentido llevarlo y no
+  // querer hielo, así que la pregunta solo sale sin congelador.
+  ok(preguntasDe("boda", { congelador: "No lleva" }).some(p => p.id === "hielo"),
+    "sin congelador, sí se pregunta");
+  ok(!preguntasDe("boda", { congelador: "Mediana" }).some(p => p.id === "hielo"),
+    "con congelador mediano, no se pregunta");
+  ok(!preguntasDe("boda", { congelador: "Grande" }).some(p => p.id === "hielo"),
+    "ni con uno grande");
+  ok(!preguntasDe("boda", {}).some(p => p.id === "hielo"),
+    "y sin contestar todavía lo del congelador, tampoco (por defecto no se muestra hasta saberlo)");
+
+  // Cristalería y bebida aparte: solo tienen sentido SIN barra libre — con cóctel o
+  // copas la respuesta es obvia (Gula pone las dos), así que se preguntan solo cuando
+  // ni cóctel ni copas tienen horas.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cristaleria: "si" }).llevaCristaleria === true,
+    "contestar que sí lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, cristaleria: "no" }).llevaCristaleria === false,
+    "y que no hace falta, también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaCristaleria === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+  ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "cristaleria"),
+    "se pregunta si cóctel y copas están a 0 horas");
+  ok(preguntasDe("boda", {}).some(p => p.id === "cristaleria"),
+    "y si cóctel/copas no se han contestado todavía");
+  ok(!preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "cristaleria"),
+    "pero no si hay barra de cóctel: la trae Gula seguro");
+  ok(!preguntasDe("boda", { coctel: 0, copas: 3 }).some(p => p.id === "cristaleria"),
+    "ni si hay barra de copas");
+  ok(!preguntasDe("produccion", {}).some(p => p.id === "cristaleria"),
+    "en un rodaje no se pregunta: no lleva cristalería de mesa");
+
+  // Bebida aparte: mismo patrón de si: que cristalería, y solo tiene sentido cuando
+  // hay barra en el evento (CON_BARRA) sin horas de cóctel/copas puestas.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, bebidaAparte: "si" }).llevaBebida === false,
+    "el cliente trae la bebida: no se calcula");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, bebidaAparte: "no" }).llevaBebida === true,
+    "la sirve Gula: se calcula como siempre");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).llevaBebida === undefined,
+    "sin contestar, no se toca");
+  ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "bebidaAparte"),
+    "se pregunta sin barra libre");
+  ok(!preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "bebidaAparte"),
+    "no se pregunta con barra de cóctel");
+  ok(!preguntasDe("boda", { coctel: 0, copas: 3 }).some(p => p.id === "bebidaAparte"),
+    "ni con barra de copas");
+  ok(!preguntasDe("produccion", {}).some(p => p.id === "bebidaAparte"),
+    "en un rodaje no se pregunta");
+
+  // Mesas altas: por nº de barras en vez de una fórmula fija por pax. Se pregunta
+  // SIEMPRE (a diferencia de bebidaAparte/cristaleria): con barra de verdad calcula
+  // las mesas de la barra; sin barra, checklist-generadores.js igual las calcula si
+  // se contesta aquí — es lo que necesitaba un evento con bebida aparte que aun así
+  // lleva mesas altas (caso real: sin barra ni de cóctel ni de copas).
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: 1 }).numBarras === 1,
+    "1 barra se guarda tal cual");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: 2 }).numBarras === 2,
+    "2 barras también");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, numBarras: "otras", numBarrasOtras: 5 }).numBarras === 5,
+    "\"otro número\" manda el número escrito, no el texto \"otras\"");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90 }).numBarras === undefined,
+    "sin contestar, no se toca (se queda con lo que ya tuviera el evento)");
+  ok(preguntasDe("boda", { coctel: 0, copas: 0 }).some(p => p.id === "numBarras"),
+    "se pregunta aunque cóctel y copas estén a 0 horas: puede que igual lleve mesas altas");
+  ok(preguntasDe("boda", {}).some(p => p.id === "numBarras"),
+    "y aunque cóctel/copas no se hayan contestado todavía");
+  ok(preguntasDe("boda", { coctel: 2, copas: 0 }).some(p => p.id === "numBarras"),
+    "y con cóctel puesto, claro que también");
+  ok(!preguntasDe("produccion", { coctel: 2 }).some(p => p.id === "numBarras"),
+    "en un rodaje no se pregunta: no lleva \"Mesa alta\" en su checklist");
+
   // Lo que ya no se pregunta en un rodaje
   const ids = resumirEnvio({ tipo: "produccion" }).map(f => f.id);
   ok(!ids.includes("sombra") && !ids.includes("carpasAlquiler"),
     "ya no se pregunta por la sombra ni si se alquilan: lo dice el número");
-  const opcionesMenu = resumirEnvio({ tipo: "produccion", menu: ["paella", "frito", "jamonero"] });
-  ok(!/Jamonero/.test(opcionesMenu.find(f => f.id === "menu").respuesta),
-    "en un rodaje no se ofrece jamonero");
   ok(!ids.includes("extras"),
     "y sin chill out ni palomitera no queda nada que preguntar de lo presupuestado: esa pantalla no sale");
   ok(resumirEnvio({ tipo: "boda" }).some(f => f.id === "extras"),
     "pero en una boda esa pregunta sigue estando");
+
+  // Jamonero: vivía en "¿Qué lleva el menú?" junto a la paella, pero no es comida —
+  // es un servicio que se presupuesta, así que se movió a "extras", con el desayuno
+  // (con quien comparte fórmula: los dos suman platos extra de postre).
+  const extrasPregunta = PREGUNTAS.find(p => p.id === "extras");
+  ok(opcionesDe(extrasPregunta, "boda").some(o => o.valor === "jamonero"),
+    "el jamonero se ofrece en \"extras\" para una boda");
+  ok(opcionesDe(extrasPregunta, "produccion").every(o => o.valor !== "jamonero"),
+    "pero no en un rodaje, igual que antes en \"menu\"");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, extras: ["jamonero"] }).llevaJamonero === true,
+    "marcarlo en extras lo guarda");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["jamonero"] }).llevaJamonero === undefined,
+    "marcarlo por error en \"menu\" (que ya no lo ofrece) no hace nada: no hay opción con ese valor ahí");
+
+  // "Primero + segundo" (antes "Dos platos principales") sigue doblando el plato
+  // en toda la checklist (dobleServicio, sin tocar). Lo que YA NO hace es doblar
+  // cubiertos/cristalería a ciegas: eso ahora lo decide la pregunta de seguimiento
+  // "queDobla" — el valor que guarda ("dosPlatos") no se ha tocado.
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"] }).dobleServicio === true,
+    "marcarlo sigue doblando el servicio (el plato), con el texto nuevo");
+  const menuPregunta = PREGUNTAS.find(p => p.id === "menu");
+  ok(/primero \+ segundo/i.test(opcionesDe(menuPregunta, "boda").find(o => o.valor === "dosPlatos").texto),
+    "la opción se llama \"Primero + segundo\", no \"Dos platos principales\"");
+
+  // "queDobla": solo sale si se marcó "primero + segundo", con cubiertos premarcados
+  // (lo normal) y cristalería sin marcar (no suele doblar, se rellena la misma copa).
+  ok(!preguntasDe("boda", { menu: ["paella"] }).some(p => p.id === "queDobla"),
+    "sin marcar primero+segundo, no se pregunta qué dobla");
+  ok(preguntasDe("boda", { menu: ["dosPlatos"] }).some(p => p.id === "queDobla"),
+    "marcando primero+segundo, sí se pregunta");
+  const queDoblaPregunta = PREGUNTAS.find(p => p.id === "queDobla");
+  ok(JSON.stringify(queDoblaPregunta.porDefecto) === JSON.stringify(["tenedor", "cuchillo", "cuchara"]),
+    "por defecto vienen marcados los cubiertos, no la cristalería");
+
+  const conDefecto = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"], queDobla: ["tenedor", "cuchillo", "cuchara"] });
+  ok(conDefecto.dobleTenedor === true && conDefecto.dobleCuchillo === true && conDefecto.dobleCuchara === true,
+    "marcados los tres cubiertos, los tres doblan");
+  ok(conDefecto.dobleVino === false && conDefecto.dobleAgua === false && conDefecto.dobleCava === false,
+    "y sin marcar cristalería, ninguna dobla");
+
+  const soloTenedorYVino = aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"], queDobla: ["tenedor", "vino"] });
+  ok(soloTenedorYVino.dobleTenedor === true && soloTenedorYVino.dobleCuchillo === false && soloTenedorYVino.dobleCuchara === false,
+    "granular de verdad: solo el tenedor dobla, no los otros dos cubiertos");
+  ok(soloTenedorYVino.dobleVino === true && soloTenedorYVino.dobleAgua === false && soloTenedorYVino.dobleCava === false,
+    "y de la cristalería, solo el vino, si es lo único marcado");
+
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 90, menu: ["dosPlatos"] }).dobleTenedor === undefined,
+    "sin contestar queDobla todavía (aunque se marcara primero+segundo), no se toca: cae al dobleServicio de siempre");
 }
 
 // ── A quién se avisa por WhatsApp ─────────────────────────────────────────────
@@ -692,15 +1130,15 @@ console.log("\n══ La diferencia entre dos versiones de un envío ══");
 // buscarlas a tiempo.
 console.log("\n══ Lo obligatorio del formulario ══");
 {
-  const { loQueFalta, preguntasDe } = await import("../formulario/preguntas.js");
-  const vacio = loQueFalta({ tipo: "boda" }).map(f => f.id);
+  const { respuestasQueFaltan, preguntasDe } = await import("../formulario/preguntas.js");
+  const vacio = respuestasQueFaltan({ tipo: "boda" }).map(f => f.id);
   ok(vacio.includes("nombreYsitio") && vacio.includes("cuando"),
     `sin nombre ni día se avisa de las dos → ${JSON.stringify(vacio)}`);
-  ok(loQueFalta({ tipo: "boda", nombre: "Boda A", fecha: "2027-08-11" }).length === 0,
+  ok(respuestasQueFaltan({ tipo: "boda", nombre: "Boda A", fecha: "2027-08-11" }).length === 0,
     "con nombre y día no falta nada");
-  ok(loQueFalta({ tipo: "boda", nombre: "   ", fecha: "2027-08-11" }).length === 1,
+  ok(respuestasQueFaltan({ tipo: "boda", nombre: "   ", fecha: "2027-08-11" }).length === 1,
     "un nombre de solo espacios no cuenta como nombre");
-  ok(loQueFalta({ tipo: "produccion", nombre: "Rodaje", fecha: "2027-08-11" }).length === 0,
+  ok(respuestasQueFaltan({ tipo: "produccion", nombre: "Rodaje", fecha: "2027-08-11" }).length === 0,
     "y en un rodaje pide lo mismo, ni más ni menos");
 
   // Y esas dos preguntas ya no ofrecen "No lo sé": sería una salida a un callejón
@@ -724,7 +1162,7 @@ console.log("\n══ Lo obligatorio del formulario ══");
 console.log("\n══ Color de los manteles ══");
 {
   const { repartoManteles, colorPorDefecto } = await import("../manteles.js");
-  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
 
   ok(colorPorDefecto("boda") === "Beige" && colorPorDefecto("produccion") === "Negros",
     "sin elegir nada se carga lo de siempre: beige en salón, negros en rodaje");
@@ -762,6 +1200,32 @@ console.log("\n══ Color de los manteles ══");
   const sinDecir = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Otro", estiloPlatoCual: "  " });
   ok(sinDecir.estiloPlatoPrincipal === undefined,
     "si eligen \"Otro\" y no escriben nada, no se pisa el plato que tuviera la app");
+
+  // El de postre no se queda solo en blanco/verde/negro: azul y naranja son colores
+  // reales que se piden (antes había que escribirlos siempre a mano en "Otro")
+  const azul = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Azul" });
+  ok(azul.estiloPlatoPostre === "Azul", "el plato de postre azul llega tal cual, sin pasar por \"Otro\"");
+  const naranja = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Naranja" });
+  ok(naranja.estiloPlatoPostre === "Naranja", "y el naranja igual");
+
+  // Y el plato grande (relieve) también, para cuando el postre se sirve en el mismo
+  // plato que el principal en vez de uno pequeño aparte.
+  const relieve = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Relieve blanco" });
+  ok(relieve.estiloPlatoPostre === "Relieve blanco", "el plato de postre \"Relieve blanco\" llega tal cual, sin pasar por \"Otro\"");
+  ok(opcionesDe(PREGUNTAS.find(p => p.id === "estiloPlatoPostre"), "boda").some(o => o.valor === "Relieve blanco"),
+    "y sale como botón rápido, igual que en el plato principal");
+
+  // "Mismo que el principal": muchas veces el postre va en el MISMO plato grande que
+  // el principal, no en uno pequeño aparte propio de postre — se copia el valor de
+  // arriba en vez de obligar a repetirlo a mano o inventar un plato que no existe.
+  const mismoQuePrincipal = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, estiloPlato: "Verde", estiloPlatoPostre: "Mismo que el principal" });
+  ok(mismoQuePrincipal.estiloPlatoPostre === "Verde",
+    `"Mismo que el principal" copia el estilo del plato principal → "${mismoQuePrincipal.estiloPlatoPostre}"`);
+  const mismoConEscrito = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, estiloPlato: "Otro", estiloPlatoCual: "Pizarra", estiloPlatoPostre: "Mismo que el principal",
+  });
+  ok(mismoConEscrito.estiloPlatoPostre === "Pizarra",
+    "y si el principal se escribió a mano, copia lo escrito, no la palabra \"Otro\"");
 }
 
 // ── Lo que hay que comprar ────────────────────────────────────────────────────
@@ -785,6 +1249,33 @@ console.log("\n══ Compras que trae el envío ══");
     "las compras se leen en una línea en la bandeja");
   ok(filas.find(f => f.id === "notas").respuesta === "Alergia al marisco",
     "y no se mezclan con las notas del evento");
+}
+
+// ── Notas del evento: se suman línea a línea, no se duplican ─────────────────
+// El bug real: al reenviar un formulario corregido, la oficina no borra lo que ya
+// había escrito, así que "nuevas" llega con una copia completa de "antes" dentro,
+// más lo añadido. Comparar el bloque entero nunca detectaba esa inclusión (el texto
+// viejo, más corto, no puede "contener" al nuevo, más largo) y todo se concatenaba
+// otra vez → notas duplicadas → filas duplicadas en "Recordatorios del evento".
+console.log("\n══ Notas del evento: se suman línea a línea, no se duplican ══");
+{
+  const { notasFusionadas } = await import("../formulario/preguntas.js");
+  const antes = "Alergia al marisco\nLlamar antes de las 10h";
+  const reenviadas = "Alergia al marisco\nLlamar antes de las 10h\nTraer 2 tronas extra";
+  ok(notasFusionadas(antes, reenviadas) === "Alergia al marisco\nLlamar antes de las 10h\nTraer 2 tronas extra",
+    "el reenvío con lo de siempre repetido no duplica nada, solo suma lo nuevo");
+
+  ok(notasFusionadas("Alergia al marisco", "Sin gluten en la mesa 4") === "Alergia al marisco\nSin gluten en la mesa 4",
+    "notas nuevas de verdad se añaden al final, sin tocar lo que ya había");
+
+  const fusionadas = notasFusionadas(antes, reenviadas);
+  ok(notasFusionadas(fusionadas, reenviadas) === fusionadas,
+    "aplicar el mismo envío dos veces no cambia nada la segunda vez (idempotente)");
+
+  ok(notasFusionadas("", "Primeras notas") === "Primeras notas", "sin notas antes, se queda solo lo nuevo");
+  ok(notasFusionadas("Notas de siempre", "") === "Notas de siempre", "sin nada nuevo, se queda lo de antes");
+  ok(notasFusionadas("Alergia al marisco", "ALERGIA AL MARISCO") === "Alergia al marisco",
+    "la comparación ignora mayúsculas: no duplica por un cambio de caja");
 }
 
 // ── El armario caliente también es alquiler ───────────────────────────────────
@@ -826,22 +1317,27 @@ console.log("\n══ Jarras, aguas y barriles ══");
 
   ok(ops("boda").includes("jarras") && !ops("cumpleanos").includes("jarras"),
     "las jarras se ofrecen donde la app las tiene: no en cumpleaños ni en rodaje");
-  ok(!ops("boda").includes("aguasPequenas"),
-    "las aguas pequeñas no se preguntan aquí: son cosa de rodaje y allí van siempre");
+  // El interruptor real de la checklist (llevaAguasPequenas) no lo preguntaba nadie en
+  // un banquete: se quedaba siempre apagado salvo que alguien se acordara de tocarlo a
+  // mano en la app. En rodaje no hace falta: ahí van siempre, solo se pregunta el
+  // envase (ver "Envase de las aguas pequeñas", debajo).
+  ok(ops("boda").includes("aguasPequenas") && !ops("produccion").includes("aguasPequenas"),
+    "las aguas pequeñas sí se preguntan aquí para un banquete, pero no en rodaje");
 
   const e = aRespuestasDeLaApp({
     tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100,
-    extras: ["barril50", "jarras"], numBarriles: 3,
+    extras: ["barril50", "jarras", "aguasPequenas"], numBarriles: 3,
   });
   ok(e.tamanoBarril === "50L" && e.numBarriles === 3,
     `el barril lleva su tamaño y cuántos → ${e.tamanoBarril} ×${e.numBarriles}`);
   ok(e.llevaJarrasCristal === true, "y las jarras llegan marcadas");
+  ok(e.llevaAguasPequenas === true, "y las aguas pequeñas activan el interruptor de la checklist");
 
   const sinBarril = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: ["jarras"], numBarriles: 3 });
   ok(sinBarril.numBarriles === undefined,
     "sin barril marcado no se cuela un número de barriles");
   const nada = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, extras: [] });
-  ok(nada.llevaJarrasCristal === false,
+  ok(nada.llevaJarrasCristal === false && nada.llevaAguasPequenas === false,
     "y decir que no hay nada presupuestado es una respuesta, no un hueco");
 }
 
@@ -877,7 +1373,7 @@ console.log("\n══ Paella: cuántas y de qué tamaño ══");
 
   const auto = aRespuestasDeLaApp({ ...base, tamanoPaella: "Auto", cuantasPaellas: "auto" });
   ok(auto.tipoPaella === "Auto" && auto.numPaellas === 0,
-    "y decir \"las que salgan por la gente\" es una respuesta: se escribe, no se deja a medias");
+    "y decir \"las que salgan según la gente\" es una respuesta: se escribe, no se deja a medias");
 
   const sinTocar = aRespuestasDeLaApp(base);
   ok(sinTocar.tipoPaella === undefined && sinTocar.numPaellas === undefined,
@@ -1001,6 +1497,193 @@ console.log("\n══ Tarta y alergias ══");
     "las alergias se preguntan en todos los tipos de evento");
   ok(ids("boda").includes("tarta") && ids("cumpleanos").includes("tarta") && !ids("produccion").includes("tarta"),
     "y la tarta en todos menos en un rodaje");
+}
+
+// Excepciones de mesa: de texto libre a casillas con su número de mesas cada una
+// (mismo patrón que buffets: marcar + conNumero) — no toca el cálculo agregado por
+// pax, lo complementa. Ni excepciones ni buffets mueven un número de la checklist
+// que no sea el suyo propio (buffets sí mueve numMesasBuffet, ver el siguiente
+// bloque); la línea de notas se reconstruye con resumirRespuesta() en los dos casos.
+console.log("\n══ Excepciones de mesa y buffets ══");
+{
+  const { aRespuestasDeLaApp, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  const con = aRespuestasDeLaApp({
+    ...base, alergias: "1 vegano",
+    excepcionesMesa: ["menuInfantil", "otro"], menuInfantilNumero: 3, otroNumero: 1,
+    buffets: ["quesos"], quesosNumero: 2,
+  });
+  ok(con.notasEvento === "⚠️ ALERGIAS: 1 vegano\n🍽️ EXCEPCIONES DE MESA: Menú infantil (3), Otro (1)\n🥐 BUFFETS: Buffet de quesos (2)",
+    `alergias, excepciones y buffets, cada uno en su línea → ${JSON.stringify(con.notasEvento)}`);
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: ["menuInfantil"] }).notasEvento === "🍽️ EXCEPCIONES DE MESA: Menú infantil",
+    "marcada sin poner número, sale sin paréntesis — no se inventa una cifra");
+  ok(aRespuestasDeLaApp({ ...base, excepcionesMesa: [] }).notasEvento === undefined,
+    "marcar la pantalla sin marcar ninguna casilla no deja una línea vacía");
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin contestar ninguna de las tres, las notas del evento no se tocan");
+  // "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" vivían aquí, pero eran una
+  // excepción de UNA mesa cuando el dueño quería el default de todo el evento — eso
+  // ya lo cubre "queDobla" (en el menú). Ya no se ofrecen: solo quedan las que de
+  // verdad son por mesa.
+  ok(opcionesDe(PREGUNTAS.find(p => p.id === "excepcionesMesa"), "boda").every(o => !["dobleTenedor", "dobleCuchillo", "cristaleriaAparte"].includes(o.valor)),
+    "las opciones de doblado ya no están en excepcionesMesa");
+}
+
+// Buffets: antes era texto libre sin efecto en la checklist ("buffet de quesos" no
+// cargaba ninguna mesa); ahora es marcado múltiple con su número de mesas cada uno
+// (mismo patrón que chillout/barril30 en "extras"), y ese total sí llega a la
+// checklist como numMesasBuffet.
+console.log("\n══ Buffets: las mesas sí llegan a la checklist ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["quesos"] }).numMesasBuffet === 1,
+    "marcar un buffet sin poner número cuenta como 1 mesa, no 0");
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["quesos", "dulce"], quesosNumero: 2, dulceNumero: 1 }).numMesasBuffet === 3,
+    "dos buffets con su propio número se suman (2 + 1 = 3)");
+  ok(aRespuestasDeLaApp({ ...base, buffets: [] }).numMesasBuffet === 0,
+    "marcar la pantalla sin marcar ningún buffet baja a 0: si ya había mesas de un envío anterior, se quitan");
+  ok(aRespuestasDeLaApp(base).numMesasBuffet === undefined,
+    "sin contestar la pantalla (ni siquiera visitarla), no se toca");
+}
+
+// "Otro" no es un buffet más: pueden ser varios (gildas, un rincón de gin-tonics...),
+// cada uno con su propio nombre y sus propias mesas, así que lleva lista, no número.
+console.log("\n══ Buffets: 'Otro' admite varios, cada uno con su nombre ══");
+{
+  const { aRespuestasDeLaApp, resumirEnvio } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+  const conDos = aRespuestasDeLaApp({
+    ...base, buffets: ["otro"],
+    buffetsOtros: [{ nombre: "Gildas", mesas: 1 }, { nombre: "Rincón de gin-tonics", mesas: 2 }],
+  });
+  ok(conDos.numMesasBuffet === 3, `las mesas de los dos "otro" se suman (1 + 2 = 3) → ${conDos.numMesasBuffet}`);
+
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["otro"], buffetsOtros: [{ nombre: "Gildas" }] }).numMesasBuffet === 1,
+    "un 'otro' sin poner mesas cuenta como 1, no 0");
+
+  ok(aRespuestasDeLaApp({ ...base, buffets: ["otro"], buffetsOtros: [] }).numMesasBuffet === 0,
+    "marcar 'otro' sin haber añadido ninguna fila todavía no suma nada");
+
+  const filas = resumirEnvio({
+    ...base, buffets: ["otro"],
+    buffetsOtros: [{ nombre: "Gildas", mesas: 1 }, { nombre: "Rincón de gin-tonics", mesas: 2 }],
+  });
+  const resumen = filas.find(f => f.id === "buffets").respuesta;
+  ok(resumen === "Gildas (1), Rincón de gin-tonics (2)",
+    `en las notas sale cada uno con su nombre, no "Otro" a secas → "${resumen}"`);
+
+  // Las filas sin nombre (a medias de escribir) no ensucian el resumen
+  const aMedias = resumirEnvio({ ...base, buffets: ["otro"], buffetsOtros: [{ nombre: "", mesas: 1 }] });
+  ok(aMedias.find(f => f.id === "buffets").respuesta === "",
+    "una fila sin nombre todavía no sale en las notas");
+}
+
+// Mobiliario de alquiler (qué + proveedor propio) y "otros alquileres" (cajón de
+// sastre): el sí/no y el proveedor del mobiliario van al estado como el resto de
+// interruptores; el qué de cada uno va a las notas, igual que alergias/excepciones.
+console.log("\n══ Mobiliario y otros alquileres ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).llevaMobiliarioAlquiler === undefined,
+    "sin contestar, no se toca el valor por defecto del evento");
+  ok(aRespuestasDeLaApp({ ...base, mobiliarioAlquiler: "no" }).llevaMobiliarioAlquiler === false,
+    "decir que no lleva se guarda igual que decir que sí");
+
+  const con = aRespuestasDeLaApp({
+    ...base, mobiliarioAlquiler: "si",
+    mobiliarioAlquilerQue: "Mesas altas y sofás", mobiliarioAlquilerProveedor: "Decoraciones Ruiz",
+  });
+  ok(con.llevaMobiliarioAlquiler === true && con.proveedorMobiliarioAlquiler === "Decoraciones Ruiz",
+    "sí lleva, con su proveedor propio");
+  ok(con.notasEvento === "🪑 MOBILIARIO ALQUILADO: Mesas altas y sofás (Decoraciones Ruiz)",
+    `el qué y el proveedor van juntos a las notas → ${JSON.stringify(con.notasEvento)}`);
+
+  const sinProveedor = aRespuestasDeLaApp({ ...base, mobiliarioAlquiler: "si", mobiliarioAlquilerQue: "Barra" });
+  ok(sinProveedor.proveedorMobiliarioAlquiler === undefined,
+    "sin decir proveedor, el estado no se toca: manda el fijo de siempre (Event Style)");
+  ok(sinProveedor.notasEvento === "🪑 MOBILIARIO ALQUILADO: Barra",
+    "sin proveedor, la nota no lleva paréntesis vacío");
+
+  const otro = aRespuestasDeLaApp({
+    ...base, otroAlquilerQue: "Vajilla especial", otroAlquilerProveedor: "Menaje Sur",
+  });
+  ok(otro.notasEvento === "🔑 OTRO ALQUILER: Vajilla especial (Menaje Sur)",
+    `el cajón de sastre también junta qué y proveedor → ${JSON.stringify(otro.notasEvento)}`);
+
+  ok(aRespuestasDeLaApp({ ...base, otroAlquilerQue: "  " }).notasEvento === undefined,
+    "el cajón de sastre en blanco no deja una línea vacía");
+
+  // Las hojas de alquiler adjuntadas se acumulan en archivosAlquiler, cada una con su
+  // origen y su etiqueta (para saber cuál es cuál en la lista de la app)
+  const archivo = { nombre: "hoja.pdf", tipo: "application/pdf", datos: "data:application/pdf;base64,AA==", peso: 100 };
+  const conArchivos = aRespuestasDeLaApp({
+    ...base, mobiliarioAlquiler: "si", mobiliarioAlquilerQue: "Mesas altas", mobiliarioAlquilerArchivo: archivo,
+    otroAlquilerQue: "Vajilla", otroAlquilerArchivo: { ...archivo, nombre: "otra.pdf" },
+  });
+  ok(conArchivos.archivosAlquiler.length === 2,
+    `los dos adjuntos viajan juntos → ${JSON.stringify(conArchivos.archivosAlquiler.map(a => a.nombre))}`);
+  ok(conArchivos.archivosAlquiler[0].origen === "mobiliarioAlquiler" && conArchivos.archivosAlquiler[0].etiqueta === "Mesas altas",
+    "el primero lleva su origen y su descripción como etiqueta");
+  ok(conArchivos.archivosAlquiler[1].origen === "otroAlquiler",
+    "y el segundo el suyo");
+  ok(aRespuestasDeLaApp(base).archivosAlquiler === undefined,
+    "sin adjuntar nada, no se crea la lista");
+}
+
+// Comentario libre por pregunta (ComentarioPregunta en Formulario.jsx, campo
+// "<id>_comentario"): se anexa a las notas del evento con el texto de la pregunta
+// delante, detrás de alergias y de las notas generales — mismo mecanismo que ya
+// usan esas dos, así que notasFusionadas (al aplicar el envío) también dedup lo
+// que aquí se escriba si se reenvía sin tocarlo.
+console.log("\n══ Comentario libre por pregunta ══");
+{
+  const { aRespuestasDeLaApp, notasFusionadas } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).notasEvento === undefined,
+    "sin ningún comentario puesto, las notas del evento no se tocan");
+  const uno = aRespuestasDeLaApp({ ...base, gente_comentario: "20 son niños de menos de 5 años" });
+  ok(/¿Cuánta gente\? 20 son niños de menos de 5 años/.test(uno.notasEvento),
+    `el comentario lleva delante el texto de SU pregunta → ${JSON.stringify(uno.notasEvento)}`);
+
+  // Junto con alergias y notas: alergias primero, notas generales después, los
+  // comentarios por pregunta al final — ningún orden se pisa entre sí.
+  const todo = aRespuestasDeLaApp({
+    ...base, alergias: "1 celíaco", notas: "Llamar antes de llegar",
+    gente_comentario: "Confirmar niños la semana antes",
+  });
+  ok(todo.notasEvento === "⚠️ ALERGIAS: 1 celíaco\nLlamar antes de llegar\n· ¿Cuánta gente? Confirmar niños la semana antes",
+    `alergias, notas y comentario cada uno en su línea → ${JSON.stringify(todo.notasEvento)}`);
+
+  ok(aRespuestasDeLaApp({ ...base, gente_comentario: "   " }).notasEvento === undefined,
+    "un comentario en blanco no deja una línea vacía");
+
+  // Reenviar el formulario sin cambiar el comentario no lo duplica en el evento: es
+  // el mismo notasFusionadas que ya evita duplicar alergias y notas (línea a línea,
+  // sin distinguir mayúsculas).
+  const primeraVez = aRespuestasDeLaApp({ ...base, gente_comentario: "Confirmar niños" }).notasEvento;
+  const fusionadas = notasFusionadas(primeraVez, primeraVez);
+  ok(fusionadas === primeraVez,
+    "reenviar sin tocar el comentario no lo duplica en las notas del evento");
+}
+
+// El café se pedía siempre para los invitados, sin preguntar: cafeParaInvitados
+// (calcCafe, en checklist-generadores.js) apaga esa parte cuando la oficina dice que
+// es solo para el personal, sin tocar el café aparte del propio equipo.
+console.log("\n══ El café, ¿para quién? ══");
+{
+  const { aRespuestasDeLaApp } = await import("../formulario/preguntas.js");
+  const base = { tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100 };
+
+  ok(aRespuestasDeLaApp(base).cafeParaInvitados === undefined,
+    "sin contestar, no se toca: el evento se queda con el valor por defecto (true)");
+  ok(aRespuestasDeLaApp({ ...base, cafe: "invitados" }).cafeParaInvitados === true,
+    "\"Para los invitados\" pone cafeParaInvitados a true");
+  ok(aRespuestasDeLaApp({ ...base, cafe: "personal" }).cafeParaInvitados === false,
+    "\"Solo para el personal\" lo pone a false");
 }
 
 // ── Lo que se sale de lo normal ──────────────────────────────────────────────

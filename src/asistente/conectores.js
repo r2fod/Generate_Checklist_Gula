@@ -62,6 +62,3 @@ export function conHerramientasDeConectores(base, config = {}) {
   });
   return salida;
 }
-
-// Solo para las pruebas: dejar el registro como estaba.
-export function olvidarConectores() { registrados.clear(); }
