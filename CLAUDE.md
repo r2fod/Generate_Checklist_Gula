@@ -27,6 +27,21 @@
 ## ORCHESTRATOR MODE
 <!-- Manejo de tareas complejas y subagentes -->
 - Treat phases as isolated modules. Clear internal context after phase verification. Auto-proceed unless blocked by errors.
+- Delegation (both subscriptions active — the point is fit, NOT saving quota; when it fits, use
+  full power, no cutting corners):
+  - USE Gemini MCP when its strength genuinely fits: very long docs/logs, several files at once
+    with no need to edit them (`gemini_team` with `file_paths` reads server-side), broad search
+    (`gemini_search`), image/audio/video (`gemini_analyze_media`), image generation
+    (`gemini_generate_image`). Pass the FULL task with all the context it needs to nail it first try.
+  - NEVER Gemini for: this repo's code (CLAUDE edits it with its own tools, verified on the spot),
+    small tasks where reading it myself is simplest, or anything needing exact-line code context.
+  - Read-only Gemini calls → no permission needed. Real effect (write/publish/execute) → normal
+    permission rules.
+  - NEVER ship Gemini output raw: contrast it against the real data when verifiable, correct what
+    doesn't hold up. CLAUDE does all code, tests, synthesis, and talking to the owner, with full
+    reasoning — and says in one line when Gemini was used.
+  - `openai-codex` MCP is NOT a code tool (only `get_costs`/`get_projects`, billing/admin) and is
+    now disconnected — never route code through it. Decided with the owner 2026-09-08/19.
 
 ## WORKFLOW & CLI
 <!-- Comandos de terminal, gestión de procesos y Git -->
