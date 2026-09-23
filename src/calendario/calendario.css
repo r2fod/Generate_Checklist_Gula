@@ -130,7 +130,10 @@
    vistazo tres cosas: que hay algo, de qué tipo es, y para cuánta gente. El fondo
    apenas teñido y la barra de color dan las dos primeras; el número, la tercera. */
 .cal-celda.tiene-cosas {
-  background: color-mix(in srgb, var(--cal-color) 8%, var(--card-bg));
+  background: color-mix(in srgb, var(--cal-color) 12%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .cal-celda.tiene-cosas::before {
@@ -221,8 +224,8 @@
 
 /* Dos eventos el mismo día. No es un error, pero es lo que hay que ver con tiempo. */
 .cal-celda.es-choque {
-  box-shadow: inset 0 0 0 2px var(--error-borde);
-  background: color-mix(in srgb, var(--error-bg) 70%, var(--card-bg));
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--error-texto-fuerte) 80%, transparent), 0 0 8px color-mix(in srgb, var(--error-texto-fuerte) 30%, transparent);
+  background: color-mix(in srgb, var(--error-bg) 40%, var(--card-bg));
 }
 
 /* Y late despacio, una vez cada tres segundos: lo justo para que el ojo lo encuentre al
@@ -297,22 +300,27 @@
    Cinco tipos de evento y tres capas que NO son eventos (vacaciones, recogidas y días
    cerrados). Los eventos van en colores llenos y las capas en gris o rayado: de un
    vistazo tiene que verse qué es trabajo de catering y qué es información de apoyo. */
-.tipo-boda        { --cal-color: #d6336c; }
-.tipo-comunion    { --cal-color: #7048e8; }
-.tipo-corporativo { --cal-color: #1c7ed6; }
-.tipo-cumpleanos  { --cal-color: #f08c00; }
-.tipo-produccion  { --cal-color: #0ca678; }
-.tipo-vacaciones  { --cal-color: #868e96; }
-.tipo-recogida    { --cal-color: #495057; }
-.tipo-cerrado     { --cal-color: #adb5bd; }
-.tipo-tarea       { --cal-color: #5c7cfa; }
+.tipo-boda        { --cal-color: #ff6b9e; }
+.tipo-comunion    { --cal-color: #9d75ff; }
+.tipo-corporativo { --cal-color: #4da3ff; }
+.tipo-cumpleanos  { --cal-color: #ffaa33; }
+.tipo-produccion  { --cal-color: #20c997; }
+.tipo-vacaciones  { --cal-color: #aeb5bc; }
+.tipo-recogida    { --cal-color: #6c757d; }
+.tipo-cerrado     { --cal-color: #ced4da; }
+.tipo-tarea       { --cal-color: #748ffc; }
 
 .cal-punto.tipo-boda, .cal-punto.tipo-comunion, .cal-punto.tipo-corporativo,
 .cal-punto.tipo-cumpleanos, .cal-punto.tipo-produccion, .cal-punto.tipo-vacaciones,
 .cal-punto.tipo-recogida, .cal-punto.tipo-cerrado,
 .cal-punto.tipo-tarea { background: var(--cal-color); }
 
-.cal-chip { background: color-mix(in srgb, var(--cal-color) 16%, transparent); color: var(--cal-color); }
+.cal-chip { 
+  background: color-mix(in srgb, var(--cal-color) 25%, rgba(0,0,0,0.4)); 
+  color: color-mix(in srgb, var(--cal-color) 80%, white); 
+  border: 1px solid color-mix(in srgb, var(--cal-color) 30%, transparent);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
 
 /* ─── VISTA DE AÑO ────────────────────────────────────────────────────────────
    Doce mini-meses. En el móvil van de dos en dos, que de uno en uno obliga a hacer
@@ -426,12 +434,17 @@
   align-items: center;
   gap: 8px;
   padding: 8px 0 8px 10px;
-  border-top: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
   flex-wrap: wrap;
   position: relative;
   animation: cal-viene-entra 0.3s ease both;
   animation-delay: calc(var(--fila, 0) * 45ms);
+  transition: background 0.2s ease;
+}
+
+.cal-viene-fila:hover {
+  background: color-mix(in srgb, var(--cal-color, var(--border-color)) 8%, transparent);
 }
 
 .cal-viene-fila::before {
@@ -488,14 +501,20 @@
 
 .cal-choque {
   text-align: left;
-  padding: 9px 12px;
+  padding: 10px 14px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--error-borde);
-  background: var(--error-bg);
+  border: 1px solid color-mix(in srgb, var(--error-texto-fuerte) 40%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--error-bg) 80%, transparent), transparent);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   color: var(--error-texto);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.cal-choque:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
 }
 
 /* ─── PANEL DEL DÍA Y EDITOR ──────────────────────────────────────────────────
