@@ -80,8 +80,9 @@
 }
 
 .cal-celda {
-  /* aspect-ratio en vez de alto fijo: la casilla crece con el ancho de la pantalla y
-     el mes se ve proporcionado en un móvil y en un monitor sin tocar nada. */
+  /* En móvil (< 560px) las celdas son cuadradas y muestran solo iconos/puntos.
+     En escritorio (>= 560px) la celda crece con su contenido para mostrar
+     todos los chips sin truncar. El aspect-ratio se sobreescribe en el @media. */
   aspect-ratio: 1 / 1;
   position: relative;   /* para la barra de color de arriba */
   min-width: 0;
@@ -90,9 +91,6 @@
   align-items: stretch;
   gap: 2px;
   padding: 4px 3px;
-  /* appearance:none y los cuatro bordes a cero explícitos: la casilla es un <button>, y
-     el navegador le pone su borde por defecto a los deshabilitados (los huecos del
-     principio y del final del mes). Salían recuadrados en negro grueso. */
   appearance: none;
   -webkit-appearance: none;
   border: 0 solid var(--border-color);
@@ -646,12 +644,17 @@
 
 /* ─── DE 560px PARA ARRIBA ────────────────────────────────────────────────────
    Ya cabe el nombre dentro de la casilla, así que los chips sustituyen a los puntos.
-   Y la casilla deja de ser cuadrada: con siete columnas anchas, un cuadrado sería una
-   casilla enorme y el mes no cabría en la pantalla de alto. */
+   La casilla deja de ser cuadrada y crece con su contenido: así se ven TODOS los
+   eventos del día sin el "+ X más". overflow:visible para que no se corten. */
 @media (min-width: 560px) {
   .cal-celda {
     aspect-ratio: auto;
-    min-height: 92px;
+    min-height: 80px;
+    /* overflow-x oculto para que nada desborde en horizontal (un nombre muy largo no
+       rompe la rejilla); overflow-y visible para que la lista de chips pueda crecer
+       hacia abajo sin quedar cortada. */
+    overflow-x: hidden;
+    overflow-y: visible;
   }
   .cal-chip { display: flex; }
   .cal-puntos { display: none; }
@@ -665,7 +668,7 @@
 }
 
 @media (min-width: 900px) {
-  .cal-celda { min-height: 112px; }
+  .cal-celda { min-height: 90px; }
 }
 
 /* ─── MUY ESTRECHO ────────────────────────────────────────────────────────────
