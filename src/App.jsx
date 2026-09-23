@@ -201,6 +201,15 @@ function temporadaInicial(estado = {}, hoy = hoyISO()) {
 // EVENTOS, IconoCategoria e IconoItem están en ./checklist-format.js y
 // ./components/Iconos.jsx (compartidos con los modales extraídos).
 const EVENTO_ICON = { boda: Heart, comunion: Church, cumpleanos: Cake, corporativo: Briefcase, produccion: Clapperboard };
+// Colores dinámicos del header por tipo de evento: fondo, texto e icono coinciden
+// con el vocabulario de color del calendario para que la app tenga un lenguaje visual único.
+const EVENTO_COLORES = {
+  boda:       { bg: "linear-gradient(135deg,#ffe0ec,#ffc5d9)", color: "#c0185e", border: "#fca5c0" },
+  comunion:   { bg: "linear-gradient(135deg,#ede9fe,#ddd6fe)", color: "#7c3aed", border: "#c4b5fd" },
+  cumpleanos: { bg: "linear-gradient(135deg,#fff7d6,#fde68a)", color: "#b45309", border: "#fcd34d" },
+  corporativo:{ bg: "linear-gradient(135deg,#dbeafe,#bfdbfe)", color: "#1d4ed8", border: "#93c5fd" },
+  produccion: { bg: "linear-gradient(135deg,#d1fae5,#a7f3d0)", color: "#065f46", border: "#6ee7b7" },
+};
 
 
 // detectarDelimitador, normalizar y sugerirCategoria están en ./checklist-format.js
@@ -3176,7 +3185,12 @@ export default function App({ onCerrarSesion } = {}) {
         {/* HEADER */}
         <header className="app-header animate-entrance">
           <div className="header-title-group">
-            <div className="header-icon">{React.createElement(EVENTO_ICON[evento] || Heart, { size: 24, strokeWidth: 2.2 })}</div>
+            <div className="header-icon" style={EVENTO_COLORES[evento] ? {
+              background: EVENTO_COLORES[evento].bg,
+              color: EVENTO_COLORES[evento].color,
+              borderColor: EVENTO_COLORES[evento].border,
+              boxShadow: `0 4px 12px ${EVENTO_COLORES[evento].color}33`,
+            } : undefined}>{React.createElement(EVENTO_ICON[evento] || Heart, { size: 24, strokeWidth: 2.2 })}</div>
             <div className="header-info">
               <h1>{nombreEvento || EVENTOS[evento]?.label || "Generador Checklist"}</h1>
               {/* El subtítulo va en trozos con clase propia porque en móvil se limita a

@@ -4397,6 +4397,28 @@ hr {
 .category-section.is-open .cat-icon { animation: cat-badge-breath 3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .category-section.is-open .cat-icon { animation: none; } }
 
+/* ─── ICONOS ANIMADOS EN TODA LA APP ────────────────────────────────────────
+   Únicamente CSS, sin tocar la lógica. Cada uno sabe cómo moverse. */
+
+/* Entrada flotante: para iconos que aparecen al cargar o al abrir una sección */
+@keyframes iconEntrar {
+  from { opacity: 0; transform: translateY(4px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Latido suave reutilizable: para cualquier icono que quiera llamar la atención */
+@keyframes iconLatidoSuave {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.1); }
+}
+/* El icono del cat-icon entra flotando cada vez que se abre la sección */
+.category-section.is-open .cat-icon svg {
+  animation: iconEntrar 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+/* Items de la checklist: cada icono aparece escalonado */
+.item-row .item-icon {
+  animation: iconEntrar 0.3s ease both;
+}
+
 /* Icono por material en cada fila: gris suave que cobra color y salta al pasar el ratón */
 /* El icono queda fijo a la izquierda y el texto (con su asterisco/etiqueta) fluye y
    se parte junto, sin que el asterisco caiga solo a una línea aparte. */
@@ -4408,8 +4430,12 @@ hr {
 /* Títulos de modales con icono alineado. Van en "flex" (no "inline-flex") para
    que el subtítulo caiga debajo del título en vez de pegarse a su derecha. */
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: flex; align-items: center; gap: 7px; }
-.item-icon { opacity: 0.92; flex-shrink: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
-.item-row:hover .item-icon { opacity: 1; transform: scale(1.2) rotate(-5deg); }
+.item-icon { opacity: 0.92; flex-shrink: 0; transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease; }
+.item-row:hover .item-icon {
+  opacity: 1;
+  transform: scale(1.2) rotate(-5deg);
+  filter: drop-shadow(0 0 4px currentColor);
+}
 .item-edit-flag { color: var(--accent, #c9a24b); display: inline; opacity: 0.9; margin-left: 3px; }
 .item-edit-flag svg { display: inline; vertical-align: -1px; }
 .tag-alquiler { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }
@@ -4637,6 +4663,8 @@ hr {
 /* Respeta a quien prefiere menos movimiento en pantalla */
 @media (prefers-reduced-motion: reduce) {
   .login-blob-1, .login-blob-2, .login-logo, .header-icon { animation: none; }
+  .item-row .item-icon { animation: none; }
+  .category-section.is-open .cat-icon svg { animation: none; }
   .header-icon:hover, .btn:active, .plantilla-row:hover,
   .category-header:hover .cat-icon svg { transform: none; }
 }
