@@ -9,6 +9,7 @@ import { chromium } from "playwright-core";
 import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
 import { recogidasConAlquileres } from "../alquileres.js";
 import { enDiasISO } from "../fecha.js";
+import { CLAVES_BEBIDA } from "../bebida.js";
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 
@@ -424,7 +425,12 @@ async function main() {
     ok(await panelBebida.count() === 1, "el panel de bebida sale en el Resumen");
     await panelBebida.locator(".cal-ratios-cab").click(); await p0.waitForTimeout(350);
     const chips = await p0.locator(".bebida-chip").allInnerTexts();
-    ok(chips.length === 4, `con las cuatro bebidas → ${chips.join(", ")}`);
+    // Contra CLAVES_BEBIDA, no contra un número a mano: este test decía "las cuatro
+    // bebidas" y se quedó obsoleto en cuanto se añadieron la tónica, el vermut, el tinto
+    // de verano y el Red Bull. Lo que importa es que el panel enseñe TODAS las que se
+    // pueden calibrar, sean las que sean — si alguien añade la novena, esto sigue valiendo.
+    ok(chips.length === CLAVES_BEBIDA.length,
+      `el panel enseña las ${CLAVES_BEBIDA.length} bebidas calibrables → ${chips.join(", ")}`);
     // Cambiar un factor tiene que cambiar la checklist de verdad, no solo la casilla
     const vinoAntes = await p0.evaluate(() => {
       const f = [...document.querySelectorAll(".carga-row, .item-row")]
@@ -2056,8 +2062,13 @@ async function main() {
     // uno distinto (no con .fill(), que sustituye el valor de golpe sin pasar por
     // onChange como hace un dedo de verdad) volvía a poner un 1 solo, tecla a tecla,
     // sin dejar terminar de escribir el número bueno.
+    //
+    // "ControlOrMeta" y no "Control" a secas: en macOS seleccionar todo es Cmd+A, y
+    // Ctrl+A mueve el cursor al principio de la línea. Con "Control" el Delete de abajo
+    // se llevaba UN carácter en vez del número entero ("11"→"1"), así que al teclear el
+    // 7 quedaba "71" y la prueba fallaba solo en el Mac del dueño, nunca en el CI.
     await numero.click();
-    await p.keyboard.press("Control+a");
+    await p.keyboard.press("ControlOrMeta+a");
     await p.keyboard.press("Delete");
     await p.waitForTimeout(150);
     ok((await numero.inputValue()) === "", "borrar el número entero lo deja vacío, no en 1");
@@ -2068,7 +2079,7 @@ async function main() {
     // Vacío y sin tocar nada más: al salir del campo recupera algo válido, no se
     // queda en blanco para siempre.
     await numero.click();
-    await p.keyboard.press("Control+a");
+    await p.keyboard.press("ControlOrMeta+a");
     await p.keyboard.press("Delete");
     await p.waitForTimeout(150);
     await p.locator(".form-titulo").click();

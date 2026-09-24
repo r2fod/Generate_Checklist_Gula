@@ -461,6 +461,37 @@ está en el historial de git y en las pruebas que los cubren):
   Mistral, OpenRouter, NVIDIA) no tenían botón, aunque estuvieran configurados: solo
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
+- **Las Fantas se quedaban cortas, y era la MEZCLA, no el volumen** — reportado en
+  eventos reales. La bajada a la mitad de los cuatro refrescos sin calibrar se aplicó a
+  los cuatro POR IGUAL, y dejó al Sprite (0,05) pesando más que cada Fanta por separado
+  (0,04 y 0,035), al revés de lo que dice el mercado (Fanta lidera los cítricos en España
+  con el 48,3%, Nielsen IQ cierre 2025). Corregida la mezcla manteniendo la suma (0,175):
+  el camión no lleva ni una unidad más y la Coca sigue clavada en su calibración
+  (120/72/12). Naranja 19→28, limón 17→25 para 65 pax. Banda derivada en `sector.js`
+  (`refrescos_citricos`), marcada como derivación y no dato directo; la prueba la lee de
+  ahí en vez de repetirla.
+- **La calibración solo veía 4 bebidas de las 8 que importan** — es la razón de fondo por
+  la que lo de las Fantas no se detectó nunca. `BEBIDAS` cubría vino, cerveza, cava y
+  refresco; la tónica, el vermut, el tinto de verano y el Red Bull **no se podían medir
+  de ninguna manera**, por muchos eventos que se apuntaran con la vuelta puesta. Añadidos
+  como grupos propios —pequeños a propósito, que `consumoDeBebida` descarta el evento
+  entero si falta UNA vuelta— y cableados también en `calcBebidas`. Ni una cantidad
+  cambia (el factor por defecto es 1). Prueba estructural que pone cada factor a 0,5 y
+  falla si alguno no mueve la carga: un control que miente es peor que no tenerlo.
+- **Modo carga · Salida a 320px aplastaba el nombre hasta 4px** — el hermano del fallo de
+  la *Vuelta* de más arriba, pero en las filas normales y sin arreglar hasta ahora.
+  `.carga-cantidad` es `flex: 0 0 auto` y su texto con coletilla ("475 (19 bateas de 25)")
+  ocupa 155px de los 264 de la fila, así que "Vasos de agua", "Vasos de cubata" y "Copas
+  de vino" se pintaban a 4, 3 y 2px: ilegibles cargando el camión. Mismo patrón de arreglo
+  que la Vuelta (`flex-wrap` en la fila + suelo de `min-width` en el nombre). Verificado
+  en la app de verdad: 0 nombres cortados de 134.
+- **El panel de bebida aplastaba el nombre del tipo de evento hasta 0px** — solo en las
+  filas CON insignia de "medido", que **nunca se habían llegado a pintar** porque no ha
+  habido jamás un factor medido. Habría aparecido justo el día que la calibración
+  empezara a servir para algo. Ojo al arreglo: `flex: 1 1 auto` en el nombre parecía
+  válido y rompía las filas normales, porque con `flex-wrap` el navegador decide los
+  saltos mirando el tamaño NATURAL de cada hijo. Con `flex: 1 1 0` el nombre ya no fuerza
+  saltos.
 
 ## Qué queda pendiente ahora mismo (2026-09-07)
 
@@ -468,6 +499,26 @@ Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
 despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
 tanda de fusiones.
+
+**De la revisión de bebida (PR #233), tres cosas abiertas que necesitan al dueño:**
+
+1. **La tónica parece corta y no hay dato.** Con 17 botellas de ginebra salen 23 tónicas
+   (1,35 por botella) y la app dimensiona cristalería para 4 cubatas por persona. El
+   0,15/adulto no tiene ningún comentario que diga de dónde sale, a diferencia de casi
+   todo lo demás del fichero. No se ha tocado: subirla mete material en el camión. Lo que
+   sí se ha hecho es que **ahora se pueda medir** — apuntando la vuelta de la tónica, a
+   los 3 eventos la app propone el factor.
+2. **Los niños no mueven el reparto de refrescos.** Un evento de 100 pax con 30 niños da
+   EXACTAMENTE los mismos 30 Fanta naranja y 111 Coca Zero que uno de 100 adultos: el
+   total sí crece con ellos (`refrescoTotal` va sobre `pax`), pero la mezcla no sabe que
+   existen, y un niño bebe Fanta, no Coca Zero. Toca cantidades de camión, así que va con
+   los números delante.
+3. **Los 20 factores por tipo de evento siguen todos a 1.** Comprobado comparando las 48
+   líneas de bebida entre boda, comunión, corporativo y cumpleaños: **47 son idénticas**
+   (la única que cambia es el agua del personal, y por el número de camareros). Una
+   comunión carga exactamente el mismo vino y la misma cerveza que una boda. Es la
+   decisión documentada en `bebida.js` —no inventar lo que nadie ha medido— pero conviene
+   saber que el tipo de evento hoy no mueve ni una botella.
 
 **Formulario: buffets configuran mesas de verdad, y reorden por bloques — HECHO
 (PR #184, tras #182/#183 ya fusionados)**:

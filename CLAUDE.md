@@ -22,8 +22,20 @@
 
 ## WORKFLOW
 - File Lock: Do NOT edit source during test/deploy.
-- Async Test: `setsid nohup npm run test > test.log 2>&1 &` | Check: `pgrep -f "npm [r]un test"`
+- Async Test: `nohup npm run test > test.log 2>&1 &` | Check: `pgrep -f "npm [r]un test"`
+  (NO `setsid`: it does not exist on macOS — the battery dies with `command not found` and
+  looks like it ran)
 - Git: Auto commit+push on green test. Delete merged feature branches.
+
+## ORCHESTRATION
+- Phases as isolated modules. Auto-proceed unless blocked by errors.
+- Gemini MCP for: very long docs/logs, many files at once (`gemini_team` + `file_paths`, read
+  server-side), broad search (`gemini_search`), media (`gemini_analyze_media`). Pass the FULL
+  task with enough context to nail it first try. Read-only calls need no permission.
+- NEVER Gemini for: this repo's code, small lookups, anything needing exact-line context.
+- NEVER ship Gemini output raw: verify against the real data first. Claude does all code, tests,
+  synthesis and talking to the owner. Say in one line when Gemini was used.
+- `openai-codex` MCP is billing-only (`get_costs`/`get_projects`), NOT a code tool. Disconnected.
 
 ## PROHIBITED
 - Real user/financial data in commits.

@@ -282,14 +282,25 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // Los refrescos (Coca-Cola, Fanta, Sprite, Nestea) se consumen durante todo el evento,
   // no solo en las horas de barra libre: calibrado con datos reales (65 pax → 120 Coca
   // normal, 72 Zero, 12 Nestea), ya no depende de las horas de barra
-  // OJO con este número: las fracciones de abajo suman 0,775, así que lo que sale de
+  // OJO con este número: las fracciones de abajo suman 0,600, así que lo que sale de
   // verdad son ~4,4 unidades por persona, no 7,4.
   //
   // Coca normal (0,25), Zero (0,15) y Nestea (0,025) SÍ están calibrados: cuadran
   // exactos con el evento de 65 pax del que salieron (120 / 72 / 12). Los otros cuatro
   // —las dos Fantas, Aquarius y Sprite— se añadieron después sin ningún dato detrás y
   // sumaban 2,6 uds/pax ellos solos: el total sobrepasaba en un 84% su propia fuente de
-  // calibración. Se bajan a la mitad hasta que haya un evento medido que diga otra cosa.
+  // calibración. Se bajaron a la mitad hasta que haya un evento medido que diga otra cosa.
+  //
+  // Esa bajada se aplicó a los cuatro POR IGUAL, y ahí estaba el fallo: dejó al Sprite
+  // (0,05) pesando más que cualquiera de las dos Fantas por separado (0,04 y 0,035),
+  // cuando el mercado dice justo lo contrario. Las Fantas se quedaban cortas en eventos
+  // de verdad —reportado por el dueño— mientras el Sprite volvía. Se corrige la MEZCLA
+  // sin tocar el VOLUMEN: los cuatro siguen sumando lo mismo (0,175), así que el camión
+  // no lleva ni una unidad más y la Coca sigue clavada en su calibración. Reparto según
+  // la banda de sector de `asistente/sector.js` (refrescos_citricos): de los tres
+  // cítricos que se sirven aquí, las Fantas se llevan ~3/4 y el Sprite ~1/4; entre
+  // naranja y limón se mantiene la proporción que ya había (53/47). Sigue SIN medir en
+  // casa: en cuanto haya tres eventos con la vuelta apuntada, manda la calibración.
   const refrescoTotal = Math.round(pax * RATIOS_BEBIDA.refresco * factor.refresco);
   // El factor de horas se acota (máx. 1,75) para que una barra muy larga no dispare
   // la tónica/refrescos de mezcla por encima de lo real, igual que en la cristalería.
@@ -298,7 +309,9 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // igual con solo cóctel —donde no hay destilados— y hasta sin barra ninguna, porque
   // el mínimo de 6 botellas se aplicaba siempre. En el aperitivo se sirve vermut,
   // cerveza y refresco; la ginebra no aparece hasta las copas.
-  const tonica = horasCopas > 0 ? Math.max(6, Math.round(alcoholPax * 0.15 * barFactorTope)) : 0;
+  // El factor va DENTRO del mínimo de 6, no fuera: un factor bajo no puede dejar una
+  // barra de copas con menos de media caja de tónica. Mismo criterio en los de abajo.
+  const tonica = horasCopas > 0 ? Math.max(6, Math.round(alcoholPax * 0.15 * barFactorTope * factor.tonica)) : 0;
   // Agua 1,5L (Solán de Cabras) es la de cliente en mesa/barra — no confundir con el
   // Agua Vidaqua de personal, que se calcula aparte en calcPersonal(). El ratio es
   // 0,8 BOTELLAS por pax (~1,2 L/pax, en el rango alto del sector: 0,5-1 L/pax);
@@ -314,17 +327,17 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   const agua15Packs = Math.max(2, Math.ceil(agua15 / 6));
   // El Red Bull sí es cosa de la barra: sin barra no va ninguno. Por eso mira las horas
   // DE VERDAD (h), no el suelo — si mirara el suelo, saldría en eventos sin barra.
-  const redbull = h > 0 ? Math.max(6, Math.round(alcoholPax * 0.06 * barFactorTope)) : 0;
+  const redbull = h > 0 ? Math.max(6, Math.round(alcoholPax * 0.06 * barFactorTope * factor.redbull)) : 0;
   // Aguas pequeñas van en cajas de 35 uds, ~3 uds/pax (ej. 65 pax ≈ 200 uds ≈ 6 cajas)
   const aguasPequenasUds = Math.round(pax * 3);
   const aguasPequenasCajas = Math.max(1, Math.ceil(aguasPequenasUds / 35));
   // El vermut (rojo/blanco) se sirve en el aperitivo, no solo con barra libre de copas:
   // se calcula aquí (siempre presente) en vez de en calcDestilados (que sí depende de horasCopas).
   // Calibrado con datos reales (65 pax → 6 rojo, 5 blanco).
-  const vermutRojo = Math.max(2, Math.round(alcoholPax / 11));
-  const vermutBlanco = Math.max(2, Math.round(alcoholPax / 13));
+  const vermutRojo = Math.max(2, Math.round(alcoholPax / 11 * factor.vermut));
+  const vermutBlanco = Math.max(2, Math.round(alcoholPax / 13 * factor.vermut));
   // Tinto de verano: bebida de verano habitual, más presente en meses cálidos
-  const tintoVerano = Math.max(2, Math.round(alcoholPax * (mesVerano ? 0.25 : 0.12)));
+  const tintoVerano = Math.max(2, Math.round(alcoholPax * (mesVerano ? 0.25 : 0.12) * factor.tintoVerano));
   return {
     // Sin margen extra: los ratios ya van por encima de los rangos del sector (vino
     // 0,72 bot/pax vs 0,33-0,5 estándar; cerveza 3/pax en verano vs 1,5-2; cava 0,2
@@ -337,10 +350,10 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
     cocaZero:   Math.round(refrescoTotal * 0.15),
     // Cada refresco por separado, sin unificar (datos reales: Fanta naranja y limón
     // se piden como productos distintos, no combinados en una sola línea)
-    fantaNaranja: Math.round(refrescoTotal * 0.04),
-    fantaLimon:   Math.round(refrescoTotal * 0.035),
-    aquarius:     Math.round(refrescoTotal * 0.05),
-    sprite:     Math.round(refrescoTotal * 0.05),
+    fantaNaranja: Math.round(refrescoTotal * 0.058),
+    fantaLimon:   Math.round(refrescoTotal * 0.051),
+    aquarius:     Math.round(refrescoTotal * 0.030),
+    sprite:     Math.round(refrescoTotal * 0.036),
     nestea:     Math.round(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real):
     // el comentario ya lo decía, pero el número que salía era de botellas sueltas, sin

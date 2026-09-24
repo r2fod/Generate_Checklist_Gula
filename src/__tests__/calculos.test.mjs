@@ -1676,6 +1676,30 @@ console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
   const sinCalibrar = (b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite) / 65;
   ok(sinCalibrar < 1.5,
     `y los cuatro sin calibrar pesan ahora ${sinCalibrar.toFixed(1)} uds/pax, no 2,6`);
+
+  // El dueño reportó que las Fantas se quedaban cortas en eventos de verdad. La causa no
+  // era el volumen: era que aquella bajada a la mitad se aplicó a los cuatro POR IGUAL y
+  // dejó al Sprite por encima de cada Fanta por separado, justo al revés de lo que dice
+  // el mercado (Fanta lidera los cítricos en España con el 48,3%; ver sector.js). Si
+  // alguien vuelve a tocar estas fracciones, que no las deje otra vez del revés.
+  ok(b.fantaNaranja > b.sprite && b.fantaLimon > b.sprite,
+    `cada Fanta pesa más que el Sprite (naranja ${b.fantaNaranja} · limón ${b.fantaLimon} · sprite ${b.sprite})`);
+  ok(b.fantaNaranja > b.fantaLimon,
+    `y la naranja por delante de la limón (${b.fantaNaranja} > ${b.fantaLimon})`);
+
+  // Se corrigió la MEZCLA, no el VOLUMEN: los cuatro suman lo mismo que antes, así que
+  // el camión no lleva ni una unidad más y la Coca sigue clavada en su calibración.
+  ok(b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite === 84,
+    `y los cuatro siguen sumando lo mismo que antes del reparto: 84 uds para 65 pax`);
+
+  // Y el reparto entre los tres cítricos que se sirven cae dentro de la banda derivada
+  // del sector. La banda vive en sector.js, no repetida aquí: si allí se corrige con un
+  // dato mejor, esta prueba se entera sola.
+  const citricos = b.fantaNaranja + b.fantaLimon + b.sprite;
+  const pctFanta = (b.fantaNaranja + b.fantaLimon) / citricos * 100;
+  const [minF, maxF] = SECTOR.refrescos_citricos.banda;
+  ok(pctFanta >= minF && pctFanta <= maxF,
+    `las Fantas son el ${pctFanta.toFixed(0)}% de los cítricos (banda del sector ${minF}-${maxF}%)`);
 }
 
 console.log("\n══ Cocina y logística dejan de aplanarse ══");
@@ -1797,11 +1821,26 @@ console.log("\n══ Las mesas de los comensales ══");
   // de que existiera. Si esta falla, la nueva pieza ha cambiado la carga de camiones
   // que llevan años saliendo bien.
   ok(TIPOS_BEBIDA.every(t => CLAVES_BEBIDA.every(b => factorDe({}, t, b) === FACTOR_NEUTRO)),
-    "sin nada puesto, los veinte factores valen 1");
+    `sin nada puesto, los ${TIPOS_BEBIDA.length * CLAVES_BEBIDA.length} factores valen 1`);
   const bodaBase = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100, tipo: "boda" });
   const sinTipo  = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100 });
   ok(JSON.stringify(bodaBase) === JSON.stringify(sinTipo),
     "y pasar el tipo sin factores da lo mismo que no pasarlo");
+
+  // CADA bebida del panel tiene que mover algo de verdad. Es la trampa que se cuela sola
+  // al añadir un grupo: aparece su casilla en el panel, se puede escribir un número, se
+  // guarda en la nube... y la carga no cambia, porque a nadie se le ocurrió cablearlo en
+  // calcBebidas. Un control que miente es peor que no tenerlo: quien lo toca se queda
+  // convencido de que ha ajustado algo.
+  const mudos = [];
+  for (const b of CLAVES_BEBIDA) {
+    ponFactores({ boda: { [b]: 0.5 } });
+    const con = calcBebidas(100, 6, true, false, false, 4, { alcoholPax: 100, tipo: "boda" });
+    if (JSON.stringify(con) === JSON.stringify(bodaBase)) mudos.push(b);
+  }
+  ponFactores({});
+  ok(mudos.length === 0,
+    `los ${CLAVES_BEBIDA.length} factores mueven la carga de verdad${mudos.length ? ` → NO hacen nada: ${mudos.join(", ")}` : ""}`);
 
   // Un factor de 0,5 en el vino de comunión baja el vino de la comunión Y NADA MÁS.
   // Es el fallo que se cuela solo: tocar un ratio y llevarse por delante otro.

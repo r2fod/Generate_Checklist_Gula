@@ -3540,6 +3540,14 @@ hr {
 .carga-row-principal {
   display: flex;
   align-items: center;
+  /* Envuelve cuando la cantidad es larga. `.carga-cantidad` es flex: 0 0 auto (no encoge
+     nunca) y hay items cuya cantidad trae coletilla — "475 (19 bateas de 25)" son 155px
+     de los 264 que tiene la fila en un móvil de 320px—, así que al nombre le quedaban 27
+     y el texto se veía a 4px: "Vasos de agua", "Vasos de cubata" y "Copas de vino" eran
+     ilegibles cargando el camión, que es justo cuando más falta hacen. Con wrap, la
+     cantidad baja a una segunda línea y se leen las dos cosas enteras; las filas que
+     caben (la inmensa mayoría) no cambian de alto. */
+  flex-wrap: wrap;
   gap: 14px;
   padding: 14px 16px;
   cursor: pointer;
@@ -3991,7 +3999,9 @@ hr {
 
 .carga-nombre {
   flex: 1;
-  min-width: 0;
+  /* Suelo para que la cantidad no lo aplaste hasta hacerlo ilegible (ver
+     .carga-row-principal). Con min-width: 0 pelado se quedaba en 27px. */
+  min-width: 6rem;
   font-size: 0.9rem;
   color: var(--text-main);
   display: inline-flex;
@@ -6161,6 +6171,15 @@ hr {
 .cal-ratio {
   display: flex;
   align-items: center;
+  /* Envuelve a propósito: la insignia de "medido" es flex: 0 0 auto (no encoge nunca) y
+     el nombre lleva min-width: 0 (encoge hasta cero), así que en un móvil de 320px la
+     insignia se quedaba con todo el sitio y el nombre del tipo de evento desaparecía
+     literalmente — 0px de ancho, el texto desbordando por debajo. Se veía "Boc" en vez
+     de "Boda". Nadie lo había visto nunca porque esa insignia solo sale cuando hay 3
+     eventos medidos, y hasta ahora no había ninguno. Con wrap, cuando no cabe todo en
+     una línea la insignia baja a la siguiente en vez de aplastar el nombre; cuando cabe
+     (el caso normal, sin medición) no cambia nada. */
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
   padding: 6px 8px;
@@ -6178,8 +6197,15 @@ hr {
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 6px;
-  flex: 1 1 auto;
-  min-width: 0;
+  /* Base 0, no auto: con flex-wrap en el padre el navegador decide los saltos de línea
+     ANTES de encoger, mirando el tamaño natural de cada hijo. Con `auto`, un nombre
+     largo ("Producción / rodaje" + su etiqueta) mide 250px de natural y empujaba el
+     campo y el botón a una segunda línea SIEMPRE, también en las filas normales — el
+     botón de volver se quedaba solo y descolgado. Con base 0 el nombre no fuerza ningún
+     salto: crece con lo que sobra y solo baja la insignia cuando de verdad no cabe.
+     El min-width es el suelo para que no lo aplasten hasta 0px (ver .cal-ratio). */
+  flex: 1 1 0;
+  min-width: 5rem;
   font-size: 0.84rem;
   font-weight: 600;
   color: var(--text-main);
