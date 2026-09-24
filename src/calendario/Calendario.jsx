@@ -18,6 +18,7 @@ import {
 } from "./apuntes.js";
 import { hoyISO } from "../fecha.js";
 import { personalNecesario, resumenAsignados, personalQueFalta, horasEntre, ROLES } from "../personal.js";
+import logoGula from "../assets/gula-logo.webp";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
@@ -95,6 +96,12 @@ export default function Calendario({
   return (
     <div className="cal-wrap">
       <div className="cal-barra">
+        <span
+          className="cal-logo"
+          role="img"
+          aria-label="Gula"
+          style={{ WebkitMaskImage: `url(${logoGula})`, maskImage: `url(${logoGula})` }}
+        />
         <div className="cal-nav">
           {/* Las flechas y el "Hoy" mueven el mes, y en la vista de equipo no hay mes
               que mover: son siempre los próximos catorce días. Dejarlas ahí sin efecto
