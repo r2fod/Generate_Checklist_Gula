@@ -103,7 +103,8 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .cal-semana > .cal-celda:last-child { border-right: 0; }
@@ -249,7 +250,7 @@
    los cuatro hasta en una pantalla de 320px. */
 .cal-puntos {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap; /* En móvil dejamos que hagan flex-wrap si hay muchos */
   overflow: hidden;
   gap: 2px;
   padding-top: 2px;
