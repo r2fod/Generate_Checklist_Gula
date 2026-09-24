@@ -1484,6 +1484,23 @@ tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
   demuestra.
 - Verificación: `npm run test` completo antes de fusionar.
 
+**Auditoría de funcionalidad (calendario, App.jsx, formulario): 16 bugs +
+mejoras, catalogados en `PLAN_MEJORAS.md` — PENDIENTE, sin código todavía**:
+segunda mitad de lo pedido por el dueño ("revisa todo y plan de mejoras"),
+tras la de cálculos de arriba. Tres pasadas de solo lectura sobre estado/
+sincronización/flujos de UI (no fórmulas). Destacan, por tocar pérdida
+silenciosa de datos: el mismo bug de fusión de Modo Carga existe también en
+`guardarCalendarioNube` (dos móviles editando el calendario a la vez pueden
+perderse el cambio del otro); borrar el evento abierto en App.jsx no lo
+borra de verdad (reaparece solo por el autoguardado); "Inicio" + elegir otro
+evento en el formulario mezcla respuestas de un evento con otro; y 4 campos
+numéricos de App.jsx corrompen su valor al borrar y reescribir (mismo bug ya
+arreglado antes en el formulario, sin aplicar aquí). Detalle completo, con
+file:line y repro de cada uno, en `PLAN_MEJORAS.md`, sección "E. Auditoría de
+funcionalidad". El asistente (`src/asistente/`) queda para una fase aparte,
+todavía sin auditar. Nada de esto se ha tocado — es la lista para que el
+dueño decida qué se ataca primero.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").
