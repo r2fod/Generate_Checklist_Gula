@@ -238,7 +238,7 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                     ya enseña la lista entera con sitio, pax y editar). Como "del" ya viene
                     con los eventos primero (porDia, en apuntes.js), lo que se recorta es
                     siempre lo menos importante del día (vacaciones, tareas...). */}
-                {del.slice(0, CHIPS_VISIBLES).map(a => (
+                {del.map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
                     <span className="cal-chip-texto">
@@ -247,9 +247,6 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                     {a.pax ? <span className="cal-chip-pax">{a.pax}</span> : null}
                   </span>
                 ))}
-                {del.length > CHIPS_VISIBLES && (
-                  <span className="cal-chip-mas">+{del.length - CHIPS_VISIBLES} más</span>
-                )}
               </button>
             );
           })}
