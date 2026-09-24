@@ -1642,3 +1642,21 @@ button.cal-turnos.es-vacia {
 }
 
 .cal-asistente .btn { min-height: 44px; }
+
+/* Logo en la barra de navegación superior del calendario */
+.cal-logo {
+  display: block;
+  flex: 0 0 auto;
+  height: 24px;
+  aspect-ratio: 1536 / 758;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  background: var(--text-main);
+  margin-right: 12px;
+}
+@media (max-width: 600px) {
+  .cal-logo { display: none; }
+}
