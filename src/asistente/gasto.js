@@ -21,6 +21,14 @@ export const PRECIOS = {
   gemini:     { entrada: 0,    salida: 0,    nombre: "Gemini" },
   claude:     { entrada: 4.6,  salida: 23,   nombre: "Claude" },
   openai:     { entrada: 0.14, salida: 0.55, nombre: "OpenAI" },
+  // Ultra-rápidos: LPU/chips especializados
+  cerebras:   { entrada: 0, salida: 0, nombre: "Cerebras" },
+  groq:       { entrada: 0, salida: 0, nombre: "Groq" },
+  // Resto de proveedores configurados en el Worker (versiones gratuitas)
+  mistral:    { entrada: 0, salida: 0, nombre: "Mistral" },
+  nvidia:     { entrada: 0, salida: 0, nombre: "NVIDIA" },
+  openrouter: { entrada: 0, salida: 0, nombre: "OpenRouter" },
+  zai:        { entrada: 0, salida: 0, nombre: "ZAI" },
   compatible: { entrada: 1,    salida: 4,    nombre: "Otro" },
 };
 

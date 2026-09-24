@@ -60,9 +60,18 @@ const guardar = guardarTexto;
 // se veía: su nota es larga, ensanchaba su columna y la rejilla salía descuadrada. Va
 // arriba y a lo ancho, que además es lo que es —o elige él, o eliges tú uno de estos.
 const PROVEEDORES = [
-  { id: "gemini", nombre: "Gemini", nota: "gratis" },
-  { id: "claude", nombre: "Claude", nota: "de pago" },
-  { id: "openai", nombre: "OpenAI", nota: "sin clientes" },
+  // ⚡ Ultra-rápidos: chips especializados, responden en < 1 segundo
+  { id: "cerebras", nombre: "Cerebras", nota: "ultra-rápido", grupo: "rapido" },
+  { id: "groq",     nombre: "Groq",     nota: "muy rápido",   grupo: "rapido" },
+  // 🧠 Razonamiento: mejores para preguntas complejas
+  { id: "claude",   nombre: "Claude",   nota: "razonamiento", grupo: "smart" },
+  { id: "mistral",  nombre: "Mistral",  nota: "equilibrado",  grupo: "smart" },
+  { id: "nvidia",   nombre: "NVIDIA",   nota: "potente",      grupo: "smart" },
+  // 🆓 Gratis / Resto
+  { id: "gemini",   nombre: "Gemini",   nota: "gratis",       grupo: "gratis" },
+  { id: "openai",   nombre: "OpenAI",   nota: "sin clientes", grupo: "gratis" },
+  { id: "zai",      nombre: "ZAI",      nota: "alternativo",  grupo: "gratis" },
+  { id: "openrouter", nombre: "OpenRouter", nota: "multimodelo", grupo: "gratis" },
 ];
 
 export default function Asistente({ contexto, onCerrar, onOlvidar }) {
@@ -610,17 +619,48 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
               <strong>Automático</strong>
               <em>elige según la pregunta</em>
             </button>
-            <div className="asis-proveedores">
-              {PROVEEDORES.map(p => (
-                <button
-                  key={p.id} type="button"
-                  className={`bebida-chip${proveedor === p.id ? " es-activa" : ""}`}
-                  onClick={() => { setProveedor(p.id); guardar(CLAVE_PROVEEDOR, p.id); }}
-                  aria-pressed={proveedor === p.id}
-                >
-                  {p.nombre} <em className="asis-nota">{p.nota}</em>
-                </button>
-              ))}
+            <div className="asis-grupo-proveedores">
+              <span className="asis-titulo-grupo">⚡ Ultra-Rápidos (<span style={{opacity: 0.6}}>respuestas en &lt; 1s</span>)</span>
+              <div className="asis-proveedores">
+                {PROVEEDORES.filter(p => p.grupo === "rapido" && (!disponibles.length || disponibles.includes(p.id))).map(p => (
+                  <button
+                    key={p.id} type="button"
+                    className={`bebida-chip${proveedor === p.id ? " es-activa" : ""}`}
+                    onClick={() => { setProveedor(p.id); guardar(CLAVE_PROVEEDOR, p.id); }}
+                    aria-pressed={proveedor === p.id}
+                  >
+                    {p.nombre} <em className="asis-nota">{p.nota}</em>
+                  </button>
+                ))}
+              </div>
+
+              <span className="asis-titulo-grupo" style={{marginTop: "12px"}}>🧠 Inteligentes (<span style={{opacity: 0.6}}>razonamiento complejo</span>)</span>
+              <div className="asis-proveedores">
+                {PROVEEDORES.filter(p => p.grupo === "smart" && (!disponibles.length || disponibles.includes(p.id))).map(p => (
+                  <button
+                    key={p.id} type="button"
+                    className={`bebida-chip${proveedor === p.id ? " es-activa" : ""}`}
+                    onClick={() => { setProveedor(p.id); guardar(CLAVE_PROVEEDOR, p.id); }}
+                    aria-pressed={proveedor === p.id}
+                  >
+                    {p.nombre} <em className="asis-nota">{p.nota}</em>
+                  </button>
+                ))}
+              </div>
+
+              <span className="asis-titulo-grupo" style={{marginTop: "12px"}}>🆓 Resto (<span style={{opacity: 0.6}}>gratuitos y alternativos</span>)</span>
+              <div className="asis-proveedores">
+                {PROVEEDORES.filter(p => p.grupo === "gratis" && (!disponibles.length || disponibles.includes(p.id))).map(p => (
+                  <button
+                    key={p.id} type="button"
+                    className={`bebida-chip${proveedor === p.id ? " es-activa" : ""}`}
+                    onClick={() => { setProveedor(p.id); guardar(CLAVE_PROVEEDOR, p.id); }}
+                    aria-pressed={proveedor === p.id}
+                  >
+                    {p.nombre} <em className="asis-nota">{p.nota}</em>
+                  </button>
+                ))}
+              </div>
             </div>
             <label className="asis-campo">
               <span>Qué se le deja hacer</span>

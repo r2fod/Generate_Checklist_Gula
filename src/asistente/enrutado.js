@@ -25,12 +25,12 @@
 
 import { sinTildes } from "../texto.js";
 
-// El orden por defecto: primero lo gratis, luego lo bueno, luego lo limitado.
-export const ORDEN = ["gemini", "claude", "openai", "compatible"];
+// El orden por defecto: primero lo rápido y barato, luego lo inteligente, luego lo limitado.
+// Cerebras y Groq son 10-15x más rápidos que Gemini para preguntas simples.
+export const ORDEN = ["cerebras", "groq", "gemini", "mistral", "claude", "nvidia", "zai", "openrouter", "openai", "compatible"];
 
-// Los que NO pueden ver datos de clientes. Es la misma regla que ya aplica el catálogo
-// de herramientas; aquí se usa para no mandarles ni la pregunta.
-export const SIN_DATOS_DE_CLIENTES = ["openai"];
+// Los que NO pueden ver datos de clientes por sus políticas de privacidad.
+export const SIN_DATOS_DE_CLIENTES = ["openai", "openrouter"];
 
 // Palabras que dicen que la pregunta va sobre EL NEGOCIO y no sobre una cuenta suelta.
 // No hace falta afinarlo: equivocarse hacia "lleva datos" no rompe nada —solo usa un
@@ -77,12 +77,17 @@ export function candidatos(texto, disponibles = ["gemini"]) {
   const permitidos = conDatos ? hay.filter(p => !SIN_DATOS_DE_CLIENTES.includes(p)) : hay;
   if (!permitidos.length) return [];
 
-  // Si la pregunta pide pensar y hay un modelo mejor configurado, ese primero. Si no,
-  // el orden de siempre: lo gratis por delante.
+  // Si la pregunta pide pensar a fondo, los modelos más inteligentes primero.
+  // Cerebras y Groq son veloces pero con modelos más pequeños; para razonar,
+  // Claude o Mistral se notan mucho más.
   if (preguntaPideCabeza(texto)) {
-    const buenos = permitidos.filter(p => p === "claude" || p === "compatible");
-    if (buenos.length) return [...buenos, ...permitidos.filter(p => !buenos.includes(p))];
+    const inteligentes = permitidos.filter(p => p === "claude" || p === "mistral" || p === "nvidia" || p === "compatible");
+    const rapidos = permitidos.filter(p => !inteligentes.includes(p));
+    if (inteligentes.length) return [...inteligentes, ...rapidos];
   }
+
+  // Para el resto (la gran mayoría): Cerebras y Groq primero por velocidad.
+  // El usuario lo nota: de 3-5 segundos pasa a menos de 1.
   return permitidos;
 }
 
@@ -96,10 +101,13 @@ export function elige(texto, disponibles) {
 // tarda más o contesta distinto.
 export function porQue(texto, elegido, disponibles = []) {
   if (disponibles.length <= 1) return "";
-  if (preguntaPideCabeza(texto) && (elegido === "claude" || elegido === "compatible")) {
+  if (elegido === "cerebras" || elegido === "groq") {
+    return preguntaPideCabeza(texto) ? "" : "respuesta rápida";
+  }
+  if (preguntaPideCabeza(texto) && (elegido === "claude" || elegido === "mistral" || elegido === "nvidia" || elegido === "compatible")) {
     return "pide comparar o recomendar";
   }
-  if (preguntaLlevaDatos(texto) && SIN_DATOS_DE_CLIENTES.includes("openai") && disponibles.includes("openai")) {
+  if (preguntaLlevaDatos(texto) && SIN_DATOS_DE_CLIENTES.some(p => disponibles.includes(p))) {
     return "lleva datos de clientes";
   }
   return "";

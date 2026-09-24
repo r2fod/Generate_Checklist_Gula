@@ -6314,13 +6314,25 @@ hr {
 .asis-auto:hover { color: var(--text-main); border-color: var(--text-muted); }
 .asis-auto.es-activa { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-/* Los tres proveedores, en tres columnas iguales. Con las notas cortas caben en un
-   móvil de 320px sin partirse. */
+.asis-grupo-proveedores {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.asis-titulo-grupo {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: -4px;
+}
+
+/* Los proveedores dentro de un grupo se adaptan en rejilla */
 .asis-proveedores {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 6px;
-  margin-bottom: 10px;
 }
 
 .asis-proveedores .bebida-chip {
