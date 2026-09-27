@@ -346,6 +346,178 @@ igual el recordatorio de hoy.
 5. **Tinyflows — decidido NO hacer por ahora** (segundo motor de reglas junto a
    `revision.js`; el repaso de la noche cubre el 80% del valor sin eso).
 
+## E. Auditoría de funcionalidad — calendario, App.jsx y formulario (2026-09-15)
+
+Pedida por el dueño ("revisa todo y plan de mejoras"), tras la auditoría de
+CÁLCULOS del mismo día (7 bugs, ya arreglados y fusionados — ver CONTEXTO.md).
+Esta es la mitad que faltaba: no fórmulas, sino estado, sincronización y
+flujos de UI. Tres pasadas de solo lectura, cada una centrada en un
+subsistema, cruzadas contra CONTEXTO.md para no repetir hallazgos ya
+cerrados. Nada de esto está arreglado todavía — es la lista para decidir qué
+se ataca y en qué orden. El asistente (`src/asistente/`, ~6700 líneas) queda
+para una fase aparte, todavía sin auditar.
+
+### E1 — Calendario compartido (`src/calendario/`)
+
+1. **[Alto] `guardarCalendarioNube` sube el documento entero, sin la fusión
+   por campo que ya se aplicó hoy a `guardarEventoNube` (Modo Carga)**.
+   `useCalendarioNube.js:97-109` + `nube.js:593-604`: `setDoc` con la lista
+   COMPLETA de `apuntes`/`equipo`, partiendo de una foto local que puede
+   estar desactualizada — sin transacción ni `baseline`. Dos móviles
+   editando el calendario a la vez (el caso normal aquí, no el raro) pueden
+   perderse el cambio del otro en silencio, exactamente el bug que hoy se
+   arregló en Modo Carga pero en el sitio hermano. Arreglo: mismo patrón
+   `fusionaCampo`/baseline, o fusión por id de apunte contra el snapshot con
+   el que se abrió la edición.
+2. **[Alto] Un evento de varios días desaparece de "Lo que viene" y de la
+   vista Equipo en cuanto EMPIEZA**, aunque siga en marcha. `apuntes.js:
+   219-225` (`aVistaProxima`) y `Calendario.jsx:549-550` (`VistaEquipo`)
+   miran `diasHasta(fecha)` (el día de INICIO) y descartan lo negativo — un
+   apunte con `hasta` se vuelve invisible en cuanto pasa su primer día. El
+   aviso de choques SÍ está bien (usa `porDia`, que expande el rango).
+   Repro: rodaje 10-13 sept., mirado el día 12 → `aVistaProxima` da `[]`.
+   Arreglo: comprobar si `hoy` cae dentro de `[fecha, hasta]`, no solo
+   `diasHasta(fecha)>=0`.
+3. **[Medio] `idDeApunte` trunca el slug a 40 caracteres y puede colisionar
+   dos apuntes distintos el mismo día**. `apuntes.js:117-122`. Dos títulos
+   que solo difieran DESPUÉS del carácter 40 dan el mismo id, y
+   `saneaLista` se queda con el último — el otro desaparece sin aviso (y
+   sin checklist, porque `checklistsPorCrear` ya no lo ve). Arreglo: no
+   truncar antes de comparar, o desempatar con un hash del título completo.
+4. **[Medio] `checklistsPorCrear` indexa el archivo SOLO por título, sin
+   fecha** — un cliente recurrente con el mismo nombre en años distintos
+   ("Cena de Navidad Empresa X") enlaza el segundo evento a la checklist
+   del año anterior en vez de crear una nueva. `apuntes.js:280-288` +
+   `App.jsx:1378-1382`. Arreglo: clave `${titulo}::${fecha}`, o comprobar
+   también que la fecha coincida antes de dar el evento por "ya existe".
+5. **[Bajo, no urgente]** El documento "solo ver" del calendario comparte
+   regla de escritura con el editable en `firestore.rules` — quien tenga
+   ese código podría escribir directamente por el SDK, sin pasar por la app
+   (el guard `soloVer` es de la app, no de las reglas). Impacto acotado: se
+   autorrepara en la siguiente edición real, y solo afecta a la copia de
+   mirar. Verlo si algún día hay tiempo de sobra, no antes.
+
+### E2 — App.jsx (~4900 líneas: estado, sincronización, UI de la checklist)
+
+1. **[Alto] "Guardar evento" y "Duplicar evento" pisan otro evento sin
+   avisar si el nombre coincide**. `App.jsx:1671-1690` y `2508-2524`. El
+   autoguardado SÍ comprueba esto (`ocupadoPorOtro`, línea 1708); los dos
+   diálogos manuales, no. Arreglo: la misma comprobación antes de
+   `guardarEventos(...)` en los dos sitios.
+2. **[Alto] Borrar el evento que tienes ABIERTO no lo borra de verdad —
+   reaparece solo**. `App.jsx:2478-2503`: `handleBorrarEvento` no llama a
+   `marcarEventoActivo("")`, así que el autoguardado (1200ms tras cualquier
+   cambio, línea 1703) lo detecta como "el activo" y lo vuelve a escribir,
+   subiéndolo de nuevo a la nube. Es el caso más habitual de borrar (el que
+   tienes delante) el que falla. Arreglo: si `nombre === eventoActivoRef.
+   current`, limpiar el evento activo en el mismo borrado.
+3. **[Medio, confianza media] Una escritura vieja a la nube puede pisar a
+   una más nueva del mismo aparato si llegan desordenadas** (red
+   inestable). `App.jsx:1046-1071` + `nube.js:105-129`: dos guardados
+   seguidos parten del MISMO `baseline` si el primero no ha resuelto
+   todavía; si el segundo (más nuevo) confirma antes que el primero, el
+   primero puede sobrescribirlo al llegar. Justo el escenario de cobertura
+   floja cargando un camión. Arreglo: serializar los guardados, o
+   actualizar `ultimoGuardadoNubeRef` de forma optimista al ENVIAR, no solo
+   al resolver.
+4. **[Medio] Las carpas se quedan encendidas al salir de "Producción" hacia
+   otro tipo**. `App.jsx:1259-1279`: se encienden solas al ENTRAR en
+   producción, pero no hay `setLlevaCarpas(false)` simétrico al salir — el
+   resto de la función sí limpia simétricamente. Arreglo: en el `else`,
+   `if (evento === "produccion" && llevaCarpas) setLlevaCarpas(false)`
+   (mirando el tipo ANTERIOR).
+5. **[Alto] Cuatro campos numéricos corrompen la cantidad al borrar y
+   reescribir**: Nº barriles (línea 4461), sartenes (4578), planchas de gas
+   (4587), chill out (4594). Mismo patrón `Math.max(1, parseInt(...)||1)`
+   con `value={x}` directo: al vaciar el campo salta a "1", y escribir "2"
+   da "12". Ya se arregló este mismo patrón en `Formulario.jsx` (líneas
+   828-946) — aquí se quedó sin aplicar. Arreglo: mismo patrón (dejar pasar
+   el valor en blanco mientras se escribe, aplicar el mínimo solo al salir
+   del campo) — candidato a extraer como helper compartido (mejora A).
+
+### E3 — Formulario de oficina (`Formulario.jsx`, `envios.js`, `codigo.js`...)
+
+1. **[Crítico] "Inicio" + elegir OTRO evento (o "Es un evento nuevo") mezcla
+   las respuestas del evento abandonado con las del nuevo**. `Formulario.
+   jsx:373-380, 536-545, 589`: `irAlInicio` no limpia `respuestas` a
+   propósito (para "seguir donde iba"), pero los otros dos botones de esa
+   pantalla TAMPOCO la limpian, así que gente/menú/carpas/horas del evento
+   anterior se cuelan en el nuevo. El patrón correcto ya existe en el
+   código ("Mandar otro evento", línea 431: `setRespuestas({})`) — solo
+   falta aplicarlo aquí. Arreglo: reset real de `respuestas` en esos dos
+   `onClick`.
+2. **[Alto] Se puede mandar el formulario con un archivo a medio subir —
+   el adjunto se pierde en silencio**. `CampoArchivo.jsx:11,16-25`:
+   `cargando` es estado local, el padre no lo sabe; nada bloquea "Siguiente"
+   /"Enviar" mientras la foto se sigue comprimiendo. Arreglo: subir
+   `cargando` a estado compartido y bloquear el avance mientras algún
+   archivo esté procesando.
+3. **[Medio-alto] `corregirEnvio` trata CUALQUIER error como "ya revisado"
+   y manda un envío duplicado**. `Formulario.jsx:612-620`: el `catch`
+   no distingue "ya revisado" (el único fallo real esperado) de un corte de
+   red — en cualquier caso crea un envío nuevo y dice (quizá en falso)
+   "logística ya revisó el anterior". Arreglo: mirar `e.code ===
+   "permission-denied"` antes de hacer el fallback.
+4. **[Medio] Editar "Nombre del evento" tras elegir uno de la lista no hace
+   nada — "Sitio", en la misma pregunta, sí se aplica**. `Formulario.jsx:
+   314-316` + `App.jsx:1955,1975`: mismo aspecto, comportamiento opuesto,
+   sin ningún aviso de cuál de los dos "cuenta". Arreglo: nombre de solo
+   lectura cuando se elige un evento existente (con nota de "para
+   renombrar, hazlo en el calendario"), sitio se queda editable.
+5. **[Medio-bajo] `buscarEnvioPorNombre` empareja solo por texto del
+   nombre, sin fecha** — dos eventos reales con el mismo nombre (típico en
+   corporativo recurrente) pueden hacer que "ya mandaste esto"/"Cambiar el
+   de antes" apunten al envío equivocado. `mios.js:56-60`. Arreglo: añadir
+   la fecha a la comparación, o comparar contra `eventoDestino` exacto.
+6. **[Bajo]** El código de acceso se compara sensible a mayúsculas
+   (`codigo.js`) — quien lo teclee a mano (la caja de "pegar el enlace",
+   sobre todo iPhone) en minúsculas ve "este enlace ya no vale" en vez de
+   un aviso de mayúsculas. Arreglo trivial: normalizar a mayúsculas antes
+   de comparar.
+7. **Curiosidad, no bug de datos**: el banner "Deshacer" de "No lo sé"
+   (`Formulario.jsx:181,326-333,712-725,775-784`) es código muerto en la
+   práctica — el `useEffect` que limpia `deshacer` se dispara en CUALQUIER
+   cambio de `paso`, incluido el que lo acaba de fijar, así que la
+   condición para mostrarlo nunca llega a cumplirse en ningún camino de
+   navegación normal. No hay pérdida de datos (la respuesta se limpia
+   igual), solo una función entera que nunca hace lo que su comentario
+   dice. Arreglo: mover el `setDeshacer(null)` a los puntos donde de
+   verdad toca limpiarlo, no a cualquier cambio de paso.
+
+### E4 — Mejoras de UX/funcionalidad (para cuando haya hueco, no bugs)
+
+- Duplicación de composición entre `calendario/main.jsx` y `EnChecklist.jsx`
+  (montan casi el mismo árbol con pequeñas variaciones) — candidato a un
+  `PanelesCalendario` con flags.
+- `Traer.jsx` no dice cuántas filas pegadas se descartaron o colisionaron
+  por id — solo "Añadidos N", sin explicar si N es menos de lo esperado.
+- "Día cerrado" no cruza con disponibilidad ni con choques — se puede
+  agendar un evento encima sin ningún aviso (a confirmar si es a propósito).
+- ~20 campos numéricos en App.jsx comparten el patrón frágil del bug E2.5
+  con mínimo 0 (más benigno, se autocorrige al seguir escribiendo, pero
+  igual fuerza un "0" visible al borrar) — mismo helper compartido lo
+  arreglaría de una vez.
+- `ETIQUETAS_CAMPO` (App.jsx:216-252) no traduce `colorManteles`,
+  `porcentajeBeige` ni `cronos`: el aviso de "actualizado desde otro
+  dispositivo" enseña el nombre crudo de la variable para esos tres.
+- Comprobación `qty && qty.u` ya inerte en dos sitios de App.jsx (el dato
+  ya llega resuelto) — simplificable a `String(qty)`.
+- La lista "Eventos guardados" no resalta cuál es el que tienes abierto
+  ahora mismo — ayudaría a no pulsar "borrar" sobre el propio (ligado a
+  E2.2).
+- Formulario: sin confirmación al abandonar un evento a medio rellenar
+  desde "Inicio" (ligado a E3.1); sin aviso suave si se avanza sin
+  adjuntar un archivo en una pregunta que lo pide; el guardado en
+  localStorage reserializa TODO `respuestas` (incluidos adjuntos en
+  base64) en cada tecla, con lag plausible en móviles de gama baja.
+
+### Por dónde empezar (sugerido, no decidido)
+
+Los de impacto "Alto" tocan pérdida silenciosa de datos o de trabajo
+(E1.1, E1.2, E2.1, E2.2, E2.5, E3.1, E3.2) — son los candidatos naturales a
+ir primero, uno por rama como el resto de esta sesión. El resto puede
+esperar a que el dueño priorice.
+
 ## No hacer (ratificado)
 
 No partir `App.jsx`/`index.css`; ningún `useMemo` sin medición; sin
