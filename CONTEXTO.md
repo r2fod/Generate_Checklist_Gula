@@ -1484,6 +1484,49 @@ tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
   demuestra.
 - Verificación: `npm run test` completo antes de fusionar.
 
+**SEGURIDAD — Un link "para marcar"/"de la carga" instalado a la pantalla de
+inicio se abría en modo edición completo — arreglado, PENDIENTE DE REVISIÓN
+HUMANA antes de fusionar (CLAUDE.md, "AI Branches")**: reportado por el
+dueño ("cuando compartes un link de modo carga... y se instala en la
+aplicación, les deja ver la checklist en modo admin"). Causa confirmada:
+`esSoloMarcar()`/`abreEnModoCarga()`/`esSoloVista()` (`App.jsx`) leían la
+restricción SOLO de `window.location.search` en cada carga. Un icono
+instalado en la pantalla de inicio no vuelve a abrir esa URL nunca más — el
+manifiesto (`public/checklist/manifest.webmanifest`) fija `start_url` a
+`"./index.html"`, sin parámetros, como exige el propio estándar de PWA
+(lanza siempre esa misma dirección, no la que hubiera en la barra al pulsar
+"Instalar"). El EVENTO sí sobrevive a eso (`gula_checklist_estado`, con
+autoguardado propio), pero "solo"/"carga"/"vista" no — así que un link "para
+marcar" o "de la carga del camión", compartido e instalado (el gesto más
+inocente que hay: "añadir a pantalla de inicio" para no buscar el link cada
+vez), se abría en modo edición completo la segunda vez que se tocaba el
+icono, sin que nadie lo pidiera ni se enterara.
+- Arreglado guardando la restricción (`gula_checklist_restriccion`, en
+  `almacen.js`) en cuanto se ve en la URL: de ahí en adelante manda en ESE
+  dispositivo aunque la URL ya no la lleve. Solo puede AÑADIR restricción,
+  nunca quitarla en silencio — la simple ausencia del parámetro (lo que deja
+  siempre un icono instalado) no la levanta. Para levantarla a propósito
+  (alguien cambia de puesto) hace falta un link explícito con `solo=0`.
+- Sigue siendo, como decía el comentario original, una barrera contra el
+  despiste y no contra quien sepa borrar el almacén local de su propio
+  móvil a propósito — eso ya estaba documentado y no cambia con este
+  arreglo; lo que se cierra es la pérdida SILENCIOSA e INVOLUNTARIA de la
+  restricción con el uso normal de la app instalada.
+- Test nuevo en `app.test.mjs` ("El link de marcar sobrevive a reabrirse sin
+  sus parámetros"): visita el link restringido, luego reabre el MISMO evento
+  SIN esos parámetros (lo más parecido, sin simular sesión de Firebase, a lo
+  que deja un icono instalado) y comprueba que Modo carga sigue mandando; y
+  que `solo=0` sí la levanta a propósito, y que reabrir sin parámetros
+  después de eso ya no la vuelve a poner.
+- **PENDIENTE**: aunque toda la batería está en verde, este cambio toca
+  control de acceso — CLAUDE.md pide revisión humana antes de fusionar a
+  main cualquier rama de seguridad. El PR se deja listo pero SIN fusionar
+  solo, a diferencia del resto de arreglos de hoy.
+- **Seguimiento, no incluido en este PR a propósito**: `PuertaSesion.jsx`
+  tiene el mismo hueco un nivel más arriba (`esLinkDeEvento()`, la puerta de
+  login, mira solo la URL) — documentado en `PLAN_MEJORAS.md`, sección "F.
+  Seguridad: la puerta de login también mira solo la URL".
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").

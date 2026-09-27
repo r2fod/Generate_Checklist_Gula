@@ -346,6 +346,45 @@ igual el recordatorio de hoy.
 5. **Tinyflows — decidido NO hacer por ahora** (segundo motor de reglas junto a
    `revision.js`; el repaso de la noche cubre el 80% del valor sin eso).
 
+## F. Seguridad: la puerta de login también mira solo la URL (2026-09-15)
+
+Encontrado investigando el bug de seguridad reportado por el dueño ("un link
+de modo carga instalado a la pantalla de inicio deja ver la checklist en
+modo admin") — ese bug YA ESTÁ ARREGLADO (ver CONTEXTO.md, "SEGURIDAD"), pero
+al investigarlo apareció un mecanismo HERMANO, sin tocar todavía, que puede
+ser la otra mitad del mismo problema en la práctica.
+
+`PuertaSesion.jsx:19-21` (`esLinkDeEvento()`) decide si la checklist se abre
+SIN pedir login mirando también, solo, `window.location.search` (`?evento=`
+o `?c=`) — la MISMA clase de hueco que `esSoloMarcar()` tenía. Un icono
+instalado reabre siempre la URL pelada del manifiesto, así que
+`esLinkDeEvento()` da `false` en cuanto se vuelve a tocar el icono, y
+`PuertaSesion` pide login de verdad (`observarSesion`).
+
+Con eso hay dos casos, según el dispositivo:
+- **Nunca tuvo sesión de equipo**: se queda en la pantalla de login, sin
+  llegar a la checklist. No es el bug reportado (no hay fuga), pero sí un
+  icono instalado que deja de servir para lo que se instaló.
+- **SÍ tuvo sesión de equipo alguna vez** (Firebase Auth persiste la sesión
+  sola, sin aviso — el móvil del propio dueño montando el link, un
+  dispositivo compartido, alguien que entró "solo para mirar" una vez):
+  `observarSesion` resuelve esa sesión persistida y `PuertaSesion` entra
+  directo a `<App>` CON `onCerrarSesion` puesto — el camino real por el que
+  se llega al bug ya arreglado. El arreglo de `App.jsx` ya corta esto en
+  seco (la restricción persistida manda igual, entre por donde entre), pero
+  el dispositivo se queda pidiendo login la mayoría de las veces (el primer
+  caso) en vez de seguir sirviendo para marcar, que es justo lo que se
+  instaló para hacer.
+
+**Propuesta, no implementada**: mismo patrón que `restriccionActiva()` — en
+cuanto `esLinkDeEvento()` ve `?evento=`/`?c=` en la URL, guardarlo también en
+el dispositivo, y que de ahí en adelante siga saltándose el login aunque la
+URL ya no lo lleve. Complementa el arreglo de seguridad (más dispositivos
+llegan a la checklist YA restringida en vez de a un login que no sirve de
+nada a quien no tiene cuenta) sin ampliar ese PR — se deja aparte a
+propósito para que la revisión de seguridad sea sobre un cambio pequeño y
+claro.
+
 ## No hacer (ratificado)
 
 No partir `App.jsx`/`index.css`; ningún `useMemo` sin medición; sin

@@ -372,19 +372,42 @@ function guardarSincronizados(nombres) {
 // modo marcar: se ve la checklist, se abre Modo carga y se marca todo lo que haga
 // falta, pero no se puede cambiar QUÉ se carga.
 //
-// Es una barrera contra el despiste, no contra alguien con mala idea: quien tenga el
-// link y sepa quitarle el "?solo=1" vuelve a poder editar. Para impedirlo de verdad
-// haría falta que la nube distinguiera quién escribe cada campo, y eso son otras
-// reglas y otro día.
-// Basta con "solo=1". ANTES exigía ADEMÁS que hubiera "evento=", y eso lo dejaba
-// muerto justo cuando no hay nube: sin ella el link no lleva "evento=" sino la
-// checklist dentro ("?c=..."), así que "Link para marcar" copiaba un link que se abría
-// editable como cualquier otro, sin avisar de nada. Pidiendo solo "solo=1" funciona con
-// las dos formas de link.
-function esSoloMarcar() {
+// Es una barrera contra el despiste, no contra alguien con mala idea: quien sepa
+// borrar el almacén local de este móvil vuelve a poder editar. Para impedirlo de
+// verdad haría falta que la nube distinguiera quién escribe cada campo, y eso son
+// otras reglas y otro día.
+//
+// BUG REAL, reportado por el dueño: la restricción se leía SOLO de la URL en cada
+// carga, y un icono instalado en la pantalla de inicio no vuelve a abrir esa URL
+// nunca más — el manifiesto declara un start_url fijo ("./index.html", sin
+// parámetros; lo exige el propio estándar de PWA: instala para lanzar siempre esa
+// misma dirección, no la que hubiera en la barra al pulsar "Instalar"). El EVENTO sí
+// sobrevive a eso (queda cacheado en `gula_checklist_estado`), pero "solo"/"carga"/
+// "vista" no — así que un link "para marcar" o "de la carga del camión", compartido
+// e instalado (el gesto más inocente que hay), se abría en modo edición completo
+// nada más volver a tocar el icono. Nadie lo pedía, nadie se enteraba.
+//
+// Arreglado guardando la restricción en cuanto se ve en la URL: de ahí en adelante
+// manda en este dispositivo aunque la URL ya no la lleve. Solo puede AÑADIR
+// restricción, nunca quitarla en silencio — para levantarla a propósito (alguien
+// cambia de puesto) hace falta un link explícito con "solo=0", nunca la simple
+// ausencia del parámetro, que es justo lo que un icono instalado deja siempre.
+const CLAVE_RESTRICCION = "gula_checklist_restriccion";
+function restriccionActiva() {
   try {
-    return !!new URLSearchParams(window.location.search).get("solo");
-  } catch (e) { return false; }
+    const p = new URLSearchParams(window.location.search);
+    const solo = p.get("solo");
+    if (solo === "0") { guardarTexto(CLAVE_RESTRICCION, ""); return ""; }
+    if (solo) {
+      const de = p.get("vista") ? "vista" : p.get("carga") ? "carga" : "marcar";
+      guardarTexto(CLAVE_RESTRICCION, de);
+      return de;
+    }
+    return leerTexto(CLAVE_RESTRICCION);
+  } catch (e) { return ""; }
+}
+function esSoloMarcar() {
+  return !!restriccionActiva();
 }
 
 // "Link para marcar" abre DIRECTO en Modo carga, en Salida. Antes aterrizaba en la
@@ -392,25 +415,17 @@ function esSoloMarcar() {
 // link por WhatsApp y solo tiene que ir marcando lo que sube al camión, eso es una
 // pantalla de más y una que no le hace falta. Dentro tiene Salida y Vuelta, que es lo
 // que marca logística, y sigue pudiendo salir de ahí si necesita mirar otra cosa.
-//
-// Va en su propia marca ("carga=1") y no colgado de "solo=1" a propósito: los links
-// que ya se mandaron llevan solo "solo=1" y tienen que seguir abriéndose como se
-// abrían. Los nuevos llevan las dos.
 function abreEnModoCarga() {
-  try {
-    return !!new URLSearchParams(window.location.search).get("carga");
-  } catch (e) { return false; }
+  return restriccionActiva() === "carga";
 }
 
 // Solo ver: la checklist entera para consultarla, sin poder marcar NADA. Es el link
 // del metre — necesita saber qué hay y cuánto, pero las marcas de carga son de
 // logística y una casilla tocada por error deja a alguien pensando que algo está
-// cargado cuando no lo está. Lleva "solo=1" además (misma lectura, sin edición) y lo
-// único que quita de más es la entrada a Modo carga.
+// cargado cuando no lo está. Lo único que quita de más sobre "marcar" es la entrada a
+// Modo carga.
 function esSoloVista() {
-  try {
-    return !!new URLSearchParams(window.location.search).get("vista");
-  } catch (e) { return false; }
+  return restriccionActiva() === "vista";
 }
 
 function leerEstadoGuardado() {

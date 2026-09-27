@@ -2861,6 +2861,59 @@ async function main() {
     await c.close();
   }
 
+  // ── El link de marcar, tras instalarlo a la pantalla de inicio ─────────────
+  // Bug real reportado por el dueño: un icono instalado nunca vuelve a abrir la URL
+  // del link (el manifiesto fija start_url a "./index.html", sin parámetros, como
+  // pide el propio estándar de PWA) — así que "&solo=1"/"&carga=1"/"&vista=1" se
+  // perdían al volver a tocar el icono, aunque el evento seguía cacheado en este
+  // móvil, y la checklist se abría en modo edición completo sin que nadie lo pidiera.
+  //
+  // Reproducir el camino EXACTO del icono instalado (URL pelada del todo) pide
+  // además una sesión de Firebase ya persistida en este navegador — sin ella, la
+  // URL pelada ni siquiera llega a App.jsx: se queda en la puerta de login
+  // (esLinkDeEvento(), en PuertaSesion.jsx, mira los mismos parámetros y hoy tiene
+  // el mismo hueco — anotado en PLAN_MEJORAS.md como seguimiento, fuera del alcance
+  // de este arreglo). Lo que SÍ se puede probar aquí, sin simular Firebase, es el
+  // mecanismo de verdad —la restricción persistida en este dispositivo— con una
+  // URL que reabre el mismo evento pero SIN "solo=1": si el arreglo funciona, la
+  // ausencia del parámetro no basta para devolver la edición.
+  console.log("\n── El link de marcar sobrevive a reabrirse sin sus parámetros ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    const evento = { evento: "boda", pax: 100, nombreEvento: "Boda Fulanita y Mengano" };
+
+    await p.goto(url(evento) + "&solo=1&carga=1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 1,
+      "primera visita por el link: entra directo en Modo carga, como siempre");
+
+    // Un link nuevo del MISMO evento, sin "solo=1" ni "carga=1" — lo más parecido a
+    // "lo que queda tras perder los parámetros" que se puede pedir sin tocar la
+    // sesión de Firebase.
+    await p.goto(url(evento), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 1,
+      "y reabrirlo SIN esos parámetros sigue en Modo carga: la restricción quedó en el dispositivo");
+    ok(await p.locator(".preview-close-btn").count() === 0,
+      "y sigue sin ✕ para salir: Modo carga sigue siendo la app entera, no una pantalla más — nunca se llega a la checklist editable de detrás");
+
+    // El escape a propósito: un link nuevo con "solo=0" SÍ levanta la restricción —
+    // para cuando alguien cambia de puesto y de verdad hace falta dársela de vuelta.
+    await p.goto(url(evento) + "&solo=0", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 0,
+      '"solo=0" sí levanta la restricción a propósito');
+
+    // Y una vez levantada, reabrir sin parámetros ya no la vuelve a poner sola
+    await p.goto(url(evento), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    ok(await p.locator(".segmented-control .segment-salida").count() === 0,
+      "y sigue sin restricción al reabrir sin parámetros, que es justo lo que se pidió al levantarla");
+    await c.close();
+  }
+
   // ── Borrar un evento se lleva su copia de la nube ──────────────────────────
   // Cada evento que se comparte alguna vez deja un documento en la nube. Al borrar el
   // evento, ese documento se quedaba PARA SIEMPRE: nadie lo referencia, nadie lo ve y
