@@ -38,6 +38,7 @@ import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { estimarTiemposCarga } from "../tiempos-carga.js";
+import { quitarItemsSinCantidad } from "../checklist-format.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
@@ -2957,6 +2958,28 @@ console.log("\n══ Auditoría de cálculos: 6 bugs reales cazados sin llegar 
   const cerveza00MediaHora = calcBebidas(100, 0.5, true, false).cerveza00;
   ok(cerveza00ConBarra > cerveza00MediaHora,
     `la cerveza 0,0 ya responde a las horas de barra libre, como la cerveza normal (4h: ${cerveza00ConBarra}, media hora: ${cerveza00MediaHora})`);
+}
+
+console.log("\n══ Una línea con cantidad null no se carga ══");
+{
+  // opt() deja las líneas opcionales en su sitio con cantidad null cuando su condición
+  // no se cumple (Carpas sin carpa, Parabanes fuera de un rodaje...). El filtro las
+  // daba por VISIBLES: String(null) es el texto "null", que no está vacío. En la app no
+  // se notaba porque App.jsx ya las quita antes, pero cualquier otro camino que parta
+  // de la checklist en bruto —la calibración de tiempos, el Word generado directamente—
+  // se las llevaba, y el Word reventaba al leer `null.u`.
+  const cats = [
+    { nombre: "Mobiliario", items: [
+      ["Carpas", null], ["Paredes de carpas", undefined], ["Mesas", "12"],
+      ["Copas de vino", { u: 30, b: 2, size: 25 }], ["Sillas", "0"], ["Manteles", ""], ["Parabanes", "—"],
+    ] },
+    { nombre: "Solo opcionales", items: [["Carrito palomitera", null]] },
+  ];
+  const quedan = quitarItemsSinCantidad(cats);
+  const etiquetas = quedan.flatMap(c => c.items.map(i => i[0]));
+  ok(etiquetas.join("|") === "Mesas|Copas de vino",
+    `solo quedan las que llevan cantidad, null y undefined incluidos fuera → ${etiquetas.join(", ")}`);
+  ok(quedan.length === 1, "y una categoría que solo tenía opcionales sin cantidad desaparece entera");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

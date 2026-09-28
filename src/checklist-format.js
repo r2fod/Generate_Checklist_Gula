@@ -90,6 +90,9 @@ export function esItemDeAlquiler(label, esAlquilerManual) {
 // — se queda fuera de Modo carga, Vista previa y Word/PDF, pero sigue editable en
 // la checklist principal de la app por si se quiere rellenar a mano.
 function tieneCantidadVisible(qty) {
+  // null es lo que deja opt() en una línea opcional cuya condición no se cumple: "no
+  // lleva". Sin esta línea pasaba por visible, porque String(null) es "null".
+  if (qty === null || qty === undefined) return false;
   const v = String(qty && qty.u ? qty.u : qty).trim();
   return v !== "" && v !== "—" && v !== "-" && v !== "0";
 }

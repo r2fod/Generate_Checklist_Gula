@@ -461,6 +461,15 @@ está en el historial de git y en las pruebas que los cubren):
   Mistral, OpenRouter, NVIDIA) no tenían botón, aunque estuvieran configurados: solo
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
+- **`quitarItemsSinCantidad` dejaba pasar las líneas con cantidad `null`** —
+  `tieneCantidadVisible` hacía `String(qty)`, y `String(null)` es el texto `"null"`, que
+  no está vacío. `null` es justo lo que deja `opt()` en una línea opcional que no toca
+  (Carpas, Paredes de carpas, Parabanes, Carrito palomitera…). En la app no se notaba
+  porque `App.jsx` ya las quita antes (línea ~2644), pero cualquier camino que parte de
+  la checklist en bruto se las llevaba: la calibración de tiempos (siguiente entrada) y
+  `generarHTMLWord` llamado directamente, que reventaba al leer `null.u`. Encontrado con
+  un barrido de 1.300 combinaciones (5 tipos × 1-500 pax × niños × horas × temporada):
+  ese fue el único fallo; nada salía `NaN` ni negativo y nada bajaba al subir los pax.
 
 ## Qué queda pendiente ahora mismo (2026-09-07)
 
