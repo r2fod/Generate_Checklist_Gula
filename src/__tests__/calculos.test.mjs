@@ -32,12 +32,12 @@ import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
 import { calibracionBebida, calibracionHielo, calibracionComida, calibracionPersonal,
-  catsDeEventoGuardado } from "../calibracion.js";
+  catsDeEventoGuardado, calcularCalibracion, contarItemsCarga } from "../calibracion.js";
 import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
   esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
-import { estimarTiemposCarga } from "../tiempos-carga.js";
+import { estimarTiemposCarga, FASES_TIEMPO } from "../tiempos-carga.js";
 import { quitarItemsSinCantidad } from "../checklist-format.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
 import { esConsumible } from "../consumibles.js";
@@ -2980,6 +2980,48 @@ console.log("\n══ Una línea con cantidad null no se carga ══");
   ok(etiquetas.join("|") === "Mesas|Copas de vino",
     `solo quedan las que llevan cantidad, null y undefined incluidos fuera → ${etiquetas.join(", ")}`);
   ok(quedan.length === 1, "y una categoría que solo tenía opcionales sin cantidad desaparece entera");
+}
+
+console.log("\n══ La calibración de tiempos cuenta lo mismo que la estimación ══");
+{
+  // La estimación de App.jsx cuenta las líneas que de verdad se cargan. La calibración
+  // reconstruía el evento guardado con checklistDeEventoGuardado, que se queda SOLO con
+  // las etiquetas: al filtrar por cantidad no había nada que quitar, y una boda de 100
+  // pax contaba 173 líneas donde se cargan 133. Comparaba el tiempo real contra una
+  // estimación inflada, y el factor salía bajo: tres eventos que tardaban JUSTO lo
+  // estimado daban 0,80 en carga — la app habría prometido un 20% menos de lo real.
+  const ev = { evento: "boda", pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4 };
+  // Lo mismo que hace App.jsx: fuera las líneas null, lo que no lleva cantidad y Personal.
+  const sinNull = catsDeEventoGuardado(ev).map(c => ({ ...c, items: c.items.filter(i => i[1] !== null) }));
+  const cargables = quitarItemsSinCantidad(sinNull).filter(c => !/personal/i.test(c.nombre));
+  const deVerdad = cargables.reduce((a, c) => a + c.items.length, 0);
+  ok(contarItemsCarga(ev) === deVerdad,
+    `boda de 100 pax: cuenta ${contarItemsCarga(ev)} líneas, las mismas ${deVerdad} que se cargan`);
+
+  const est = estimarTiemposCarga({ totalItems: deVerdad, pax: 100, numLogistica: 2, horasJornada: 0 }, null);
+  const clavado = { ...ev, cronos: Object.fromEntries(FASES_TIEMPO.map(f => [f, { ms: est[`${f}Min`] * 60000 }])) };
+  const cal = calcularCalibracion({ a: clavado, b: clavado, c: clavado });
+  const factores = cal ? FASES_TIEMPO.map(f => cal.factores[f]) : [];
+  ok(factores.length === FASES_TIEMPO.length && factores.every(f => Math.abs(f - 1) < 0.001),
+    `tres eventos que tardan justo lo estimado dan factor 1 en todas las fases → ${factores.map(f => f.toFixed(2)).join(" · ")}`);
+
+  // Y cuenta como la app lo que se ha tocado a mano: una línea oculta y otra puesta a 0
+  // no se cargan, una añadida a mano sí, y otra añadida sin cantidad no. Las claves van
+  // con el nombre de la categoría YA renombrada, igual que en App.jsx.
+  const cat = cargables[0];
+  const renombrada = "Renombrada a mano";
+  const ajustado = {
+    ...ev,
+    categoriasRenombradas: { [cat.nombre]: renombrada },
+    itemsOcultos: { [`${renombrada}::${cat.items[0][0]}`]: true },
+    overridesManuales: { [`${renombrada}::${cat.items[1][0]}`]: "0" },
+    itemsManuales: [
+      { categoria: renombrada, label: "Carretilla extra", cantidad: "1" },
+      { categoria: renombrada, label: "Por decidir", cantidad: "" },
+    ],
+  };
+  ok(contarItemsCarga(ajustado) === deVerdad - 2 + 1,
+    `con una oculta, una a 0 y una añadida a mano cuenta ${contarItemsCarga(ajustado)} (esperado ${deVerdad - 1})`);
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

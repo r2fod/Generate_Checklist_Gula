@@ -1,5 +1,5 @@
 import { estimarTiemposCarga, FASES_TIEMPO } from "./tiempos-carga.js";
-import { horasLogistica, quitarItemsSinCantidad } from "./checklist-format.js";
+import { horasLogistica, quitarItemsSinCantidad, CATEGORIA_MANUAL } from "./checklist-format.js";
 import { buildChecklist } from "./checklist-generadores.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "./bebida.js";
 import { COMIDAS, CLAVES_COMIDA } from "./comida.js";
@@ -56,34 +56,41 @@ function numLogisticaDe(ev) {
 function horasJornadaDe(ev) {
   return (ev.logisticaEquipo || []).reduce((mx, p) => { const h = horasLogistica(p.inicio, p.fin); return h && h > mx ? h : mx; }, 0);
 }
-// Nº de items que se cargan de verdad en un evento guardado (sin los que no llevan
-// cantidad y sin "Personal"), para poder comparar su tiempo real con el estimado.
-function contarItemsCarga(ev) {
+// Nº de items que se cargan de verdad en un evento guardado, para comparar su tiempo
+// real con el estimado. Tiene que ser la MISMA cuenta que hace App.jsx para estimar
+// (totalItemsCarga): categorías renombradas, sin lo oculto, con las cantidades
+// editadas a mano, más lo añadido a mano, y fuera lo que no lleva cantidad y
+// "Personal". Si las dos cuentas no coinciden, el factor compara cosas distintas.
+//
+// Antes partía de checklistDeEventoGuardado, que se queda SOLO con las etiquetas: al
+// filtrar por cantidad no quedaba nada que quitar, y una boda de 100 pax contaba 173
+// líneas donde se cargan 133. Tres eventos que tardaban justo lo estimado daban 0,80
+// en carga: la app habría prometido un 20% menos de tiempo del que hace falta.
+// Exportada para poder probar la cuenta directamente.
+export function contarItemsCarga(ev) {
   try {
-    return quitarItemsSinCantidad(checklistDeEventoGuardado(ev))
+    const renom = ev.categoriasRenombradas || {};
+    const ocultos = ev.itemsOcultos || {};
+    const aMano = ev.overridesManuales || {};
+    const cats = catsDeEventoGuardado(ev).map(c => {
+      const nombre = renom[c.nombre] ?? c.nombre;
+      return {
+        nombre,
+        items: c.items
+          .filter(([label]) => !ocultos[`${nombre}::${label}`])
+          .map(([label, qty]) => [label, aMano[`${nombre}::${label}`] ?? qty]),
+      };
+    });
+    (ev.itemsManuales || []).forEach(it => {
+      const nombre = it.categoria || CATEGORIA_MANUAL;
+      let destino = cats.find(c => c.nombre === nombre);
+      if (!destino) { destino = { nombre, items: [] }; cats.push(destino); }
+      destino.items.push([it.label, it.cantidad]);
+    });
+    return quitarItemsSinCantidad(cats)
       .filter(c => !/personal/i.test(c.nombre))
       .reduce((a, c) => a + c.items.length, 0);
   } catch (e) { return 0; }
-}
-
-// ─── REVISIÓN DE DATOS GUARDADOS ──────────────────────────────────────────────
-// Reconstruye la checklist (categorías + items) de un evento GUARDADO a partir de
-// su configuración, para poder comparar sus marcas con los items que tendría hoy
-// sin necesidad de abrirlo. Aplica las categorías renombradas y añade los items
-// puestos a mano (la clave usa la etiqueta base del item).
-export function checklistDeEventoGuardado(ev) {
-  let cats;
-  try { cats = catsDeEventoGuardado(ev); } catch (e) { return []; }
-  if (!cats.length) return [];
-  const renom = ev.categoriasRenombradas || {};
-  const salida = cats.map(c => ({ nombre: renom[c.nombre] ?? c.nombre, items: c.items.map(it => it[0]) }));
-  (ev.itemsManuales || []).forEach(it => {
-    const nombreCat = renom[it.categoria] ?? it.categoria ?? "Otros";
-    let destino = salida.find(c => c.nombre === nombreCat);
-    if (!destino) { destino = { nombre: nombreCat, items: [] }; salida.push(destino); }
-    destino.items.push(it.label);
-  });
-  return salida;
 }
 
 // ─── CUÁNTO SE BEBIÓ DE VERDAD ────────────────────────────────────────────────
@@ -300,8 +307,8 @@ export function huecosDeCatalogo(eventosGuardados = {}, precios = {}) {
   return salidas.sort((a, b) => b.sinPrecio - a.sinPrecio).slice(0, 3);
 }
 
-// Las categorías con sus cantidades, tal y como saldrían hoy. checklistDeEventoGuardado
-// se queda solo con las etiquetas; la calibración necesita también los números.
+// Las categorías con sus cantidades, tal y como saldrían hoy. La calibración necesita
+// los números, no solo las etiquetas: por no tenerlos contaba mal los tiempos.
 export function catsDeEventoGuardado(ev) {
   if (!ev || !ev.evento) return [];
   const opts = {

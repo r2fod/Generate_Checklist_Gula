@@ -470,6 +470,17 @@ está en el historial de git y en las pruebas que los cubren):
   `generarHTMLWord` llamado directamente, que reventaba al leer `null.u`. Encontrado con
   un barrido de 1.300 combinaciones (5 tipos × 1-500 pax × niños × horas × temporada):
   ese fue el único fallo; nada salía `NaN` ni negativo y nada bajaba al subir los pax.
+- **La calibración de tiempos de carga salía un 20% corta** — `contarItemsCarga`
+  reconstruía el evento guardado con `checklistDeEventoGuardado`, que se queda SOLO con
+  las etiquetas: al filtrar por cantidad no quedaba nada que quitar. Una boda de 100 pax
+  contaba **173 líneas donde se cargan 133**, y como `totalItemsCarga` no se guarda con
+  el evento, pasaba SIEMPRE. Simulado: tres eventos que tardaban exactamente lo estimado
+  daban factores **0,92 · 0,80 · 0,80 · 0,93** en vez de 1 — la app habría prometido un
+  20% menos de tiempo de carga del real, que es el lado en que se sale tarde. Ahora
+  cuenta igual que `App.jsx` (renombres, ocultos, cantidades a mano, líneas añadidas),
+  con prueba de las tres cosas. `checklistDeEventoGuardado` se quedó sin uso y se quitó.
+  No afectaba a la calibración de bebida, comida ni hielo: esas ya usaban
+  `catsDeEventoGuardado`, con cantidades.
 
 ## Qué queda pendiente ahora mismo (2026-09-07)
 
