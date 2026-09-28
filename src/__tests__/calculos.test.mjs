@@ -38,7 +38,7 @@ import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { estimarTiemposCarga, FASES_TIEMPO } from "../tiempos-carga.js";
-import { quitarItemsSinCantidad } from "../checklist-format.js";
+import { quitarItemsSinCantidad, generarHTMLWord } from "../checklist-format.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
@@ -3022,6 +3022,41 @@ console.log("\n══ La calibración de tiempos cuenta lo mismo que la estimaci
   };
   ok(contarItemsCarga(ajustado) === deVerdad - 2 + 1,
     `con una oculta, una a 0 y una añadida a mano cuenta ${contarItemsCarga(ajustado)} (esperado ${deVerdad - 1})`);
+}
+
+console.log("\n══ El Word/PDF no ejecuta lo que venga escrito en el evento ══");
+{
+  // Compartir → PDF abre una ventana con window.open("") y le hace document.write de
+  // este HTML: esa ventana es del MISMO origen que la app, así que un <img onerror> que
+  // llegara sin escapar se ejecutaba con acceso a la sesión (comprobado en Chromium). Y
+  // el texto puede venir de fuera del equipo: el sitio y las notas del formulario de
+  // oficina, o el sitio de un apunte del calendario, acaban en ubicacion/notasEvento.
+  // Se prueba campo a campo para que, si uno se escapa, el fallo diga cuál.
+  const CARGA = `<img src=x onerror=alert(1)>`;
+  const base = [{ nombre: "Menaje", items: [["Mesas", "12"]] }];
+  const word = (meta = {}, cats = base) => generarHTMLWord("boda", 100, 0, 2, 4, true, true, cats, meta);
+  const campos = {
+    "nombre del evento": word({ nombreEvento: `Boda ${CARGA}` }),
+    "sitio": word({ ubicacion: `Finca ${CARGA}` }),
+    "hora": word({ horaInicio: `13:00 ${CARGA}` }),
+    "notas": word({ notasEvento: `Alergias ${CARGA}` }),
+    "equipo de logística": word({ logisticaEquipo: [{ nombre: `Persona ${CARGA}`, inicio: "08:00", fin: "16:00" }] }),
+    "recogidas": word({ recogidas: [{ concepto: `Carpas ${CARGA}`, fecha: "2027-06-11" }] }),
+    "compras": word({ compras: [{ concepto: `Hielo ${CARGA}`, cantidad: `3 ${CARGA}` }] }),
+    "línea": word({}, [{ nombre: "Menaje", items: [[`Mesas ${CARGA}`, "12"]] }]),
+    "categoría": word({}, [{ nombre: `Menaje ${CARGA}`, items: [["Mesas", "12"]] }]),
+    "cantidad escrita a mano": word({}, [{ nombre: "Menaje", items: [["Mesas", `12 ${CARGA}`]] }]),
+    "roturas": word({ roturas: { "Menaje::Mesas": `2 ${CARGA}` } }),
+  };
+  const colados = Object.entries(campos).filter(([, html]) => /<img/i.test(html)).map(([c]) => c);
+  ok(colados.length === 0,
+    `ningún campo mete HTML propio en el documento${colados.length ? ` → se cuela por: ${colados.join(", ")}` : ` (${Object.keys(campos).length} campos probados)`}`);
+
+  // Escapar no puede estropear el texto normal: se lee igual, y una sola vez.
+  const normal = word({ ubicacion: "Finca Ríos & Hijos", notasEvento: "Mesa \"4\"\ncon dos celiacos" });
+  ok(normal.includes("Finca Ríos &amp; Hijos") && !normal.includes("&amp;amp;"),
+    "el texto normal sale igual, con el & escapado una sola vez");
+  ok(normal.includes("Mesa &quot;4&quot;\ncon dos celiacos"), "y las notas conservan sus saltos de línea");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

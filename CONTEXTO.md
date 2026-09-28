@@ -481,6 +481,20 @@ está en el historial de git y en las pruebas que los cubren):
   con prueba de las tres cosas. `checklistDeEventoGuardado` se quedó sin uso y se quitó.
   No afectaba a la calibración de bebida, comida ni hielo: esas ya usaban
   `catsDeEventoGuardado`, con cantidades.
+- **Compartir → PDF ejecutaba el HTML que viniera escrito en el evento** —
+  `generarHTMLWord` metía el texto sin escapar y `handleCompartirPDF` lo pasa a
+  `window.open("")` + `document.write`: esa ventana es del MISMO origen que la app.
+  Comprobado en Chromium: un `<img onerror>` en el sitio leía lo guardado por la app (y
+  en la app de verdad ahí está la sesión de Firebase). Y el texto no solo lo escribe el
+  equipo: el sitio y las notas del formulario de oficina (`r.sitio`) y el sitio de un
+  apunte del calendario (`a.sitio`) acaban en `ubicacion`/`notasEvento`, y se entra a los
+  dos sin sesión (con el código o el enlace de editar). Se colaba por **11 campos**:
+  nombre, sitio, hora, notas, equipo de logística, recogidas, compras, líneas,
+  categorías, cantidades escritas a mano y roturas. Arreglado con `esc()` en todos,
+  escapando DESPUÉS del `toUpperCase()` del nombre (al revés, `&amp;` sería `&AMP;`).
+  Verificado tres veces: la prueba campo a campo, el documento de un evento normal sale
+  **idéntico byte a byte** al de antes (así que no hay cambio visual que capturar), y en
+  Chromium con control — la carga sin escapar se ejecuta, la misma tras el arreglo no.
 
 ## Qué queda pendiente ahora mismo (2026-09-07)
 
