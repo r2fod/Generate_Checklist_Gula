@@ -2458,6 +2458,25 @@ body {
 }
 .item-unidad-btn:hover, .item-unidad-btn:focus-visible { border-bottom-color: currentColor; }
 .item-unidad-btn.es-manual { color: var(--accent); font-style: italic; }
+/* El texto mide 16px de alto y a veces 12 de ancho ("ud"): poco para un dedo. Gana
+   zona de toque sin moverse, con una capa invisible de al menos 44×32 pegada a su
+   borde derecho. Crece hacia abajo (el hueco de la fila) y no hacia arriba, donde está
+   la caja de la cantidad: un toque en su borde de abajo no debe abrir la unidad. */
+.item-unidad-btn { position: relative; }
+.item-unidad-btn::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: max(100%, 44px);
+  height: 32px;
+}
+/* En las filas de alquiler el gris de siempre se queda en 4,48 sobre el amarillo:
+   el de las etiquetas, un punto más oscuro, llega al mínimo legible (4,5). Solo en
+   claro: en oscuro el gris de siempre ya se lee (y el de etiquetas, no). */
+:root:not([data-tema="oscuro"]) .item-row.is-alquiler .item-batea-info:not(.es-manual) {
+  color: var(--text-label);
+}
 
 /* Editando: 16px para que iOS no haga zoom al enfocar, y el ancho de lo escrito */
 .item-unidad-input {

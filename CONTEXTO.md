@@ -1465,6 +1465,12 @@ Medido con todos los generadores: de ~400 items, 304 salían con el número solo
   packs automáticos siguen solos mientras nadie los toque. La puesta a mano manda sobre
   todo (cajas incluidas), concuerda con el número si es un envase conocido y sale en
   acento y cursiva. Con el link de solo marcar se lee pero no se toca.
+- El botón de la unidad mide 16px de alto (12 de ancho en "ud"): gana zona de toque
+  con un `::after` invisible de al menos 44×32, pegado a su borde derecho y crecido
+  hacia abajo (no hacia la caja de la cantidad). En las filas de alquiler, en claro,
+  la unidad va en `--text-label`: el gris de siempre daba 4,48 sobre el amarillo. No
+  con `color-mix()`: su color calculado sale como `color(srgb 0.68 …)` y la prueba de
+  contraste lo leía como casi negro.
 - El estado nuevo va como los demás ajustes a mano: en `getEstadoActual`,
   `SETTERS_SYNC` (nube), `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, "Deshacer", y
   se migra al renombrar un item manual o una categoría. La tupla de cada item lleva un
