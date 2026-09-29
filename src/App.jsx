@@ -65,6 +65,7 @@ import {
   CATEGORIA_MANUAL, quitarItemsSinCantidad,
   horasLogistica, importeLogistica, fmtLogistica, totalLogistica,
   fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord, envaseSegunCantidad,
+  unidadPorDefecto, bateaSizeDe, cajaSizeDe,
 } from "./checklist-format.js";
 import { infoCategoria } from "./components/Iconos.jsx";
 import CargandoPanel from "./components/CargandoPanel.jsx";
@@ -242,7 +243,7 @@ const ETIQUETAS_CAMPO = {
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   recogidas: "Recogidas", compras: "Compras",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
-  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas", ordenCategorias: "Orden de las categorías",
+  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", unidadesManuales: "Unidades cambiadas a mano", categoriasRenombradas: "Categorías renombradas", ordenCategorias: "Orden de las categorías",
   itemsAlquilerManual: "Items marcados como alquiler proveedor",
   preparados: "Items marcados como preparados", checkeados: "Items marcados como cargados",
   marcasRevisar: "Items con la cantidad cambiada tras marcarlos",
@@ -665,6 +666,9 @@ export default function App({ onCerrarSesion } = {}) {
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {});
+  // La unidad escrita a mano en una fila ("cajas", "sacos"...). Sin entrada, la de la
+  // app: la del generador, las cajas/bateas que se calculan solas o la de por defecto.
+  const [unidadesManuales, setUnidadesManuales] = useState(estadoInicial.unidadesManuales ?? {}); // { "categoria::labelOriginal": "unidad" }
   // Orden de categorías elegido a mano (lista de nombres). Vacío = el de la app.
   const [ordenCategorias, setOrdenCategorias] = useState(estadoInicial.ordenCategorias ?? []); // { "categoria::labelOriginal": "nombre corregido" }
   // Preparar (sacar del almacén y dejarlo listo) y cargar en el camión son dos momentos
@@ -917,7 +921,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, tipoMesa, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
+    itemsOcultos, nombresManuales, unidadesManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
     formularioRespuestas,
   });
@@ -1029,7 +1033,7 @@ export default function App({ onCerrarSesion } = {}) {
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas, tipoMesa: setTipoMesa,
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
-    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
+    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, unidadesManuales: setUnidadesManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
     itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, marcasRevisar: setMarcasRevisar, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
@@ -2666,9 +2670,20 @@ export default function App({ onCerrarSesion } = {}) {
           const valorBase = esObjetoConSufijo ? qty.u : qty;
           const sufijoBruto = esObjetoConSufijo ? qty.sufijo : undefined;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
+          const nombre = nombresManuales[key] ?? label;
+          // Todos con su unidad (lo pidió el dueño): la del generador si trae; si no, y no
+          // es de los que cuentan cajas o bateas solos, la de por defecto ("uds",
+          // "botellas"...). Solo con número: debajo de un "—" no dice nada.
+          const sufijoGenerador = typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto;
+          const conNumero = !isNaN(parseFloat(String(cantidad).replace(",", ".")));
+          const sufijoAuto = sufijoGenerador
+            ?? (conNumero && !bateaSizeDe(nombre) && !cajaSizeDe(nombre) ? unidadPorDefecto(label, cat.nombre) : undefined);
+          // La escrita a mano manda sobre todo lo anterior, cajas automáticas incluidas;
+          // borrarla la devuelve a la de la app. El séptimo dato dice si es a mano.
+          const unidadManual = unidadesManuales[key];
           // Y la unidad concuerda con el número ya resuelto: "1 botella", "3 cajas"
-          const sufijo = envaseSegunCantidad(typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto, cantidad);
-          return [nombresManuales[key] ?? label, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo];
+          const sufijo = envaseSegunCantidad(unidadManual ?? sufijoAuto, cantidad);
+          return [nombre, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo, unidadManual !== undefined];
         });
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
@@ -2686,7 +2701,7 @@ export default function App({ onCerrarSesion } = {}) {
         return pa !== pb ? pa - pb : a.i - b.i;
       })
       .map(x => x.c);
-  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, ordenCategorias]);
+  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, unidadesManuales, categoriasRenombradas, itemsAlquilerManual, ordenCategorias]);
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
@@ -2722,6 +2737,7 @@ export default function App({ onCerrarSesion } = {}) {
   const accionesFilaRef = React.useRef({});
   accionesFilaRef.current = {
     editarCantidad: (categoria, labelOriginal, valor) => handleEditarCantidad(categoria, labelOriginal, valor),
+    editarUnidad: (categoria, labelOriginal, valor) => handleEditarUnidad(categoria, labelOriginal, valor),
     ocultar: (categoria, labelOriginal) => handleOcultarItem(categoria, labelOriginal),
     quitarManual: (idx) => handleRemoveItemManual(idx),
     empezarEdicion: (keyId, label, esAlquiler) => {
@@ -2733,8 +2749,25 @@ export default function App({ onCerrarSesion } = {}) {
     setAlquilerTemporal,
   };
 
-  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
+  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, unidadesManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
+
+  // La unidad de una fila, escrita a mano. Vacía = vuelve a la de la app (la del
+  // generador, las cajas/bateas automáticas o la de por defecto). Se confirma al salir
+  // del campo, así que cada cambio es un paso de "Deshacer".
+  const handleEditarUnidad = (categoria, labelOriginal, valor) => {
+    const key = `${categoria}::${labelOriginal}`;
+    const limpio = String(valor ?? "").trim();
+    if ((unidadesManuales[key] ?? "") === limpio) return;
+    ultimaClaveEditadaRef.current = null;
+    pushHistorial();
+    setUnidadesManuales(prev => {
+      const next = { ...prev };
+      if (limpio === "") delete next[key];
+      else next[key] = limpio;
+      return next;
+    });
+  };
 
   const handleEditarCantidad = (categoria, labelOriginal, valor) => {
     const key = `${categoria}::${labelOriginal}`;
@@ -2892,7 +2925,7 @@ export default function App({ onCerrarSesion } = {}) {
           delete next[key];
           return next;
         });
-        [setOverridesManuales, setPreparados, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
+        [setOverridesManuales, setUnidadesManuales, setPreparados, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
         keyFinal = newKey;
       } else {
         setNombresManuales(prev => ({ ...prev, [key]: nuevoLabel }));
@@ -2914,6 +2947,7 @@ export default function App({ onCerrarSesion } = {}) {
     setItemsManuales(ultimo.itemsManuales);
     setItemsOcultos(ultimo.itemsOcultos);
     setNombresManuales(ultimo.nombresManuales);
+    setUnidadesManuales(ultimo.unidadesManuales ?? {});
     setOrdenCategorias(ultimo.ordenCategorias ?? []);
     setCategoriasRenombradas(ultimo.categoriasRenombradas);
     setItemsAlquilerManual(ultimo.itemsAlquilerManual);
@@ -2963,6 +2997,7 @@ export default function App({ onCerrarSesion } = {}) {
     setOverridesManuales(migraClaves);
     setItemsOcultos(migraClaves);
     setNombresManuales(migraClaves);
+    setUnidadesManuales(migraClaves);
     setItemsAlquilerManual(migraClaves);
   };
 
@@ -3105,7 +3140,7 @@ export default function App({ onCerrarSesion } = {}) {
   };
 
   const getTextoChecklist = () => {
-    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q, , , , sufijo]) => `  • ${l}: ${fmtCantidadCompleta(l, q.u ? q.u : q, sufijo)}`).join("\n")).join("\n");
+    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q, , , , sufijo, unidadManual]) => `  • ${l}: ${fmtCantidadCompleta(l, q.u ? q.u : q, sufijo, unidadManual)}`).join("\n")).join("\n");
     const cabecera = [
       nombreEvento ? nombreEvento.toUpperCase() : `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()}`,
       `${pax} pax`,
@@ -4857,7 +4892,7 @@ export default function App({ onCerrarSesion } = {}) {
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
-                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual, sufijo], i) => {
+                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual, sufijo, unidadManual], i) => {
                     const keyId = `${cat.nombre}::${labelOriginal ?? label}`;
                     const editando = editandoNombre === keyId;
                     return (
@@ -4870,6 +4905,7 @@ export default function App({ onCerrarSesion } = {}) {
                         manualIdx={manualIdx}
                         esAlquilerManual={esAlquilerManual}
                         sufijo={sufijo}
+                        unidadManual={unidadManual}
                         editado={overridesManuales[keyId] !== undefined}
                         renombrado={manualIdx === undefined && nombresManuales[keyId] !== undefined}
                         editando={editando}

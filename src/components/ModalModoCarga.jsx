@@ -37,7 +37,7 @@ import Escaleta from "./Escaleta.jsx";
 // onToggleSale, onVuelve y onRoturas van con useCallback en App.jsx: una función
 // nueva en cada tecla habría dejado el memo en nada, todas las filas "cambiadas".
 const FilaCargaPrep = memo(function FilaCargaPrep({
-  dataKey, label, qty, sufijo, enPreparacion, marcado, otroMarcado, marcaRevisar, esAlquiler, onToggle,
+  dataKey, label, qty, sufijo, unidadManual, enPreparacion, marcado, otroMarcado, marcaRevisar, esAlquiler, onToggle,
 }) {
   return (
     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""}`}
@@ -71,13 +71,13 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
             <span className="carga-marca-otra-texto">revisar</span>
           </span>
         )}
-        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</span>
       </label>
     </div>
   );
 });
 
-const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, consumible, esAlquiler, onVuelve, onRoturas }) {
+const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, unidadManual, valorVuelta, roturaValor, consumible, esAlquiler, onVuelve, onRoturas }) {
   const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
   const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
   const marcado = valorVuelta !== undefined && valorVuelta !== "";
@@ -107,7 +107,7 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
           </span>
           {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
         </span>
-        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</span>
         <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -801,7 +801,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 <span>{cat.nombre}</span>
               </div>
               <div className="carga-lista">
-                {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo]) => {
+                {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual]) => {
                   const dataKey = `${cat.nombre}::${labelOriginal}`;
                   // Mismo criterio que la lista normal (FilaItem.jsx): el tag manual, o
                   // si el propio nombre ya lo delata (Dealde/Carvillo/Novelda/alquiler).
@@ -822,6 +822,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                         label={label}
                         qty={qty}
                         sufijo={sufijo}
+                        unidadManual={unidadManual}
                         enPreparacion={enPreparacion}
                         marcado={marcado}
                         otroMarcado={otroMarcado}
@@ -838,6 +839,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                       label={label}
                       qty={qty}
                       sufijo={sufijo}
+                      unidadManual={unidadManual}
                       valorVuelta={vueltos[dataKey]}
                       roturaValor={roturas[dataKey]}
                       consumible={esConsumible(cat.nombre, labelOriginal)}

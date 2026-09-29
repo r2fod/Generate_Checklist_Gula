@@ -23,9 +23,9 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
   const alquileres = checklist.flatMap(cat => cat.items
     .filter(([label, , , , esAlquilerManual]) =>
       esAlquilerManual || PALABRAS_ALQUILER.some(pl => String(label).toLowerCase().includes(pl)))
-    .map(([label, qty, , , , sufijo]) => ({
+    .map(([label, qty, , , , sufijo, unidadManual]) => ({
       label,
-      cantidad: fmtCantidadCompleta(label, qty && qty.u ? qty.u : qty, sufijo),
+      cantidad: fmtCantidadCompleta(label, qty && qty.u ? qty.u : qty, sufijo, unidadManual),
     })));
   return (
     <div className={`preview-overlay ${sinCerrar ? "is-pantalla" : ""}`} onClick={sinCerrar ? undefined : onClose}>
@@ -92,7 +92,7 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
                     </tr>
                   </thead>
                   <tbody>
-                    {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo], i) => {
+                    {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual], i) => {
                       const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
                       const key = `${cat.nombre}::${labelOriginal ?? label}`;
                       return (
@@ -101,7 +101,7 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
                             {label}
                             {alq && <span className="preview-rental-badge">ALQUILER</span>}
                           </td>
-                          <td className="preview-qty-cell">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
+                          <td className="preview-qty-cell">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</td>
                           {hayMarcas && <td className="preview-check-cell">{(meta.preparados || {})[key] ? "✓" : ""}</td>}
                           {hayMarcas && <td className="preview-check-cell">{(meta.checkeados || {})[key] ? "✓" : ""}</td>}
                           {hayMarcas && <td className="preview-check-cell">{(meta.vueltos || {})[key] ? "✓" : ""}</td>}
