@@ -22,10 +22,6 @@ import logoGula from "../assets/gula-logo.webp";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
-// Chips que se enseñan de golpe en una casilla del mes (≥560px) antes de resumir el
-// resto en "+N más". Con el mínimo de casilla a 92px caben tres cómodos; ver Mes().
-const CHIPS_VISIBLES = 3;
-
 // El icono del tipo. Va con su clase de color, así que hereda el mismo tono que el
 // punto y el chip: un solo color por tipo en todas partes.
 function IconoTipo({ tipo, size = 13, className = "" }) {
@@ -142,8 +138,12 @@ export default function Calendario({
       )}
 
       {vista === "mes" && (
-        <Mes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
-             onDia={abrirDia} abierto={diaAbierto} />
+        <>
+          <Mes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
+               onDia={abrirDia} abierto={diaAbierto} />
+          <AgendaMes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
+                     onDia={abrirDia} />
+        </>
       )}
       {vista === "anio" && (
         <Anio anio={cursor.anio} mapa={mapa} hoy={hoy}
@@ -185,10 +185,14 @@ export default function Calendario({
 }
 
 // ─── VISTA DE MES ─────────────────────────────────────────────────────────────
-// La casilla enseña el nombre cuando hay sitio y solo puntos cuando no. No se decide
-// con JavaScript mirando el ancho: los chips se pintan siempre y el CSS los esconde por
-// debajo de 560px, dejando los puntos. Así no hay que escuchar el "resize" ni hay un
-// primer dibujado con la vista equivocada.
+// Cada apunte es una barrita de su color con el nombre, y salen TODOS, también en el
+// móvil. Antes el móvil enseñaba solo iconos y un "×3", y el dueño lo pidió claro: ver
+// todos los eventos, sin "3 más", que así no es nada visual. La casilla crece lo que
+// haga falta (la fila entera con ella) en vez de recortar o hacer scroll por dentro.
+// Y ningún nombre cortado: en tableta y escritorio sale entero, en las líneas que haga
+// falta; en el móvil (casillas de 45px, no cabe ni "Comunión") la barrita va sin texto,
+// solo su color, y el nombre entero, la hora y el sitio están justo debajo, en "día a
+// día" (AgendaMes).
 function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
   const semanas = semanasDelMes(anio, mes);
   return (
@@ -205,10 +209,8 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             // null === null marcaba TODOS los huecos como el día abierto y salían
             // recuadrados en oscuro nada más entrar en el calendario.
             const esAbierto = Boolean(dia) && dia === abierto;
-            // Cuánta gente hay ese día en total. En un móvil el nombre de la boda no cabe
-            // y solo se veían unos iconos: en un día con tres bodas eso son tres corazones
-            // y ninguna pista de si son 40 comensales o 330. El número es lo que de verdad
-            // dice si el día es un problema.
+            // Cuánta gente hay ese día en total. El número es lo que de verdad dice si
+            // el día es un problema: tres bodas pueden ser 40 comensales o 330.
             const paxDia = del.reduce((s, a) => s + (a.pax || 0), 0);
             // El color de la casilla lo manda el primer EVENTO del día, no el primer
             // apunte: si no, un día con una boda y unas vacaciones se pintaría del gris
@@ -228,23 +230,16 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                   + `${dia && enChoque.has(dia) ? " es-choque" : ""}${esAbierto ? " es-abierto" : ""}`}
                 onClick={() => onDia(dia)}
               >
-                {dia && <span className="cal-numero">{Number(dia.slice(8))}</span>}
-                {del.length > 0 && (
-                  <span className="cal-puntos">
-                    {del.slice(0, 4).map(a => <IconoTipo key={a.id} tipo={a.tipo} size={12} />)}
-                    {/* El total. En pantallas muy estrechas (320px son 35px de casilla)
-                        no caben cuatro iconos, así que el CSS deja solo el primero y
-                        enseña esto: "×4" dice más que cuatro glifos cortados. */}
-                    {del.length > 1 && <span className="cal-mas">×{del.length}</span>}
+                {/* El número del día y, en su misma línea, la gente de ese día. Abajo en
+                    una esquina tapaba la última barrita en cuanto el día iba lleno. */}
+                {dia && (
+                  <span className="cal-celda-cab">
+                    <span className="cal-numero">{Number(dia.slice(8))}</span>
+                    {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
                   </span>
                 )}
-                {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
-                {/* Máximo 3 chips por casilla: un día con seis apuntes no puede estirar su
-                    fila del mes seis veces más alta que las de al lado. Lo que sobra se
-                    resume en "+N más" — el resto está a un clic, abriendo el día (PanelDia
-                    ya enseña la lista entera con sitio, pax y editar). Como "del" ya viene
-                    con los eventos primero (porDia, en apuntes.js), lo que se recorta es
-                    siempre lo menos importante del día (vacaciones, tareas...). */}
+                {/* Como "del" ya viene con los eventos primero (porDia, en apuntes.js),
+                    arriba va siempre lo importante y debajo vacaciones, tareas... */}
                 {del.map(a => (
                   <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
@@ -260,6 +255,66 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
         </div>
       ))}
     </div>
+  );
+}
+
+// ─── EL MES, DÍA A DÍA (MÓVIL) ────────────────────────────────────────────────
+// En el móvil la casilla mide 45px: la barrita dice qué hay y de qué color, pero el
+// nombre entero no cabe. Aquí debajo va todo el mes en lista, día por día, con nombre,
+// hora, sitio y pax, sin tener que ir abriendo los días uno a uno. Tocar un día abre
+// su panel, igual que en la rejilla. Por encima de 560px no sale: allí la rejilla ya
+// enseña los nombres.
+//
+// Lo que dura varios días (unas vacaciones) sale una vez, el día que empieza —o el 1,
+// si viene del mes anterior— con "hasta el N": repetido en cada día llenaba la lista
+// de lo mismo y tapaba los eventos.
+function AgendaMes({ anio, mes, mapa, hoy, enChoque, onDia }) {
+  const dias = semanasDelMes(anio, mes).flat().filter(Boolean);
+  const primero = dias[0];
+  const filas = dias
+    .map(dia => ({ dia, lista: (mapa[dia] || []).filter(a => a.fecha === dia || (dia === primero && a.fecha < dia)) }))
+    .filter(f => f.lista.length);
+  return (
+    <section className="cal-agenda" aria-label={`${NOMBRE_MES[mes - 1]}, día a día`}>
+      <h3 className="cal-agenda-titulo">{NOMBRE_MES[mes - 1]}, día a día</h3>
+      {filas.length === 0 && <div className="cal-agenda-vacio">Nada apuntado este mes.</div>}
+      {filas.map(({ dia, lista }) => {
+        const f = aFecha(dia);
+        const numero = numeraRepetidos(mapa[dia] || []);
+        return (
+          <button
+            type="button"
+            key={dia}
+            className={`cal-agenda-dia${dia === hoy ? " es-hoy" : ""}${dia < hoy ? " es-pasado" : ""}${enChoque.has(dia) ? " es-choque" : ""}`}
+            onClick={() => onDia(dia)}
+          >
+            <span className="cal-agenda-fecha">
+              <small>{f ? f.toLocaleDateString("es-ES", { weekday: "short" }).replace(".", "") : ""}</small>
+              <strong>{Number(dia.slice(8))}</strong>
+            </span>
+            <span className="cal-agenda-lista">
+              {lista.map(a => (
+                <span key={a.id} className={`cal-agenda-item tipo-${a.tipo}`}>
+                  <IconoTipo tipo={a.tipo} size={15} />
+                  <span className="cal-agenda-texto">
+                    <strong>{a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}</strong>
+                    <small>
+                      {[
+                        TIPOS[a.tipo].nombre,
+                        a.hora,
+                        a.sitio,
+                        a.pax ? `${a.pax} pax` : "",
+                        a.hasta && a.hasta !== a.fecha ? `hasta el ${Number(a.hasta.slice(8))}${a.hasta.slice(0, 7) !== dia.slice(0, 7) ? ` de ${NOMBRE_MES[Number(a.hasta.slice(5, 7)) - 1].toLowerCase()}` : ""}` : "",
+                      ].filter(Boolean).join(" · ")}
+                    </small>
+                  </span>
+                </span>
+              ))}
+            </span>
+          </button>
+        );
+      })}
+    </section>
   );
 }
 

@@ -1418,6 +1418,34 @@ cuenta con cada chip.
   360/1280/1920px: la casilla cargada ya no desborda su fila, se ve "+2 más" y el
   resto de casillas de la semana quedan a la misma altura.
 
+**Calendario: todos los apuntes a la vista, también en el móvil — HECHO**: el dueño,
+tras #234: "que se vean todos los eventos y no ponga lo de 2 más o 3 más, que si no no
+es nada visual; y en el móvil también". En el móvil la casilla enseñaba solo iconos y
+un "×3" (`.cal-puntos`/`.cal-mas`), y en escritorio los chips hacían scroll dentro de la
+casilla (`overflow-y: auto` de #234).
+- **Una barrita por apunte, todas, a cualquier ancho** (`Mes()`): desaparecen
+  `.cal-puntos`, `.cal-mas`, `.cal-chip-mas` y `CHIPS_VISIBLES`. La casilla deja de
+  ser cuadrada (`min-height` 52px móvil / 92px ≥560px) y crece con lo que lleve, la
+  fila con ella; sin scroll dentro. **Ningún nombre cortado** (el dueño, tras ver la
+  primera versión: "pero se corta, que no se corte en el calendario"): ≥560px lleva
+  icono, nombre entero en las líneas que haga falta (parte por palabras: si no cabe
+  con el pax, baja el pax; entre 560 y 899px sin icono, que se quedaba solo en su
+  línea) y pax. En el móvil (casillas de 40-55px, no cabe entero ni "Comunión") la
+  barrita va sin texto, llena de su color (flojita lo que no es evento), y los nombres
+  enteros van justo debajo, en "día a día". "Lo que viene" tampoco corta con "…".
+- **La gente del día junto al número** (`.cal-celda-cab`), no en la esquina de abajo,
+  donde tapaba la última barrita.
+- **"Octubre, día a día"** (`AgendaMes`, solo <560px): debajo del mes, una fila por
+  día con algo, fecha grande a la izquierda y cada apunte con su nombre entero, tipo,
+  hora, sitio y pax. Lo que dura varios días sale una vez (el día que empieza, o el 1
+  si viene de antes) con "hasta el N". Hoy resaltado, lo pasado apagado, los días con
+  choque con el borde rojo. Tocar un día abre `PanelDia`, igual que la rejilla.
+- Pruebas en `app.test.mjs` (bloque del calendario, 320/390/768/1280): todas las
+  casillas enseñan todas sus barritas visibles y sin scroll, ni "×N" ni "+N", ningún
+  nombre cortado ni palabra partida en el calendario (tampoco en "Lo que viene"); la gente
+  en la línea del número; la lista día a día sale solo <560px, con los nombres enteros,
+  hora y pax, lo de varios días una vez, y abre el día al tocarlo.
+
 **Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
 por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
 otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba

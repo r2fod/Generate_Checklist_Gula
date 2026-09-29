@@ -4296,36 +4296,79 @@ async function main() {
       ok(await p.locator(".cal-celda.es-hueco.es-abierto").count() === 0,
         `${w}px · las casillas vacías del mes no salen marcadas como el día abierto`);
 
-      // En el móvil el nombre de la boda no cabe, así que la casilla tiene que decir
-      // igualmente para cuánta gente es. Sin esto, un día con tres bodas eran tres
-      // iconos y ninguna pista de si son 40 comensales o 330.
+      // La casilla dice igualmente para cuánta gente es el día. Sin esto, un día con
+      // tres bodas eran tres iconos y ninguna pista de si son 40 comensales o 330.
       ok(await p.locator(".cal-pax-dia").count() > 0,
         `${w}px · los días con eventos enseñan cuánta gente hay`);
-      // Y nada de lo que va dentro de la casilla se sale de ella: con los iconos
-      // envolviendo, la segunda fila salía cortada por la mitad y el número se perdía.
-      ok(await p.evaluate(() => {
-        let fuera = 0;
-        document.querySelectorAll(".cal-celda").forEach(cel => {
-          const c = cel.getBoundingClientRect();
-          cel.querySelectorAll(".cal-puntos .cal-icono, .cal-pax-dia, .cal-mas").forEach(e => {
-            const r = e.getBoundingClientRect();
-            if (r.width && (r.right > c.right + 0.5 || r.bottom > c.bottom + 0.5)) fuera++;
-          });
-        });
-        return fuera === 0;
-      }), `${w}px · ni los iconos ni el número se salen de su casilla`);
 
-      // A partir de 560px (chips en vez de puntos) cada casilla enseña TODOS sus
-      // apuntes. #228 los topaba en 3 con un "+N más" para que un día cargado no
-      // estirara su fila; el dueño lo quitó en #234 ("mostrar todos los eventos sin
-      // truncar"): prefiere verlos todos de un vistazo aunque esa fila crezca. El banco
-      // tiene un día con cinco apuntes.
-      if (w >= 560) {
-        ok(await p.evaluate(() =>
-          Math.max(...[...document.querySelectorAll(".cal-celda")].map(c => c.querySelectorAll(".cal-chip").length)) > 3),
-          `${w}px · el día con más de 3 apuntes los enseña todos en la casilla`);
-        ok(await p.locator(".cal-chip-mas").count() === 0,
-          `${w}px · y sin "+N más": no se esconde ninguno`);
+      // Cada casilla enseña TODOS sus apuntes, a cualquier ancho, uno por barrita. #228
+      // los topaba en 3 con "+N más", #234 los soltó solo a partir de 560px y el móvil
+      // siguió con iconos y un "×3". El dueño: "que se vean todos los eventos y no ponga
+      // lo de 2 más o 3 más, que si no no es nada visual". El banco tiene un día con
+      // cinco apuntes.
+      const casillas = await p.evaluate(() => [...document.querySelectorAll(".cal-celda")].map(cel => {
+        const c = cel.getBoundingClientRect();
+        const chips = [...cel.querySelectorAll(".cal-chip")];
+        return {
+          chips: chips.length,
+          // Visibles de verdad y dentro de la casilla
+          vistos: chips.filter(ch => {
+            const r = ch.getBoundingClientRect();
+            return r.height >= 3 && r.bottom <= c.bottom + 0.5 && r.top >= c.top - 0.5
+              && r.left >= c.left - 0.5 && r.right <= c.right + 0.5;
+          }).length,
+          // Y ningún nombre a medias ("Boda de p", "Corporativ…"): el que se ve, se ve
+          // entero. En el móvil no cabe ninguno y la barrita va sin texto.
+          cortados: chips.map(ch => ch.querySelector(".cal-chip-texto"))
+            .filter(t => t.getClientRects().length && (t.scrollWidth > t.clientWidth + 1
+              || t.getBoundingClientRect().right > c.right + 0.5)).length,
+          // Nada de scroll dentro de la casilla: lo que no se ve sin tocar, no se ve
+          scroll: cel.scrollHeight > cel.clientHeight + 1,
+        };
+      }));
+      ok(Math.max(...casillas.map(x => x.chips)) >= 5 && casillas.every(x => x.vistos === x.chips && !x.scroll),
+        `${w}px · todas las casillas enseñan todos sus apuntes, sin scroll dentro (${casillas.filter(x => x.vistos !== x.chips || x.scroll).length} mal)`);
+      // "Pero se corta, mira bien eso, que no se corte en el calendario" (el dueño)
+      const cortados = casillas.reduce((s, x) => s + x.cortados, 0);
+      ok(cortados === 0, `${w}px · ningún nombre sale cortado en el mes (${cortados} cortados)`);
+      const partidas = await palabrasPartidas(p);
+      ok(partidas.length === 0, `${w}px · ninguna palabra partida en el calendario${partidas.length ? ` → ${partidas.slice(0, 5).join(", ")}` : ""}`);
+      // "Lo que viene" tampoco: el nombre entero, aunque baje de línea
+      ok(await p.evaluate(() => [...document.querySelectorAll(".cal-viene-nombre")]
+        .every(n => n.scrollWidth <= n.clientWidth + 1 && getComputedStyle(n).textOverflow !== "ellipsis")),
+        `${w}px · y en "Lo que viene" los nombres salen enteros`);
+      ok(!/[×+]\s?\d/.test(await p.locator(".cal-mes").innerText()),
+        `${w}px · y ni "×3" ni "+2 más": no se resume nada`);
+      // El número del día y la gente, en la misma línea y dentro de la casilla: abajo
+      // en una esquina tapaban la última barrita en cuanto el día iba lleno
+      ok(await p.evaluate(() => [...document.querySelectorAll(".cal-pax-dia")].every(e => {
+        const c = e.closest(".cal-celda").getBoundingClientRect(), r = e.getBoundingClientRect();
+        const n = e.closest(".cal-celda").querySelector(".cal-numero").getBoundingClientRect();
+        return r.right <= c.right + 0.5 && Math.abs(r.bottom - n.bottom) < 4;
+      })), `${w}px · la gente del día va junto al número, dentro de la casilla`);
+
+      // Por debajo de 560px el nombre entero no cabe en la casilla: debajo del mes va
+      // la lista día a día, con cada apunte, su nombre entero y sus datos. Por encima
+      // no sale, que la rejilla ya enseña los nombres.
+      const agenda = p.locator(".cal-agenda");
+      if (w < 560) {
+        ok(await agenda.isVisible(), `${w}px · debajo del mes, la lista día a día`);
+        const textoAgenda = await agenda.innerText();
+        // Los del día cargado del banco: caen siempre en el mes que abre (MES_DEMO)
+        const faltan = ["Boda de prueba tres", "Comunión de prueba", "Rodaje de prueba", "Libra Zutana"]
+          .filter(t => !textoAgenda.includes(t));
+        ok(faltan.length === 0, `${w}px · con el nombre entero de cada apunte${faltan.length ? ` → faltan ${faltan.join(", ")}` : ""}`);
+        ok(/180 pax/.test(textoAgenda) && /21:00/.test(textoAgenda),
+          `${w}px · y su hora y su gente`);
+        // Unas vacaciones de cuatro días salen UNA vez, con "hasta el", no cuatro
+        ok((textoAgenda.match(/Vacas Mengano/g) || []).length === 1 && /hasta el/.test(textoAgenda),
+          `${w}px · lo que dura varios días sale una vez, con "hasta el"`);
+        // Tocar un día de la lista abre su panel, como en la rejilla
+        await agenda.locator(".cal-agenda-dia", { hasText: "Boda de prueba tres" }).click();
+        ok(await p.locator(".cal-dia-panel").isVisible(), `${w}px · y tocar un día de la lista abre ese día`);
+        await p.locator(".cal-dia-cerrar").click();
+      } else {
+        ok(!await agenda.isVisible(), `${w}px · la lista día a día no sale: la rejilla ya enseña los nombres`);
       }
 
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda
