@@ -2307,31 +2307,35 @@ body {
   flex-direction: column;
 }
 
-/* Cada fila decide sola si va en una línea o en dos, sin punto de corte fijo: si el
-   nombre ENTERO cabe al lado de sus controles, una línea; si no, el nombre se queda
-   todo el ancho arriba y cantidad + envase + ✎/✕ bajan juntos debajo. Antes el nombre
-   se quedaba con lo que sobraba y, a 393px con la letra del móvil un poco grande,
-   eran 50px: "Cápsul-as café (para el person-al)" en seis líneas. Un corte por ancho
-   de pantalla no sirve: el mismo móvil falla o no según el tamaño de letra que tenga
-   puesto quien lo usa. */
+/* ─── LA FILA, EN COLUMNAS FIJAS ────────────────────────────────────────────────
+   Nombre | cantidad | ✎✕, como una tabla: todas las cajas de cantidad del mismo
+   ancho y en la misma columna, y los botones igual, tenga la fila una línea o dos.
+   Con flex cada fila ponía la cantidad donde le cabía —unas al lado del nombre, otras
+   debajo— y la columna salía en zigzag: "sin simetría", dijo el dueño. El nombre se
+   queda con lo que sobra y parte por palabras (antes, a 393px con la letra grande,
+   le quedaban 50px y salía "Cápsul-as café (para el person-al)").
+   La columna de cantidad mide lo que 4 cifras (medido: 4,7em aquí, 4,4 en el móvil):
+   así 7, 38 y 216 salen en cajas iguales; solo un texto largo la ensancha.
+   El envase ("9 cajas de 24") va DEBAJO del número, pegado a su derecha como el propio
+   número, como pidió el dueño. Si es más largo que la caja crece hacia la izquierda,
+   por debajo del nombre, sin mover la columna. */
 .item-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4.75em, max-content) auto;
+  grid-template-areas: "nombre cantidad acciones" "envase envase .";
   align-items: center;
   padding: 13px 22px;
   border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s;
-  gap: 6px 12px;
+  gap: 0 12px;
 }
 
-.item-controles {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-left: auto;
-  min-width: 0;
-}
+/* El grupo es del DOM; en la rejilla sus hijos se colocan como si fueran de la fila */
+.item-controles { display: contents; }
+.item-row > .item-name, .item-row > .item-edit-row { grid-area: nombre; }
+.item-row .item-qty-input { grid-area: cantidad; width: 100%; }
+.item-row .item-batea-info { grid-area: envase; justify-self: end; text-align: right; white-space: normal; min-width: 0; margin-top: 3px; }
+.item-row .item-actions { grid-area: acciones; }
 
 .item-row:last-child {
   border-bottom: none;
@@ -2349,14 +2353,13 @@ body {
   background-color: #fef3c7;
 }
 
-/* "auto" y no "1": con base 0 el nombre nunca pedía sitio y era el que cedía siempre */
 .item-name {
   font-size: 0.9rem;
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  flex: 1 1 auto;
+  flex: 1;
   min-width: 0;
 }
 
@@ -4769,8 +4772,19 @@ hr {
   .main-layout { gap: 14px; }
 
   /* Filas de la checklist: un pelín más juntas verticalmente */
-  .item-row { padding: 10px 14px; gap: 6px 10px; }
-  .item-controles { gap: 10px; }
+  .item-row {
+    padding: 10px 14px;
+    column-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(4.5em, max-content) auto;
+  }
+  /* Las columnas fijas son lo que se le quita al nombre: ✎✕ ceden ancho (toque 34×40,
+     por encima de los 32 que exige la prueba de zonas táctiles), no alto */
+  .item-row .item-action-btn { min-width: 34px; }
+  /* Editando el nombre, el campo se lleva la fila entera y lo demás baja */
+  .item-row:has(.item-edit-row) {
+    grid-template-areas: "nombre nombre nombre" ". cantidad acciones" "envase envase .";
+    row-gap: 6px;
+  }
   .category-header { padding: 11px 14px; }
   .category-header .cat-icon { width: 28px; height: 28px; min-width: 28px; }
   /* ↑ ↓ ✎ a 40px de ancho cada uno se llevaban casi la mitad de la cabecera y el
@@ -4813,6 +4827,16 @@ hr {
 
   /* Títulos y textos ligeramente más ajustados */
   .config-card > .section-title { margin-bottom: -2px; }
+}
+
+/* Lista muy estrecha PARA SU LETRA (320px con la letra al 130%): al lado de las
+   columnas fijas el nombre se quedaba en 75px y partía "Alarga-dores". Se mide en em
+   del propio contenedor, no en px de pantalla: salta por ancho o por letra grande,
+   lo que llegue antes. El nombre sube a toda la fila y lo demás baja, en las mismas
+   columnas que el resto. */
+.item-list { container-type: inline-size; }
+@container (max-width: 17em) {
+  .item-list > .item-row { grid-template-areas: "nombre nombre nombre" ". cantidad acciones" "envase envase ."; row-gap: 6px; }
 }
 
 /* El logo de Gula es un PNG en negro: sobre la tarjeta oscura no se vería, así que

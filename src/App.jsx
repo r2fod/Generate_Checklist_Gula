@@ -64,7 +64,7 @@ import {
   EVENTOS, fmtCantidadCompleta,
   CATEGORIA_MANUAL, quitarItemsSinCantidad,
   horasLogistica, importeLogistica, fmtLogistica, totalLogistica,
-  fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord,
+  fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord, envaseSegunCantidad,
 } from "./checklist-format.js";
 import { infoCategoria } from "./components/Iconos.jsx";
 import CargandoPanel from "./components/CargandoPanel.jsx";
@@ -2666,7 +2666,8 @@ export default function App({ onCerrarSesion } = {}) {
           const valorBase = esObjetoConSufijo ? qty.u : qty;
           const sufijoBruto = esObjetoConSufijo ? qty.sufijo : undefined;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
-          const sufijo = typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto;
+          // Y la unidad concuerda con el número ya resuelto: "1 botella", "3 cajas"
+          const sufijo = envaseSegunCantidad(typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto, cantidad);
           return [nombresManuales[key] ?? label, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo];
         });
     });
