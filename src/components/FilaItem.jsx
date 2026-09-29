@@ -2,7 +2,7 @@ import { memo, useState, useRef, useEffect } from "react";
 import { Tag, Asterisk, Pencil, X } from "lucide-react";
 import { IconoItem } from "./Iconos.jsx";
 import { conCortes } from "./cortes.jsx";
-import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe } from "../checklist-format.js";
+import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe, plural, envaseSegunCantidad } from "../checklist-format.js";
 
 // ─── UNA FILA DE LA LISTA ──────────────────────────────────────────────────────
 // Está fuera del componente grande y envuelta en React.memo por una razón medida: con
@@ -45,12 +45,14 @@ const FilaItem = memo(function FilaItem({
   }, []);
 
   // Nº de bateas recalculado siempre en vivo a partir de lo que se esté mostrando
-  // (aunque la cantidad se edite a mano), no de un texto fijado
+  // (aunque la cantidad se edite a mano), no de un texto fijado. Sin número ("—", a
+  // decidir allí) no hay envases que contar: antes salía "0 cajas de 24".
+  const num = parseFloat(qty.replace(",", "."));
   const bateaSize = bateaSizeDe(label);
-  const bateaCount = bateaSize ? Math.ceil((parseFloat(qty.replace(",", ".")) || 0) / bateaSize) : null;
+  const bateaCount = bateaSize && !isNaN(num) ? Math.ceil(num / bateaSize) : null;
   // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza, vino, refrescos)
   const cajaSize = bateaSize ? null : cajaSizeDe(label);
-  const cajaCount = cajaSize ? Math.ceil((parseFloat(qty.replace(",", ".")) || 0) / cajaSize) : null;
+  const cajaCount = cajaSize && !isNaN(num) ? Math.ceil(num / cajaSize) : null;
   return (
     <div className={`item-row ${alq ? "is-alquiler" : ""}`}>
       {editando && !soloMarcar ? (
@@ -121,17 +123,17 @@ const FilaItem = memo(function FilaItem({
         onFocus={e => e.target.select()}
         size={Math.max(2, qty.length)}
       />
-      {/* El "=" no es adorno: sin él, "5" y al lado "1 caja de 24" se lee como dos
-          cantidades distintas y no se sabe si hay que llevar 5 o 24. Con el igual
-          queda claro que es la MISMA cantidad dicha en envases: 5 uds = 1 caja.
-          Y donde el número ya son cajas o packs (envase fijo, columna de la derecha
-          sin "="), el texto es solo la etiqueta de lo que se cuenta. */}
+      {/* Va DEBAJO del número, en pequeño y sin "=" (lo pidió el dueño). El "=" estaba
+          para que "5" y al lado "1 caja de 24" no se leyeran como dos cantidades
+          distintas; debajo del número ya se lee como lo que es: la misma cantidad
+          dicha en envases. Donde el número ya son packs o botellas, el texto es la
+          etiqueta de lo que se cuenta, y concuerda con él mientras se teclea. */}
       {bateaCount !== null ? (
-        <span className="item-batea-info" title={`${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`}>= {bateaCount === 1 ? "1 batea" : `${bateaCount} bateas`} de {bateaSize}</span>
+        <span className="item-batea-info" title={`${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`}>{plural(bateaCount, "batea", "bateas")} de {bateaSize}</span>
       ) : cajaCount !== null ? (
-        <span className="item-batea-info" title={`${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`}>= {cajaCount === 1 ? "1 caja" : `${cajaCount} cajas`} de {cajaSize}</span>
+        <span className="item-batea-info" title={`${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`}>{plural(cajaCount, "caja", "cajas")} de {cajaSize}</span>
       ) : sufijo ? (
-        <span className="item-batea-info" title="El número de la izquierda ya va en este envase: no cambia aunque edites la cantidad">{sufijo}</span>
+        <span className="item-batea-info" title="El número de arriba ya va en este envase">{envaseSegunCantidad(sufijo, qty)}</span>
       ) : null}
       {/* Renombrar y quitar items cambian la checklist para todo el mundo: con el
           link de solo marcar no se ofrecen. */}

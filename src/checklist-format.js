@@ -28,7 +28,20 @@ export function bateaSizeDe(label) {
 }
 // "1 caja" y no "1 cajas". Parece una tontería hasta que se lee "1 cajas de 24" al
 // lado de un número y hay que pararse a pensar qué está diciendo.
-function plural(n, singular, plural_) { return `${n} ${n === 1 ? singular : plural_}`; }
+export function plural(n, singular, plural_) { return `${n} ${n === 1 ? singular : plural_}`; }
+
+// Lo mismo para el envase que va debajo del número. Los generadores lo escriben fijo
+// ("botellas", "caja", "rollo"...) y al cambiar la cantidad se quedaba igual: "3 caja"
+// en las infusiones, "2 rollo" en el papel Chemine, "1 botellas" al bajar el cava.
+// Solo se toca la primera palabra y solo si es una unidad de estas: "paq.", "kg" o
+// "para 12 personas" valen igual para cualquier número y se quedan como están.
+const UNIDADES_ENVASE = ["batea", "bolsa", "bote", "botella", "caja", "carga", "lata", "pack", "paquete", "rollo", "taxi"];
+export function envaseSegunCantidad(sufijo, cantidad) {
+  const n = parseFloat(String(cantidad).replace(",", "."));
+  if (typeof sufijo !== "string" || isNaN(n)) return sufijo;
+  return sufijo.replace(/^([a-z]+?)(\(s\)|s)?(?=$|[\s(])/i, (todo, raiz) =>
+    UNIDADES_ENVASE.includes(raiz.toLowerCase()) ? (n === 1 ? raiz : `${raiz}s`) : todo);
+}
 
 function conBateas(label, qtyTexto) {
   const size = bateaSizeDe(label);

@@ -39,6 +39,7 @@ import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMen
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { estimarTiemposCarga } from "../tiempos-carga.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
+import { envaseSegunCantidad } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
@@ -2957,6 +2958,22 @@ console.log("\n══ Auditoría de cálculos: 6 bugs reales cazados sin llegar 
   const cerveza00MediaHora = calcBebidas(100, 0.5, true, false).cerveza00;
   ok(cerveza00ConBarra > cerveza00MediaHora,
     `la cerveza 0,0 ya responde a las horas de barra libre, como la cerveza normal (4h: ${cerveza00ConBarra}, media hora: ${cerveza00MediaHora})`);
+}
+
+// ─── El envase de debajo del número concuerda con él ────────────────────────
+// "1 botellas" o "3 caja" obligan a leer dos veces; el dueño pidió que cambie según
+// la cantidad. Solo toca la primera palabra si es un envase: el resto se respeta.
+console.log("\n── Envase según la cantidad ──");
+{
+  ok(envaseSegunCantidad("botellas", "1") === "botella", '1 → "botella"');
+  ok(envaseSegunCantidad("botella", "12") === "botellas", '12 → "botellas"');
+  ok(envaseSegunCantidad("caja(s)", "3") === "cajas" && envaseSegunCantidad("caja(s)", "1") === "caja",
+    'el "(s)" de las plantillas se resuelve: "caja" / "cajas"');
+  ok(envaseSegunCantidad("packs (6 uds)", "1") === "pack (6 uds)", "lo de detrás se respeta");
+  ok(envaseSegunCantidad("packs (6 uds)", "1,0") === "pack (6 uds)", "con coma decimal también");
+  ok(envaseSegunCantidad("kg · 3 taxis", "1") === "kg · 3 taxis", "kg no es un envase: no se toca");
+  ok(envaseSegunCantidad("cajas", "—") === "cajas", 'sin número ("—") se queda como estaba');
+  ok(envaseSegunCantidad("bolsas", "0") === "bolsas", "0 va en plural: 0 bolsas");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

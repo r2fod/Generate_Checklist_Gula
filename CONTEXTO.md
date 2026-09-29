@@ -1499,8 +1499,9 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
 - **Fila del item, en columnas fijas** (segunda pasada: el dueño vio la primera "sin
   simetría" —con `flex-wrap` unas filas iban en una línea y otras en dos, y cada caja
   de cantidad caía en un sitio: 21 posiciones distintas en una boda—). Ahora es una
-  rejilla: nombre | cantidad | envase | ✎✕, y en el móvil (≤560px) el envase baja
-  debajo del nombre, en pequeño y con la sangría del icono. La columna de cantidad
+  rejilla: nombre | cantidad | ✎✕, y el envase DEBAJO del número, en pequeño, sin
+  "=" y alineado a su borde derecho (tercera pasada, lo pidió el dueño: debajo ya se
+  lee como la misma cantidad dicha en envases). La columna de cantidad
   mide lo que 4 cifras (4,75em escritorio / 4,5em móvil, medido): las 115 cajas
   numéricas de una boda salen en UNA posición y del mismo ancho, y ✎✕ en otra. El
   grupo `.item-controles` va con `display: contents` para que sus hijos entren en la
@@ -1510,6 +1511,15 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
   `overflow-wrap: anywhere` → `break-word`, y `conCortes()` (`components/cortes.jsx`,
   compartido con Modo carga) mete `<wbr>` tras cada "/" también en la checklist.
   Alto de la lista a 393px con letra al 115%: 9.031px (antes del arreglo, 9.493).
+- **El envase concuerda con el número, y en vivo**: "1 caja de 24" / "3 cajas de 24",
+  "1 batea", y también los sufijos fijos que eran la etiqueta de lo que se cuenta
+  ("botellas", "packs (6 uds)", "caja(s)"): `envaseSegunCantidad()`
+  (`checklist-format.js`) pasa a singular o plural solo la primera palabra si es un
+  envase (batea, bolsa, bote, botella, caja, carga, lata, pack, paquete, rollo, taxi);
+  "kg" y lo demás no se toca. Se aplica al resolver la checklist (App.jsx, así Modo
+  carga y el Word ya lo llevan) y en la fila mientras se teclea. Hielo "1 taxi" y
+  carpas "falta 1, hay que alquilarla" en singular. Sin número ("—") no se cuentan
+  cajas: antes salía "0 cajas de 24".
 - **Cabecera de categoría**: el nombre parte en líneas por palabras en vez de "…";
   nunca encoge por debajo de su palabra más larga (`min-width: min-content`) y, si ni
   esa cabe, la que baja de línea es la píldora (la cabecera hace `flex-wrap`). En
@@ -1533,6 +1543,9 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
   arreglo da 20 fallos; con él, 0. Y la simetría: todas las cajas de cantidad y los
   ✎✕ en una sola posición (contra la primera pasada, en flex, falla en los 4 casos). Barrido a mano además en formulario (12 preguntas)
   y calendario, y a 360/412 y letra al 130%: 0 palabras partidas, 0 recortes.
+  "Lo que pone debajo de la cantidad" (sin "=", debajo y a la derecha de la caja,
+  singular/plural al teclear) y el de hielo/carpas en singular; puras de
+  `envaseSegunCantidad()` en `calculos.test.mjs`.
 
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,

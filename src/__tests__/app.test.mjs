@@ -3257,11 +3257,15 @@ async function main() {
     await c.close();
   }
 
-  // ── Lo que pone al lado de la cantidad ─────────────────────────────────────
+  // ── Lo que pone debajo de la cantidad ──────────────────────────────────────
   // "5" y al lado "1 cajas de 24" se lee como dos cantidades distintas: ¿hay que
   // llevar 5 o 24? Y "1 cajas" en plural obliga a pararse a leerlo dos veces. En una
   // lista de compra eso no es un detalle de estilo, es un pedido equivocado.
-  console.log("\n── Lo que pone al lado de la cantidad ──");
+  //
+  // El dueño pidió además quitar el "=" y poner el envase DEBAJO del número: debajo
+  // ya se lee como la misma cantidad dicha en envases. Y que concuerde con el número
+  // mientras se teclea: "1 botella", "3 cajas".
+  console.log("\n── Lo que pone debajo de la cantidad ──");
   {
     const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
@@ -3269,40 +3273,55 @@ async function main() {
     await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 4 }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(1900);
 
+    // Por nombre exacto: "Cava" también está dentro de "Copas de cava"
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
     const infoDe = async (nombre) => {
-      const fila = p.locator(".item-row", { hasText: nombre }).first();
-      const i = fila.locator(".item-batea-info");
+      const i = filaExacta(nombre).locator(".item-batea-info");
       return await i.count() ? (await i.innerText()).trim() : "";
     };
-    const cantidadDe = (nombre) => p.locator(".item-row", { hasText: nombre }).first().locator(".item-qty-input");
+    const poner = async (nombre, valor) => {
+      await filaExacta(nombre).locator(".item-qty-input").fill(valor);
+      await p.waitForTimeout(900);
+      return infoDe(nombre);
+    };
 
     // Se baja el Nestea a 5: cinco unidades siguen siendo UNA caja, no cinco
-    await cantidadDe("Nestea").fill("5");
-    await p.waitForTimeout(900);
-    const cinco = await infoDe("Nestea");
-    ok(/^=/.test(cinco),
-      `con "=" delante, para que se lea como la misma cantidad en envases y no como otra distinta → "${cinco}"`);
-    ok(/1 caja de 24/.test(cinco) && !/1 cajas/.test(cinco),
+    const cinco = await poner("Nestea", "5");
+    ok(cinco.length > 0 && !/=/.test(cinco),
+      `sin "=" delante, como pidió el dueño → "${cinco}"`);
+    ok(/^1 caja de 24$/.test(cinco),
       `y en singular: "1 caja de 24", no "1 cajas de 24" → "${cinco}"`);
 
-    // Y al cambiarla, el de al lado la sigue
-    await cantidadDe("Nestea").fill("50");
-    await p.waitForTimeout(900);
-    const cincuenta = await infoDe("Nestea");
-    ok(/3 cajas de 24/.test(cincuenta),
-      `cambiar la cantidad recalcula las cajas al momento (50 → "${cincuenta}")`);
-    ok(/cajas/.test(cincuenta),
-      "y con más de una vuelve al plural");
+    // Debajo del número y pegado a su borde derecho, no al lado
+    const [caja, envase] = await Promise.all([
+      filaExacta("Nestea").locator(".item-qty-input").boundingBox(),
+      filaExacta("Nestea").locator(".item-batea-info").boundingBox(),
+    ]);
+    ok(envase.y >= caja.y + caja.height - 1 && Math.abs((envase.x + envase.width) - (caja.x + caja.width)) <= 2,
+      `el envase va debajo del número, alineado a su derecha (caja ${Math.round(caja.y + caja.height)}px, envase ${Math.round(envase.y)}px)`);
+
+    // Y al cambiarla, el de debajo la sigue
+    const cincuenta = await poner("Nestea", "50");
+    ok(/^3 cajas de 24$/.test(cincuenta),
+      `cambiar la cantidad recalcula las cajas al momento, en plural (50 → "${cincuenta}")`);
+
+    // Sin número no hay envases que contar: antes salía "0 cajas de 24"
+    ok(await poner("Nestea", "—") === "", "con \"—\" no se inventa ninguna caja");
 
     // Las bateas de cristalería, igual
     const copas = await infoDe("Copas de vino");
-    ok(/^= \d+ batea/.test(copas), `las bateas siguen la misma regla → "${copas}"`);
+    ok(/^\d+ batea/.test(copas), `las bateas siguen la misma regla → "${copas}"`);
 
-    // Donde el número YA son packs, no lleva "=": ahí el texto es la etiqueta de lo
-    // que se cuenta, no una conversión. Mezclar las dos cosas es lo que liaba.
-    const agua = await infoDe("Agua 1,5L");
-    ok(agua.length > 0 && !/^=/.test(agua),
-      `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+    // Donde el número YA son packs o botellas, el texto es la etiqueta de lo que se
+    // cuenta: también sin "=", y concordando con el número que haya escrito
+    const agua = await infoDe("Agua 1,5L \\(Solán de Cabras, cliente\\)");
+    ok(agua.length > 0 && !/=/.test(agua), `donde el número ya va en packs tampoco hay "=" → "${agua}"`);
+    const unaBotella = await poner("Cava", "1");
+    ok(/^botella\b/.test(unaBotella), `1 de cava → "botella", en singular → "${unaBotella}"`);
+    const doce = await poner("Cava", "12");
+    ok(/^botellas\b/.test(doce), `y 12 → "botellas" → "${doce}"`);
 
     await c.close();
   }
@@ -3339,6 +3358,10 @@ async function main() {
     await p.waitForTimeout(900);
     ok(/5 taxis/.test(await sufijoDe("Hielo")),
       `y al subir a 100kg pasan a ser 5: no se quedan pegados los de cuando se generó (${await sufijoDe("Hielo")})`);
+    await filaExacta("Hielo").locator(".item-qty-input").fill("20");
+    await p.waitForTimeout(900);
+    ok(/1 taxi$/.test(await sufijoDe("Hielo")),
+      `y con uno solo, en singular: "1 taxi", no "1 taxis" (${await sufijoDe("Hielo")})`);
 
     // 100 pax piden 11 carpas (carpasRecomendadas): caben 8 en almacén, faltan 3 por alquilar
     const inicial = await sufijoDe("Carpas");
@@ -3348,6 +3371,10 @@ async function main() {
     await p.waitForTimeout(900);
     ok(/faltan 6, hay que alquilarlas/.test(await sufijoDe("Carpas")),
       `cargar solo 5 de las 8 recalcula cuántas faltan por alquilar, no se queda en 3 (${await sufijoDe("Carpas")})`);
+    await filaExacta("Carpas").locator(".item-qty-input").fill("10");
+    await p.waitForTimeout(900);
+    ok(/falta 1, hay que alquilarla$/.test(await sufijoDe("Carpas")),
+      `y si falta una sola, en singular (${await sufijoDe("Carpas")})`);
 
     await c.close();
   }
