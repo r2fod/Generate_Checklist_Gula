@@ -80,9 +80,10 @@
 }
 
 .cal-celda {
-  /* aspect-ratio en vez de alto fijo: la casilla crece con el ancho de la pantalla y
-     el mes se ve proporcionado en un móvil y en un monitor sin tocar nada. */
-  aspect-ratio: 1 / 1;
+  /* Alto mínimo y no cuadrada: la casilla crece con lo que lleve dentro y la fila
+     entera con ella. Cuadrada y con el sobrante escondido, un día con cinco apuntes
+     solo podía enseñar dos (o un "×5"). */
+  min-height: 52px;
   position: relative;   /* para la barra de color de arriba */
   min-width: 0;
   display: flex;
@@ -103,8 +104,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* Sin alto fijo no hay nada que cortar por abajo: esto solo recorta a lo ancho las
+     barritas cuyo nombre no cabe. Nada de scroll dentro de la casilla. */
+  overflow: hidden;
 }
 
 .cal-semana > .cal-celda:last-child { border-right: 0; }
@@ -171,48 +173,24 @@
   50%      { transform: scale(1.18); }
 }
 
-/* Cuánta gente hay ese día, sumando todo lo que tenga pax. Es EL número de logística:
-   "el 19 hay tres bodas" no dice nada, "el 19 hay 330" lo dice todo. */
-/* Va FUERA del flujo, pegado a la esquina. En el flujo, un día con cuatro apuntes metía
-   dos filas de iconos y empujaba el número fuera de la casilla, que tiene overflow
-   oculto: se veía la mitad de arriba de un "65" y nada más. */
-.cal-pax-dia {
-  position: absolute;
-  right: 2px;
-  bottom: 1px;
-  padding: 0 2px;
-  border-radius: 3px;
-  font-size: 0.62rem;
-  font-weight: 900;
-  line-height: 1.25;
-  color: var(--cal-color);
-  background: var(--card-bg);
-  letter-spacing: -0.02em;
-  pointer-events: none;
+/* El número del día y, en su misma línea, cuánta gente hay ese día sumando todo lo que
+   tenga pax. Es EL número de logística: "el 19 hay tres bodas" no dice nada, "el 19 hay
+   330" lo dice todo. Antes iba en la esquina de abajo y tapaba la última barrita. */
+.cal-celda-cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 0;
 }
 
-.cal-celda.es-hoy .cal-pax-dia { background: var(--aviso-bg-fuerte); }
-.cal-celda.es-choque .cal-pax-dia { background: var(--error-bg); }
-
-
-/* Cuántas cosas hay ese día. Solo sale en pantallas muy estrechas, donde los iconos no
-   caben (ver más abajo); a partir de 420px se ven los iconos y sobra. */
-.cal-mas {
-  display: none;
-  font-size: 0.6rem;
+.cal-pax-dia {
+  font-size: 0.62rem;
   font-weight: 900;
   line-height: 1;
   color: var(--cal-color);
-  align-self: center;
-  flex: 0 0 auto;
-}
-
-/* En 320px la casilla mide unos 35px: ahí caben DOS iconos, no cuatro. Antes el cuarto
-   se quedaba cortado por la mitad contra el borde y parecía un fallo. Se deja el icono
-   del tipo que manda ese día y al lado el total. */
-@media (max-width: 419px) {
-  .cal-puntos .cal-icono:nth-of-type(n+2) { display: none; }
-  .cal-mas { display: inline-block; }
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 @keyframes cal-barra-entra {
@@ -244,23 +222,9 @@
 }
 .cal-celda.es-abierto { box-shadow: inset 0 0 0 2px var(--primario, var(--text-main)); }
 
-/* ─── PUNTOS Y CHIPS ──────────────────────────────────────────────────────── */
-/* En UNA fila y sin envolver: envolviendo salía una segunda fila cortada por la mitad
-   por el overflow de la casilla, y se veía rota. Con los iconos a 10px en móvil caben
-   los cuatro hasta en una pantalla de 320px. */
-.cal-puntos {
-  display: flex;
-  flex-wrap: wrap; /* En móvil dejamos que hagan flex-wrap si hay muchos */
-  overflow: hidden;
-  gap: 2px;
-  padding-top: 2px;
-}
-
-@media (max-width: 559px) {
-  /* Manda sobre el width/height que lucide pone como atributo en el propio SVG */
-  .cal-puntos .cal-icono { width: 10px; height: 10px; }
-}
-
+/* ─── LAS BARRITAS ───────────────────────────────────────────────────────────
+   Una por apunte, todas, a cualquier ancho. En escritorio con icono, nombre y pax; en
+   el móvil (ver abajo) solo el nombre, lo que quepa, con el borde de su color. */
 .cal-punto {
   width: 7px;
   height: 7px;
@@ -270,7 +234,7 @@
 }
 
 .cal-chip {
-  display: none; /* de 560px para arriba se enseñan */
+  display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
@@ -294,15 +258,20 @@
   font-weight: 800;
 }
 
-/* El resumen de lo que no cabe en los CHIPS_VISIBLES chips (Calendario.jsx). Mismo
-   trato que .cal-mas en móvil: no es un botón aparte, toda la casilla ya abre el día
-   al pulsar en cualquier sitio. */
-.cal-chip-mas {
-  display: none; /* de 560px para arriba, junto con los chips */
-  font-size: 0.66rem;
-  font-weight: 800;
-  color: var(--text-muted);
-  padding: 1px 5px 0;
+/* En el móvil la casilla mide 40-55px: el icono y el pax se comerían todo el nombre.
+   Queda el nombre, cortado a secas (con "…" se perdía otra letra más), y un borde
+   izquierdo de su color que se distingue aunque el nombre no se lea. */
+@media (max-width: 559px) {
+  .cal-celda { padding: 3px 2px; gap: 2px; }
+  .cal-chip {
+    padding: 1px 2px 1px 3px;
+    border-radius: 3px;
+    border-left: 2px solid var(--cal-color);
+    font-size: 0.58rem;
+    line-height: 1.3;
+  }
+  .cal-chip .cal-icono, .cal-chip-pax { display: none; }
+  .cal-chip-texto { text-overflow: clip; }
 }
 
 /* ─── COLOR POR TIPO ──────────────────────────────────────────────────────────
@@ -397,6 +366,99 @@
 .cal-mini-puntos .cal-punto { width: 4px; height: 4px; }
 
 /* ─── LO QUE VIENE ────────────────────────────────────────────────────────── */
+/* ─── EL MES, DÍA A DÍA (solo móvil, ver AgendaMes) ──────────────────────────
+   Lo que en la rejilla del móvil no cabe —el nombre entero, la hora, el sitio— en una
+   lista debajo. Una fila por día: la fecha grande a la izquierda, como en una agenda de
+   papel, y a su lado todo lo de ese día con el color de su tipo. */
+.cal-agenda {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px 12px 4px;
+}
+
+.cal-agenda-titulo {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+}
+
+.cal-agenda-vacio { color: var(--text-muted); font-size: 0.85rem; padding-bottom: 8px; }
+
+.cal-agenda-dia {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 0;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: cal-viene-entra 0.3s ease both;
+}
+
+.cal-agenda-fecha {
+  flex: 0 0 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  line-height: 1.1;
+}
+
+.cal-agenda-fecha small {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cal-agenda-fecha strong { font-size: 1.05rem; font-weight: 900; }
+
+/* Hoy, igual que en la rejilla; lo que ya pasó, más apagado; dos eventos el mismo día,
+   con el mismo rojo que la casilla. */
+.cal-agenda-dia.es-hoy .cal-agenda-fecha { background: var(--aviso-bg-fuerte); color: var(--aviso-texto); }
+.cal-agenda-dia.es-pasado { opacity: 0.6; }
+.cal-agenda-dia.es-choque .cal-agenda-fecha { box-shadow: inset 0 0 0 2px var(--error-borde); }
+
+.cal-agenda-lista {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cal-agenda-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--cal-color);
+}
+
+.cal-agenda-item .cal-icono { flex: 0 0 auto; margin-top: 2px; }
+
+.cal-agenda-texto { display: flex; flex-direction: column; min-width: 0; }
+.cal-agenda-texto strong { font-size: 0.88rem; font-weight: 700; overflow-wrap: break-word; }
+.cal-agenda-texto small { font-size: 0.74rem; color: var(--text-muted); overflow-wrap: break-word; }
+
+/* Vacaciones, recogidas, días cerrados y tareas: se ven, pero en segundo plano */
+.cal-agenda-item.tipo-vacaciones strong,
+.cal-agenda-item.tipo-recogida strong,
+.cal-agenda-item.tipo-cerrado strong,
+.cal-agenda-item.tipo-tarea strong { font-weight: 600; color: var(--text-muted); }
+
 .cal-viene {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -642,14 +704,23 @@
    Y la casilla deja de ser cuadrada: con siete columnas anchas, un cuadrado sería una
    casilla enorme y el mes no cabría en la pantalla de alto. */
 @media (min-width: 560px) {
-  .cal-celda {
-    aspect-ratio: auto;
-    min-height: 92px;
-  }
-  .cal-chip { display: flex; }
-  .cal-chip-mas { display: block; }
-  .cal-puntos { display: none; }
+  .cal-celda { min-height: 92px; }
   .cal-numero { font-size: 0.82rem; }
+  /* El nombre entero, en las líneas que haga falta: con "…" una tableta leía "Boda d…"
+     y había que abrir el día para saber cuál era. Parte por palabras, no por letras:
+     si icono + palabra más larga + pax no caben en una línea, baja el pax
+     ("Corporativ/o" en una tableta). */
+  .cal-chip { align-items: flex-start; flex-wrap: wrap; column-gap: 4px; row-gap: 0; }
+  .cal-chip .cal-icono { margin-top: 2px; flex: 0 0 auto; }
+  .cal-chip-texto { flex: 1 1 0; min-width: min-content; white-space: normal; overflow-wrap: break-word; }
+  /* La rejilla ya enseña los nombres: la lista de debajo sobraría */
+  .cal-agenda { display: none; }
+}
+
+/* Tableta: la casilla mide 75-125px y el icono se quedaba solo en su línea, encima del
+   nombre, doblando el alto de la fila. El color de la barrita ya dice el tipo. */
+@media (min-width: 560px) and (max-width: 899px) {
+  .cal-chip .cal-icono { display: none; }
 }
 
 /* En pantalla grande los paneles dejan de venir de abajo y se centran */
@@ -794,7 +865,7 @@
 /* Y todo se apaga si el móvil está en modo de movimiento reducido. Una animación que no
    se puede quitar es un problema de accesibilidad, no un adorno. */
 @media (prefers-reduced-motion: reduce) {
-  .cal-semana, .cal-mini, .cal-dia-panel, .cal-editor, .cal-editor-fondo, .cal-choque { animation: none; }
+  .cal-semana, .cal-mini, .cal-dia-panel, .cal-editor, .cal-editor-fondo, .cal-choque, .cal-agenda-dia { animation: none; }
   .cal-celda, .cal-icono, .cal-mini { transition: none; }
   .cal-celda:not(:disabled):active, .cal-mini:hover { transform: none; }
   .cal-celda:not(:disabled):hover .cal-icono { transform: none; }
