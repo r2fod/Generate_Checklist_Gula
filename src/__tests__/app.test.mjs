@@ -138,6 +138,36 @@ const revisaCaja = (page, selector) => page.evaluate((sel) => {
   return [...new Set(problemas)];
 }, selector);
 
+// ─── PALABRAS PARTIDAS POR DENTRO ─────────────────────────────────────────────
+// Ni el desbordamiento ni el "texto cortado" de arriba lo cazan: una palabra partida
+// ("Cervez" / "a") no se sale de nada ni se recorta, solo se lee mal. Aquí se mide cada
+// tira de letras y números de la pantalla con getClientRects(): si sus trozos caen en
+// líneas distintas, la palabra está partida. Las "/" y los espacios son cortes
+// legítimos y no cuentan (no son letras).
+const palabrasPartidas = (page) => page.evaluate(() => {
+  const partidas = [];
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = w.nextNode())) {
+    const el = n.parentElement;
+    if (!el || !el.getClientRects().length) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden") continue;
+    const alto = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+    const re = /[\p{L}\p{N}]{2,}/gu;
+    let m;
+    while ((m = re.exec(n.data))) {
+      const r = document.createRange();
+      r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+      const tops = [...r.getClientRects()].filter(x => x.width > 0).map(x => x.top);
+      if (tops.length > 1 && Math.max(...tops) - Math.min(...tops) > alto / 2) {
+        partidas.push(`"${m[0]}" en ${(el.closest("[class]")?.className || el.tagName).toString().split(" ")[0]}`);
+      }
+    }
+  }
+  return [...new Set(partidas)];
+});
+
 // La checklist entera como texto, "nombre=cantidad|sufijo" por item. Vive aquí arriba
 // porque lo usan bloques repartidos por toda la prueba, y definido a media función se
 // quedaba fuera del alcance de los de más arriba.
@@ -274,6 +304,77 @@ async function main() {
 
     ok((await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0,
       "y nada de esto desborda la pantalla");
+    await c.close();
+  }
+
+  // ── Las palabras no se parten, ni con la letra del móvil grande ─────────────
+  // Captura del dueño, a 393px con la letra de Android algo grande: "Cápsul/as café
+  // (para/el/person/al)" en seis líneas y "Cervez/a Alham/bra". El nombre se quedaba
+  // con lo que sobraba de la fila (50px) tras la cantidad, el envase y ✎/✕, y
+  // "overflow-wrap: anywhere" lo partía por cualquier letra. Nada se salía ni se
+  // recortaba —las pruebas de arriba pasaban—, solo se leía mal.
+  //
+  // La letra grande se simula subiendo la fuente raíz: la app va en rem, que es lo que
+  // agranda el ajuste de accesibilidad del móvil. Por eso no vale un corte por ancho de
+  // pantalla: el mismo móvil falla o no según el tamaño de letra de quien lo usa.
+  console.log("\n── Ninguna palabra partida, ni con la letra grande ──");
+  for (const [w, escala] of [[320, 1], [393, 1], [393, 1.15], [320, 1.15]]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 150, nombreEvento: "Boda Fulanita y Mengano en la finca",
+      barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    if (escala !== 1) await p.addStyleTag({ content: `html { font-size: ${escala * 100}% !important; }` });
+    // Todas abiertas: plegadas no hay filas que medir
+    const cab = p.locator(".category-header");
+    for (let i = 0, n = await cab.count(); i < n; i++) {
+      if (!await cab.nth(i).evaluate(h => h.closest(".category-section").classList.contains("is-open"))) await cab.nth(i).click();
+    }
+    await p.waitForTimeout(600);
+    const tag = `${w}px, letra ×${escala}`;
+
+    const partidas = await palabrasPartidas(p);
+    ok(partidas.length === 0, `${tag}: ninguna palabra partida en la checklist${partidas.length ? ` → ${partidas.slice(0, 5).join(", ")}` : ""}`);
+
+    // El nombre va entero en una línea al lado de sus controles, o solo en la suya con
+    // los controles debajo: nunca apretado en varias líneas junto a ellos
+    const apretados = await p.locator(".item-row").evaluateAll(rs => rs.filter(r => {
+      const t = r.querySelector(".item-label-text"), ctl = r.querySelector(".item-controles");
+      if (!t || !ctl) return false;
+      const lineas = Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight));
+      return ctl.getBoundingClientRect().top < t.getBoundingClientRect().bottom - 2 && lineas > 1;
+    }).map(r => r.querySelector(".item-label-text").textContent.trim()));
+    ok(apretados.length === 0,
+      `${tag}: ningún nombre en varias líneas al lado de su cantidad${apretados.length ? ` → ${apretados.slice(0, 4).join(" | ")}` : ""}`);
+
+    // "BEBIDAS F…" en la misma captura: el nombre de la categoría entero, y el
+    // contador dentro de su tarjeta (si no cabe al lado, baja de línea)
+    const cabeceras = await p.locator(".category-header").evaluateAll(hs => hs.map(h => {
+      const t = h.querySelector(".cat-name-texto"), caja = h.getBoundingClientRect(), pill = h.querySelector(".cat-count").getBoundingClientRect();
+      return { n: t.textContent, bien: t.scrollWidth <= t.clientWidth + 1 && pill.right <= caja.right + 0.5 && pill.left >= caja.left - 0.5 };
+    }));
+    const malas = cabeceras.filter(x => !x.bien).map(x => x.n);
+    ok(cabeceras.length > 5 && malas.length === 0,
+      `${tag}: las ${cabeceras.length} categorías con su nombre entero y el contador dentro${malas.length ? ` → ${malas.join(", ")}` : ""}`);
+
+    // La barra fina de arriba, opaca: con el desenfoque sin pintar (ahorro de batería,
+    // algunos Android) la lista se leía a través de ella, un nombre encima del buscador
+    if (w === 320 && escala === 1) {
+      const fondo = await p.evaluate(() => getComputedStyle(document.querySelector(".barra-fija")).backgroundColor);
+      ok(!/rgba\([^)]*,\s*0?\.\d+\)/.test(fondo), `la barra fina de arriba es opaca → ${fondo}`);
+    }
+
+    await p.locator("button", { hasText: "Modo carga" }).first().click(); await p.waitForTimeout(900);
+    for (const t of ["Salida", "Vuelta", "Resumen"]) {
+      await p.locator(".carga-modo-toggle button").filter({ hasText: t }).first().click(); await p.waitForTimeout(550);
+      const enCarga = await palabrasPartidas(p);
+      ok(enCarga.length === 0, `${tag}: ninguna palabra partida en Modo carga · ${t}${enCarga.length ? ` → ${enCarga.slice(0, 5).join(", ")}` : ""}`);
+    }
+    // En el Resumen el nombre del producto se recortaba con "…" ("Peche (licor d…")
+    const recortados = await p.locator(".resumen-tabla-producto").evaluateAll(cs =>
+      cs.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent.trim()));
+    ok(recortados.length === 0, `${tag}: ningún producto recortado en la tabla del Resumen${recortados.length ? ` → ${recortados.slice(0, 4).join(" | ")}` : ""}`);
     await c.close();
   }
 

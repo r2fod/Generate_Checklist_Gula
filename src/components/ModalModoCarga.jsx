@@ -23,6 +23,12 @@ import Escaleta from "./Escaleta.jsx";
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
 
+// El navegador no parte la línea en una "/": "(estándar/descafeinado)" o
+// "(Seagrams/Tanqueray)" son para él UNA palabra de 170px, que en la columna del
+// resumen (132px en el móvil) acababa partida por cualquier letra. <wbr> ofrece el
+// corte justo detrás de la barra sin añadir texto: innerText sigue siendo el nombre.
+const conCortes = (texto) => String(texto).split("/").flatMap((t, i) => i ? ["/", <wbr key={i} />, t] : [t]);
+
 // ─── LAS FILAS, APARTE Y MEMOIZADAS ────────────────────────────────────────────
 // Medido con Playwright (móvil simulado, CPU ×4): marcar una casilla tardaba entre
 // 50 y 140ms en repintar con una boda de 120 pax (111 items) — la lista entera se
@@ -50,7 +56,7 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
               como hermano directo sin eso, el tag le robaba ancho al nombre y a 320px
               se partía letra a letra. */}
           <span className="carga-nombre-lead">
-            <IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span>
+            <IconoItem label={label} /> <span className="carga-nombre-texto">{conCortes(label)}</span>
           </span>
           {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
         </span>
@@ -102,7 +108,7 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
       <div className="carga-row-principal carga-row-vuelta">
         <span className="carga-nombre">
           <span className="carga-nombre-lead">
-            <IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span>
+            <IconoItem label={label} /> <span className="carga-nombre-texto">{conCortes(label)}</span>
           </span>
           {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
         </span>
@@ -731,7 +737,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                       </tr>
                       {cat.filas.map(f => (
                         <tr key={f.key}>
-                          <td className="resumen-tabla-producto" title={f.label}><IconoItem label={f.label} size={13} /> {f.label}</td>
+                          <td className="resumen-tabla-producto" title={f.label}><span className="resumen-producto-nombre"><IconoItem label={f.label} size={13} /><span>{conCortes(f.label)}</span></span></td>
                           <td>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</td>
                           <td className={f.vueltaImposible ? "resumen-celda-imposible" : ""}
                               title={f.vueltaImposible ? `Vuelven ${f.vuelta} de ${f.cargaInicial} cargadas: imposible. Suele pasar cuando la cantidad se recalcula después de apuntar la vuelta. Revísalo, porque así esta línea no cobra la merma.` : undefined}>

@@ -306,9 +306,10 @@ body {
        quedaba 2-3px más ancha que la pantalla y la página se podía mover en lateral. */
     margin: 0 0 10px;
     padding: 8px 10px;
-    background: var(--superficie-velo);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    /* Opaca y no de cristal: en móviles donde el desenfoque no se pinta (ahorro de
+       batería, algunos Android), la lista se leía A TRAVÉS de la barra, con el nombre
+       de un item encima del buscador. */
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
@@ -328,13 +329,17 @@ body {
     opacity: 1;
   }
 
+  /* Dos líneas antes que "Boda Rita y Ll…": cabe en el alto que ya tiene la barra */
   .barra-fija-nombre {
     font-size: 0.78rem;
     font-weight: 700;
+    line-height: 1.2;
     color: var(--text-main);
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
     max-width: 26%;
     flex-shrink: 0;
   }
@@ -2193,9 +2198,10 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s;
@@ -2214,22 +2220,23 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Sin min-width:0 un flex item no encoge por debajo de su contenido (el nombre
-     entero), así que a 320px, con la píldora de al lado en flex-shrink:0, algo
-     tenía que desbordar — y la tarjeta redondeada con overflow oculto se lo
-     tragaba en silencio: la píldora del contador y la flecha ▼/▲ desaparecían
-     sin aviso en 9 de cada 10 categorías, justo lo que hace falta para saber si
-     está abierta y cuántos items tiene. Con esto el que cede es el NOMBRE (se
-     recorta con puntos suspensivos vía .cat-name-texto), nunca la píldora. */
-  min-width: 0;
-  flex: 1 1 auto;
+  /* El nombre se parte en líneas por palabras en vez de recortarse con "…": en móvil
+     salían cortadas 6 de 13 ("MOBILIARIO, SALA Y DE…", "BEBIDAS F…"). Nunca encoge por
+     debajo de su palabra más larga; si ni esa cabe junto a la píldora, la que baja a
+     su propia línea es la PÍLDORA (flex-wrap de la cabecera), así que no se pierde
+     nunca: a 320px, sin tope, algo tenía que desbordar y la tarjeta redondeada con
+     overflow oculto se tragaba el contador y la flecha ▼/▲ sin aviso. */
+  min-width: min-content;
+  flex: 1 1 0;
 }
 
 .cat-name-texto {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+}
+
+.category-header .cat-count {
+  margin-left: auto;
 }
 
 .category-header .cat-icon {
@@ -2300,14 +2307,30 @@ body {
   flex-direction: column;
 }
 
+/* Cada fila decide sola si va en una línea o en dos, sin punto de corte fijo: si el
+   nombre ENTERO cabe al lado de sus controles, una línea; si no, el nombre se queda
+   todo el ancho arriba y cantidad + envase + ✎/✕ bajan juntos debajo. Antes el nombre
+   se quedaba con lo que sobraba y, a 393px con la letra del móvil un poco grande,
+   eran 50px: "Cápsul-as café (para el person-al)" en seis líneas. Un corte por ancho
+   de pantalla no sirve: el mismo móvil falla o no según el tamaño de letra que tenga
+   puesto quien lo usa. */
 .item-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   padding: 13px 22px;
   border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s;
+  gap: 6px 12px;
+}
+
+.item-controles {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  margin-left: auto;
+  min-width: 0;
 }
 
 .item-row:last-child {
@@ -2326,13 +2349,14 @@ body {
   background-color: #fef3c7;
 }
 
+/* "auto" y no "1": con base 0 el nombre nunca pedía sitio y era el que cedía siempre */
 .item-name {
   font-size: 0.9rem;
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -3537,8 +3561,11 @@ hr {
   background-color: var(--alquiler-bg);
 }
 
+/* flex-wrap: si el nombre no cabe ni con su palabra más larga, la que baja de línea es
+   la cantidad (a la derecha, ver .carga-cantidad), no el nombre partido por letras */
 .carga-row-principal {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
@@ -3800,13 +3827,21 @@ hr {
    arrastrar en escritorio para ver el "€" del coste total, la cifra que se mira.
    Con 165px (y menos aire por celda, ver .resumen-tabla th/td) sobran ~65px de
    margen real: aguanta esas diferencias sin depender de acertar un número exacto. */
+/* El nombre parte en líneas en vez de cortarse con "…": en el móvil salían recortados
+   46 de 130 ("Peche (licor d…", "Mesa redonda especial para Tar…") y había que
+   adivinar cuál era. El ancho se fija (width, no solo max-width): al poder partirse,
+   la tabla estrechaba esta columna hasta la palabra más larga para no arrastrar, y
+   hasta "Ballantines" bajaba de línea dejando el icono solo arriba. */
 .resumen-tabla-producto {
+  width: 165px;
   max-width: 165px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
   color: var(--text-main);
 }
+/* Icono y nombre en bloque: las líneas del nombre van sangradas bajo el texto, no
+   bajo el icono */
+.resumen-producto-nombre { display: flex; align-items: flex-start; }
 
 .resumen-tabla td {
   font-variant-numeric: tabular-nums;
@@ -3882,6 +3917,7 @@ hr {
   }
 
   .resumen-tabla-producto {
+    width: 132px;
     max-width: 132px;
   }
 
@@ -3969,11 +4005,11 @@ hr {
 
   /* Sin esto, la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de
      80px de los 264 de la fila: hasta "Regletas" se partía a media palabra
-     ("Regleta" / "s"), aunque overflow-wrap: anywhere hace exactamente lo que tiene
-     que hacer con ese poco sitio. El nombre no necesitaba partirse, necesitaba sitio:
-     con este mínimo, la pastilla es la que cae a su propia línea cuando no cabe. */
+     ("Regleta" / "s"). El nombre no necesitaba partirse, necesitaba sitio: pide al
+     menos 110px (o su palabra más larga, si es mayor: ver .carga-nombre), y la
+     pastilla es la que cae a su propia línea cuando no cabe. */
   .carga-row-vuelta .carga-nombre {
-    min-width: 110px;
+    flex-basis: 110px;
   }
 
   /* En móvil los dos números pegan al borde: 46px de sangría se comen el ancho que
@@ -3989,9 +4025,11 @@ hr {
   }
 }
 
+/* Nunca más estrecho que su palabra más larga: "Ginebra (Seagrams/Ta-nqueray)" y
+   "(estándar/de-scafeinado)" se partían por dentro al apretarse contra la cantidad */
 .carga-nombre {
   flex: 1;
-  min-width: 0;
+  min-width: min-content;
   font-size: 0.9rem;
   color: var(--text-main);
   display: inline-flex;
@@ -4020,12 +4058,12 @@ hr {
    entero, no una pista de cuál era. */
 .carga-nombre-texto {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .carga-nombre .item-icon { flex-shrink: 0; }
 .carga-row:hover .item-icon { transform: scale(1.18) rotate(-5deg); }
 /* Icono en la tabla de resumen: alineado con el texto del producto */
-.resumen-tabla-producto .item-icon { vertical-align: -2px; margin-right: 5px; }
+.resumen-tabla-producto .item-icon { margin: 2px 5px 0 0; }
 .resumen-cat-header .cat-icon-mini, .resumen-cat-header td > svg { vertical-align: -2px; margin-right: 5px; }
 
 .carga-cantidad {
@@ -4034,6 +4072,7 @@ hr {
   font-size: 0.9rem;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Aviso pequeño de cómo va la OTRA marca: en Preparación dice lo que ya está cargado
@@ -4475,11 +4514,11 @@ hr {
 /* Icono por material en cada fila: gris suave que cobra color y salta al pasar el ratón */
 /* El icono queda fijo a la izquierda y el texto (con su asterisco/etiqueta) fluye y
    se parte junto, sin que el asterisco caiga solo a una línea aparte. */
-.item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1; }
+.item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1 1 auto; }
 .item-name-lead > .item-icon { margin-top: 2px; }
-/* Igual que en Modo carga: el nombre se parte antes que recortarse. A 390px se
-   quedaba en 79px de los 145 que necesita. */
-.item-label-text { min-width: 0; overflow-wrap: anywhere; }
+/* Parte por palabras. "anywhere" cortaba por cualquier letra ("Cervez/a") en cuanto
+   faltaba sitio; ahora solo se corta una palabra si no cabe ni sola en la línea. */
+.item-label-text { min-width: 0; overflow-wrap: break-word; }
 /* Títulos de modales con icono alineado. Van en "flex" (no "inline-flex") para
    que el subtítulo caiga debajo del título en vez de pegarse a su derecha. */
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: flex; align-items: center; gap: 7px; }
@@ -4730,9 +4769,15 @@ hr {
   .main-layout { gap: 14px; }
 
   /* Filas de la checklist: un pelín más juntas verticalmente */
-  .item-row { padding: 10px 14px; gap: 10px; }
+  .item-row { padding: 10px 14px; gap: 6px 10px; }
+  .item-controles { gap: 10px; }
   .category-header { padding: 11px 14px; }
   .category-header .cat-icon { width: 28px; height: 28px; min-width: 28px; }
+  /* ↑ ↓ ✎ a 40px de ancho cada uno se llevaban casi la mitad de la cabecera y el
+     nombre no cabía. Pierden ancho, no alto: la zona de toque sigue en 34×40. */
+  .category-header .cat-count { gap: 2px; padding: 4px 8px; }
+  .category-header .cat-count .arrow { margin-left: 4px; }
+  .category-header .cat-edit-btn { min-width: 34px; }
   .item-list-wrapper .item-row:first-child { padding-top: 11px; }
 
   /* Modales (Vista previa / Modo carga): cuerpo y cabecera más ajustados */
@@ -4937,36 +4982,6 @@ hr {
 @media (max-width: 480px) {
   .agregar-cuerpo { padding: 16px; }
   .agregar-cabecera { padding: 14px 16px; }
-}
-
-/* En pantallas muy estrechas (320-360px, tipo iPhone SE) el nombre del item se
-   quedaba en unos 57px de ancho porque la cantidad, la unidad y los dos botones se
-   llevaban el resto: "Vasos de cartón café mini (personal)" salía partido palabra a
-   palabra en seis líneas y la fila medía 125px de alto. Aquí la fila pasa a dos
-   pisos: el nombre arriba a todo lo ancho, y debajo la cantidad, la unidad y los
-   botones en una sola línea. */
-@media (max-width: 360px) {
-  .item-row {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 8px 10px;
-  }
-
-  .item-row > .item-name,
-  .item-row > .item-edit-row {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
-  .item-row > .item-qty-input {
-    max-width: none;
-    width: 92px;
-  }
-
-  .item-row > .item-actions {
-    justify-self: end;
-  }
 }
 
 /* Campos de texto libre que ocupan la fila entera del formulario de evento. En la

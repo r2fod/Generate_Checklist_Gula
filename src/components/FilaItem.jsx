@@ -88,6 +88,9 @@ const FilaItem = memo(function FilaItem({
           </span>
         </div>
       )}
+      {/* Cantidad, envase y ✎/✕ van juntos: si el nombre no cabe entero a su lado,
+          bajan los tres a su propia línea en vez de partirse entre dos. */}
+      <div className="item-controles">
       <input
         type="text"
         className="item-qty-input"
@@ -147,6 +150,7 @@ const FilaItem = memo(function FilaItem({
           ><X size={14} /></button>
         </div>
       )}
+      </div>
     </div>
   );
 });
