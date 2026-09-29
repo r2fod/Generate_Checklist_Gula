@@ -14,7 +14,7 @@ import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe, plural, envaseSegunCantidad 
 // si se pasaran como funciones sueltas se crearían nuevas en cada render y la
 // memoización no serviría de nada.
 const FilaItem = memo(function FilaItem({
-  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo,
+  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo, unidadManual = false,
   editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones, soloMarcar = false,
 }) {
   const alq = esItemDeAlquiler(label, esAlquilerManual);
@@ -53,6 +53,21 @@ const FilaItem = memo(function FilaItem({
   // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza, vino, refrescos)
   const cajaSize = bateaSize ? null : cajaSizeDe(label);
   const cajaCount = cajaSize && !isNaN(num) ? Math.ceil(num / cajaSize) : null;
+  // Lo que pone debajo del número. Escrita a mano, manda la de la persona (también sobre
+  // las cajas y bateas que se cuentan solas); si no, las cajas/bateas en vivo o la del
+  // generador, concordando con lo que haya escrito: "1 botella", "3 cajas".
+  const unidad = unidadManual ? envaseSegunCantidad(sufijo, qty)
+    : bateaCount !== null ? `${plural(bateaCount, "batea", "bateas")} de ${bateaSize}`
+    : cajaCount !== null ? `${plural(cajaCount, "caja", "cajas")} de ${cajaSize}`
+    : sufijo ? envaseSegunCantidad(sufijo, qty) : "";
+  const tituloUnidad = unidadManual ? "Unidad puesta a mano. Bórrala para volver a la de la app."
+    : bateaCount !== null ? `${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`
+    : cajaCount !== null ? `${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`
+    : "Toca para cambiar la unidad";
+  // Al tocar la unidad pasa a ser un campo; lo escrito vive aquí y se guarda al salir,
+  // como el nombre. null = no se está editando.
+  const [unidadTecleando, setUnidadTecleando] = useState(null);
+  const cancelarUnidadRef = useRef(false);
   return (
     <div className={`item-row ${alq ? "is-alquiler" : ""}`}>
       {editando && !soloMarcar ? (
@@ -128,13 +143,47 @@ const FilaItem = memo(function FilaItem({
           distintas; debajo del número ya se lee como lo que es: la misma cantidad
           dicha en envases. Donde el número ya son packs o botellas, el texto es la
           etiqueta de lo que se cuenta, y concuerda con él mientras se teclea. */}
-      {bateaCount !== null ? (
-        <span className="item-batea-info" title={`${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`}>{plural(bateaCount, "batea", "bateas")} de {bateaSize}</span>
-      ) : cajaCount !== null ? (
-        <span className="item-batea-info" title={`${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`}>{plural(cajaCount, "caja", "cajas")} de {cajaSize}</span>
-      ) : sufijo ? (
-        <span className="item-batea-info" title="El número de arriba ya va en este envase">{envaseSegunCantidad(sufijo, qty)}</span>
-      ) : null}
+      {/* Y se puede cambiar a mano en cualquier fila (lo pidió el dueño): se lee como
+          texto, y al tocarlo pasa a ser un campo. Vacío = vuelve a la de la app, así las
+          cajas y los packs que se cuentan solos siguen funcionando mientras nadie los
+          toque. Con el link de solo marcar se lee pero no se cambia, como la cantidad.
+          Sin número ("—") no hay unidad que enseñar: aparece al poner la cantidad. */}
+      {unidadTecleando !== null ? (
+        <input
+          type="text"
+          className="item-batea-info item-unidad-input"
+          value={unidadTecleando}
+          placeholder="unidad (vacío = la de la app)"
+          aria-label={`Unidad de ${label}`}
+          size={Math.max(8, unidadTecleando.length + 1)}
+          autoFocus
+          onFocus={e => e.target.select()}
+          onChange={e => setUnidadTecleando(e.target.value)}
+          onBlur={() => {
+            const valor = unidadTecleando.trim();
+            setUnidadTecleando(null);
+            if (cancelarUnidadRef.current) { cancelarUnidadRef.current = false; return; }
+            // Sin cambios no se guarda nada: tocar y salir no convierte la automática
+            // en una fija que ya no seguiría a la cantidad
+            if (valor === unidad.trim()) return;
+            acciones.current.editarUnidad(categoria, labelOriginal ?? label, valor);
+          }}
+          onKeyDown={e => {
+            if (e.key === "Enter") e.target.blur();
+            if (e.key === "Escape") { cancelarUnidadRef.current = true; e.target.blur(); }
+          }}
+        />
+      ) : !unidad ? null : soloMarcar ? (
+        <span className="item-batea-info" title={tituloUnidad}>{unidad}</span>
+      ) : (
+        <button
+          type="button"
+          className={`item-batea-info item-unidad-btn${unidadManual ? " es-manual" : ""}`}
+          title={tituloUnidad}
+          aria-label={`Unidad de ${label}: ${unidad}. Tocar para cambiarla`}
+          onClick={() => setUnidadTecleando(unidad)}
+        >{unidad}</button>
+      )}
       {/* Renombrar y quitar items cambian la checklist para todo el mundo: con el
           link de solo marcar no se ofrecen. */}
       {!soloMarcar && (

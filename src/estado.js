@@ -25,7 +25,7 @@ const LISTAS = [
 // editadas, los cronómetros...). Un array o un número aquí también rompe.
 const MAPAS = [
   "cronos", "categoriasRenombradas", "overridesManuales", "itemsOcultos",
-  "nombresManuales", "preparados", "marcasRevisar", "checkeados",
+  "nombresManuales", "unidadesManuales", "preparados", "marcasRevisar", "checkeados",
   "valoresCalculados", "vueltos", "roturas", "notasCheck", "itemsAlquilerManual",
 ];
 

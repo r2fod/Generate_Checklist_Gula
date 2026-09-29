@@ -2442,6 +2442,55 @@ body {
   }
 }
 
+/* La unidad se cambia a mano tocándola (FilaItem.jsx): se lee igual que el texto de
+   siempre —mismo tamaño, color y sitio— y solo al pasar por encima se nota que se
+   puede tocar. La puesta a mano, en el color de acento y en cursiva, para que se
+   distinga de la que calcula la app. */
+.item-unidad-btn {
+  font-family: inherit;
+  line-height: 1.3;
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  padding: 0;
+  cursor: text;
+  text-align: right;
+}
+.item-unidad-btn:hover, .item-unidad-btn:focus-visible { border-bottom-color: currentColor; }
+.item-unidad-btn.es-manual { color: var(--accent); font-style: italic; }
+/* El texto mide 16px de alto y a veces 12 de ancho ("ud"): poco para un dedo. Gana
+   zona de toque sin moverse, con una capa invisible de al menos 44×32 pegada a su
+   borde derecho. Crece hacia abajo (el hueco de la fila) y no hacia arriba, donde está
+   la caja de la cantidad: un toque en su borde de abajo no debe abrir la unidad. */
+.item-unidad-btn { position: relative; }
+.item-unidad-btn::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: max(100%, 44px);
+  height: 32px;
+}
+/* En las filas de alquiler el gris de siempre se queda en 4,48 sobre el amarillo:
+   el de las etiquetas, un punto más oscuro, llega al mínimo legible (4,5). Solo en
+   claro: en oscuro el gris de siempre ya se lee (y el de etiquetas, no). */
+:root:not([data-tema="oscuro"]) .item-row.is-alquiler .item-batea-info:not(.es-manual) {
+  color: var(--text-label);
+}
+
+/* Editando: 16px para que iOS no haga zoom al enfocar, y el ancho de lo escrito */
+.item-unidad-input {
+  font-family: inherit;
+  font-size: 16px;
+  text-align: right;
+  color: var(--text-main);
+  background: var(--card-bg);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  max-width: 100%;
+}
+
 /* Botones ✎ (editar nombre) y ✕ (quitar) de cada item */
 .item-actions {
   display: flex;

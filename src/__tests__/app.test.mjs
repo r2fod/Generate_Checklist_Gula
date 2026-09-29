@@ -178,8 +178,13 @@ const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
   // un rodaje, el "de 8 en almacén" de las carpas). Sin él, la prueba daba por
   // mudo un control que sí cambiaba lo que se carga.
   const suf = r.querySelector(".item-batea-info");
-  return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${suf ? "|" + suf.textContent.trim() : ""}`;
+  // La unidad es un campo (se cambia a mano), salvo con el link de solo marcar: texto
+  const unidad = suf ? (suf.tagName === "INPUT" ? suf.value : suf.textContent).trim() : "";
+  return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${unidad ? "|" + unidad : ""}`;
 }));
+
+// Lo mismo desde un locator: la unidad de debajo del número, sea campo o texto
+const textoUnidad = (loc) => loc.evaluate(e => (e.tagName === "INPUT" ? e.value : e.textContent).trim());
 
 async function main() {
   const srv = await arrancarServidor();
@@ -3202,7 +3207,7 @@ async function main() {
     await cerveza.locator(".item-qty-input").click();
     await p.keyboard.type("48", { delay: 30 });
     await p.waitForTimeout(120);
-    const info = await cerveza.locator(".item-batea-info").innerText();
+    const info = await textoUnidad(cerveza.locator(".item-batea-info"));
     ok(/2 cajas/.test(info), `y las cajas de al lado siguen al número mientras se teclea → "${info}"`);
     await c.close();
   }
@@ -3279,7 +3284,7 @@ async function main() {
     }).first();
     const infoDe = async (nombre) => {
       const i = filaExacta(nombre).locator(".item-batea-info");
-      return await i.count() ? (await i.innerText()).trim() : "";
+      return await i.count() ? await textoUnidad(i) : "";
     };
     const poner = async (nombre, valor) => {
       await filaExacta(nombre).locator(".item-qty-input").fill(valor);
@@ -3347,7 +3352,7 @@ async function main() {
     }).first();
     const sufijoDe = async (nombre) => {
       const i = filaExacta(nombre).locator(".item-batea-info");
-      return await i.count() ? (await i.innerText()).trim() : "";
+      return await i.count() ? await textoUnidad(i) : "";
     };
 
     await filaExacta("Hielo").locator(".item-qty-input").fill("48");
@@ -3377,6 +3382,97 @@ async function main() {
       `y si falta una sola, en singular (${await sufijoDe("Carpas")})`);
 
     await c.close();
+  }
+
+  // ── Todas las filas con su unidad, y editable a mano ──────────────────────
+  // El dueño: "hay cosas que no tienen unidades o cajas; ponle a todos, permite poder
+  // editarlo si se quiere, pero que los que se actualizan solos (cajas, packs) sigan
+  // funcionando". De unos 160 items de una boda, dos tercios salían con el número solo.
+  console.log("\n── Todas las filas con su unidad, y editable a mano ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 393, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    for (const evento of ["boda", "produccion"]) {
+      await p.goto(url({ evento, pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }),
+        { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      const filas = await listaItems(p);
+      const conNumero = filas.filter(f => /=\d+([.,]\d+)?(\||$)/.test(f));
+      const sinUnidad = conNumero.filter(f => !f.includes("|"));
+      ok(conNumero.length > 40 && sinUnidad.length === 0,
+        `${evento}: las ${conNumero.length} filas con número llevan su unidad${sinUnidad.length ? ` → sin: ${sinUnidad.slice(0, 5).join(", ")}` : ""}`);
+    }
+    // Cada una la que le toca, y en singular con 1
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
+    const unidadDe = async (nombre) => textoUnidad(filaExacta(nombre).locator(".item-batea-info"));
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }),
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    ok(await unidadDe("Ballantines") === "botellas" && await unidadDe("Camareros") === "personas" && await unidadDe("Mesas de 1,8m") === "uds",
+      `licores en botellas, personal en personas, lo demás en uds (${await unidadDe("Ballantines")} · ${await unidadDe("Camareros")} · ${await unidadDe("Mesas de 1,8m")})`);
+    await filaExacta("Mesas de 1,8m").locator(".item-qty-input").fill("1");
+    await p.waitForTimeout(900);
+    ok(await unidadDe("Mesas de 1,8m") === "ud", `con 1, "ud" y no "uds" (${await unidadDe("Mesas de 1,8m")})`);
+    ok(/^\d+ cajas? de 24$/.test(await unidadDe("Agua con gas")),
+      `el agua con gas ya dice sus cajas de 24, como los refrescos (${await unidadDe("Agua con gas")})`);
+
+    // Se cambia a mano tocándola
+    await filaExacta("Mesas de 1,8m").locator(".item-unidad-btn").click();
+    const campo = filaExacta("Mesas de 1,8m").locator(".item-unidad-input");
+    ok(await campo.isVisible() && await campo.inputValue() === "ud", "tocar la unidad la convierte en un campo con la de ahora");
+    await p.keyboard.type("tableros");
+    await p.keyboard.press("Enter");
+    await p.waitForTimeout(300);
+    ok(await unidadDe("Mesas de 1,8m") === "tableros" && await filaExacta("Mesas de 1,8m").locator(".item-unidad-btn.es-manual").count() === 1,
+      `y lo escrito se queda, marcado como puesto a mano (${await unidadDe("Mesas de 1,8m")})`);
+    // Escape no guarda
+    await filaExacta("Ballantines").locator(".item-unidad-btn").click();
+    await p.keyboard.type("garrafas");
+    await p.keyboard.press("Escape");
+    await p.waitForTimeout(300);
+    ok(await unidadDe("Ballantines") === "botellas", "Escape deja la que había");
+
+    // Las cajas que se cuentan solas siguen contándose mientras nadie las toque...
+    await filaExacta("Nestea").locator(".item-qty-input").fill("50");
+    await p.waitForTimeout(900);
+    ok(await unidadDe("Nestea") === "3 cajas de 24", `las cajas automáticas siguen al número (${await unidadDe("Nestea")})`);
+    // ...y una puesta a mano manda sobre ellas, concordando con el número
+    await filaExacta("Nestea").locator(".item-unidad-btn").click();
+    await p.keyboard.type("packs");
+    await p.keyboard.press("Enter");
+    await filaExacta("Nestea").locator(".item-qty-input").fill("1");
+    await p.waitForTimeout(900);
+    ok(await unidadDe("Nestea") === "pack", `a mano manda la de la persona, y con 1 en singular (${await unidadDe("Nestea")})`);
+    // Vaciarla la devuelve a la automática
+    await filaExacta("Nestea").locator(".item-unidad-btn").click();
+    await p.keyboard.press("Control+A");
+    await p.keyboard.press("Delete");
+    await p.keyboard.press("Enter");
+    await p.waitForTimeout(300);
+    ok(await unidadDe("Nestea") === "1 caja de 24", `borrarla la devuelve a las cajas automáticas (${await unidadDe("Nestea")})`);
+
+    // Lo puesto a mano sale igual en Modo carga
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+    await p.locator(".carga-modo-toggle button").filter({ hasText: "Salida" }).first().click();
+    await p.waitForTimeout(500);
+    const enCarga = (await p.locator(".carga-row").filter({ has: p.locator(".carga-nombre-texto", { hasText: /^Mesas de 1,8m$/ }) })
+      .first().locator(".carga-cantidad").innerText()).trim();
+    ok(enCarga === "1 tableros", `y en Modo carga (${enCarga})`);
+    await c.close();
+
+    // Con el link de solo marcar se lee pero no se cambia, como la cantidad
+    const c2 = await navegador.newContext({ viewport: { width: 393, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
+    const p2 = await nuevaPagina(c2);
+    await p2.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }) + "&solo=1", { waitUntil: "domcontentloaded" });
+    await p2.waitForTimeout(1900);
+    ok(await p2.locator(".item-unidad-btn").count() === 0 && await p2.locator(".item-batea-info").count() > 40,
+      "con el link de solo marcar la unidad se lee, pero no se puede tocar");
+    await c2.close();
   }
 
   // ── El aviso de "actualizado desde otro dispositivo" ───────────────────────

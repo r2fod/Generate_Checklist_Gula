@@ -1446,6 +1446,43 @@ casilla (`overflow-y: auto` de #234).
   en la línea del número; la lista día a día sale solo <560px, con los nombres enteros,
   hora y pax, lo de varios días una vez, y abre el día al tocarlo.
 
+**Todas las filas con su unidad, y editable a mano — HECHO**: el dueño: "hay cosas que
+no tienen unidades o cajas; analiza bien y ponle a todos, permite poder editarlo si se
+quiere, pero que los que se actualizan solos como las cajas o packs sigan funcionando".
+Medido con todos los generadores: de ~400 items, 304 salían con el número solo.
+- **Unidad por defecto** (`unidadPorDefecto(label, categoria)`, `checklist-format.js`):
+  solo para los que no traen unidad del generador ni cuentan cajas/bateas solos, y
+  solo con número (debajo de un "—" no dice nada). Licores en "botellas", personal en
+  "personas", carbón y leña en "sacos", Red Bull en "latas", leches en "bricks",
+  vermut y cerveza sin gluten en "botellas"; el resto, "uds". Concuerda con el número
+  como las demás (`UNIDADES_ENVASE` suma ud, persona, saco, brick): "1 ud", "23 uds".
+- **Agua con gas y cerveza 0,0** entran en `CAJA_POR_LABEL` (24): `calcBebidas` ya las
+  sacaba en cajas de 24 y no lo decían.
+- **Editable a mano** (`unidadesManuales`, mapa `"categoria::labelOriginal" → texto`):
+  la unidad de debajo del número es un botón que se lee como el texto de siempre; al
+  tocarlo pasa a campo (16px, sin zoom de iOS). Enter guarda, Escape no; tocar y
+  salir sin cambiar no la fija. Vacío = vuelve a la de la app, así las cajas, bateas y
+  packs automáticos siguen solos mientras nadie los toque. La puesta a mano manda sobre
+  todo (cajas incluidas), concuerda con el número si es un envase conocido y sale en
+  acento y cursiva. Con el link de solo marcar se lee pero no se toca.
+- El botón de la unidad mide 16px de alto (12 de ancho en "ud"): gana zona de toque
+  con un `::after` invisible de al menos 44×32, pegado a su borde derecho y crecido
+  hacia abajo (no hacia la caja de la cantidad). En las filas de alquiler, en claro,
+  la unidad va en `--text-label`: el gris de siempre daba 4,48 sobre el amarillo. No
+  con `color-mix()`: su color calculado sale como `color(srgb 0.68 …)` y la prueba de
+  contraste lo leía como casi negro.
+- El estado nuevo va como los demás ajustes a mano: en `getEstadoActual`,
+  `SETTERS_SYNC` (nube), `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, "Deshacer", y
+  se migra al renombrar un item manual o una categoría. La tupla de cada item lleva un
+  séptimo dato (`unidadManual`) y `fmtCantidadCompleta(label, qty, sufijo,
+  unidadManual)` lo respeta en Modo carga, Vista previa, Word y copiar texto.
+- Pruebas: puras en `calculos.test.mjs` (unidad por defecto, singulares nuevos, cajas
+  de agua con gas/0,0, manual sobre automática, `sanearEstado`); en `app.test.mjs`
+  ("Todas las filas con su unidad, y editable a mano"): boda y producción sin ninguna
+  fila con número sin unidad, cambiar a mano, Escape, cajas automáticas que siguen,
+  manual sobre cajas y en singular, vaciar devuelve la automática, Modo carga y solo
+  marcar. Las pruebas que leían `.item-batea-info` como texto usan `textoUnidad()`.
+
 **Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
 por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
 otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba

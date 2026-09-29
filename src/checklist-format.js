@@ -35,12 +35,35 @@ export function plural(n, singular, plural_) { return `${n} ${n === 1 ? singular
 // en las infusiones, "2 rollo" en el papel Chemine, "1 botellas" al bajar el cava.
 // Solo se toca la primera palabra y solo si es una unidad de estas: "paq.", "kg" o
 // "para 12 personas" valen igual para cualquier número y se quedan como están.
-const UNIDADES_ENVASE = ["batea", "bolsa", "bote", "botella", "caja", "carga", "lata", "pack", "paquete", "rollo", "taxi"];
+const UNIDADES_ENVASE = ["batea", "bolsa", "bote", "botella", "brick", "caja", "carga", "lata", "pack", "paquete",
+  "persona", "rollo", "saco", "taxi", "ud"];
 export function envaseSegunCantidad(sufijo, cantidad) {
   const n = parseFloat(String(cantidad).replace(",", "."));
   if (typeof sufijo !== "string" || isNaN(n)) return sufijo;
   return sufijo.replace(/^([a-z]+?)(\(s\)|s)?(?=$|[\s(])/i, (todo, raiz) =>
     UNIDADES_ENVASE.includes(raiz.toLowerCase()) ? (n === 1 ? raiz : `${raiz}s`) : todo);
+}
+
+// ─── LA UNIDAD DE LO QUE NO TRAE NINGUNA ──────────────────────────────────────
+// De unos 400 items, 300 salían con el número solo: "23" debajo de "Mesas de 1,8m" o
+// "8" en el Ballantines. El dueño pidió que todos lleven su unidad. Casi todo se cuenta
+// por unidades sueltas; lo que no, se dice aquí: por categoría (los licores van en
+// botellas, el personal son personas) o por el nombre. Solo para los que no traen
+// unidad propia ni cajas/bateas automáticas, y se puede cambiar a mano en cada fila.
+const UNIDAD_POR_NOMBRE = [
+  [/vermut|cerveza sin gluten/, "botellas"],
+  [/redbull|red bull/, "latas"],
+  [/carbon|\blena\b/, "sacos"],
+  [/leches/, "bricks"],
+  [/pastillas de encender/, "cajas"],
+  [/^taxis/, "taxis"],
+];
+export function unidadPorDefecto(label, categoria = "") {
+  const cat = sinTildes(categoria), nombre = sinTildes(label);
+  if (/alcohol|licor/.test(cat)) return "botellas";
+  if (/^personal/.test(cat)) return "personas";
+  const m = UNIDAD_POR_NOMBRE.find(([re]) => re.test(nombre));
+  return m ? m[1] : "uds";
 }
 
 function conBateas(label, qtyTexto) {
@@ -51,9 +74,11 @@ function conBateas(label, qtyTexto) {
 }
 // Mismo mecanismo que las bateas, para bebidas que se piden en cajas de tamaño fijo:
 // cerveza (24 tercios/caja), vino y tinto de verano (6 botellas/caja) y refrescos
-// (24 uds/caja). El nº de cajas se recalcula en vivo igual que las bateas.
+// (24 uds/caja). El nº de cajas se recalcula en vivo igual que las bateas. El agua con
+// gas y la cerveza 0,0 ya se calculaban en cajas de 24 (calcBebidas) pero no lo decían.
 const CAJA_POR_LABEL = [
-  { fragmento: "cerveza alhambra", size: 24 },
+  { fragmento: "cerveza alhambra", size: 24 }, { fragmento: "cerveza 0,0", size: 24 },
+  { fragmento: "agua con gas", size: 24 },
   { fragmento: "vino blanco", size: 6 }, { fragmento: "vino tinto", size: 6 }, { fragmento: "tinto de verano", size: 6 },
   { fragmento: "coca-cola", size: 24 }, { fragmento: "fanta", size: 24 }, { fragmento: "aquarius", size: 24 },
   { fragmento: "sprite", size: 24 }, { fragmento: "nestea", size: 24 },
@@ -75,8 +100,10 @@ function conCajas(label, qtyTexto) {
 export function conSufijo(u, sufijo) { return { u, sufijo }; }
 // Añade la info de bateas (cristalería) o el sufijo de envase (packs/cajas/paq.) a
 // la cantidad mostrada, para Word/Vista previa/texto — en la lista principal esa
-// info se muestra aparte, no mezclada en el campo editable.
-export function fmtCantidadCompleta(label, qtyTexto, sufijo) {
+// info se muestra aparte, no mezclada en el campo editable. Con una unidad puesta a
+// mano (unidadManual) manda esa: es lo que alguien ha decidido que pone ahí.
+export function fmtCantidadCompleta(label, qtyTexto, sufijo, unidadManual = false) {
+  if (unidadManual) return sufijo ? `${qtyTexto} ${sufijo}` : qtyTexto;
   const conBatea = conBateas(label, qtyTexto);
   if (conBatea !== qtyTexto) return conBatea;
   const conCaja = conCajas(label, qtyTexto);
@@ -241,7 +268,7 @@ export function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, bar
   const tablaHTML = (items, catNombre) => `
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
       <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
-      <tbody>${items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo], i) => {
+      <tbody>${items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual], i) => {
         const alq = esItemDeAlquiler(label, esAlquilerManual);
         const key = `${catNombre}::${labelOriginal ?? label}`;
         const prep = preparados[key] ? "✓" : "";
@@ -250,7 +277,7 @@ export function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, bar
         const rot = roturas[key] || "";
         return `<tr style="background:${alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#f9fafb"};">
           <td style="padding:5px 6px;">${label}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
-          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</td>
+          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</td>
           <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${prep}</td>
           <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${sale}</td>
           <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${vuelve}</td>
