@@ -1398,6 +1398,12 @@ que las de al lado, mientras días vacíos se quedaban en el mínimo. Causa: en
 UN chip por apunte sin límite; `min-height` en `.cal-celda` es un suelo, no un techo,
 y `overflow:hidden` no recorta nada porque el alto natural de la columna flex ya
 cuenta con cada chip.
+- **Deshecho por el dueño en #234** ("mostrar todos los eventos sin truncar"): la
+  casilla vuelve a enseñar todos los chips (`overflow-y: auto`) y el día cargado estira
+  su fila; prefiere verlos todos. `CHIPS_VISIBLES` y `.cal-chip-mas` quedan sin uso.
+  #234 no tocó las dos pruebas de este tope y la batería completa se quedó en rojo
+  desde el 24-09 —y con ella todos los despliegues, que no publican en rojo—; ahora
+  comprueban lo contrario: el día con cinco apuntes enseña los cinco y no hay "+N más".
 - Tope de `CHIPS_VISIBLES = 3` por casilla (constante junto a `ICONOS`); a partir del
   cuarto apunte sale un `+N más` (`.cal-chip-mas`, mismo trato visual que `.cal-mas`
   en móvil). Como `del` ya viene con los eventos primero (`porDia()`), lo que se
