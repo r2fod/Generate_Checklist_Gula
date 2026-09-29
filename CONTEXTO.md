@@ -1484,6 +1484,43 @@ tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
   demuestra.
 - Verificación: `npm run test` completo antes de fusionar.
 
+**Palabras partidas y nombres cortados en el móvil — HECHO**: captura del dueño a
+393px con la letra de Android algo grande: "Cápsul/as café (para/el/person/al)" en
+seis líneas, "Cervez/a Alham/bra", "BEBIDAS F…" y la lista leyéndose a través de la
+barra fija. Reproducido tal cual subiendo la fuente raíz al 115% (la app va en rem,
+que es lo que agranda el ajuste de accesibilidad del móvil). Nada se salía ni se
+recortaba —el barrido responsive pasaba—, solo se leía mal.
+- **Fila del item** (`FilaItem.jsx`): cantidad + envase + ✎/✕ van en un grupo
+  (`.item-controles`) y la fila hace `flex-wrap`. El nombre pide su ancho ENTERO
+  (`flex: 1 1 auto`; con `flex: 1` su base era 0 y era siempre el que cedía): si cabe
+  al lado de los controles, una línea; si no, arriba a todo el ancho y los controles
+  bajan juntos debajo. Lo decide cada fila con su contenido, sin punto de corte fijo
+  —el de 360px que había (rejilla a dos pisos) se quita: el mismo móvil fallaba o no
+  según el tamaño de letra—. `overflow-wrap: anywhere` → `break-word` (solo parte una
+  palabra si no cabe ni sola). Alto de la lista: −14% a 320px, −23% a 360, +6% a 393.
+- **Cabecera de categoría**: el nombre parte en líneas por palabras en vez de "…";
+  nunca encoge por debajo de su palabra más larga (`min-width: min-content`) y, si ni
+  esa cabe, la que baja de línea es la píldora (la cabecera hace `flex-wrap`). En
+  ≤560px los ↑ ↓ ✎ pasan de 40 a 34px de ancho (alto 40, toque ≥32 como pide la
+  prueba de zonas táctiles). A 320px la píldora baja en 8 de 12: no cabe de otra forma
+  sin esconder botones.
+- **Barra fija del móvil**: opaca (`--card-bg`) en vez de cristal: donde el desenfoque
+  no se pinta (ahorro de batería, algunos Android) la lista se leía a través. El
+  nombre del evento, en dos líneas antes que "Boda Rita y Ll…".
+- **Modo carga**: mismo problema en las filas ("(estándar/de-scafeinado)",
+  "(Seagrams/Ta-nqueray)"): `.carga-nombre` con `min-width: min-content` y la fila con
+  `flex-wrap`, así baja la cantidad antes que partir el nombre. En el Resumen, 46 de
+  130 productos salían con "…": ahora parten en líneas, con icono y nombre en bloque y
+  el ancho de columna fijo (sin `width` la tabla la estrechaba a la palabra más larga).
+  `conCortes()` (ModalModoCarga.jsx) mete `<wbr>` tras cada "/": el navegador no
+  parte ahí y "estándar/descafeinado" era una sola palabra de 170px en 132.
+- Test nuevo en `app.test.mjs` ("Ninguna palabra partida, ni con la letra grande"),
+  con `palabrasPartidas()`: mide cada tira de letras con `getClientRects()` y falla si
+  sus trozos caen en líneas distintas. 320 y 393px × letra al 100 y 115%: checklist,
+  cabeceras, barra fija y Modo carga (Salida, Vuelta, Resumen). Contra `main` sin el
+  arreglo da 20 fallos; con él, 0. Barrido a mano además en formulario (12 preguntas)
+  y calendario, y a 360/412 y letra al 130%: 0 palabras partidas, 0 recortes.
+
 **Tres planes grandes, sin código todavía, guardados por si se retoman** —
 ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
 "Orden de lectura").
