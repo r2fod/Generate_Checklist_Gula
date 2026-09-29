@@ -4183,17 +4183,17 @@ async function main() {
         return fuera === 0;
       }), `${w}px · ni los iconos ni el número se salen de su casilla`);
 
-      // Un día con muchos apuntes no puede estirar su casilla —y su fila entera de
-      // la rejilla— mucho más que las de al lado. A partir de 560px (donde salen los
-      // chips en vez de los puntos), cada casilla enseña como mucho CHIPS_VISIBLES (3,
-      // Calendario.jsx) y resume el resto en "+N más": el día completo sigue a un
-      // clic, en PanelDia.
+      // A partir de 560px (chips en vez de puntos) cada casilla enseña TODOS sus
+      // apuntes. #228 los topaba en 3 con un "+N más" para que un día cargado no
+      // estirara su fila; el dueño lo quitó en #234 ("mostrar todos los eventos sin
+      // truncar"): prefiere verlos todos de un vistazo aunque esa fila crezca. El banco
+      // tiene un día con cinco apuntes.
       if (w >= 560) {
         ok(await p.evaluate(() =>
-          [...document.querySelectorAll(".cal-celda")].every(c => c.querySelectorAll(".cal-chip").length <= 3)),
-          `${w}px · ninguna casilla enseña más de 3 chips de golpe`);
-        ok(await p.locator(".cal-chip-mas").count() > 0,
-          `${w}px · el día con más de 3 apuntes resume el resto en "+N más"`);
+          Math.max(...[...document.querySelectorAll(".cal-celda")].map(c => c.querySelectorAll(".cal-chip").length)) > 3),
+          `${w}px · el día con más de 3 apuntes los enseña todos en la casilla`);
+        ok(await p.locator(".cal-chip-mas").count() === 0,
+          `${w}px · y sin "+N más": no se esconde ninguno`);
       }
 
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda
