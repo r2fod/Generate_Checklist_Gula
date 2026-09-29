@@ -189,8 +189,10 @@ export default function Calendario({
 // móvil. Antes el móvil enseñaba solo iconos y un "×3", y el dueño lo pidió claro: ver
 // todos los eventos, sin "3 más", que así no es nada visual. La casilla crece lo que
 // haga falta (la fila entera con ella) en vez de recortar o hacer scroll por dentro.
-// En el móvil la barrita lleva lo que quepa del nombre; el nombre entero, la hora y el
-// sitio están justo debajo, en "día a día" (AgendaMes).
+// Y ningún nombre cortado: en tableta y escritorio sale entero, en las líneas que haga
+// falta; en el móvil (casillas de 45px, no cabe ni "Comunión") la barrita va sin texto,
+// solo su color, y el nombre entero, la hora y el sitio están justo debajo, en "día a
+// día" (AgendaMes).
 function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
   const semanas = semanasDelMes(anio, mes);
   return (

@@ -4311,18 +4311,32 @@ async function main() {
         const chips = [...cel.querySelectorAll(".cal-chip")];
         return {
           chips: chips.length,
-          // Visibles de verdad, con algo de nombre, y dentro de la casilla (por abajo:
-          // a lo ancho el nombre se puede recortar en el móvil, para eso está la lista)
+          // Visibles de verdad y dentro de la casilla
           vistos: chips.filter(ch => {
-            const r = ch.getBoundingClientRect(), t = ch.querySelector(".cal-chip-texto").getBoundingClientRect();
-            return r.height > 6 && t.width > 10 && r.bottom <= c.bottom + 0.5 && r.top >= c.top - 0.5;
+            const r = ch.getBoundingClientRect();
+            return r.height >= 3 && r.bottom <= c.bottom + 0.5 && r.top >= c.top - 0.5
+              && r.left >= c.left - 0.5 && r.right <= c.right + 0.5;
           }).length,
+          // Y ningún nombre a medias ("Boda de p", "Corporativ…"): el que se ve, se ve
+          // entero. En el móvil no cabe ninguno y la barrita va sin texto.
+          cortados: chips.map(ch => ch.querySelector(".cal-chip-texto"))
+            .filter(t => t.getClientRects().length && (t.scrollWidth > t.clientWidth + 1
+              || t.getBoundingClientRect().right > c.right + 0.5)).length,
           // Nada de scroll dentro de la casilla: lo que no se ve sin tocar, no se ve
           scroll: cel.scrollHeight > cel.clientHeight + 1,
         };
       }));
       ok(Math.max(...casillas.map(x => x.chips)) >= 5 && casillas.every(x => x.vistos === x.chips && !x.scroll),
         `${w}px · todas las casillas enseñan todos sus apuntes, sin scroll dentro (${casillas.filter(x => x.vistos !== x.chips || x.scroll).length} mal)`);
+      // "Pero se corta, mira bien eso, que no se corte en el calendario" (el dueño)
+      const cortados = casillas.reduce((s, x) => s + x.cortados, 0);
+      ok(cortados === 0, `${w}px · ningún nombre sale cortado en el mes (${cortados} cortados)`);
+      const partidas = await palabrasPartidas(p);
+      ok(partidas.length === 0, `${w}px · ninguna palabra partida en el calendario${partidas.length ? ` → ${partidas.slice(0, 5).join(", ")}` : ""}`);
+      // "Lo que viene" tampoco: el nombre entero, aunque baje de línea
+      ok(await p.evaluate(() => [...document.querySelectorAll(".cal-viene-nombre")]
+        .every(n => n.scrollWidth <= n.clientWidth + 1 && getComputedStyle(n).textOverflow !== "ellipsis")),
+        `${w}px · y en "Lo que viene" los nombres salen enteros`);
       ok(!/[×+]\s?\d/.test(await p.locator(".cal-mes").innerText()),
         `${w}px · y ni "×3" ni "+2 más": no se resume nada`);
       // El número del día y la gente, en la misma línea y dentro de la casilla: abajo

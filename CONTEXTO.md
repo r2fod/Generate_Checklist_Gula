@@ -1426,10 +1426,13 @@ casilla (`overflow-y: auto` de #234).
 - **Una barrita por apunte, todas, a cualquier ancho** (`Mes()`): desaparecen
   `.cal-puntos`, `.cal-mas`, `.cal-chip-mas` y `CHIPS_VISIBLES`. La casilla deja de
   ser cuadrada (`min-height` 52px móvil / 92px ≥560px) y crece con lo que lleve, la
-  fila con ella; sin scroll dentro. En el móvil la barrita es solo el nombre (lo que
-  quepa, cortado a secas) con un borde izquierdo de su color; ≥560px lleva icono,
-  nombre entero en las líneas que haga falta (parte por palabras: si no cabe con el
-  pax, baja el pax) y pax.
+  fila con ella; sin scroll dentro. **Ningún nombre cortado** (el dueño, tras ver la
+  primera versión: "pero se corta, que no se corte en el calendario"): ≥560px lleva
+  icono, nombre entero en las líneas que haga falta (parte por palabras: si no cabe
+  con el pax, baja el pax; entre 560 y 899px sin icono, que se quedaba solo en su
+  línea) y pax. En el móvil (casillas de 40-55px, no cabe entero ni "Comunión") la
+  barrita va sin texto, llena de su color (flojita lo que no es evento), y los nombres
+  enteros van justo debajo, en "día a día". "Lo que viene" tampoco corta con "…".
 - **La gente del día junto al número** (`.cal-celda-cab`), no en la esquina de abajo,
   donde tapaba la última barrita.
 - **"Octubre, día a día"** (`AgendaMes`, solo <560px): debajo del mes, una fila por
@@ -1438,7 +1441,8 @@ casilla (`overflow-y: auto` de #234).
   si viene de antes) con "hasta el N". Hoy resaltado, lo pasado apagado, los días con
   choque con el borde rojo. Tocar un día abre `PanelDia`, igual que la rejilla.
 - Pruebas en `app.test.mjs` (bloque del calendario, 320/390/768/1280): todas las
-  casillas enseñan todas sus barritas visibles y sin scroll, ni "×N" ni "+N"; la gente
+  casillas enseñan todas sus barritas visibles y sin scroll, ni "×N" ni "+N", ningún
+  nombre cortado ni palabra partida en el calendario (tampoco en "Lo que viene"); la gente
   en la línea del número; la lista día a día sale solo <560px, con los nombres enteros,
   hora y pax, lo de varios días una vez, y abre el día al tocarlo.
 
