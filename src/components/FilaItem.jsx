@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect } from "react";
 import { Tag, Asterisk, Pencil, X } from "lucide-react";
 import { IconoItem } from "./Iconos.jsx";
+import { conCortes } from "./cortes.jsx";
 import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe } from "../checklist-format.js";
 
 // ─── UNA FILA DE LA LISTA ──────────────────────────────────────────────────────
@@ -81,7 +82,7 @@ const FilaItem = memo(function FilaItem({
           <span className="item-name-lead">
             <IconoItem label={label} />
             <span className="item-label-text">
-              {label}
+              {conCortes(label)}
               {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
               {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
             </span>

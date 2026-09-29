@@ -4,6 +4,7 @@ import {
   Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag,
 } from "lucide-react";
 import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
+import { conCortes } from "./cortes.jsx";
 import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
@@ -22,12 +23,6 @@ import Escaleta from "./Escaleta.jsx";
 // del evento que ya se sincroniza en tiempo real (eventoNubeId): si varias personas
 // abren el link a la vez ven los checks de las demás al momento, y queda guardado en
 // la nube para poder consultarlo o exportarlo cuando haga falta.
-
-// El navegador no parte la línea en una "/": "(estándar/descafeinado)" o
-// "(Seagrams/Tanqueray)" son para él UNA palabra de 170px, que en la columna del
-// resumen (132px en el móvil) acababa partida por cualquier letra. <wbr> ofrece el
-// corte justo detrás de la barra sin añadir texto: innerText sigue siendo el nombre.
-const conCortes = (texto) => String(texto).split("/").flatMap((t, i) => i ? ["/", <wbr key={i} />, t] : [t]);
 
 // ─── LAS FILAS, APARTE Y MEMOIZADAS ────────────────────────────────────────────
 // Medido con Playwright (móvil simulado, CPU ×4): marcar una casilla tardaba entre

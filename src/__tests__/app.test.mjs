@@ -337,16 +337,20 @@ async function main() {
     const partidas = await palabrasPartidas(p);
     ok(partidas.length === 0, `${tag}: ninguna palabra partida en la checklist${partidas.length ? ` → ${partidas.slice(0, 5).join(", ")}` : ""}`);
 
-    // El nombre va entero en una línea al lado de sus controles, o solo en la suya con
-    // los controles debajo: nunca apretado en varias líneas junto a ellos
-    const apretados = await p.locator(".item-row").evaluateAll(rs => rs.filter(r => {
-      const t = r.querySelector(".item-label-text"), ctl = r.querySelector(".item-controles");
-      if (!t || !ctl) return false;
-      const lineas = Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight));
-      return ctl.getBoundingClientRect().top < t.getBoundingClientRect().bottom - 2 && lineas > 1;
-    }).map(r => r.querySelector(".item-label-text").textContent.trim()));
-    ok(apretados.length === 0,
-      `${tag}: ningún nombre en varias líneas al lado de su cantidad${apretados.length ? ` → ${apretados.slice(0, 4).join(" | ")}` : ""}`);
+    // Simetría: todas las cajas de cantidad (hasta 4 cifras) en UNA columna y del mismo
+    // ancho, y ✎✕ en otra. Con la fila en flex cada una caía donde le cabía —unas al
+    // lado del nombre, otras debajo— y la columna salía en zigzag ("sin simetría").
+    const columnas = await p.locator(".item-row").evaluateAll(rs => {
+      const cajas = new Set(), botones = new Set();
+      rs.forEach(r => {
+        const q = r.querySelector(".item-qty-input"), a = r.querySelector(".item-actions");
+        if (q && /^\d{1,4}$/.test(q.value)) { const b = q.getBoundingClientRect(); cajas.add(`${Math.round(b.left)}-${Math.round(b.right)}`); }
+        if (a) botones.add(Math.round(a.getBoundingClientRect().left));
+      });
+      return { cajas: [...cajas], botones: [...botones] };
+    });
+    ok(columnas.cajas.length === 1 && columnas.botones.length === 1,
+      `${tag}: cantidades y ✎✕ en columna, todas en el mismo sitio → cajas ${columnas.cajas.join(" ")} · ✎✕ ${columnas.botones.join(" ")}`);
 
     // "BEBIDAS F…" en la misma captura: el nombre de la categoría entero, y el
     // contador dentro de su tarjeta (si no cabe al lado, baja de línea)
