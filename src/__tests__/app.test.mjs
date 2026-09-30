@@ -4401,10 +4401,13 @@ async function main() {
       // los topaba en 3 con "+N más", #234 los soltó solo a partir de 560px y el móvil
       // siguió con iconos y un "×3". El dueño: "que se vean todos los eventos y no ponga
       // lo de 2 más o 3 más, que si no no es nada visual". El banco tiene un día con
-      // cinco apuntes.
+      // cinco apuntes. En el móvil van como puntos (el nombre, debajo de la semana) y
+      // las vacaciones y días cerrados no salen en la casilla, sino en su línea de la
+      // semana: son lo único que puede faltar en ella.
       const casillas = await p.evaluate(() => [...document.querySelectorAll(".cal-celda")].map(cel => {
         const c = cel.getBoundingClientRect();
-        const chips = [...cel.querySelectorAll(".cal-chip")];
+        const chips = [...cel.querySelectorAll(".cal-chip")]
+          .filter(ch => !ch.classList.contains("es-ausencia") || getComputedStyle(ch).display !== "none");
         return {
           chips: chips.length,
           // Visibles de verdad y dentro de la casilla
@@ -4422,7 +4425,7 @@ async function main() {
           scroll: cel.scrollHeight > cel.clientHeight + 1,
         };
       }));
-      ok(Math.max(...casillas.map(x => x.chips)) >= 5 && casillas.every(x => x.vistos === x.chips && !x.scroll),
+      ok(Math.max(...casillas.map(x => x.chips)) >= (w < 560 ? 3 : 5) && casillas.every(x => x.vistos === x.chips && !x.scroll),
         `${w}px · todas las casillas enseñan todos sus apuntes, sin scroll dentro (${casillas.filter(x => x.vistos !== x.chips || x.scroll).length} mal)`);
       // "Pero se corta, mira bien eso, que no se corte en el calendario" (el dueño)
       const cortados = casillas.reduce((s, x) => s + x.cortados, 0);
@@ -4443,28 +4446,32 @@ async function main() {
         return r.right <= c.right + 0.5 && Math.abs(r.bottom - n.bottom) < 4;
       })), `${w}px · la gente del día va junto al número, dentro de la casilla`);
 
-      // Por debajo de 560px el nombre entero no cabe en la casilla: debajo del mes va
-      // la lista día a día, con cada apunte, su nombre entero y sus datos. Por encima
-      // no sale, que la rejilla ya enseña los nombres.
-      const agenda = p.locator(".cal-agenda");
+      // Por debajo de 560px el nombre entero no cabe en la casilla: debajo de CADA
+      // semana va lo suyo, con el nombre entero y sus datos. Primero fue una lista al
+      // final del mes y con los datos de verdad "no se ve nada": había que bajar todo el
+      // mes para leer un nombre. Por encima de 560px no sale, la rejilla ya los enseña.
+      const listas = p.locator(".cal-semana-lista");
       if (w < 560) {
-        ok(await agenda.isVisible(), `${w}px · debajo del mes, la lista día a día`);
-        const textoAgenda = await agenda.innerText();
+        ok(await listas.count() > 0 && await listas.first().isVisible(), `${w}px · debajo de cada semana, su lista`);
+        ok(await listas.evaluateAll(ls => ls.every(l => l.previousElementSibling?.classList.contains("cal-semana"))),
+          `${w}px · cada lista va justo debajo de la fila de su semana`);
+        const textoListas = (await listas.allInnerTexts()).join("\n");
         // Los del día cargado del banco: caen siempre en el mes que abre (MES_DEMO)
         const faltan = ["Boda de prueba tres", "Comunión de prueba", "Rodaje de prueba", "Libra Zutana"]
-          .filter(t => !textoAgenda.includes(t));
+          .filter(t => !textoListas.includes(t));
         ok(faltan.length === 0, `${w}px · con el nombre entero de cada apunte${faltan.length ? ` → faltan ${faltan.join(", ")}` : ""}`);
-        ok(/180 pax/.test(textoAgenda) && /21:00/.test(textoAgenda),
+        ok(/180 pax/.test(textoListas) && /21:00/.test(textoListas),
           `${w}px · y su hora y su gente`);
-        // Unas vacaciones de cuatro días salen UNA vez, con "hasta el", no cuatro
-        ok((textoAgenda.match(/Vacas Mengano/g) || []).length === 1 && /hasta el/.test(textoAgenda),
-          `${w}px · lo que dura varios días sale una vez, con "hasta el"`);
+        // Las vacaciones, en su línea de la semana y una vez por semana, no día a día
+        const ausencias = await p.locator(".cal-semana-ausencias").allInnerTexts();
+        ok(ausencias.join(" ").includes("Vacas Mengano") && ausencias.every(t => (t.match(/Vacas Mengano/g) || []).length <= 1),
+          `${w}px · las vacaciones van en la línea de su semana, una vez (${ausencias.join(" | ").replace(/\s+/g, " ")})`);
         // Tocar un día de la lista abre su panel, como en la rejilla
-        await agenda.locator(".cal-agenda-dia", { hasText: "Boda de prueba tres" }).click();
+        await listas.locator(".cal-agenda-dia", { hasText: "Boda de prueba tres" }).click();
         ok(await p.locator(".cal-dia-panel").isVisible(), `${w}px · y tocar un día de la lista abre ese día`);
         await p.locator(".cal-dia-cerrar").click();
       } else {
-        ok(!await agenda.isVisible(), `${w}px · la lista día a día no sale: la rejilla ya enseña los nombres`);
+        ok(!await listas.first().isVisible(), `${w}px · la lista de cada semana no sale: la rejilla ya enseña los nombres`);
       }
 
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda

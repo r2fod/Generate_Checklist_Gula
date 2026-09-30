@@ -259,23 +259,34 @@
 }
 
 /* En el móvil la casilla mide 40-55px: ahí no cabe entero ni "Comunión", y un nombre
-   cortado ("Boda de p") es justo lo que el dueño no quiere ver. La barrita va sin
-   texto, llena de su color —una por apunte, se cuentan de un vistazo— y los nombres
-   enteros están justo debajo del mes, en "día a día" (AgendaMes). Lo que no es un
-   evento (vacaciones, tareas...), más flojo, como en el resto del calendario. */
+   cortado ("Boda de p") es justo lo que el dueño no quiere ver. La casilla dice qué
+   días tienen algo con un punto de su color por apunte (flojo lo que no es un evento)
+   y los nombres enteros van justo debajo de la semana (SemanaEnLista). Las
+   vacaciones y los días cerrados no salen en la casilla: van en su línea de la semana
+   y, con los datos de verdad, llenaban cada día de rayas grises. */
 @media (max-width: 559px) {
-  .cal-celda { padding: 3px 2px; gap: 3px; }
+  .cal-celda {
+    min-height: 46px;
+    padding: 3px 3px 4px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 3px;
+  }
+  .cal-celda-cab { flex: 0 0 100%; }
   /* Con .cal-celda delante: el color por tipo (más abajo) pinta el fondo flojito y,
      con la misma especificidad, ganaría por ir después */
   .cal-celda .cal-chip {
-    height: 6px;
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
     padding: 0;
-    border-radius: 3px;
+    border-radius: 50%;
     background: var(--cal-color);
   }
   .cal-chip .cal-icono, .cal-chip-texto, .cal-chip-pax { display: none; }
-  .cal-celda .cal-chip.tipo-vacaciones, .cal-celda .cal-chip.tipo-recogida,
-  .cal-celda .cal-chip.tipo-cerrado, .cal-celda .cal-chip.tipo-tarea { opacity: 0.45; height: 4px; }
+  .cal-celda .cal-chip.tipo-recogida, .cal-celda .cal-chip.tipo-tarea { opacity: 0.5; }
+  .cal-celda .cal-chip.es-ausencia { display: none; }
 }
 
 /* ─── COLOR POR TIPO ──────────────────────────────────────────────────────────
@@ -370,34 +381,41 @@
 .cal-mini-puntos .cal-punto { width: 4px; height: 4px; }
 
 /* ─── LO QUE VIENE ────────────────────────────────────────────────────────── */
-/* ─── EL MES, DÍA A DÍA (solo móvil, ver AgendaMes) ──────────────────────────
-   Lo que en la rejilla del móvil no cabe —el nombre entero, la hora, el sitio— en una
-   lista debajo. Una fila por día: la fecha grande a la izquierda, como en una agenda de
-   papel, y a su lado todo lo de ese día con el color de su tipo. */
-.cal-agenda {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--card-bg);
-  padding: 10px 12px 4px;
+/* ─── LA SEMANA, EN LISTA (solo móvil, ver SemanaEnLista) ────────────────────
+   Lo que en la casilla del móvil no cabe —el nombre entero, la hora, el sitio— justo
+   debajo de su semana. Un día por fila: la fecha grande a la izquierda, como en una
+   agenda de papel, y a su lado todo lo de ese día con el color de su tipo. Fondo un
+   punto más apagado que las casillas, para que se lea como el detalle de la fila de
+   encima y no como otra semana. */
+.cal-semana-lista {
+  padding: 2px 12px 8px;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-color);
 }
+.cal-semana-lista > .cal-agenda-dia:first-child { border-top: 0; }
+/* La fecha, en blanco sobre el fondo apagado de la lista */
+.cal-semana-lista .cal-agenda-fecha { background: var(--card-bg); }
 
-.cal-agenda-titulo {
-  margin: 0 0 6px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+/* Quien falta esa semana, en una línea: "Raúl 1–2 · Ana 7–13" */
+.cal-semana-ausencias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 8px 0 2px;
+  border-top: 1px dashed var(--border-color);
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
-
-.cal-agenda-vacio { color: var(--text-muted); font-size: 0.85rem; padding-bottom: 8px; }
+.cal-semana-lista > .cal-semana-ausencias:first-child { border-top: 0; }
+.cal-ausencia { display: inline-flex; align-items: center; gap: 5px; }
+.cal-ausencia b { font-weight: 800; }
 
 .cal-agenda-dia {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   width: 100%;
-  padding: 9px 0;
+  padding: 8px 0;
   border: 0;
   border-top: 1px solid var(--border-color);
   background: none;
@@ -718,8 +736,8 @@
   .cal-chip { align-items: flex-start; flex-wrap: wrap; column-gap: 4px; row-gap: 0; }
   .cal-chip .cal-icono { margin-top: 2px; flex: 0 0 auto; }
   .cal-chip-texto { flex: 1 1 0; min-width: min-content; white-space: normal; overflow-wrap: break-word; }
-  /* La rejilla ya enseña los nombres: la lista de debajo sobraría */
-  .cal-agenda { display: none; }
+  /* La rejilla ya enseña los nombres: la lista de cada semana sobraría */
+  .cal-semana-lista { display: none; }
 }
 
 /* Tableta: la casilla mide 75-125px y el icono se quedaba solo en su línea, encima del
