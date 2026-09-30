@@ -138,12 +138,8 @@ export default function Calendario({
       )}
 
       {vista === "mes" && (
-        <>
-          <Mes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
-               onDia={abrirDia} abierto={diaAbierto} />
-          <AgendaMes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
-                     onDia={abrirDia} />
-        </>
+        <Mes anio={cursor.anio} mes={cursor.mes} mapa={mapa} hoy={hoy} enChoque={diasEnChoque}
+             onDia={abrirDia} abierto={diaAbierto} />
       )}
       {vista === "anio" && (
         <Anio anio={cursor.anio} mapa={mapa} hoy={hoy}
@@ -190,9 +186,10 @@ export default function Calendario({
 // todos los eventos, sin "3 más", que así no es nada visual. La casilla crece lo que
 // haga falta (la fila entera con ella) en vez de recortar o hacer scroll por dentro.
 // Y ningún nombre cortado: en tableta y escritorio sale entero, en las líneas que haga
-// falta; en el móvil (casillas de 45px, no cabe ni "Comunión") la barrita va sin texto,
-// solo su color, y el nombre entero, la hora y el sitio están justo debajo, en "día a
-// día" (AgendaMes).
+// falta. En el móvil (casillas de 45px, no cabe ni "Comunión") el mes va por semanas:
+// la fila de los siete días marca con puntos de color qué días tienen algo, y justo
+// debajo van los de esa semana con su nombre entero (SemanaEnLista). Con barritas sin
+// texto y la lista al final del mes, el dueño lo vio con sus datos y "no se ve nada".
 function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
   const semanas = semanasDelMes(anio, mes);
   return (
@@ -201,7 +198,8 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
         {INICIAL_DIA.map((d, i) => <div key={i} className="cal-dia-nombre">{d}</div>)}
       </div>
       {semanas.map((semana, i) => (
-        <div className="cal-semana" key={i}>
+        <React.Fragment key={i}>
+        <div className="cal-semana">
           {semana.map((dia, j) => {
             const del = (dia && mapa[dia]) || [];
             // El "dia &&" del día abierto no sobra: los huecos del principio y del final
@@ -211,7 +209,7 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             const esAbierto = Boolean(dia) && dia === abierto;
             // Cuánta gente hay ese día en total. El número es lo que de verdad dice si
             // el día es un problema: tres bodas pueden ser 40 comensales o 330.
-            const paxDia = del.reduce((s, a) => s + (a.pax || 0), 0);
+            const paxDia = del.reduce((s, a) => s + (Number(a.pax) || 0), 0);
             // El color de la casilla lo manda el primer EVENTO del día, no el primer
             // apunte: si no, un día con una boda y unas vacaciones se pintaría del gris
             // de las vacaciones y la boda desaparecería del mes.
@@ -241,7 +239,7 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                 {/* Como "del" ya viene con los eventos primero (porDia, en apuntes.js),
                     arriba va siempre lo importante y debajo vacaciones, tareas... */}
                 {del.map(a => (
-                  <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
+                  <span key={a.id} className={`cal-chip tipo-${a.tipo}${AUSENCIAS.has(a.tipo) ? " es-ausencia" : ""}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
                     <span className="cal-chip-texto">
                       {a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}
@@ -253,31 +251,50 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             );
           })}
         </div>
+        <SemanaEnLista semana={semana} mapa={mapa} hoy={hoy} enChoque={enChoque} onDia={onDia} />
+        </React.Fragment>
       ))}
     </div>
   );
 }
 
-// ─── EL MES, DÍA A DÍA (MÓVIL) ────────────────────────────────────────────────
-// En el móvil la casilla mide 45px: la barrita dice qué hay y de qué color, pero el
-// nombre entero no cabe. Aquí debajo va todo el mes en lista, día por día, con nombre,
-// hora, sitio y pax, sin tener que ir abriendo los días uno a uno. Tocar un día abre
-// su panel, igual que en la rejilla. Por encima de 560px no sale: allí la rejilla ya
-// enseña los nombres.
+// ─── LA SEMANA, EN LISTA (MÓVIL) ─────────────────────────────────────────────
+// Debajo de cada fila de siete días, lo de esa semana con el nombre entero, la hora,
+// el sitio y el pax: el nombre no cabe en una casilla de 45px y cortado no sirve. Día a
+// día, con la fecha grande a la izquierda como en una agenda de papel; tocar uno abre
+// su panel, igual que la casilla. Por encima de 560px no sale: la rejilla ya enseña
+// los nombres.
 //
-// Lo que dura varios días (unas vacaciones) sale una vez, el día que empieza —o el 1,
-// si viene del mes anterior— con "hasta el N": repetido en cada día llenaba la lista
-// de lo mismo y tapaba los eventos.
-function AgendaMes({ anio, mes, mapa, hoy, enChoque, onDia }) {
-  const dias = semanasDelMes(anio, mes).flat().filter(Boolean);
-  const primero = dias[0];
+// Las vacaciones y los días cerrados no son trabajo que preparar sino gente que falta:
+// con los datos de verdad eran la mitad de lo apuntado y tapaban las bodas. Van en una
+// línea al final de la semana ("Raúl 1–2 · Ana 7–13"), no repetidos día a día. Lo demás
+// que dura varios días sale una vez, el primero de la semana, con "hasta el N".
+const AUSENCIAS = new Set(["vacaciones", "cerrado"]);
+
+function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia }) {
+  const dias = semana.filter(Boolean);
+  if (!dias.length) return null;
+  const primero = dias[0], ultimo = dias[dias.length - 1];
   const filas = dias
-    .map(dia => ({ dia, lista: (mapa[dia] || []).filter(a => a.fecha === dia || (dia === primero && a.fecha < dia)) }))
+    .map(dia => ({ dia, lista: (mapa[dia] || []).filter(a => !AUSENCIAS.has(a.tipo)
+      && (a.fecha === dia || (dia === primero && a.fecha < dia))) }))
     .filter(f => f.lista.length);
+  // Cada ausencia una vez, con los días que caen en esta semana
+  const ausencias = [];
+  const vistas = new Set();
+  for (const dia of dias) {
+    for (const a of mapa[dia] || []) {
+      if (!AUSENCIAS.has(a.tipo) || vistas.has(a.id)) continue;
+      vistas.add(a.id);
+      const desde = a.fecha < primero ? primero : a.fecha;
+      const hasta = !a.hasta ? a.fecha : a.hasta > ultimo ? ultimo : a.hasta;
+      const d1 = Number(desde.slice(8)), d2 = Number(hasta.slice(8));
+      ausencias.push({ a, dias: d1 === d2 ? String(d1) : `${d1}–${d2}` });
+    }
+  }
+  if (!filas.length && !ausencias.length) return null;
   return (
-    <section className="cal-agenda" aria-label={`${NOMBRE_MES[mes - 1]}, día a día`}>
-      <h3 className="cal-agenda-titulo">{NOMBRE_MES[mes - 1]}, día a día</h3>
-      {filas.length === 0 && <div className="cal-agenda-vacio">Nada apuntado este mes.</div>}
+    <div className="cal-semana-lista">
       {filas.map(({ dia, lista }) => {
         const f = aFecha(dia);
         const numero = numeraRepetidos(mapa[dia] || []);
@@ -314,7 +331,17 @@ function AgendaMes({ anio, mes, mapa, hoy, enChoque, onDia }) {
           </button>
         );
       })}
-    </section>
+      {ausencias.length > 0 && (
+        <div className="cal-semana-ausencias">
+          {ausencias.map(({ a, dias: rango }) => (
+            <span key={a.id} className={`cal-ausencia tipo-${a.tipo}`}>
+              <IconoTipo tipo={a.tipo} size={13} />
+              <span>{a.titulo} <b>{rango}</b></span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

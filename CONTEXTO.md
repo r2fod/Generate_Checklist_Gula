@@ -1431,20 +1431,31 @@ casilla (`overflow-y: auto` de #234).
   icono, nombre entero en las líneas que haga falta (parte por palabras: si no cabe
   con el pax, baja el pax; entre 560 y 899px sin icono, que se quedaba solo en su
   línea) y pax. En el móvil (casillas de 40-55px, no cabe entero ni "Comunión") la
-  barrita va sin texto, llena de su color (flojita lo que no es evento), y los nombres
-  enteros van justo debajo, en "día a día". "Lo que viene" tampoco corta con "…".
+  casilla lleva un punto de su color por apunte y los nombres van debajo de la semana
+  (ver abajo). "Lo que viene" tampoco corta con "…".
 - **La gente del día junto al número** (`.cal-celda-cab`), no en la esquina de abajo,
   donde tapaba la última barrita.
-- **"Octubre, día a día"** (`AgendaMes`, solo <560px): debajo del mes, una fila por
-  día con algo, fecha grande a la izquierda y cada apunte con su nombre entero, tipo,
-  hora, sitio y pax. Lo que dura varios días sale una vez (el día que empieza, o el 1
-  si viene de antes) con "hasta el N". Hoy resaltado, lo pasado apagado, los días con
-  choque con el borde rojo. Tocar un día abre `PanelDia`, igual que la rejilla.
+- **El móvil, por semanas** (`SemanaEnLista`, solo <560px). Primero fueron barritas
+  sin texto y una lista "día a día" al final del mes: el dueño lo vio con sus datos
+  de verdad (muchas vacaciones y tareas) y "no se ve nada, cámbialo". Ahora cada fila
+  de siete días marca con un punto de su color cada evento, tarea o recogida (flojos
+  los que no son evento), y JUSTO DEBAJO de esa fila va lo de esa semana: un día por
+  fila, fecha grande a la izquierda y cada apunte con su nombre entero, tipo, hora,
+  sitio y pax. Lo que dura varios días sale una vez (el primer día de la semana en
+  que cae) con "hasta el N". Las vacaciones y los días cerrados (`AUSENCIAS`) no salen
+  en la casilla: van en una línea al final de su semana ("Raúl 1–2 · Ana 7–13"). Hoy
+  resaltado, lo pasado apagado, los días con choque con el borde rojo. Tocar un día de
+  la lista abre `PanelDia`, igual que la casilla.
+- El total de gente del día suma con `Number(a.pax)`: en la captura del dueño un día
+  salía "10015"; los apuntes pasan por `saneaApunte`, que solo guarda pax numéricos,
+  así que lo más probable es un apunte con el pax mal tecleado — el `Number` es por si
+  entra uno como texto por otro camino.
 - Pruebas en `app.test.mjs` (bloque del calendario, 320/390/768/1280): todas las
   casillas enseñan todas sus barritas visibles y sin scroll, ni "×N" ni "+N", ningún
   nombre cortado ni palabra partida en el calendario (tampoco en "Lo que viene"); la gente
-  en la línea del número; la lista día a día sale solo <560px, con los nombres enteros,
-  hora y pax, lo de varios días una vez, y abre el día al tocarlo.
+  en la línea del número; en el móvil, una lista justo debajo de cada semana con los
+  nombres enteros, hora y pax, las vacaciones en su línea una vez por semana, y tocar
+  un día lo abre; por encima de 560px la lista no sale.
 
 **Todas las filas con su unidad, y editable a mano — HECHO**: el dueño: "hay cosas que
 no tienen unidades o cajas; analiza bien y ponle a todos, permite poder editarlo si se
