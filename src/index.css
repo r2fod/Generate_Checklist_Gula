@@ -4580,6 +4580,111 @@ hr {
 .item-edit-flag svg { display: inline; vertical-align: -1px; }
 .tag-alquiler { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }
 
+/* ─── A MEDIAS: LO QUE FALTA POR LLEGAR ──────────────────────────────────────
+   Preparado en parte y el resto pendiente (lo trae el proveedor...). Se apunta en
+   Modo carga · Prep. con el reloj de arena y se ve en ámbar en todas partes: en la
+   fila, en la lista normal y en el recuadro de arriba de Modo carga. */
+.tag-pendiente {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.carga-row.is-pendiente { background: var(--aviso-bg); box-shadow: inset 4px 0 0 var(--aviso-borde); }
+
+.carga-pendiente-tag {
+  display: block;
+  margin-top: 3px;
+  flex-basis: 100%;
+  color: var(--aviso-texto);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.carga-pendiente-tag svg { vertical-align: -1px; margin-right: 3px; }
+
+/* El reloj de arena de cada fila de Prep.: discreto hasta que hay algo pendiente */
+.carga-pendiente-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.carga-pendiente-btn.is-on { border-color: var(--aviso-borde); background: var(--aviso-bg-fuerte); color: var(--aviso-texto); }
+
+.carga-pendiente-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 16px 14px 54px;
+}
+.carga-pendiente-campo { display: flex; flex-direction: column; gap: 4px; flex: 0 1 140px; min-width: 0; }
+.carga-pendiente-campo.carga-pendiente-nota { flex: 1 1 200px; }
+.carga-pendiente-campo span { font-size: 0.74rem; font-weight: 700; color: var(--text-muted); }
+/* 16px: por debajo iOS hace zoom al enfocar */
+.carga-pendiente-campo input {
+  font: inherit;
+  font-size: 16px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border-color-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  min-width: 0;
+}
+.carga-pendiente-acciones { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.carga-pendiente-acciones .btn { min-height: 42px; }
+
+/* El recuadro de arriba: todo lo que falta, junto */
+.carga-pendientes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--aviso-borde);
+  border-radius: 12px;
+  background: var(--aviso-bg);
+  color: var(--aviso-texto);
+}
+.carga-pendientes-titulo { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: 0.88rem; margin-bottom: 4px; }
+.carga-pendientes-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  min-height: 40px;
+  padding: 6px 0;
+  border: 0;
+  border-top: 1px solid var(--aviso-borde);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+.carga-pendientes-item strong { font-weight: 800; }
+
 /* Indicador "Guardado ✓": chip flotante abajo-derecha que aparece un instante */
 .guardado-indicador {
   position: fixed;

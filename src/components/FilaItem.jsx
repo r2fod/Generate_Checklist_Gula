@@ -1,5 +1,5 @@
 import { memo, useState, useRef, useEffect } from "react";
-import { Tag, Asterisk, Pencil, X } from "lucide-react";
+import { Tag, Asterisk, Pencil, X, Hourglass } from "lucide-react";
 import { IconoItem } from "./Iconos.jsx";
 import { conCortes } from "./cortes.jsx";
 import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe, plural, envaseSegunCantidad } from "../checklist-format.js";
@@ -14,7 +14,7 @@ import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe, plural, envaseSegunCantidad 
 // si se pasaran como funciones sueltas se crearían nuevas en cada render y la
 // memoización no serviría de nada.
 const FilaItem = memo(function FilaItem({
-  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo, unidadManual = false,
+  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo, unidadManual = false, pendiente,
   editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones, soloMarcar = false,
 }) {
   const alq = esItemDeAlquiler(label, esAlquilerManual);
@@ -102,6 +102,13 @@ const FilaItem = memo(function FilaItem({
               {conCortes(label)}
               {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
               {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+              {/* A medias: falta parte por llegar (se apunta en Modo carga · Prep.). Aquí
+                  también, para que quien mira la lista no lo dé por preparado. */}
+              {pendiente && (
+                <span className="tag-pendiente" title={`Faltan ${pendiente.faltan}${pendiente.nota ? ` · ${pendiente.nota}` : ""}. Se apunta en Modo carga.`}>
+                  <Hourglass size={10} /> FALTAN {pendiente.faltan}
+                </span>
+              )}
             </span>
           </span>
         </div>

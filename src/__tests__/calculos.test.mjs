@@ -427,6 +427,10 @@ console.log("\n══ Sanear el estado que entra ══");
   ok(!("unidadesManuales" in sanearEstado({ unidadesManuales: ["cajas"] }))
     && sanearEstado({ unidadesManuales: { "Bebidas::Nestea": "packs" } }).unidadesManuales["Bebidas::Nestea"] === "packs",
     "las unidades puestas a mano se vigilan: un mapa pasa, una lista se tira");
+  // Y lo que falta por preparar, igual
+  ok(!("pendientes" in sanearEstado({ pendientes: "faltan 3" }))
+    && sanearEstado({ pendientes: { "Bebidas::Nestea": { faltan: "3" } } }).pendientes["Bebidas::Nestea"].faltan === "3",
+    "lo que falta por preparar se vigila: un mapa pasa, un texto se tira");
 }
 
 console.log("\n══ Instalar el formulario: qué aviso toca en cada móvil ══");
