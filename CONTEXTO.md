@@ -5,6 +5,8 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 
 - Rama `main` · Firebase: `gula-checklist`
 - **Reglas del dueño → `CLAUDE.md`** (se carga solo en cada sesión). Léelo primero.
+  Con Gemini se carga `GEMINI.md`, que importa ese mismo `CLAUDE.md`: las reglas son
+  las mismas para cualquier IA.
 - **Estado del plan de mejoras (N1–N6, A–D) → `PLAN_MEJORAS.md`.** No se repite aquí: ese
   archivo lleva su propia tabla de hecho/pendiente por ítem, con su porqué y su tamaño, y
   apunta de vuelta aquí (`Ver CONTEXTO.md, "..."`) para el detalle técnico de cada uno.
@@ -462,7 +464,76 @@ está en el historial de git y en las pruebas que los cubren):
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
 
-## Qué queda pendiente ahora mismo (2026-09-07)
+## Qué queda pendiente ahora mismo (2026-09-30)
+
+### Estado de HOY (2026-09-30) — léelo primero si retomas (Claude, Gemini u otra IA)
+
+**En producción** (publicado en `gh-pages`, comprobado en Actions): todo `main` hasta
+#245. Lo último de esta tanda, cada uno con su entrada "— HECHO" más abajo:
+- #241 calendario con todos los apuntes a la vista, sin "+N" ni nombres cortados;
+- #242 todas las filas con su unidad, y editable a mano (`unidadesManuales`);
+- #243 y #244 calendario del móvil por semanas, con la lista debajo de cada una y la
+  semana en curso la primera;
+- #245 Modo carga: lo que falta por preparar (`pendientes`).
+
+**PR abiertos que NO son para fusionar sin el dueño**: #221, #222, #231 y #232 (este
+último es de seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
+fusionarlos por mucho que estén en verde.
+
+**Pendiente de código** (sin empezar): presupuesto y margen por evento
+(`PLAN_PRESUPUESTO.md`, fase 1 de `PLAN_COCINA.md`) y plan de logística por persona
+con el asistente. El dueño no ha dicho cuál va primero: preguntar.
+
+**Pendiente de datos del calendario (en Firestore, no en el código)**:
+- 2026-09-30 se volvió a cruzar la hoja de Google "CALENDARIO GULA" (pestaña del
+  calendario de 2026 + la de bodas, que trae también las de 2027) con lo que había en
+  la app, y el dueño pegó con "Añadir varios apuntes de golpe" los 30 que faltaban.
+- **Sobran todavía, a borrar a mano en la app (o con permiso expreso del dueño)**:
+  unos 29 apuntes que la importación del 14/9 puso en el mes equivocado. Son días del
+  mes anterior/siguiente que la hoja pinta al principio o al final de cada mes y se
+  leyeron con el mes del bloque:
+  - 1 y 3 de abril: son del 1 y 3 de mayo;
+  - 1–5 de junio: son del 1–5 de julio;
+  - 28–31 de octubre: son del 28–30 de septiembre;
+  - 4 de diciembre: es del 4 de julio.
+
+  Además hay un "Día cerrado" el 2/11 que ya no está en la hoja, varios repetidos (el
+  mismo evento con dos títulos distintos, uno de la hoja y otro creado en la app) y
+  dos producciones del 8 y 9 de octubre que siguen también como "Posible …" junto a la
+  versión confirmada. El dueño aún no ha dicho si los borra él o que se borren por él.
+- **Cómo leer esa hoja sin repetir el fallo** (lo que funcionó):
+  - Son dos bloques de 7 columnas (C–I enero–junio, K–Q julio–diciembre), con una fila
+    de mes y otra de "L M X J V S D", y luego filas de números de día seguidas de las
+    filas de apuntes.
+  - La fecha de cada fila de días se ancla por el DÍA DE LA SEMANA: se busca en qué
+    mes (el del bloque, el anterior o el siguiente) cae ese número en esa columna, y
+    se vota entre todas las celdas de la fila. Así salen bien los días que arrastran
+    de otro mes, los tapados con texto ("Día cerrado") y las erratas ("16 17 17 19").
+    Una fila puede mezclar números y apuntes: los números de sábado/domingo de un mes
+    nuevo a veces van en la misma fila que apuntes de la semana.
+  - Se ignoran: las filas con etiqueta en A/B (turnos del personal), las columnas
+    fuera del bloque (importes, notas sueltas) y todo lo que va debajo del calendario
+    (otra tabla, "APERTURA GULA BAR", con su propio mini-calendario que da fechas
+    falsas).
+  - Comparar con lo que ya hay en la app por fecha y título NORMALIZADO igual, no por
+    parecido: con parecido, "Posible Produ X" se daba por igual a "Produ X, 73 pax" y
+    se perdía la confirmación.
+  - Antes de dar el JSON, meterlo en `saneaLista` + `mezclaApuntes` contra una copia
+    del calendario actual: tienen que entrar todos, ninguno repetido.
+  - El JSON lleva nombres de clientes y del equipo: NUNCA al repositorio (es público).
+    Se le pasa al dueño aparte y lo pega él en Calendario → "Añadir varios apuntes de
+    golpe", que solo añade (no borra ni cambia nada).
+
+**Cómo se ha trabajado esta tanda** (sirve igual para otra IA):
+- Una rama por cambio, PR en borrador y fusión solo con `npm run lint`,
+  `npm run tipos`, `npm run test:rapido` Y la batería completa (`npm run test`,
+  ~45 min, ~2500 comprobaciones) en verde, con capturas revisadas si es visual.
+- Mientras corre una batería no se toca el código de esa carpeta ("File Lock" de
+  `CLAUDE.md`). Para seguir trabajando en paralelo: `git worktree add` en otra
+  carpeta, con `node_modules` enlazado y otro puerto para las pruebas.
+- Al fusionar en `main`, "Publicar" vuelve a pasar la batería entera y luego sube
+  `dist/` a `gh-pages` (~35 min). No decir "ya está en la app" hasta que ese job
+  termine en verde.
 
 Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo, igualar
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
@@ -1367,7 +1438,10 @@ Google nunca habían llegado al calendario de la app.
   repo (viven en Firestore, no en el código): el JSON se le pasó al dueño aparte.
   Excluidos de esta pasada por datos poco fiables en la hoja de origen: junio, julio
   y diciembre (semanas mal cuadradas o contenido duplicado/vacío) — quedan
-  pendientes de repasar a mano.
+  pendientes de repasar a mano. **Repasado el 2026-09-30**: esa importación leyó con
+  el mes del bloque los días de otro mes que la hoja pinta en la primera o la última
+  fila de cada mes. Lo que falta, lo que sobra y cómo leer la hoja bien están en
+  "Estado de HOY", al final.
 
 **Modo carga → Resumen: la tabla se ajustaba al pixel justo y podía obligar a
 arrastrar — HECHO**: el dueño lo vio en la app real (captura). `.resumen-tabla-producto`
