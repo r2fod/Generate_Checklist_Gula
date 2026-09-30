@@ -192,14 +192,26 @@ export default function Calendario({
 // texto y la lista al final del mes, el dueño lo vio con sus datos y "no se ve nada".
 function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
   const semanas = semanasDelMes(anio, mes);
+  // En el mes de hoy, lo primero es la semana en curso (lo pidió el dueño): las que ya
+  // pasaron se pliegan tras un botón y se abren si se quieren ver. Solo en el móvil,
+  // donde cada semana lleva su lista y había que bajar por las pasadas para llegar a
+  // la de ahora; en pantalla ancha el mes entero cabe de un vistazo (ver el CSS).
+  const [verPasadas, setVerPasadas] = useState(false);
+  const pasadas = Math.max(0, semanas.findIndex(s => s.includes(hoy)));
   return (
     <div className="cal-mes">
       <div className="cal-cabecera">
         {INICIAL_DIA.map((d, i) => <div key={i} className="cal-dia-nombre">{d}</div>)}
       </div>
+      {pasadas > 0 && (
+        <button type="button" className="cal-ver-pasadas" aria-expanded={verPasadas} onClick={() => setVerPasadas(v => !v)}>
+          {verPasadas ? "Ocultar las semanas pasadas"
+            : pasadas === 1 ? "Ver la semana pasada" : `Ver las ${pasadas} semanas pasadas`}
+        </button>
+      )}
       {semanas.map((semana, i) => (
         <React.Fragment key={i}>
-        <div className="cal-semana">
+        <div className={`cal-semana${i < pasadas && !verPasadas ? " es-pasada" : ""}`}>
           {semana.map((dia, j) => {
             const del = (dia && mapa[dia]) || [];
             // El "dia &&" del día abierto no sobra: los huecos del principio y del final
@@ -251,7 +263,8 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             );
           })}
         </div>
-        <SemanaEnLista semana={semana} mapa={mapa} hoy={hoy} enChoque={enChoque} onDia={onDia} />
+        <SemanaEnLista semana={semana} mapa={mapa} hoy={hoy} enChoque={enChoque} onDia={onDia}
+                       pasada={i < pasadas && !verPasadas} />
         </React.Fragment>
       ))}
     </div>
@@ -271,7 +284,7 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
 // que dura varios días sale una vez, el primero de la semana, con "hasta el N".
 const AUSENCIAS = new Set(["vacaciones", "cerrado"]);
 
-function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia }) {
+function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia, pasada = false }) {
   const dias = semana.filter(Boolean);
   if (!dias.length) return null;
   const primero = dias[0], ultimo = dias[dias.length - 1];
@@ -294,7 +307,7 @@ function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia }) {
   }
   if (!filas.length && !ausencias.length) return null;
   return (
-    <div className="cal-semana-lista">
+    <div className={`cal-semana-lista${pasada ? " es-pasada" : ""}`}>
       {filas.map(({ dia, lista }) => {
         const f = aFecha(dia);
         const numero = numeraRepetidos(mapa[dia] || []);

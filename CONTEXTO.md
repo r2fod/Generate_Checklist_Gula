@@ -1446,6 +1446,11 @@ casilla (`overflow-y: auto` de #234).
   en la casilla: van en una línea al final de su semana ("Raúl 1–2 · Ana 7–13"). Hoy
   resaltado, lo pasado apagado, los días con choque con el borde rojo. Tocar un día de
   la lista abre `PanelDia`, igual que la casilla.
+- **La semana en curso, lo primero** (el dueño: "estaría bien que esté al principio la
+  semana activa"). En el mes de hoy, en el móvil, las semanas que ya pasaron se
+  pliegan tras un botón ("Ver las N semanas pasadas", `.cal-ver-pasadas`; clase
+  `es-pasada` en la fila y en su lista) y la primera fila que se ve es la de hoy. En
+  otros meses y en ancho (≥560px) se ve el mes entero, como siempre.
 - El total de gente del día suma con `Number(a.pax)`: en la captura del dueño un día
   salía "10015"; los apuntes pasan por `saneaApunte`, que solo guarda pax numéricos,
   así que lo más probable es un apunte con el pax mal tecleado — el `Number` es por si
@@ -1455,7 +1460,8 @@ casilla (`overflow-y: auto` de #234).
   nombre cortado ni palabra partida en el calendario (tampoco en "Lo que viene"); la gente
   en la línea del número; en el móvil, una lista justo debajo de cada semana con los
   nombres enteros, hora y pax, las vacaciones en su línea una vez por semana, y tocar
-  un día lo abre; por encima de 560px la lista no sale.
+  un día lo abre; en el mes de hoy la primera semana que se ve es la de hoy y el botón
+  despliega las pasadas; por encima de 560px la lista no sale y el mes sale entero.
 
 **Todas las filas con su unidad, y editable a mano — HECHO**: el dueño: "hay cosas que
 no tienen unidades o cajas; analiza bien y ponle a todos, permite poder editarlo si se

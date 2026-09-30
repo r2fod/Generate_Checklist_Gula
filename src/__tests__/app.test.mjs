@@ -4479,7 +4479,8 @@ async function main() {
       // cinco apuntes. En el móvil van como puntos (el nombre, debajo de la semana) y
       // las vacaciones y días cerrados no salen en la casilla, sino en su línea de la
       // semana: son lo único que puede faltar en ella.
-      const casillas = await p.evaluate(() => [...document.querySelectorAll(".cal-celda")].map(cel => {
+      // (Solo las semanas a la vista: en el mes de hoy las pasadas van plegadas)
+      const casillas = await p.evaluate(() => [...document.querySelectorAll(".cal-celda")].filter(c => c.getClientRects().length).map(cel => {
         const c = cel.getBoundingClientRect();
         const chips = [...cel.querySelectorAll(".cal-chip")]
           .filter(ch => !ch.classList.contains("es-ausencia") || getComputedStyle(ch).display !== "none");
@@ -4545,8 +4546,31 @@ async function main() {
         await listas.locator(".cal-agenda-dia", { hasText: "Boda de prueba tres" }).click();
         ok(await p.locator(".cal-dia-panel").isVisible(), `${w}px · y tocar un día de la lista abre ese día`);
         await p.locator(".cal-dia-cerrar").click();
+
+        // En el mes de hoy, lo primero es la semana en curso (lo pidió el dueño): las que
+        // ya pasaron van plegadas tras un botón, y se pueden abrir
+        await p.locator(".cal-hoy").click();
+        await p.waitForTimeout(300);
+        const semanasVisibles = () => p.locator(".cal-semana").evaluateAll(ss => ss.filter(x => x.getClientRects().length).length);
+        ok(await p.locator(".cal-semana").evaluateAll(ss => {
+          const primera = ss.find(x => x.getClientRects().length);
+          return !!primera && !!primera.querySelector(".cal-celda.es-hoy");
+        }), `${w}px · en el mes de hoy la primera semana que se ve es la de hoy`);
+        const boton = p.locator(".cal-ver-pasadas");
+        if (await boton.count()) {
+          const antes = await semanasVisibles();
+          await boton.click();
+          ok(await semanasVisibles() > antes, `${w}px · y el botón despliega las semanas pasadas (${antes} → ${await semanasVisibles()})`);
+          await boton.click();
+        }
       } else {
         ok(!await listas.first().isVisible(), `${w}px · la lista de cada semana no sale: la rejilla ya enseña los nombres`);
+        // Y el mes entero, sin plegar nada: en ancho cabe de un vistazo
+        await p.locator(".cal-hoy").click();
+        await p.waitForTimeout(300);
+        ok(await p.locator(".cal-semana").evaluateAll(ss => ss.every(x => x.getClientRects().length))
+          && !await p.locator(".cal-ver-pasadas").isVisible(),
+          `${w}px · en ancho el mes de hoy sale entero, sin semanas plegadas`);
       }
 
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda
