@@ -478,8 +478,8 @@ está en el historial de git y en las pruebas que los cubren):
   semana en curso la primera;
 - #245 Modo carga: lo que falta por preparar (`pendientes`).
 
-**PR abiertos que NO son para fusionar sin el dueño**: #221, #222, #231 y #232 (este
-último es de seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
+**PR abiertos que NO son para fusionar sin el dueño**: #221, #222, #231, #233, #237
+y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
 fusionarlos por mucho que estén en verde.
 
 **Pendiente de código** (sin empezar): presupuesto y margen por evento

@@ -4,6 +4,29 @@
 > lo que se enlaza. Al cerrar algo, se quita de aquí en el mismo commit (igual que
 > `CONTEXTO.md`). Repo público: ni nombres, ni importes, ni datos de clientes.
 
+## 0. Mejoras grandes que propuso el dueño (planes escritos, sin código)
+
+1. **Presupuesto y margen por evento**: el primero, porque reutiliza los costes que ya
+   se calculan. Ver `PLAN_PRESUPUESTO.md`.
+2. **Cocina**: recetario, escandallo (coste real por ración) y lista de la compra.
+   Ver `PLAN_COCINA.md`.
+3. **Inventario inteligente**: lo que hay en el almacén alimenta la checklist, que
+   dice sola cuánto alquilar o comprar, y avisa de caducidades. Ver
+   `PLAN_INVENTARIO.md`. La parte de material (carpas, sillas, menaje) puede
+   empezar ya; la de ingredientes necesita Cocina.
+4. **Vista de logística por persona, con el asistente dentro** ("cámbiale el horario
+   a…", "añádele tal tarea"). El plan está en el PR #221 (`PLAN_LOGISTICA.md`), aún
+   sin fusionar. **Ojo**: ese plan lleva nombres reales del equipo; hay que quitarlos
+   antes de fusionar.
+5. **Auditoría de funcionalidad**: 16 fallos (uno crítico en el formulario y varios
+   altos en calendario y checklist) más mejoras de uso. El plan está en el PR #231
+   (sección E de `PLAN_MEJORAS.md`), aún sin fusionar.
+6. **Sin fecha**: marketing con Meta (A4 v2 y v3), gasto global (D2) y memoria
+   semántica (D3).
+
+Los tres primeros van en ese orden, porque cada uno reutiliza el anterior. El 4 y el
+5 son independientes.
+
 ## 1. Código, listo para empezar (preguntar al dueño el orden)
 
 - **Presupuesto y margen por evento**: el diseño ya está fijado en
@@ -18,11 +41,21 @@
 
 ## 2. Decisión del dueño
 
-- **PR abiertos #221, #222, #231 y #232**: no se fusionan sin él. #232 es de
-  seguridad y necesita revisión humana (`CLAUDE.md`).
+- **PR abiertos que esperan su revisión** (ninguno se fusiona sin él):
+  - #221: plan de logística (ver 0.4);
+  - #222: Modo carga a 320px, plegar "Tiempos estimados";
+  - #231: plan de la auditoría (ver 0.5);
+  - #232 (seguridad): un enlace "para marcar" instalado se abría en modo edición;
+  - #233: las Fantas se quedaban cortas, y la calibración pasa de 4 a 8 bebidas;
+  - #237 (toca seguridad): calibración de tiempos un 20% corta, HTML que se ejecutaba
+    en el PDF y líneas `null`.
+
+  Los de seguridad necesitan revisión humana (`CLAUDE.md`). Los de código llevan
+  tiempo abiertos: habrá que traerles `main` y volver a pasar la batería antes.
 - **Modo carga a 320px**: la cabecera (escaleta, cronómetros y, desde #245, el
   recuadro "Falta por preparar") tapa el primer ítem. Hay que decidir qué se pliega
-  por defecto. Detalle en `CONTEXTO.md`, "Auditoría visual móvil…", punto 3.
+  por defecto; #222 propone una parte. Detalle en `CONTEXTO.md`, "Auditoría visual
+  móvil…", punto 3.
 - **Limpieza de datos del calendario** (en la app, no en el código): unos 29 apuntes
   en el mes equivocado, varios repetidos y dos "Posible…" ya confirmados. ¿Los borra
   él o se le borran? Detalle en `CONTEXTO.md`, "Estado de HOY".
