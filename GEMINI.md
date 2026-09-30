@@ -9,7 +9,9 @@
 1. `CONTEXTO.md`: "Orden de lectura" al principio y, sobre todo, "Estado de HOY"
    dentro de "Qué queda pendiente ahora mismo": qué está en producción, qué PR no se
    tocan, qué queda por hacer y qué datos del calendario hay que limpiar.
-2. `PLAN_MEJORAS.md` y los `PLAN_*.md` solo si el dueño pide algo de esos planes.
+2. `PENDIENTES.md`: la lista corta de lo que falta y de quién depende. El orden lo
+   decide el dueño: pregúntale.
+3. `PLAN_MEJORAS.md` y los `PLAN_*.md` solo si el dueño pide algo de esos planes.
 
 ## Lo que en `CLAUDE.md` es de Claude y aquí no aplica
 - Las líneas de firma de los commits ("Co-Authored-By: Claude…", "Claude-Session: …"):

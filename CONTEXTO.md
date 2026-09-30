@@ -26,6 +26,8 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 3. "Proceso" — cómo lanzar pruebas y deploy sin romperlo tú mismo.
 4. `PLAN_MEJORAS.md` — qué falta de verdad, qué ya está cerrado.
 5. "Qué queda pendiente ahora mismo", al final de este archivo — el estado de HOY.
+6. `PENDIENTES.md` — la lista corta de lo que falta y de quién depende (código,
+   decisión del dueño, acción suya fuera del código, datos reales).
 
 ## Mapa del repositorio
 
@@ -482,7 +484,8 @@ fusionarlos por mucho que estén en verde.
 
 **Pendiente de código** (sin empezar): presupuesto y margen por evento
 (`PLAN_PRESUPUESTO.md`, fase 1 de `PLAN_COCINA.md`) y plan de logística por persona
-con el asistente. El dueño no ha dicho cuál va primero: preguntar.
+con el asistente. El dueño no ha dicho cuál va primero: preguntar. La lista entera,
+con las decisiones que esperan al dueño, está en `PENDIENTES.md`.
 
 **Pendiente de datos del calendario (en Firestore, no en el código)**:
 - 2026-09-30 se volvió a cruzar la hoja de Google "CALENDARIO GULA" (pestaña del
