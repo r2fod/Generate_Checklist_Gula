@@ -1500,6 +1500,33 @@ Medido con todos los generadores: de ~400 items, 304 salían con el número solo
   manual sobre cajas y en singular, vaciar devuelve la automática, Modo carga y solo
   marcar. Las pruebas que leían `.item-batea-info` como texto usan `textoUnidad()`.
 
+**Modo carga: lo que falta por preparar (a medias) — HECHO**: el dueño: "quiero poder
+poner la cantidad que queda pendiente, porque a veces no tengo todo porque tiene que
+venir el proveedor, y si no luego es un lío con lo que falta; estudia la mejor forma
+para no olvidarnos". En Prep. un item era preparado o no, y lo que faltaba vivía en la
+cabeza de alguien.
+- **Estado nuevo `pendientes`** (App.jsx): mapa `"categoria::labelOriginal" → { faltan,
+  nota? }`. Va como los demás de Modo carga: `getEstadoActual`, `SETTERS_SYNC` (la nube
+  fusiona clave a clave, así que dos personas apuntando cosas distintas no se pisan),
+  `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, se vacía al duplicar el evento y se
+  migra al renombrar un item manual o una categoría.
+- **Apuntarlo** (Modo carga · Prep., `FilaCargaPrep`): un reloj de arena en cada fila
+  abre "¿Cuántos faltan? (de N)" y "Quién lo trae o cuándo (opcional)". Guardar con
+  algo pendiente le quita la marca de preparado (no está todo); vacío o 0 lo borra. El
+  botón va dentro de la etiqueta de la fila pero no marca la casilla.
+- **Que no se olvide**: la fila, en ámbar, dice "Faltan 3 de 8 botellas · proveedor
+  martes" (en Prep. y en Salida); arriba de Modo carga, un recuadro "Falta por preparar
+  (N)" con todo lo pendiente, y tocar cada línea lleva a su fila; la cuenta de arriba
+  añade "· N a medias"; y en la lista normal la fila lleva la etiqueta "FALTAN N".
+- **Cuando llega**: "Ya ha llegado todo" en el mismo recuadro, o marcar la casilla de
+  preparado, lo da por completo y quita lo pendiente (`handleTogglePreparado`). En
+  Salida marcar como cargado NO lo quita: puede salir incompleto y lo que falta sigue
+  a la vista.
+- Pruebas: `calculos.test.mjs` (`sanearEstado` con `pendientes`) y `app.test.mjs` ("Lo
+  que falta por preparar": apuntar sin tocar la casilla, la fila, el recuadro, la
+  cuenta, Salida, "Ya ha llegado todo", la lista normal, guardado con el evento y
+  marcar la casilla).
+
 **Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
 por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
 otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba

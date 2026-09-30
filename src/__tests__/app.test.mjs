@@ -3475,6 +3475,81 @@ async function main() {
     await c2.close();
   }
 
+  // ── Lo que falta por preparar (a medias) ───────────────────────────────────
+  // El dueño: "quiero poder poner la cantidad que queda pendiente, porque a veces no
+  // tengo todo porque tiene que venir el proveedor, y si no luego es un lío con lo que
+  // falta". En Prep. un item era preparado o no: lo que faltaba vivía en la cabeza de
+  // alguien. Ahora se apunta cuánto falta (y quién lo trae), y se ve en la fila, en un
+  // recuadro arriba de Modo carga y en la lista normal, hasta que llega.
+  console.log("\n── Lo que falta por preparar ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 393, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }),
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+    const pestana = (t) => p.locator(".carga-modo-toggle button").filter({ hasText: t }).first();
+    await pestana("Prep.").click();
+    await p.waitForTimeout(400);
+    const fila = p.locator(".carga-row").filter({ has: p.locator(".carga-nombre-texto", { hasText: /^Ballantines$/ }) }).first();
+    const casilla = fila.locator("input[type=checkbox]");
+
+    // Estaba preparado, y resulta que falta parte
+    await casilla.check();
+    await fila.locator(".carga-pendiente-btn").click();
+    ok(await fila.locator(".carga-pendiente-editor").isVisible() && await casilla.isChecked(),
+      "el reloj de arena abre dónde apuntar lo que falta, sin tocar la casilla");
+    await fila.locator(".carga-pendiente-editor input").first().fill("3");
+    await fila.locator(".carga-pendiente-editor input").nth(1).fill("proveedor martes");
+    await fila.locator(".carga-pendiente-editor .btn-green").click();
+    await p.waitForTimeout(300);
+    const etiqueta = (await fila.locator(".carga-pendiente-tag").innerText()).replace(/\s+/g, " ");
+    ok(/Faltan 3 de \d+ botellas/.test(etiqueta) && /proveedor martes/.test(etiqueta),
+      `la fila dice cuánto falta, de cuánto y quién lo trae ("${etiqueta}")`);
+    ok(!await casilla.isChecked(), "y deja de contar como preparado: no está todo");
+    const resumen = (await p.locator(".carga-pendientes").innerText()).replace(/\s+/g, " ");
+    ok(/Falta por preparar \(1\)/.test(resumen) && /Ballantines/.test(resumen) && /faltan 3/.test(resumen),
+      `arriba, un recuadro con todo lo que falta ("${resumen}")`);
+    ok(/1 a medias/.test(await p.locator(".modal-content, .carga-modal, body").first().innerText()),
+      "y la cuenta de arriba dice cuántos van a medias");
+
+    // En Salida se ve (va incompleto al camión), pero se apunta en Prep.
+    await pestana("Salida").click();
+    await p.waitForTimeout(300);
+    ok(await fila.locator(".carga-pendiente-tag").count() === 1 && await fila.locator(".carga-pendiente-btn").count() === 0
+      && await p.locator(".carga-pendientes").isVisible(),
+      "en Salida se ve lo que falta, sin el botón de apuntarlo");
+
+    // Cuando llega: "Ya ha llegado todo" lo da por preparado y quita el aviso
+    await pestana("Prep.").click();
+    await p.waitForTimeout(300);
+    await fila.locator(".carga-pendiente-btn").click();
+    await fila.locator(".carga-pendiente-editor .btn-outline", { hasText: "Ya ha llegado todo" }).click();
+    await p.waitForTimeout(300);
+    ok(await casilla.isChecked() && await fila.locator(".carga-pendiente-tag").count() === 0 && await p.locator(".carga-pendientes").count() === 0,
+      "\"Ya ha llegado todo\" lo marca preparado y quita lo pendiente");
+
+    // Otra vez a medias: sale también en la lista normal, y se guarda con el evento
+    await fila.locator(".carga-pendiente-btn").click();
+    await fila.locator(".carga-pendiente-editor input").first().fill("2");
+    await fila.locator(".carga-pendiente-editor .btn-green").click();
+    await p.waitForTimeout(400);
+    const enLista = p.locator(".item-row").filter({ has: p.locator(".item-label-text", { hasText: /^Ballantines/ }) }).first().locator(".tag-pendiente");
+    ok(await enLista.count() === 1 && /FALTAN 2/.test(await enLista.innerText()),
+      "en la lista normal la fila lleva \"FALTAN 2\"");
+    const guardado = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}").pendientes);
+    ok(guardado && guardado["Alcoholes y licores::Ballantines"]?.faltan === "2",
+      `y queda guardado con el evento (${JSON.stringify(guardado)})`);
+    // Marcar la casilla también es que ha llegado todo
+    await casilla.check();
+    await p.waitForTimeout(300);
+    ok(await fila.locator(".carga-pendiente-tag").count() === 0, "marcar la casilla también da por llegado lo que faltaba");
+    await c.close();
+  }
+
   // ── El aviso de "actualizado desde otro dispositivo" ───────────────────────
   // Se veía cortado por la derecha ("Actualizado desde otro di…"), justo el aviso que
   // hay que leer entero porque dice qué te ha cambiado alguien por debajo.

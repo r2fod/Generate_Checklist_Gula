@@ -26,7 +26,7 @@ const LISTAS = [
 const MAPAS = [
   "cronos", "categoriasRenombradas", "overridesManuales", "itemsOcultos",
   "nombresManuales", "unidadesManuales", "preparados", "marcasRevisar", "checkeados",
-  "valoresCalculados", "vueltos", "roturas", "notasCheck", "itemsAlquilerManual",
+  "valoresCalculados", "vueltos", "roturas", "notasCheck", "itemsAlquilerManual", "pendientes",
 ];
 
 const esLista = (v) => Array.isArray(v);
