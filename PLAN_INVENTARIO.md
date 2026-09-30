@@ -1,5 +1,11 @@
 # Plan: Inventario Inteligente (Cocina + Logística)
 
+> **Al día (2026-09-30)**: presupuesto y margen, y la logística del personal, van en
+> otra app del dueño que más adelante se juntará con esta. Inventario sigue aquí,
+> después de Cocina. El consumo real por evento (`consumoReal`/`roturas` de Modo
+> carga) sale de esta app igual, sin Presupuesto: lo de abajo sobre "reutilizar de
+> Presupuesto" se refiere a ese mismo dato.
+
 ## Cómo se conecta con los otros dos planes
 
 Fase 3, después de `PLAN_PRESUPUESTO.md` y `PLAN_COCINA.md` — se apoya en las dos:

@@ -4,25 +4,51 @@
 > lo que se enlaza. Al cerrar algo, se quita de aquí en el mismo commit (igual que
 > `CONTEXTO.md`). Repo público: ni nombres, ni importes, ni datos de clientes.
 
+## Fuera de esta app (decidido por el dueño, 2026-09-30)
+
+**La logística del personal y el resumen financiero los lleva otra app del dueño**,
+que más adelante quiere juntar con esta. Por eso aquí NO se planifica ni se programa
+presupuesto y margen, ni la vista de logística por persona. El plan de presupuesto
+(`PLAN_PRESUPUESTO.md`) y el de #221 se quitaron; siguen en el historial de git
+(commit `d7b28e7`) por si sirven al juntar las dos apps. **Cocina e inventario SÍ
+siguen aquí.**
+
+## 0. Mejoras grandes
+
+1. **Cocina**: recetario, escandallo (coste real por ración) y lista de la compra.
+   Ver `PLAN_COCINA.md`. Es la primera de las dos.
+2. **Inventario inteligente**: lo que hay en el almacén alimenta la checklist, que
+   dice sola cuánto alquilar o comprar, y avisa de caducidades. Ver
+   `PLAN_INVENTARIO.md`. La parte de material (carpas, sillas, menaje) puede empezar
+   ya; la de ingredientes necesita Cocina.
+3. **Auditoría de funcionalidad**: 16 fallos (uno crítico en el formulario y varios
+   altos en calendario y checklist) más mejoras de uso. El plan está en el PR #231
+   (sección E de `PLAN_MEJORAS.md`), aún sin fusionar.
+4. **Sin fecha**: marketing con Meta (A4 v2 y v3), gasto global (D2) y memoria
+   semántica (D3).
+
 ## 1. Código, listo para empezar (preguntar al dueño el orden)
 
-- **Presupuesto y margen por evento**: el diseño ya está fijado en
-  `PLAN_PRESUPUESTO.md`; es la fase 1 de `PLAN_COCINA.md` (y luego
-  `PLAN_INVENTARIO.md`, en ese orden).
-- **Plan de logística por persona, con el asistente**: sin plan escrito todavía. De
-  partida, la hora de cada apunte del calendario (`hora` en `saneaApunte`,
-  `src/calendario/apuntes.js`) y el dato medido "sala entra 6 h antes de sentar".
 - **Vajilla y cubertería**: sacar `platosDoble`/`cubiertosDoble`, repetidos en los tres
   generadores de `src/checklist-generadores.js`, a una función compartida antes de
   darles un factor ajustable (`PLAN_MEJORAS.md`, A1).
 
 ## 2. Decisión del dueño
 
-- **PR abiertos #221, #222, #231 y #232**: no se fusionan sin él. #232 es de
-  seguridad y necesita revisión humana (`CLAUDE.md`).
+- **PR abiertos que esperan su revisión** (ninguno se fusiona sin él):
+  - #222: Modo carga a 320px, plegar "Tiempos estimados";
+  - #231: plan de la auditoría (ver 0.3);
+  - #232 (seguridad): un enlace "para marcar" instalado se abría en modo edición;
+  - #233: las Fantas se quedaban cortas, y la calibración pasa de 4 a 8 bebidas;
+  - #237 (toca seguridad): calibración de tiempos un 20% corta, HTML que se ejecutaba
+    en el PDF y líneas `null`.
+
+  Los de seguridad necesitan revisión humana (`CLAUDE.md`). Los de código llevan
+  tiempo abiertos: habrá que traerles `main` y volver a pasar la batería antes.
 - **Modo carga a 320px**: la cabecera (escaleta, cronómetros y, desde #245, el
   recuadro "Falta por preparar") tapa el primer ítem. Hay que decidir qué se pliega
-  por defecto. Detalle en `CONTEXTO.md`, "Auditoría visual móvil…", punto 3.
+  por defecto; #222 propone una parte. Detalle en `CONTEXTO.md`, "Auditoría visual
+  móvil…", punto 3.
 - **Limpieza de datos del calendario** (en la app, no en el código): unos 29 apuntes
   en el mes equivocado, varios repetidos y dos "Posible…" ya confirmados. ¿Los borra
   él o se le borran? Detalle en `CONTEXTO.md`, "Estado de HOY".

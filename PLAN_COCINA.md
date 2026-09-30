@@ -1,5 +1,10 @@
 # Plan: Cocina — escandallo y lista de la compra
 
+> **Al día (2026-09-30)**: presupuesto y margen van en otra app del dueño, junto con
+> la logística, que más adelante se juntará con esta. Cocina sigue aquí y pasa a ser
+> la primera pieza. Donde abajo dice "Presupuesto solo tiene que enchufar este número",
+> queda como el enganche para cuando se junten las dos apps.
+
 ## Cómo se conecta con los otros dos planes
 
 Fase 2 del plan grande, después de `PLAN_PRESUPUESTO.md` (fase 1). A diferencia de

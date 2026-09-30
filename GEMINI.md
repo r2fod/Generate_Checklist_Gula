@@ -11,7 +11,8 @@
    tocan, qué queda por hacer y qué datos del calendario hay que limpiar.
 2. `PENDIENTES.md`: la lista corta de lo que falta y de quién depende. El orden lo
    decide el dueño: pregúntale.
-3. `PLAN_MEJORAS.md` y los `PLAN_*.md` solo si el dueño pide algo de esos planes.
+3. `PLAN_MEJORAS.md`, `PLAN_COCINA.md` y `PLAN_INVENTARIO.md` solo si el dueño pide algo
+   de esos planes.
 
 ## Lo que en `CLAUDE.md` es de Claude y aquí no aplica
 - Las líneas de firma de los commits ("Co-Authored-By: Claude…", "Claude-Session: …"):
