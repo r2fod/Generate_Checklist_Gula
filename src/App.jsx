@@ -2829,8 +2829,9 @@ export default function App({ onCerrarSesion } = {}) {
   // todo: se le quita la marca de preparado, que se vuelve a poner cuando llegue.
   // Sin número (o 0) no hay nada pendiente y se borra.
   const handlePendiente = useCallback((key, datos) => {
-    const faltan = datos ? String(datos.faltan ?? "").trim().replace(",", ".") : "";
-    const hay = Number(faltan) > 0;
+    // Tal como se escribe ("2,5"), que es como se lee; la coma solo se cambia para contar
+    const faltan = datos ? String(datos.faltan ?? "").trim() : "";
+    const hay = Number(faltan.replace(",", ".")) > 0;
     setPendientes(prev => {
       const next = { ...prev };
       if (!hay) delete next[key];
