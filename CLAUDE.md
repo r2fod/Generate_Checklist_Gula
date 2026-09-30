@@ -29,3 +29,10 @@
 - Real user/financial data in commits.
 - Key renames without migrations.
 - Approving UI solely via auto tests.
+
+## OWNER RULES (chat)
+- Replies: Spanish, brief. Owner dictates by voice (expect typos).
+- Merge: owner authorized merging feature PRs once lint + tipos + test:rapido + full `npm run test` are green ("que no rompa nada"). Security-sensitive PRs (auth, rules, SSRF, #232) and owner PRs #221/#222/#231 wait for the owner.
+- "In production" = "Publicar" job green (battery + gh-pages), not just merged.
+- Calendar data from the Drive sheet: JSON to the owner, NEVER committed. Compare with the current calendar first (exact normalized title per date); "Traer" only adds. Method: `CONTEXTO.md` → "Estado de HOY".
+- Same rules for any AI (`GEMINI.md` imports this file).
