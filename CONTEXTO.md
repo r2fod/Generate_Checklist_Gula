@@ -10,13 +10,12 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 - **Estado del plan de mejoras (N1–N6, A–D) → `PLAN_MEJORAS.md`.** No se repite aquí: ese
   archivo lleva su propia tabla de hecho/pendiente por ítem, con su porqué y su tamaño, y
   apunta de vuelta aquí (`Ver CONTEXTO.md, "..."`) para el detalle técnico de cada uno.
-- **Los tres planes grandes, sin código todavía → `PLAN_PRESUPUESTO.md`,
-  `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`.** En ese orden (cada uno reutiliza del
-  anterior). Presupuesto ya tiene su diseño fijado por la hoja de cálculo real que
-  usa hoy el negocio (capturas del dueño, no reproducidas aquí por ser el repo
-  público): cuatro partidas —Personal, Comida, Bebida, Otros— con líneas sueltas
-  concepto+total, y un balance final Presupuesto/Gastos/Margen. Ver el propio
-  fichero para el detalle.
+- **Logística y resumen financiero: fuera de esta app** (decidido por el dueño el
+  2026-09-30). Los lleva otra app suya, que más adelante quiere juntar con esta. Aquí
+  no se planifica ni se programa presupuesto/margen, escandallo de cocina, inventario
+  ni vista de logística por persona. Los planes que había (`PLAN_PRESUPUESTO.md`,
+  `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`) se quitaron; siguen en git, commit
+  `d7b28e7`.
 
 ## Orden de lectura
 
@@ -478,14 +477,13 @@ está en el historial de git y en las pruebas que los cubren):
   semana en curso la primera;
 - #245 Modo carga: lo que falta por preparar (`pendientes`).
 
-**PR abiertos que NO son para fusionar sin el dueño**: #221, #222, #231, #233, #237
+**PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
 fusionarlos por mucho que estén en verde.
 
-**Pendiente de código** (sin empezar): presupuesto y margen por evento
-(`PLAN_PRESUPUESTO.md`, fase 1 de `PLAN_COCINA.md`) y plan de logística por persona
-con el asistente. El dueño no ha dicho cuál va primero: preguntar. La lista entera,
-con las decisiones que esperan al dueño, está en `PENDIENTES.md`.
+**Pendiente**: la lista entera, con las decisiones que esperan al dueño, está en
+`PENDIENTES.md`. Presupuesto, cocina, inventario y logística por persona NO: los lleva
+otra app del dueño (ver al principio de este archivo).
 
 **Pendiente de datos del calendario (en Firestore, no en el código)**:
 - 2026-09-30 se volvió a cruzar la hoja de Google "CALENDARIO GULA" (pestaña del
@@ -1175,7 +1173,8 @@ mismo criterio que ya pedía para el formulario):
    tarifas de sala/cocina y el presupuesto en sí), Cocina/escandallo después (parte de
    cero: recetario, menú del evento, nada reutilizable todavía). Fase 3, el asistente,
    al final. Piloto: el evento real "Aryan Campana" (ya limpio de notas duplicadas),
-   para probar con datos de verdad antes de generalizar.
+   para probar con datos de verdad antes de generalizar. **Descartado aquí el
+   2026-09-30**: lo lleva otra app del dueño (ver al principio de este archivo).
 2. **Mejoras del formulario — HECHO, las seis.** Bug de las tronas: investigado a fondo
    (reproducción real con Playwright por los dos caminos posibles) y no se reprodujo —
    `Tronas` sale directo de `ninos` en los tres builders y ya estaba en las dependencias
@@ -1733,9 +1732,8 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
   singular/plural al teclear) y el de hielo/carpas en singular; puras de
   `envaseSegunCantidad()` en `calculos.test.mjs`.
 
-**Tres planes grandes, sin código todavía, guardados por si se retoman** —
-ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
-"Orden de lectura").
+**Presupuesto, cocina e inventario**: fuera de esta app, los lleva otra del dueño
+(ver al principio de este archivo).
 
 **Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
 septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.

@@ -4,37 +4,25 @@
 > lo que se enlaza. Al cerrar algo, se quita de aquí en el mismo commit (igual que
 > `CONTEXTO.md`). Repo público: ni nombres, ni importes, ni datos de clientes.
 
-## 0. Mejoras grandes que propuso el dueño (planes escritos, sin código)
+## Fuera de esta app (decidido por el dueño, 2026-09-30)
 
-1. **Presupuesto y margen por evento**: el primero, porque reutiliza los costes que ya
-   se calculan. Ver `PLAN_PRESUPUESTO.md`.
-2. **Cocina**: recetario, escandallo (coste real por ración) y lista de la compra.
-   Ver `PLAN_COCINA.md`.
-3. **Inventario inteligente**: lo que hay en el almacén alimenta la checklist, que
-   dice sola cuánto alquilar o comprar, y avisa de caducidades. Ver
-   `PLAN_INVENTARIO.md`. La parte de material (carpas, sillas, menaje) puede
-   empezar ya; la de ingredientes necesita Cocina.
-4. **Vista de logística por persona, con el asistente dentro** ("cámbiale el horario
-   a…", "añádele tal tarea"). El plan está en el PR #221 (`PLAN_LOGISTICA.md`), aún
-   sin fusionar. **Ojo**: ese plan lleva nombres reales del equipo; hay que quitarlos
-   antes de fusionar.
-5. **Auditoría de funcionalidad**: 16 fallos (uno crítico en el formulario y varios
+**La logística y el resumen financiero los lleva otra app del dueño**, que más
+adelante quiere juntar con esta. Por eso aquí NO se planifica ni se programa:
+presupuesto y margen, escandallo de cocina, inventario, ni la vista de logística por
+persona. Los planes que había (`PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`,
+`PLAN_INVENTARIO.md` y el de #221) se quitaron; siguen en el historial de git
+(commit `d7b28e7`) por si sirven al juntar las dos apps.
+
+## 0. Mejoras grandes
+
+1. **Auditoría de funcionalidad**: 16 fallos (uno crítico en el formulario y varios
    altos en calendario y checklist) más mejoras de uso. El plan está en el PR #231
    (sección E de `PLAN_MEJORAS.md`), aún sin fusionar.
-6. **Sin fecha**: marketing con Meta (A4 v2 y v3), gasto global (D2) y memoria
+2. **Sin fecha**: marketing con Meta (A4 v2 y v3), gasto global (D2) y memoria
    semántica (D3).
-
-Los tres primeros van en ese orden, porque cada uno reutiliza el anterior. El 4 y el
-5 son independientes.
 
 ## 1. Código, listo para empezar (preguntar al dueño el orden)
 
-- **Presupuesto y margen por evento**: el diseño ya está fijado en
-  `PLAN_PRESUPUESTO.md`; es la fase 1 de `PLAN_COCINA.md` (y luego
-  `PLAN_INVENTARIO.md`, en ese orden).
-- **Plan de logística por persona, con el asistente**: sin plan escrito todavía. De
-  partida, la hora de cada apunte del calendario (`hora` en `saneaApunte`,
-  `src/calendario/apuntes.js`) y el dato medido "sala entra 6 h antes de sentar".
 - **Vajilla y cubertería**: sacar `platosDoble`/`cubiertosDoble`, repetidos en los tres
   generadores de `src/checklist-generadores.js`, a una función compartida antes de
   darles un factor ajustable (`PLAN_MEJORAS.md`, A1).
@@ -42,9 +30,8 @@ Los tres primeros van en ese orden, porque cada uno reutiliza el anterior. El 4 
 ## 2. Decisión del dueño
 
 - **PR abiertos que esperan su revisión** (ninguno se fusiona sin él):
-  - #221: plan de logística (ver 0.4);
   - #222: Modo carga a 320px, plegar "Tiempos estimados";
-  - #231: plan de la auditoría (ver 0.5);
+  - #231: plan de la auditoría (ver 0.1);
   - #232 (seguridad): un enlace "para marcar" instalado se abría en modo edición;
   - #233: las Fantas se quedaban cortas, y la calibración pasa de 4 a 8 bebidas;
   - #237 (toca seguridad): calibración de tiempos un 20% corta, HTML que se ejecutaba

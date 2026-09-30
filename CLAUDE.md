@@ -32,7 +32,8 @@
 
 ## OWNER RULES (chat)
 - Replies: Spanish, brief. Owner dictates by voice (expect typos).
-- Merge: owner authorized merging feature PRs once lint + tipos + test:rapido + full `npm run test` are green ("que no rompa nada"). Security-sensitive PRs (auth, rules, SSRF, XSS: #232, #237) and PRs #221/#222/#231/#233 wait for the owner.
+- Merge: owner authorized merging feature PRs once lint + tipos + test:rapido + full `npm run test` are green ("que no rompa nada"). Security-sensitive PRs (auth, rules, SSRF, XSS: #232, #237) and PRs #222/#231/#233 wait for the owner.
+- Out of scope: logistics (staff per person, schedules) and financial summary (budget/margin, costing, inventory) live in the owner's other app, to be merged later. Don't plan or build them here.
 - "In production" = "Publicar" job green (battery + gh-pages), not just merged.
 - Calendar data from the Drive sheet: JSON to the owner, NEVER committed. Compare with the current calendar first (exact normalized title per date); "Traer" only adds. Method: `CONTEXTO.md` → "Estado de HOY".
 - Same rules for any AI (`GEMINI.md` imports this file).
