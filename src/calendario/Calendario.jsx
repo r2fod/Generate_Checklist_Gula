@@ -22,10 +22,6 @@ import logoGula from "../assets/gula-logo.webp";
 
 const ICONOS = { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList };
 
-// Chips que se enseñan de golpe en una casilla del mes (≥560px) antes de resumir el
-// resto en "+N más". Con el mínimo de casilla a 92px caben tres cómodos; ver Mes().
-const CHIPS_VISIBLES = 3;
-
 // El icono del tipo. Va con su clase de color, así que hereda el mismo tono que el
 // punto y el chip: un solo color por tipo en todas partes.
 function IconoTipo({ tipo, size = 13, className = "" }) {
@@ -185,19 +181,37 @@ export default function Calendario({
 }
 
 // ─── VISTA DE MES ─────────────────────────────────────────────────────────────
-// La casilla enseña el nombre cuando hay sitio y solo puntos cuando no. No se decide
-// con JavaScript mirando el ancho: los chips se pintan siempre y el CSS los esconde por
-// debajo de 560px, dejando los puntos. Así no hay que escuchar el "resize" ni hay un
-// primer dibujado con la vista equivocada.
+// Cada apunte es una barrita de su color con el nombre, y salen TODOS, también en el
+// móvil. Antes el móvil enseñaba solo iconos y un "×3", y el dueño lo pidió claro: ver
+// todos los eventos, sin "3 más", que así no es nada visual. La casilla crece lo que
+// haga falta (la fila entera con ella) en vez de recortar o hacer scroll por dentro.
+// Y ningún nombre cortado: en tableta y escritorio sale entero, en las líneas que haga
+// falta. En el móvil (casillas de 45px, no cabe ni "Comunión") el mes va por semanas:
+// la fila de los siete días marca con puntos de color qué días tienen algo, y justo
+// debajo van los de esa semana con su nombre entero (SemanaEnLista). Con barritas sin
+// texto y la lista al final del mes, el dueño lo vio con sus datos y "no se ve nada".
 function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
   const semanas = semanasDelMes(anio, mes);
+  // En el mes de hoy, lo primero es la semana en curso (lo pidió el dueño): las que ya
+  // pasaron se pliegan tras un botón y se abren si se quieren ver. Solo en el móvil,
+  // donde cada semana lleva su lista y había que bajar por las pasadas para llegar a
+  // la de ahora; en pantalla ancha el mes entero cabe de un vistazo (ver el CSS).
+  const [verPasadas, setVerPasadas] = useState(false);
+  const pasadas = Math.max(0, semanas.findIndex(s => s.includes(hoy)));
   return (
     <div className="cal-mes">
       <div className="cal-cabecera">
         {INICIAL_DIA.map((d, i) => <div key={i} className="cal-dia-nombre">{d}</div>)}
       </div>
+      {pasadas > 0 && (
+        <button type="button" className="cal-ver-pasadas" aria-expanded={verPasadas} onClick={() => setVerPasadas(v => !v)}>
+          {verPasadas ? "Ocultar las semanas pasadas"
+            : pasadas === 1 ? "Ver la semana pasada" : `Ver las ${pasadas} semanas pasadas`}
+        </button>
+      )}
       {semanas.map((semana, i) => (
-        <div className="cal-semana" key={i}>
+        <React.Fragment key={i}>
+        <div className={`cal-semana${i < pasadas && !verPasadas ? " es-pasada" : ""}`}>
           {semana.map((dia, j) => {
             const del = (dia && mapa[dia]) || [];
             // El "dia &&" del día abierto no sobra: los huecos del principio y del final
@@ -205,11 +219,9 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             // null === null marcaba TODOS los huecos como el día abierto y salían
             // recuadrados en oscuro nada más entrar en el calendario.
             const esAbierto = Boolean(dia) && dia === abierto;
-            // Cuánta gente hay ese día en total. En un móvil el nombre de la boda no cabe
-            // y solo se veían unos iconos: en un día con tres bodas eso son tres corazones
-            // y ninguna pista de si son 40 comensales o 330. El número es lo que de verdad
-            // dice si el día es un problema.
-            const paxDia = del.reduce((s, a) => s + (a.pax || 0), 0);
+            // Cuánta gente hay ese día en total. El número es lo que de verdad dice si
+            // el día es un problema: tres bodas pueden ser 40 comensales o 330.
+            const paxDia = del.reduce((s, a) => s + (Number(a.pax) || 0), 0);
             // El color de la casilla lo manda el primer EVENTO del día, no el primer
             // apunte: si no, un día con una boda y unas vacaciones se pintaría del gris
             // de las vacaciones y la boda desaparecería del mes.
@@ -228,25 +240,18 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
                   + `${dia && enChoque.has(dia) ? " es-choque" : ""}${esAbierto ? " es-abierto" : ""}`}
                 onClick={() => onDia(dia)}
               >
-                {dia && <span className="cal-numero">{Number(dia.slice(8))}</span>}
-                {del.length > 0 && (
-                  <span className="cal-puntos">
-                    {del.slice(0, 4).map(a => <IconoTipo key={a.id} tipo={a.tipo} size={12} />)}
-                    {/* El total. En pantallas muy estrechas (320px son 35px de casilla)
-                        no caben cuatro iconos, así que el CSS deja solo el primero y
-                        enseña esto: "×4" dice más que cuatro glifos cortados. */}
-                    {del.length > 1 && <span className="cal-mas">×{del.length}</span>}
+                {/* El número del día y, en su misma línea, la gente de ese día. Abajo en
+                    una esquina tapaba la última barrita en cuanto el día iba lleno. */}
+                {dia && (
+                  <span className="cal-celda-cab">
+                    <span className="cal-numero">{Number(dia.slice(8))}</span>
+                    {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
                   </span>
                 )}
-                {paxDia > 0 && <span className="cal-pax-dia">{paxDia}</span>}
-                {/* Máximo 3 chips por casilla: un día con seis apuntes no puede estirar su
-                    fila del mes seis veces más alta que las de al lado. Lo que sobra se
-                    resume en "+N más" — el resto está a un clic, abriendo el día (PanelDia
-                    ya enseña la lista entera con sitio, pax y editar). Como "del" ya viene
-                    con los eventos primero (porDia, en apuntes.js), lo que se recorta es
-                    siempre lo menos importante del día (vacaciones, tareas...). */}
+                {/* Como "del" ya viene con los eventos primero (porDia, en apuntes.js),
+                    arriba va siempre lo importante y debajo vacaciones, tareas... */}
                 {del.map(a => (
-                  <span key={a.id} className={`cal-chip tipo-${a.tipo}`}>
+                  <span key={a.id} className={`cal-chip tipo-${a.tipo}${AUSENCIAS.has(a.tipo) ? " es-ausencia" : ""}`}>
                     <IconoTipo tipo={a.tipo} size={11} />
                     <span className="cal-chip-texto">
                       {a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}
@@ -258,7 +263,97 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
             );
           })}
         </div>
+        <SemanaEnLista semana={semana} mapa={mapa} hoy={hoy} enChoque={enChoque} onDia={onDia}
+                       pasada={i < pasadas && !verPasadas} />
+        </React.Fragment>
       ))}
+    </div>
+  );
+}
+
+// ─── LA SEMANA, EN LISTA (MÓVIL) ─────────────────────────────────────────────
+// Debajo de cada fila de siete días, lo de esa semana con el nombre entero, la hora,
+// el sitio y el pax: el nombre no cabe en una casilla de 45px y cortado no sirve. Día a
+// día, con la fecha grande a la izquierda como en una agenda de papel; tocar uno abre
+// su panel, igual que la casilla. Por encima de 560px no sale: la rejilla ya enseña
+// los nombres.
+//
+// Las vacaciones y los días cerrados no son trabajo que preparar sino gente que falta:
+// con los datos de verdad eran la mitad de lo apuntado y tapaban las bodas. Van en una
+// línea al final de la semana ("Raúl 1–2 · Ana 7–13"), no repetidos día a día. Lo demás
+// que dura varios días sale una vez, el primero de la semana, con "hasta el N".
+const AUSENCIAS = new Set(["vacaciones", "cerrado"]);
+
+function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia, pasada = false }) {
+  const dias = semana.filter(Boolean);
+  if (!dias.length) return null;
+  const primero = dias[0], ultimo = dias[dias.length - 1];
+  const filas = dias
+    .map(dia => ({ dia, lista: (mapa[dia] || []).filter(a => !AUSENCIAS.has(a.tipo)
+      && (a.fecha === dia || (dia === primero && a.fecha < dia))) }))
+    .filter(f => f.lista.length);
+  // Cada ausencia una vez, con los días que caen en esta semana
+  const ausencias = [];
+  const vistas = new Set();
+  for (const dia of dias) {
+    for (const a of mapa[dia] || []) {
+      if (!AUSENCIAS.has(a.tipo) || vistas.has(a.id)) continue;
+      vistas.add(a.id);
+      const desde = a.fecha < primero ? primero : a.fecha;
+      const hasta = !a.hasta ? a.fecha : a.hasta > ultimo ? ultimo : a.hasta;
+      const d1 = Number(desde.slice(8)), d2 = Number(hasta.slice(8));
+      ausencias.push({ a, dias: d1 === d2 ? String(d1) : `${d1}–${d2}` });
+    }
+  }
+  if (!filas.length && !ausencias.length) return null;
+  return (
+    <div className={`cal-semana-lista${pasada ? " es-pasada" : ""}`}>
+      {filas.map(({ dia, lista }) => {
+        const f = aFecha(dia);
+        const numero = numeraRepetidos(mapa[dia] || []);
+        return (
+          <button
+            type="button"
+            key={dia}
+            className={`cal-agenda-dia${dia === hoy ? " es-hoy" : ""}${dia < hoy ? " es-pasado" : ""}${enChoque.has(dia) ? " es-choque" : ""}`}
+            onClick={() => onDia(dia)}
+          >
+            <span className="cal-agenda-fecha">
+              <small>{f ? f.toLocaleDateString("es-ES", { weekday: "short" }).replace(".", "") : ""}</small>
+              <strong>{Number(dia.slice(8))}</strong>
+            </span>
+            <span className="cal-agenda-lista">
+              {lista.map(a => (
+                <span key={a.id} className={`cal-agenda-item tipo-${a.tipo}`}>
+                  <IconoTipo tipo={a.tipo} size={15} />
+                  <span className="cal-agenda-texto">
+                    <strong>{a.titulo}{numero[a.id] ? ` ${numero[a.id]}` : ""}</strong>
+                    <small>
+                      {[
+                        TIPOS[a.tipo].nombre,
+                        a.hora,
+                        a.sitio,
+                        a.pax ? `${a.pax} pax` : "",
+                        a.hasta && a.hasta !== a.fecha ? `hasta el ${Number(a.hasta.slice(8))}${a.hasta.slice(0, 7) !== dia.slice(0, 7) ? ` de ${NOMBRE_MES[Number(a.hasta.slice(5, 7)) - 1].toLowerCase()}` : ""}` : "",
+                      ].filter(Boolean).join(" · ")}
+                    </small>
+                  </span>
+                </span>
+              ))}
+            </span>
+          </button>
+        );
+      })}
+      {ausencias.length > 0 && (
+        <div className="cal-semana-ausencias">
+          {ausencias.map(({ a, dias: rango }) => (
+            <span key={a.id} className={`cal-ausencia tipo-${a.tipo}`}>
+              <IconoTipo tipo={a.tipo} size={13} />
+              <span>{a.titulo} <b>{rango}</b></span>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

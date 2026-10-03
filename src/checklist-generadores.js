@@ -9,7 +9,7 @@ import {
 } from "./calculos.js";
 import { factoresDeTipo } from "./bebida.js";
 import { categoriaMenusEspeciales } from "./menus-especiales.js";
-import { conSufijo } from "./checklist-format.js";
+import { conSufijo, plural } from "./checklist-format.js";
 import { calcCarpas, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
@@ -56,9 +56,11 @@ function sillasAlquiler(origenSillas, incluyeCojines = false) {
 function sufijoCarpas(faltanCarpas) {
   return (numCargado) => {
     const faltanAhora = Math.max(0, CARPAS_EN_ALMACEN + faltanCarpas - numCargado);
-    return faltanAhora > 0
+    return faltanAhora > 1
       ? `de ${CARPAS_EN_ALMACEN} en almacén · faltan ${faltanAhora}, hay que alquilarlas`
-      : `de ${CARPAS_EN_ALMACEN} en almacén`;
+      : faltanAhora === 1
+        ? `de ${CARPAS_EN_ALMACEN} en almacén · falta 1, hay que alquilarla`
+        : `de ${CARPAS_EN_ALMACEN} en almacén`;
   };
 }
 
@@ -543,7 +545,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
     // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
     // el número de cuando se generó, ver App.jsx donde se resuelve).
-    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)]),
+    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${plural(taxisDeHielo(kg), "taxi", "taxis")}`)]),
     opt(hayBarra, ["Redbull", String(bebidas.redbull)]),
   ]});
 
@@ -750,7 +752,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
     // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
     // el número de cuando se generó, ver App.jsx donde se resuelve).
-    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${taxisDeHielo(kg)} taxis`)]),
+    opt(llevaHielo, ["Hielo", conSufijo(bebidas.hieloKg, kg => `kg · ${plural(taxisDeHielo(kg), "taxi", "taxis")}`)]),
   ]});
 
   if (destilados) cats.push(categoriaAlcoholes(destilados));

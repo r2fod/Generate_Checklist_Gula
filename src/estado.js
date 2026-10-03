@@ -25,8 +25,8 @@ const LISTAS = [
 // editadas, los cronómetros...). Un array o un número aquí también rompe.
 const MAPAS = [
   "cronos", "categoriasRenombradas", "overridesManuales", "itemsOcultos",
-  "nombresManuales", "preparados", "marcasRevisar", "checkeados",
-  "valoresCalculados", "vueltos", "roturas", "notasCheck", "itemsAlquilerManual",
+  "nombresManuales", "unidadesManuales", "preparados", "marcasRevisar", "checkeados",
+  "valoresCalculados", "vueltos", "roturas", "notasCheck", "itemsAlquilerManual", "pendientes",
 ];
 
 const esLista = (v) => Array.isArray(v);

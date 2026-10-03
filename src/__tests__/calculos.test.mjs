@@ -38,8 +38,9 @@ import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
 import { estimarTiemposCarga, FASES_TIEMPO } from "../tiempos-carga.js";
-import { quitarItemsSinCantidad, generarHTMLWord } from "../checklist-format.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
+import { envaseSegunCantidad, unidadPorDefecto, fmtCantidadCompleta, cajaSizeDe,
+  quitarItemsSinCantidad, generarHTMLWord } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
@@ -423,6 +424,14 @@ console.log("\n══ Sanear el estado que entra ══");
   // Todos los campos vigilados están cubiertos por uno de los dos tipos
   ok(CAMPOS_VIGILADOS.LISTAS.length >= 6 && CAMPOS_VIGILADOS.MAPAS.length >= 13,
     `vigila ${CAMPOS_VIGILADOS.LISTAS.length} listas y ${CAMPOS_VIGILADOS.MAPAS.length} mapas`);
+  // Las unidades puestas a mano son un mapa más: una lista ahí rompería la checklist
+  ok(!("unidadesManuales" in sanearEstado({ unidadesManuales: ["cajas"] }))
+    && sanearEstado({ unidadesManuales: { "Bebidas::Nestea": "packs" } }).unidadesManuales["Bebidas::Nestea"] === "packs",
+    "las unidades puestas a mano se vigilan: un mapa pasa, una lista se tira");
+  // Y lo que falta por preparar, igual
+  ok(!("pendientes" in sanearEstado({ pendientes: "faltan 3" }))
+    && sanearEstado({ pendientes: { "Bebidas::Nestea": { faltan: "3" } } }).pendientes["Bebidas::Nestea"].faltan === "3",
+    "lo que falta por preparar se vigila: un mapa pasa, un texto se tira");
 }
 
 console.log("\n══ Instalar el formulario: qué aviso toca en cada móvil ══");
@@ -3057,6 +3066,50 @@ console.log("\n══ El Word/PDF no ejecuta lo que venga escrito en el evento �
   ok(normal.includes("Finca Ríos &amp; Hijos") && !normal.includes("&amp;amp;"),
     "el texto normal sale igual, con el & escapado una sola vez");
   ok(normal.includes("Mesa &quot;4&quot;\ncon dos celiacos"), "y las notas conservan sus saltos de línea");
+}
+
+// ─── El envase de debajo del número concuerda con él ────────────────────────
+// "1 botellas" o "3 caja" obligan a leer dos veces; el dueño pidió que cambie según
+// la cantidad. Solo toca la primera palabra si es un envase: el resto se respeta.
+console.log("\n── Envase según la cantidad ──");
+{
+  ok(envaseSegunCantidad("botellas", "1") === "botella", '1 → "botella"');
+  ok(envaseSegunCantidad("botella", "12") === "botellas", '12 → "botellas"');
+  ok(envaseSegunCantidad("caja(s)", "3") === "cajas" && envaseSegunCantidad("caja(s)", "1") === "caja",
+    'el "(s)" de las plantillas se resuelve: "caja" / "cajas"');
+  ok(envaseSegunCantidad("packs (6 uds)", "1") === "pack (6 uds)", "lo de detrás se respeta");
+  ok(envaseSegunCantidad("packs (6 uds)", "1,0") === "pack (6 uds)", "con coma decimal también");
+  ok(envaseSegunCantidad("kg · 3 taxis", "1") === "kg · 3 taxis", "kg no es un envase: no se toca");
+  ok(envaseSegunCantidad("cajas", "—") === "cajas", 'sin número ("—") se queda como estaba');
+  ok(envaseSegunCantidad("bolsas", "0") === "bolsas", "0 va en plural: 0 bolsas");
+  ok(envaseSegunCantidad("uds", "1") === "ud" && envaseSegunCantidad("uds", "23") === "uds",
+    'las unidades sueltas también: "1 ud", "23 uds"');
+  ok(envaseSegunCantidad("personas", "1") === "persona" && envaseSegunCantidad("sacos", "1") === "saco",
+    '"1 persona", "1 saco"');
+}
+
+// ─── Todos con su unidad ────────────────────────────────────────────────────
+// De unos 400 items, 300 salían con el número solo ("23" debajo de las mesas, "8" en
+// el Ballantines). El dueño: "hay cosas que no tienen unidades o cajas, ponle a todos".
+console.log("\n── La unidad de los que no traían ninguna ──");
+{
+  ok(unidadPorDefecto("Ballantines", "Alcoholes y licores") === "botellas", "los licores, en botellas");
+  ok(unidadPorDefecto("Camareros", "Personal") === "personas", "el personal, en personas");
+  ok(unidadPorDefecto("Carbón", "Paella y fuego") === "sacos" && unidadPorDefecto("Leña", "Paella y fuego") === "sacos",
+    "el carbón y la leña, en sacos");
+  ok(unidadPorDefecto("Redbull", "Bebidas frías") === "latas", "el Red Bull, en latas");
+  ok(unidadPorDefecto("Vermut rojo", "Bebidas frías") === "botellas", "el vermut, en botellas");
+  ok(unidadPorDefecto("Mesas de 1,8m", "Mobiliario") === "uds" && unidadPorDefecto("Tenedores grandes", "Vajilla") === "uds",
+    'lo demás, en unidades sueltas: "uds"');
+  // El agua con gas y la cerveza 0,0 ya se calculaban en cajas de 24 y no lo decían
+  ok(cajaSizeDe("Agua con gas") === 24 && cajaSizeDe("Cerveza 0,0") === 24,
+    "agua con gas y cerveza 0,0 cuentan sus cajas de 24 solas, como los refrescos");
+  ok(cajaSizeDe("Cerveza sin gluten") === null, "y la sin gluten no, que no va en cajas de 24");
+  // Una unidad puesta a mano manda sobre las cajas automáticas, en Word y Modo carga
+  ok(fmtCantidadCompleta("Nestea", "5", "latas", true) === "5 latas",
+    "con unidad a mano sale la de la persona, no las cajas");
+  ok(fmtCantidadCompleta("Nestea", "5", undefined) === "5 (1 caja de 24)",
+    "y sin ella, las cajas automáticas de siempre");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

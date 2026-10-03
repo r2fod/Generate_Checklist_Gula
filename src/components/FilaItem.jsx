@@ -1,7 +1,8 @@
 import { memo, useState, useRef, useEffect } from "react";
-import { Tag, Asterisk, Pencil, X } from "lucide-react";
+import { Tag, Asterisk, Pencil, X, Hourglass } from "lucide-react";
 import { IconoItem } from "./Iconos.jsx";
-import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe } from "../checklist-format.js";
+import { conCortes } from "./cortes.jsx";
+import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe, plural, envaseSegunCantidad } from "../checklist-format.js";
 
 // ─── UNA FILA DE LA LISTA ──────────────────────────────────────────────────────
 // Está fuera del componente grande y envuelta en React.memo por una razón medida: con
@@ -13,7 +14,7 @@ import { esItemDeAlquiler, bateaSizeDe, cajaSizeDe } from "../checklist-format.j
 // si se pasaran como funciones sueltas se crearían nuevas en cada render y la
 // memoización no serviría de nada.
 const FilaItem = memo(function FilaItem({
-  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo,
+  categoria, label, labelOriginal, displayQty, manualIdx, esAlquilerManual, sufijo, unidadManual = false, pendiente,
   editado, renombrado, editando, nombreTemporal, alquilerTemporal, acciones, soloMarcar = false,
 }) {
   const alq = esItemDeAlquiler(label, esAlquilerManual);
@@ -44,12 +45,29 @@ const FilaItem = memo(function FilaItem({
   }, []);
 
   // Nº de bateas recalculado siempre en vivo a partir de lo que se esté mostrando
-  // (aunque la cantidad se edite a mano), no de un texto fijado
+  // (aunque la cantidad se edite a mano), no de un texto fijado. Sin número ("—", a
+  // decidir allí) no hay envases que contar: antes salía "0 cajas de 24".
+  const num = parseFloat(qty.replace(",", "."));
   const bateaSize = bateaSizeDe(label);
-  const bateaCount = bateaSize ? Math.ceil((parseFloat(qty.replace(",", ".")) || 0) / bateaSize) : null;
+  const bateaCount = bateaSize && !isNaN(num) ? Math.ceil(num / bateaSize) : null;
   // Igual que las bateas, pero para bebidas que se piden en cajas (cerveza, vino, refrescos)
   const cajaSize = bateaSize ? null : cajaSizeDe(label);
-  const cajaCount = cajaSize ? Math.ceil((parseFloat(qty.replace(",", ".")) || 0) / cajaSize) : null;
+  const cajaCount = cajaSize && !isNaN(num) ? Math.ceil(num / cajaSize) : null;
+  // Lo que pone debajo del número. Escrita a mano, manda la de la persona (también sobre
+  // las cajas y bateas que se cuentan solas); si no, las cajas/bateas en vivo o la del
+  // generador, concordando con lo que haya escrito: "1 botella", "3 cajas".
+  const unidad = unidadManual ? envaseSegunCantidad(sufijo, qty)
+    : bateaCount !== null ? `${plural(bateaCount, "batea", "bateas")} de ${bateaSize}`
+    : cajaCount !== null ? `${plural(cajaCount, "caja", "cajas")} de ${cajaSize}`
+    : sufijo ? envaseSegunCantidad(sufijo, qty) : "";
+  const tituloUnidad = unidadManual ? "Unidad puesta a mano. Bórrala para volver a la de la app."
+    : bateaCount !== null ? `${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`
+    : cajaCount !== null ? `${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`
+    : "Toca para cambiar la unidad";
+  // Al tocar la unidad pasa a ser un campo; lo escrito vive aquí y se guarda al salir,
+  // como el nombre. null = no se está editando.
+  const [unidadTecleando, setUnidadTecleando] = useState(null);
+  const cancelarUnidadRef = useRef(false);
   return (
     <div className={`item-row ${alq ? "is-alquiler" : ""}`}>
       {editando && !soloMarcar ? (
@@ -81,13 +99,23 @@ const FilaItem = memo(function FilaItem({
           <span className="item-name-lead">
             <IconoItem label={label} />
             <span className="item-label-text">
-              {label}
+              {conCortes(label)}
               {(editado || renombrado) && <span title={renombrado ? "Nombre corregido a mano" : "Cantidad editada a mano"} className="item-edit-flag"><Asterisk size={11} /></span>}
               {alq && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+              {/* A medias: falta parte por llegar (se apunta en Modo carga · Prep.). Aquí
+                  también, para que quien mira la lista no lo dé por preparado. */}
+              {pendiente && (
+                <span className="tag-pendiente" title={`Faltan ${pendiente.faltan}${pendiente.nota ? ` · ${pendiente.nota}` : ""}. Se apunta en Modo carga.`}>
+                  <Hourglass size={10} /> FALTAN {pendiente.faltan}
+                </span>
+              )}
             </span>
           </span>
         </div>
       )}
+      {/* Cantidad, envase y ✎/✕ van juntos: si el nombre no cabe entero a su lado,
+          bajan los tres a su propia línea en vez de partirse entre dos. */}
+      <div className="item-controles">
       <input
         type="text"
         className="item-qty-input"
@@ -117,18 +145,52 @@ const FilaItem = memo(function FilaItem({
         onFocus={e => e.target.select()}
         size={Math.max(2, qty.length)}
       />
-      {/* El "=" no es adorno: sin él, "5" y al lado "1 caja de 24" se lee como dos
-          cantidades distintas y no se sabe si hay que llevar 5 o 24. Con el igual
-          queda claro que es la MISMA cantidad dicha en envases: 5 uds = 1 caja.
-          Y donde el número ya son cajas o packs (envase fijo, columna de la derecha
-          sin "="), el texto es solo la etiqueta de lo que se cuenta. */}
-      {bateaCount !== null ? (
-        <span className="item-batea-info" title={`${displayQty} copas caben en estas bateas. Se recalcula solo al cambiar la cantidad.`}>= {bateaCount === 1 ? "1 batea" : `${bateaCount} bateas`} de {bateaSize}</span>
-      ) : cajaCount !== null ? (
-        <span className="item-batea-info" title={`${displayQty} unidades son estas cajas. Se recalcula solo al cambiar la cantidad.`}>= {cajaCount === 1 ? "1 caja" : `${cajaCount} cajas`} de {cajaSize}</span>
-      ) : sufijo ? (
-        <span className="item-batea-info" title="El número de la izquierda ya va en este envase: no cambia aunque edites la cantidad">{sufijo}</span>
-      ) : null}
+      {/* Va DEBAJO del número, en pequeño y sin "=" (lo pidió el dueño). El "=" estaba
+          para que "5" y al lado "1 caja de 24" no se leyeran como dos cantidades
+          distintas; debajo del número ya se lee como lo que es: la misma cantidad
+          dicha en envases. Donde el número ya son packs o botellas, el texto es la
+          etiqueta de lo que se cuenta, y concuerda con él mientras se teclea. */}
+      {/* Y se puede cambiar a mano en cualquier fila (lo pidió el dueño): se lee como
+          texto, y al tocarlo pasa a ser un campo. Vacío = vuelve a la de la app, así las
+          cajas y los packs que se cuentan solos siguen funcionando mientras nadie los
+          toque. Con el link de solo marcar se lee pero no se cambia, como la cantidad.
+          Sin número ("—") no hay unidad que enseñar: aparece al poner la cantidad. */}
+      {unidadTecleando !== null ? (
+        <input
+          type="text"
+          className="item-batea-info item-unidad-input"
+          value={unidadTecleando}
+          placeholder="unidad (vacío = la de la app)"
+          aria-label={`Unidad de ${label}`}
+          size={Math.max(8, unidadTecleando.length + 1)}
+          autoFocus
+          onFocus={e => e.target.select()}
+          onChange={e => setUnidadTecleando(e.target.value)}
+          onBlur={() => {
+            const valor = unidadTecleando.trim();
+            setUnidadTecleando(null);
+            if (cancelarUnidadRef.current) { cancelarUnidadRef.current = false; return; }
+            // Sin cambios no se guarda nada: tocar y salir no convierte la automática
+            // en una fija que ya no seguiría a la cantidad
+            if (valor === unidad.trim()) return;
+            acciones.current.editarUnidad(categoria, labelOriginal ?? label, valor);
+          }}
+          onKeyDown={e => {
+            if (e.key === "Enter") e.target.blur();
+            if (e.key === "Escape") { cancelarUnidadRef.current = true; e.target.blur(); }
+          }}
+        />
+      ) : !unidad ? null : soloMarcar ? (
+        <span className="item-batea-info" title={tituloUnidad}>{unidad}</span>
+      ) : (
+        <button
+          type="button"
+          className={`item-batea-info item-unidad-btn${unidadManual ? " es-manual" : ""}`}
+          title={tituloUnidad}
+          aria-label={`Unidad de ${label}: ${unidad}. Tocar para cambiarla`}
+          onClick={() => setUnidadTecleando(unidad)}
+        >{unidad}</button>
+      )}
       {/* Renombrar y quitar items cambian la checklist para todo el mundo: con el
           link de solo marcar no se ofrecen. */}
       {!soloMarcar && (
@@ -147,6 +209,7 @@ const FilaItem = memo(function FilaItem({
           ><X size={14} /></button>
         </div>
       )}
+      </div>
     </div>
   );
 });

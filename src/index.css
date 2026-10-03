@@ -306,9 +306,10 @@ body {
        quedaba 2-3px más ancha que la pantalla y la página se podía mover en lateral. */
     margin: 0 0 10px;
     padding: 8px 10px;
-    background: var(--superficie-velo);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    /* Opaca y no de cristal: en móviles donde el desenfoque no se pinta (ahorro de
+       batería, algunos Android), la lista se leía A TRAVÉS de la barra, con el nombre
+       de un item encima del buscador. */
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
@@ -328,13 +329,17 @@ body {
     opacity: 1;
   }
 
+  /* Dos líneas antes que "Boda Rita y Ll…": cabe en el alto que ya tiene la barra */
   .barra-fija-nombre {
     font-size: 0.78rem;
     font-weight: 700;
+    line-height: 1.2;
     color: var(--text-main);
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
     max-width: 26%;
     flex-shrink: 0;
   }
@@ -2193,9 +2198,10 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.4px;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s;
@@ -2214,22 +2220,23 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Sin min-width:0 un flex item no encoge por debajo de su contenido (el nombre
-     entero), así que a 320px, con la píldora de al lado en flex-shrink:0, algo
-     tenía que desbordar — y la tarjeta redondeada con overflow oculto se lo
-     tragaba en silencio: la píldora del contador y la flecha ▼/▲ desaparecían
-     sin aviso en 9 de cada 10 categorías, justo lo que hace falta para saber si
-     está abierta y cuántos items tiene. Con esto el que cede es el NOMBRE (se
-     recorta con puntos suspensivos vía .cat-name-texto), nunca la píldora. */
-  min-width: 0;
-  flex: 1 1 auto;
+  /* El nombre se parte en líneas por palabras en vez de recortarse con "…": en móvil
+     salían cortadas 6 de 13 ("MOBILIARIO, SALA Y DE…", "BEBIDAS F…"). Nunca encoge por
+     debajo de su palabra más larga; si ni esa cabe junto a la píldora, la que baja a
+     su propia línea es la PÍLDORA (flex-wrap de la cabecera), así que no se pierde
+     nunca: a 320px, sin tope, algo tenía que desbordar y la tarjeta redondeada con
+     overflow oculto se tragaba el contador y la flecha ▼/▲ sin aviso. */
+  min-width: min-content;
+  flex: 1 1 0;
 }
 
 .cat-name-texto {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
+}
+
+.category-header .cat-count {
+  margin-left: auto;
 }
 
 .category-header .cat-icon {
@@ -2300,15 +2307,35 @@ body {
   flex-direction: column;
 }
 
+/* ─── LA FILA, EN COLUMNAS FIJAS ────────────────────────────────────────────────
+   Nombre | cantidad | ✎✕, como una tabla: todas las cajas de cantidad del mismo
+   ancho y en la misma columna, y los botones igual, tenga la fila una línea o dos.
+   Con flex cada fila ponía la cantidad donde le cabía —unas al lado del nombre, otras
+   debajo— y la columna salía en zigzag: "sin simetría", dijo el dueño. El nombre se
+   queda con lo que sobra y parte por palabras (antes, a 393px con la letra grande,
+   le quedaban 50px y salía "Cápsul-as café (para el person-al)").
+   La columna de cantidad mide lo que 4 cifras (medido: 4,7em aquí, 4,4 en el móvil):
+   así 7, 38 y 216 salen en cajas iguales; solo un texto largo la ensancha.
+   El envase ("9 cajas de 24") va DEBAJO del número, pegado a su derecha como el propio
+   número, como pidió el dueño. Si es más largo que la caja crece hacia la izquierda,
+   por debajo del nombre, sin mover la columna. */
 .item-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4.75em, max-content) auto;
+  grid-template-areas: "nombre cantidad acciones" "envase envase .";
   align-items: center;
   padding: 13px 22px;
   border-bottom: 1px solid var(--border-color);
   transition: background-color 0.2s;
-  gap: 12px;
+  gap: 0 12px;
 }
+
+/* El grupo es del DOM; en la rejilla sus hijos se colocan como si fueran de la fila */
+.item-controles { display: contents; }
+.item-row > .item-name, .item-row > .item-edit-row { grid-area: nombre; }
+.item-row .item-qty-input { grid-area: cantidad; width: 100%; }
+.item-row .item-batea-info { grid-area: envase; justify-self: end; text-align: right; white-space: normal; min-width: 0; margin-top: 3px; }
+.item-row .item-actions { grid-area: acciones; }
 
 .item-row:last-child {
   border-bottom: none;
@@ -2413,6 +2440,55 @@ body {
     flex-shrink: 1;
     min-width: 0;
   }
+}
+
+/* La unidad se cambia a mano tocándola (FilaItem.jsx): se lee igual que el texto de
+   siempre —mismo tamaño, color y sitio— y solo al pasar por encima se nota que se
+   puede tocar. La puesta a mano, en el color de acento y en cursiva, para que se
+   distinga de la que calcula la app. */
+.item-unidad-btn {
+  font-family: inherit;
+  line-height: 1.3;
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  padding: 0;
+  cursor: text;
+  text-align: right;
+}
+.item-unidad-btn:hover, .item-unidad-btn:focus-visible { border-bottom-color: currentColor; }
+.item-unidad-btn.es-manual { color: var(--accent); font-style: italic; }
+/* El texto mide 16px de alto y a veces 12 de ancho ("ud"): poco para un dedo. Gana
+   zona de toque sin moverse, con una capa invisible de al menos 44×32 pegada a su
+   borde derecho. Crece hacia abajo (el hueco de la fila) y no hacia arriba, donde está
+   la caja de la cantidad: un toque en su borde de abajo no debe abrir la unidad. */
+.item-unidad-btn { position: relative; }
+.item-unidad-btn::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: -2px;
+  width: max(100%, 44px);
+  height: 32px;
+}
+/* En las filas de alquiler el gris de siempre se queda en 4,48 sobre el amarillo:
+   el de las etiquetas, un punto más oscuro, llega al mínimo legible (4,5). Solo en
+   claro: en oscuro el gris de siempre ya se lee (y el de etiquetas, no). */
+:root:not([data-tema="oscuro"]) .item-row.is-alquiler .item-batea-info:not(.es-manual) {
+  color: var(--text-label);
+}
+
+/* Editando: 16px para que iOS no haga zoom al enfocar, y el ancho de lo escrito */
+.item-unidad-input {
+  font-family: inherit;
+  font-size: 16px;
+  text-align: right;
+  color: var(--text-main);
+  background: var(--card-bg);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  max-width: 100%;
 }
 
 /* Botones ✎ (editar nombre) y ✕ (quitar) de cada item */
@@ -3537,8 +3613,11 @@ hr {
   background-color: var(--alquiler-bg);
 }
 
+/* flex-wrap: si el nombre no cabe ni con su palabra más larga, la que baja de línea es
+   la cantidad (a la derecha, ver .carga-cantidad), no el nombre partido por letras */
 .carga-row-principal {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
@@ -3800,13 +3879,21 @@ hr {
    arrastrar en escritorio para ver el "€" del coste total, la cifra que se mira.
    Con 165px (y menos aire por celda, ver .resumen-tabla th/td) sobran ~65px de
    margen real: aguanta esas diferencias sin depender de acertar un número exacto. */
+/* El nombre parte en líneas en vez de cortarse con "…": en el móvil salían recortados
+   46 de 130 ("Peche (licor d…", "Mesa redonda especial para Tar…") y había que
+   adivinar cuál era. El ancho se fija (width, no solo max-width): al poder partirse,
+   la tabla estrechaba esta columna hasta la palabra más larga para no arrastrar, y
+   hasta "Ballantines" bajaba de línea dejando el icono solo arriba. */
 .resumen-tabla-producto {
+  width: 165px;
   max-width: 165px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
   color: var(--text-main);
 }
+/* Icono y nombre en bloque: las líneas del nombre van sangradas bajo el texto, no
+   bajo el icono */
+.resumen-producto-nombre { display: flex; align-items: flex-start; }
 
 .resumen-tabla td {
   font-variant-numeric: tabular-nums;
@@ -3882,6 +3969,7 @@ hr {
   }
 
   .resumen-tabla-producto {
+    width: 132px;
     max-width: 132px;
   }
 
@@ -3969,11 +4057,11 @@ hr {
 
   /* Sin esto, la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de
      80px de los 264 de la fila: hasta "Regletas" se partía a media palabra
-     ("Regleta" / "s"), aunque overflow-wrap: anywhere hace exactamente lo que tiene
-     que hacer con ese poco sitio. El nombre no necesitaba partirse, necesitaba sitio:
-     con este mínimo, la pastilla es la que cae a su propia línea cuando no cabe. */
+     ("Regleta" / "s"). El nombre no necesitaba partirse, necesitaba sitio: pide al
+     menos 110px (o su palabra más larga, si es mayor: ver .carga-nombre), y la
+     pastilla es la que cae a su propia línea cuando no cabe. */
   .carga-row-vuelta .carga-nombre {
-    min-width: 110px;
+    flex-basis: 110px;
   }
 
   /* En móvil los dos números pegan al borde: 46px de sangría se comen el ancho que
@@ -3989,9 +4077,11 @@ hr {
   }
 }
 
+/* Nunca más estrecho que su palabra más larga: "Ginebra (Seagrams/Ta-nqueray)" y
+   "(estándar/de-scafeinado)" se partían por dentro al apretarse contra la cantidad */
 .carga-nombre {
   flex: 1;
-  min-width: 0;
+  min-width: min-content;
   font-size: 0.9rem;
   color: var(--text-main);
   display: inline-flex;
@@ -4020,12 +4110,12 @@ hr {
    entero, no una pista de cuál era. */
 .carga-nombre-texto {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .carga-nombre .item-icon { flex-shrink: 0; }
 .carga-row:hover .item-icon { transform: scale(1.18) rotate(-5deg); }
 /* Icono en la tabla de resumen: alineado con el texto del producto */
-.resumen-tabla-producto .item-icon { vertical-align: -2px; margin-right: 5px; }
+.resumen-tabla-producto .item-icon { margin: 2px 5px 0 0; }
 .resumen-cat-header .cat-icon-mini, .resumen-cat-header td > svg { vertical-align: -2px; margin-right: 5px; }
 
 .carga-cantidad {
@@ -4034,6 +4124,7 @@ hr {
   font-size: 0.9rem;
   white-space: nowrap;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* Aviso pequeño de cómo va la OTRA marca: en Preparación dice lo que ya está cargado
@@ -4475,11 +4566,11 @@ hr {
 /* Icono por material en cada fila: gris suave que cobra color y salta al pasar el ratón */
 /* El icono queda fijo a la izquierda y el texto (con su asterisco/etiqueta) fluye y
    se parte junto, sin que el asterisco caiga solo a una línea aparte. */
-.item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1; }
+.item-name-lead { display: flex; align-items: flex-start; gap: 8px; min-width: 0; flex: 1 1 auto; }
 .item-name-lead > .item-icon { margin-top: 2px; }
-/* Igual que en Modo carga: el nombre se parte antes que recortarse. A 390px se
-   quedaba en 79px de los 145 que necesita. */
-.item-label-text { min-width: 0; overflow-wrap: anywhere; }
+/* Parte por palabras. "anywhere" cortaba por cualquier letra ("Cervez/a") en cuanto
+   faltaba sitio; ahora solo se corta una palabra si no cabe ni sola en la línea. */
+.item-label-text { min-width: 0; overflow-wrap: break-word; }
 /* Títulos de modales con icono alineado. Van en "flex" (no "inline-flex") para
    que el subtítulo caiga debajo del título en vez de pegarse a su derecha. */
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: flex; align-items: center; gap: 7px; }
@@ -4488,6 +4579,111 @@ hr {
 .item-edit-flag { color: var(--accent, #c9a24b); display: inline; opacity: 0.9; margin-left: 3px; }
 .item-edit-flag svg { display: inline; vertical-align: -1px; }
 .tag-alquiler { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }
+
+/* ─── A MEDIAS: LO QUE FALTA POR LLEGAR ──────────────────────────────────────
+   Preparado en parte y el resto pendiente (lo trae el proveedor...). Se apunta en
+   Modo carga · Prep. con el reloj de arena y se ve en ámbar en todas partes: en la
+   fila, en la lista normal y en el recuadro de arriba de Modo carga. */
+.tag-pendiente {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--aviso-borde);
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.carga-row.is-pendiente { background: var(--aviso-bg); box-shadow: inset 4px 0 0 var(--aviso-borde); }
+
+.carga-pendiente-tag {
+  display: block;
+  margin-top: 3px;
+  flex-basis: 100%;
+  color: var(--aviso-texto);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.carga-pendiente-tag svg { vertical-align: -1px; margin-right: 3px; }
+
+/* El reloj de arena de cada fila de Prep.: discreto hasta que hay algo pendiente */
+.carga-pendiente-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.carga-pendiente-btn.is-on { border-color: var(--aviso-borde); background: var(--aviso-bg-fuerte); color: var(--aviso-texto); }
+
+.carga-pendiente-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 16px 14px 54px;
+}
+.carga-pendiente-campo { display: flex; flex-direction: column; gap: 4px; flex: 0 1 140px; min-width: 0; }
+.carga-pendiente-campo.carga-pendiente-nota { flex: 1 1 200px; }
+.carga-pendiente-campo span { font-size: 0.74rem; font-weight: 700; color: var(--text-muted); }
+/* 16px: por debajo iOS hace zoom al enfocar */
+.carga-pendiente-campo input {
+  font: inherit;
+  font-size: 16px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border-color-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text-main);
+  min-width: 0;
+}
+.carga-pendiente-acciones { display: flex; flex-wrap: wrap; gap: 8px; flex-basis: 100%; }
+.carga-pendiente-acciones .btn { min-height: 42px; }
+
+/* El recuadro de arriba: todo lo que falta, junto */
+.carga-pendientes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--aviso-borde);
+  border-radius: 12px;
+  background: var(--aviso-bg);
+  color: var(--aviso-texto);
+}
+.carga-pendientes-titulo { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: 0.88rem; margin-bottom: 4px; }
+.carga-pendientes-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  min-height: 40px;
+  padding: 6px 0;
+  border: 0;
+  border-top: 1px solid var(--aviso-borde);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+.carga-pendientes-item strong { font-weight: 800; }
 
 /* Indicador "Guardado ✓": chip flotante abajo-derecha que aparece un instante */
 .guardado-indicador {
@@ -4730,9 +4926,26 @@ hr {
   .main-layout { gap: 14px; }
 
   /* Filas de la checklist: un pelín más juntas verticalmente */
-  .item-row { padding: 10px 14px; gap: 10px; }
+  .item-row {
+    padding: 10px 14px;
+    column-gap: 8px;
+    grid-template-columns: minmax(0, 1fr) minmax(4.5em, max-content) auto;
+  }
+  /* Las columnas fijas son lo que se le quita al nombre: ✎✕ ceden ancho (toque 34×40,
+     por encima de los 32 que exige la prueba de zonas táctiles), no alto */
+  .item-row .item-action-btn { min-width: 34px; }
+  /* Editando el nombre, el campo se lleva la fila entera y lo demás baja */
+  .item-row:has(.item-edit-row) {
+    grid-template-areas: "nombre nombre nombre" ". cantidad acciones" "envase envase .";
+    row-gap: 6px;
+  }
   .category-header { padding: 11px 14px; }
   .category-header .cat-icon { width: 28px; height: 28px; min-width: 28px; }
+  /* ↑ ↓ ✎ a 40px de ancho cada uno se llevaban casi la mitad de la cabecera y el
+     nombre no cabía. Pierden ancho, no alto: la zona de toque sigue en 34×40. */
+  .category-header .cat-count { gap: 2px; padding: 4px 8px; }
+  .category-header .cat-count .arrow { margin-left: 4px; }
+  .category-header .cat-edit-btn { min-width: 34px; }
   .item-list-wrapper .item-row:first-child { padding-top: 11px; }
 
   /* Modales (Vista previa / Modo carga): cuerpo y cabecera más ajustados */
@@ -4768,6 +4981,16 @@ hr {
 
   /* Títulos y textos ligeramente más ajustados */
   .config-card > .section-title { margin-bottom: -2px; }
+}
+
+/* Lista muy estrecha PARA SU LETRA (320px con la letra al 130%): al lado de las
+   columnas fijas el nombre se quedaba en 75px y partía "Alarga-dores". Se mide en em
+   del propio contenedor, no en px de pantalla: salta por ancho o por letra grande,
+   lo que llegue antes. El nombre sube a toda la fila y lo demás baja, en las mismas
+   columnas que el resto. */
+.item-list { container-type: inline-size; }
+@container (max-width: 17em) {
+  .item-list > .item-row { grid-template-areas: "nombre nombre nombre" ". cantidad acciones" "envase envase ."; row-gap: 6px; }
 }
 
 /* El logo de Gula es un PNG en negro: sobre la tarjeta oscura no se vería, así que
@@ -4937,36 +5160,6 @@ hr {
 @media (max-width: 480px) {
   .agregar-cuerpo { padding: 16px; }
   .agregar-cabecera { padding: 14px 16px; }
-}
-
-/* En pantallas muy estrechas (320-360px, tipo iPhone SE) el nombre del item se
-   quedaba en unos 57px de ancho porque la cantidad, la unidad y los dos botones se
-   llevaban el resto: "Vasos de cartón café mini (personal)" salía partido palabra a
-   palabra en seis líneas y la fila medía 125px de alto. Aquí la fila pasa a dos
-   pisos: el nombre arriba a todo lo ancho, y debajo la cantidad, la unidad y los
-   botones en una sola línea. */
-@media (max-width: 360px) {
-  .item-row {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 8px 10px;
-  }
-
-  .item-row > .item-name,
-  .item-row > .item-edit-row {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
-  .item-row > .item-qty-input {
-    max-width: none;
-    width: 92px;
-  }
-
-  .item-row > .item-actions {
-    justify-self: end;
-  }
 }
 
 /* Campos de texto libre que ocupan la fila entera del formulario de evento. En la

@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, memo } from "react";
 import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
-  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag,
+  Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag, Hourglass,
 } from "lucide-react";
 import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
+import { conCortes } from "./cortes.jsx";
 import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
@@ -36,11 +37,22 @@ import Escaleta from "./Escaleta.jsx";
 // onToggleSale, onVuelve y onRoturas van con useCallback en App.jsx: una función
 // nueva en cada tecla habría dejado el memo en nada, todas las filas "cambiadas".
 const FilaCargaPrep = memo(function FilaCargaPrep({
-  dataKey, label, qty, sufijo, enPreparacion, marcado, otroMarcado, marcaRevisar, esAlquiler, onToggle,
+  dataKey, label, qty, sufijo, unidadManual, enPreparacion, marcado, otroMarcado, marcaRevisar, esAlquiler, onToggle,
+  pendiente, onPendiente,
 }) {
+  // Lo que falta de este item (ver pendientes en App.jsx): se apunta en Prep. desde el
+  // reloj de arena, con cuántos faltan y, si se quiere, quién lo trae o cuándo.
+  const [editando, setEditando] = useState(false);
+  const [faltanTxt, setFaltanTxt] = useState("");
+  const [notaTxt, setNotaTxt] = useState("");
+  const cantidadNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
+  const abrir = () => { setFaltanTxt(pendiente ? pendiente.faltan : ""); setNotaTxt(pendiente?.nota || ""); setEditando(true); };
+  const guardar = () => { onPendiente(dataKey, { faltan: faltanTxt, nota: notaTxt }); setEditando(false); };
+  // Ya ha llegado todo: queda preparado del todo (y marcarlo quita lo pendiente)
+  const yaEstaTodo = () => { if (!marcado) onToggle(dataKey); else onPendiente(dataKey, null); setEditando(false); };
   return (
-    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""}`}
-         data-revisar={marcaRevisar ? dataKey : undefined}>
+    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""} ${pendiente ? "is-pendiente" : ""}`}
+         data-revisar={marcaRevisar ? dataKey : undefined} data-pendiente={pendiente ? dataKey : undefined}>
       <label className="carga-row-principal">
         <input type="checkbox" checked={marcado} onChange={() => onToggle && onToggle(dataKey)} />
         <span className="carga-nombre">
@@ -50,9 +62,15 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
               como hermano directo sin eso, el tag le robaba ancho al nombre y a 320px
               se partía letra a letra. */}
           <span className="carga-nombre-lead">
-            <IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span>
+            <IconoItem label={label} /> <span className="carga-nombre-texto">{conCortes(label)}</span>
           </span>
           {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
+          {pendiente && (
+            <span className="carga-pendiente-tag">
+              <Hourglass size={11} /> Faltan {pendiente.faltan}{!isNaN(cantidadNum) ? ` de ${cantidadNum}${sufijo ? ` ${sufijo}` : ""}` : ""}
+              {pendiente.nota ? ` · ${pendiente.nota}` : ""}
+            </span>
+          )}
         </span>
         {otroMarcado && (
           <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
@@ -70,13 +88,42 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
             <span className="carga-marca-otra-texto">revisar</span>
           </span>
         )}
-        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+        <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</span>
+        {/* Dentro de la etiqueta pero sin marcar la casilla: un botón no la activa */}
+        {enPreparacion && onPendiente && (
+          <button type="button" className={`carga-pendiente-btn ${pendiente ? "is-on" : ""}`}
+                  onClick={e => { e.preventDefault(); if (editando) setEditando(false); else abrir(); }}
+                  aria-label={`Falta parte de ${label}`} title="Falta parte: apunta cuánto y quién lo trae">
+            <Hourglass size={16} />
+          </button>
+        )}
       </label>
+      {editando && (
+        <div className="carga-pendiente-editor">
+          <label className="carga-pendiente-campo">
+            <span>¿Cuántos faltan?{!isNaN(cantidadNum) ? ` (de ${cantidadNum})` : ""}</span>
+            <input type="text" inputMode="decimal" value={faltanTxt} autoFocus placeholder="0"
+                   onChange={e => setFaltanTxt(e.target.value)}
+                   onKeyDown={e => { if (e.key === "Enter") guardar(); if (e.key === "Escape") setEditando(false); }} />
+          </label>
+          <label className="carga-pendiente-campo carga-pendiente-nota">
+            <span>Quién lo trae o cuándo (opcional)</span>
+            <input type="text" value={notaTxt} placeholder="Proveedor, día..."
+                   onChange={e => setNotaTxt(e.target.value)}
+                   onKeyDown={e => { if (e.key === "Enter") guardar(); if (e.key === "Escape") setEditando(false); }} />
+          </label>
+          <div className="carga-pendiente-acciones">
+            <button type="button" className="btn btn-green" onClick={guardar}>Guardar</button>
+            {pendiente && <button type="button" className="btn btn-outline" onClick={yaEstaTodo}><Check size={14} /> Ya ha llegado todo</button>}
+            <button type="button" className="btn btn-outline" onClick={() => setEditando(false)}>Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
 
-const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, valorVuelta, roturaValor, consumible, esAlquiler, onVuelve, onRoturas }) {
+const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, unidadManual, valorVuelta, roturaValor, consumible, esAlquiler, onVuelve, onRoturas }) {
   const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
   const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
   const marcado = valorVuelta !== undefined && valorVuelta !== "";
@@ -102,11 +149,11 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
       <div className="carga-row-principal carga-row-vuelta">
         <span className="carga-nombre">
           <span className="carga-nombre-lead">
-            <IconoItem label={label} /> <span className="carga-nombre-texto">{label}</span>
+            <IconoItem label={label} /> <span className="carga-nombre-texto">{conCortes(label)}</span>
           </span>
           {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
         </span>
-        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo)}</span>
+        <span className="carga-cantidad">de {fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</span>
         <label className={`carga-vino-todo ${vinoTodo ? "is-on" : ""}`} title={cantidadCompleta !== null ? "Vino todo: rellena la cantidad completa" : "Marcar como que volvió entero"} onClick={e => e.stopPropagation()}>
           <input
             type="checkbox"
@@ -179,7 +226,7 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
   );
 });
 
-export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
+export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, pendientes = {}, onPendiente, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // Las categorías "Personal" (camareros/logística/cocina) y "Menús especiales" (cuántos
@@ -221,6 +268,15 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   const todoVuelto = itemsMarcables.length > 0 && itemsMarcables.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
   const contarSi = (cumple) => checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => cumple(`${c.nombre}::${lo}`)).length, 0);
   const totalPreparados = contarSi(k => preparados[k]);
+  // Lo que está a medias, con su nombre y su cantidad, para decirlo ARRIBA: en una
+  // lista de 130 items, un aviso que solo vive en su fila es un aviso que se olvida.
+  const aMedias = checklist.flatMap(c => c.items
+    .filter(([, , , lo]) => pendientes[`${c.nombre}::${lo}`])
+    .map(([label, q, , lo, , sufijo]) => ({ key: `${c.nombre}::${lo}`, label, total: q && q.u ? q.u : q, sufijo, ...pendientes[`${c.nombre}::${lo}`] })));
+  const irAPendiente = (key) => {
+    const fila = document.querySelector(`[data-pendiente="${CSS.escape(key)}"]`);
+    if (fila) fila.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   // Lo que está preparado pero todavía sin cargar. Es el camino normal —se prepara y
   // luego se sube al camión— así que subirlo de golpe ahorra repasar la lista entera
   // item a item. También es la vía para recuperar una carga que se haya perdido,
@@ -474,6 +530,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
             <div className="preview-header-subtitle">
               {totalMarcados} de {totalItems} {palabraModo}
               {modo === "salida" && totalPreparados > 0 ? ` · ${totalPreparados} preparados` : ""}
+              {modo !== "vuelta" && aMedias.length > 0 ? ` · ${aMedias.length} a medias` : ""}
               {totalRoturas > 0 ? ` · ${totalRoturas} roturas` : ""}
             </div>
             {/* Alguien ha cambiado una cantidad de algo que ya estaba marcado. Va aquí
@@ -731,7 +788,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                       </tr>
                       {cat.filas.map(f => (
                         <tr key={f.key}>
-                          <td className="resumen-tabla-producto" title={f.label}><IconoItem label={f.label} size={13} /> {f.label}</td>
+                          <td className="resumen-tabla-producto" title={f.label}><span className="resumen-producto-nombre"><IconoItem label={f.label} size={13} /><span>{conCortes(f.label)}</span></span></td>
                           <td>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</td>
                           <td className={f.vueltaImposible ? "resumen-celda-imposible" : ""}
                               title={f.vueltaImposible ? `Vuelven ${f.vuelta} de ${f.cargaInicial} cargadas: imposible. Suele pasar cuando la cantidad se recalcula después de apuntar la vuelta. Revísalo, porque así esta línea no cobra la merma.` : undefined}>
@@ -785,6 +842,21 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
               title="Da por cargado todo lo que ya está marcado como preparado. No quita ninguna marca."
             ><Check size={15} /> Cargar todo lo preparado ({preparadosSinCargar.length})</button>
           )}
+          {/* Lo que falta por llegar, junto y arriba: en Prep. para no darlo por hecho y
+              en Salida para saber que eso va incompleto. Tocar uno lleva a su fila. */}
+          {modo !== "vuelta" && aMedias.length > 0 && (
+            <div className="carga-pendientes" role="note">
+              <div className="carga-pendientes-titulo">
+                <Hourglass size={15} /> Falta por preparar ({aMedias.length})
+              </div>
+              {aMedias.map(p => (
+                <button type="button" key={p.key} className="carga-pendientes-item" onClick={() => irAPendiente(p.key)}>
+                  <strong>{p.label}</strong>
+                  <span>faltan {p.faltan}{p.total !== undefined && p.total !== null && p.total !== "" ? ` de ${p.total}${p.sufijo ? ` ${p.sufijo}` : ""}` : ""}{p.nota ? ` · ${p.nota}` : ""}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {modo === "vuelta" && renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
           {modo === "vuelta" && (
             <button
@@ -800,7 +872,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                 <span>{cat.nombre}</span>
               </div>
               <div className="carga-lista">
-                {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo]) => {
+                {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual]) => {
                   const dataKey = `${cat.nombre}::${labelOriginal}`;
                   // Mismo criterio que la lista normal (FilaItem.jsx): el tag manual, o
                   // si el propio nombre ya lo delata (Dealde/Carvillo/Novelda/alquiler).
@@ -821,6 +893,9 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                         label={label}
                         qty={qty}
                         sufijo={sufijo}
+                        unidadManual={unidadManual}
+                        pendiente={pendientes[dataKey]}
+                        onPendiente={onPendiente}
                         enPreparacion={enPreparacion}
                         marcado={marcado}
                         otroMarcado={otroMarcado}
@@ -837,6 +912,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
                       label={label}
                       qty={qty}
                       sufijo={sufijo}
+                      unidadManual={unidadManual}
                       valorVuelta={vueltos[dataKey]}
                       roturaValor={roturas[dataKey]}
                       consumible={esConsumible(cat.nombre, labelOriginal)}

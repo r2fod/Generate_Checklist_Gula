@@ -138,6 +138,36 @@ const revisaCaja = (page, selector) => page.evaluate((sel) => {
   return [...new Set(problemas)];
 }, selector);
 
+// ─── PALABRAS PARTIDAS POR DENTRO ─────────────────────────────────────────────
+// Ni el desbordamiento ni el "texto cortado" de arriba lo cazan: una palabra partida
+// ("Cervez" / "a") no se sale de nada ni se recorta, solo se lee mal. Aquí se mide cada
+// tira de letras y números de la pantalla con getClientRects(): si sus trozos caen en
+// líneas distintas, la palabra está partida. Las "/" y los espacios son cortes
+// legítimos y no cuentan (no son letras).
+const palabrasPartidas = (page) => page.evaluate(() => {
+  const partidas = [];
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let n;
+  while ((n = w.nextNode())) {
+    const el = n.parentElement;
+    if (!el || !el.getClientRects().length) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden") continue;
+    const alto = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+    const re = /[\p{L}\p{N}]{2,}/gu;
+    let m;
+    while ((m = re.exec(n.data))) {
+      const r = document.createRange();
+      r.setStart(n, m.index); r.setEnd(n, m.index + m[0].length);
+      const tops = [...r.getClientRects()].filter(x => x.width > 0).map(x => x.top);
+      if (tops.length > 1 && Math.max(...tops) - Math.min(...tops) > alto / 2) {
+        partidas.push(`"${m[0]}" en ${(el.closest("[class]")?.className || el.tagName).toString().split(" ")[0]}`);
+      }
+    }
+  }
+  return [...new Set(partidas)];
+});
+
 // La checklist entera como texto, "nombre=cantidad|sufijo" por item. Vive aquí arriba
 // porque lo usan bloques repartidos por toda la prueba, y definido a media función se
 // quedaba fuera del alcance de los de más arriba.
@@ -148,8 +178,13 @@ const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
   // un rodaje, el "de 8 en almacén" de las carpas). Sin él, la prueba daba por
   // mudo un control que sí cambiaba lo que se carga.
   const suf = r.querySelector(".item-batea-info");
-  return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${suf ? "|" + suf.textContent.trim() : ""}`;
+  // La unidad es un campo (se cambia a mano), salvo con el link de solo marcar: texto
+  const unidad = suf ? (suf.tagName === "INPUT" ? suf.value : suf.textContent).trim() : "";
+  return `${(n ? n.textContent : "").trim()}=${q ? q.value : ""}${unidad ? "|" + unidad : ""}`;
 }));
+
+// Lo mismo desde un locator: la unidad de debajo del número, sea campo o texto
+const textoUnidad = (loc) => loc.evaluate(e => (e.tagName === "INPUT" ? e.value : e.textContent).trim());
 
 async function main() {
   const srv = await arrancarServidor();
@@ -274,6 +309,81 @@ async function main() {
 
     ok((await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0,
       "y nada de esto desborda la pantalla");
+    await c.close();
+  }
+
+  // ── Las palabras no se parten, ni con la letra del móvil grande ─────────────
+  // Captura del dueño, a 393px con la letra de Android algo grande: "Cápsul/as café
+  // (para/el/person/al)" en seis líneas y "Cervez/a Alham/bra". El nombre se quedaba
+  // con lo que sobraba de la fila (50px) tras la cantidad, el envase y ✎/✕, y
+  // "overflow-wrap: anywhere" lo partía por cualquier letra. Nada se salía ni se
+  // recortaba —las pruebas de arriba pasaban—, solo se leía mal.
+  //
+  // La letra grande se simula subiendo la fuente raíz: la app va en rem, que es lo que
+  // agranda el ajuste de accesibilidad del móvil. Por eso no vale un corte por ancho de
+  // pantalla: el mismo móvil falla o no según el tamaño de letra de quien lo usa.
+  console.log("\n── Ninguna palabra partida, ni con la letra grande ──");
+  for (const [w, escala] of [[320, 1], [393, 1], [393, 1.15], [320, 1.15]]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 150, nombreEvento: "Boda Fulanita y Mengano en la finca",
+      barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    if (escala !== 1) await p.addStyleTag({ content: `html { font-size: ${escala * 100}% !important; }` });
+    // Todas abiertas: plegadas no hay filas que medir
+    const cab = p.locator(".category-header");
+    for (let i = 0, n = await cab.count(); i < n; i++) {
+      if (!await cab.nth(i).evaluate(h => h.closest(".category-section").classList.contains("is-open"))) await cab.nth(i).click();
+    }
+    await p.waitForTimeout(600);
+    const tag = `${w}px, letra ×${escala}`;
+
+    const partidas = await palabrasPartidas(p);
+    ok(partidas.length === 0, `${tag}: ninguna palabra partida en la checklist${partidas.length ? ` → ${partidas.slice(0, 5).join(", ")}` : ""}`);
+
+    // Simetría: todas las cajas de cantidad (hasta 4 cifras) en UNA columna y del mismo
+    // ancho, y ✎✕ en otra. Con la fila en flex cada una caía donde le cabía —unas al
+    // lado del nombre, otras debajo— y la columna salía en zigzag ("sin simetría").
+    const columnas = await p.locator(".item-row").evaluateAll(rs => {
+      const cajas = new Set(), botones = new Set();
+      rs.forEach(r => {
+        const q = r.querySelector(".item-qty-input"), a = r.querySelector(".item-actions");
+        if (q && /^\d{1,4}$/.test(q.value)) { const b = q.getBoundingClientRect(); cajas.add(`${Math.round(b.left)}-${Math.round(b.right)}`); }
+        if (a) botones.add(Math.round(a.getBoundingClientRect().left));
+      });
+      return { cajas: [...cajas], botones: [...botones] };
+    });
+    ok(columnas.cajas.length === 1 && columnas.botones.length === 1,
+      `${tag}: cantidades y ✎✕ en columna, todas en el mismo sitio → cajas ${columnas.cajas.join(" ")} · ✎✕ ${columnas.botones.join(" ")}`);
+
+    // "BEBIDAS F…" en la misma captura: el nombre de la categoría entero, y el
+    // contador dentro de su tarjeta (si no cabe al lado, baja de línea)
+    const cabeceras = await p.locator(".category-header").evaluateAll(hs => hs.map(h => {
+      const t = h.querySelector(".cat-name-texto"), caja = h.getBoundingClientRect(), pill = h.querySelector(".cat-count").getBoundingClientRect();
+      return { n: t.textContent, bien: t.scrollWidth <= t.clientWidth + 1 && pill.right <= caja.right + 0.5 && pill.left >= caja.left - 0.5 };
+    }));
+    const malas = cabeceras.filter(x => !x.bien).map(x => x.n);
+    ok(cabeceras.length > 5 && malas.length === 0,
+      `${tag}: las ${cabeceras.length} categorías con su nombre entero y el contador dentro${malas.length ? ` → ${malas.join(", ")}` : ""}`);
+
+    // La barra fina de arriba, opaca: con el desenfoque sin pintar (ahorro de batería,
+    // algunos Android) la lista se leía a través de ella, un nombre encima del buscador
+    if (w === 320 && escala === 1) {
+      const fondo = await p.evaluate(() => getComputedStyle(document.querySelector(".barra-fija")).backgroundColor);
+      ok(!/rgba\([^)]*,\s*0?\.\d+\)/.test(fondo), `la barra fina de arriba es opaca → ${fondo}`);
+    }
+
+    await p.locator("button", { hasText: "Modo carga" }).first().click(); await p.waitForTimeout(900);
+    for (const t of ["Salida", "Vuelta", "Resumen"]) {
+      await p.locator(".carga-modo-toggle button").filter({ hasText: t }).first().click(); await p.waitForTimeout(550);
+      const enCarga = await palabrasPartidas(p);
+      ok(enCarga.length === 0, `${tag}: ninguna palabra partida en Modo carga · ${t}${enCarga.length ? ` → ${enCarga.slice(0, 5).join(", ")}` : ""}`);
+    }
+    // En el Resumen el nombre del producto se recortaba con "…" ("Peche (licor d…")
+    const recortados = await p.locator(".resumen-tabla-producto").evaluateAll(cs =>
+      cs.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent.trim()));
+    ok(recortados.length === 0, `${tag}: ningún producto recortado en la tabla del Resumen${recortados.length ? ` → ${recortados.slice(0, 4).join(" | ")}` : ""}`);
     await c.close();
   }
 
@@ -3097,7 +3207,7 @@ async function main() {
     await cerveza.locator(".item-qty-input").click();
     await p.keyboard.type("48", { delay: 30 });
     await p.waitForTimeout(120);
-    const info = await cerveza.locator(".item-batea-info").innerText();
+    const info = await textoUnidad(cerveza.locator(".item-batea-info"));
     ok(/2 cajas/.test(info), `y las cajas de al lado siguen al número mientras se teclea → "${info}"`);
     await c.close();
   }
@@ -3152,11 +3262,15 @@ async function main() {
     await c.close();
   }
 
-  // ── Lo que pone al lado de la cantidad ─────────────────────────────────────
+  // ── Lo que pone debajo de la cantidad ──────────────────────────────────────
   // "5" y al lado "1 cajas de 24" se lee como dos cantidades distintas: ¿hay que
   // llevar 5 o 24? Y "1 cajas" en plural obliga a pararse a leerlo dos veces. En una
   // lista de compra eso no es un detalle de estilo, es un pedido equivocado.
-  console.log("\n── Lo que pone al lado de la cantidad ──");
+  //
+  // El dueño pidió además quitar el "=" y poner el envase DEBAJO del número: debajo
+  // ya se lee como la misma cantidad dicha en envases. Y que concuerde con el número
+  // mientras se teclea: "1 botella", "3 cajas".
+  console.log("\n── Lo que pone debajo de la cantidad ──");
   {
     const c = await navegador.newContext({ viewport: { width: 1440, height: 1000 } });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
@@ -3164,40 +3278,55 @@ async function main() {
     await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 4 }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(1900);
 
+    // Por nombre exacto: "Cava" también está dentro de "Copas de cava"
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
     const infoDe = async (nombre) => {
-      const fila = p.locator(".item-row", { hasText: nombre }).first();
-      const i = fila.locator(".item-batea-info");
-      return await i.count() ? (await i.innerText()).trim() : "";
+      const i = filaExacta(nombre).locator(".item-batea-info");
+      return await i.count() ? await textoUnidad(i) : "";
     };
-    const cantidadDe = (nombre) => p.locator(".item-row", { hasText: nombre }).first().locator(".item-qty-input");
+    const poner = async (nombre, valor) => {
+      await filaExacta(nombre).locator(".item-qty-input").fill(valor);
+      await p.waitForTimeout(900);
+      return infoDe(nombre);
+    };
 
     // Se baja el Nestea a 5: cinco unidades siguen siendo UNA caja, no cinco
-    await cantidadDe("Nestea").fill("5");
-    await p.waitForTimeout(900);
-    const cinco = await infoDe("Nestea");
-    ok(/^=/.test(cinco),
-      `con "=" delante, para que se lea como la misma cantidad en envases y no como otra distinta → "${cinco}"`);
-    ok(/1 caja de 24/.test(cinco) && !/1 cajas/.test(cinco),
+    const cinco = await poner("Nestea", "5");
+    ok(cinco.length > 0 && !/=/.test(cinco),
+      `sin "=" delante, como pidió el dueño → "${cinco}"`);
+    ok(/^1 caja de 24$/.test(cinco),
       `y en singular: "1 caja de 24", no "1 cajas de 24" → "${cinco}"`);
 
-    // Y al cambiarla, el de al lado la sigue
-    await cantidadDe("Nestea").fill("50");
-    await p.waitForTimeout(900);
-    const cincuenta = await infoDe("Nestea");
-    ok(/3 cajas de 24/.test(cincuenta),
-      `cambiar la cantidad recalcula las cajas al momento (50 → "${cincuenta}")`);
-    ok(/cajas/.test(cincuenta),
-      "y con más de una vuelve al plural");
+    // Debajo del número y pegado a su borde derecho, no al lado
+    const [caja, envase] = await Promise.all([
+      filaExacta("Nestea").locator(".item-qty-input").boundingBox(),
+      filaExacta("Nestea").locator(".item-batea-info").boundingBox(),
+    ]);
+    ok(envase.y >= caja.y + caja.height - 1 && Math.abs((envase.x + envase.width) - (caja.x + caja.width)) <= 2,
+      `el envase va debajo del número, alineado a su derecha (caja ${Math.round(caja.y + caja.height)}px, envase ${Math.round(envase.y)}px)`);
+
+    // Y al cambiarla, el de debajo la sigue
+    const cincuenta = await poner("Nestea", "50");
+    ok(/^3 cajas de 24$/.test(cincuenta),
+      `cambiar la cantidad recalcula las cajas al momento, en plural (50 → "${cincuenta}")`);
+
+    // Sin número no hay envases que contar: antes salía "0 cajas de 24"
+    ok(await poner("Nestea", "—") === "", "con \"—\" no se inventa ninguna caja");
 
     // Las bateas de cristalería, igual
     const copas = await infoDe("Copas de vino");
-    ok(/^= \d+ batea/.test(copas), `las bateas siguen la misma regla → "${copas}"`);
+    ok(/^\d+ batea/.test(copas), `las bateas siguen la misma regla → "${copas}"`);
 
-    // Donde el número YA son packs, no lleva "=": ahí el texto es la etiqueta de lo
-    // que se cuenta, no una conversión. Mezclar las dos cosas es lo que liaba.
-    const agua = await infoDe("Agua 1,5L");
-    ok(agua.length > 0 && !/^=/.test(agua),
-      `y donde el número ya va en packs no se pone "=" → "${agua}"`);
+    // Donde el número YA son packs o botellas, el texto es la etiqueta de lo que se
+    // cuenta: también sin "=", y concordando con el número que haya escrito
+    const agua = await infoDe("Agua 1,5L \\(Solán de Cabras, cliente\\)");
+    ok(agua.length > 0 && !/=/.test(agua), `donde el número ya va en packs tampoco hay "=" → "${agua}"`);
+    const unaBotella = await poner("Cava", "1");
+    ok(/^botella\b/.test(unaBotella), `1 de cava → "botella", en singular → "${unaBotella}"`);
+    const doce = await poner("Cava", "12");
+    ok(/^botellas\b/.test(doce), `y 12 → "botellas" → "${doce}"`);
 
     await c.close();
   }
@@ -3223,7 +3352,7 @@ async function main() {
     }).first();
     const sufijoDe = async (nombre) => {
       const i = filaExacta(nombre).locator(".item-batea-info");
-      return await i.count() ? (await i.innerText()).trim() : "";
+      return await i.count() ? await textoUnidad(i) : "";
     };
 
     await filaExacta("Hielo").locator(".item-qty-input").fill("48");
@@ -3234,6 +3363,10 @@ async function main() {
     await p.waitForTimeout(900);
     ok(/5 taxis/.test(await sufijoDe("Hielo")),
       `y al subir a 100kg pasan a ser 5: no se quedan pegados los de cuando se generó (${await sufijoDe("Hielo")})`);
+    await filaExacta("Hielo").locator(".item-qty-input").fill("20");
+    await p.waitForTimeout(900);
+    ok(/1 taxi$/.test(await sufijoDe("Hielo")),
+      `y con uno solo, en singular: "1 taxi", no "1 taxis" (${await sufijoDe("Hielo")})`);
 
     // 100 pax piden 11 carpas (carpasRecomendadas): caben 8 en almacén, faltan 3 por alquilar
     const inicial = await sufijoDe("Carpas");
@@ -3243,7 +3376,177 @@ async function main() {
     await p.waitForTimeout(900);
     ok(/faltan 6, hay que alquilarlas/.test(await sufijoDe("Carpas")),
       `cargar solo 5 de las 8 recalcula cuántas faltan por alquilar, no se queda en 3 (${await sufijoDe("Carpas")})`);
+    await filaExacta("Carpas").locator(".item-qty-input").fill("10");
+    await p.waitForTimeout(900);
+    ok(/falta 1, hay que alquilarla$/.test(await sufijoDe("Carpas")),
+      `y si falta una sola, en singular (${await sufijoDe("Carpas")})`);
 
+    await c.close();
+  }
+
+  // ── Todas las filas con su unidad, y editable a mano ──────────────────────
+  // El dueño: "hay cosas que no tienen unidades o cajas; ponle a todos, permite poder
+  // editarlo si se quiere, pero que los que se actualizan solos (cajas, packs) sigan
+  // funcionando". De unos 160 items de una boda, dos tercios salían con el número solo.
+  console.log("\n── Todas las filas con su unidad, y editable a mano ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 393, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    for (const evento of ["boda", "produccion"]) {
+      await p.goto(url({ evento, pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }),
+        { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1900);
+      const filas = await listaItems(p);
+      const conNumero = filas.filter(f => /=\d+([.,]\d+)?(\||$)/.test(f));
+      const sinUnidad = conNumero.filter(f => !f.includes("|"));
+      ok(conNumero.length > 40 && sinUnidad.length === 0,
+        `${evento}: las ${conNumero.length} filas con número llevan su unidad${sinUnidad.length ? ` → sin: ${sinUnidad.slice(0, 5).join(", ")}` : ""}`);
+    }
+    // Cada una la que le toca, y en singular con 1
+    const filaExacta = (nombre) => p.locator(".item-row").filter({
+      has: p.locator(".item-label-text", { hasText: new RegExp(`^${nombre}$`) }),
+    }).first();
+    const unidadDe = async (nombre) => textoUnidad(filaExacta(nombre).locator(".item-batea-info"));
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }),
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    ok(await unidadDe("Ballantines") === "botellas" && await unidadDe("Camareros") === "personas" && await unidadDe("Mesas de 1,8m") === "uds",
+      `licores en botellas, personal en personas, lo demás en uds (${await unidadDe("Ballantines")} · ${await unidadDe("Camareros")} · ${await unidadDe("Mesas de 1,8m")})`);
+    await filaExacta("Mesas de 1,8m").locator(".item-qty-input").fill("1");
+    await p.waitForTimeout(900);
+    ok(await unidadDe("Mesas de 1,8m") === "ud", `con 1, "ud" y no "uds" (${await unidadDe("Mesas de 1,8m")})`);
+    ok(/^\d+ cajas? de 24$/.test(await unidadDe("Agua con gas")),
+      `el agua con gas ya dice sus cajas de 24, como los refrescos (${await unidadDe("Agua con gas")})`);
+
+    // Se cambia a mano tocándola
+    await filaExacta("Mesas de 1,8m").locator(".item-unidad-btn").click();
+    const campo = filaExacta("Mesas de 1,8m").locator(".item-unidad-input");
+    ok(await campo.isVisible() && await campo.inputValue() === "ud", "tocar la unidad la convierte en un campo con la de ahora");
+    await p.keyboard.type("tableros");
+    await p.keyboard.press("Enter");
+    await p.waitForTimeout(300);
+    ok(await unidadDe("Mesas de 1,8m") === "tableros" && await filaExacta("Mesas de 1,8m").locator(".item-unidad-btn.es-manual").count() === 1,
+      `y lo escrito se queda, marcado como puesto a mano (${await unidadDe("Mesas de 1,8m")})`);
+    // Escape no guarda
+    await filaExacta("Ballantines").locator(".item-unidad-btn").click();
+    await p.keyboard.type("garrafas");
+    await p.keyboard.press("Escape");
+    await p.waitForTimeout(300);
+    ok(await unidadDe("Ballantines") === "botellas", "Escape deja la que había");
+
+    // Las cajas que se cuentan solas siguen contándose mientras nadie las toque...
+    await filaExacta("Nestea").locator(".item-qty-input").fill("50");
+    await p.waitForTimeout(900);
+    ok(await unidadDe("Nestea") === "3 cajas de 24", `las cajas automáticas siguen al número (${await unidadDe("Nestea")})`);
+    // ...y una puesta a mano manda sobre ellas, concordando con el número
+    await filaExacta("Nestea").locator(".item-unidad-btn").click();
+    await p.keyboard.type("packs");
+    await p.keyboard.press("Enter");
+    await filaExacta("Nestea").locator(".item-qty-input").fill("1");
+    await p.waitForTimeout(900);
+    ok(await unidadDe("Nestea") === "pack", `a mano manda la de la persona, y con 1 en singular (${await unidadDe("Nestea")})`);
+    // Vaciarla la devuelve a la automática
+    await filaExacta("Nestea").locator(".item-unidad-btn").click();
+    await p.keyboard.press("Control+A");
+    await p.keyboard.press("Delete");
+    await p.keyboard.press("Enter");
+    await p.waitForTimeout(300);
+    ok(await unidadDe("Nestea") === "1 caja de 24", `borrarla la devuelve a las cajas automáticas (${await unidadDe("Nestea")})`);
+
+    // Lo puesto a mano sale igual en Modo carga
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+    await p.locator(".carga-modo-toggle button").filter({ hasText: "Salida" }).first().click();
+    await p.waitForTimeout(500);
+    const enCarga = (await p.locator(".carga-row").filter({ has: p.locator(".carga-nombre-texto", { hasText: /^Mesas de 1,8m$/ }) })
+      .first().locator(".carga-cantidad").innerText()).trim();
+    ok(enCarga === "1 tableros", `y en Modo carga (${enCarga})`);
+    await c.close();
+
+    // Con el link de solo marcar se lee pero no se cambia, como la cantidad
+    const c2 = await navegador.newContext({ viewport: { width: 393, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
+    const p2 = await nuevaPagina(c2);
+    await p2.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }) + "&solo=1", { waitUntil: "domcontentloaded" });
+    await p2.waitForTimeout(1900);
+    ok(await p2.locator(".item-unidad-btn").count() === 0 && await p2.locator(".item-batea-info").count() > 40,
+      "con el link de solo marcar la unidad se lee, pero no se puede tocar");
+    await c2.close();
+  }
+
+  // ── Lo que falta por preparar (a medias) ───────────────────────────────────
+  // El dueño: "quiero poder poner la cantidad que queda pendiente, porque a veces no
+  // tengo todo porque tiene que venir el proveedor, y si no luego es un lío con lo que
+  // falta". En Prep. un item era preparado o no: lo que faltaba vivía en la cabeza de
+  // alguien. Ahora se apunta cuánto falta (y quién lo trae), y se ve en la fila, en un
+  // recuadro arriba de Modo carga y en la lista normal, hasta que llega.
+  console.log("\n── Lo que falta por preparar ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 393, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10", barraCoctel: true, horasCoctel: 3, barraCopas: true, horasCopas: 4 }),
+      { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+    const pestana = (t) => p.locator(".carga-modo-toggle button").filter({ hasText: t }).first();
+    await pestana("Prep.").click();
+    await p.waitForTimeout(400);
+    const fila = p.locator(".carga-row").filter({ has: p.locator(".carga-nombre-texto", { hasText: /^Ballantines$/ }) }).first();
+    const casilla = fila.locator("input[type=checkbox]");
+
+    // Estaba preparado, y resulta que falta parte
+    await casilla.check();
+    await fila.locator(".carga-pendiente-btn").click();
+    ok(await fila.locator(".carga-pendiente-editor").isVisible() && await casilla.isChecked(),
+      "el reloj de arena abre dónde apuntar lo que falta, sin tocar la casilla");
+    await fila.locator(".carga-pendiente-editor input").first().fill("3");
+    await fila.locator(".carga-pendiente-editor input").nth(1).fill("proveedor martes");
+    await fila.locator(".carga-pendiente-editor .btn-green").click();
+    await p.waitForTimeout(300);
+    const etiqueta = (await fila.locator(".carga-pendiente-tag").innerText()).replace(/\s+/g, " ");
+    ok(/Faltan 3 de \d+ botellas/.test(etiqueta) && /proveedor martes/.test(etiqueta),
+      `la fila dice cuánto falta, de cuánto y quién lo trae ("${etiqueta}")`);
+    ok(!await casilla.isChecked(), "y deja de contar como preparado: no está todo");
+    const resumen = (await p.locator(".carga-pendientes").innerText()).replace(/\s+/g, " ");
+    ok(/Falta por preparar \(1\)/.test(resumen) && /Ballantines/.test(resumen) && /faltan 3/.test(resumen),
+      `arriba, un recuadro con todo lo que falta ("${resumen}")`);
+    ok(/1 a medias/.test(await p.locator(".modal-content, .carga-modal, body").first().innerText()),
+      "y la cuenta de arriba dice cuántos van a medias");
+
+    // En Salida se ve (va incompleto al camión), pero se apunta en Prep.
+    await pestana("Salida").click();
+    await p.waitForTimeout(300);
+    ok(await fila.locator(".carga-pendiente-tag").count() === 1 && await fila.locator(".carga-pendiente-btn").count() === 0
+      && await p.locator(".carga-pendientes").isVisible(),
+      "en Salida se ve lo que falta, sin el botón de apuntarlo");
+
+    // Cuando llega: "Ya ha llegado todo" lo da por preparado y quita el aviso
+    await pestana("Prep.").click();
+    await p.waitForTimeout(300);
+    await fila.locator(".carga-pendiente-btn").click();
+    await fila.locator(".carga-pendiente-editor .btn-outline", { hasText: "Ya ha llegado todo" }).click();
+    await p.waitForTimeout(300);
+    ok(await casilla.isChecked() && await fila.locator(".carga-pendiente-tag").count() === 0 && await p.locator(".carga-pendientes").count() === 0,
+      "\"Ya ha llegado todo\" lo marca preparado y quita lo pendiente");
+
+    // Otra vez a medias: sale también en la lista normal, y se guarda con el evento
+    await fila.locator(".carga-pendiente-btn").click();
+    await fila.locator(".carga-pendiente-editor input").first().fill("2");
+    await fila.locator(".carga-pendiente-editor .btn-green").click();
+    await p.waitForTimeout(400);
+    const enLista = p.locator(".item-row").filter({ has: p.locator(".item-label-text", { hasText: /^Ballantines/ }) }).first().locator(".tag-pendiente");
+    ok(await enLista.count() === 1 && /FALTAN 2/.test(await enLista.innerText()),
+      "en la lista normal la fila lleva \"FALTAN 2\"");
+    const guardado = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_checklist_estado") || "{}").pendientes);
+    ok(guardado && guardado["Alcoholes y licores::Ballantines"]?.faltan === "2",
+      `y queda guardado con el evento (${JSON.stringify(guardado)})`);
+    // Marcar la casilla también es que ha llegado todo
+    await casilla.check();
+    await p.waitForTimeout(300);
+    ok(await fila.locator(".carga-pendiente-tag").count() === 0, "marcar la casilla también da por llegado lo que faltaba");
     await c.close();
   }
 
@@ -4164,36 +4467,110 @@ async function main() {
       ok(await p.locator(".cal-celda.es-hueco.es-abierto").count() === 0,
         `${w}px · las casillas vacías del mes no salen marcadas como el día abierto`);
 
-      // En el móvil el nombre de la boda no cabe, así que la casilla tiene que decir
-      // igualmente para cuánta gente es. Sin esto, un día con tres bodas eran tres
-      // iconos y ninguna pista de si son 40 comensales o 330.
+      // La casilla dice igualmente para cuánta gente es el día. Sin esto, un día con
+      // tres bodas eran tres iconos y ninguna pista de si son 40 comensales o 330.
       ok(await p.locator(".cal-pax-dia").count() > 0,
         `${w}px · los días con eventos enseñan cuánta gente hay`);
-      // Y nada de lo que va dentro de la casilla se sale de ella: con los iconos
-      // envolviendo, la segunda fila salía cortada por la mitad y el número se perdía.
-      ok(await p.evaluate(() => {
-        let fuera = 0;
-        document.querySelectorAll(".cal-celda").forEach(cel => {
-          const c = cel.getBoundingClientRect();
-          cel.querySelectorAll(".cal-puntos .cal-icono, .cal-pax-dia, .cal-mas").forEach(e => {
-            const r = e.getBoundingClientRect();
-            if (r.width && (r.right > c.right + 0.5 || r.bottom > c.bottom + 0.5)) fuera++;
-          });
-        });
-        return fuera === 0;
-      }), `${w}px · ni los iconos ni el número se salen de su casilla`);
 
-      // Un día con muchos apuntes no puede estirar su casilla —y su fila entera de
-      // la rejilla— mucho más que las de al lado. A partir de 560px (donde salen los
-      // chips en vez de los puntos), cada casilla enseña como mucho CHIPS_VISIBLES (3,
-      // Calendario.jsx) y resume el resto en "+N más": el día completo sigue a un
-      // clic, en PanelDia.
-      if (w >= 560) {
-        ok(await p.evaluate(() =>
-          [...document.querySelectorAll(".cal-celda")].every(c => c.querySelectorAll(".cal-chip").length <= 3)),
-          `${w}px · ninguna casilla enseña más de 3 chips de golpe`);
-        ok(await p.locator(".cal-chip-mas").count() > 0,
-          `${w}px · el día con más de 3 apuntes resume el resto en "+N más"`);
+      // Cada casilla enseña TODOS sus apuntes, a cualquier ancho, uno por barrita. #228
+      // los topaba en 3 con "+N más", #234 los soltó solo a partir de 560px y el móvil
+      // siguió con iconos y un "×3". El dueño: "que se vean todos los eventos y no ponga
+      // lo de 2 más o 3 más, que si no no es nada visual". El banco tiene un día con
+      // cinco apuntes. En el móvil van como puntos (el nombre, debajo de la semana) y
+      // las vacaciones y días cerrados no salen en la casilla, sino en su línea de la
+      // semana: son lo único que puede faltar en ella.
+      // (Solo las semanas a la vista: en el mes de hoy las pasadas van plegadas)
+      const casillas = await p.evaluate(() => [...document.querySelectorAll(".cal-celda")].filter(c => c.getClientRects().length).map(cel => {
+        const c = cel.getBoundingClientRect();
+        const chips = [...cel.querySelectorAll(".cal-chip")]
+          .filter(ch => !ch.classList.contains("es-ausencia") || getComputedStyle(ch).display !== "none");
+        return {
+          chips: chips.length,
+          // Visibles de verdad y dentro de la casilla
+          vistos: chips.filter(ch => {
+            const r = ch.getBoundingClientRect();
+            return r.height >= 3 && r.bottom <= c.bottom + 0.5 && r.top >= c.top - 0.5
+              && r.left >= c.left - 0.5 && r.right <= c.right + 0.5;
+          }).length,
+          // Y ningún nombre a medias ("Boda de p", "Corporativ…"): el que se ve, se ve
+          // entero. En el móvil no cabe ninguno y la barrita va sin texto.
+          cortados: chips.map(ch => ch.querySelector(".cal-chip-texto"))
+            .filter(t => t.getClientRects().length && (t.scrollWidth > t.clientWidth + 1
+              || t.getBoundingClientRect().right > c.right + 0.5)).length,
+          // Nada de scroll dentro de la casilla: lo que no se ve sin tocar, no se ve
+          scroll: cel.scrollHeight > cel.clientHeight + 1,
+        };
+      }));
+      ok(Math.max(...casillas.map(x => x.chips)) >= (w < 560 ? 3 : 5) && casillas.every(x => x.vistos === x.chips && !x.scroll),
+        `${w}px · todas las casillas enseñan todos sus apuntes, sin scroll dentro (${casillas.filter(x => x.vistos !== x.chips || x.scroll).length} mal)`);
+      // "Pero se corta, mira bien eso, que no se corte en el calendario" (el dueño)
+      const cortados = casillas.reduce((s, x) => s + x.cortados, 0);
+      ok(cortados === 0, `${w}px · ningún nombre sale cortado en el mes (${cortados} cortados)`);
+      const partidas = await palabrasPartidas(p);
+      ok(partidas.length === 0, `${w}px · ninguna palabra partida en el calendario${partidas.length ? ` → ${partidas.slice(0, 5).join(", ")}` : ""}`);
+      // "Lo que viene" tampoco: el nombre entero, aunque baje de línea
+      ok(await p.evaluate(() => [...document.querySelectorAll(".cal-viene-nombre")]
+        .every(n => n.scrollWidth <= n.clientWidth + 1 && getComputedStyle(n).textOverflow !== "ellipsis")),
+        `${w}px · y en "Lo que viene" los nombres salen enteros`);
+      ok(!/[×+]\s?\d/.test(await p.locator(".cal-mes").innerText()),
+        `${w}px · y ni "×3" ni "+2 más": no se resume nada`);
+      // El número del día y la gente, en la misma línea y dentro de la casilla: abajo
+      // en una esquina tapaban la última barrita en cuanto el día iba lleno
+      ok(await p.evaluate(() => [...document.querySelectorAll(".cal-pax-dia")].every(e => {
+        const c = e.closest(".cal-celda").getBoundingClientRect(), r = e.getBoundingClientRect();
+        const n = e.closest(".cal-celda").querySelector(".cal-numero").getBoundingClientRect();
+        return r.right <= c.right + 0.5 && Math.abs(r.bottom - n.bottom) < 4;
+      })), `${w}px · la gente del día va junto al número, dentro de la casilla`);
+
+      // Por debajo de 560px el nombre entero no cabe en la casilla: debajo de CADA
+      // semana va lo suyo, con el nombre entero y sus datos. Primero fue una lista al
+      // final del mes y con los datos de verdad "no se ve nada": había que bajar todo el
+      // mes para leer un nombre. Por encima de 560px no sale, la rejilla ya los enseña.
+      const listas = p.locator(".cal-semana-lista");
+      if (w < 560) {
+        ok(await listas.count() > 0 && await listas.first().isVisible(), `${w}px · debajo de cada semana, su lista`);
+        ok(await listas.evaluateAll(ls => ls.every(l => l.previousElementSibling?.classList.contains("cal-semana"))),
+          `${w}px · cada lista va justo debajo de la fila de su semana`);
+        const textoListas = (await listas.allInnerTexts()).join("\n");
+        // Los del día cargado del banco: caen siempre en el mes que abre (MES_DEMO)
+        const faltan = ["Boda de prueba tres", "Comunión de prueba", "Rodaje de prueba", "Libra Zutana"]
+          .filter(t => !textoListas.includes(t));
+        ok(faltan.length === 0, `${w}px · con el nombre entero de cada apunte${faltan.length ? ` → faltan ${faltan.join(", ")}` : ""}`);
+        ok(/180 pax/.test(textoListas) && /21:00/.test(textoListas),
+          `${w}px · y su hora y su gente`);
+        // Las vacaciones, en su línea de la semana y una vez por semana, no día a día
+        const ausencias = await p.locator(".cal-semana-ausencias").allInnerTexts();
+        ok(ausencias.join(" ").includes("Vacas Mengano") && ausencias.every(t => (t.match(/Vacas Mengano/g) || []).length <= 1),
+          `${w}px · las vacaciones van en la línea de su semana, una vez (${ausencias.join(" | ").replace(/\s+/g, " ")})`);
+        // Tocar un día de la lista abre su panel, como en la rejilla
+        await listas.locator(".cal-agenda-dia", { hasText: "Boda de prueba tres" }).click();
+        ok(await p.locator(".cal-dia-panel").isVisible(), `${w}px · y tocar un día de la lista abre ese día`);
+        await p.locator(".cal-dia-cerrar").click();
+
+        // En el mes de hoy, lo primero es la semana en curso (lo pidió el dueño): las que
+        // ya pasaron van plegadas tras un botón, y se pueden abrir
+        await p.locator(".cal-hoy").click();
+        await p.waitForTimeout(300);
+        const semanasVisibles = () => p.locator(".cal-semana").evaluateAll(ss => ss.filter(x => x.getClientRects().length).length);
+        ok(await p.locator(".cal-semana").evaluateAll(ss => {
+          const primera = ss.find(x => x.getClientRects().length);
+          return !!primera && !!primera.querySelector(".cal-celda.es-hoy");
+        }), `${w}px · en el mes de hoy la primera semana que se ve es la de hoy`);
+        const boton = p.locator(".cal-ver-pasadas");
+        if (await boton.count()) {
+          const antes = await semanasVisibles();
+          await boton.click();
+          ok(await semanasVisibles() > antes, `${w}px · y el botón despliega las semanas pasadas (${antes} → ${await semanasVisibles()})`);
+          await boton.click();
+        }
+      } else {
+        ok(!await listas.first().isVisible(), `${w}px · la lista de cada semana no sale: la rejilla ya enseña los nombres`);
+        // Y el mes entero, sin plegar nada: en ancho cabe de un vistazo
+        await p.locator(".cal-hoy").click();
+        await p.waitForTimeout(300);
+        ok(await p.locator(".cal-semana").evaluateAll(ss => ss.every(x => x.getClientRects().length))
+          && !await p.locator(".cal-ver-pasadas").isVisible(),
+          `${w}px · en ancho el mes de hoy sale entero, sin semanas plegadas`);
       }
 
       // El equipo: sin él, el aviso de choque no puede decir cuánta gente queda

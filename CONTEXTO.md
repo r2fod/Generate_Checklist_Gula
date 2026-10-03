@@ -5,16 +5,18 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 
 - Rama `main` · Firebase: `gula-checklist`
 - **Reglas del dueño → `CLAUDE.md`** (se carga solo en cada sesión). Léelo primero.
+  Con Gemini se carga `GEMINI.md`, que importa ese mismo `CLAUDE.md`: las reglas son
+  las mismas para cualquier IA.
 - **Estado del plan de mejoras (N1–N6, A–D) → `PLAN_MEJORAS.md`.** No se repite aquí: ese
   archivo lleva su propia tabla de hecho/pendiente por ítem, con su porqué y su tamaño, y
   apunta de vuelta aquí (`Ver CONTEXTO.md, "..."`) para el detalle técnico de cada uno.
-- **Los tres planes grandes, sin código todavía → `PLAN_PRESUPUESTO.md`,
-  `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`.** En ese orden (cada uno reutiliza del
-  anterior). Presupuesto ya tiene su diseño fijado por la hoja de cálculo real que
-  usa hoy el negocio (capturas del dueño, no reproducidas aquí por ser el repo
-  público): cuatro partidas —Personal, Comida, Bebida, Otros— con líneas sueltas
-  concepto+total, y un balance final Presupuesto/Gastos/Margen. Ver el propio
-  fichero para el detalle.
+- **Logística del personal y resumen financiero: fuera de esta app** (decidido por
+  el dueño el 2026-09-30). Los lleva otra app suya, que más adelante quiere juntar con
+  esta. Aquí no se planifica ni se programa presupuesto/margen ni vista de logística
+  por persona; `PLAN_PRESUPUESTO.md` se quitó (sigue en git, commit `d7b28e7`).
+- **Los dos planes grandes que SÍ siguen, sin código todavía → `PLAN_COCINA.md`
+  (primero) y `PLAN_INVENTARIO.md`** (después: su parte de ingredientes necesita el
+  escandallo de Cocina; la de material puede empezar antes).
 
 ## Orden de lectura
 
@@ -24,6 +26,8 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 3. "Proceso" — cómo lanzar pruebas y deploy sin romperlo tú mismo.
 4. `PLAN_MEJORAS.md` — qué falta de verdad, qué ya está cerrado.
 5. "Qué queda pendiente ahora mismo", al final de este archivo — el estado de HOY.
+6. `PENDIENTES.md` — la lista corta de lo que falta y de quién depende (código,
+   decisión del dueño, acción suya fuera del código, datos reales).
 
 ## Mapa del repositorio
 
@@ -496,7 +500,76 @@ está en el historial de git y en las pruebas que los cubren):
   **idéntico byte a byte** al de antes (así que no hay cambio visual que capturar), y en
   Chromium con control — la carga sin escapar se ejecuta, la misma tras el arreglo no.
 
-## Qué queda pendiente ahora mismo (2026-09-07)
+## Qué queda pendiente ahora mismo (2026-09-30)
+
+### Estado de HOY (2026-09-30) — léelo primero si retomas (Claude, Gemini u otra IA)
+
+**En producción** (publicado en `gh-pages`, comprobado en Actions): todo `main` hasta
+#245. Lo último de esta tanda, cada uno con su entrada "— HECHO" más abajo:
+- #241 calendario con todos los apuntes a la vista, sin "+N" ni nombres cortados;
+- #242 todas las filas con su unidad, y editable a mano (`unidadesManuales`);
+- #243 y #244 calendario del móvil por semanas, con la lista debajo de cada una y la
+  semana en curso la primera;
+- #245 Modo carga: lo que falta por preparar (`pendientes`).
+
+**PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
+y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
+fusionarlos por mucho que estén en verde.
+
+**Pendiente**: la lista entera, con las decisiones que esperan al dueño, está en
+`PENDIENTES.md`. Presupuesto y logística por persona NO: los lleva otra app del dueño
+(ver al principio de este archivo). Cocina e inventario sí siguen aquí.
+
+**Pendiente de datos del calendario (en Firestore, no en el código)**:
+- 2026-09-30 se volvió a cruzar la hoja de Google "CALENDARIO GULA" (pestaña del
+  calendario de 2026 + la de bodas, que trae también las de 2027) con lo que había en
+  la app, y el dueño pegó con "Añadir varios apuntes de golpe" los 30 que faltaban.
+- **Sobran todavía, a borrar a mano en la app (o con permiso expreso del dueño)**:
+  unos 29 apuntes que la importación del 14/9 puso en el mes equivocado. Son días del
+  mes anterior/siguiente que la hoja pinta al principio o al final de cada mes y se
+  leyeron con el mes del bloque:
+  - 1 y 3 de abril: son del 1 y 3 de mayo;
+  - 1–5 de junio: son del 1–5 de julio;
+  - 28–31 de octubre: son del 28–30 de septiembre;
+  - 4 de diciembre: es del 4 de julio.
+
+  Además hay un "Día cerrado" el 2/11 que ya no está en la hoja, varios repetidos (el
+  mismo evento con dos títulos distintos, uno de la hoja y otro creado en la app) y
+  dos producciones del 8 y 9 de octubre que siguen también como "Posible …" junto a la
+  versión confirmada. El dueño aún no ha dicho si los borra él o que se borren por él.
+- **Cómo leer esa hoja sin repetir el fallo** (lo que funcionó):
+  - Son dos bloques de 7 columnas (C–I enero–junio, K–Q julio–diciembre), con una fila
+    de mes y otra de "L M X J V S D", y luego filas de números de día seguidas de las
+    filas de apuntes.
+  - La fecha de cada fila de días se ancla por el DÍA DE LA SEMANA: se busca en qué
+    mes (el del bloque, el anterior o el siguiente) cae ese número en esa columna, y
+    se vota entre todas las celdas de la fila. Así salen bien los días que arrastran
+    de otro mes, los tapados con texto ("Día cerrado") y las erratas ("16 17 17 19").
+    Una fila puede mezclar números y apuntes: los números de sábado/domingo de un mes
+    nuevo a veces van en la misma fila que apuntes de la semana.
+  - Se ignoran: las filas con etiqueta en A/B (turnos del personal), las columnas
+    fuera del bloque (importes, notas sueltas) y todo lo que va debajo del calendario
+    (otra tabla, "APERTURA GULA BAR", con su propio mini-calendario que da fechas
+    falsas).
+  - Comparar con lo que ya hay en la app por fecha y título NORMALIZADO igual, no por
+    parecido: con parecido, "Posible Produ X" se daba por igual a "Produ X, 73 pax" y
+    se perdía la confirmación.
+  - Antes de dar el JSON, meterlo en `saneaLista` + `mezclaApuntes` contra una copia
+    del calendario actual: tienen que entrar todos, ninguno repetido.
+  - El JSON lleva nombres de clientes y del equipo: NUNCA al repositorio (es público).
+    Se le pasa al dueño aparte y lo pega él en Calendario → "Añadir varios apuntes de
+    golpe", que solo añade (no borra ni cambia nada).
+
+**Cómo se ha trabajado esta tanda** (sirve igual para otra IA):
+- Una rama por cambio, PR en borrador y fusión solo con `npm run lint`,
+  `npm run tipos`, `npm run test:rapido` Y la batería completa (`npm run test`,
+  ~45 min, ~2500 comprobaciones) en verde, con capturas revisadas si es visual.
+- Mientras corre una batería no se toca el código de esa carpeta ("File Lock" de
+  `CLAUDE.md`). Para seguir trabajando en paralelo: `git worktree add` en otra
+  carpeta, con `node_modules` enlazado y otro puerto para las pruebas.
+- Al fusionar en `main`, "Publicar" vuelve a pasar la batería entera y luego sube
+  `dist/` a `gh-pages` (~35 min). No decir "ya está en la app" hasta que ese job
+  termine en verde.
 
 Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo, igualar
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
@@ -1135,7 +1208,9 @@ mismo criterio que ya pedía para el formulario):
    tarifas de sala/cocina y el presupuesto en sí), Cocina/escandallo después (parte de
    cero: recetario, menú del evento, nada reutilizable todavía). Fase 3, el asistente,
    al final. Piloto: el evento real "Aryan Campana" (ya limpio de notas duplicadas),
-   para probar con datos de verdad antes de generalizar.
+   para probar con datos de verdad antes de generalizar. **2026-09-30: presupuesto y
+   margen, descartados aquí** (los lleva otra app del dueño, ver al principio de este
+   archivo); cocina sigue, en `PLAN_COCINA.md`.
 2. **Mejoras del formulario — HECHO, las seis.** Bug de las tronas: investigado a fondo
    (reproducción real con Playwright por los dos caminos posibles) y no se reprodujo —
    `Tronas` sale directo de `ninos` en los tres builders y ya estaba en las dependencias
@@ -1401,7 +1476,10 @@ Google nunca habían llegado al calendario de la app.
   repo (viven en Firestore, no en el código): el JSON se le pasó al dueño aparte.
   Excluidos de esta pasada por datos poco fiables en la hoja de origen: junio, julio
   y diciembre (semanas mal cuadradas o contenido duplicado/vacío) — quedan
-  pendientes de repasar a mano.
+  pendientes de repasar a mano. **Repasado el 2026-09-30**: esa importación leyó con
+  el mes del bloque los días de otro mes que la hoja pinta en la primera o la última
+  fila de cada mes. Lo que falta, lo que sobra y cómo leer la hoja bien están en
+  "Estado de HOY", al final.
 
 **Modo carga → Resumen: la tabla se ajustaba al pixel justo y podía obligar a
 arrastrar — HECHO**: el dueño lo vio en la app real (captura). `.resumen-tabla-producto`
@@ -1432,6 +1510,12 @@ que las de al lado, mientras días vacíos se quedaban en el mínimo. Causa: en
 UN chip por apunte sin límite; `min-height` en `.cal-celda` es un suelo, no un techo,
 y `overflow:hidden` no recorta nada porque el alto natural de la columna flex ya
 cuenta con cada chip.
+- **Deshecho por el dueño en #234** ("mostrar todos los eventos sin truncar"): la
+  casilla vuelve a enseñar todos los chips (`overflow-y: auto`) y el día cargado estira
+  su fila; prefiere verlos todos. `CHIPS_VISIBLES` y `.cal-chip-mas` quedan sin uso.
+  #234 no tocó las dos pruebas de este tope y la batería completa se quedó en rojo
+  desde el 24-09 —y con ella todos los despliegues, que no publican en rojo—; ahora
+  comprueban lo contrario: el día con cinco apuntes enseña los cinco y no hay "+N más".
 - Tope de `CHIPS_VISIBLES = 3` por casilla (constante junto a `ICONOS`); a partir del
   cuarto apunte sale un `+N más` (`.cal-chip-mas`, mismo trato visual que `.cal-mas`
   en móvil). Como `del` ya viene con los eventos primero (`porDia()`), lo que se
@@ -1445,6 +1529,115 @@ cuenta con cada chip.
   tres eventos + dos vacaciones el mismo día, el mismo caso que el del dueño) a
   360/1280/1920px: la casilla cargada ya no desborda su fila, se ve "+2 más" y el
   resto de casillas de la semana quedan a la misma altura.
+
+**Calendario: todos los apuntes a la vista, también en el móvil — HECHO**: el dueño,
+tras #234: "que se vean todos los eventos y no ponga lo de 2 más o 3 más, que si no no
+es nada visual; y en el móvil también". En el móvil la casilla enseñaba solo iconos y
+un "×3" (`.cal-puntos`/`.cal-mas`), y en escritorio los chips hacían scroll dentro de la
+casilla (`overflow-y: auto` de #234).
+- **Una barrita por apunte, todas, a cualquier ancho** (`Mes()`): desaparecen
+  `.cal-puntos`, `.cal-mas`, `.cal-chip-mas` y `CHIPS_VISIBLES`. La casilla deja de
+  ser cuadrada (`min-height` 52px móvil / 92px ≥560px) y crece con lo que lleve, la
+  fila con ella; sin scroll dentro. **Ningún nombre cortado** (el dueño, tras ver la
+  primera versión: "pero se corta, que no se corte en el calendario"): ≥560px lleva
+  icono, nombre entero en las líneas que haga falta (parte por palabras: si no cabe
+  con el pax, baja el pax; entre 560 y 899px sin icono, que se quedaba solo en su
+  línea) y pax. En el móvil (casillas de 40-55px, no cabe entero ni "Comunión") la
+  casilla lleva un punto de su color por apunte y los nombres van debajo de la semana
+  (ver abajo). "Lo que viene" tampoco corta con "…".
+- **La gente del día junto al número** (`.cal-celda-cab`), no en la esquina de abajo,
+  donde tapaba la última barrita.
+- **El móvil, por semanas** (`SemanaEnLista`, solo <560px). Primero fueron barritas
+  sin texto y una lista "día a día" al final del mes: el dueño lo vio con sus datos
+  de verdad (muchas vacaciones y tareas) y "no se ve nada, cámbialo". Ahora cada fila
+  de siete días marca con un punto de su color cada evento, tarea o recogida (flojos
+  los que no son evento), y JUSTO DEBAJO de esa fila va lo de esa semana: un día por
+  fila, fecha grande a la izquierda y cada apunte con su nombre entero, tipo, hora,
+  sitio y pax. Lo que dura varios días sale una vez (el primer día de la semana en
+  que cae) con "hasta el N". Las vacaciones y los días cerrados (`AUSENCIAS`) no salen
+  en la casilla: van en una línea al final de su semana ("Raúl 1–2 · Ana 7–13"). Hoy
+  resaltado, lo pasado apagado, los días con choque con el borde rojo. Tocar un día de
+  la lista abre `PanelDia`, igual que la casilla.
+- **La semana en curso, lo primero** (el dueño: "estaría bien que esté al principio la
+  semana activa"). En el mes de hoy, en el móvil, las semanas que ya pasaron se
+  pliegan tras un botón ("Ver las N semanas pasadas", `.cal-ver-pasadas`; clase
+  `es-pasada` en la fila y en su lista) y la primera fila que se ve es la de hoy. En
+  otros meses y en ancho (≥560px) se ve el mes entero, como siempre.
+- El total de gente del día suma con `Number(a.pax)`: en la captura del dueño un día
+  salía "10015"; los apuntes pasan por `saneaApunte`, que solo guarda pax numéricos,
+  así que lo más probable es un apunte con el pax mal tecleado — el `Number` es por si
+  entra uno como texto por otro camino.
+- Pruebas en `app.test.mjs` (bloque del calendario, 320/390/768/1280): todas las
+  casillas enseñan todas sus barritas visibles y sin scroll, ni "×N" ni "+N", ningún
+  nombre cortado ni palabra partida en el calendario (tampoco en "Lo que viene"); la gente
+  en la línea del número; en el móvil, una lista justo debajo de cada semana con los
+  nombres enteros, hora y pax, las vacaciones en su línea una vez por semana, y tocar
+  un día lo abre; en el mes de hoy la primera semana que se ve es la de hoy y el botón
+  despliega las pasadas; por encima de 560px la lista no sale y el mes sale entero.
+
+**Todas las filas con su unidad, y editable a mano — HECHO**: el dueño: "hay cosas que
+no tienen unidades o cajas; analiza bien y ponle a todos, permite poder editarlo si se
+quiere, pero que los que se actualizan solos como las cajas o packs sigan funcionando".
+Medido con todos los generadores: de ~400 items, 304 salían con el número solo.
+- **Unidad por defecto** (`unidadPorDefecto(label, categoria)`, `checklist-format.js`):
+  solo para los que no traen unidad del generador ni cuentan cajas/bateas solos, y
+  solo con número (debajo de un "—" no dice nada). Licores en "botellas", personal en
+  "personas", carbón y leña en "sacos", Red Bull en "latas", leches en "bricks",
+  vermut y cerveza sin gluten en "botellas"; el resto, "uds". Concuerda con el número
+  como las demás (`UNIDADES_ENVASE` suma ud, persona, saco, brick): "1 ud", "23 uds".
+- **Agua con gas y cerveza 0,0** entran en `CAJA_POR_LABEL` (24): `calcBebidas` ya las
+  sacaba en cajas de 24 y no lo decían.
+- **Editable a mano** (`unidadesManuales`, mapa `"categoria::labelOriginal" → texto`):
+  la unidad de debajo del número es un botón que se lee como el texto de siempre; al
+  tocarlo pasa a campo (16px, sin zoom de iOS). Enter guarda, Escape no; tocar y
+  salir sin cambiar no la fija. Vacío = vuelve a la de la app, así las cajas, bateas y
+  packs automáticos siguen solos mientras nadie los toque. La puesta a mano manda sobre
+  todo (cajas incluidas), concuerda con el número si es un envase conocido y sale en
+  acento y cursiva. Con el link de solo marcar se lee pero no se toca.
+- El botón de la unidad mide 16px de alto (12 de ancho en "ud"): gana zona de toque
+  con un `::after` invisible de al menos 44×32, pegado a su borde derecho y crecido
+  hacia abajo (no hacia la caja de la cantidad). En las filas de alquiler, en claro,
+  la unidad va en `--text-label`: el gris de siempre daba 4,48 sobre el amarillo. No
+  con `color-mix()`: su color calculado sale como `color(srgb 0.68 …)` y la prueba de
+  contraste lo leía como casi negro.
+- El estado nuevo va como los demás ajustes a mano: en `getEstadoActual`,
+  `SETTERS_SYNC` (nube), `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, "Deshacer", y
+  se migra al renombrar un item manual o una categoría. La tupla de cada item lleva un
+  séptimo dato (`unidadManual`) y `fmtCantidadCompleta(label, qty, sufijo,
+  unidadManual)` lo respeta en Modo carga, Vista previa, Word y copiar texto.
+- Pruebas: puras en `calculos.test.mjs` (unidad por defecto, singulares nuevos, cajas
+  de agua con gas/0,0, manual sobre automática, `sanearEstado`); en `app.test.mjs`
+  ("Todas las filas con su unidad, y editable a mano"): boda y producción sin ninguna
+  fila con número sin unidad, cambiar a mano, Escape, cajas automáticas que siguen,
+  manual sobre cajas y en singular, vaciar devuelve la automática, Modo carga y solo
+  marcar. Las pruebas que leían `.item-batea-info` como texto usan `textoUnidad()`.
+
+**Modo carga: lo que falta por preparar (a medias) — HECHO**: el dueño: "quiero poder
+poner la cantidad que queda pendiente, porque a veces no tengo todo porque tiene que
+venir el proveedor, y si no luego es un lío con lo que falta; estudia la mejor forma
+para no olvidarnos". En Prep. un item era preparado o no, y lo que faltaba vivía en la
+cabeza de alguien.
+- **Estado nuevo `pendientes`** (App.jsx): mapa `"categoria::labelOriginal" → { faltan,
+  nota? }`. Va como los demás de Modo carga: `getEstadoActual`, `SETTERS_SYNC` (la nube
+  fusiona clave a clave, así que dos personas apuntando cosas distintas no se pisan),
+  `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, se vacía al duplicar el evento y se
+  migra al renombrar un item manual o una categoría.
+- **Apuntarlo** (Modo carga · Prep., `FilaCargaPrep`): un reloj de arena en cada fila
+  abre "¿Cuántos faltan? (de N)" y "Quién lo trae o cuándo (opcional)". Guardar con
+  algo pendiente le quita la marca de preparado (no está todo); vacío o 0 lo borra. El
+  botón va dentro de la etiqueta de la fila pero no marca la casilla.
+- **Que no se olvide**: la fila, en ámbar, dice "Faltan 3 de 8 botellas · proveedor
+  martes" (en Prep. y en Salida); arriba de Modo carga, un recuadro "Falta por preparar
+  (N)" con todo lo pendiente, y tocar cada línea lleva a su fila; la cuenta de arriba
+  añade "· N a medias"; y en la lista normal la fila lleva la etiqueta "FALTAN N".
+- **Cuando llega**: "Ya ha llegado todo" en el mismo recuadro, o marcar la casilla de
+  preparado, lo da por completo y quita lo pendiente (`handleTogglePreparado`). En
+  Salida marcar como cargado NO lo quita: puede salir incompleto y lo que falta sigue
+  a la vista.
+- Pruebas: `calculos.test.mjs` (`sanearEstado` con `pendientes`) y `app.test.mjs` ("Lo
+  que falta por preparar": apuntar sin tocar la casilla, la fila, el recuadro, la
+  cuenta, Salida, "Ya ha llegado todo", la lista normal, guardado con el evento y
+  marcar la casilla).
 
 **Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
 por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
@@ -1518,9 +1711,65 @@ tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
   demuestra.
 - Verificación: `npm run test` completo antes de fusionar.
 
-**Tres planes grandes, sin código todavía, guardados por si se retoman** —
-ver `PLAN_PRESUPUESTO.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md` (detalle arriba,
-"Orden de lectura").
+**Palabras partidas y nombres cortados en el móvil — HECHO**: captura del dueño a
+393px con la letra de Android algo grande: "Cápsul/as café (para/el/person/al)" en
+seis líneas, "Cervez/a Alham/bra", "BEBIDAS F…" y la lista leyéndose a través de la
+barra fija. Reproducido tal cual subiendo la fuente raíz al 115% (la app va en rem,
+que es lo que agranda el ajuste de accesibilidad del móvil). Nada se salía ni se
+recortaba —el barrido responsive pasaba—, solo se leía mal.
+- **Fila del item, en columnas fijas** (segunda pasada: el dueño vio la primera "sin
+  simetría" —con `flex-wrap` unas filas iban en una línea y otras en dos, y cada caja
+  de cantidad caía en un sitio: 21 posiciones distintas en una boda—). Ahora es una
+  rejilla: nombre | cantidad | ✎✕, y el envase DEBAJO del número, en pequeño, sin
+  "=" y alineado a su borde derecho (tercera pasada, lo pidió el dueño: debajo ya se
+  lee como la misma cantidad dicha en envases). La columna de cantidad
+  mide lo que 4 cifras (4,75em escritorio / 4,5em móvil, medido): las 115 cajas
+  numéricas de una boda salen en UNA posición y del mismo ancho, y ✎✕ en otra. El
+  grupo `.item-controles` va con `display: contents` para que sus hijos entren en la
+  rejilla. ✎✕ a 34px de ancho en el móvil (toque 34×40). Si la LISTA es más estrecha
+  que 17em (container query, se mide con la letra de verdad: 320px con la letra al
+  115-130%), el nombre sube a toda la fila y lo demás baja, en las mismas columnas.
+  `overflow-wrap: anywhere` → `break-word`, y `conCortes()` (`components/cortes.jsx`,
+  compartido con Modo carga) mete `<wbr>` tras cada "/" también en la checklist.
+  Alto de la lista a 393px con letra al 115%: 9.031px (antes del arreglo, 9.493).
+- **El envase concuerda con el número, y en vivo**: "1 caja de 24" / "3 cajas de 24",
+  "1 batea", y también los sufijos fijos que eran la etiqueta de lo que se cuenta
+  ("botellas", "packs (6 uds)", "caja(s)"): `envaseSegunCantidad()`
+  (`checklist-format.js`) pasa a singular o plural solo la primera palabra si es un
+  envase (batea, bolsa, bote, botella, caja, carga, lata, pack, paquete, rollo, taxi);
+  "kg" y lo demás no se toca. Se aplica al resolver la checklist (App.jsx, así Modo
+  carga y el Word ya lo llevan) y en la fila mientras se teclea. Hielo "1 taxi" y
+  carpas "falta 1, hay que alquilarla" en singular. Sin número ("—") no se cuentan
+  cajas: antes salía "0 cajas de 24".
+- **Cabecera de categoría**: el nombre parte en líneas por palabras en vez de "…";
+  nunca encoge por debajo de su palabra más larga (`min-width: min-content`) y, si ni
+  esa cabe, la que baja de línea es la píldora (la cabecera hace `flex-wrap`). En
+  ≤560px los ↑ ↓ ✎ pasan de 40 a 34px de ancho (alto 40, toque ≥32 como pide la
+  prueba de zonas táctiles). A 320px la píldora baja en 8 de 12: no cabe de otra forma
+  sin esconder botones.
+- **Barra fija del móvil**: opaca (`--card-bg`) en vez de cristal: donde el desenfoque
+  no se pinta (ahorro de batería, algunos Android) la lista se leía a través. El
+  nombre del evento, en dos líneas antes que "Boda Rita y Ll…".
+- **Modo carga**: mismo problema en las filas ("(estándar/de-scafeinado)",
+  "(Seagrams/Ta-nqueray)"): `.carga-nombre` con `min-width: min-content` y la fila con
+  `flex-wrap`, así baja la cantidad antes que partir el nombre. En el Resumen, 46 de
+  130 productos salían con "…": ahora parten en líneas, con icono y nombre en bloque y
+  el ancho de columna fijo (sin `width` la tabla la estrechaba a la palabra más larga).
+  `conCortes()` mete `<wbr>` tras cada "/": el navegador no parte ahí y
+  "estándar/descafeinado" era una sola palabra de 170px en 132.
+- Test nuevo en `app.test.mjs` ("Ninguna palabra partida, ni con la letra grande"),
+  con `palabrasPartidas()`: mide cada tira de letras con `getClientRects()` y falla si
+  sus trozos caen en líneas distintas. 320 y 393px × letra al 100 y 115%: checklist,
+  cabeceras, barra fija y Modo carga (Salida, Vuelta, Resumen). Contra `main` sin el
+  arreglo da 20 fallos; con él, 0. Y la simetría: todas las cajas de cantidad y los
+  ✎✕ en una sola posición (contra la primera pasada, en flex, falla en los 4 casos). Barrido a mano además en formulario (12 preguntas)
+  y calendario, y a 360/412 y letra al 130%: 0 palabras partidas, 0 recortes.
+  "Lo que pone debajo de la cantidad" (sin "=", debajo y a la derecha de la caja,
+  singular/plural al teclear) y el de hielo/carpas en singular; puras de
+  `envaseSegunCantidad()` en `calculos.test.mjs`.
+
+**Dos planes grandes, sin código todavía**: `PLAN_COCINA.md` y `PLAN_INVENTARIO.md`.
+Presupuesto no: lo lleva otra app del dueño (ver al principio de este archivo).
 
 **Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
 septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.

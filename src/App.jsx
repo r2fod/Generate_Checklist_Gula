@@ -64,7 +64,8 @@ import {
   EVENTOS, fmtCantidadCompleta,
   CATEGORIA_MANUAL, quitarItemsSinCantidad,
   horasLogistica, importeLogistica, fmtLogistica, totalLogistica,
-  fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord,
+  fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord, envaseSegunCantidad,
+  unidadPorDefecto, bateaSizeDe, cajaSizeDe,
 } from "./checklist-format.js";
 import { infoCategoria } from "./components/Iconos.jsx";
 import CargandoPanel from "./components/CargandoPanel.jsx";
@@ -242,9 +243,10 @@ const ETIQUETAS_CAMPO = {
   logisticaEquipo: "Equipo de logística", tarifaLogistica: "Tarifa de logística", plusFurgoneta: "Plus de furgoneta",
   recogidas: "Recogidas", compras: "Compras",
   itemsManuales: "Items añadidos a mano", overridesManuales: "Cantidades editadas a mano",
-  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", categoriasRenombradas: "Categorías renombradas", ordenCategorias: "Orden de las categorías",
+  itemsOcultos: "Items quitados", nombresManuales: "Nombres corregidos", unidadesManuales: "Unidades cambiadas a mano", categoriasRenombradas: "Categorías renombradas", ordenCategorias: "Orden de las categorías",
   itemsAlquilerManual: "Items marcados como alquiler proveedor",
   preparados: "Items marcados como preparados", checkeados: "Items marcados como cargados",
+  pendientes: "Cosas a medias (lo que falta por preparar)",
   marcasRevisar: "Items con la cantidad cambiada tras marcarlos",
   vueltos: "Items marcados como vueltos", roturas: "Roturas contadas",
   notasCheck: "Recordatorios de notas hechos",
@@ -665,12 +667,19 @@ export default function App({ onCerrarSesion } = {}) {
   const [overridesManuales, setOverridesManuales] = useState(estadoInicial.overridesManuales ?? {}); // { "categoria::label": "cantidad editada a mano" }
   const [itemsOcultos, setItemsOcultos] = useState(estadoInicial.itemsOcultos ?? {}); // { "categoria::label": true } — items calculados quitados de la lista
   const [nombresManuales, setNombresManuales] = useState(estadoInicial.nombresManuales ?? {});
+  // La unidad escrita a mano en una fila ("cajas", "sacos"...). Sin entrada, la de la
+  // app: la del generador, las cajas/bateas que se calculan solas o la de por defecto.
+  const [unidadesManuales, setUnidadesManuales] = useState(estadoInicial.unidadesManuales ?? {}); // { "categoria::labelOriginal": "unidad" }
   // Orden de categorías elegido a mano (lista de nombres). Vacío = el de la app.
   const [ordenCategorias, setOrdenCategorias] = useState(estadoInicial.ordenCategorias ?? []); // { "categoria::labelOriginal": "nombre corregido" }
   // Preparar (sacar del almacén y dejarlo listo) y cargar en el camión son dos momentos
   // distintos, muchas veces de personas distintas: llevan su propio check para poder
   // controlar la preparación sin mezclarla con lo que ya está subido al camión.
   const [preparados, setPreparados] = useState(estadoInicial.preparados ?? {}); // { "categoria::label": true } — marcados como preparados en "Modo carga"
+  // Lo que está A MEDIAS: preparado en parte, y el resto pendiente de que llegue (lo
+  // trae el proveedor, se compra el martes...). Sin esto se marcaba como preparado o
+  // no, y "lo que falta" vivía en la cabeza de alguien. { "categoria::label": { faltan: "20", nota: "proveedor martes" } }
+  const [pendientes, setPendientes] = useState(estadoInicial.pendientes ?? {});
   // Items marcados en Modo carga a los que se les cambió la cantidad DESPUÉS de
   // marcarlos: la marca se conserva (es trabajo hecho) pero se señalan para volver a
   // contarlos. Se limpia al volver a tocar su casilla, que es cuando se han revisado.
@@ -917,7 +926,7 @@ export default function App({ onCerrarSesion } = {}) {
     personasPorPlatoEntrante, llevaAguasPequenas, tipoAguaPequena, hayDesayuno,
     entranteCompartido, numEntrantesCompartir,
     tipoNevera, tipoCongelador, origenSillas, tipoMesa, itemsManuales, overridesManuales,
-    itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
+    itemsOcultos, nombresManuales, unidadesManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual, preparados, pendientes, checkeados, vueltos, roturas, marcasRevisar, notasCheck, cronos,
     valoresCalculados, logisticaEquipo, tarifaLogistica, plusFurgoneta, recogidas, compras, eventoNubeId,
     formularioRespuestas,
   });
@@ -1029,8 +1038,8 @@ export default function App({ onCerrarSesion } = {}) {
     tipoNevera: setTipoNevera, tipoCongelador: setTipoCongelador, origenSillas: setOrigenSillas, tipoMesa: setTipoMesa,
     logisticaEquipo: setLogisticaEquipo, tarifaLogistica: setTarifaLogistica, plusFurgoneta: setPlusFurgoneta, recogidas: setRecogidas, compras: setCompras,
     itemsManuales: setItemsManuales, overridesManuales: setOverridesManuales,
-    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
-    itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, marcasRevisar: setMarcasRevisar, notasCheck: setNotasCheck, cronos: setCronos,
+    itemsOcultos: setItemsOcultos, nombresManuales: setNombresManuales, unidadesManuales: setUnidadesManuales, categoriasRenombradas: setCategoriasRenombradas, ordenCategorias: setOrdenCategorias,
+    itemsAlquilerManual: setItemsAlquilerManual, preparados: setPreparados, pendientes: setPendientes, checkeados: setCheckeados, vueltos: setVueltos, roturas: setRoturas, marcasRevisar: setMarcasRevisar, notasCheck: setNotasCheck, cronos: setCronos,
     valoresCalculados: setValoresCalculados,
     eventoNubeId: setEventoNubeId,
     formularioRespuestas: setFormularioRespuestas,
@@ -2516,7 +2525,7 @@ export default function App({ onCerrarSesion } = {}) {
       const base = eventosGuardados[nombre];
       const nom = (nuevo || "").trim();
       if (!base || !nom) return;
-      const copia = { ...base, nombreEvento: nom, eventoNubeId: null, preparados: {}, checkeados: {}, vueltos: {}, roturas: {}, marcasRevisar: {}, cronos: {} };
+      const copia = { ...base, nombreEvento: nom, eventoNubeId: null, preparados: {}, pendientes: {}, checkeados: {}, vueltos: {}, roturas: {}, marcasRevisar: {}, cronos: {} };
       guardarEventos({ ...eventosGuardados, [nom]: copia });
       setGuardadoEventoMsg(`✓ Duplicado como "${nom}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3000);
@@ -2666,8 +2675,20 @@ export default function App({ onCerrarSesion } = {}) {
           const valorBase = esObjetoConSufijo ? qty.u : qty;
           const sufijoBruto = esObjetoConSufijo ? qty.sufijo : undefined;
           const cantidad = overridesManuales[key] !== undefined ? overridesManuales[key] : valorBase;
-          const sufijo = typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto;
-          return [nombresManuales[key] ?? label, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo];
+          const nombre = nombresManuales[key] ?? label;
+          // Todos con su unidad (lo pidió el dueño): la del generador si trae; si no, y no
+          // es de los que cuentan cajas o bateas solos, la de por defecto ("uds",
+          // "botellas"...). Solo con número: debajo de un "—" no dice nada.
+          const sufijoGenerador = typeof sufijoBruto === "function" ? sufijoBruto(cantidad) : sufijoBruto;
+          const conNumero = !isNaN(parseFloat(String(cantidad).replace(",", ".")));
+          const sufijoAuto = sufijoGenerador
+            ?? (conNumero && !bateaSizeDe(nombre) && !cajaSizeDe(nombre) ? unidadPorDefecto(label, cat.nombre) : undefined);
+          // La escrita a mano manda sobre todo lo anterior, cajas automáticas incluidas;
+          // borrarla la devuelve a la de la app. El séptimo dato dice si es a mano.
+          const unidadManual = unidadesManuales[key];
+          // Y la unidad concuerda con el número ya resuelto: "1 botella", "3 cajas"
+          const sufijo = envaseSegunCantidad(unidadManual ?? sufijoAuto, cantidad);
+          return [nombre, cantidad, idx, label, esAlquilerFijo || !!itemsAlquilerManual[key], sufijo, unidadManual !== undefined];
         });
     });
     // Si se ocultan todos los items de una categoría, la categoría desaparece también
@@ -2685,7 +2706,7 @@ export default function App({ onCerrarSesion } = {}) {
         return pa !== pb ? pa - pb : a.i - b.i;
       })
       .map(x => x.c);
-  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, categoriasRenombradas, itemsAlquilerManual, ordenCategorias]);
+  }, [baseChecklist, itemsManuales, overridesManuales, itemsOcultos, nombresManuales, unidadesManuales, categoriasRenombradas, itemsAlquilerManual, ordenCategorias]);
 
   // Estimación de tiempos para sugerir la hora de fin de logística desde la de inicio.
   // Usa el nº recomendado de logística (1 cada 60 pax) para que la sugerencia sea estable.
@@ -2721,6 +2742,7 @@ export default function App({ onCerrarSesion } = {}) {
   const accionesFilaRef = React.useRef({});
   accionesFilaRef.current = {
     editarCantidad: (categoria, labelOriginal, valor) => handleEditarCantidad(categoria, labelOriginal, valor),
+    editarUnidad: (categoria, labelOriginal, valor) => handleEditarUnidad(categoria, labelOriginal, valor),
     ocultar: (categoria, labelOriginal) => handleOcultarItem(categoria, labelOriginal),
     quitarManual: (idx) => handleRemoveItemManual(idx),
     empezarEdicion: (keyId, label, esAlquiler) => {
@@ -2732,8 +2754,25 @@ export default function App({ onCerrarSesion } = {}) {
     setAlquilerTemporal,
   };
 
-  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
+  const snapshotHistorial = () => ({ overridesManuales, itemsManuales, itemsOcultos, nombresManuales, unidadesManuales, categoriasRenombradas, ordenCategorias, itemsAlquilerManual });
   const pushHistorial = () => setHistorial(prev => [...prev.slice(-19), snapshotHistorial()]);
+
+  // La unidad de una fila, escrita a mano. Vacía = vuelve a la de la app (la del
+  // generador, las cajas/bateas automáticas o la de por defecto). Se confirma al salir
+  // del campo, así que cada cambio es un paso de "Deshacer".
+  const handleEditarUnidad = (categoria, labelOriginal, valor) => {
+    const key = `${categoria}::${labelOriginal}`;
+    const limpio = String(valor ?? "").trim();
+    if ((unidadesManuales[key] ?? "") === limpio) return;
+    ultimaClaveEditadaRef.current = null;
+    pushHistorial();
+    setUnidadesManuales(prev => {
+      const next = { ...prev };
+      if (limpio === "") delete next[key];
+      else next[key] = limpio;
+      return next;
+    });
+  };
 
   const handleEditarCantidad = (categoria, labelOriginal, valor) => {
     const key = `${categoria}::${labelOriginal}`;
@@ -2777,7 +2816,30 @@ export default function App({ onCerrarSesion } = {}) {
     delete next[key];
     return next;
   }), []);
-  const handleTogglePreparado = useCallback((key) => { revisado(key); setPreparados(prev => ({ ...prev, [key]: !prev[key] })); }, [revisado]);
+  // Marcarlo como preparado es que ya está TODO: si estaba a medias, deja de estarlo
+  const handleTogglePreparado = useCallback((key) => {
+    revisado(key);
+    setPreparados(prev => {
+      const marcando = !prev[key];
+      if (marcando) setPendientes(p => { if (!p[key]) return p; const n = { ...p }; delete n[key]; return n; });
+      return { ...prev, [key]: marcando };
+    });
+  }, [revisado]);
+  // Apuntar (o quitar) lo que falta de un item. Si falta algo, no está preparado del
+  // todo: se le quita la marca de preparado, que se vuelve a poner cuando llegue.
+  // Sin número (o 0) no hay nada pendiente y se borra.
+  const handlePendiente = useCallback((key, datos) => {
+    // Tal como se escribe ("2,5"), que es como se lee; la coma solo se cambia para contar
+    const faltan = datos ? String(datos.faltan ?? "").trim() : "";
+    const hay = Number(faltan.replace(",", ".")) > 0;
+    setPendientes(prev => {
+      const next = { ...prev };
+      if (!hay) delete next[key];
+      else next[key] = datos.nota && datos.nota.trim() ? { faltan, nota: datos.nota.trim() } : { faltan };
+      return next;
+    });
+    if (hay) setPreparados(p => (p[key] ? { ...p, [key]: false } : p));
+  }, []);
   // Si algo sale en el camión es porque estaba preparado: marcarlo en Salida lo da
   // por preparado también. Antes las dos listas podían contradecirse —"cargado" pero
   // "sin preparar"— y quien miraba la de preparación volvía a buscar por el almacén
@@ -2891,7 +2953,7 @@ export default function App({ onCerrarSesion } = {}) {
           delete next[key];
           return next;
         });
-        [setOverridesManuales, setPreparados, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
+        [setOverridesManuales, setUnidadesManuales, setPreparados, setPendientes, setCheckeados, setVueltos, setRoturas, setMarcasRevisar].forEach(migrar);
         keyFinal = newKey;
       } else {
         setNombresManuales(prev => ({ ...prev, [key]: nuevoLabel }));
@@ -2913,6 +2975,7 @@ export default function App({ onCerrarSesion } = {}) {
     setItemsManuales(ultimo.itemsManuales);
     setItemsOcultos(ultimo.itemsOcultos);
     setNombresManuales(ultimo.nombresManuales);
+    setUnidadesManuales(ultimo.unidadesManuales ?? {});
     setOrdenCategorias(ultimo.ordenCategorias ?? []);
     setCategoriasRenombradas(ultimo.categoriasRenombradas);
     setItemsAlquilerManual(ultimo.itemsAlquilerManual);
@@ -2962,7 +3025,10 @@ export default function App({ onCerrarSesion } = {}) {
     setOverridesManuales(migraClaves);
     setItemsOcultos(migraClaves);
     setNombresManuales(migraClaves);
+    setUnidadesManuales(migraClaves);
     setItemsAlquilerManual(migraClaves);
+    // Lo que falta por llegar no se puede perder por renombrar la categoría
+    setPendientes(migraClaves);
   };
 
   const handleLabelItemManual = (value) => {
@@ -3104,7 +3170,7 @@ export default function App({ onCerrarSesion } = {}) {
   };
 
   const getTextoChecklist = () => {
-    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q, , , , sufijo]) => `  • ${l}: ${fmtCantidadCompleta(l, q.u ? q.u : q, sufijo)}`).join("\n")).join("\n");
+    const texto = checklist.map(cat => `\n▶ ${cat.nombre.toUpperCase()}\n` + cat.items.map(([l, q, , , , sufijo, unidadManual]) => `  • ${l}: ${fmtCantidadCompleta(l, q.u ? q.u : q, sufijo, unidadManual)}`).join("\n")).join("\n");
     const cabecera = [
       nombreEvento ? nombreEvento.toUpperCase() : `CHECKLIST ${EVENTOS[evento]?.label?.toUpperCase()}`,
       `${pax} pax`,
@@ -3208,6 +3274,8 @@ export default function App({ onCerrarSesion } = {}) {
           onCambiarRatios={guardarRatiosAsistente}
           checklist={checklist}
           preparados={preparados}
+          pendientes={pendientes}
+          onPendiente={handlePendiente}
           marcasRevisar={marcasRevisar}
           checkeados={checkeados}
           vueltos={vueltos}
@@ -4856,7 +4924,7 @@ export default function App({ onCerrarSesion } = {}) {
               </div>
               <div className="item-list-wrapper">
                 <div className="item-list">
-                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual, sufijo], i) => {
+                  {cat.items.map(([label, qty, manualIdx, labelOriginal, esAlquilerManual, sufijo, unidadManual], i) => {
                     const keyId = `${cat.nombre}::${labelOriginal ?? label}`;
                     const editando = editandoNombre === keyId;
                     return (
@@ -4869,6 +4937,8 @@ export default function App({ onCerrarSesion } = {}) {
                         manualIdx={manualIdx}
                         esAlquilerManual={esAlquilerManual}
                         sufijo={sufijo}
+                        unidadManual={unidadManual}
+                        pendiente={pendientes[keyId]}
                         editado={overridesManuales[keyId] !== undefined}
                         renombrado={manualIdx === undefined && nombresManuales[keyId] !== undefined}
                         editando={editando}
