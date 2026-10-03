@@ -4077,6 +4077,54 @@ hr {
   }
 }
 
+/* Prep. (la fila con el reloj de arena), en rejilla: cada cosa en su columna en todas
+   las filas. En flex, según lo largo del nombre, unas veces bajaba la cantidad, otras
+   el reloj, otras las dos (a 393px con la letra al 115%, 22 filas de 136, en cuatro
+   formas distintas; a 320px, casi todas).
+   - El nombre nunca baja de su palabra más larga (min-content): no se parte por dentro.
+   - La cantidad sí puede partirse en dos líneas ("1100 (44 bateas / de 25)") antes que
+     apretar el nombre, siempre alineada a la derecha.
+   - Lo que falta, debajo, de la columna del nombre al borde.
+   Los huecos van en márgenes y no en gap: una columna vacía (sin marcas) no deja hueco. */
+.carga-row { container: cargafila / inline-size; }
+.carga-row-principal.carga-row-prep {
+  display: grid;
+  grid-template-columns: auto minmax(min-content, 1fr) auto auto auto;
+  gap: 6px 0;
+}
+.carga-row-prep > input[type="checkbox"] { grid-column: 1; grid-row: 1; margin: 0 14px 0 0; }
+.carga-row-prep > .carga-nombre { grid-column: 2; grid-row: 1; }
+.carga-row-prep > .carga-marcas { grid-column: 3; grid-row: 1; margin-left: 8px; }
+.carga-row-prep > .carga-cantidad {
+  grid-column: 4;
+  grid-row: 1;
+  margin-left: 12px;
+  white-space: normal;
+  text-align: right;
+}
+.carga-row-prep > .carga-pendiente-btn { grid-column: 5; grid-row: 1; margin-left: 12px; }
+.carga-row-prep > .carga-pendiente-tag { grid-column: 2 / -1; grid-row: 2; margin: 0; padding: 0; }
+/* Cuando ni así cabe (320px, o la letra grande del móvil por debajo de ~360px), todas
+   las filas pasan a la misma forma de dos pisos: el nombre arriba con todo el ancho, y
+   la cantidad y el reloj abajo a la derecha. Lo que falta, en un tercer piso. Se mide en
+   em de la propia fila: con la letra al 115% cambia antes, que es justo cuando hace
+   falta. */
+@container cargafila (max-width: 17.5em) {
+  .carga-row-principal.carga-row-prep {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+    gap: 2px 0;
+    padding-top: 11px;
+    padding-bottom: 11px;
+  }
+  .carga-row-prep > .carga-nombre { grid-column: 2 / -1; min-width: 0; }
+  .carga-row-prep > .carga-marcas { grid-row: 2; }
+  .carga-row-prep > .carga-cantidad { grid-row: 2; }
+  .carga-row-prep > .carga-pendiente-btn { grid-row: 2; }
+  .carga-row-prep > .carga-pendiente-tag { grid-row: 3; }
+}
+/* Las marcas de "cargado"/"prep."/"revisar", juntas: van en la misma columna */
+.carga-marcas { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
 /* Nunca más estrecho que su palabra más larga: "Ginebra (Seagrams/Ta-nqueray)" y
    "(estándar/de-scafeinado)" se partían por dentro al apretarse contra la cantidad */
 .carga-nombre {
@@ -4603,14 +4651,22 @@ hr {
 
 .carga-row.is-pendiente { background: var(--aviso-bg); box-shadow: inset 4px 0 0 var(--aviso-borde); }
 
+/* Lo que falta va en su propia línea, bajo el nombre y con el ancho de la fila (es
+   hijo directo de la fila, no del nombre). Aquí, la fila en flex de Salida: el 40px
+   es la casilla más su hueco, para que empiece donde empieza el nombre. */
 .carga-pendiente-tag {
   display: block;
-  margin-top: 3px;
-  flex-basis: 100%;
+  flex: 1 1 100%;
+  order: 9;
+  margin-top: -8px;
+  padding-left: 38px;
+  min-width: 0;
+  overflow-wrap: break-word;
   color: var(--aviso-texto);
   font-size: 0.78rem;
   font-weight: 700;
 }
+@media (max-width: 768px) { .carga-pendiente-tag { padding-left: 40px; } }
 
 .carga-pendiente-tag svg { vertical-align: -1px; margin-right: 3px; }
 
@@ -4667,13 +4723,35 @@ hr {
   color: var(--aviso-texto);
 }
 .carga-pendientes-titulo { display: flex; align-items: center; gap: 7px; font-weight: 800; font-size: 0.88rem; margin-bottom: 4px; }
-.carga-pendientes-item {
+/* Con scroll propio: con 30 cosas a medias el recuadro medía 1.700px y la lista de
+   Modo carga empezaba dos pantallas más abajo. Se ven unas cinco y el resto, deslizando
+   dentro. Las sombras de arriba/abajo (fondos "local" + "scroll") solo salen cuando hay
+   más por ver en ese lado: es la pista de que la lista sigue. */
+.carga-pendientes-lista {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
+  flex-direction: column;
+  max-height: min(42vh, 17rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background:
+    linear-gradient(var(--aviso-bg) 30%, transparent) top / 100% 28px no-repeat local,
+    linear-gradient(transparent, var(--aviso-bg) 70%) bottom / 100% 28px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.4), transparent) top / 100% 14px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.4), transparent) bottom / 100% 14px no-repeat scroll;
+}
+/* Todas las líneas con la misma forma: el nombre a la izquierda, cuánto falta a la
+   derecha (siempre en su sitio, como la columna de cantidades de la lista) y la nota
+   debajo. Antes era texto seguido: según lo largo del nombre, el resto cabía en la
+   línea o bajaba, y cada línea salía de una manera. */
+.carga-pendientes-item {
+  display: grid;
+  /* En una columna flex con tope de alto, los hijos encogen y se pisan: estos no */
+  flex-shrink: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 10px;
   align-items: baseline;
   min-height: 40px;
-  padding: 6px 0;
+  padding: 7px 0;
   border: 0;
   border-top: 1px solid var(--aviso-borde);
   background: none;
@@ -4683,7 +4761,9 @@ hr {
   text-align: left;
   cursor: pointer;
 }
-.carga-pendientes-item strong { font-weight: 800; }
+.carga-pendientes-item strong { font-weight: 800; min-width: 0; overflow-wrap: break-word; }
+.carga-pendientes-cant { font-weight: 700; white-space: nowrap; text-align: right; }
+.carga-pendientes-nota { grid-column: 1 / -1; min-width: 0; overflow-wrap: break-word; font-size: 0.78rem; font-weight: 600; }
 
 /* Indicador "Guardado ✓": chip flotante abajo-derecha que aparece un instante */
 .guardado-indicador {

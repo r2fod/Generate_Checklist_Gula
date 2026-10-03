@@ -53,7 +53,10 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
   return (
     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""} ${pendiente ? "is-pendiente" : ""}`}
          data-revisar={marcaRevisar ? dataKey : undefined} data-pendiente={pendiente ? dataKey : undefined}>
-      <label className="carga-row-principal">
+      {/* En Prep. (con el reloj de arena) la fila va en rejilla: cada cosa en su
+          columna en todas las filas, en vez de que el reloj o la cantidad bajen de
+          línea según lo largo que sea el nombre. Ver .carga-row-prep en index.css. */}
+      <label className={`carga-row-principal ${enPreparacion && onPendiente ? "carga-row-prep" : ""}`}>
         <input type="checkbox" checked={marcado} onChange={() => onToggle && onToggle(dataKey)} />
         <span className="carga-nombre">
           {/* El tag va FUERA de carga-nombre-texto (que es el nombre puro: algo lo lee
@@ -65,27 +68,25 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
             <IconoItem label={label} /> <span className="carga-nombre-texto">{conCortes(label)}</span>
           </span>
           {esAlquiler && <span className="tag-alquiler"><Tag size={10} /> ALQUILER</span>}
-          {pendiente && (
-            <span className="carga-pendiente-tag">
-              <Hourglass size={11} /> Faltan {pendiente.faltan}{!isNaN(cantidadNum) ? ` de ${cantidadNum}${sufijo ? ` ${sufijo}` : ""}` : ""}
-              {pendiente.nota ? ` · ${pendiente.nota}` : ""}
-            </span>
-          )}
         </span>
-        {otroMarcado && (
-          <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
-                title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
-            {enPreparacion ? <Truck size={11} /> : <ClipboardCheck size={11} />}
-            <span className="carga-marca-otra-texto">{enPreparacion ? "cargado" : "prep."}</span>
-          </span>
-        )}
-        {/* La cantidad cambió DESPUÉS de marcarlo: la marca se respeta (es trabajo
-            hecho) pero hay que volver a contarlo. */}
-        {marcaRevisar && (
-          <span className="carga-marca-otra is-revisar"
-                title="La cantidad ha cambiado desde que lo marcaste: conviene volver a contarlo">
-            <AlertTriangle size={11} />
-            <span className="carga-marca-otra-texto">revisar</span>
+        {(otroMarcado || marcaRevisar) && (
+          <span className="carga-marcas">
+            {otroMarcado && (
+              <span className={`carga-marca-otra ${enPreparacion ? "is-cargado" : "is-preparado"}`}
+                    title={enPreparacion ? "Ya está cargado en el camión" : "Estaba marcado como preparado"}>
+                {enPreparacion ? <Truck size={11} /> : <ClipboardCheck size={11} />}
+                <span className="carga-marca-otra-texto">{enPreparacion ? "cargado" : "prep."}</span>
+              </span>
+            )}
+            {/* La cantidad cambió DESPUÉS de marcarlo: la marca se respeta (es trabajo
+                hecho) pero hay que volver a contarlo. */}
+            {marcaRevisar && (
+              <span className="carga-marca-otra is-revisar"
+                    title="La cantidad ha cambiado desde que lo marcaste: conviene volver a contarlo">
+                <AlertTriangle size={11} />
+                <span className="carga-marca-otra-texto">revisar</span>
+              </span>
+            )}
           </span>
         )}
         <span className="carga-cantidad">{fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</span>
@@ -96,6 +97,15 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
                   aria-label={`Falta parte de ${label}`} title="Falta parte: apunta cuánto y quién lo trae">
             <Hourglass size={16} />
           </button>
+        )}
+        {/* Lo que falta, en su propia línea bajo el nombre y con todo el ancho de la
+            fila: metido en la columna del nombre se estrujaba ("Faltan 1 / de 1 bolsa
+            · / cocina" a 320px). */}
+        {pendiente && (
+          <span className="carga-pendiente-tag">
+            <Hourglass size={11} /> Faltan {pendiente.faltan}{!isNaN(cantidadNum) ? ` de ${cantidadNum}${sufijo ? ` ${sufijo}` : ""}` : ""}
+            {pendiente.nota ? ` · ${pendiente.nota}` : ""}
+          </span>
         )}
       </label>
       {editando && (
@@ -849,12 +859,18 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
               <div className="carga-pendientes-titulo">
                 <Hourglass size={15} /> Falta por preparar ({aMedias.length})
               </div>
-              {aMedias.map(p => (
-                <button type="button" key={p.key} className="carga-pendientes-item" onClick={() => irAPendiente(p.key)}>
-                  <strong>{p.label}</strong>
-                  <span>faltan {p.faltan}{p.total !== undefined && p.total !== null && p.total !== "" ? ` de ${p.total}${p.sufijo ? ` ${p.sufijo}` : ""}` : ""}{p.nota ? ` · ${p.nota}` : ""}</span>
-                </button>
-              ))}
+              {/* Con scroll propio: con 30 cosas a medias el recuadro medía 1.700px y
+                  había que bajar dos pantallas para llegar a la lista. Cada línea tiene
+                  la misma forma: nombre, cuánto falta a la derecha y la nota debajo. */}
+              <div className="carga-pendientes-lista">
+                {aMedias.map(p => (
+                  <button type="button" key={p.key} className="carga-pendientes-item" onClick={() => irAPendiente(p.key)}>
+                    <strong>{p.label}</strong>
+                    <span className="carga-pendientes-cant">faltan {p.faltan}{p.total !== undefined && p.total !== null && p.total !== "" ? ` de ${p.total}${p.sufijo ? ` ${p.sufijo}` : ""}` : ""}</span>
+                    {p.nota && <span className="carga-pendientes-nota">{p.nota}</span>}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           {modo === "vuelta" && renderCrono("descarga", descargaMin, "Cronómetro de descarga")}
