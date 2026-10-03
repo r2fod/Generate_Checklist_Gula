@@ -1605,6 +1605,42 @@ cabeza de alguien.
   cuenta, Salida, "Ya ha llegado todo", la lista normal, guardado con el evento y
   marcar la casilla).
 
+**Modo carga con muchas cosas a medias: recuadro con scroll y filas de Prep. en su sitio
+— HECHO**: captura del dueño con 36 cosas a medias: "pon un scroll para que no sea tan
+largo llegar a la checklist, y mira la distribución, que ahora se corta o se bajan".
+- **El recuadro "Falta por preparar"** medía 1.700px: la lista empezaba dos pantallas
+  más abajo. Ahora la lista va dentro de `.carga-pendientes-lista`, con tope de
+  `min(42vh, 17rem)` y scroll propio (se ven unas cinco). Las sombras arriba y abajo
+  (fondos `local` + `scroll`, CSS puro) avisan de que hay más.
+- **Cada línea del recuadro con la misma forma** (rejilla): el nombre, cuánto falta a
+  la derecha (`.carga-pendientes-cant`) y la nota debajo (`.carga-pendientes-nota`).
+  Antes era texto seguido, y según lo largo del nombre el resto cabía o bajaba.
+- **Las filas de Prep. en rejilla** (`.carga-row-prep`, solo con el reloj de arena):
+  casilla | nombre | marcas | cantidad | reloj. En flex, según el nombre, bajaba la
+  cantidad, el reloj o los dos: a 393px con la letra al 115%, 22 de 136 filas, en
+  cuatro formas distintas; a 320px, casi todas.
+  - El nombre nunca baja de su palabra más larga (`minmax(min-content, 1fr)`). La
+    cantidad larga ("1100 (44 bateas de 25)") se parte en dos líneas, alineada a la
+    derecha.
+  - Lo que falta va debajo, de la columna del nombre al borde: ahora es hijo directo
+    de la fila, no del nombre, donde se estrujaba ("Faltan 1 / de 1 bolsa").
+  - Si ni así cabe (`@container cargafila (max-width: 17.5em)`, en em de la propia
+    fila, así que con la letra grande cambia antes), TODAS las filas pasan a la misma
+    forma de dos pisos: el nombre arriba con todo el ancho, y cantidad y reloj debajo
+    a la derecha.
+  - Medido: a 340, 360 y 375px (letra ×1) y a 393 y 412px (×1.15), una línea. A
+    320px, y a 360–375px con letra ×1.15, dos pisos. En todos, 0 desbordes y 0
+    palabras partidas, también en producción, cumpleaños y comunión.
+  - Salida (sin reloj) sigue en flex como antes; lo que falta, en su línea, alineado
+    con el nombre.
+  - Las marcas "cargado"/"prep."/"revisar" van juntas en `.carga-marcas`, para que
+    ocupen una sola columna.
+- Prueba en `app.test.mjs` ("Muchas cosas a medias", 393 ×1 y ×1.15, y 320): con 24
+  a medias, el recuadro desliza y no pasa de media pantalla, y la lista empieza en la
+  primera pantalla. Cada línea del recuadro tiene su forma. En Prep., una sola
+  columna de relojes, una de cantidades y una sola forma; sin desbordes ni palabras
+  partidas. Contra `main` sin el arreglo da 12 fallos; con él, 0.
+
 **Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
 por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
 otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba

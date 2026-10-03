@@ -3550,6 +3550,79 @@ async function main() {
     await c.close();
   }
 
+  // ── Muchas cosas a medias: el recuadro con scroll, y cada cosa en su sitio ──
+  // Captura del dueño con 36 cosas a medias: el recuadro medía 1.700px (había que bajar
+  // dos pantallas para llegar a la lista) y cada línea salía de una forma, con lo que
+  // falta en la misma línea o debajo según lo largo del nombre. Y en las filas de Prep.
+  // el reloj de arena o la cantidad bajaban de línea en unas filas sí y en otras no (a
+  // 393px con la letra al 115%, 22 de 136 filas, en cuatro formas distintas).
+  console.log("\n── Muchas cosas a medias: recuadro con scroll y todo en su sitio ──");
+  for (const [w, escala] of [[393, 1], [393, 1.15], [320, 1]]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 860 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, ninos: 0, fechaEvento: "2027-07-10" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    if (escala !== 1) await p.addStyleTag({ content: `html { font-size: ${escala * 100}% !important; }` });
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForTimeout(900);
+    await p.locator(".carga-modo-toggle button").filter({ hasText: "Prep." }).first().click();
+    await p.waitForTimeout(400);
+    const tag = `${w}px, letra ×${escala}`;
+    for (let i = 0; i < 24; i++) {
+      const fila = p.locator(".carga-row:not(.is-pendiente)").first();
+      await fila.locator(".carga-pendiente-btn").click();
+      const ed = fila.locator(".carga-pendiente-editor");
+      await ed.locator("input").first().fill("1");
+      if (i % 3 === 0) await ed.locator("input").nth(1).fill("lo trae el proveedor el martes");
+      await ed.locator(".btn-green").click();
+    }
+    await p.waitForTimeout(300);
+    const m = await p.evaluate(() => {
+      for (let e = document.querySelector(".carga-pendientes"); e; e = e.parentElement) e.scrollTop = 0;
+      // Sin la lista con scroll (como era antes) se mide el recuadro entero y falla en
+      // las comprobaciones, no a mitad de la batería.
+      const lista = document.querySelector(".carga-pendientes-lista") || document.querySelector(".carga-pendientes");
+      const items = [...lista.querySelectorAll(".carga-pendientes-item")];
+      const enSuSitio = items.every(it => {
+        if (!it.querySelector(".carga-pendientes-cant")) return false;
+        const n = it.querySelector("strong").getBoundingClientRect();
+        const q = it.querySelector(".carga-pendientes-cant").getBoundingClientRect();
+        const nota = it.querySelector(".carga-pendientes-nota");
+        return Math.abs(n.top - q.top) < 4 && q.left > n.left && (!nota || nota.getBoundingClientRect().top >= n.bottom - 1);
+      });
+      const filas = [...document.querySelectorAll(".carga-row")].filter(f => f.querySelector(".carga-pendiente-btn"));
+      const btn = f => f.querySelector(".carga-pendiente-btn").getBoundingClientRect();
+      return {
+        items: items.length,
+        alto: lista.clientHeight,
+        conScroll: lista.scrollHeight > lista.clientHeight + 10,
+        vh: innerHeight,
+        empiezaLaLista: Math.round(document.querySelector(".preview-category").getBoundingClientRect().top),
+        enSuSitio,
+        filas: filas.length,
+        // Todos los relojes en la misma columna, y todas las cantidades acabando en el
+        // mismo sitio: en flex, los que bajaban de línea se iban a la izquierda.
+        relojes: new Set(filas.map(f => Math.round(btn(f).left))).size,
+        cantidades: new Set(filas.map(f => Math.round(f.querySelector(".carga-cantidad").getBoundingClientRect().right))).size,
+        // O todas las filas con el reloj en la línea del nombre, o todas debajo
+        formas: new Set(filas.map(f => btn(f).top < f.querySelector(".carga-nombre-lead").getBoundingClientRect().bottom)).size,
+        desborda: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    ok(m.items === 24 && m.conScroll && m.alto <= m.vh * 0.45,
+      `${tag}: el recuadro de lo que falta (24) desliza por dentro y no pasa de media pantalla (${m.alto}px)`);
+    ok(m.empiezaLaLista < m.vh,
+      `${tag}: y la lista de Modo carga empieza en la primera pantalla (a ${m.empiezaLaLista}px)`);
+    ok(m.enSuSitio, `${tag}: cada línea igual: el nombre, cuánto falta a su derecha y la nota debajo`);
+    ok(m.filas > 50 && m.relojes === 1 && m.cantidades === 1 && m.formas === 1,
+      `${tag}: en Prep. todas las filas con la misma forma (${m.relojes} columna de relojes, ${m.cantidades} de cantidades, ${m.formas} forma)`);
+    const partidas = await palabrasPartidas(p);
+    ok(m.desborda === 0 && partidas.length === 0,
+      `${tag}: sin desbordar ni partir palabras${partidas.length ? ` → ${partidas.slice(0, 4).join(", ")}` : ""}`);
+    await c.close();
+  }
+
   // ── El aviso de "actualizado desde otro dispositivo" ───────────────────────
   // Se veía cortado por la derecha ("Actualizado desde otro di…"), justo el aviso que
   // hay que leer entero porque dice qué te ha cambiado alguien por debajo.
