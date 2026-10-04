@@ -305,6 +305,39 @@ async function main() {
     });
     ok(cabecera.desfase !== null && cabecera.desfase < 12, `${w}px: la ✕ de Modo carga va arriba, a la altura del título (${cabecera.desfase}px)`);
     ok(cabecera.icono >= 15, `${w}px: el icono de la escaleta no se encoge (${cabecera.icono}px)`);
+
+    // "Que las ✕ de cerrar no se vayan con el scroll, que es incómodo" (el dueño). Con
+    // el contenido al final, alguna ✕ tiene que estar a la vista y poder tocarse: en
+    // Modo carga la de la cabecera se va (es alta) y sale otra en la tira fija.
+    const xALaVista = (sel) => page.evaluate((sel) => new Promise(res => {
+      for (const e of document.querySelectorAll("*")) {
+        if (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 2) e.scrollTop = e.scrollHeight;
+      }
+      setTimeout(() => res([...document.querySelectorAll(sel)].some(x => {
+        const r = x.getBoundingClientRect();
+        if (!r.width || r.top < 0 || r.bottom > innerHeight) return false;
+        const arriba = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !!arriba && (arriba === x || x.contains(arriba));
+      })), 400);
+    }), sel);
+    ok(await xALaVista(".carga-modal .preview-close-btn"), `${w}px: en Modo carga, con la lista al final, la ✕ sigue a la vista`);
+    // Una sola fila de Prep./Salida/Vuelta/Resumen aunque esté la ✕ (a 320 ya se partía)
+    ok(await page.evaluate(() => document.querySelector(".carga-modo-toggle .segmented-control").getBoundingClientRect().height < 60),
+      `${w}px: la tira de Modo carga cabe en una fila con la ✕`);
+    // Y en el Resumen los plegables se separan con el gap del cuerpo, sin margen de más
+    await page.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click(); await page.waitForTimeout(500);
+    const huecos = await page.evaluate(() => {
+      const ps = [...document.querySelectorAll(".preview-body > .cal-ratios")].map(e => e.getBoundingClientRect());
+      return ps.slice(1).map((r, i) => Math.round(r.top - ps[i].bottom));
+    });
+    ok(huecos.length >= 2 && huecos.every(h => h <= 16), `${w}px: entre plegable y plegable del Resumen, un hueco normal (${huecos.join(", ")}px)`);
+    await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+    // La Vista previa: su cabecera es sticky, pero el overflow: hidden del modal la anulaba
+    await page.goto(url({ evento: "boda", pax: 80 }), { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1600);
+    await page.locator("button", { hasText: "Compartir" }).first().click(); await page.waitForTimeout(300);
+    await page.locator("button", { hasText: "Ver la hoja" }).first().click(); await page.waitForTimeout(800);
+    ok(await xALaVista(".preview-modal:not(.carga-modal) .preview-close-btn"), `${w}px: en la Vista previa, con la hoja al final, la ✕ sigue a la vista`);
     await ctx.close();
   }
 
@@ -4604,6 +4637,31 @@ async function main() {
           return v && n ? Math.abs((v.top + v.bottom) / 2 - (n.top + n.bottom) / 2) : null;
         });
         ok(fila !== null && fila < 6, `${w}px · las vistas y "+ Apunte" comparten fila (${fila})`);
+
+        // En una pantalla bajita el editor y el panel del día scrollean por dentro:
+        // Cancelar/Guardar y la ✕ del día se quedan a la vista, no se van con el scroll.
+        await p.setViewportSize({ width: w, height: 480 });
+        const aLaVista = (sel, alFinal) => p.evaluate(([sel, alFinal]) => {
+          const x = document.querySelector(sel);
+          const panel = x && x.closest(".cal-editor, .cal-dia-panel");
+          if (!panel) return false;
+          panel.scrollTop = alFinal ? panel.scrollHeight : 0;
+          const r = x.getBoundingClientRect(), caja = panel.getBoundingClientRect();
+          const arriba = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return panel.scrollHeight > panel.clientHeight && r.top >= caja.top - 1 && r.bottom <= caja.bottom + 1
+            && !!arriba && (arriba === x || x.contains(arriba));
+        }, [sel, alFinal]);
+        await p.locator(".cal-nuevo").first().click(); await p.waitForTimeout(300);
+        ok(await aLaVista(".cal-editor-acciones .btn-green", false), `${w}px · con el editor arriba del todo, Guardar sigue a la vista`);
+        await p.locator(".cal-editor-acciones .btn-outline", { hasText: "Cancelar" }).click(); await p.waitForTimeout(200);
+        // El día más lleno del banco (tres eventos y dos ausencias): es el que scrollea
+        await p.locator(".cal-celda.es-choque").first().click(); await p.waitForTimeout(300);
+        const largo = await p.evaluate(() => { const d = document.querySelector(".cal-dia-panel"); return d && d.scrollHeight > d.clientHeight; });
+        if (largo) ok(await aLaVista(".cal-dia-cerrar", true), `${w}px · con el día al final, su ✕ sigue a la vista`);
+        ok(/^[A-ZÁÉÍÓÚ][a-záéíóú]+, \d+ de [a-z]+$/.test((await p.locator(".cal-dia-titulo > span").first().innerText()).trim()),
+          `${w}px · el día se titula "Martes, 6 de octubre", sin "De" en mayúscula`);
+        await p.locator(".cal-dia-cerrar").click(); await p.waitForTimeout(200);
+        await p.setViewportSize({ width: w, height: 900 });
       }
 
       // Los huecos del principio y del final del mes son null, y "ningún día abierto"
@@ -5009,10 +5067,13 @@ async function main() {
     console.log("\n══ Responsive de todo lo nuevo: 9 anchos × 2 temas ══");
     {
       const PANTALLAS = [
-        ["calendario del equipo", BANCO, [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+        // "Limpiar el calendario" usa el mismo plegable (.cal-ratios) y va antes: sin el
+        // :not, el barrido abría el limpiador en vez de la gente por comensal
+        ["calendario del equipo", BANCO, [".cal-compartir-cab", ".cal-ratios:not(.cal-limpiar) > .cal-ratios-cab", ".cal-equipo-cab"]],
+        ["limpiar el calendario", BANCO + "?sucio=1", [".cal-limpiar .cal-ratios-cab"]],
         ["aviso de creadas", BANCO + "?promover=1", []],
         ["solo lectura", BANCO + "?solover=1", []],
-        ["a pantalla completa", BANCO + "?pantalla=1", [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+        ["a pantalla completa", BANCO + "?pantalla=1", [".cal-compartir-cab", ".cal-ratios:not(.cal-limpiar) > .cal-ratios-cab", ".cal-equipo-cab"]],
         // El asistente pide sesión de equipo en la app, así que solo se le llega por
         // aquí. Se abre con los ajustes desplegados, que es lo que más ocupa.
         ["asistente", BANCO + "?asistente=1", []],
@@ -5035,7 +5096,9 @@ async function main() {
         ["asistente tareas", BANCO + "?asistente=1", ['.asis-pestana:has-text("Tareas")']],
         ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:has-text("Gasto")']],
       ];
-      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura",
+      // revisaCaja mira la primera que encuentra: el limpiador y la gente por comensal
+      // comparten clase, así que van por separado
+      const CAJAS = [".cal-compartir", ".cal-ratios:not(.cal-limpiar)", ".cal-limpiar", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura",
         // El panel entero y, dentro, lo que se descuadra por su cuenta: la fila de
         // pestañas (cinco no caben a lo ancho en un móvil), el muñeco grande, la rejilla
         // de proveedores, las tres cifras del gasto y los objetivos del cerebro.
@@ -5199,12 +5262,14 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`ratios ${w}px: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-ratios-cab");
+      // El limpiador usa el mismo plegable: la gente por comensal es el otro
+      const RATIOS = ".cal-ratios:not(.cal-limpiar)";
+      await p.waitForSelector(`${RATIOS} > .cal-ratios-cab`);
 
-      ok(await p.locator(".cal-ratios-cuerpo").count() === 0,
+      ok(await p.locator(`${RATIOS} .cal-ratios-cuerpo`).count() === 0,
         `${w}px · el panel de ratios arranca plegado, como el del equipo`);
-      await p.locator(".cal-ratios-cab").click();
-      await p.waitForSelector(".cal-ratios-cuerpo");
+      await p.locator(`${RATIOS} > .cal-ratios-cab`).click();
+      await p.waitForSelector(`${RATIOS} .cal-ratios-cuerpo`);
 
       ok(await p.locator(".cal-ratio").count() === 5,
         `${w}px · hay un ratio por tipo de evento`);
@@ -5213,7 +5278,7 @@ async function main() {
         `${w}px · cumpleaños y producción salen marcados como "sin comprobar"`);
       ok(!await seMueveDeLado(p), `${w}px · el panel no mueve la página de lado`);
       {
-        const mal = await revisaCaja(p, ".cal-ratios");
+        const mal = await revisaCaja(p, RATIOS);
         ok(mal.length === 0, `${w}px · el panel de ratios, bien${mal.length ? ` → ${mal.join(" · ")}` : ""}`);
       }
 
@@ -5354,6 +5419,35 @@ async function main() {
     }
 
     // ── COMO LO VE QUIEN ENTRA POR EL ENLACE DE MIRAR ──
+    // Limpiar el calendario: lo que sobra de las importaciones, a la vista y con su
+    // casilla. El banco con "?sucio=1" trae un repetido, un "Posible" ya confirmado y
+    // una boda leída también un mes antes. Nada se borra sin confirmar, y se deshace.
+    console.log("\n══ Limpiar el calendario ══");
+    for (const w of [320, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`limpiar ${w}px: ${e}`));
+      await p.goto(BANCO + "?sucio=1", { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+      const cab = p.locator(".cal-limpiar .cal-ratios-cab");
+      const cuantos = async () => p.evaluate(() => document.querySelectorAll(".cal-celda .cal-punto, .cal-celda .cal-chip").length);
+      ok(/3 por revisar/.test(await cab.innerText()), `${w}px · la barra dice cuántas cosas hay que revisar sin abrirla`);
+      await cab.click(); await p.waitForTimeout(300);
+      ok(await p.locator(".cal-limpiar input:checked").count() === 3 && await p.locator(".cal-limpiar-grupo").count() === 3,
+        `${w}px · tres grupos, y en cada uno va marcado el que sobra`);
+      ok(!await seMueveDeLado(p), `${w}px · la lista de lo que sobra no mueve la página de lado`);
+      const antes = await cuantos();
+      await p.locator(".cal-limpiar-borrar").click(); await p.waitForTimeout(200);
+      ok(await cuantos() === antes && /¿Borrar 3 apuntes\?/.test(await p.locator(".cal-limpiar-acciones").innerText()),
+        `${w}px · el primer toque solo pregunta: todavía no se ha borrado nada`);
+      await p.locator(".cal-limpiar-borrar", { hasText: "Sí, borrar" }).click(); await p.waitForTimeout(300);
+      ok(/todo en orden/.test(await cab.innerText()) && /Borrados 3 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText()),
+        `${w}px · al confirmar se borran y la barra queda en orden`);
+      await p.locator(".cal-limpiar-hecho button", { hasText: "Deshacer" }).click(); await p.waitForTimeout(300);
+      ok(/3 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
+      await c.close();
+    }
+
     // No basta con que Firestore le deniegue la escritura: si la pantalla le ofrece
     // botones que no funcionan, el enlace parece roto en vez de ser de solo lectura.
     console.log("\n══ El calendario en solo lectura ══");
@@ -5368,8 +5462,9 @@ async function main() {
         `${w}px · se dice desde arriba que es solo lectura, para que no parezca roto`);
       ok(await p.locator(".cal-nuevo").count() === 0
          && await p.locator(".cal-equipo").count() === 0
-         && await p.locator(".cal-compartir").count() === 0,
-        `${w}px · ni añadir apuntes, ni tocar el equipo, ni repartir más enlaces`);
+         && await p.locator(".cal-compartir").count() === 0
+         && await p.locator(".cal-limpiar").count() === 0,
+        `${w}px · ni añadir apuntes, ni tocar el equipo, ni repartir más enlaces, ni limpiar`);
       ok(!await seMueveDeLado(p), `${w}px · en solo lectura tampoco se mueve de lado`);
 
       // Mirar un día SÍ: en el móvil es la única forma de leer el nombre entero de una

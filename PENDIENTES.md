@@ -50,8 +50,10 @@ siguen aquí.**
   por defecto; #222 propone una parte. Detalle en `CONTEXTO.md`, "Auditoría visual
   móvil…", punto 3.
 - **Limpieza de datos del calendario** (en la app, no en el código): unos 29 apuntes
-  en el mes equivocado, varios repetidos y dos "Posible…" ya confirmados. ¿Los borra
-  él o se le borran? Detalle en `CONTEXTO.md`, "Estado de HOY".
+  en el mes equivocado, varios repetidos y dos "Posible…" ya confirmados. Ya hay
+  herramienta: "Limpiar el calendario", en los ajustes del calendario. Falta que el
+  dueño lo revise y confirme allí; el 4/12 y el "Día cerrado" del 2/11, a mano.
+  Detalle en `CONTEXTO.md`, "Estado de HOY".
 - **Dónde se enseña `subconsciente.js`**: está construido y probado, pero ninguna
   pantalla lo llama.
 - **Unificar o no `aplicar_factor_bebida` y `aplicar_calibracion`**: ver

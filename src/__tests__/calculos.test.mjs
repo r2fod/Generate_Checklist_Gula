@@ -23,6 +23,7 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
+import { sugerenciasDeLimpieza, nucleoDeTitulo } from "../calendario/limpieza.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
@@ -1141,6 +1142,61 @@ console.log("\n══ Traer apuntes de golpe sobre un calendario que ya tiene da
   // vez") no debe duplicar nada de lo que ya se trajo la primera vez.
   const reenviado = mezclaApuntes(saneaLista([...yaHabia, ...nuevos]), traidos);
   ok(reenviado.length === 0, "repetir el mismo pegado no añade nada de segundas");
+}
+
+console.log("\n══ Limpiar el calendario: qué sobra tras las importaciones ══");
+{
+  // Lo que dejó la hoja de pared en el calendario de verdad, con nombres inventados:
+  // el mismo evento con la gente en el título, un "Posible" ya confirmado y días del
+  // mes de al lado leídos con el mes del bloque (el 1 de mayo, también el 1 de abril).
+  ok(nucleoDeTitulo("Posible Produ X 73 PAX").nucleo === "produ x" && nucleoDeTitulo("Posible Produ X").tentativo,
+    "el núcleo de un título quita la gente y el «posible»");
+  const lista = saneaLista([
+    { fecha: "2026-10-08", titulo: "Produ X", tipo: "produccion" },
+    { fecha: "2026-10-08", titulo: "Produ X 73 PAX", tipo: "produccion", pax: 73, hora: "08:00" },
+    { fecha: "2026-10-09", titulo: "Posible Produ Y", tipo: "produccion" },
+    { fecha: "2026-10-09", titulo: "Produ Y", tipo: "produccion" },
+    { fecha: "2026-04-01", titulo: "Boda Ana y Luis", tipo: "boda" },
+    { fecha: "2026-05-01", titulo: "Boda Ana y Luis", tipo: "boda", hora: "13:00" },
+    { fecha: "2026-09-30", titulo: "Comunión Pepa", tipo: "comunion" },
+    { fecha: "2026-10-30", titulo: "Comunión Pepa", tipo: "comunion" },
+    { fecha: "2026-06-15", titulo: "Corporativo Z", tipo: "corporativo" },
+    { fecha: "2026-07-15", titulo: "Corporativo Z", tipo: "corporativo" },
+    // Dos camiones el mismo día son dos camiones: lo que no es evento no se toca
+    { fecha: "2026-10-08", titulo: "Camión Covey", tipo: "recogida" },
+    { fecha: "2026-10-08", titulo: "Camión  covey", tipo: "recogida" },
+    // Con checklist creada: se enseña, pero no se marca nunca solo
+    { fecha: "2026-11-02", titulo: "Boda Con Checklist", tipo: "boda" },
+    { fecha: "2026-11-02", titulo: "Boda con checklist 120 pax", tipo: "boda", evento: "Boda con checklist 120 pax" },
+    { fecha: "2026-11-03", titulo: "Boda Otra", tipo: "boda", evento: "Boda Otra" },
+    { fecha: "2026-11-03", titulo: "Boda otra (90 pax)", tipo: "boda", personal: [{ nombre: "Fulanita", rol: "camarero" }] },
+  ]);
+  const grupos = sugerenciasDeLimpieza(lista);
+  const de = (clase, fecha) => grupos.find(g => g.clase === clase && g.apuntes.some(a => a.fecha === fecha));
+  const rep = de("repetido", "2026-10-08");
+  ok(rep && rep.apuntes.length === 2 && rep.queda === "2026-10-08_produ-x-73-pax" && rep.quitar.join() === "2026-10-08_produ-x",
+    "repetido: se queda el que trae más datos (hora y gente) y se marca el otro");
+  const pos = de("posible", "2026-10-09");
+  ok(pos && pos.queda === "2026-10-09_produ-y" && pos.quitar.join() === "2026-10-09_posible-produ-y",
+    "«Posible Produ Y» sobra si «Produ Y» ya está ese mismo día");
+  ok(de("mes", "2026-04-01")?.quitar.join() === "2026-04-01_boda-ana-y-luis",
+    "mes cruzado a principios de mes: sobra el del mes de ANTES (el 1 de mayo se leyó en abril)");
+  ok(de("mes", "2026-10-30")?.quitar.join() === "2026-10-30_comunion-pepa",
+    "mes cruzado a final de mes: sobra el del mes de DESPUÉS (el 30 de septiembre se leyó en octubre)");
+  const medio = de("mes", "2026-06-15");
+  ok(medio && medio.quitar.length === 0 && medio.queda === null,
+    "a mitad de mes no hay regla: se enseña la pareja y no se marca ninguno");
+  ok(!grupos.some(g => g.apuntes.some(a => a.tipo === "recogida")), "dos recogidas iguales el mismo día no se tocan");
+  const conCheck = de("repetido", "2026-11-02");
+  ok(conCheck && conCheck.queda === "2026-11-02_boda-con-checklist-120-pax" && conCheck.quitar.join() === "2026-11-02_boda-con-checklist",
+    "con checklist creada, ese es el que se queda");
+  const ambos = de("repetido", "2026-11-03");
+  ok(ambos && ambos.quitar.length === 0, "si los dos tienen trabajo dentro (checklist, personal), no se marca ninguno");
+  ok(grupos.every(g => g.quitar.every(id => !lista.find(a => a.id === id).evento)),
+    "nunca se sugiere borrar uno con checklist");
+  ok(sugerenciasDeLimpieza(saneaLista([{ fecha: "2026-01-31", titulo: "Boda Q", tipo: "boda" }, { fecha: "2026-02-28", titulo: "Boda Q", tipo: "boda" }])).length === 0,
+    "el 31 de enero no tiene «mismo día» en febrero: no se inventa pareja");
+  ok(sugerenciasDeLimpieza([]).length === 0 && sugerenciasDeLimpieza(null).length === 0, "sin apuntes, nada que limpiar");
 }
 
 console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");

@@ -14,6 +14,7 @@ import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
 import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
+import Limpiar from "./Limpiar.jsx";
 import useCalendarioNube from "./useCalendarioNube.js";
 
 // Aquí dentro siempre se entra con cuenta —es la checklist del equipo—, así que no hay
@@ -83,6 +84,7 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrear
               )}
               <div className="cal-ajustes">
               <Traer apuntes={apuntes} onTraer={traer} />
+              <Limpiar apuntes={apuntes} onCambiar={traer} />
               {/* Los enlaces para compartir, también desde aquí: el calendario se abre
                   más veces desde dentro de la checklist que en su app suelta, y tener
                   que cambiar de app para copiar un enlace es la clase de rodeo que hace
