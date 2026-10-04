@@ -1070,6 +1070,8 @@ body {
   font-weight: 700;
   white-space: nowrap;
 }
+/* Sin su apunte: no es "falta hacer algo" (ámbar) sino "esto sobra", en gris */
+.plantilla-sin-configurar.es-sin-apunte { background: var(--bg-color); color: var(--text-muted); border: 1px solid var(--border-color); }
 
 .aviso-nombre-ocupado {
   display: block;
