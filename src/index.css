@@ -1427,7 +1427,7 @@ body {
 .form-input, .form-select {
   width: 100%;
   min-height: 48px;
-  padding: 11px 14px;
+  padding: 11px 12px;
   border: 1.5px solid var(--border-color);
   border-radius: var(--radius-md);
   /* 1rem = 16px: por debajo, iOS hace zoom al enfocar el campo */
@@ -5319,11 +5319,16 @@ hr {
 }
 
 /* La categoría es un select, y su opción más larga ("Otros (añadidos manualmente)")
-   necesita ~210px: por debajo de eso el navegador recorta el texto sin avisar. Con
-   este mínimo la fila prefiere envolver antes que cortar el nombre de la categoría. */
+   necesita ~221px con la letra a 16px: por debajo de eso el navegador recorta el texto
+   sin avisar. Con este mínimo la fila prefiere envolver antes que cortar el nombre de
+   la categoría. En rem para que acompañe a la letra grande del móvil. */
 .add-item-row .add-item-categoria {
-  min-width: 256px;
+  min-width: min(100%, 17.5rem);
 }
+/* Y el nombre y la cantidad, igual: sin mínimo eran los que cedían todo el sitio y el
+   nombre se quedaba en "Ej: Vela arom". Así lo que baja de línea es el botón. */
+.add-item-row > .form-group:first-child { min-width: min(100%, 14rem); }
+.add-item-row > .form-group:nth-child(2) { min-width: min(100%, 5rem); }
 
 /* Aviso de versión nueva: los .js llevan hash en el nombre, así que un index.html
    cacheado en el móvil sigue sirviendo la compilación vieja para siempre. Esto avisa

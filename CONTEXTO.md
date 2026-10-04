@@ -238,7 +238,9 @@ operativo).
 - **CSS, repaso "premium"** (2026-10-04): `.form-input` estaba definido dos veces (el del
   formulario, más alto y de otro fondo, pisaba al de la checklist y las cajas de texto
   no medían lo mismo que los desplegables de al lado): ahora UNA regla para
-  `.form-input, .form-select`. Fuera también un `.btn:active` repetido. Los espacios
+  `.form-input, .form-select`. Fuera también un `.btn:active` repetido. Con la letra
+  a 16px, los mínimos de la fila de "Añadir item" van en rem: si no, la categoría
+  ("Otros (añadidos manualmente)") salía cortada — lo cazó la prueba "Nada se corta". Los espacios
   entre bloques los pone el `gap` del contenedor (`.config-card`, `.cal-ajustes`), no
   un `margin` en cada hijo: los dos sumados daban huecos dobles.
 - Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el
