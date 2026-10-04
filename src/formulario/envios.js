@@ -75,11 +75,26 @@ export function respuestasParaOficina(respuestas) {
   return limpio;
 }
 
+// Una checklist que creó el calendario y nadie ha configurado (sinConfigurar) existe por
+// su apunte: si el apunte ya no está —se borró por repetido, por ejemplo—, sobra. "He
+// borrado del calendario eventos duplicados y en el formulario no se actualiza" (el
+// dueño): la checklist en blanco de cada repetido seguía en el archivo, y el formulario
+// lista el archivo, no el calendario. Se reconoce porque ningún apunte la nombra: ni
+// enlazada (evento) ni por crear (título, que es el nombre con el que nace; ver
+// estadoDesdeApunte). No se borra nada —puede llevar algún check hecho—: deja de
+// ofrecerse. Y con el calendario sin leer (apuntes null) no se da ninguna por huérfana:
+// no saber qué hay en el calendario no es lo mismo que no haber nada.
+export function sinApunteEnElCalendario(nombre, evento, apuntes) {
+  if (!Array.isArray(apuntes) || !evento?.sinConfigurar) return false;
+  return !apuntes.some(a => a && (a.evento === nombre || a.titulo === nombre));
+}
+
 // Deja SOLO lo que la oficina necesita para reconocer un evento. Esta función es la
 // frontera de lo que sale de la app: si algún día se añade un campo al evento, aquí
 // no aparece salvo que se ponga a mano, que es justo lo que se quiere.
-export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO()) {
+export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO(), apuntes = null) {
   return Object.entries(eventosGuardados)
+    .filter(([nombre, e]) => !sinApunteEnElCalendario(nombre, e, apuntes))
     // El tipo va incluido para que, al elegir un evento que ya existe, el formulario
     // sepa qué preguntas tocan sin tener que preguntárselo otra vez a la oficina.
     // "configurado" viaja igual: si el evento lo creó el calendario en blanco
@@ -98,13 +113,14 @@ export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO()) {
     .slice(0, MAX_PROXIMOS);
 }
 
-// La app publica la lista corta cada vez que cambian sus eventos
-export async function publicarProximos(codigo, eventosGuardados, avisos = []) {
+// La app publica la lista corta cada vez que cambian sus eventos (o los apuntes del
+// calendario: ver sinApunteEnElCalendario)
+export async function publicarProximos(codigo, eventosGuardados, avisos = [], apuntes = null) {
   const conexion = await getDb();
   if (!conexion || !codigo) return;
   const { db, fs } = conexion;
   await fs.setDoc(fs.doc(db, "publico", codigo), {
-    eventos: resumirParaOficina(eventosGuardados),
+    eventos: resumirParaOficina(eventosGuardados, undefined, apuntes),
     // A quién avisar por WhatsApp al terminar de mandar. Va aquí porque el botón lo
     // pinta el formulario: es su "Enviar" el que encadena el aviso.
     avisos: limpiarAvisos(avisos),

@@ -258,6 +258,15 @@ operativo).
   mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
   nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
   el "Borrar" del editor: no pide permisos nuevos. El banco lo prueba con `?sucio=1`.
+- **Borrar un apunte no borra su checklist, pero la quita del formulario**: el formulario
+  lista el ARCHIVO de checklists (`publico/{código}`, lo publica la app), no el
+  calendario, y cada repetido había dejado su checklist en blanco (`sinConfigurar`).
+  `sinApunteEnElCalendario` (envios.js): una en blanco que ningún apunte nombra (ni
+  `evento` ni título) deja de publicarse; en "Eventos guardados" sale en gris "sin
+  apunte en el calendario" para borrarla a mano si sobra. Las que tienen datos no se
+  tocan. La app escucha el calendario en vivo (`suscribirCalendarioNube`) y republica;
+  sin calendario leído no se quita nada. Ojo: el formulario solo se actualiza cuando la
+  app de la checklist está abierta en algún sitio (es quien publica).
 - **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
   `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
   en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista

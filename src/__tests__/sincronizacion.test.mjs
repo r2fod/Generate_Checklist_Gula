@@ -728,6 +728,39 @@ console.log("\n══ 'configurado' en la lista corta de la oficina ══");
     "sin el campo (eventos de siempre, montados a mano) cuenta como configurado");
 }
 
+// "He borrado del calendario eventos duplicados y en el formulario no se actualiza"
+// (el dueño). El formulario lista el ARCHIVO de checklists, no el calendario, y cada
+// repetido había dejado su checklist en blanco (sinConfigurar). Al borrar el apunte, esa
+// checklist sigue en el archivo: ahora deja de ofrecerse a la oficina. No se borra.
+console.log("\n══ Una checklist en blanco cuyo apunte se ha borrado no sale en el formulario ══");
+{
+  const { resumirParaOficina, sinApunteEnElCalendario } = await import("../formulario/envios.js");
+  const archivo = {
+    "Produ X": { evento: "produccion", fechaEvento: "2027-10-08", sinConfigurar: true },          // su apunte se borró
+    "Produ X 73 PAX": { evento: "produccion", fechaEvento: "2027-10-08", sinConfigurar: true },   // enlazada
+    "Boda por crear": { evento: "boda", fechaEvento: "2027-10-10", sinConfigurar: true },         // apunte sin enlazar aún
+    "Boda configurada": { evento: "boda", fechaEvento: "2027-10-11", sinConfigurar: false },      // con datos: se queda
+    "Boda de siempre": { evento: "boda", fechaEvento: "2027-10-12" },                             // hecha a mano
+  };
+  const apuntes = [
+    { fecha: "2027-10-08", titulo: "Produ X 73 PAX", tipo: "produccion", evento: "Produ X 73 PAX" },
+    { fecha: "2027-10-10", titulo: "Boda por crear", tipo: "boda" },
+  ];
+  const nombres = (lista) => lista.map(e => e.nombre);
+  const conCal = nombres(resumirParaOficina(archivo, "2027-01-01", apuntes));
+  ok(!conCal.includes("Produ X"), `la checklist en blanco del apunte borrado ya no sale → ${JSON.stringify(conCal)}`);
+  ok(conCal.includes("Produ X 73 PAX") && conCal.includes("Boda por crear"),
+    "las que tienen su apunte (enlazado o por enlazar, por el título) siguen saliendo");
+  ok(conCal.includes("Boda configurada") && conCal.includes("Boda de siempre"),
+    "y una con datos de verdad, o hecha a mano, sale aunque no tenga apunte: no se esconde trabajo");
+  ok(nombres(resumirParaOficina(archivo, "2027-01-01")).length === 5,
+    "sin calendario leído (apuntes null) no se quita nada: no saber no es no haber");
+  ok(!nombres(resumirParaOficina(archivo, "2027-01-01", [])).includes("Boda por crear"),
+    "con el calendario leído y vacío, las checklists en blanco ya no tienen apunte");
+  ok(sinApunteEnElCalendario("Produ X", archivo["Produ X"], apuntes) && !sinApunteEnElCalendario("Produ X", archivo["Produ X"], null),
+    "sinApunteEnElCalendario: sí con calendario, nunca sin él");
+}
+
 // ── Un evento "ya configurado" se rellena solo si vino de un envío anterior ───────
 // El dueño avisó de un conflicto: la lista decía "Ya configurado" pero al entrar
 // preguntaba todo de cero — la etiqueta hablaba de la CHECKLIST, no del formulario.
@@ -1774,6 +1807,17 @@ console.log('\n══ El buzón de la oficina: publico/ y envios/ ══');
   const publicado = almacen.get(`publico/${CODIGO}`);
   ok(publicado.eventos.length === 1 && !('pax' in publicado.eventos[0]),
     'lo que se publica para la oficina no lleva pax ni nada de dentro del evento');
+
+  // Con los apuntes del calendario, la checklist en blanco de uno borrado no se publica
+  await publicarProximos(CODIGO, {
+    'Boda Fulanita y Mengano': { evento: 'boda', fechaEvento: '2099-09-13' },
+    'Boda repetida': { evento: 'boda', fechaEvento: '2099-09-13', sinConfigurar: true },
+  }, [], [{ fecha: '2099-09-13', titulo: 'Boda Fulanita y Mengano', tipo: 'boda' }]);
+  ok(almacen.get(`publico/${CODIGO}`).eventos.map(e => e.nombre).join() === 'Boda Fulanita y Mengano',
+    'publicar con el calendario deja fuera la checklist en blanco cuyo apunte se borró');
+  await publicarProximos(CODIGO, {
+    'Boda Fulanita y Mengano': { evento: 'boda', pax: 120, fechaEvento: '2099-09-13', ubicacion: 'Finca inventada', notasEvento: 'lo que sea' },
+  }, [{ nombre: 'Logística', tel: '600 11 22 33' }]);
 
   // Y la lee quien tiene el enlace, sin cuenta ninguna.
   setSesion(false);

@@ -27,7 +27,7 @@ import {
   cargarIndiceEventosNube,
   sincronizarArchivoNube, cargarArchivoNube, suscribirArchivoNube,
   leerConfigFormulario, guardarConfigFormulario,
-  resolverCalendario, cargarCalendarioNube, guardarCalendarioNube,
+  resolverCalendario, cargarCalendarioNube, guardarCalendarioNube, suscribirCalendarioNube,
   cargarPreciosNube, guardarPreciosNube, suscribirPreciosNube,
   cargarBebidaNube, guardarBebidaNube, suscribirBebidaNube,
   cargarHieloNube, guardarHieloNube, suscribirHieloNube,
@@ -42,7 +42,7 @@ import {
 import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
 import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
 import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio, notasFusionadas } from "./formulario/preguntas.js";
-import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos } from "./formulario/envios.js";
+import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos, sinApunteEnElCalendario } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
 // solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se
 // abren de higos a brevas. Estaban las tres dentro del trozo que se descarga al abrir la
@@ -110,7 +110,7 @@ import { marcarActualizando, confirmaSiActualizado } from "./asistente/actualiza
 // aquí) porque es lo que sabe el CALENDARIO: qué apuntes se acercan, cuáles ya tienen
 // checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
 // EnChecklist— para que no arrastre el calendario entero al bundle de la checklist.
-import { checklistsPorCrear, saneaLista, saneaEquipo } from "./calendario/apuntes.js";
+import { checklistsPorCrear, saneaLista, saneaEquipo, mismaLista } from "./calendario/apuntes.js";
 
 // Qué evento pide abrir la dirección, si es que pide alguno. Es como el calendario (que
 // es otra app, en otra carpeta) manda a la checklist a un evento concreto: sin esto, su
@@ -767,6 +767,17 @@ export default function App({ onCerrarSesion } = {}) {
   // nube con el código, así que se pone una vez y vale para todos los dispositivos.
   // El número NO va escrito en el código: este repositorio es público.
   const [avisosWhatsapp, setAvisosWhatsapp] = useState([{ nombre: "Raúl · Jefe de logística", tel: "" }]);
+  // Los apuntes del calendario, guardados de la carga que YA se hace al arrancar para
+  // crear las checklists que se acercan (y escuchados en vivo desde entonces). Van aquí
+  // arriba porque la lista del formulario depende de ellos (ver publicarProximos): el
+  // array de dependencias de un efecto se evalúa al pintar, y nombrarlos antes de
+  // declararlos revienta la app entera con un ReferenceError.
+  const [apuntesCalendario, setApuntesCalendario] = useState([]);
+  // null hasta leer el calendario: sin él no se puede saber qué checklist se ha quedado
+  // sin apunte, y el formulario sigue enseñándolas todas (ver sinApunteEnElCalendario)
+  const [codigoCalendario, setCodigoCalendario] = useState(null);
+  const [calendarioLeido, setCalendarioLeido] = useState(false);
+  const apuntesParaOficina = calendarioLeido ? apuntesCalendario : null;
   const primeraFotoEnviosRef = React.useRef(true);
   useEffect(() => {
     if (!avisoEnvios) return;
@@ -1861,13 +1872,15 @@ export default function App({ onCerrarSesion } = {}) {
   }, [codigoFormulario]);
   // La lista corta que ve la oficina se republica cuando cambian los eventos. Va con
   // retardo para no escribir en la nube en cada tecleo mientras se edita un nombre.
+  // También cuando cambia el calendario: borrar el apunte de un repetido tiene que
+  // quitar su checklist en blanco del formulario (ver sinApunteEnElCalendario).
   useEffect(() => {
     if (!codigoFormulario || !nubeActiva()) return;
     const t = setTimeout(() => {
-      publicarProximos(codigoFormulario, eventosGuardadosRef.current, avisosWhatsapp).catch(() => { /* se reintenta al siguiente cambio */ });
+      publicarProximos(codigoFormulario, eventosGuardadosRef.current, avisosWhatsapp, apuntesParaOficina).catch(() => { /* se reintenta al siguiente cambio */ });
     }, 2000);
     return () => clearTimeout(t);
-  }, [codigoFormulario, eventosGuardados, avisosWhatsapp]);
+  }, [codigoFormulario, eventosGuardados, avisosWhatsapp, apuntesParaOficina]);
   // Pendiente = lo que aún no se ha revisado. El aviso y el contador cuentan eso, no
   // el buzón entero: lo ya revisado se guarda para consultarlo, no para dar la lata.
   const enviosPendientes = repartirEnvios(envios).pendientes;
@@ -1893,7 +1906,7 @@ export default function App({ onCerrarSesion } = {}) {
     const codigo = nuevoCodigo();
     try {
       await guardarConfigFormulario({ codigo, avisos: avisosWhatsapp });
-      await publicarProximos(codigo, eventosGuardadosRef.current, avisosWhatsapp);
+      await publicarProximos(codigo, eventosGuardadosRef.current, avisosWhatsapp, apuntesParaOficina);
       setCodigoFormulario(codigo);
       refrescarEnvios(codigo);
     } catch (e) { avisarFalloNube(e); }
@@ -1925,7 +1938,7 @@ export default function App({ onCerrarSesion } = {}) {
     setAvisosWhatsapp(lista);
     if (!codigoFormulario || !nubeActiva()) return;
     guardarConfigFormulario({ codigo: codigoFormulario, avisos: lista }).catch(avisarFalloNube);
-    publicarProximos(codigoFormulario, eventosGuardadosRef.current, lista).catch(() => { /* se reintenta al siguiente cambio */ });
+    publicarProximos(codigoFormulario, eventosGuardadosRef.current, lista, apuntesParaOficina).catch(() => { /* se reintenta al siguiente cambio */ });
   };
   const handleCopiarEnlaceFormulario = () => {
     navigator.clipboard.writeText(enlaceFormulario).then(() => {
@@ -2113,14 +2126,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [tareas, setTareas] = useState([]);
   const tareasRef = React.useRef([]);
   React.useEffect(() => { tareasRef.current = tareas; }, [tareas]);
-  // Los apuntes del calendario, guardados de la carga que YA se hace al arrancar para
-  // crear las checklists que se acercan. No cuesta una petición más: es la misma.
-  const [apuntesCalendario, setApuntesCalendario] = useState([]);
-
-  // Va AQUÍ, pegado a la declaración de arriba, y no más arriba con el resto de acciones:
+  // Va DESPUÉS de declarar apuntesCalendario (arriba, junto al formulario), nunca antes:
   // el array de dependencias de un useCallback se evalúa al pintar, así que nombrar
-  // "apuntesCalendario" antes de esta línea revienta la app entera con un ReferenceError
-  // —página en blanco, sin pista de por qué—. El build no lo caza: es de ejecución.
+  // "apuntesCalendario" antes de su declaración revienta la app entera con un
+  // ReferenceError —página en blanco, sin pista de por qué—. El build no lo caza.
   // ─── ESCRIBIR EN EL CALENDARIO DESDE LA CHECKLIST ───────────────────────────
   // El asistente podía crear, editar y borrar apuntes en la app del calendario, pero no
   // aquí: solo se le encendía el conector de checklists. Y el asistente es el mismo en
@@ -2432,6 +2441,8 @@ export default function App({ onCerrarSesion } = {}) {
         if (!cal || !vivo) return;
         const apuntes = saneaLista(cal.apuntes);
         setApuntesCalendario(apuntes);
+        setCalendarioLeido(true);
+        setCodigoCalendario(cs.codigo);
         if (!vivo) return;
         const creadas = await promoverApuntes(apuntes);
         if (creadas.length && vivo) setChecklistsCreadas(creadas);
@@ -2440,6 +2451,19 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { vivo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [haySesionEquipo, archivoListo]);
+
+  // Y desde ahí, en vivo: un apunte borrado en el calendario (aquí dentro, en su app o
+  // en otro móvil) tiene que llegar al formulario sin recargar la checklist. Solo se
+  // cambia el estado si la lista cambia de verdad (mismaLista): cada escritura propia
+  // dispara su eco y repintar por nada republicaría el formulario por nada.
+  useEffect(() => {
+    if (!codigoCalendario) return;
+    return suscribirCalendarioNube(codigoCalendario, ({ apuntes }) => {
+      const nuevos = saneaLista(apuntes);
+      setApuntesCalendario(antes => (mismaLista(antes, nuevos) ? antes : nuevos));
+      setCalendarioLeido(true);
+    });
+  }, [codigoCalendario]);
 
   const pidioAbrir = React.useRef(false);
   // El tope de espera. Se arma solo si la dirección pide abrir algo, para no dejar un
@@ -2542,7 +2566,11 @@ export default function App({ onCerrarSesion } = {}) {
         {/* Cuáles vienen del calendario y siguen sin datos, sin tener que abrirlos uno a
             uno. En una semana con cuatro bodas es la diferencia entre saber qué falta y
             enterarte la víspera. */}
-        {eventosGuardados[n]?.sinConfigurar && (
+        {/* Y las que se han quedado sin su apunte (se borró del calendario): ya no le
+            salen a la oficina en el formulario, y aquí se dice por qué. */}
+        {sinApunteEnElCalendario(n, eventosGuardados[n], apuntesParaOficina) ? (
+          <span className="plantilla-sin-configurar es-sin-apunte" title="Su apunte ya no está en el calendario: no sale en el formulario. Bórrala si sobra.">sin apunte en el calendario</span>
+        ) : eventosGuardados[n]?.sinConfigurar && (
           <span className="plantilla-sin-configurar" title="Creado desde el calendario: falta configurarlo">sin configurar</span>
         )}
       </button>
