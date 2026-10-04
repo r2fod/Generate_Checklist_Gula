@@ -78,6 +78,11 @@ Mira `src/asistente/` antes de escribir — el estilo es marcado y desentona rá
 - **Cero duplicación** — se extrae a un fichero compartido en cuanto se repite. Tres
   pruebas recorren `src/` y fallan si algo vuelve a copiarse.
 - **Los avisos dicen qué hacer**, no solo qué pasó.
+- **Letra y radios, siempre con token**: `--fs-3xs` … `--fs-4xl` (y `--fs-input`, 16px
+  por el zoom de iOS), `--radius-xs/sm/md/lg/pill`, en el `:root` de `src/index.css`. Un
+  tamaño suelto nuevo es lo que llevó a 43 distintos. Fuera de la escala, a propósito:
+  los px de la pantalla de acceso y los tamaños diminutos medidos (mini calendario,
+  fichas a 360px).
 - Una prueba por fallo arreglado **y por cada comportamiento nuevo**, con el porqué en su texto.
 - **Esta misma nota vale para `CONTEXTO.md`**: entradas cortas, con el porqué, no un
   diario de "lo que se vio / lo que se probó" — eso es lo que hace crecer el archivo sin
@@ -230,6 +235,14 @@ operativo).
   huérfano lo guardado. La ñ se sigue perdiendo en las claves, por lo mismo.
 - **`almacen.js`** — los `try/catch` de `localStorage` en un sitio. Excepciones:
   `formulario/codigo.js` e `instalar.js` reciben el almacén COMO PARÁMETRO.
+- **CSS, repaso "premium"** (2026-10-04): `.form-input` estaba definido dos veces (el del
+  formulario, más alto y de otro fondo, pisaba al de la checklist y las cajas de texto
+  no medían lo mismo que los desplegables de al lado): ahora UNA regla para
+  `.form-input, .form-select`. Fuera también un `.btn:active` repetido. Con la letra
+  a 16px, los mínimos de la fila de "Añadir item" van en rem: si no, la categoría
+  ("Otros (añadidos manualmente)") salía cortada — lo cazó la prueba "Nada se corta". Los espacios
+  entre bloques los pone el `gap` del contenedor (`.config-card`, `.cal-ajustes`), no
+  un `margin` en cada hijo: los dos sumados daban huecos dobles.
 - Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el
   nombre en el módulo — las funciones que lo usaban reventaban al ejecutarse. El build no
   lo caza. Tiene prueba.

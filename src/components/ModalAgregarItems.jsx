@@ -58,7 +58,7 @@ export default function ModalAgregarItems({ checklist, categoriasDisponibles, on
   const nInclu = propuestos.filter(p => p.incluir).length;
 
   const selectStyle = {
-    padding: "8px 10px", border: "1px solid var(--border-color)", borderRadius: 6, fontSize: "0.85rem",
+    padding: "8px 10px", border: "1px solid var(--border-color)", borderRadius: 6, fontSize: "var(--fs-md)",
     background: "var(--card-bg)", color: "var(--text-main)", width: "100%", cursor: "pointer",
   };
 
@@ -97,7 +97,7 @@ export default function ModalAgregarItems({ checklist, categoriasDisponibles, on
                   value={texto}
                   onChange={e => setTexto(e.target.value)}
                   rows={10}
-                  style={{ ...selectStyle, padding: "12px 14px", fontSize: "0.85rem", fontFamily: "monospace", cursor: "text", resize: "vertical" }}
+                  style={{ ...selectStyle, padding: "12px 14px", fontSize: "var(--fs-md)", fontFamily: "monospace", cursor: "text", resize: "vertical" }}
                 />
               </div>
               {error && <div className="agregar-error"><AlertTriangle size={14} /> <span>{error}</span></div>}

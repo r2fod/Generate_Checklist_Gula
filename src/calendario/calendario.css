@@ -36,12 +36,12 @@
   width: 44px;
   min-height: 44px;
   padding: 0;
-  font-size: 1.3rem;
+  font-size: var(--fs-2xl);
   line-height: 1;
 }
 
 .cal-titulo {
-  font-size: 1.05rem;
+  font-size: var(--fs-xl);
   min-width: 0;
   /* El nombre del mes no parte nunca: "Sep- tiembre" en dos líneas movería toda la
      barra al cambiar de mes. */
@@ -72,7 +72,7 @@
 .cal-dia-nombre {
   padding: 8px 2px;
   text-align: center;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   color: var(--text-muted);
   background: var(--bg-subtle);
@@ -115,7 +115,7 @@
 .cal-celda:not(:disabled):hover { background: var(--bg-subtle); }
 
 .cal-numero {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--text-muted);
   line-height: 1;
@@ -185,7 +185,7 @@
 }
 
 .cal-pax-dia {
-  font-size: 0.62rem;
+  font-size: var(--fs-3xs);
   font-weight: 900;
   line-height: 1;
   color: var(--cal-color);
@@ -240,7 +240,7 @@
   min-width: 0;
   padding: 2px 5px;
   border-radius: 5px;
-  font-size: 0.68rem;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   line-height: 1.25;
 }
@@ -334,7 +334,7 @@
 .cal-mini:hover { border-color: var(--border-color-strong); background: var(--bg-subtle); }
 
 .cal-mini-titulo {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 800;
   margin-bottom: 5px;
 }
@@ -407,7 +407,7 @@
   background: var(--bg-subtle);
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
 }
@@ -423,7 +423,7 @@
   gap: 4px 14px;
   padding: 8px 0 2px;
   border-top: 1px dashed var(--border-color);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 .cal-semana-lista > .cal-semana-ausencias:first-child { border-top: 0; }
@@ -458,13 +458,13 @@
 }
 
 .cal-agenda-fecha small {
-  font-size: 0.62rem;
+  font-size: var(--fs-3xs);
   font-weight: 800;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.cal-agenda-fecha strong { font-size: 1.05rem; font-weight: 900; }
+.cal-agenda-fecha strong { font-size: var(--fs-xl); font-weight: 900; }
 
 /* Hoy, igual que en la rejilla; lo que ya pasó, más apagado; dos eventos el mismo día,
    con el mismo rojo que la casilla. */
@@ -492,8 +492,8 @@
 .cal-agenda-item .cal-icono { flex: 0 0 auto; margin-top: 2px; }
 
 .cal-agenda-texto { display: flex; flex-direction: column; min-width: 0; }
-.cal-agenda-texto strong { font-size: 0.88rem; font-weight: 700; overflow-wrap: break-word; }
-.cal-agenda-texto small { font-size: 0.74rem; color: var(--text-muted); overflow-wrap: break-word; }
+.cal-agenda-texto strong { font-size: var(--fs-md); font-weight: 700; overflow-wrap: break-word; }
+.cal-agenda-texto small { font-size: var(--fs-xs); color: var(--text-muted); overflow-wrap: break-word; }
 
 /* Vacaciones, recogidas, días cerrados y tareas: se ven, pero en segundo plano */
 .cal-agenda-item.tipo-vacaciones strong,
@@ -508,14 +508,14 @@
   padding: 10px 12px;
 }
 
-.cal-viene-vacio { color: var(--text-muted); font-size: 0.85rem; }
+.cal-viene-vacio { color: var(--text-muted); font-size: var(--fs-md); }
 
 .cal-viene-titulo {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -527,10 +527,10 @@
    es trabajo pendiente — y la mayor parte del año habrá alguno. */
 .cal-viene-pendientes {
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--aviso-bg-fuerte);
   color: var(--aviso-texto);
-  font-size: 0.68rem;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.2px;
 }
 
@@ -543,7 +543,7 @@
   gap: 8px;
   padding: 8px 0 8px 10px;
   border-top: 1px solid var(--border-color);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   flex-wrap: wrap;
   position: relative;
   animation: cal-viene-entra 0.3s ease both;
@@ -589,15 +589,15 @@
 
 .cal-viene-falta {
   flex: 0 0 auto;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--aviso-texto);
   background: var(--aviso-bg-fuerte);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 2px 8px;
 }
 
-.cal-viene-sin { flex: 0 0 auto; font-size: 0.76rem; color: var(--text-muted); }
+.cal-viene-sin { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--text-muted); }
 .cal-viene-ir { flex: 0 0 auto; min-height: 36px; }
 
 /* ─── CHOQUES ─────────────────────────────────────────────────────────────── */
@@ -610,8 +610,9 @@
   border: 1px solid var(--error-borde);
   background: var(--error-bg);
   color: var(--error-texto);
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  line-height: 1.4;
   cursor: pointer;
 }
 
@@ -653,7 +654,7 @@
 
 .cal-dia-titulo em {
   font-style: normal;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--text-muted);
   text-transform: none;
@@ -666,11 +667,11 @@
   border: 0;
   background: transparent;
   color: var(--text-muted);
-  font-size: 1.1rem;
+  font-size: var(--fs-xl);
   cursor: pointer;
 }
 
-.cal-dia-vacio { color: var(--text-muted); font-size: 0.86rem; padding: 6px 0; }
+.cal-dia-vacio { color: var(--text-muted); font-size: var(--fs-md); padding: 6px 0; }
 
 .cal-dia-item {
   display: flex;
@@ -690,14 +691,14 @@
   flex: 1 1 140px;
 }
 
-.cal-dia-item-texto small { color: var(--text-muted); font-size: 0.74rem; }
+.cal-dia-item-texto small { color: var(--text-muted); font-size: var(--fs-xs); }
 .cal-dia-btn { min-height: 38px; flex: 0 0 auto; }
 .cal-dia-anadir { min-height: 44px; }
 
 .cal-campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 
 .cal-campo > span {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -716,7 +717,7 @@
   font: inherit;
   /* Sin esto, iOS hace zoom al enfocar cualquier campo de menos de 16px y deja la
      pantalla descolocada al salir. */
-  font-size: 16px;
+  font-size: var(--fs-input);
   min-width: 0;
 }
 
@@ -728,7 +729,7 @@
   gap: 10px;
 }
 
-.cal-editor-titulo { font-weight: 800; font-size: 1rem; }
+.cal-editor-titulo { font-weight: 800; font-size: var(--fs-lg); }
 
 .cal-editor-acciones {
   display: flex;
@@ -748,7 +749,7 @@
    casilla enorme y el mes no cabría en la pantalla de alto. */
 @media (min-width: 560px) {
   .cal-celda { min-height: 92px; }
-  .cal-numero { font-size: 0.82rem; }
+  .cal-numero { font-size: var(--fs-sm); }
   /* El nombre entero, en las líneas que haga falta: con "…" una tableta leía "Boda d…"
      y había que abrir el día para saber cuál era. Parte por palabras, no por letras:
      si icono + palabra más larga + pax no caben en una línea, baja el pax
@@ -776,13 +777,20 @@
   .cal-celda { min-height: 112px; }
 }
 
+/* Móvil: el ".segmented-control { width: 100% }" general dejaba las vistas solas en su
+   fila y "+ Apunte" huérfano debajo. Aquí comparten fila (vistas estiradas, el botón a
+   su tamaño) y la fila del mes ocupa el ancho con el título en el centro. */
+@media (max-width: 640px) {
+  .cal-nav { width: 100%; }
+  .cal-titulo { flex: 1 1 auto; text-align: center; }
+  .cal-barra .cal-vistas { flex: 1 1 auto; width: auto; margin-left: 0; }
+}
+
 /* ─── MUY ESTRECHO ────────────────────────────────────────────────────────────
    320px: la barra de arriba no cabe en una línea y el título del mes se lleva el hueco.
    Se reparte en dos filas en vez de encoger los botones por debajo del dedo. */
 @media (max-width: 380px) {
-  .cal-vistas { margin-left: 0; }
-  .cal-nav { width: 100%; }
-  .cal-titulo { flex: 1 1 auto; text-align: center; font-size: 0.95rem; }
+  .cal-titulo { font-size: var(--fs-base); }
   .cal-nuevo { flex: 1 1 auto; }
   .cal-celda { padding: 3px 2px; }
   .cal-punto { width: 6px; height: 6px; }
@@ -801,7 +809,7 @@
   border-radius: var(--radius-md);
   background: var(--aviso-bg-fuerte);
   color: var(--aviso-texto);
-  font-size: 0.86rem;
+  font-size: var(--fs-md);
 }
 
 .cal-traer .btn { align-self: flex-start; min-height: 44px; }
@@ -818,12 +826,12 @@
   color: var(--text-main);
   font-family: monospace;
   /* 16px para que iOS no haga zoom al enfocar */
-  font-size: 16px;
+  font-size: var(--fs-input);
   resize: vertical;
 }
 
-.cal-traer-error { color: var(--error-texto-fuerte); font-weight: 700; font-size: 0.82rem; }
-.cal-traer-ok { color: var(--ok-texto); font-weight: 700; font-size: 0.82rem; }
+.cal-traer-error { color: var(--error-texto-fuerte); font-weight: 700; font-size: var(--fs-sm); }
+.cal-traer-ok { color: var(--ok-texto); font-weight: 700; font-size: var(--fs-sm); }
 .cal-traer-botones { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* El disparador plegado, cuando ya hay apuntes: mismo patrón que "Compartir" (más
@@ -842,7 +850,7 @@
   color: var(--text-muted);
   font: inherit;
   font-weight: 600;
-  font-size: 0.86rem;
+  font-size: var(--fs-md);
   text-align: left;
   cursor: pointer;
 }
@@ -942,7 +950,7 @@
   border-radius: var(--radius-md);
   background: var(--bg-subtle);
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
 }
 
@@ -963,7 +971,7 @@
   border-radius: var(--radius-md);
   background: var(--ok-bg);
   color: var(--ok-texto);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
 }
 
@@ -981,7 +989,7 @@
   margin: -8px -6px -8px 0;   /* la zona de toque crece sin engordar el aviso */
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: inherit;
   cursor: pointer;
@@ -1014,7 +1022,7 @@
   color: var(--text-main);
   font: inherit;
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: var(--fs-md);
   text-align: left;
   cursor: pointer;
 }
@@ -1057,7 +1065,7 @@
   flex-wrap: wrap;
   gap: 4px 8px;
   min-width: 0;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 
 .cal-compartir-que svg { flex: 0 0 auto; }
@@ -1066,7 +1074,7 @@
 .cal-compartir-que small {
   flex: 1 1 100%;
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   line-height: 1.35;
 }
 
@@ -1083,7 +1091,7 @@
   background: var(--card-bg);
   color: var(--text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
   /* Un toque lo selecciona entero: la salida cuando el portapapeles no está disponible */
   user-select: all;
@@ -1127,7 +1135,7 @@
 .cal-compartir-aviso {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   line-height: 1.45;
 }
 
@@ -1178,7 +1186,7 @@
   color: var(--text-main);
   font: inherit;
   font-weight: 700;
-  font-size: 0.86rem;
+  font-size: var(--fs-md);
   text-align: left;
   cursor: pointer;
 }
@@ -1200,7 +1208,7 @@
 .cal-equipo-nota {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
 }
 
@@ -1225,9 +1233,9 @@
   min-height: 44px;
   padding: 0 4px 0 12px;
   border: 1px solid var(--border-color);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--card-bg);
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
 }
 
 /* El chip entero es el botón de editar: tocar a alguien lo carga en el formulario */
@@ -1254,7 +1262,7 @@
 
 .cal-persona-apodos {
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   /* Los apodos son la letra pequeña: si un nombre trae cinco, que se corten antes de
      empujar el chip fuera de la pantalla. */
   max-width: 9rem;
@@ -1272,7 +1280,7 @@
   height: 44px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--text-muted);
   cursor: pointer;
@@ -1298,7 +1306,7 @@
   gap: 4px;
   min-width: 0;
   color: var(--text-muted);
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 
@@ -1314,7 +1322,7 @@
   background: var(--card-bg);
   color: var(--text-main);
   /* 16px para que iOS no haga zoom al enfocar */
-  font-size: 16px;
+  font-size: var(--fs-input);
 }
 
 .cal-equipo-anadir { min-height: 44px; }
@@ -1352,7 +1360,7 @@
   border-bottom: 1px solid var(--border-color);
   background: var(--card-bg);
   color: var(--text-main);
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   /* Por debajo de la muesca y la barra de estado en los móviles con pantalla completa */
   padding-top: max(10px, env(safe-area-inset-top));
 }
@@ -1416,11 +1424,11 @@
   flex-wrap: wrap;
 }
 
-.cal-jornada-dia { font-size: 0.95rem; }
+.cal-jornada-dia { font-size: var(--fs-base); }
 /* Solo la primera letra: con text-transform:capitalize salía "Lunes, 17 De Agosto",
    porque pone en mayúscula todas las palabras, preposiciones incluidas. */
 .cal-jornada-dia::first-letter { text-transform: uppercase; }
-.cal-jornada-cuando { color: var(--text-muted); font-size: 0.8rem; margin-left: auto; }
+.cal-jornada-cuando { color: var(--text-muted); font-size: var(--fs-sm); margin-left: auto; }
 .cal-jornada.es-urgente .cal-jornada-cuando { color: var(--error-texto-fuerte); font-weight: 800; }
 
 .cal-evento {
@@ -1453,33 +1461,33 @@
 
 .cal-evento-nombre:hover { text-decoration-color: var(--cal-color); }
 
-.cal-evento-pax { font-weight: 800; color: var(--cal-color); font-size: 0.82rem; }
-.cal-evento-sinpax { font-size: 0.76rem; color: var(--text-muted); font-style: italic; }
-.cal-evento-sitio { font-size: 0.78rem; color: var(--text-muted); }
+.cal-evento-pax { font-weight: 800; color: var(--cal-color); font-size: var(--fs-sm); }
+.cal-evento-sinpax { font-size: var(--fs-xs); color: var(--text-muted); font-style: italic; }
+.cal-evento-sitio { font-size: var(--fs-sm); color: var(--text-muted); }
 
 /* Las tres cifras que se vienen a ver */
 .cal-necesita {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 10px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
-.cal-necesita b { color: var(--text-main); font-size: 0.92rem; }
+.cal-necesita b { color: var(--text-main); font-size: var(--fs-base); }
 .cal-necesita-total { font-weight: 800; color: var(--cal-color); }
 
 /* Un ratio que nadie ha comprobado se dice, en vez de darlo por bueno */
 .cal-sin-medir {
-  font-size: 0.7rem;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   color: var(--aviso-texto);
   background: var(--aviso-bg-fuerte);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 7px;
 }
 
-.cal-turnos { font-size: 0.78rem; color: var(--text-muted); }
+.cal-turnos { font-size: var(--fs-sm); color: var(--text-muted); }
 .cal-turnos b { color: var(--text-main); }
 
 /* Sin hora no hay turnos: se ofrece ponerla ahí mismo en vez de dejar un hueco */
@@ -1490,7 +1498,7 @@ button.cal-turnos.es-vacia {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--aviso-texto-suave, var(--text-muted));
   text-align: left;
   cursor: pointer;
@@ -1498,20 +1506,20 @@ button.cal-turnos.es-vacia {
 }
 
 .cal-evento-ir { align-self: flex-start; min-height: 36px; }
-.cal-evento-sin { font-size: 0.76rem; color: var(--text-muted); }
+.cal-evento-sin { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* El total del día: la línea que hace falta cuando hay dos o tres eventos a la vez */
 .cal-jornada-suma {
   border-top: 1px solid var(--border-color);
   padding-top: 7px;
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
 .cal-jornada-suma b { color: var(--text-main); }
 
 .cal-jornada-gente {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -1529,7 +1537,7 @@ button.cal-turnos.es-vacia {
 /* La pista de turnos del editor, debajo de la hora */
 .cal-turnos-pista {
   align-self: end;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   padding-bottom: 10px;
 }
@@ -1560,7 +1568,7 @@ button.cal-turnos.es-vacia {
   background: none;
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
 }
@@ -1574,14 +1582,14 @@ button.cal-turnos.es-vacia {
   display: block;
   width: 100%;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--border-color);
   overflow: hidden;
 }
 .cal-asignados-barra-relleno {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   transition: width 0.2s ease;
 }
@@ -1590,10 +1598,10 @@ button.cal-turnos.es-vacia {
 .cal-asignados-falta {
   flex: 0 0 auto;
   font-weight: 800;
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   color: var(--error-texto-fuerte);
   background: var(--error-bg);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 8px;
 }
 
@@ -1672,7 +1680,7 @@ button.cal-turnos.es-vacia {
   background: var(--card-bg);
   color: var(--text-main);
   /* 16px para que iOS no haga zoom al enfocar */
-  font-size: 16px;
+  font-size: var(--fs-input);
   min-width: 0;
 }
 
@@ -1689,7 +1697,7 @@ button.cal-turnos.es-vacia {
 
 .cal-asignado-horas {
   flex: 0 0 auto;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--text-muted);
   min-width: 42px;
@@ -1704,7 +1712,7 @@ button.cal-turnos.es-vacia {
   height: 32px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--text-muted);
   cursor: pointer;
@@ -1720,7 +1728,7 @@ button.cal-turnos.es-vacia {
   gap: 6px;
 }
 
-.cal-asignados-anadir .btn { min-height: 38px; font-size: 0.8rem; }
+.cal-asignados-anadir .btn { min-height: 38px; font-size: var(--fs-sm); }
 
 .cal-asignados-suma {
   display: flex;
@@ -1728,7 +1736,7 @@ button.cal-turnos.es-vacia {
   gap: 4px 12px;
   border-top: 1px solid var(--border-color);
   padding-top: 6px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -1737,9 +1745,9 @@ button.cal-turnos.es-vacia {
 .cal-asignados-parcial {
   color: var(--aviso-texto);
   background: var(--aviso-bg-fuerte);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 1px 8px;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   font-weight: 700;
 }
 
@@ -1775,3 +1783,13 @@ button.cal-turnos.es-vacia {
 @media (max-width: 600px) {
   .cal-logo { display: none; }
 }
+
+/* ─── AJUSTES PLEGABLES, JUNTOS ───────────────────────────────────────────────
+   Traer, compartir, el asistente, el equipo y la gente por comensal son de la misma
+   familia: barras de una línea que se abren de vez en cuando. Sueltas, cada una sumaba
+   su margen al hueco de la página y entre barra y barra quedaban 32px; juntas, con un
+   hueco corto, se leen como un bloque y el mes sube media pantalla. */
+.cal-ajustes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.cal-ajustes > * { margin-bottom: 0; }
+.app-wrapper > .cal-ajustes { margin-bottom: 0; }
+.cal-ajustes:empty { display: none; }

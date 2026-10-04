@@ -167,10 +167,12 @@ function Banco() {
             </button>
           </div>
         )}
+        <div className="cal-ajustes">
         <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
         <Ratios ratios={ratios} onCambiar={(r) => setRatios(ponRatios(r))} />
+        </div>
         <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} mesInicial={mesInicial} />
       </>
     );

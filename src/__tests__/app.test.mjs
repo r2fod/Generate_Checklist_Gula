@@ -274,6 +274,22 @@ async function main() {
     });
     ok(filas.length === 1 && new Set(filas[0]).size === 1,
       `${w}px: las 3 cifras en una fila y del mismo ancho ${JSON.stringify(filas)}`);
+    // Repaso "premium": el detalle de cada cifra va en su línea sin un "·" colgando
+    // delante, el botón del tema es solo el icono (el texto le robaba ancho al título)
+    // y las cajas de texto miden lo mismo que los desplegables de al lado.
+    const pulido = await page.evaluate(() => {
+      const alto = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().height) : 0; };
+      return {
+        puntos: [...document.querySelectorAll(".resumen-ficha-valor em")]
+          .filter(e => getComputedStyle(e, "::before").content.includes("·")).length,
+        tema: Math.round(document.querySelector(".btn-tema")?.getBoundingClientRect().width || 0),
+        input: alto(".config-sidebar input.form-input"), select: alto(".config-sidebar .form-select"),
+      };
+    });
+    ok(pulido.puntos === 0, `${w}px: el detalle de las cifras sin "·" delante (${pulido.puntos})`);
+    ok(pulido.tema > 0 && pulido.tema <= 44, `${w}px: el botón del tema es solo el icono (${pulido.tema}px)`);
+    ok(pulido.input > 0 && pulido.input === pulido.select,
+      `${w}px: cajas de texto y desplegables con el mismo alto (${pulido.input} / ${pulido.select})`);
     await ctx.close();
   }
 
@@ -4533,6 +4549,17 @@ async function main() {
       await p.waitForSelector(".cal-celda");
 
       ok(!await seMueveDeLado(p), `${w}px · el mes no mueve la página de lado`);
+
+      // En el móvil las vistas y "+ Apunte" van en la misma fila: el botón salía solo
+      // en una línea entera debajo de Mes/Año/Equipo.
+      if (w <= 640) {
+        const fila = await p.evaluate(() => {
+          const v = document.querySelector(".cal-vistas")?.getBoundingClientRect();
+          const n = document.querySelector(".cal-nuevo")?.getBoundingClientRect();
+          return v && n ? Math.abs((v.top + v.bottom) / 2 - (n.top + n.bottom) / 2) : null;
+        });
+        ok(fila !== null && fila < 6, `${w}px · las vistas y "+ Apunte" comparten fila (${fila})`);
+      }
 
       // Los huecos del principio y del final del mes son null, y "ningún día abierto"
       // también era null: null === null les ponía la marca del día abierto y salían

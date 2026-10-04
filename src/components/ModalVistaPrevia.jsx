@@ -116,7 +116,7 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
           ))}
           <div className="preview-notes">
             <strong>Notas</strong>
-            {meta.notasEvento && <p style={{ whiteSpace: "pre-wrap", margin: "6px 0 0", fontSize: "0.88rem" }}>{meta.notasEvento}</p>}
+            {meta.notasEvento && <p style={{ whiteSpace: "pre-wrap", margin: "6px 0 0", fontSize: "var(--fs-md)" }}>{meta.notasEvento}</p>}
           </div>
         </div>
       </div>

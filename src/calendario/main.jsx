@@ -61,6 +61,8 @@ function AppCalendario() {
         </div>
       )}
 
+      {/* Los ajustes plegables, juntos en un bloque (ver .cal-ajustes) */}
+      <div className="cal-ajustes">
       {/* Traer apuntes de golpe pegándolos, NUNCA desde un archivo del repositorio. Los
           nombres de clientes y las vacaciones del equipo son datos de personas, y tanto
           el repositorio como lo publicado en GitHub Pages son públicos: eso vive en
@@ -94,6 +96,7 @@ function AppCalendario() {
 
       {!soloVer && <Equipo equipo={equipo} onCambiar={cambiarEquipo} />}
       {!soloVer && <Ratios ratios={ratios} onCambiar={cambiarRatios} />}
+      </div>
 
       {/* Desde un enlace no se ofrece abrir la checklist: es otra app y pide cuenta,
           así que el botón solo llevaría a una pantalla de login. */}

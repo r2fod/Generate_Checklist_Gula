@@ -81,6 +81,7 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrear
                   </button>
                 </div>
               )}
+              <div className="cal-ajustes">
               <Traer apuntes={apuntes} onTraer={traer} />
               {/* Los enlaces para compartir, también desde aquí: el calendario se abre
                   más veces desde dentro de la checklist que en su app suelta, y tener
@@ -89,6 +90,7 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrear
               <Compartir codigos={codigos} href={window.location.href} />
               <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
               <Ratios ratios={ratios} onCambiar={cambiarRatios} />
+              </div>
               {/* onAbrirEvento aquí NO cambia de página: abre el evento guardado en esta
                   misma app, que es justo lo que se venía a hacer. */}
               <Calendario
