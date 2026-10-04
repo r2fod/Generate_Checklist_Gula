@@ -11,7 +11,7 @@
 // Vive aparte, como Traer, porque lo montan LOS DOS calendarios: la app suelta y la
 // vista de dentro de la checklist.
 import { useMemo, useState } from "react";
-import { ChevronDown, Sparkles } from "lucide-react";
+import { Check, ChevronDown, Sparkles } from "lucide-react";
 import { sugerenciasDeLimpieza } from "./limpieza.js";
 import { aFecha } from "./apuntes.js";
 
@@ -100,6 +100,7 @@ export default function Limpiar({ apuntes, onCambiar }) {
                       return (
                         <label key={a.id} className={`cal-limpiar-fila${elegidos.has(a.id) ? " es-marcado" : ""}`}>
                           <input type="checkbox" checked={elegidos.has(a.id)} onChange={() => alternar(a.id)} />
+                          <span className="cal-limpiar-caja" aria-hidden="true"><Check size={14} strokeWidth={3} /></span>
                           <span className="cal-limpiar-texto">
                             <span className="cal-limpiar-titulo">{a.titulo}</span>
                             <span className="cal-limpiar-datos">{datos}</span>

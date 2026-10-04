@@ -1825,6 +1825,7 @@ button.cal-turnos.es-vacia {
 .cal-limpiar-motivo { font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); }
 .cal-limpiar-ayuda { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; }
 .cal-limpiar-fila {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1832,7 +1833,38 @@ button.cal-turnos.es-vacia {
   padding: 4px 0;
   cursor: pointer;
 }
-.cal-limpiar-fila input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--error-texto-fuerte); }
+/* La casilla de verdad cubre la fila entera y no se ve: es lo que se toca (44px de
+   alto, no los 18 de una casilla suelta) y con 16px de letra iOS no hace zoom. La que
+   se ve es .cal-limpiar-caja, pintada a partir de su estado. */
+.cal-limpiar-fila input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: var(--fs-input);
+}
+.cal-limpiar-caja {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border-color-strong);
+  border-radius: var(--radius-xs);
+  background: var(--card-bg);
+  color: transparent;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.cal-limpiar-fila input:checked + .cal-limpiar-caja {
+  background: var(--error-texto-fuerte);
+  border-color: var(--error-texto-fuerte);
+  color: #fff;
+}
+.cal-limpiar-fila input:focus-visible + .cal-limpiar-caja { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cal-limpiar-texto { display: flex; flex-direction: column; min-width: 0; }
 .cal-limpiar-titulo { font-weight: 600; font-size: var(--fs-base); overflow-wrap: anywhere; }
 .cal-limpiar-datos { font-size: var(--fs-xs); color: var(--text-muted); }
