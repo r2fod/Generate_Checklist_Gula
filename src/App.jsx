@@ -4634,7 +4634,7 @@ export default function App({ onCerrarSesion } = {}) {
                       placeholder={String(calcPaella(pax, tipoPaella, 0, evento).n)}
                       onChange={e => setNumPaellas(Math.max(0, parseInt(e.target.value) || 0))}
                     />
-                    <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
                       En blanco salen {calcPaella(pax, tipoPaella, 0, evento).n} por la gente
                     </span>
                   </div>
@@ -4644,7 +4644,7 @@ export default function App({ onCerrarSesion } = {}) {
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº sartenes parisiene (frituras)</span>
                   <input type="number" className="form-input" value={numFrituras} min="1" onChange={e => setNumFrituras(Math.max(1, parseInt(e.target.value) || 1))} />
-                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Ajusta bombonas, difusor, trípode y espumadera</span>
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Ajusta bombonas, difusor, trípode y espumadera</span>
                 </div>
               )}
               {/* En producción la plancha va fija, así que el número se ofrece siempre;
@@ -4653,7 +4653,7 @@ export default function App({ onCerrarSesion } = {}) {
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº planchas de gas</span>
                   <input type="number" className="form-input" value={numPlanchasGas} min="1" onChange={e => setNumPlanchasGas(Math.max(1, parseInt(e.target.value) || 1))} />
-                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Cada plancha suma su bombona</span>
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Cada plancha suma su bombona</span>
                 </div>
               )}
               {llevaChillOut && (
