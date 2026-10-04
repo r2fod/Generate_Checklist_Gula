@@ -92,16 +92,22 @@ export function iconoDeOpcion(idPregunta, indice) {
 
 // Sitios fijos (en %), tamaños y ritmos. Van a mano y no al azar para que el fondo
 // quede repartido y no se amontone en una esquina, y para que sea siempre igual.
+// "conMargen": solo caben donde hay margen a los lados de la columna. En el móvil no
+// lo hay y esos caían justo debajo del icono del título (un corazón detrás del
+// corazón del título), de la barra de progreso o de los botones de arriba: ahí se
+// esconden (hasta 900px). Por encima, la columna ocupa como mucho del 23% al 77% del
+// ancho, así que ningún icono entra en esa franja: uno a 46% asomaba junto a la barra
+// de progreso y otro a 30% detrás de "Atrás".
 const SITIOS = [
-  { x: 6, y: 12, tam: 46, dur: 19, retraso: 0 },
-  { x: 84, y: 8, tam: 34, dur: 23, retraso: 1.6 },
+  { x: 6, y: 12, tam: 46, dur: 19, retraso: 0, conMargen: true },
+  { x: 84, y: 8, tam: 34, dur: 23, retraso: 1.6, conMargen: true },
   { x: 91, y: 34, tam: 54, dur: 26, retraso: 0.4 },
-  { x: 3, y: 44, tam: 30, dur: 21, retraso: 2.4 },
+  { x: 3, y: 44, tam: 30, dur: 21, retraso: 2.4, conMargen: true },
   { x: 12, y: 74, tam: 50, dur: 24, retraso: 1.1 },
   { x: 88, y: 66, tam: 40, dur: 20, retraso: 3.0 },
-  { x: 76, y: 89, tam: 28, dur: 25, retraso: 0.8 },
-  { x: 30, y: 92, tam: 36, dur: 22, retraso: 2.0 },
-  { x: 46, y: 4, tam: 26, dur: 27, retraso: 1.4 },
+  { x: 80, y: 89, tam: 28, dur: 25, retraso: 0.8 },
+  { x: 16, y: 92, tam: 36, dur: 22, retraso: 2.0 },
+  { x: 15, y: 5, tam: 26, dur: 27, retraso: 1.4, conMargen: true },
 ];
 
 export default function FondoIconos({ pregunta }) {
@@ -113,9 +119,9 @@ export default function FondoIconos({ pregunta }) {
     // La clave hace que al cambiar de pregunta el fondo entero se vuelva a montar y
     // entre con su fundido, en vez de cambiar los iconos de golpe
     <div className="form-fondo" aria-hidden="true" key={pregunta}>
-      {piezas.map(({ Icono, x, y, tam, dur, retraso, id }) => (
+      {piezas.map(({ Icono, x, y, tam, dur, retraso, conMargen, id }) => (
         <span
-          className="form-fondo-icono"
+          className={`form-fondo-icono${conMargen ? " con-margen" : ""}`}
           key={id}
           style={{
             left: `${x}%`, top: `${y}%`,

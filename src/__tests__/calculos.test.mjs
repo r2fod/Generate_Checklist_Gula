@@ -2487,6 +2487,48 @@ console.log("\n══ Lo que estaba escrito cuatro veces (fecha, texto, almacén
     && /function aplicarTemaInicial/.test(readFileSync(f, "utf8")));
   ok(copiasTema.length === 0, `aplicarTemaInicial vive solo en src/tema.js (copias: ${copiasTema.join(", ") || "ninguna"})`);
 
+  // CSS: el mismo selector, en el mismo sitio (fuera o dentro del mismo @media), no
+  // vuelve a poner una propiedad que ya puso otro bloque suyo. Así estaban .form-input
+  // (el del formulario pisaba al de la checklist), .category-section o el aviso de
+  // cambios: la segunda copia gana sin que se vea, y quien toca la primera no ve efecto.
+  const hojas = ["src/index.css", "src/calendario/calendario.css"];
+  const bloquesCss = (t) => {
+    const fuera = [], pila = [];
+    let ini = 0;
+    t = t.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "));
+    for (let i = 0; i < t.length; i++) {
+      if (t[i] === "{") { pila.push([t.slice(ini, i).trim().replace(/\s+/g, " "), i]); ini = i + 1; }
+      else if (t[i] === "}") {
+        const [sel, desde] = pila.pop();
+        const cuerpo = t.slice(desde + 1, i);
+        if (!cuerpo.includes("{")) fuera.push({ ctx: pila.map(p => p[0]).join(" > "), sel, cuerpo, linea: t.slice(0, desde).split("\n").length });
+        ini = i + 1;
+      } else if (t[i] === ";" && !pila.length) ini = i + 1;
+    }
+    return fuera;
+  };
+  const pisadas = [];
+  for (const hoja of hojas) {
+    const vistas = new Map();
+    for (const b of bloquesCss(readFileSync(hoja, "utf8"))) {
+      if (b.ctx.startsWith("@keyframes")) continue;
+      b.cuerpo.split(";").map(d => d.split(":")[0].trim()).filter(Boolean).forEach(prop => {
+        const clave = `${b.ctx}|${b.sel}|${prop}`, antes = vistas.get(clave);
+        if (antes && antes !== b.linea) pisadas.push(`${hoja}:${b.linea} ${b.sel} { ${prop} } (ya en la ${antes})`);
+        else vistas.set(clave, b.linea);
+      });
+    }
+  }
+  ok(pisadas.length === 0, `ninguna regla CSS repite una propiedad de otro bloque del mismo selector (${pisadas.slice(0, 3).join("; ") || "ninguna"})`);
+
+  // Y los tamaños de letra salen de la escala (--fs-*): con tamaños sueltos se llegó a
+  // 43 distintos. Solo valen sueltos los diminutos que quedan por DEBAJO de la escala
+  // (mini calendario, fichas a 360px), medidos a mano.
+  const minEscala = parseFloat(readFileSync("src/index.css", "utf8").match(/--fs-3xs:\s*([\d.]+)rem/)[1]);
+  const sueltos = hojas.flatMap(h => [...readFileSync(h, "utf8").matchAll(/font-size:\s*([\d.]+)rem/g)]
+    .filter(m => parseFloat(m[1]) >= minEscala).map(m => `${h}: ${m[1]}rem`));
+  ok(sueltos.length === 0, `los tamaños de letra en rem salen de la escala --fs-* (${sueltos.slice(0, 3).join("; ") || "ninguno suelto"})`);
+
   // El calendario arrancaba SIEMPRE en claro: aplicarTemaInicial() se llamaba en el
   // arranque de la checklist y del formulario, pero se quedó fuera cuando el calendario
   // se separó en su propia carpeta/app (ni el automático por horario ni "oscuro" puesto
