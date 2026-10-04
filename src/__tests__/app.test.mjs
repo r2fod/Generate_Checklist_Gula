@@ -5067,10 +5067,13 @@ async function main() {
     console.log("\n══ Responsive de todo lo nuevo: 9 anchos × 2 temas ══");
     {
       const PANTALLAS = [
-        ["calendario del equipo", BANCO, [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+        // "Limpiar el calendario" usa el mismo plegable (.cal-ratios) y va antes: sin el
+        // :not, el barrido abría el limpiador en vez de la gente por comensal
+        ["calendario del equipo", BANCO, [".cal-compartir-cab", ".cal-ratios:not(.cal-limpiar) > .cal-ratios-cab", ".cal-equipo-cab"]],
+        ["limpiar el calendario", BANCO + "?sucio=1", [".cal-limpiar .cal-ratios-cab"]],
         ["aviso de creadas", BANCO + "?promover=1", []],
         ["solo lectura", BANCO + "?solover=1", []],
-        ["a pantalla completa", BANCO + "?pantalla=1", [".cal-compartir-cab", ".cal-ratios-cab", ".cal-equipo-cab"]],
+        ["a pantalla completa", BANCO + "?pantalla=1", [".cal-compartir-cab", ".cal-ratios:not(.cal-limpiar) > .cal-ratios-cab", ".cal-equipo-cab"]],
         // El asistente pide sesión de equipo en la app, así que solo se le llega por
         // aquí. Se abre con los ajustes desplegados, que es lo que más ocupa.
         ["asistente", BANCO + "?asistente=1", []],
@@ -5093,7 +5096,9 @@ async function main() {
         ["asistente tareas", BANCO + "?asistente=1", ['.asis-pestana:has-text("Tareas")']],
         ["asistente gasto", BANCO + "?asistente=1", ['.asis-pestana:has-text("Gasto")']],
       ];
-      const CAJAS = [".cal-compartir", ".cal-ratios", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura",
+      // revisaCaja mira la primera que encuentra: el limpiador y la gente por comensal
+      // comparten clase, así que van por separado
+      const CAJAS = [".cal-compartir", ".cal-ratios:not(.cal-limpiar)", ".cal-limpiar", ".cal-equipo", ".cal-viene", ".cal-creadas", ".cal-aviso-lectura",
         // El panel entero y, dentro, lo que se descuadra por su cuenta: la fila de
         // pestañas (cinco no caben a lo ancho en un móvil), el muñeco grande, la rejilla
         // de proveedores, las tres cifras del gasto y los objetivos del cerebro.
@@ -5257,12 +5262,14 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`ratios ${w}px: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-ratios-cab");
+      // El limpiador usa el mismo plegable: la gente por comensal es el otro
+      const RATIOS = ".cal-ratios:not(.cal-limpiar)";
+      await p.waitForSelector(`${RATIOS} > .cal-ratios-cab`);
 
-      ok(await p.locator(".cal-ratios-cuerpo").count() === 0,
+      ok(await p.locator(`${RATIOS} .cal-ratios-cuerpo`).count() === 0,
         `${w}px · el panel de ratios arranca plegado, como el del equipo`);
-      await p.locator(".cal-ratios-cab").click();
-      await p.waitForSelector(".cal-ratios-cuerpo");
+      await p.locator(`${RATIOS} > .cal-ratios-cab`).click();
+      await p.waitForSelector(`${RATIOS} .cal-ratios-cuerpo`);
 
       ok(await p.locator(".cal-ratio").count() === 5,
         `${w}px · hay un ratio por tipo de evento`);
@@ -5271,7 +5278,7 @@ async function main() {
         `${w}px · cumpleaños y producción salen marcados como "sin comprobar"`);
       ok(!await seMueveDeLado(p), `${w}px · el panel no mueve la página de lado`);
       {
-        const mal = await revisaCaja(p, ".cal-ratios");
+        const mal = await revisaCaja(p, RATIOS);
         ok(mal.length === 0, `${w}px · el panel de ratios, bien${mal.length ? ` → ${mal.join(" · ")}` : ""}`);
       }
 
