@@ -478,6 +478,40 @@ está en el historial de git y en las pruebas que los cubren):
   Mistral, OpenRouter, NVIDIA) no tenían botón, aunque estuvieran configurados: solo
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
+- **`quitarItemsSinCantidad` dejaba pasar las líneas con cantidad `null`** —
+  `tieneCantidadVisible` hacía `String(qty)`, y `String(null)` es el texto `"null"`, que
+  no está vacío. `null` es justo lo que deja `opt()` en una línea opcional que no toca
+  (Carpas, Paredes de carpas, Parabanes, Carrito palomitera…). En la app no se notaba
+  porque `App.jsx` ya las quita antes (línea ~2644), pero cualquier camino que parte de
+  la checklist en bruto se las llevaba: la calibración de tiempos (siguiente entrada) y
+  `generarHTMLWord` llamado directamente, que reventaba al leer `null.u`. Encontrado con
+  un barrido de 1.300 combinaciones (5 tipos × 1-500 pax × niños × horas × temporada):
+  ese fue el único fallo; nada salía `NaN` ni negativo y nada bajaba al subir los pax.
+- **La calibración de tiempos de carga salía un 20% corta** — `contarItemsCarga`
+  reconstruía el evento guardado con `checklistDeEventoGuardado`, que se queda SOLO con
+  las etiquetas: al filtrar por cantidad no quedaba nada que quitar. Una boda de 100 pax
+  contaba **173 líneas donde se cargan 133**, y como `totalItemsCarga` no se guarda con
+  el evento, pasaba SIEMPRE. Simulado: tres eventos que tardaban exactamente lo estimado
+  daban factores **0,92 · 0,80 · 0,80 · 0,93** en vez de 1 — la app habría prometido un
+  20% menos de tiempo de carga del real, que es el lado en que se sale tarde. Ahora
+  cuenta igual que `App.jsx` (renombres, ocultos, cantidades a mano, líneas añadidas),
+  con prueba de las tres cosas. `checklistDeEventoGuardado` se quedó sin uso y se quitó.
+  No afectaba a la calibración de bebida, comida ni hielo: esas ya usaban
+  `catsDeEventoGuardado`, con cantidades.
+- **Compartir → PDF ejecutaba el HTML que viniera escrito en el evento** —
+  `generarHTMLWord` metía el texto sin escapar y `handleCompartirPDF` lo pasa a
+  `window.open("")` + `document.write`: esa ventana es del MISMO origen que la app.
+  Comprobado en Chromium: un `<img onerror>` en el sitio leía lo guardado por la app (y
+  en la app de verdad ahí está la sesión de Firebase). Y el texto no solo lo escribe el
+  equipo: el sitio y las notas del formulario de oficina (`r.sitio`) y el sitio de un
+  apunte del calendario (`a.sitio`) acaban en `ubicacion`/`notasEvento`, y se entra a los
+  dos sin sesión (con el código o el enlace de editar). Se colaba por **11 campos**:
+  nombre, sitio, hora, notas, equipo de logística, recogidas, compras, líneas,
+  categorías, cantidades escritas a mano y roturas. Arreglado con `esc()` en todos,
+  escapando DESPUÉS del `toUpperCase()` del nombre (al revés, `&amp;` sería `&AMP;`).
+  Verificado tres veces: la prueba campo a campo, el documento de un evento normal sale
+  **idéntico byte a byte** al de antes (así que no hay cambio visual que capturar), y en
+  Chromium con control — la carga sin escapar se ejecuta, la misma tras el arreglo no.
 
 ## Qué queda pendiente ahora mismo (2026-09-30)
 

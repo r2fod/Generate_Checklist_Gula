@@ -130,6 +130,9 @@ export function esItemDeAlquiler(label, esAlquilerManual) {
 // — se queda fuera de Modo carga, Vista previa y Word/PDF, pero sigue editable en
 // la checklist principal de la app por si se quiere rellenar a mano.
 function tieneCantidadVisible(qty) {
+  // null es lo que deja opt() en una línea opcional cuya condición no se cumple: "no
+  // lleva". Sin esta línea pasaba por visible, porque String(null) es "null".
+  if (qty === null || qty === undefined) return false;
   const v = String(qty && qty.u ? qty.u : qty).trim();
   return v !== "" && v !== "—" && v !== "-" && v !== "0";
 }
@@ -256,6 +259,16 @@ export function sugerirCategoria(label, categoriasDisponibles) {
 // ─── EXPORTAR A WORD ────────────────────────────────────────────────────────
 // Documento HTML que Word abre como si fuera un .doc: todas las categorías con sus
 // cantidades, más recogidas/compras y un hueco para notas a mano.
+//
+// Todo lo que viene del evento pasa por esc() antes de entrar en el HTML. No es
+// prudencia: Compartir → PDF hace window.open("") + document.write de este HTML, y esa
+// ventana es del MISMO origen que la app. Un <img onerror> escrito en el sitio o en las
+// notas —que pueden llegar del formulario de oficina o de un apunte del calendario, sin
+// sesión— se ejecutaba con acceso a la sesión de quien imprimía. Se escapa DESPUÉS de
+// cualquier toUpperCase(): al revés, "&amp;" se volvería "&AMP;".
+const ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ESCAPES[c]);
+
 export function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, barraCoctel, barraCopas, checklistCompleta, meta = {}) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
   const fecha = new Date().toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
@@ -276,24 +289,24 @@ export function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, bar
         const vuelve = vueltos[key] ? "✓" : "";
         const rot = roturas[key] || "";
         return `<tr style="background:${alq ? "#fdf6e3" : i % 2 === 0 ? "#fff" : "#f9fafb"};">
-          <td style="padding:5px 6px;">${label}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
-          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual)}</td>
+          <td style="padding:5px 6px;">${esc(label)}${alq ? ' <b style="color:#b45309;font-size:9pt;">[ALQUILER]</b>' : ""}</td>
+          <td style="padding:5px 6px;font-weight:bold;color:#16a34a;">${esc(fmtCantidadCompleta(label, qty.u ? qty.u : qty, sufijo, unidadManual))}</td>
           <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${prep}</td>
           <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${sale}</td>
           <td style="width:60px;text-align:center;font-weight:bold;color:#16a34a;">${vuelve}</td>
-          <td style="width:60px;text-align:center;font-weight:bold;color:#dc2626;">${rot}</td>
+          <td style="width:60px;text-align:center;font-weight:bold;color:#dc2626;">${esc(rot)}</td>
         </tr>`;
       }).join("")}</tbody>
     </table>`;
   const secciones = checklist.map(cat => `
-    <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${cat.nombre}</h3>${tablaHTML(cat.items, cat.nombre)}`).join("");
+    <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${esc(cat.nombre)}</h3>${tablaHTML(cat.items, cat.nombre)}`).join("");
   // Recogidas y compras iban solo en pantalla: en el documento que se lleva la furgoneta
   // no aparecían. Ahora van como secciones propias, con su casilla para marcar en papel.
   const tablaSimple = (titulo, cols, filas) => filas.length === 0 ? "" : `
     <h3 style="background:#1f314d;color:white;padding:8px 12px;font-size:11pt;margin:18px 0 0 0;text-transform:uppercase;">${titulo}</h3>
     <table border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:11pt;">
       <thead><tr style="background:#1f314d;color:white;">${cols.map(c => `<th style="text-align:left;padding:6px;">${c}</th>`).join("")}</tr></thead>
-      <tbody>${filas.map((f, i) => `<tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">${f.map((celda, j) => `<td style="padding:5px 6px;${j === f.length - 1 ? "width:60px;text-align:center;font-weight:bold;color:#16a34a;" : ""}">${celda}</td>`).join("")}</tr>`).join("")}</tbody>
+      <tbody>${filas.map((f, i) => `<tr style="background:${i % 2 === 0 ? "#fff" : "#f9fafb"};">${f.map((celda, j) => `<td style="padding:5px 6px;${j === f.length - 1 ? "width:60px;text-align:center;font-weight:bold;color:#16a34a;" : ""}">${esc(celda)}</td>`).join("")}</tr>`).join("")}</tbody>
     </table>`;
   const fmtFecha = (f) => f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" }) : "";
   const seccionRecogidas = tablaSimple("Recogidas y devoluciones", ["Concepto", "Recoger", "Devolver", "Hecho"],
@@ -308,31 +321,31 @@ export function generarHTMLWord(evtKey, pax, ninos, horasCoctel, horasCopas, bar
       c.concepto, c.cantidad || "—", fmtFecha(c.fecha) || "—", c.comprado ? "✓" : "",
     ]));
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-    <title>Checklist ${EVENTOS[evtKey]?.label} · ${pax} pax</title>
+    <title>Checklist ${EVENTOS[evtKey]?.label} · ${esc(pax)} pax</title>
     <style>body{font-family:Arial,Helvetica,sans-serif;margin:20px;color:#222;}h1{color:#1f314d;font-size:18pt;}
     .meta{display:flex;flex-wrap:wrap;gap:12px 32px;background:#f3f4f6;padding:12px 16px;border-radius:4px;margin:16px 0;font-size:10pt;}
     .ml{font-weight:bold;color:#555;font-size:9pt;text-transform:uppercase;display:block;}
     .notas{margin-top:24px;border:1px solid #ddd;padding:12px;min-height:80px;border-radius:4px;}
     @media print{body{margin:10px}}</style>
     </head><body>
-    <h1>${meta.nombreEvento ? meta.nombreEvento.toUpperCase() : `CHECKLIST DE EVENTO — ${EVENTOS[evtKey]?.label?.toUpperCase()}`} · ${pax} PAX</h1>
+    <h1>${meta.nombreEvento ? esc(meta.nombreEvento.toUpperCase()) : `CHECKLIST DE EVENTO — ${EVENTOS[evtKey]?.label?.toUpperCase()}`} · ${esc(pax)} PAX</h1>
     <div class="meta">
       ${meta.nombreEvento ? `<div><span class="ml">Tipo de evento</span>${EVENTOS[evtKey]?.label}</div>` : ""}
       ${fechaEventoFmt ? `<div><span class="ml">Fecha del evento</span>${fechaEventoFmt}</div>` : ""}
-      ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${meta.horaInicio}h</div>` : ""}
-      ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${meta.ubicacion}</div>` : ""}
-      ${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) ? `<div><span class="ml">Equipo logística</span>${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)}${totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€` : ""}</div>` : ""}
-      ${fmtRecogidas(meta.recogidas) ? `<div><span class="ml">Recogidas</span>${fmtRecogidas(meta.recogidas)}</div>` : ""}
+      ${meta.horaInicio ? `<div><span class="ml">Hora de inicio</span>${esc(meta.horaInicio)}h</div>` : ""}
+      ${meta.ubicacion ? `<div><span class="ml">Ubicación</span>${esc(meta.ubicacion)}</div>` : ""}
+      ${fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) ? `<div><span class="ml">Equipo logística</span>${esc(fmtLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta))}${totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta) > 0 ? ` — Total ${String(totalLogistica(meta.logisticaEquipo, meta.tarifaLogistica, meta.plusFurgoneta)).replace(".", ",")}€` : ""}</div>` : ""}
+      ${fmtRecogidas(meta.recogidas) ? `<div><span class="ml">Recogidas</span>${esc(fmtRecogidas(meta.recogidas))}</div>` : ""}
       <div><span class="ml">Fecha generación</span>${fecha}</div>
-      <div><span class="ml">PAX total</span>${(() => {
+      <div><span class="ml">PAX total</span>${esc((() => {
         const dias = evtKey === "produccion" ? (meta.diasProduccion || []).map(d => parseInt(d, 10)).filter(n => n > 0) : [];
         return dias.length ? `${dias.join(" + ")} pax (${dias.length} días de producción)` : `${pax + ninos} (${pax} adultos${ninos > 0 ? ` + ${ninos} niños` : ""})`;
-      })()}</div>
-      ${evtKey !== "produccion" ? `<div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${horasCoctel}h` : "—"}${barraCopas ? ` + Copas ${horasCopas}h` : ""}</div>` : ""}
+      })())}</div>
+      ${evtKey !== "produccion" ? `<div><span class="ml">Barra libre</span>${barraCoctel ? `Cóctel ${esc(horasCoctel)}h` : "—"}${barraCopas ? ` + Copas ${esc(horasCopas)}h` : ""}</div>` : ""}
     </div>
     ${secciones}
     ${seccionRecogidas}
     ${seccionCompras}
-    <div class="notas"><strong>NOTAS:</strong><br/>${meta.notasEvento ? `<p style="white-space:pre-wrap;margin:6px 0;">${meta.notasEvento}</p>` : "<br/>"}</div>
+    <div class="notas"><strong>NOTAS:</strong><br/>${meta.notasEvento ? `<p style="white-space:pre-wrap;margin:6px 0;">${esc(meta.notasEvento)}</p>` : "<br/>"}</div>
     </body></html>`;
 }

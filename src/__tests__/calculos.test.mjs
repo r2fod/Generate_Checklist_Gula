@@ -32,14 +32,15 @@ import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, RATIOS_BEBIDA, FACTOR_NEUTRO,
   saneaFactores, ponFactores, leerFactores, factorDe, factoresDeTipo, conFactor,
   esFactorValido, cuantosAjustados } from "../bebida.js";
 import { calibracionBebida, calibracionHielo, calibracionComida, calibracionPersonal,
-  catsDeEventoGuardado } from "../calibracion.js";
+  catsDeEventoGuardado, calcularCalibracion, contarItemsCarga } from "../calibracion.js";
 import { saneaFactoresCristaleria, ponFactoresCristaleria, factorCristaleria,
   esFactorValido as esFactorCristaleriaValido } from "../cristaleria.js";
 import { menusEspeciales, totalMenusEspeciales, alergiasDeLasNotas, categoriaMenusEspeciales } from "../menus-especiales.js";
 import { escaletaDelEvento, resumenEscaleta, MARGEN_ANTES_MIN, VIAJE_POR_DEFECTO_MIN } from "../escaleta.js";
-import { estimarTiemposCarga } from "../tiempos-carga.js";
+import { estimarTiemposCarga, FASES_TIEMPO } from "../tiempos-carga.js";
 import { buildChecklist, GASTROS_MINIMO } from "../checklist-generadores.js";
-import { envaseSegunCantidad, unidadPorDefecto, fmtCantidadCompleta, cajaSizeDe } from "../checklist-format.js";
+import { envaseSegunCantidad, unidadPorDefecto, fmtCantidadCompleta, cajaSizeDe,
+  quitarItemsSinCantidad, generarHTMLWord } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { aISO, hoyISO, enDiasISO, diaDeMs } from "../fecha.js";
 import { sinTildes, limpiaTexto, claveDeTexto } from "../texto.js";
@@ -2966,6 +2967,105 @@ console.log("\n══ Auditoría de cálculos: 6 bugs reales cazados sin llegar 
   const cerveza00MediaHora = calcBebidas(100, 0.5, true, false).cerveza00;
   ok(cerveza00ConBarra > cerveza00MediaHora,
     `la cerveza 0,0 ya responde a las horas de barra libre, como la cerveza normal (4h: ${cerveza00ConBarra}, media hora: ${cerveza00MediaHora})`);
+}
+
+console.log("\n══ Una línea con cantidad null no se carga ══");
+{
+  // opt() deja las líneas opcionales en su sitio con cantidad null cuando su condición
+  // no se cumple (Carpas sin carpa, Parabanes fuera de un rodaje...). El filtro las
+  // daba por VISIBLES: String(null) es el texto "null", que no está vacío. En la app no
+  // se notaba porque App.jsx ya las quita antes, pero cualquier otro camino que parta
+  // de la checklist en bruto —la calibración de tiempos, el Word generado directamente—
+  // se las llevaba, y el Word reventaba al leer `null.u`.
+  const cats = [
+    { nombre: "Mobiliario", items: [
+      ["Carpas", null], ["Paredes de carpas", undefined], ["Mesas", "12"],
+      ["Copas de vino", { u: 30, b: 2, size: 25 }], ["Sillas", "0"], ["Manteles", ""], ["Parabanes", "—"],
+    ] },
+    { nombre: "Solo opcionales", items: [["Carrito palomitera", null]] },
+  ];
+  const quedan = quitarItemsSinCantidad(cats);
+  const etiquetas = quedan.flatMap(c => c.items.map(i => i[0]));
+  ok(etiquetas.join("|") === "Mesas|Copas de vino",
+    `solo quedan las que llevan cantidad, null y undefined incluidos fuera → ${etiquetas.join(", ")}`);
+  ok(quedan.length === 1, "y una categoría que solo tenía opcionales sin cantidad desaparece entera");
+}
+
+console.log("\n══ La calibración de tiempos cuenta lo mismo que la estimación ══");
+{
+  // La estimación de App.jsx cuenta las líneas que de verdad se cargan. La calibración
+  // reconstruía el evento guardado con checklistDeEventoGuardado, que se queda SOLO con
+  // las etiquetas: al filtrar por cantidad no había nada que quitar, y una boda de 100
+  // pax contaba 173 líneas donde se cargan 133. Comparaba el tiempo real contra una
+  // estimación inflada, y el factor salía bajo: tres eventos que tardaban JUSTO lo
+  // estimado daban 0,80 en carga — la app habría prometido un 20% menos de lo real.
+  const ev = { evento: "boda", pax: 100, ninos: 0, barraCoctel: true, horasCoctel: 2, barraCopas: true, horasCopas: 4 };
+  // Lo mismo que hace App.jsx: fuera las líneas null, lo que no lleva cantidad y Personal.
+  const sinNull = catsDeEventoGuardado(ev).map(c => ({ ...c, items: c.items.filter(i => i[1] !== null) }));
+  const cargables = quitarItemsSinCantidad(sinNull).filter(c => !/personal/i.test(c.nombre));
+  const deVerdad = cargables.reduce((a, c) => a + c.items.length, 0);
+  ok(contarItemsCarga(ev) === deVerdad,
+    `boda de 100 pax: cuenta ${contarItemsCarga(ev)} líneas, las mismas ${deVerdad} que se cargan`);
+
+  const est = estimarTiemposCarga({ totalItems: deVerdad, pax: 100, numLogistica: 2, horasJornada: 0 }, null);
+  const clavado = { ...ev, cronos: Object.fromEntries(FASES_TIEMPO.map(f => [f, { ms: est[`${f}Min`] * 60000 }])) };
+  const cal = calcularCalibracion({ a: clavado, b: clavado, c: clavado });
+  const factores = cal ? FASES_TIEMPO.map(f => cal.factores[f]) : [];
+  ok(factores.length === FASES_TIEMPO.length && factores.every(f => Math.abs(f - 1) < 0.001),
+    `tres eventos que tardan justo lo estimado dan factor 1 en todas las fases → ${factores.map(f => f.toFixed(2)).join(" · ")}`);
+
+  // Y cuenta como la app lo que se ha tocado a mano: una línea oculta y otra puesta a 0
+  // no se cargan, una añadida a mano sí, y otra añadida sin cantidad no. Las claves van
+  // con el nombre de la categoría YA renombrada, igual que en App.jsx.
+  const cat = cargables[0];
+  const renombrada = "Renombrada a mano";
+  const ajustado = {
+    ...ev,
+    categoriasRenombradas: { [cat.nombre]: renombrada },
+    itemsOcultos: { [`${renombrada}::${cat.items[0][0]}`]: true },
+    overridesManuales: { [`${renombrada}::${cat.items[1][0]}`]: "0" },
+    itemsManuales: [
+      { categoria: renombrada, label: "Carretilla extra", cantidad: "1" },
+      { categoria: renombrada, label: "Por decidir", cantidad: "" },
+    ],
+  };
+  ok(contarItemsCarga(ajustado) === deVerdad - 2 + 1,
+    `con una oculta, una a 0 y una añadida a mano cuenta ${contarItemsCarga(ajustado)} (esperado ${deVerdad - 1})`);
+}
+
+console.log("\n══ El Word/PDF no ejecuta lo que venga escrito en el evento ══");
+{
+  // Compartir → PDF abre una ventana con window.open("") y le hace document.write de
+  // este HTML: esa ventana es del MISMO origen que la app, así que un <img onerror> que
+  // llegara sin escapar se ejecutaba con acceso a la sesión (comprobado en Chromium). Y
+  // el texto puede venir de fuera del equipo: el sitio y las notas del formulario de
+  // oficina, o el sitio de un apunte del calendario, acaban en ubicacion/notasEvento.
+  // Se prueba campo a campo para que, si uno se escapa, el fallo diga cuál.
+  const CARGA = `<img src=x onerror=alert(1)>`;
+  const base = [{ nombre: "Menaje", items: [["Mesas", "12"]] }];
+  const word = (meta = {}, cats = base) => generarHTMLWord("boda", 100, 0, 2, 4, true, true, cats, meta);
+  const campos = {
+    "nombre del evento": word({ nombreEvento: `Boda ${CARGA}` }),
+    "sitio": word({ ubicacion: `Finca ${CARGA}` }),
+    "hora": word({ horaInicio: `13:00 ${CARGA}` }),
+    "notas": word({ notasEvento: `Alergias ${CARGA}` }),
+    "equipo de logística": word({ logisticaEquipo: [{ nombre: `Persona ${CARGA}`, inicio: "08:00", fin: "16:00" }] }),
+    "recogidas": word({ recogidas: [{ concepto: `Carpas ${CARGA}`, fecha: "2027-06-11" }] }),
+    "compras": word({ compras: [{ concepto: `Hielo ${CARGA}`, cantidad: `3 ${CARGA}` }] }),
+    "línea": word({}, [{ nombre: "Menaje", items: [[`Mesas ${CARGA}`, "12"]] }]),
+    "categoría": word({}, [{ nombre: `Menaje ${CARGA}`, items: [["Mesas", "12"]] }]),
+    "cantidad escrita a mano": word({}, [{ nombre: "Menaje", items: [["Mesas", `12 ${CARGA}`]] }]),
+    "roturas": word({ roturas: { "Menaje::Mesas": `2 ${CARGA}` } }),
+  };
+  const colados = Object.entries(campos).filter(([, html]) => /<img/i.test(html)).map(([c]) => c);
+  ok(colados.length === 0,
+    `ningún campo mete HTML propio en el documento${colados.length ? ` → se cuela por: ${colados.join(", ")}` : ` (${Object.keys(campos).length} campos probados)`}`);
+
+  // Escapar no puede estropear el texto normal: se lee igual, y una sola vez.
+  const normal = word({ ubicacion: "Finca Ríos & Hijos", notasEvento: "Mesa \"4\"\ncon dos celiacos" });
+  ok(normal.includes("Finca Ríos &amp; Hijos") && !normal.includes("&amp;amp;"),
+    "el texto normal sale igual, con el & escapado una sola vez");
+  ok(normal.includes("Mesa &quot;4&quot;\ncon dos celiacos"), "y las notas conservan sus saltos de línea");
 }
 
 // ─── El envase de debajo del número concuerda con él ────────────────────────
