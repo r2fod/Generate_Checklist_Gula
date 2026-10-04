@@ -630,7 +630,7 @@ body {
   border: 1px solid var(--aviso-borde);
   color: var(--aviso-texto);
   border-radius: var(--radius-md);
-  padding: 10px 14px 10px 18px;
+  padding: 10px 40px 10px 18px;
   font-size: var(--fs-md);
   font-weight: 600;
   display: flex;
@@ -638,15 +638,11 @@ body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  position: relative;
 }
 
 .avisos-recogidas-banner .cambios-remotos-detalle span {
   color: var(--aviso-texto);
-}
-
-.avisos-recogidas-banner {
-  position: relative;
-  padding-right: 40px;
 }
 .avisos-recogidas-banner .cambios-remotos-cerrar {
   color: var(--aviso-texto);
@@ -2204,12 +2200,13 @@ body {
   overflow: hidden;
   border: 1px solid var(--border-color);
   background: var(--card-bg);
-  transition: var(--transition-smooth);
+  transition: box-shadow 0.25s ease;
   box-shadow: var(--shadow-sm);
 }
 
 .category-section:hover {
   border-color: var(--border-color-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .category-header {
@@ -2258,10 +2255,6 @@ body {
   overflow-wrap: break-word;
 }
 
-.category-header .cat-count {
-  margin-left: auto;
-}
-
 .category-header .cat-icon {
   font-size: var(--fs-lg);
   width: 32px;
@@ -2275,6 +2268,7 @@ body {
 }
 
 .category-header .cat-count {
+  margin-left: auto;
   font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--text-muted);
@@ -2478,6 +2472,7 @@ body {
   padding: 0;
   cursor: text;
   text-align: right;
+  position: relative;
 }
 .item-unidad-btn:hover, .item-unidad-btn:focus-visible { border-bottom-color: currentColor; }
 .item-unidad-btn.es-manual { color: var(--accent); font-style: italic; }
@@ -2485,7 +2480,6 @@ body {
    zona de toque sin moverse, con una capa invisible de al menos 44×32 pegada a su
    borde derecho. Crece hacia abajo (el hueco de la fila) y no hacia arriba, donde está
    la caja de la cantidad: un toque en su borde de abajo no debe abrir la unidad. */
-.item-unidad-btn { position: relative; }
 .item-unidad-btn::after {
   content: "";
   position: absolute;
@@ -3460,6 +3454,7 @@ hr {
 .carga-modo-toggle .segmented-control {
   flex: 1;
   min-width: 0;
+  width: 100%;
 }
 
 .carga-toggle-cuenta {
@@ -3468,10 +3463,6 @@ hr {
   font-weight: 700;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-}
-
-.carga-modo-toggle .segmented-control {
-  width: 100%;
 }
 
 .carga-modo-toggle .segment-btn {
@@ -4572,8 +4563,6 @@ hr {
 
 /* Tarjetas y categorías: leve elevación al pasar el ratón */
 .config-card:hover { box-shadow: var(--shadow-md); }
-.category-section { transition: box-shadow 0.25s ease; }
-.category-section:hover { box-shadow: var(--shadow-md); }
 
 /* Iconos SVG (lucide): centrado y micro-animación al pasar el ratón */
 .cat-icon { display: inline-flex; align-items: center; justify-content: center; }
@@ -4905,8 +4894,8 @@ hr {
   gap: 8px;
   margin-bottom: 14px;
 }
-.resumen-ficha { flex: 1 1 150px; }
 .resumen-ficha {
+  flex: 1 1 150px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -5077,7 +5066,7 @@ hr {
      item medía 77px a 393px y había que deslizar el doble para recorrer el camión. */
   .carga-row-principal:not(.carga-row-vuelta) { padding-top: 5px; padding-bottom: 5px; }
   /* La barra de progreso, de lado a lado: a 220px parecía un adorno a medias */
-  .carga-progreso { width: 100%; max-width: none; }
+  .carga-progreso { width: 100%; max-width: none; margin-top: 6px; }
 
   /* Bloques de logística / recogidas / compras: menos separación entre campos */
   .logistica-block { gap: 8px; }
@@ -5092,7 +5081,6 @@ hr {
   /* Cabecera de Modo carga más compacta (menos scroll) */
   .preview-header-title { font-size: var(--fs-lg); }
   .preview-header-subtitle { margin-top: 2px; font-size: var(--fs-sm); }
-  .carga-progreso { margin-top: 6px; }
   .carga-tiempos { margin-top: 7px; font-size: var(--fs-xs); gap: 3px 5px; }
   .carga-tiempos-nota { font-size: var(--fs-2xs); }
   .carga-modo-toggle { padding: 10px 14px 0; }
@@ -6093,8 +6081,8 @@ hr {
 .envio-avisar { display: flex; flex-wrap: wrap; gap: 6px; }
 .envio-avisar-btn { text-decoration: none; }
 
-/* El aviso del formulario lleva varias acciones: que envuelvan en móvil */
-.cambios-remotos-banner { flex-wrap: wrap; }
+/* El aviso del formulario lleva varias acciones: que envuelvan en móvil (el
+   flex-wrap ya va en la regla del aviso) */
 .cambios-remotos-banner .btn { flex-shrink: 0; text-decoration: none; }
 
 /* ─── EL LOGO EN EL FORMULARIO ─────────────────────────────────────────────────
@@ -6395,14 +6383,13 @@ hr {
   align-items: stretch;
 }
 .link-roto-pegar[hidden] { display: none; }
+/* El campo nunca por debajo de lo legible; si con el botón al lado no cabe, el botón
+   baja a su propia línea y ocupa el ancho entero, que es más fácil de acertar. */
 .link-roto-pegar .form-input {
-  flex: 1;
+  flex: 1 1 190px;
   min-width: 0;   /* sin esto el input no baja de su ancho por defecto y desborda en 320px */
   text-align: left;
 }
-/* El campo nunca por debajo de lo legible; si con el botón al lado no cabe, el botón
-   baja a su propia línea y ocupa el ancho entero, que es más fácil de acertar. */
-.link-roto-pegar .form-input { flex: 1 1 190px; }
 .link-roto-pegar button { flex: 1 1 auto; min-width: 96px; padding: 0 16px; }
 @media (min-width: 400px) {
   .link-roto-pegar button { flex: 0 0 auto; }

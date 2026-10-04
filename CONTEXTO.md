@@ -240,7 +240,12 @@ operativo).
   no medían lo mismo que los desplegables de al lado): ahora UNA regla para
   `.form-input, .form-select`. Fuera también un `.btn:active` repetido. Con la letra
   a 16px, los mínimos de la fila de "Añadir item" van en rem: si no, la categoría
-  ("Otros (añadidos manualmente)") salía cortada — lo cazó la prueba "Nada se corta". Los espacios
+  ("Otros (añadidos manualmente)") salía cortada — lo cazó la prueba "Nada se corta".
+  Dos pruebas lo vigilan (`calculos.test.mjs`): ningún selector vuelve a poner una
+  propiedad que ya puso otro bloque suyo en el mismo `@media`, y ningún `font-size` en
+  rem fuera de la escala (salvo los diminutos, por debajo de `--fs-3xs`). Las reglas
+  partidas que quedan (las animaciones de `.btn`, `.header-icon`, el asistente) son a
+  propósito: juntarlas cambia el orden de la cascada. Los espacios
   entre bloques los pone el `gap` del contenedor (`.config-card`, `.cal-ajustes`), no
   un `margin` en cada hijo: los dos sumados daban huecos dobles.
 - Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el
