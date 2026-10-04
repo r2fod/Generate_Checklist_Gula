@@ -250,6 +250,14 @@ operativo).
   del 21–79% del ancho, que es donde está la columna en un ordenador; los marcados
   `conMargen` se esconden hasta 900px porque en el móvil caían detrás del título y de
   la barra. Una prueba mide que ninguno pise título, barra ni columna.
+- **Limpiar el calendario** (`calendario/limpieza.js` la cuenta, `Limpiar.jsx` la
+  pantalla, montado en los dos calendarios): repetidos el mismo día (mismo título sin
+  la gente: "Produ X" / "Produ X 73 PAX"), "Posible X" ya confirmado como "X" y el mismo
+  evento con un mes justo de diferencia. En este último sobra el del mes de antes si es
+  principio de mes y el de después si es final (así se equivocó la importación); a
+  mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
+  nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
+  el "Borrar" del editor: no pide permisos nuevos. El banco lo prueba con `?sucio=1`.
 - **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
   `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
   en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista
@@ -531,7 +539,10 @@ fusionarlos por mucho que estén en verde.
   Además hay un "Día cerrado" el 2/11 que ya no está en la hoja, varios repetidos (el
   mismo evento con dos títulos distintos, uno de la hoja y otro creado en la app) y
   dos producciones del 8 y 9 de octubre que siguen también como "Posible …" junto a la
-  versión confirmada. El dueño aún no ha dicho si los borra él o que se borren por él.
+  versión confirmada. **Para eso está "Limpiar el calendario"** (en los ajustes del
+  calendario, solo con permiso de escribir): los encuentra, marca el que sobra y borra
+  al confirmar, con "Deshacer". El 4 de diciembre (5 meses de diferencia) y el "Día
+  cerrado" del 2/11 no los detecta: esos, a mano.
 - **Cómo leer esa hoja sin repetir el fallo** (lo que funcionó):
   - Son dos bloques de 7 columnas (C–I enero–junio, K–Q julio–diciembre), con una fila
     de mes y otra de "L M X J V S D", y luego filas de números de día seguidas de las

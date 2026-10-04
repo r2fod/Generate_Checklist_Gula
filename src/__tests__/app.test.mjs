@@ -5412,6 +5412,35 @@ async function main() {
     }
 
     // ── COMO LO VE QUIEN ENTRA POR EL ENLACE DE MIRAR ──
+    // Limpiar el calendario: lo que sobra de las importaciones, a la vista y con su
+    // casilla. El banco con "?sucio=1" trae un repetido, un "Posible" ya confirmado y
+    // una boda leída también un mes antes. Nada se borra sin confirmar, y se deshace.
+    console.log("\n══ Limpiar el calendario ══");
+    for (const w of [320, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`limpiar ${w}px: ${e}`));
+      await p.goto(BANCO + "?sucio=1", { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-celda");
+      const cab = p.locator(".cal-limpiar .cal-ratios-cab");
+      const cuantos = async () => p.evaluate(() => document.querySelectorAll(".cal-celda .cal-punto, .cal-celda .cal-chip").length);
+      ok(/3 por revisar/.test(await cab.innerText()), `${w}px · la barra dice cuántas cosas hay que revisar sin abrirla`);
+      await cab.click(); await p.waitForTimeout(300);
+      ok(await p.locator(".cal-limpiar input:checked").count() === 3 && await p.locator(".cal-limpiar-grupo").count() === 3,
+        `${w}px · tres grupos, y en cada uno va marcado el que sobra`);
+      ok(!await seMueveDeLado(p), `${w}px · la lista de lo que sobra no mueve la página de lado`);
+      const antes = await cuantos();
+      await p.locator(".cal-limpiar-borrar").click(); await p.waitForTimeout(200);
+      ok(await cuantos() === antes && /¿Borrar 3 apuntes\?/.test(await p.locator(".cal-limpiar-acciones").innerText()),
+        `${w}px · el primer toque solo pregunta: todavía no se ha borrado nada`);
+      await p.locator(".cal-limpiar-borrar", { hasText: "Sí, borrar" }).click(); await p.waitForTimeout(300);
+      ok(/todo en orden/.test(await cab.innerText()) && /Borrados 3 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText()),
+        `${w}px · al confirmar se borran y la barra queda en orden`);
+      await p.locator(".cal-limpiar-hecho button", { hasText: "Deshacer" }).click(); await p.waitForTimeout(300);
+      ok(/3 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
+      await c.close();
+    }
+
     // No basta con que Firestore le deniegue la escritura: si la pantalla le ofrece
     // botones que no funcionan, el enlace parece roto en vez de ser de solo lectura.
     console.log("\n══ El calendario en solo lectura ══");
@@ -5426,8 +5455,9 @@ async function main() {
         `${w}px · se dice desde arriba que es solo lectura, para que no parezca roto`);
       ok(await p.locator(".cal-nuevo").count() === 0
          && await p.locator(".cal-equipo").count() === 0
-         && await p.locator(".cal-compartir").count() === 0,
-        `${w}px · ni añadir apuntes, ni tocar el equipo, ni repartir más enlaces`);
+         && await p.locator(".cal-compartir").count() === 0
+         && await p.locator(".cal-limpiar").count() === 0,
+        `${w}px · ni añadir apuntes, ni tocar el equipo, ni repartir más enlaces, ni limpiar`);
       ok(!await seMueveDeLado(p), `${w}px · en solo lectura tampoco se mueve de lado`);
 
       // Mirar un día SÍ: en el móvil es la única forma de leer el nombre entero de una

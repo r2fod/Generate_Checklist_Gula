@@ -17,6 +17,7 @@ import Equipo from "./Equipo.jsx";
 import Compartir from "./Compartir.jsx";
 import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
+import Limpiar from "./Limpiar.jsx";
 import { saneaLista, saneaEquipo, aISO, checklistsPorCrear } from "./apuntes.js";
 import { leerRatios, ponRatios } from "../personal.js";
 // El asistente pide sesión de equipo para salir en la app, así que la batería tampoco
@@ -66,6 +67,18 @@ const DEMO = [
   { fecha: dia(5), titulo: "Prueba de menú de prueba", tipo: "tarea" },
 ];
 
+// Con "?sucio=1" se añaden las sobras que deja una importación (ver limpieza.js): un
+// repetido con la gente en el título, un "Posible" ya confirmado y el mismo evento
+// leído también un mes antes. Van aparte para que el limpiador se pruebe sin tocar los
+// datos con los que se prueba todo lo demás. El del mes, en fechas fijas: con "dentro
+// de N días" un 31 no tiene mes anterior y la pareja no saldría según el día.
+const SUCIOS = [
+  { fecha: dia(20), titulo: "Corporativo de prueba 80 PAX", tipo: "corporativo" },
+  { fecha: dia(16), titulo: "Posible Cumpleaños de prueba", tipo: "cumpleanos" },
+  { fecha: "2030-04-02", titulo: "Boda cruzada de prueba", tipo: "boda" },
+  { fecha: "2030-05-02", titulo: "Boda cruzada de prueba", tipo: "boda", hora: "13:00" },
+];
+
 // Nombres inventados, como los apuntes: esto se compila y se publica.
 const EQUIPO_DEMO = [
   { nombre: "Fulanita", apodos: ["fula"] },
@@ -109,7 +122,8 @@ function Banco() {
   const cuantos = Number(new URLSearchParams(window.location.search).get("muchos")) || 0;
   const [apuntes, setApuntes] = useState(() => {
     if (arrancaVacio) return [];
-    return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : DEMO);
+    const sucio = new URLSearchParams(window.location.search).get("sucio");
+    return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : sucio ? [...DEMO, ...SUCIOS] : DEMO);
   });
   // Solo con el DEMO fijo tiene sentido fijar el mes: vacío no tiene nada que enseñar,
   // y "muchos" reparte sus apuntes a propósito por todo el año (medir.mjs), no en un
@@ -169,6 +183,7 @@ function Banco() {
         )}
         <div className="cal-ajustes">
         <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
+        <Limpiar apuntes={apuntes} onCambiar={(lista) => setApuntes(saneaLista(lista))} />
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
         <Ratios ratios={ratios} onCambiar={(r) => setRatios(ponRatios(r))} />

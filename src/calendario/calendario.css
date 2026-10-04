@@ -1807,3 +1807,56 @@ button.cal-turnos.es-vacia {
 .cal-ajustes > * { margin-bottom: 0; }
 .app-wrapper > .cal-ajustes { margin-bottom: 0; }
 .cal-ajustes:empty { display: none; }
+
+/* ─── LIMPIAR EL CALENDARIO ───────────────────────────────────────────────────
+   Un grupo por cada cosa que sobra, con su porqué arriba y una fila por apunte. La fila
+   entera es la casilla (44px de alto, para el dedo); lo marcado para borrar se tacha en
+   rojo, que es lo que va a pasar si se confirma. */
+.cal-limpiar-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cal-limpiar-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-color);
+}
+.cal-limpiar-motivo { font-size: var(--fs-xs); font-weight: 700; color: var(--text-muted); }
+.cal-limpiar-ayuda { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.4; }
+.cal-limpiar-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.cal-limpiar-fila input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--error-texto-fuerte); }
+.cal-limpiar-texto { display: flex; flex-direction: column; min-width: 0; }
+.cal-limpiar-titulo { font-weight: 600; font-size: var(--fs-base); overflow-wrap: anywhere; }
+.cal-limpiar-datos { font-size: var(--fs-xs); color: var(--text-muted); }
+.cal-limpiar-fila.es-marcado .cal-limpiar-titulo {
+  color: var(--error-texto);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.cal-limpiar-acciones { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.cal-limpiar-acciones .btn { min-height: 44px; }
+.cal-limpiar-pregunta { font-weight: 700; font-size: var(--fs-sm); margin-right: auto; }
+.cal-limpiar-borrar { color: var(--error-texto-fuerte); border-color: var(--error-borde); }
+.cal-limpiar-borrar:not(.btn-outline) { background: var(--error-bg); }
+.cal-limpiar-hecho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--ok-borde);
+  border-radius: var(--radius-sm);
+  background: var(--ok-bg);
+  color: var(--ok-texto);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+}

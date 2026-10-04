@@ -26,6 +26,7 @@ import { aplicarEnRatios } from "../asistente/escrituraRatios.js";
 import { encadenar } from "../asistente/escrituraTareas.js";
 import useCalendarioNube from "./useCalendarioNube.js";
 import Traer from "./Traer.jsx";
+import Limpiar from "./Limpiar.jsx";
 import { enlaceDeLaUrl } from "./enlace.js";
 
 // Sin esto el calendario arrancaba SIEMPRE en claro: aplicarTemaInicial() se llamaba en
@@ -68,6 +69,8 @@ function AppCalendario() {
           el repositorio como lo publicado en GitHub Pages son públicos: eso vive en
           Firestore, que para eso está. */}
       {!soloVer && <Traer apuntes={apuntes} onTraer={traer} />}
+      {/* Y lo que sobra de traer de golpe: repetidos, "posibles" ya confirmados... */}
+      {!soloVer && <Limpiar apuntes={apuntes} onCambiar={traer} />}
 
       {/* Los enlaces solo los reparte quien entra con cuenta: el que ya viene por un
           enlace no tiene por qué poder fabricar otros, y del de mirar no se puede
