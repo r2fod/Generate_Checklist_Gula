@@ -290,6 +290,21 @@ async function main() {
     ok(pulido.tema > 0 && pulido.tema <= 44, `${w}px: el botón del tema es solo el icono (${pulido.tema}px)`);
     ok(pulido.input > 0 && pulido.input === pulido.select,
       `${w}px: cajas de texto y desplegables con el mismo alto (${pulido.input} / ${pulido.select})`);
+
+    // Modo carga: la ✕ arriba, junto al título (centrada en una cabecera de cinco
+    // líneas quedaba flotando a media altura), y el icono de la escaleta a su tamaño
+    // (el título largo lo encogía a la mitad).
+    await page.goto(url({ evento: "boda", pax: 80, horaInicio: "13:00", nombreEvento: "Boda de prueba con nombre largo" }), { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1800);
+    await page.locator("button", { hasText: "Modo carga" }).first().click(); await page.waitForTimeout(800);
+    const cabecera = await page.evaluate(() => {
+      const x = document.querySelector(".carga-modal .preview-close-btn")?.getBoundingClientRect();
+      const t = document.querySelector(".carga-modal .preview-header-title")?.getBoundingClientRect();
+      const i = document.querySelector(".escaleta .cal-ratios-cab > svg")?.getBoundingClientRect();
+      return { desfase: x && t ? Math.round(x.top - t.top) : null, icono: i ? Math.round(i.width) : null };
+    });
+    ok(cabecera.desfase !== null && cabecera.desfase < 12, `${w}px: la ✕ de Modo carga va arriba, a la altura del título (${cabecera.desfase}px)`);
+    ok(cabecera.icono >= 15, `${w}px: el icono de la escaleta no se encoge (${cabecera.icono}px)`);
     await ctx.close();
   }
 
@@ -1946,6 +1961,36 @@ async function main() {
     ok(pax === 200, `un borrador con el mismo nombre NO pisa el evento guardado (sigue con ${pax} pax)`);
     ok(await p.locator(".aviso-nombre-ocupado").count() === 1,
       "y se avisa de que ese nombre ya está cogido");
+    await c.close();
+  }
+
+  // ── Los iconos del fondo del formulario no pisan lo que hay que leer ─────────
+  // En el móvil un corazón del fondo caía justo detrás del corazón del título y otro
+  // cruzaba la barra de progreso; en el ordenador, uno asomaba dentro de la columna
+  // junto a la barra y otro detrás de "Atrás". Se mide sin la animación de flotar.
+  console.log("\n── El fondo del formulario no pisa la columna ──");
+  for (const w of [390, 901, 1280]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 844 }, isMobile: w < 768, hasTouch: w < 768 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2000);
+    await p.addStyleTag({ content: ".form-fondo-icono, .form-fondo { animation: none !important; }" });
+    const pisan = async () => p.evaluate((ancho) => {
+      const choca = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+      const zonas = [".form-titulo", ".form-progreso"].map(s => document.querySelector(s)).filter(Boolean);
+      // En el ordenador la columna entera es intocable; en el móvil es toda la pantalla
+      if (ancho > 900) zonas.push(document.querySelector(".form-pantalla"));
+      return [...document.querySelectorAll(".form-fondo-icono svg")]
+        .filter(i => getComputedStyle(i.parentElement).display !== "none")
+        .filter(i => zonas.some(z => z && choca(i.getBoundingClientRect(), z.getBoundingClientRect()))).length;
+    }, w);
+    const enInicio = await pisan();
+    await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
+    await p.waitForTimeout(500);
+    const enPregunta = await pisan();
+    ok(enInicio === 0 && enPregunta === 0,
+      `${w}px: ningún icono del fondo pisa el título, la barra ni la columna (${enInicio} al entrar, ${enPregunta} en la primera pregunta)`);
     await c.close();
   }
 

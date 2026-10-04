@@ -245,7 +245,11 @@ operativo).
   propiedad que ya puso otro bloque suyo en el mismo `@media`, y ningún `font-size` en
   rem fuera de la escala (salvo los diminutos, por debajo de `--fs-3xs`). Las reglas
   partidas que quedan (las animaciones de `.btn`, `.header-icon`, el asistente) son a
-  propósito: juntarlas cambia el orden de la cascada. Los espacios
+  propósito: juntarlas cambia el orden de la cascada.
+- **Iconos del fondo del formulario** (`FondoIconos.jsx`, `SITIOS`): fuera de la franja
+  del 21–79% del ancho, que es donde está la columna en un ordenador; los marcados
+  `conMargen` se esconden hasta 900px porque en el móvil caían detrás del título y de
+  la barra. Una prueba mide que ninguno pise título, barra ni columna. Los espacios
   entre bloques los pone el `gap` del contenedor (`.config-card`, `.cal-ajustes`), no
   un `margin` en cada hijo: los dos sumados daban huecos dobles.
 - Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el

@@ -3437,6 +3437,9 @@ hr {
 
 .carga-modal .preview-header {
   position: static;
+  /* La cabecera de Modo carga mide cinco líneas: centrada, la ✕ quedaba flotando a
+     media altura, lejos del título y de donde se busca para cerrar. */
+  align-items: flex-start;
 }
 
 .carga-modo-toggle {
@@ -5559,6 +5562,7 @@ hr {
   will-change: transform;
 }
 :root[data-tema="oscuro"] .form-fondo-icono { opacity: 0.11; }
+@media (max-width: 900px) { .form-fondo-icono.con-margen { display: none; } }
 
 @keyframes form-fondo-entra { from { opacity: 0; } to { opacity: 1; } }
 @keyframes form-flota {
@@ -6434,6 +6438,9 @@ hr {
 }
 
 .cal-ratios-titulo { flex: 1 1 auto; min-width: 0; }
+/* El icono de la izquierda no cede sitio: con un título largo ("Escaleta del día ·
+   Salida 03:10 · inicio…") el flex lo encogía a la mitad. */
+.cal-ratios-cab > svg { flex-shrink: 0; }
 .cal-ratios-titulo em { font-style: normal; font-weight: 500; color: var(--text-muted); }
 
 .cal-ratios-flecha { flex: 0 0 auto; transition: transform 0.18s ease; }
