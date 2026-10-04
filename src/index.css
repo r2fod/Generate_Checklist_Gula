@@ -2896,6 +2896,10 @@ hr {
   max-width: 860px;
   box-shadow: var(--shadow-lg);
   overflow: hidden;
+  /* clip y no hidden: hidden lo convierte en contenedor de scroll y la cabecera
+     (sticky) dejaba de quedarse arriba — la ✕ de la Vista previa se iba con el scroll.
+     Un navegador sin clip se queda con el hidden de arriba. */
+  overflow: clip;
   animation: slideUpFade 0.25s ease both;
 }
 
@@ -3471,6 +3475,19 @@ hr {
 .carga-modo-toggle .segment-btn {
   flex: 1;
   text-align: center;
+}
+
+/* La ✕ de la tira fija: sale cuando la cabecera (con su ✕) se ha ido con el scroll */
+.carga-toggle-cerrar { animation: carga-cerrar-entra 0.18s ease-out both; }
+@keyframes carga-cerrar-entra {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .carga-toggle-cerrar { animation: none; } }
+/* En el móvil, Prep./Salida/Vuelta/Resumen van solo con su nombre: con los iconos no
+   cabían junto al recuento y la ✕, y a 320px ya se partían en dos filas. */
+@media (max-width: 420px) {
+  .carga-modo-toggle .segment-btn svg { display: none; }
 }
 
 /* Recordatorios del evento durante la carga: banner ámbar con las notas
@@ -6419,6 +6436,10 @@ hr {
   background: var(--card-bg);
   overflow: hidden;
 }
+/* Dentro del Resumen de Modo carga ya los separa el gap del cuerpo, y en la cabecera
+   es lo último: con el margen, ~30px entre plegable y plegable y un hueco de más
+   bajo la escaleta. */
+.preview-body > .cal-ratios, .preview-header .cal-ratios { margin-bottom: 0; }
 
 .cal-ratios-cab {
   display: flex;

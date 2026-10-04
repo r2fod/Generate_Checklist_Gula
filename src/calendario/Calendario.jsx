@@ -364,9 +364,9 @@ function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia, pasada = false }) {
 function PanelDia({ dia, apuntes, puedeEditar, soloAnadir, onCerrar, onEditar, onAnadir, onAbrirEvento }) {
   const f = aFecha(dia);
   const cuando = diasHasta(dia);
-  const titulo = f
-    ? f.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })
-    : dia;
+  // Mayúscula solo la primera: con text-transform: capitalize salía "Martes, 6 De Octubre"
+  const fecha = f ? f.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" }) : dia;
+  const titulo = fecha.charAt(0).toUpperCase() + fecha.slice(1);
   return (
     <div className="cal-editor-fondo" onClick={onCerrar}>
       <div className="cal-dia-panel" onClick={e => e.stopPropagation()}>

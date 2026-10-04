@@ -249,7 +249,14 @@ operativo).
 - **Iconos del fondo del formulario** (`FondoIconos.jsx`, `SITIOS`): fuera de la franja
   del 21–79% del ancho, que es donde está la columna en un ordenador; los marcados
   `conMargen` se esconden hasta 900px porque en el móvil caían detrás del título y de
-  la barra. Una prueba mide que ninguno pise título, barra ni columna. Los espacios
+  la barra. Una prueba mide que ninguno pise título, barra ni columna.
+- **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
+  `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
+  en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista
+  (IntersectionObserver), sale otra ✕ en la tira fija — por eso en el móvil
+  Prep./Salida/Vuelta/Resumen van sin icono. En el calendario, el título del día con su
+  ✕ y Cancelar/Guardar del editor son sticky. Prueba: con todo al final, alguna ✕ a la
+  vista y tocable. Los espacios
   entre bloques los pone el `gap` del contenedor (`.config-card`, `.cal-ajustes`), no
   un `margin` en cada hijo: los dos sumados daban huecos dobles.
 - Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el

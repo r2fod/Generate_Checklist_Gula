@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo } from "react";
+import { useState, useEffect, useMemo, useRef, memo } from "react";
 import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
   Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag, Hourglass,
@@ -531,10 +531,22 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+  // La cabecera es alta y se va con el scroll (ver .carga-modal en el CSS), y con ella
+  // la ✕: cargando un camión, para cerrar había que volver arriba del todo. Cuando la
+  // cabecera sale de la vista, la ✕ aparece en la tira fija de abajo.
+  const cabeceraRef = useRef(null);
+  const [cabeceraFuera, setCabeceraFuera] = useState(false);
+  useEffect(() => {
+    const cab = cabeceraRef.current;
+    if (!cab || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(([e]) => setCabeceraFuera(!e.isIntersecting), { root: cab.parentElement, threshold: 0 });
+    obs.observe(cab);
+    return () => obs.disconnect();
+  }, []);
   return (
     <div className={`preview-overlay ${sinCerrar ? "is-pantalla" : ""}`} onClick={sinCerrar ? undefined : onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
-        <div className="preview-header">
+        <div className="preview-header" ref={cabeceraRef}>
           <div>
             <div className="preview-header-title"><Package size={16} /> Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
             <div className="preview-header-subtitle">
@@ -630,6 +642,9 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
             <span className="carga-toggle-cuenta" title={`${totalMarcados} de ${totalItems} ${palabraModo}`}>
               {totalMarcados}/{totalItems}
             </span>
+          )}
+          {!sinCerrar && cabeceraFuera && (
+            <button className="preview-close-btn carga-toggle-cerrar" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
           )}
         </div>
         {mostrarRecordatorio && (

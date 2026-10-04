@@ -305,6 +305,39 @@ async function main() {
     });
     ok(cabecera.desfase !== null && cabecera.desfase < 12, `${w}px: la ✕ de Modo carga va arriba, a la altura del título (${cabecera.desfase}px)`);
     ok(cabecera.icono >= 15, `${w}px: el icono de la escaleta no se encoge (${cabecera.icono}px)`);
+
+    // "Que las ✕ de cerrar no se vayan con el scroll, que es incómodo" (el dueño). Con
+    // el contenido al final, alguna ✕ tiene que estar a la vista y poder tocarse: en
+    // Modo carga la de la cabecera se va (es alta) y sale otra en la tira fija.
+    const xALaVista = (sel) => page.evaluate((sel) => new Promise(res => {
+      for (const e of document.querySelectorAll("*")) {
+        if (/(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 2) e.scrollTop = e.scrollHeight;
+      }
+      setTimeout(() => res([...document.querySelectorAll(sel)].some(x => {
+        const r = x.getBoundingClientRect();
+        if (!r.width || r.top < 0 || r.bottom > innerHeight) return false;
+        const arriba = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !!arriba && (arriba === x || x.contains(arriba));
+      })), 400);
+    }), sel);
+    ok(await xALaVista(".carga-modal .preview-close-btn"), `${w}px: en Modo carga, con la lista al final, la ✕ sigue a la vista`);
+    // Una sola fila de Prep./Salida/Vuelta/Resumen aunque esté la ✕ (a 320 ya se partía)
+    ok(await page.evaluate(() => document.querySelector(".carga-modo-toggle .segmented-control").getBoundingClientRect().height < 60),
+      `${w}px: la tira de Modo carga cabe en una fila con la ✕`);
+    // Y en el Resumen los plegables se separan con el gap del cuerpo, sin margen de más
+    await page.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click(); await page.waitForTimeout(500);
+    const huecos = await page.evaluate(() => {
+      const ps = [...document.querySelectorAll(".preview-body > .cal-ratios")].map(e => e.getBoundingClientRect());
+      return ps.slice(1).map((r, i) => Math.round(r.top - ps[i].bottom));
+    });
+    ok(huecos.length >= 2 && huecos.every(h => h <= 16), `${w}px: entre plegable y plegable del Resumen, un hueco normal (${huecos.join(", ")}px)`);
+    await page.keyboard.press("Escape"); await page.waitForTimeout(300);
+    // La Vista previa: su cabecera es sticky, pero el overflow: hidden del modal la anulaba
+    await page.goto(url({ evento: "boda", pax: 80 }), { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(1600);
+    await page.locator("button", { hasText: "Compartir" }).first().click(); await page.waitForTimeout(300);
+    await page.locator("button", { hasText: "Ver la hoja" }).first().click(); await page.waitForTimeout(800);
+    ok(await xALaVista(".preview-modal:not(.carga-modal) .preview-close-btn"), `${w}px: en la Vista previa, con la hoja al final, la ✕ sigue a la vista`);
     await ctx.close();
   }
 
@@ -4604,6 +4637,31 @@ async function main() {
           return v && n ? Math.abs((v.top + v.bottom) / 2 - (n.top + n.bottom) / 2) : null;
         });
         ok(fila !== null && fila < 6, `${w}px · las vistas y "+ Apunte" comparten fila (${fila})`);
+
+        // En una pantalla bajita el editor y el panel del día scrollean por dentro:
+        // Cancelar/Guardar y la ✕ del día se quedan a la vista, no se van con el scroll.
+        await p.setViewportSize({ width: w, height: 480 });
+        const aLaVista = (sel, alFinal) => p.evaluate(([sel, alFinal]) => {
+          const x = document.querySelector(sel);
+          const panel = x && x.closest(".cal-editor, .cal-dia-panel");
+          if (!panel) return false;
+          panel.scrollTop = alFinal ? panel.scrollHeight : 0;
+          const r = x.getBoundingClientRect(), caja = panel.getBoundingClientRect();
+          const arriba = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          return panel.scrollHeight > panel.clientHeight && r.top >= caja.top - 1 && r.bottom <= caja.bottom + 1
+            && !!arriba && (arriba === x || x.contains(arriba));
+        }, [sel, alFinal]);
+        await p.locator(".cal-nuevo").first().click(); await p.waitForTimeout(300);
+        ok(await aLaVista(".cal-editor-acciones .btn-green", false), `${w}px · con el editor arriba del todo, Guardar sigue a la vista`);
+        await p.locator(".cal-editor-acciones .btn-outline", { hasText: "Cancelar" }).click(); await p.waitForTimeout(200);
+        // El día más lleno del banco (tres eventos y dos ausencias): es el que scrollea
+        await p.locator(".cal-celda.es-choque").first().click(); await p.waitForTimeout(300);
+        const largo = await p.evaluate(() => { const d = document.querySelector(".cal-dia-panel"); return d && d.scrollHeight > d.clientHeight; });
+        if (largo) ok(await aLaVista(".cal-dia-cerrar", true), `${w}px · con el día al final, su ✕ sigue a la vista`);
+        ok(/^[A-ZÁÉÍÓÚ][a-záéíóú]+, \d+ de [a-z]+$/.test((await p.locator(".cal-dia-titulo > span").first().innerText()).trim()),
+          `${w}px · el día se titula "Martes, 6 de octubre", sin "De" en mayúscula`);
+        await p.locator(".cal-dia-cerrar").click(); await p.waitForTimeout(200);
+        await p.setViewportSize({ width: w, height: 900 });
       }
 
       // Los huecos del principio y del final del mes son null, y "ningún día abierto"

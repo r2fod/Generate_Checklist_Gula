@@ -649,7 +649,14 @@
   align-items: center;
   gap: 8px;
   font-weight: 800;
-  text-transform: capitalize;
+  /* El panel scrollea por dentro: con un día lleno, la ✕ se iba hacia arriba con el
+     título. Se quedan pegados arriba, tapando lo que pasa por debajo. */
+  position: sticky;
+  top: -14px;
+  z-index: 1;
+  margin: -14px -14px 0;
+  padding: 14px 14px 6px;
+  background: var(--card-bg);
 }
 
 .cal-dia-titulo em {
@@ -657,7 +664,6 @@
   font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--text-muted);
-  text-transform: none;
 }
 
 .cal-dia-cerrar {
@@ -736,7 +742,15 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  padding-top: 4px;
+  /* Cancelar y Guardar, siempre a la vista: con el personal asignado el editor es más
+     alto que la pantalla y había que bajar hasta el final para salir. */
+  position: sticky;
+  bottom: -14px;
+  z-index: 1;
+  margin: 0 -14px -14px;
+  padding: 10px 14px 14px;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border-color);
 }
 
 .cal-editor-acciones .btn { min-height: 44px; }
