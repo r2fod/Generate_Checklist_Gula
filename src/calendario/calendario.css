@@ -611,7 +611,8 @@
   background: var(--error-bg);
   color: var(--error-texto);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.4;
   cursor: pointer;
 }
 
@@ -776,13 +777,20 @@
   .cal-celda { min-height: 112px; }
 }
 
+/* Móvil: el ".segmented-control { width: 100% }" general dejaba las vistas solas en su
+   fila y "+ Apunte" huérfano debajo. Aquí comparten fila (vistas estiradas, el botón a
+   su tamaño) y la fila del mes ocupa el ancho con el título en el centro. */
+@media (max-width: 640px) {
+  .cal-nav { width: 100%; }
+  .cal-titulo { flex: 1 1 auto; text-align: center; }
+  .cal-barra .cal-vistas { flex: 1 1 auto; width: auto; margin-left: 0; }
+}
+
 /* ─── MUY ESTRECHO ────────────────────────────────────────────────────────────
    320px: la barra de arriba no cabe en una línea y el título del mes se lleva el hueco.
    Se reparte en dos filas en vez de encoger los botones por debajo del dedo. */
 @media (max-width: 380px) {
-  .cal-vistas { margin-left: 0; }
-  .cal-nav { width: 100%; }
-  .cal-titulo { flex: 1 1 auto; text-align: center; font-size: var(--fs-base); }
+  .cal-titulo { font-size: var(--fs-base); }
   .cal-nuevo { flex: 1 1 auto; }
   .cal-celda { padding: 3px 2px; }
   .cal-punto { width: 6px; height: 6px; }
@@ -1775,3 +1783,13 @@ button.cal-turnos.es-vacia {
 @media (max-width: 600px) {
   .cal-logo { display: none; }
 }
+
+/* ─── AJUSTES PLEGABLES, JUNTOS ───────────────────────────────────────────────
+   Traer, compartir, el asistente, el equipo y la gente por comensal son de la misma
+   familia: barras de una línea que se abren de vez en cuando. Sueltas, cada una sumaba
+   su margen al hueco de la página y entre barra y barra quedaban 32px; juntas, con un
+   hueco corto, se leen como un bloque y el mes sube media pantalla. */
+.cal-ajustes { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.cal-ajustes > * { margin-bottom: 0; }
+.app-wrapper > .cal-ajustes { margin-bottom: 0; }
+.cal-ajustes:empty { display: none; }

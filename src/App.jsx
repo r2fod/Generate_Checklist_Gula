@@ -3430,7 +3430,7 @@ export default function App({ onCerrarSesion } = {}) {
                   onClick={() => setPreferenciaTema(siguiente)}
                   title={`${etiqueta} · el automático pone oscuro de ${HORA_OSCURO}:00 a ${HORA_CLARO}:00. Pulsa para pasar a "${{ auto: "automático", claro: "siempre claro", oscuro: "siempre oscuro" }[siguiente]}"`}
                   aria-label={etiqueta}
-                ><Icono size={15} /> {rotulo}</button>
+                ><Icono size={15} /> <span className="btn-tema-texto">{rotulo}</span></button>
               );
             })()}
           </div>
@@ -3582,7 +3582,7 @@ export default function App({ onCerrarSesion } = {}) {
         <div className="resumen-evento animate-entrance" style={{ animationDelay: "0.04s" }}>
           <div className="resumen-ficha">
             <span className="resumen-ficha-label"><Users size={13} /> Pax total</span>
-            <span className="resumen-ficha-valor">{pax + ninos}{ninos > 0 ? <em> · {pax} + {ninos} niños</em> : null}</span>
+            <span className="resumen-ficha-valor">{pax + ninos}{ninos > 0 ? <em>{pax} + {ninos} niños</em> : null}</span>
           </div>
           <div className="resumen-ficha">
             <span className="resumen-ficha-label"><Boxes size={13} /> Conceptos</span>
@@ -3590,12 +3590,12 @@ export default function App({ onCerrarSesion } = {}) {
                 preparación; en cuanto se empieza a cargar, manda lo cargado. Nunca se
                 enseñan las dos: en el móvil la fila no da para tres cifras. */}
             <span className="resumen-ficha-valor">{totalConceptos}{itemsCargados > 0
-              ? <em> · {itemsCargados} cargados</em>
-              : itemsPreparados > 0 ? <em> · {itemsPreparados} preparados</em> : null}</span>
+              ? <em>{itemsCargados} cargados</em>
+              : itemsPreparados > 0 ? <em>{itemsPreparados} preparados</em> : null}</span>
           </div>
           <div className="resumen-ficha">
-            <span className="resumen-ficha-label"><Clock size={13} /> Tiempo estimado</span>
-            <span className="resumen-ficha-valor">{fmtMinutos(tiemposCargaForm.totalMin)}<em> · {logisticaParaTiempos} logística</em></span>
+            <span className="resumen-ficha-label"><Clock size={13} /> Tiempo<span className="resumen-ficha-label-mas"> estimado</span></span>
+            <span className="resumen-ficha-valor">{fmtMinutos(tiemposCargaForm.totalMin)}<em>{logisticaParaTiempos} logística</em></span>
           </div>
           {totalLogistica(logisticaEquipo, tarifaLogistica, plusFurgoneta) > 0 && (
             <div className="resumen-ficha">
@@ -3606,7 +3606,7 @@ export default function App({ onCerrarSesion } = {}) {
           {pendientesEvento > 0 && (
             <div className="resumen-ficha is-aviso">
               <span className="resumen-ficha-label"><Bell size={13} /> Pendientes</span>
-              <span className="resumen-ficha-valor">{pendientesEvento}<em> · recogidas y compras</em></span>
+              <span className="resumen-ficha-valor">{pendientesEvento}<em>recogidas y compras</em></span>
             </div>
           )}
         </div>

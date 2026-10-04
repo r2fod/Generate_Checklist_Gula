@@ -1128,10 +1128,6 @@ body {
   overflow: hidden;
 }
 
-.btn:active {
-  transform: scale(0.96);
-}
-
 .btn-outline {
   background: var(--card-bg);
   border-color: var(--border-color-strong);
@@ -1424,14 +1420,20 @@ body {
   letter-spacing: 0.5px;
 }
 
+/* Campos de texto y desplegables, iguales en las tres apps. Antes el formulario
+   redefinía .form-input más abajo (50px, letra de 1rem, otro fondo) y, al ser global,
+   en la checklist los campos de texto salían más altos y de otro color que los
+   desplegables que tienen al lado ("Tipo de evento" junto a "Pax adultos"). */
 .form-input, .form-select {
   width: 100%;
-  padding: 10px 12px;
+  min-height: 48px;
+  padding: 11px 14px;
   border: 1.5px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-base);
+  border-radius: var(--radius-md);
+  /* 1rem = 16px: por debajo, iOS hace zoom al enfocar el campo */
+  font-size: var(--fs-lg);
   color: var(--text-main);
-  background: var(--card-bg);
+  background: var(--bg-color);
   transition: var(--transition-smooth);
 }
 
@@ -2064,8 +2066,10 @@ body {
   white-space: nowrap;
 }
 
+/* Sin margen propio: la tarjeta (.config-card) ya separa a sus hijos con su gap, y
+   sumando los dos quedaban 35px entre "Recalcular cantidades" y este texto. */
 .plantillas-vacio {
-  margin: 10px 0 0;
+  margin: 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   line-height: 1.45;
@@ -2073,7 +2077,7 @@ body {
 
 /* Confirmación de qué se acaba de guardar (plantilla o evento) */
 .guardado-confirm {
-  margin: 10px 0 0;
+  margin: 0;
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--green-qty);
@@ -2205,7 +2209,6 @@ body {
 }
 
 .category-section:hover {
-  box-shadow: var(--shadow-md);
   border-color: var(--border-color-strong);
 }
 
@@ -4813,7 +4816,6 @@ hr {
 .btn-secundario-ancho {
   width: 100%;
   justify-content: center;
-  margin-bottom: 12px;
 }
 
 /* Mantenimiento (copia de seguridad y restaurar): se usa muy de vez en cuando, así
@@ -4886,6 +4888,13 @@ hr {
   border-color: var(--border-color-strong);
 }
 .btn-tema svg { flex: 0 0 auto; }
+/* En el móvil, solo el icono (sol, luna o reloj): el texto le quitaba ~90px al título y
+   el subtítulo del evento salía recortado ("12:30h ·…"). El nombre sigue en su
+   aria-label y en el title. */
+@media (max-width: 768px) {
+  .btn-tema { width: 40px; min-height: 40px; padding: 0; justify-content: center; }
+  .btn-tema-texto { display: none; }
+}
 
 /* Resumen del evento bajo la cabecera: las cifras que antes había que ir a buscar a
    Vista previa o a Modo carga. En flex (no grid) para que la última fila se estire y
@@ -4934,6 +4943,9 @@ hr {
   color: var(--text-muted);
 }
 .resumen-ficha.is-aviso .resumen-ficha-valor em { color: var(--aviso-texto-suave); }
+/* El "·" lo pone el CSS y no el texto: en el móvil el detalle baja a su línea, y un
+   "· 100 + 10 niños" empezando por el punto se leía como una errata. */
+.resumen-ficha-valor em::before { content: " · "; }
 /* En móvil las tres cifras habituales (pax, conceptos y tiempo) caben en UNA fila:
    se compactan el acolchado y las letras lo justo para que entren sin apretarse. Si
    el evento tiene además coste de logística o pendientes, las de más pasan a una
@@ -4949,6 +4961,10 @@ hr {
   .resumen-ficha-label svg { width: 11px; height: 11px; }
   .resumen-ficha-valor { font-size: var(--fs-md); }
   .resumen-ficha-valor em { font-size: var(--fs-3xs); display: block; }
+  .resumen-ficha-valor em::before { content: none; }
+  /* "Tiempo estimado" partía en dos líneas y bajaba su cifra respecto a las otras dos:
+     en una ficha de un tercio de ancho basta con "Tiempo". */
+  .resumen-ficha-label-mas { display: none; }
 }
 @media (max-width: 360px) {
   .resumen-ficha-label { font-size: 0.55rem; }
@@ -5057,6 +5073,11 @@ hr {
   .preview-body { padding: 14px 14px 22px; gap: 12px; }
   .preview-category-header { padding: 9px 13px; }
   .carga-row { padding: 10px 13px; }
+  /* La fila ya trae 10px arriba y abajo: con los 15px de la etiqueta encima, cada
+     item medía 77px a 393px y había que deslizar el doble para recorrer el camión. */
+  .carga-row-principal:not(.carga-row-vuelta) { padding-top: 5px; padding-bottom: 5px; }
+  /* La barra de progreso, de lado a lado: a 220px parecía un adorno a medias */
+  .carga-progreso { width: 100%; max-width: none; }
 
   /* Bloques de logística / recogidas / compras: menos separación entre campos */
   .logistica-block { gap: 8px; }
@@ -5684,17 +5705,6 @@ hr {
   color: var(--text-label);
 }
 
-.form-input {
-  width: 100%;
-  min-height: 50px;
-  padding: 12px 14px;
-  font-size: var(--fs-lg);
-  color: var(--text-main);
-  background: var(--bg-color);
-  border: 1.5px solid var(--border-color);
-  border-radius: var(--radius-md);
-}
-.form-input:focus { outline: none; border-color: var(--accent); }
 .form-input-corto { max-width: 160px; }
 .form-textarea { min-height: 110px; resize: vertical; font-family: inherit; }
 
