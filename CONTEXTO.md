@@ -255,7 +255,9 @@ operativo).
   la gente: "Produ X" / "Produ X 73 PAX", o uno dentro del otro: "BODA X EN LA FINCA?"
   / "Boda X" — `mismoTitulo` de repetidos.js, el mismo criterio que el archivo), "Posible
   X" ya confirmado como "X", el mismo evento con un mes justo de diferencia y el mismo
-  evento en días seguidos (sin marcar ninguno; ni producciones ni lo que tiene "hasta"). En este último sobra el del mes de antes si es
+  evento en días seguidos (sin marcar ninguno; ni producciones, ni lo que tiene "hasta",
+  ni rachas de 3+ días —un evento largo apuntado día a día—, ni dos con checklist o
+  personal: los montó alguien a propósito). En este último sobra el del mes de antes si es
   principio de mes y el de después si es final (así se equivocó la importación); a
   mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
   nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como

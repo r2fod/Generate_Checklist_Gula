@@ -100,15 +100,21 @@ export function sugerenciasDeLimpieza(apuntes) {
   // dura varios días (hasta). Un apunte que ya sale en otro grupo puede salir aquí
   // también —el 9 repetido Y además el 10—, pero emparejado con el que se queda, no con
   // el que ya va marcado para borrar.
+  //
+  // Y tampoco lo que es de varios días apuntado día a día: con los datos de verdad salían
+  // un evento de empresa de cuatro días seguidos (tres parejas) y otro de dos con su
+  // checklist cada día. Tres días o más seguidos son un evento largo, no un error de
+  // fecha; y dos con trabajo dentro (checklist o personal) los montó alguien a propósito.
   const sobran = new Set(grupos.flatMap(g => g.quitar));
   const enDia = new Set();
   const deUnDia = (a) => a.tipo !== "produccion" && !a.hasta && !sobran.has(a.id) && !enDia.has(a.id);
+  const diaMas = (iso, n) => { const f = aFecha(iso); return aISO(new Date(f.getFullYear(), f.getMonth(), f.getDate() + n)); };
+  const hayIgual = (a, iso) => eventos.some(x => x.id !== a.id && x.fecha === iso && mismoEvento(a, x));
   for (const a of eventos) {
     if (!deUnDia(a)) continue;
-    const f = aFecha(a.fecha);
-    const iso = aISO(new Date(f.getFullYear(), f.getMonth(), f.getDate() + 1));
-    const b = eventos.find(x => deUnDia(x) && x.fecha === iso && mismoEvento(a, x));
+    const b = eventos.find(x => deUnDia(x) && x.fecha === diaMas(a.fecha, 1) && mismoEvento(a, x));
     if (!b) continue;
+    if ((conTrabajo(a) && conTrabajo(b)) || hayIgual(a, diaMas(a.fecha, -1)) || hayIgual(b, diaMas(b.fecha, 1))) continue;
     grupos.push({ clase: "dia", apuntes: [a, b], queda: null, quitar: [] });
     enDia.add(a.id); enDia.add(b.id);
   }

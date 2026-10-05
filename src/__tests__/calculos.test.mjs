@@ -1221,6 +1221,16 @@ console.log("\n══ Limpiar el calendario: qué sobra tras las importaciones �
     "y al día siguiente otra vez: sale la pareja, con el que se queda del 9, sin marcar ninguno (el día bueno lo sabe quien mira)");
   ok(!g2.some(g => g.apuntes.some(a => a.tipo === "produccion")), "un rodaje de dos días seguidos no es un repetido");
   ok(!g2.some(g => g.apuntes.some(a => a.titulo === "Boda")), "«Boda» a secas no casa con todas las bodas del día");
+
+  // Con los datos de verdad salían como "días seguidos" un evento de empresa de cuatro
+  // días apuntado día a día, y otro de dos con su checklist cada día: no son errores.
+  const largos = saneaLista([
+    ...["2027-09-28", "2027-09-29", "2027-09-30", "2027-10-01"].map(fecha => ({ fecha, titulo: "CONGRESO ZETA", tipo: "corporativo" })),
+    { fecha: "2027-11-05", titulo: "Evento Perengano", tipo: "corporativo", evento: "Evento Perengano" },
+    { fecha: "2027-11-06", titulo: "EVENTO PERENGANO", tipo: "corporativo", evento: "EVENTO PERENGANO" },
+  ]);
+  ok(!sugerenciasDeLimpieza(largos).some(g => g.clase === "dia"),
+    "tres días o más seguidos son un evento largo, y dos con su checklist cada uno se montaron a propósito: ninguno sale como «días seguidos»");
 }
 
 console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");
