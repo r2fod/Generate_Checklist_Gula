@@ -104,6 +104,12 @@ function pedirElEnlace() {
 aplicarTemaInicial()
 
 const elCodigo = codigo()
+// Y el icono que se instale, con el código dentro: el manifiesto se pide con él y el
+// service worker lo pone en start_url (ver manifiestoConCodigo en public/sw.js). Así la
+// app instalada no depende de lo que recuerde el navegador, que en Android no siempre es
+// el mismo almacén que el de la app (el enlace se abre desde WhatsApp).
+const manifiesto = document.querySelector('link[rel="manifest"]')
+if (manifiesto && elCodigo) manifiesto.href = `./manifest.webmanifest?enviar=${encodeURIComponent(elCodigo)}`
 if (!elCodigo) {
   pedirElEnlace()
 } else {

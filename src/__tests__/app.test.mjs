@@ -2315,6 +2315,38 @@ async function main() {
     await c.close();
   }
 
+  // ── El icono instalado del formulario lleva el código ───────────────────────
+  // "Es súper molesto tener que ponerlo cada vez" (el dueño, con "Falta el enlace" en la
+  // app instalada). En Android el icono abre el start_url del manifiesto, que iba sin
+  // código, y la app dependía de lo que recordara el navegador. Ahora el formulario pide
+  // el manifiesto con el código y el service worker lo pone en start_url: se mira lo que
+  // el NAVEGADOR entiende como manifiesto (CDP), que es lo que se instala.
+  console.log("\n── El icono instalado del formulario lleva el código ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "load" });
+    await p.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+    const cdp = await c.newCDPSession(p);
+    const manifiesto = async () => JSON.parse((await cdp.send("Page.getAppManifest")).data || "{}");
+    const m = await manifiesto();
+    ok(m.start_url === "./index.html?enviar=PRUEBA1",
+      `lo que se instalaría abre el formulario CON su código → ${m.start_url}`);
+    ok(m.id === "./index.html", "y con la identidad de siempre: el móvil actualiza la app instalada, no la toma por otra");
+    // Abierto sin código (el icono instalado antes de esto): lo recuerda, y desde ahí el
+    // manifiesto ya lo lleva, que es lo que actualiza el icono viejo
+    await p.goto(BASE_FORM, { waitUntil: "load" });
+    await p.waitForTimeout(500);
+    ok((await manifiesto()).start_url === "./index.html?enviar=PRUEBA1",
+      "abierto sin código en la dirección, el manifiesto sigue llevando el que recuerda");
+    const raro = await p.evaluate(async () => (await fetch("./manifest.webmanifest?enviar=" + encodeURIComponent('<x>"y'))).json());
+    ok(raro.start_url === "./index.html", "un código con pinta rara no entra en el manifiesto: se sirve el de siempre");
+    const ck = await p.evaluate(async () => (await fetch("../checklist/manifest.webmanifest?enviar=PRUEBA1")).json());
+    ok(ck.start_url === "./index.html", "y el de la checklist no se toca aunque le pongan un código");
+    await c.close();
+  }
+
   // ── Dos apps separadas ──────────────────────────────────────────────────────
   // La checklist y el formulario tienen que poder instalarse por separado. Antes
   // compartían dirección y, con ella, el ámbito del manifiesto: para el navegador dos
