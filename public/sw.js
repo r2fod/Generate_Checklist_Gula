@@ -123,6 +123,28 @@ self.addEventListener("activate", (e) => {
   );
 });
 
+// El manifiesto del formulario CON el código dentro. El icono que se instala en Android
+// abre el start_url del manifiesto, y el de siempre va pelado ("./index.html"): la app
+// instalada dependía de lo que guardara el navegador, y en cuanto ese almacén no era el
+// suyo —el enlace abierto desde WhatsApp en otro navegador, un móvil que limpia
+// datos— salía "Falta el enlace" cada vez ("es súper molesto tener que ponerlo cada
+// vez", el dueño). El formulario pide "manifest.webmanifest?enviar=<código>" (ver
+// formulario/main.jsx) y aquí se devuelve el de siempre con el código en start_url: lo
+// que se instala lo lleva dentro. El id no cambia ("./index.html", el que ya tenía por
+// defecto): con otro, el móvil lo tomaría por otra app y no actualizaría la instalada.
+// Solo entra un código con pinta de código; cualquier otra cosa recibe el de siempre.
+const CODIGO_VALIDO = /^[\w-]{3,60}$/;
+async function manifiestoConCodigo(url) {
+  const base = new URL(url.pathname, url.origin).href;
+  const res = (await caches.match(base)) || (await fetch(base));
+  const codigo = url.searchParams.get("enviar") || "";
+  if (!res || !res.ok || !CODIGO_VALIDO.test(codigo)) return res;
+  const m = await res.clone().json();
+  m.id = m.id || "./index.html";
+  m.start_url = `./index.html?enviar=${encodeURIComponent(codigo)}`;
+  return new Response(JSON.stringify(m), { headers: { "Content-Type": "application/manifest+json" } });
+}
+
 const guardar = async (req, res) => {
   if (res && res.ok && res.type === "basic") {
     const c = await caches.open(CACHE);
@@ -136,6 +158,11 @@ self.addEventListener("fetch", (e) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // Firebase y compañía: sin tocar
+
+  if (url.pathname.endsWith("/formulario/manifest.webmanifest") && url.searchParams.has("enviar")) {
+    e.respondWith(manifiestoConCodigo(url));
+    return;
+  }
 
   // El fichero de versión, siempre de la red
   if (url.pathname.endsWith("/version.json")) {

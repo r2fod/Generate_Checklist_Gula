@@ -29,6 +29,13 @@ export default function Dialogo({ config, onCerrar }) {
         )}
         <div className="dialogo-acciones">
           <button className="btn btn-ghost" onClick={onCerrar}>Cancelar</button>
+          {/* Una tercera salida, cuando hay dos maneras de seguir (aplicar a un evento que
+              ya existe o crear uno nuevo) además de no hacer nada */}
+          {config.alternativa && (
+            <button className="btn btn-outline" onClick={() => { onCerrar(); config.alternativa.onClick(); }}>
+              {config.alternativa.texto}
+            </button>
+          )}
           <button
             className={`btn ${config.peligro ? "btn-peligro" : "btn-green"}`}
             onClick={confirmar}

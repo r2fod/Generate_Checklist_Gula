@@ -23,7 +23,8 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
-import { sugerenciasDeLimpieza, nucleoDeTitulo } from "../calendario/limpieza.js";
+import { sugerenciasDeLimpieza } from "../calendario/limpieza.js";
+import { nucleoDeTitulo } from "../texto.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";
@@ -1197,6 +1198,39 @@ console.log("\n══ Limpiar el calendario: qué sobra tras las importaciones �
   ok(sugerenciasDeLimpieza(saneaLista([{ fecha: "2026-01-31", titulo: "Boda Q", tipo: "boda" }, { fecha: "2026-02-28", titulo: "Boda Q", tipo: "boda" }])).length === 0,
     "el 31 de enero no tiene «mismo día» en febrero: no se inventa pareja");
   ok(sugerenciasDeLimpieza([]).length === 0 && sugerenciasDeLimpieza(null).length === 0, "sin apuntes, nada que limpiar");
+
+  // "Mira por si en calendario también están repetidos" (el dueño): el título de la hoja
+  // y el escrito a mano no eran iguales letra a letra, y el mismo evento estaba también
+  // al día siguiente. Mismo criterio que el archivo de checklists (repetidos.js).
+  const hoja = saneaLista([
+    { fecha: "2027-10-09", titulo: "BODA FULANITA Y MENGANO EN LA FINCA?", tipo: "boda" },
+    { fecha: "2027-10-09", titulo: "Boda Fulanita y Mengano", tipo: "boda", hora: "13:00" },
+    { fecha: "2027-10-10", titulo: "Boda Fulanita y Mengano", tipo: "boda" },
+    { fecha: "2027-10-08", titulo: "Produ Zeta", tipo: "produccion" },
+    { fecha: "2027-10-09", titulo: "Produ Zeta", tipo: "produccion" },
+    { fecha: "2027-10-20", titulo: "Boda", tipo: "boda" },
+    { fecha: "2027-10-20", titulo: "Boda Zutana", tipo: "boda" },
+  ]);
+  const g2 = sugerenciasDeLimpieza(hoja);
+  const repHoja = g2.find(g => g.clase === "repetido" && g.apuntes.some(a => a.fecha === "2027-10-09"));
+  ok(repHoja && repHoja.quitar.join() === "2027-10-09_boda-fulanita-y-mengano-en-la-finca",
+    "el título de la hoja y el escrito a mano, el mismo día, son repetidos: sobra el que trae menos datos");
+  const seguidos = g2.find(g => g.clase === "dia");
+  ok(seguidos && seguidos.quitar.length === 0 && seguidos.apuntes.map(a => a.fecha).join() === "2027-10-09,2027-10-10"
+    && seguidos.apuntes[0].hora === "13:00",
+    "y al día siguiente otra vez: sale la pareja, con el que se queda del 9, sin marcar ninguno (el día bueno lo sabe quien mira)");
+  ok(!g2.some(g => g.apuntes.some(a => a.tipo === "produccion")), "un rodaje de dos días seguidos no es un repetido");
+  ok(!g2.some(g => g.apuntes.some(a => a.titulo === "Boda")), "«Boda» a secas no casa con todas las bodas del día");
+
+  // Con los datos de verdad salían como "días seguidos" un evento de empresa de cuatro
+  // días apuntado día a día, y otro de dos con su checklist cada día: no son errores.
+  const largos = saneaLista([
+    ...["2027-09-28", "2027-09-29", "2027-09-30", "2027-10-01"].map(fecha => ({ fecha, titulo: "CONGRESO ZETA", tipo: "corporativo" })),
+    { fecha: "2027-11-05", titulo: "Evento Perengano", tipo: "corporativo", evento: "Evento Perengano" },
+    { fecha: "2027-11-06", titulo: "EVENTO PERENGANO", tipo: "corporativo", evento: "EVENTO PERENGANO" },
+  ]);
+  ok(!sugerenciasDeLimpieza(largos).some(g => g.clase === "dia"),
+    "tres días o más seguidos son un evento largo, y dos con su checklist cada uno se montaron a propósito: ninguno sale como «días seguidos»");
 }
 
 console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");

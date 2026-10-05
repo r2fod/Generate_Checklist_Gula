@@ -761,6 +761,49 @@ console.log("\n══ Una checklist en blanco cuyo apunte se ha borrado no sale 
     "sinApunteEnElCalendario: sí con calendario, nunca sin él");
 }
 
+// "Veo duplicados eventos, revisa bien qué pasa" (el dueño). El calendario crea la
+// checklist en blanco con el título de la hoja; la oficina no la reconoce, manda "Es un
+// evento nuevo" con el nombre escrito a su manera, y al aplicarlo salía otro evento.
+console.log("\n══ Eventos repetidos en el archivo ══");
+{
+  const { mismoTitulo, parecenElMismo, repetidosDe, eventoParecido, blancaConGemela } = await import("../repetidos.js");
+  const { resumirParaOficina } = await import("../formulario/envios.js");
+  const HOJA = "BODA FULANITA Y MENGANO EN LA FINCA?";
+  const archivo = {
+    [HOJA]: { evento: "boda", fechaEvento: "2027-10-09", sinConfigurar: true },
+    "Boda Fulanita Y Mengano": { evento: "boda", fechaEvento: "2027-10-09", sinConfigurar: false, ubicacion: "Finca" },
+    "Boda Fulanita y Mengano": { evento: "boda", fechaEvento: "2027-10-10", sinConfigurar: false, ubicacion: "Finca" },
+    "Boda Zutana": { evento: "boda", fechaEvento: "2027-10-10" },
+    "Boda Zutana y Perengano": { evento: "boda", fechaEvento: "2027-12-10" },
+    "Produ Fulanita y Mengano": { evento: "produccion", fechaEvento: "2027-10-09" },
+  };
+  ok(mismoTitulo("Boda Fulanita y Mengano", HOJA) && mismoTitulo("Boda Fulanita Y Mengano", "boda fulanita y mengano"),
+    "el mismo título sin mayúsculas, o uno dentro del otro por palabras enteras");
+  ok(!mismoTitulo("Boda", "Boda Zutana") && !mismoTitulo("Boda Fulana", "Boda Fulanita y Mengano"),
+    "pero «Boda» a secas no casa con todas las bodas, ni una palabra a medias");
+  ok(!parecenElMismo("Boda Zutana", archivo["Boda Zutana"], "Boda Zutana y Perengano", archivo["Boda Zutana y Perengano"]),
+    "con dos meses de diferencia no es el mismo evento");
+  ok(!parecenElMismo("Boda Fulanita Y Mengano", archivo["Boda Fulanita Y Mengano"], "Produ Fulanita y Mengano", archivo["Produ Fulanita y Mengano"]),
+    "ni con otro tipo de evento");
+  const rep = repetidosDe(archivo);
+  ok(rep.get(HOJA)?.length === 2 && rep.get("Boda Fulanita y Mengano")?.length === 2 && !rep.has("Boda Zutana"),
+    `los tres de Fulanita y Mengano se marcan como repetidos entre sí, y nada más → ${JSON.stringify([...rep.keys()])}`);
+  ok(eventoParecido(archivo, "boda fulanita y mengano", { evento: "boda", fechaEvento: "2027-10-09" }) === "Boda Fulanita Y Mengano",
+    "un envío «nuevo» se ofrece al que ya hay ese día, y antes al que tiene datos que al de en blanco");
+  ok(eventoParecido({ [HOJA]: archivo[HOJA] }, "Boda Fulanita y Mengano", { evento: "boda", fechaEvento: "2027-10-10" }) === HOJA,
+    "con un día de diferencia también se ofrece (la hoja y la oficina no siempre ponen el mismo día)");
+  ok(eventoParecido(archivo, "Boda Perengano", { evento: "boda", fechaEvento: "2027-10-09" }) === null,
+    "y si no se parece a ninguno, se crea como siempre");
+  ok(blancaConGemela(HOJA, archivo[HOJA], archivo) && !blancaConGemela("Boda Fulanita y Mengano", archivo["Boda Fulanita y Mengano"], archivo),
+    "la checklist en blanco con gemela con datos el mismo día sobra; una con datos nunca");
+  const paraOficina = resumirParaOficina(archivo, "2027-01-01").map(e => e.nombre);
+  ok(!paraOficina.includes(HOJA) && paraOficina.includes("Boda Fulanita Y Mengano") && paraOficina.includes("Boda Fulanita y Mengano"),
+    `la oficina ya no ve la de en blanco; las dos con datos (días distintos) siguen, que la fecha buena la decide alguien → ${JSON.stringify(paraOficina)}`);
+  const soloBlanca = { [HOJA]: archivo[HOJA], "Boda Fulanita y Mengano": archivo["Boda Fulanita y Mengano"] };
+  ok(resumirParaOficina(soloBlanca, "2027-01-01").some(e => e.nombre === HOJA),
+    "con la gemela a un día de diferencia, la de en blanco no se esconde: no se sabe cuál es el día bueno");
+}
+
 // ── Un evento "ya configurado" se rellena solo si vino de un envío anterior ───────
 // El dueño avisó de un conflicto: la lista decía "Ya configurado" pero al entrar
 // preguntaba todo de cero — la etiqueta hablaba de la CHECKLIST, no del formulario.

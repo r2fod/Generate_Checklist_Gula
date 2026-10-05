@@ -19,9 +19,13 @@ const MOTIVO = {
   repetido: "El mismo evento dos veces el mismo día",
   posible: "Era «posible» y ya está confirmado ese día",
   mes: "El mismo evento con un mes justo de diferencia",
+  dia: "El mismo evento en días seguidos",
 };
-// Solo el del mes necesita explicación: los otros dos se ven a simple vista
-const AYUDA_MES = "La hoja de pared pinta al principio y al final de cada mes días del mes de al lado, y al traerla se leyeron con el mes equivocado. Mira cuál es el día de verdad.";
+// Solo el del mes y el de días seguidos necesitan explicación: los otros se ven a simple vista
+const AYUDA = {
+  mes: "La hoja de pared pinta al principio y al final de cada mes días del mes de al lado, y al traerla se leyeron con el mes equivocado. Mira cuál es el día de verdad.",
+  dia: "Uno de los dos tiene el día mal. Mira cuál es el bueno y marca el otro.",
+};
 
 const fechaConDia = (iso) => {
   const f = aFecha(iso);
@@ -91,7 +95,7 @@ export default function Limpiar({ apuntes, onCambiar }) {
                 {grupos.map(g => (
                   <li key={g.apuntes.map(a => a.id).join("|")} className="cal-limpiar-grupo">
                     <span className="cal-limpiar-motivo">{MOTIVO[g.clase]}</span>
-                    {g.clase === "mes" && <span className="cal-limpiar-ayuda">{AYUDA_MES}</span>}
+                    {AYUDA[g.clase] && <span className="cal-limpiar-ayuda">{AYUDA[g.clase]}</span>}
                     {g.apuntes.map(a => {
                       const datos = [
                         fechaConDia(a.fecha), a.hora, a.pax && `${a.pax} pax`, a.sitio,

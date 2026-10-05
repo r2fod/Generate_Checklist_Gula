@@ -252,8 +252,12 @@ operativo).
   la barra. Una prueba mide que ninguno pise título, barra ni columna.
 - **Limpiar el calendario** (`calendario/limpieza.js` la cuenta, `Limpiar.jsx` la
   pantalla, montado en los dos calendarios): repetidos el mismo día (mismo título sin
-  la gente: "Produ X" / "Produ X 73 PAX"), "Posible X" ya confirmado como "X" y el mismo
-  evento con un mes justo de diferencia. En este último sobra el del mes de antes si es
+  la gente: "Produ X" / "Produ X 73 PAX", o uno dentro del otro: "BODA X EN LA FINCA?"
+  / "Boda X" — `mismoTitulo` de repetidos.js, el mismo criterio que el archivo), "Posible
+  X" ya confirmado como "X", el mismo evento con un mes justo de diferencia y el mismo
+  evento en días seguidos (sin marcar ninguno; ni producciones, ni lo que tiene "hasta",
+  ni rachas de 3+ días —un evento largo apuntado día a día—, ni dos con checklist o
+  personal: los montó alguien a propósito). En este último sobra el del mes de antes si es
   principio de mes y el de después si es final (así se equivocó la importación); a
   mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
   nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
@@ -267,6 +271,31 @@ operativo).
   tocan. La app escucha el calendario en vivo (`suscribirCalendarioNube`) y republica;
   sin calendario leído no se quita nada. Ojo: el formulario solo se actualiza cuando la
   app de la checklist está abierta en algún sitio (es quien publica).
+- **Eventos repetidos en el archivo** (`repetidos.js`): salían así — el calendario crea
+  la checklist en blanco con el título de la hoja, la oficina no la reconoce, manda "Es
+  un evento nuevo" con el nombre a su manera y al aplicarlo se creaba otro. Mismo
+  evento = mismo tipo, ±1 día y mismo título (`nucleoDeTitulo`, en `texto.js`, el mismo
+  criterio que el limpiador del calendario; uno dentro del otro vale si el corto tiene
+  2+ palabras). Tres usos: al aplicar un envío nuevo se ofrece el parecido ("Aplicar a
+  ese" / "Crear uno nuevo", `alternativa` en `Dialogo.jsx`); la checklist en blanco con
+  gemela con datos EL MISMO DÍA no se publica al formulario (a ±1 día sí: no se sabe la
+  fecha buena); y en "Eventos guardados" sale "¿repetido?" para borrar a mano. Nada se
+  borra solo.
+- **El icono instalado del formulario lleva el código** ("Falta el enlace" cada vez en
+  Android): el icono abre el `start_url` del manifiesto, que iba sin código, y la app
+  dependía del almacén del navegador — que no es el suyo si el enlace se abre desde
+  WhatsApp en otro navegador o el móvil limpia datos. Ahora `formulario/main.jsx` pide
+  `manifest.webmanifest?enviar=<código>` y `public/sw.js` (`manifiestoConCodigo`) sirve
+  el de siempre con el código en `start_url` y el mismo `id` (`./index.html`, el que
+  tenía por defecto: con otro, el móvil no actualizaría la app instalada). La primera
+  visita aún no la controla el service worker: ahí se queda como antes. Una app ya
+  instalada se corrige sola la próxima vez que se abra con el código (Chrome revisa el
+  manifiesto al abrirla). Prueba: lo que el navegador entiende como manifiesto (CDP
+  `Page.getAppManifest`).
+- **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
+  las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
+  empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
+  acababa nunca: la batería se caía según el día.
 - **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
   `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
   en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista

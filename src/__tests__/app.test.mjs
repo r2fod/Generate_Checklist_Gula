@@ -2315,6 +2315,38 @@ async function main() {
     await c.close();
   }
 
+  // ── El icono instalado del formulario lleva el código ───────────────────────
+  // "Es súper molesto tener que ponerlo cada vez" (el dueño, con "Falta el enlace" en la
+  // app instalada). En Android el icono abre el start_url del manifiesto, que iba sin
+  // código, y la app dependía de lo que recordara el navegador. Ahora el formulario pide
+  // el manifiesto con el código y el service worker lo pone en start_url: se mira lo que
+  // el NAVEGADOR entiende como manifiesto (CDP), que es lo que se instala.
+  console.log("\n── El icono instalado del formulario lleva el código ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA1", { waitUntil: "load" });
+    await p.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15000 }).catch(() => {});
+    const cdp = await c.newCDPSession(p);
+    const manifiesto = async () => JSON.parse((await cdp.send("Page.getAppManifest")).data || "{}");
+    const m = await manifiesto();
+    ok(m.start_url === "./index.html?enviar=PRUEBA1",
+      `lo que se instalaría abre el formulario CON su código → ${m.start_url}`);
+    ok(m.id === "./index.html", "y con la identidad de siempre: el móvil actualiza la app instalada, no la toma por otra");
+    // Abierto sin código (el icono instalado antes de esto): lo recuerda, y desde ahí el
+    // manifiesto ya lo lleva, que es lo que actualiza el icono viejo
+    await p.goto(BASE_FORM, { waitUntil: "load" });
+    await p.waitForTimeout(500);
+    ok((await manifiesto()).start_url === "./index.html?enviar=PRUEBA1",
+      "abierto sin código en la dirección, el manifiesto sigue llevando el que recuerda");
+    const raro = await p.evaluate(async () => (await fetch("./manifest.webmanifest?enviar=" + encodeURIComponent('<x>"y'))).json());
+    ok(raro.start_url === "./index.html", "un código con pinta rara no entra en el manifiesto: se sirve el de siempre");
+    const ck = await p.evaluate(async () => (await fetch("../checklist/manifest.webmanifest?enviar=PRUEBA1")).json());
+    ok(ck.start_url === "./index.html", "y el de la checklist no se toca aunque le pongan un código");
+    await c.close();
+  }
+
   // ── Dos apps separadas ──────────────────────────────────────────────────────
   // La checklist y el formulario tienen que poder instalarse por separado. Antes
   // compartían dirección y, con ella, el ámbito del manifiesto: para el navegador dos
@@ -4624,7 +4656,10 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`calendario ${w}px: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      // Se espera a la rejilla, no a la primera casilla: en el mes de hoy las semanas
+      // pasadas van plegadas, y cuando la primera ya ha pasado (un 5 de octubre, con el
+      // mes empezando en jueves) su casilla no se ve y la espera no acababa nunca.
+      await p.waitForSelector(".cal-mes");
 
       ok(!await seMueveDeLado(p), `${w}px · el mes no mueve la página de lado`);
 
@@ -4847,7 +4882,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`vista equipo: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       await p.locator(".segment-btn", { hasText: "Equipo" }).click();
       await p.waitForSelector(".cal-jornada");
 
@@ -4933,7 +4968,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`nombre asignado desktop: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       await p.locator(".segment-btn", { hasText: "Equipo" }).click();
       await p.waitForSelector(".cal-jornada");
       await p.locator(".cal-asignados-cab").first().click();
@@ -4962,7 +4997,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`personal evento pasado: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
 
       const hoy = new Date();
       const pasada = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 40);
@@ -5349,7 +5384,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`sin creadas: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       ok(await p.locator(".cal-creadas").count() === 0,
         "abriendo el calendario sin nada que crear no sale ningún aviso");
       await c.close();
@@ -5428,23 +5463,27 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`limpiar ${w}px: ${e}`));
       await p.goto(BANCO + "?sucio=1", { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       const cab = p.locator(".cal-limpiar .cal-ratios-cab");
       const cuantos = async () => p.evaluate(() => document.querySelectorAll(".cal-celda .cal-punto, .cal-celda .cal-chip").length);
-      ok(/3 por revisar/.test(await cab.innerText()), `${w}px · la barra dice cuántas cosas hay que revisar sin abrirla`);
+      ok(/4 por revisar/.test(await cab.innerText()), `${w}px · la barra dice cuántas cosas hay que revisar sin abrirla`);
       await cab.click(); await p.waitForTimeout(300);
-      ok(await p.locator(".cal-limpiar input:checked").count() === 3 && await p.locator(".cal-limpiar-grupo").count() === 3,
-        `${w}px · tres grupos, y en cada uno va marcado el que sobra`);
+      // Cuatro grupos; en tres va marcado el que sobra. El cuarto (la misma boda al día
+      // siguiente) sale sin marcar: el día bueno lo tiene que decir alguien
+      ok(await p.locator(".cal-limpiar input:checked").count() === 3 && await p.locator(".cal-limpiar-grupo").count() === 4,
+        `${w}px · cuatro grupos, y en los que se sabe va marcado el que sobra`);
+      ok(/días seguidos/.test(await p.locator(".cal-limpiar-grupo").filter({ hasText: "EN LA FINCA" }).innerText()),
+        `${w}px · la misma boda al día siguiente sale como «días seguidos», con su explicación`);
       ok(!await seMueveDeLado(p), `${w}px · la lista de lo que sobra no mueve la página de lado`);
       const antes = await cuantos();
       await p.locator(".cal-limpiar-borrar").click(); await p.waitForTimeout(200);
       ok(await cuantos() === antes && /¿Borrar 3 apuntes\?/.test(await p.locator(".cal-limpiar-acciones").innerText()),
         `${w}px · el primer toque solo pregunta: todavía no se ha borrado nada`);
       await p.locator(".cal-limpiar-borrar", { hasText: "Sí, borrar" }).click(); await p.waitForTimeout(300);
-      ok(/todo en orden/.test(await cab.innerText()) && /Borrados 3 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText()),
-        `${w}px · al confirmar se borran y la barra queda en orden`);
+      ok(/1 por revisar/.test(await cab.innerText()) && /Borrados 3 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText()),
+        `${w}px · al confirmar se borran, y queda solo lo que hay que decidir a mano`);
       await p.locator(".cal-limpiar-hecho button", { hasText: "Deshacer" }).click(); await p.waitForTimeout(300);
-      ok(/3 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
+      ok(/4 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
       await c.close();
     }
 
@@ -5456,7 +5495,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`solo ver ${w}px: ${e}`));
       await p.goto(BANCO + "?solover=1", { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
 
       ok(await p.locator(".cal-aviso-lectura").isVisible(),
         `${w}px · se dice desde arriba que es solo lectura, para que no parezca roto`);
