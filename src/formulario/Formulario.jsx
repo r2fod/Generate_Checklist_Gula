@@ -5,7 +5,7 @@
 //
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
-import { useState, useEffect, useMemo, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
@@ -68,6 +68,34 @@ function LogoGula({ grande = false, pequeno = false }) {
         aria-label="Gula"
         style={{ WebkitMaskImage: `url(${logoGula})`, maskImage: `url(${logoGula})` }}
       />
+    </div>
+  );
+}
+
+// Una lista con scroll propio que dice por qué lado quedan cosas: pone hay-mas-arriba /
+// hay-mas-abajo según dónde esté, y el CSS desvanece ese borde. Sin la pista, si el
+// corte caía justo entre dos tarjetas, la lista parecía terminada y no lo estaba.
+function ListaQueDesliza({ className, children }) {
+  const ref = useRef(null);
+  const [bordes, setBordes] = useState({ arriba: false, abajo: false });
+  const mirar = useCallback(() => {
+    const l = ref.current;
+    if (!l) return;
+    const arriba = l.scrollTop > 1, abajo = l.scrollTop + l.clientHeight < l.scrollHeight - 1;
+    setBordes(b => (b.arriba === arriba && b.abajo === abajo ? b : { arriba, abajo }));
+  }, []);
+  // Tras cada pintada (han llegado eventos, se ha buscado) y cada vez que cambia de alto
+  useEffect(() => { mirar(); });
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(mirar);
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, [mirar]);
+  return (
+    <div ref={ref} onScroll={mirar}
+      className={`${className}${bordes.arriba ? " hay-mas-arriba" : ""}${bordes.abajo ? " hay-mas-abajo" : ""}`}>
+      {children}
     </div>
   );
 }
@@ -496,7 +524,7 @@ export default function Formulario({ codigo }) {
     const primerConfiguradoIdx = lista.findIndex(e => e.configurado);
     const IconoElegir = iconoDePregunta("elegir");
     return (
-      <div className="form-pantalla">
+      <div className="form-pantalla es-elegir">
         <FondoIconos pregunta="elegir" />
         <LogoGula grande />
         <h1 className="form-titulo">
@@ -514,7 +542,7 @@ export default function Formulario({ codigo }) {
         {proximos !== null && proximos.length === 0 && (
           <p className="form-nota">No hay eventos próximos guardados. Sigue y lo creamos nuevo.</p>
         )}
-        <div className="form-lista-eventos">
+        <ListaQueDesliza className="form-lista-eventos">
           {lista.map((e, i) => {
             // El mismo icono que ya distingue el tipo en la pregunta "tipo": boda,
             // comunión, empresa... así se reconoce de un vistazo sin leer el nombre.
@@ -576,7 +604,7 @@ export default function Formulario({ codigo }) {
               </Fragment>
             );
           })}
-        </div>
+        </ListaQueDesliza>
         {(proximos || []).length > 4 && (
           <input
             className="form-input"

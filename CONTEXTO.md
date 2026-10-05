@@ -296,6 +296,14 @@ operativo).
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
   acababa nunca: la batería se caía según el día.
+- **"¿De qué evento son los datos?" cabe sin scroll** (lo pidió el dueño): la pantalla
+  (`.form-pantalla.es-elegir`) mide `100dvh` y solo encoge la lista
+  (`.form-lista-eventos`, con su propio scroll); logo, título, buscador y "Es un evento
+  nuevo" se quedan a la vista. Lo que sigue por debajo/encima se difumina con
+  `mask-image` (`hay-mas-abajo`/`hay-mas-arriba`, los pone `ListaQueDesliza` en
+  `Formulario.jsx`): una sombra pintada con el color del fondo se veía como una franja,
+  porque el fondo del formulario lleva degradados. Prueba: tarjetas de mentira metidas en
+  la lista (la batería no tiene nube), la página no se desliza y el botón se ve.
 - **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
   `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
   en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista
