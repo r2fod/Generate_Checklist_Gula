@@ -111,6 +111,7 @@ import { marcarActualizando, confirmaSiActualizado } from "./asistente/actualiza
 // checklist y qué campos suyos valen para arrancarla. Se importa suelto —no desde
 // EnChecklist— para que no arrastre el calendario entero al bundle de la checklist.
 import { checklistsPorCrear, saneaLista, saneaEquipo, mismaLista } from "./calendario/apuntes.js";
+import { eventoParecido, repetidosDe } from "./repetidos.js";
 
 // Qué evento pide abrir la dirección, si es que pide alguno. Es como el calendario (que
 // es otra app, en otra carpeta) manda a la checklist a un evento concreto: sin esto, su
@@ -1974,10 +1975,81 @@ export default function App({ onCerrarSesion } = {}) {
   // detrás en un evento que no estás mirando: lo que llega de fuera se revisa.
   const handleAplicarEnvio = (envio) => {
     const cambios = aRespuestasDeLaApp(envio.respuestas || {});
-    const destino = envio.eventoDestino || cambios.nombreEvento || "";
+    const destinoPedido = envio.eventoDestino || cambios.nombreEvento || "";
     const guardados = eventosGuardadosRef.current || {};
-    const existe = !!(destino && guardados[destino]);
-    const nombre = destino || "Evento del formulario";
+    // Pone el envío en el evento `destino` (o lo crea, si no está en el archivo) y lo abre
+    const aplicar = async (destino) => {
+      const existe = !!(destino && guardados[destino]);
+      const nombre = destino || "Evento del formulario";
+      const base = existe ? guardados[destino] : {};
+      // Y aquí deja de estar "sin configurar": esto es exactamente lo que le faltaba.
+      // El aviso existe para que nadie cargue un camión con los valores de fábrica;
+      // una vez llegan los datos de la oficina, seguir avisando sería ruido.
+      // formularioRespuestas guarda lo último que contestó la oficina tal cual: es lo
+      // que el propio formulario recupera si vuelven a elegir este evento (ver
+      // resumirParaOficina), para no preguntarlo todo de cero un evento que "ya
+      // configurado" decía tener resuelto.
+      const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false, formularioRespuestas: envio.respuestas || {} };
+      // Las notas se SUMAN, no se sustituyen (ver notasFusionadas en preguntas.js,
+      // que explica por qué se compara línea a línea y no el bloque entero).
+      estado.notasEvento = notasFusionadas(base.notasEvento, cambios.notasEvento);
+      // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
+      // si no, la app cargaría el material y nadie iría a buscarlo.
+      estado.recogidas = recogidasConAlquileres(estado);
+      // Y las flores y las minutas, que no son material nuestro sino un sitio y un
+      // día al que hay que ir. Se suman sin duplicar: si ya estaba escrita a mano,
+      // manda la que ya había (puede tener la fecha ajustada o estar marcada).
+      recogidasDelEnvio(envio.respuestas || {}).forEach(r => {
+        if (estado.recogidas.some(x => (x.concepto || "").trim().toLowerCase() === r.concepto.toLowerCase())) return;
+        estado.recogidas = [...estado.recogidas, r];
+      });
+      // Y lo que hay que comprar, a Compras: también se suma sin duplicar, que lo
+      // que ya estuviera apuntado puede estar marcado como comprado.
+      const comprasAntes = Array.isArray(estado.compras) ? estado.compras : [];
+      estado.compras = comprasAntes.slice();
+      comprasDelEnvio(envio.respuestas || {}).forEach(c => {
+        if (estado.compras.some(x => (x.concepto || "").trim().toLowerCase() === c.concepto.toLowerCase())) return;
+        estado.compras = [...estado.compras, c];
+      });
+      // Las hojas de alquiler (Dealde, Event Style...) se ACUMULAN, no se sustituyen:
+      // el spread de arriba ya puso las del envío nuevo, aquí se le suman las que ya
+      // hubiera guardadas. Se limita a las últimas TOPE_ARCHIVOS_ALQUILER para no
+      // acercarse al límite de 1 MiB por documento de Firestore.
+      const TOPE_ARCHIVOS_ALQUILER = 8;
+      const archivosAntes = Array.isArray(base.archivosAlquiler) ? base.archivosAlquiler : [];
+      const archivosNuevos = Array.isArray(cambios.archivosAlquiler) ? cambios.archivosAlquiler : [];
+      const yaEstaba = a => archivosAntes.some(x => x.origen === a.origen && x.nombre === a.nombre && x.peso === a.peso);
+      estado.archivosAlquiler = [...archivosAntes, ...archivosNuevos.filter(a => !yaEstaba(a))].slice(-TOPE_ARCHIVOS_ALQUILER);
+      const siguiente = { ...guardados, [nombre]: estado };
+      guardarEventos(siguiente);
+      // No se borra: queda guardado como revisado, con a qué evento fue a parar
+      try { await marcarRevisado(envio.id, { aplicado: true, eventoDestino: nombre }); }
+      catch (e) { /* si falla, seguirá en la bandeja y se vuelve a intentar */ }
+      guardarJSON("gula_checklist_estado", estado);
+      marcarEventoActivo(nombre);
+      window.location.href = window.location.origin + window.location.pathname;
+    };
+    const existe = !!(destinoPedido && guardados[destinoPedido]);
+    const nombre = destinoPedido || "Evento del formulario";
+    // Llega como evento NUEVO, pero en el archivo ya hay uno que parece el mismo: la
+    // checklist que el calendario creó en blanco con el título de la hoja, que la
+    // oficina no reconoció. Crearlo otra vez es como salían los repetidos (ver
+    // repetidos.js); se ofrece ese primero y crear uno nuevo queda como alternativa.
+    const parecido = !existe && !envio.eventoDestino ? eventoParecido(guardados, nombre, cambios) : null;
+    if (parecido) {
+      const fechaDe = (f) => (f ? new Date(f + "T00:00:00").toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" }) : "sin fecha");
+      const otroDia = guardados[parecido].fechaEvento !== cambios.fechaEvento;
+      return setDialogo({
+        tipo: "confirm",
+        titulo: `¿Es el evento "${parecido}"?`,
+        mensaje: `La oficina lo manda como evento nuevo ("${nombre}"), pero ya hay uno que parece el mismo${otroDia
+          ? ` con un día de diferencia (${fechaDe(guardados[parecido].fechaEvento)} en el archivo, ${fechaDe(cambios.fechaEvento)} en el formulario): se queda la del formulario, revisa cuál es la buena`
+          : " ese mismo día"}. Si es el mismo, los datos se ponen ahí y no sale repetido.`,
+        textoConfirmar: "Aplicar a ese",
+        alternativa: { texto: "Crear uno nuevo", onClick: () => aplicar(destinoPedido) },
+        onConfirm: () => aplicar(parecido),
+      });
+    }
     setDialogo({
       tipo: "confirm",
       titulo: existe ? `¿Aplicar al evento "${nombre}"?` : `¿Crear el evento "${nombre}"?`,
@@ -1985,55 +2057,7 @@ export default function App({ onCerrarSesion } = {}) {
         ? "Se abre el evento con los datos del formulario puestos encima de lo que ya tenía. Lo que la oficina no contestó se queda como está."
         : "Se crea el evento con lo que ha contestado la oficina; el resto se queda con los valores de siempre para que lo revises.",
       textoConfirmar: existe ? "Aplicar y abrir" : "Crear y abrir",
-      onConfirm: async () => {
-        const base = existe ? guardados[destino] : {};
-        // Y aquí deja de estar "sin configurar": esto es exactamente lo que le faltaba.
-        // El aviso existe para que nadie cargue un camión con los valores de fábrica;
-        // una vez llegan los datos de la oficina, seguir avisando sería ruido.
-        // formularioRespuestas guarda lo último que contestó la oficina tal cual: es lo
-        // que el propio formulario recupera si vuelven a elegir este evento (ver
-        // resumirParaOficina), para no preguntarlo todo de cero un evento que "ya
-        // configurado" decía tener resuelto.
-        const estado = { ...base, ...cambios, nombreEvento: nombre, sinConfigurar: false, formularioRespuestas: envio.respuestas || {} };
-        // Las notas se SUMAN, no se sustituyen (ver notasFusionadas en preguntas.js,
-        // que explica por qué se compara línea a línea y no el bloque entero).
-        estado.notasEvento = notasFusionadas(base.notasEvento, cambios.notasEvento);
-        // Los alquileres que trae el envío tienen que traer su recogida y su devolución:
-        // si no, la app cargaría el material y nadie iría a buscarlo.
-        estado.recogidas = recogidasConAlquileres(estado);
-        // Y las flores y las minutas, que no son material nuestro sino un sitio y un
-        // día al que hay que ir. Se suman sin duplicar: si ya estaba escrita a mano,
-        // manda la que ya había (puede tener la fecha ajustada o estar marcada).
-        recogidasDelEnvio(envio.respuestas || {}).forEach(r => {
-          if (estado.recogidas.some(x => (x.concepto || "").trim().toLowerCase() === r.concepto.toLowerCase())) return;
-          estado.recogidas = [...estado.recogidas, r];
-        });
-        // Y lo que hay que comprar, a Compras: también se suma sin duplicar, que lo
-        // que ya estuviera apuntado puede estar marcado como comprado.
-        const comprasAntes = Array.isArray(estado.compras) ? estado.compras : [];
-        estado.compras = comprasAntes.slice();
-        comprasDelEnvio(envio.respuestas || {}).forEach(c => {
-          if (estado.compras.some(x => (x.concepto || "").trim().toLowerCase() === c.concepto.toLowerCase())) return;
-          estado.compras = [...estado.compras, c];
-        });
-        // Las hojas de alquiler (Dealde, Event Style...) se ACUMULAN, no se sustituyen:
-        // el spread de arriba ya puso las del envío nuevo, aquí se le suman las que ya
-        // hubiera guardadas. Se limita a las últimas TOPE_ARCHIVOS_ALQUILER para no
-        // acercarse al límite de 1 MiB por documento de Firestore.
-        const TOPE_ARCHIVOS_ALQUILER = 8;
-        const archivosAntes = Array.isArray(base.archivosAlquiler) ? base.archivosAlquiler : [];
-        const archivosNuevos = Array.isArray(cambios.archivosAlquiler) ? cambios.archivosAlquiler : [];
-        const yaEstaba = a => archivosAntes.some(x => x.origen === a.origen && x.nombre === a.nombre && x.peso === a.peso);
-        estado.archivosAlquiler = [...archivosAntes, ...archivosNuevos.filter(a => !yaEstaba(a))].slice(-TOPE_ARCHIVOS_ALQUILER);
-        const siguiente = { ...guardados, [nombre]: estado };
-        guardarEventos(siguiente);
-        // No se borra: queda guardado como revisado, con a qué evento fue a parar
-        try { await marcarRevisado(envio.id, { aplicado: true, eventoDestino: nombre }); }
-        catch (e) { /* si falla, seguirá en la bandeja y se vuelve a intentar */ }
-        guardarJSON("gula_checklist_estado", estado);
-        marcarEventoActivo(nombre);
-        window.location.href = window.location.origin + window.location.pathname;
-      },
+      onConfirm: () => aplicar(destinoPedido),
     });
   };
   const handleCargarEvento = (nombre) => {
@@ -2556,6 +2580,9 @@ export default function App({ onCerrarSesion } = {}) {
     },
   });
   // Fila de un evento guardado (se reutiliza en la lista de pendientes y en la de pasados)
+  // Los que parecen el mismo evento guardado dos veces (ver repetidos.js): se marcan para
+  // borrar el que sobre a mano. Una vez por cambio del archivo, no en cada pintada.
+  const repetidos = React.useMemo(() => repetidosDe(eventosGuardados), [eventosGuardados]);
   const filaEvento = (n) => (
     <div className="plantilla-row" key={n}>
       <button className="plantilla-nombre" onClick={() => handleCargarEvento(n)} title={`Abrir el evento "${n}"`}>
@@ -2572,6 +2599,9 @@ export default function App({ onCerrarSesion } = {}) {
           <span className="plantilla-sin-configurar es-sin-apunte" title="Su apunte ya no está en el calendario: no sale en el formulario. Bórrala si sobra.">sin apunte en el calendario</span>
         ) : eventosGuardados[n]?.sinConfigurar && (
           <span className="plantilla-sin-configurar" title="Creado desde el calendario: falta configurarlo">sin configurar</span>
+        )}
+        {repetidos.has(n) && (
+          <span className="plantilla-sin-configurar es-repetido" title={`Parece el mismo que: ${repetidos.get(n).join(", ")}. Si sobra, bórralo.`}>¿repetido?</span>
         )}
       </button>
       <button className="plantilla-link" onClick={() => handleDuplicarEvento(n)} title="Duplicar evento" aria-label={`Duplicar evento ${n}`}><Copy size={15} /></button>

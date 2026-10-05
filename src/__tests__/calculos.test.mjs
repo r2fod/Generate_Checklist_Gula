@@ -23,7 +23,8 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
-import { sugerenciasDeLimpieza, nucleoDeTitulo } from "../calendario/limpieza.js";
+import { sugerenciasDeLimpieza } from "../calendario/limpieza.js";
+import { nucleoDeTitulo } from "../texto.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
 import { MODOS, enlaceDeLaUrl, direccionDelCalendario, enlacesDeCalendario, enlaceCorto } from "../calendario/enlace.js";

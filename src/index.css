@@ -1070,8 +1070,8 @@ body {
   font-weight: 700;
   white-space: nowrap;
 }
-/* Sin su apunte: no es "falta hacer algo" (ámbar) sino "esto sobra", en gris */
-.plantilla-sin-configurar.es-sin-apunte { background: var(--bg-color); color: var(--text-muted); border: 1px solid var(--border-color); }
+/* Sin su apunte, o repetido: no es "falta hacer algo" (ámbar) sino "esto sobra", en gris */
+.plantilla-sin-configurar.es-sin-apunte, .plantilla-sin-configurar.es-repetido { background: var(--bg-color); color: var(--text-muted); border: 1px solid var(--border-color); }
 
 .aviso-nombre-ocupado {
   display: block;
@@ -1218,6 +1218,8 @@ body {
 .dialogo-acciones {
   display: flex;
   justify-content: flex-end;
+  /* Con tres botones (Cancelar, la alternativa y el principal) a 320px no caben en fila */
+  flex-wrap: wrap;
   gap: 10px;
   margin-top: 4px;
 }

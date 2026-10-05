@@ -267,6 +267,16 @@ operativo).
   tocan. La app escucha el calendario en vivo (`suscribirCalendarioNube`) y republica;
   sin calendario leído no se quita nada. Ojo: el formulario solo se actualiza cuando la
   app de la checklist está abierta en algún sitio (es quien publica).
+- **Eventos repetidos en el archivo** (`repetidos.js`): salían así — el calendario crea
+  la checklist en blanco con el título de la hoja, la oficina no la reconoce, manda "Es
+  un evento nuevo" con el nombre a su manera y al aplicarlo se creaba otro. Mismo
+  evento = mismo tipo, ±1 día y mismo título (`nucleoDeTitulo`, en `texto.js`, el mismo
+  criterio que el limpiador del calendario; uno dentro del otro vale si el corto tiene
+  2+ palabras). Tres usos: al aplicar un envío nuevo se ofrece el parecido ("Aplicar a
+  ese" / "Crear uno nuevo", `alternativa` en `Dialogo.jsx`); la checklist en blanco con
+  gemela con datos EL MISMO DÍA no se publica al formulario (a ±1 día sí: no se sabe la
+  fecha buena); y en "Eventos guardados" sale "¿repetido?" para borrar a mano. Nada se
+  borra solo.
 - **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
   `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
   en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista

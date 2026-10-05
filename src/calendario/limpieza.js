@@ -18,20 +18,8 @@
 //
 // Sin React ni navegador: entra la lista, salen los grupos. Se prueba con node.
 import { aFecha, esTipoEvento } from "./apuntes.js";
-import { sinTildes } from "../texto.js";
-
-const TENTATIVO = /^(posibles?|provisional(es)?|tentativos?|a confirmar|por confirmar|sin confirmar)\s+/;
-
-// Lo que importa de un título para saber si dos son el mismo evento: sin tildes, sin
-// mayúsculas, sin signos, sin el número de gente ("73 PAX") y sin el "posible" delante.
-export function nucleoDeTitulo(titulo) {
-  let t = sinTildes(titulo).replace(/[^a-z0-9ñ]+/g, " ")
-    .replace(/\b\d+\s*(pax|personas|invitados|comensales)\b/g, " ")
-    .replace(/\s+/g, " ").trim();
-  const tentativo = TENTATIVO.test(t);
-  if (tentativo) t = t.replace(TENTATIVO, "").trim();
-  return { nucleo: t, tentativo };
-}
+// Vive en texto.js: la usan también los repetidos del archivo de eventos (repetidos.js)
+import { nucleoDeTitulo } from "../texto.js";
 
 // Con checklist creada o con gente asignada: ahí hay trabajo que no se rehace solo
 const conTrabajo = (a) => !!(a.evento || (a.personal && a.personal.length));

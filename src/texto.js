@@ -33,6 +33,22 @@ export const limpiaTexto = (t, max = Infinity) =>
 export const claveDeTexto = (texto, max = 60) => sinTildes(limpiaTexto(texto))
   .replace(/[^a-z0-9ñ ]/g, "").replace(/\s+/g, "-").slice(0, max);
 
+// ─── ¿ES EL MISMO EVENTO? ─────────────────────────────────────────────────────
+// Lo que importa de un título para saber si dos son el mismo evento: sin tildes, sin
+// mayúsculas, sin signos, sin el número de gente ("73 PAX") y sin el "posible" delante.
+// Lo usan el limpiador del calendario (calendario/limpieza.js) y los repetidos del
+// archivo de eventos (repetidos.js): el mismo criterio en los dos sitios.
+const TENTATIVO = /^(posibles?|provisional(es)?|tentativos?|a confirmar|por confirmar|sin confirmar)\s+/;
+/** @param {unknown} titulo @returns {{ nucleo: string, tentativo: boolean }} */
+export function nucleoDeTitulo(titulo) {
+  let t = sinTildes(titulo).replace(/[^a-z0-9ñ]+/g, " ")
+    .replace(/\b\d+\s*(pax|personas|invitados|comensales)\b/g, " ")
+    .replace(/\s+/g, " ").trim();
+  const tentativo = TENTATIVO.test(t);
+  if (tentativo) t = t.replace(TENTATIVO, "").trim();
+  return { nucleo: t, tentativo };
+}
+
 // ─── NÚMERO A TEXTO, AL GUSTO DE LA CASA ──────────────────────────────────────
 // 0,85 y no 85% ni 0.85: es el mismo formato que ya se escribe en toda la app y el que
 // se teclea en un móvil español sin pelearse con el punto. Vivía copiado en

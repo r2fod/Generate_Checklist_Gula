@@ -13,6 +13,7 @@
 // src/firestore.js). Antes estaban aquí duplicados, con su propia promesa.
 import { getDb, nubeActiva, suscribir } from "../firestore.js";
 import { hoyISO } from "../fecha.js";
+import { blancaConGemela } from "../repetidos.js";
 
 export { nubeActiva };
 
@@ -95,6 +96,9 @@ export function sinApunteEnElCalendario(nombre, evento, apuntes) {
 export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO(), apuntes = null) {
   return Object.entries(eventosGuardados)
     .filter(([nombre, e]) => !sinApunteEnElCalendario(nombre, e, apuntes))
+    // Ni la checklist en blanco que ese mismo día ya tiene gemela con datos: la oficina
+    // la elegía y los datos iban a parar a la vacía (ver repetidos.js)
+    .filter(([nombre, e]) => !blancaConGemela(nombre, e, eventosGuardados))
     // El tipo va incluido para que, al elegir un evento que ya existe, el formulario
     // sepa qué preguntas tocan sin tener que preguntárselo otra vez a la oficina.
     // "configurado" viaja igual: si el evento lo creó el calendario en blanco
