@@ -5804,6 +5804,35 @@ hr {
   flex-direction: column;
   gap: 8px;
 }
+/* Elegir evento cabe en la pantalla, sin bajar ("que quepa sin scroll", el dueño): con
+   siete eventos y el logo grande sobraban 150px y, al bajar al botón, el logo salía
+   cortado. La pantalla mide lo que el móvil; si los eventos no caben, desliza la LISTA
+   por dentro (con su sombra de "hay más"), y el título arriba y "Es un evento nuevo"
+   abajo se quedan siempre a la vista. El logo, más pequeño: aquí lo que importa es la
+   lista. */
+.form-pantalla.es-elegir { height: 100vh; height: 100dvh; }
+.form-pantalla.es-elegir > *, .form-lista-eventos > * { flex-shrink: 0; }
+.form-pantalla.es-elegir > .form-lista-eventos {
+  flex-shrink: 1;
+  min-height: 9rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Aire para que el borde y la sombra de las tarjetas no se corten en el recorte */
+  margin: -4px -6px;
+  padding: 4px 6px;
+  /* La pista de "hay más": la lista se desvanece por el lado donde quedan eventos
+     (ListaQueDesliza pone las clases). Con máscara y no con un fondo encima, que aquí
+     el fondo no es liso y se veía la franja. */
+  -webkit-mask-image: var(--mascara-lista, none);
+  mask-image: var(--mascara-lista, none);
+}
+.form-lista-eventos.hay-mas-abajo { --mascara-lista: linear-gradient(to bottom, #000 calc(100% - 36px), transparent); }
+.form-lista-eventos.hay-mas-arriba { --mascara-lista: linear-gradient(to top, #000 calc(100% - 36px), transparent); }
+.form-lista-eventos.hay-mas-arriba.hay-mas-abajo {
+  --mascara-lista: linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+.form-pantalla.es-elegir > .form-lista-eventos:empty { display: none; }
+.form-pantalla.es-elegir .form-logo.es-grande .form-logo-color { height: 64px; }
 .form-evento {
   display: flex;
   flex-direction: column;

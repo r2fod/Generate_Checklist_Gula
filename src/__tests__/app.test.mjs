@@ -2053,6 +2053,32 @@ async function main() {
     ok(estirados.length === 0,
       `ningún botón se estira a lo alto${estirados.length ? ` → ${JSON.stringify(estirados)}` : ""}`);
 
+    // Con muchos eventos la pantalla de elegir cabe entera ("que quepa sin scroll", el
+    // dueño): se desliza solo la lista, y el buscador y "Es un evento nuevo" se quedan a
+    // la vista. Antes la página entera bajaba y el logo se iba por arriba. Aquí no hay
+    // nube, así que se meten a mano tarjetas de mentira en la lista.
+    await p.locator(".form-lista-eventos").evaluate(l => {
+      for (let i = 1; i <= 12; i++) {
+        const b = document.createElement("button");
+        b.className = "form-evento";
+        b.innerHTML = `<span class="form-evento-texto"><strong>Boda de prueba ${i}</strong><small>sáb, ${i} oct</small></span>`;
+        l.appendChild(b);
+      }
+    });
+    await p.waitForTimeout(500);
+    const cabe = await p.evaluate(() => {
+      const l = document.querySelector(".form-lista-eventos"), b = document.querySelector(".form-btn-principal");
+      return { pagina: document.documentElement.scrollHeight - innerHeight, lista: l.scrollHeight - l.clientHeight,
+        boton: b.getBoundingClientRect().bottom <= innerHeight, sombra: l.classList.contains("hay-mas-abajo") };
+    });
+    ok(cabe.pagina <= 0 && cabe.lista > 0 && cabe.boton && cabe.sombra,
+      `con muchos eventos la página no se desliza: la lista sí, por dentro y difuminada abajo, y el botón se ve → ${JSON.stringify(cabe)}`);
+    await p.locator(".form-lista-eventos").evaluate(l => { l.scrollTop = l.scrollHeight; });
+    await p.waitForTimeout(300);
+    ok(await p.locator(".form-lista-eventos").evaluate(l => l.classList.contains("hay-mas-arriba") && !l.classList.contains("hay-mas-abajo")),
+      "al final de la lista el difuminado pasa arriba");
+    await p.locator(".form-lista-eventos").evaluate(l => { l.querySelectorAll(".form-evento").forEach(b => b.remove()); });
+
     await p.locator(".form-btn-principal", { hasText: "Es un evento nuevo" }).click();
     await p.waitForTimeout(500);
 
