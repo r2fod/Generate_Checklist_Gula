@@ -1198,6 +1198,29 @@ console.log("\n══ Limpiar el calendario: qué sobra tras las importaciones �
   ok(sugerenciasDeLimpieza(saneaLista([{ fecha: "2026-01-31", titulo: "Boda Q", tipo: "boda" }, { fecha: "2026-02-28", titulo: "Boda Q", tipo: "boda" }])).length === 0,
     "el 31 de enero no tiene «mismo día» en febrero: no se inventa pareja");
   ok(sugerenciasDeLimpieza([]).length === 0 && sugerenciasDeLimpieza(null).length === 0, "sin apuntes, nada que limpiar");
+
+  // "Mira por si en calendario también están repetidos" (el dueño): el título de la hoja
+  // y el escrito a mano no eran iguales letra a letra, y el mismo evento estaba también
+  // al día siguiente. Mismo criterio que el archivo de checklists (repetidos.js).
+  const hoja = saneaLista([
+    { fecha: "2027-10-09", titulo: "BODA FULANITA Y MENGANO EN LA FINCA?", tipo: "boda" },
+    { fecha: "2027-10-09", titulo: "Boda Fulanita y Mengano", tipo: "boda", hora: "13:00" },
+    { fecha: "2027-10-10", titulo: "Boda Fulanita y Mengano", tipo: "boda" },
+    { fecha: "2027-10-08", titulo: "Produ Zeta", tipo: "produccion" },
+    { fecha: "2027-10-09", titulo: "Produ Zeta", tipo: "produccion" },
+    { fecha: "2027-10-20", titulo: "Boda", tipo: "boda" },
+    { fecha: "2027-10-20", titulo: "Boda Zutana", tipo: "boda" },
+  ]);
+  const g2 = sugerenciasDeLimpieza(hoja);
+  const repHoja = g2.find(g => g.clase === "repetido" && g.apuntes.some(a => a.fecha === "2027-10-09"));
+  ok(repHoja && repHoja.quitar.join() === "2027-10-09_boda-fulanita-y-mengano-en-la-finca",
+    "el título de la hoja y el escrito a mano, el mismo día, son repetidos: sobra el que trae menos datos");
+  const seguidos = g2.find(g => g.clase === "dia");
+  ok(seguidos && seguidos.quitar.length === 0 && seguidos.apuntes.map(a => a.fecha).join() === "2027-10-09,2027-10-10"
+    && seguidos.apuntes[0].hora === "13:00",
+    "y al día siguiente otra vez: sale la pareja, con el que se queda del 9, sin marcar ninguno (el día bueno lo sabe quien mira)");
+  ok(!g2.some(g => g.apuntes.some(a => a.tipo === "produccion")), "un rodaje de dos días seguidos no es un repetido");
+  ok(!g2.some(g => g.apuntes.some(a => a.titulo === "Boda")), "«Boda» a secas no casa con todas las bodas del día");
 }
 
 console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");

@@ -68,8 +68,8 @@ const DEMO = [
 ];
 
 // Con "?sucio=1" se añaden las sobras que deja una importación (ver limpieza.js): un
-// repetido con la gente en el título, un "Posible" ya confirmado y el mismo evento
-// leído también un mes antes. Van aparte para que el limpiador se pruebe sin tocar los
+// repetido con la gente en el título, un "Posible" ya confirmado, el mismo evento
+// leído también un mes antes y una boda apuntada también al día siguiente. Van aparte para que el limpiador se pruebe sin tocar los
 // datos con los que se prueba todo lo demás. El del mes, en fechas fijas: con "dentro
 // de N días" un 31 no tiene mes anterior y la pareja no saldría según el día.
 const SUCIOS = [
@@ -77,6 +77,7 @@ const SUCIOS = [
   { fecha: dia(16), titulo: "Posible Cumpleaños de prueba", tipo: "cumpleanos" },
   { fecha: "2030-04-02", titulo: "Boda cruzada de prueba", tipo: "boda" },
   { fecha: "2030-05-02", titulo: "Boda cruzada de prueba", tipo: "boda", hora: "13:00" },
+  { fecha: dia(3), titulo: "BODA DE PRUEBA UNO EN LA FINCA?", tipo: "boda" },
 ];
 
 // Nombres inventados, como los apuntes: esto se compila y se publica.

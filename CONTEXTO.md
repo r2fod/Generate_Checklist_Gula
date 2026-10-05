@@ -252,8 +252,10 @@ operativo).
   la barra. Una prueba mide que ninguno pise título, barra ni columna.
 - **Limpiar el calendario** (`calendario/limpieza.js` la cuenta, `Limpiar.jsx` la
   pantalla, montado en los dos calendarios): repetidos el mismo día (mismo título sin
-  la gente: "Produ X" / "Produ X 73 PAX"), "Posible X" ya confirmado como "X" y el mismo
-  evento con un mes justo de diferencia. En este último sobra el del mes de antes si es
+  la gente: "Produ X" / "Produ X 73 PAX", o uno dentro del otro: "BODA X EN LA FINCA?"
+  / "Boda X" — `mismoTitulo` de repetidos.js, el mismo criterio que el archivo), "Posible
+  X" ya confirmado como "X", el mismo evento con un mes justo de diferencia y el mismo
+  evento en días seguidos (sin marcar ninguno; ni producciones ni lo que tiene "hasta"). En este último sobra el del mes de antes si es
   principio de mes y el de después si es final (así se equivocó la importación); a
   mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
   nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
@@ -288,6 +290,10 @@ operativo).
   instalada se corrige sola la próxima vez que se abra con el código (Chrome revisa el
   manifiesto al abrirla). Prueba: lo que el navegador entiende como manifiesto (CDP
   `Page.getAppManifest`).
+- **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
+  las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
+  empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
+  acababa nunca: la batería se caía según el día.
 - **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
   `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
   en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista

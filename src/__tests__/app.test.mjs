@@ -4656,7 +4656,10 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`calendario ${w}px: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      // Se espera a la rejilla, no a la primera casilla: en el mes de hoy las semanas
+      // pasadas van plegadas, y cuando la primera ya ha pasado (un 5 de octubre, con el
+      // mes empezando en jueves) su casilla no se ve y la espera no acababa nunca.
+      await p.waitForSelector(".cal-mes");
 
       ok(!await seMueveDeLado(p), `${w}px · el mes no mueve la página de lado`);
 
@@ -4879,7 +4882,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`vista equipo: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       await p.locator(".segment-btn", { hasText: "Equipo" }).click();
       await p.waitForSelector(".cal-jornada");
 
@@ -4965,7 +4968,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`nombre asignado desktop: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       await p.locator(".segment-btn", { hasText: "Equipo" }).click();
       await p.waitForSelector(".cal-jornada");
       await p.locator(".cal-asignados-cab").first().click();
@@ -4994,7 +4997,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`personal evento pasado: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
 
       const hoy = new Date();
       const pasada = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 40);
@@ -5381,7 +5384,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`sin creadas: ${e}`));
       await p.goto(BANCO, { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       ok(await p.locator(".cal-creadas").count() === 0,
         "abriendo el calendario sin nada que crear no sale ningún aviso");
       await c.close();
@@ -5460,23 +5463,27 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`limpiar ${w}px: ${e}`));
       await p.goto(BANCO + "?sucio=1", { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
       const cab = p.locator(".cal-limpiar .cal-ratios-cab");
       const cuantos = async () => p.evaluate(() => document.querySelectorAll(".cal-celda .cal-punto, .cal-celda .cal-chip").length);
-      ok(/3 por revisar/.test(await cab.innerText()), `${w}px · la barra dice cuántas cosas hay que revisar sin abrirla`);
+      ok(/4 por revisar/.test(await cab.innerText()), `${w}px · la barra dice cuántas cosas hay que revisar sin abrirla`);
       await cab.click(); await p.waitForTimeout(300);
-      ok(await p.locator(".cal-limpiar input:checked").count() === 3 && await p.locator(".cal-limpiar-grupo").count() === 3,
-        `${w}px · tres grupos, y en cada uno va marcado el que sobra`);
+      // Cuatro grupos; en tres va marcado el que sobra. El cuarto (la misma boda al día
+      // siguiente) sale sin marcar: el día bueno lo tiene que decir alguien
+      ok(await p.locator(".cal-limpiar input:checked").count() === 3 && await p.locator(".cal-limpiar-grupo").count() === 4,
+        `${w}px · cuatro grupos, y en los que se sabe va marcado el que sobra`);
+      ok(/días seguidos/.test(await p.locator(".cal-limpiar-grupo").filter({ hasText: "EN LA FINCA" }).innerText()),
+        `${w}px · la misma boda al día siguiente sale como «días seguidos», con su explicación`);
       ok(!await seMueveDeLado(p), `${w}px · la lista de lo que sobra no mueve la página de lado`);
       const antes = await cuantos();
       await p.locator(".cal-limpiar-borrar").click(); await p.waitForTimeout(200);
       ok(await cuantos() === antes && /¿Borrar 3 apuntes\?/.test(await p.locator(".cal-limpiar-acciones").innerText()),
         `${w}px · el primer toque solo pregunta: todavía no se ha borrado nada`);
       await p.locator(".cal-limpiar-borrar", { hasText: "Sí, borrar" }).click(); await p.waitForTimeout(300);
-      ok(/todo en orden/.test(await cab.innerText()) && /Borrados 3 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText()),
-        `${w}px · al confirmar se borran y la barra queda en orden`);
+      ok(/1 por revisar/.test(await cab.innerText()) && /Borrados 3 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText()),
+        `${w}px · al confirmar se borran, y queda solo lo que hay que decidir a mano`);
       await p.locator(".cal-limpiar-hecho button", { hasText: "Deshacer" }).click(); await p.waitForTimeout(300);
-      ok(/3 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
+      ok(/4 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
       await c.close();
     }
 
@@ -5488,7 +5495,7 @@ async function main() {
       const p = await c.newPage();
       p.on("pageerror", e => errores.push(`solo ver ${w}px: ${e}`));
       await p.goto(BANCO + "?solover=1", { waitUntil: "networkidle" });
-      await p.waitForSelector(".cal-celda");
+      await p.waitForSelector(".cal-mes");
 
       ok(await p.locator(".cal-aviso-lectura").isVisible(),
         `${w}px · se dice desde arriba que es solo lectura, para que no parezca roto`);
