@@ -34,8 +34,8 @@ export default function PanelComida({ factores = {}, calibracion = {}, onCambiar
         <UtensilsCrossed size={16} aria-hidden="true" />
         <span className="cal-ratios-titulo">
           Paella y bandejas por tipo de evento
-          {ajustados > 0 && <em> · {ajustados} ajustado{ajustados === 1 ? "" : "s"}</em>}
-          {ajustados === 0 && medidos > 0 && <em> · {medidos} medido{medidos === 1 ? "" : "s"} sin aplicar</em>}
+          {ajustados > 0 && <em>{ajustados} ajustado{ajustados === 1 ? "" : "s"}</em>}
+          {ajustados === 0 && medidos > 0 && <em>{medidos} medido{medidos === 1 ? "" : "s"} sin aplicar</em>}
         </span>
         <ChevronDown size={16} aria-hidden="true" className={`cal-ratios-flecha${abierto ? " es-abierta" : ""}`} />
       </button>

@@ -67,7 +67,7 @@ import {
   fmtRecogidas, fmtCompras, sugerirCategoria, generarHTMLWord, envaseSegunCantidad,
   unidadPorDefecto, bateaSizeDe, cajaSizeDe,
 } from "./checklist-format.js";
-import { IconoCategoria, estiloCategoria } from "./components/Iconos.jsx";
+import { IconoCategoria, estiloCategoria, IconoBloque, TituloBloque, IconoExtra } from "./components/Iconos.jsx";
 import CargandoPanel from "./components/CargandoPanel.jsx";
 import useSuscripcionDiferida from "./asistente/suscripcionDiferida.js";
 import { alSobrarTiempo } from "./precarga.js";
@@ -3976,7 +3976,7 @@ export default function App({ onCerrarSesion } = {}) {
         {/* CONFIG */}
         {!soloMarcar && (
         <div className="config-card animate-entrance" style={{ animationDelay: "0.1s" }}>
-          <div className="section-title">Evento</div>
+          <div className="section-title" data-bloque="evento"><IconoBloque bloque="evento" />Evento</div>
           <div className="form-row">
             <div className="form-group">
               <span className="form-label">TIPO DE EVENTO</span>
@@ -4109,9 +4109,9 @@ export default function App({ onCerrarSesion } = {}) {
               rows={3}
             />
           </div>
-          <div className="logistica-block">
+          <div className="logistica-block" data-bloque="logistica">
             <span className="form-label logistica-label-rec">
-              EQUIPO DE LOGÍSTICA (cada uno con su horario)
+              <TituloBloque bloque="logistica" detalle="Cada uno con su horario">EQUIPO DE LOGÍSTICA</TituloBloque>
               <span className="logistica-recomendado" title="Recomendado: 1 persona de logística cada 60 pax. Se usa para repartir el tiempo de carga/descarga.">
                 <Truck size={12} /> Recomendado: {Math.max(1, Math.ceil(pax / 60))}
                 {logisticaEquipo.length < Math.max(1, Math.ceil(pax / 60)) && (
@@ -4221,8 +4221,8 @@ export default function App({ onCerrarSesion } = {}) {
               alquiler, salía en la carga, y la recogida y la devolución había que
               escribirlas a mano evento tras evento. Ahora van juntos y cada uno crea
               las suyas con las fechas sacadas de la del evento. */}
-          <div className="logistica-block">
-            <span className="form-label">ALQUILERES (material de otros — crea su recogida y su devolución)</span>
+          <div className="logistica-block" data-bloque="alquileres">
+            <span className="form-label"><TituloBloque bloque="alquileres" detalle="Material de otros: crea su recogida y su devolución">ALQUILERES</TituloBloque></span>
             <div className="equip-grid alquileres-grid">
               <SegmentedControl
                 label="Sillas"
@@ -4405,8 +4405,8 @@ export default function App({ onCerrarSesion } = {}) {
               </div>
             )}
           </div>
-          <div className="logistica-block">
-            <span className="form-label">RECOGIDAS (alquileres/equipo de otros a devolver o recoger)</span>
+          <div className="logistica-block" data-bloque="recogidas">
+            <span className="form-label"><TituloBloque bloque="recogidas" detalle="Alquileres y equipo de otros a devolver o recoger">RECOGIDAS</TituloBloque></span>
             {recogidas.map((r, i) => (
               <div className="recogida-card" key={i}>
                 <div className="recogida-card-top">
@@ -4486,8 +4486,8 @@ export default function App({ onCerrarSesion } = {}) {
               onClick={() => setRecogidas(prev => [...prev, { concepto: "", fecha: "", hora: "", fechaDevolucion: "" }])}
             >+ Añadir recogida</button>
           </div>
-          <div className="logistica-block">
-            <span className="form-label">COMPRAS (qué falta comprar, con fecha límite y aviso)</span>
+          <div className="logistica-block" data-bloque="compras">
+            <span className="form-label"><TituloBloque bloque="compras" detalle="Qué falta comprar, con fecha límite y aviso">COMPRAS</TituloBloque></span>
             {compras.map((c, i) => (
               <div className="recogida-card" key={i}>
                 <div className="recogida-card-top">
@@ -4546,7 +4546,7 @@ export default function App({ onCerrarSesion } = {}) {
           </div>
           {evento !== "produccion" && (<>
           <hr />
-          <div className="section-title">Barra libre</div>
+          <div className="section-title" data-bloque="barra"><IconoBloque bloque="barra" />Barra libre</div>
           <div className="form-row">
             <div className="range-group">
               <label className="checkbox-label">
@@ -4591,8 +4591,8 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
           )}
           <hr />
-          <div className="section-title">Extras</div>
-          <div className="checkbox-grid">
+          <div className="section-title" data-bloque="extras"><IconoBloque bloque="extras" />Extras</div>
+          <div className="checkbox-grid" data-bloque="extras">
             {[
               [dobleServicio,        setDobleServicio,        "Doble servicio",          "dobla el plato"],
               // Qué dobla en concreto (cubiertos y cristalería), aparte del plato de
@@ -4651,6 +4651,7 @@ export default function App({ onCerrarSesion } = {}) {
             ].map(([val, fn, lab, sub]) => (
               <label key={lab} className="checkbox-label-normal">
                 <input type="checkbox" checked={val} onChange={e => fn(e.target.checked)} />
+                <IconoExtra nombre={lab} />
                 <span className="checkbox-texto">{lab} <span className="checkbox-sub">· {sub}</span></span>
               </label>
             ))}
@@ -4724,7 +4725,7 @@ export default function App({ onCerrarSesion } = {}) {
             </div>
           )}
           <hr />
-          <div className="section-title">Equipamiento</div>
+          <div className="section-title" data-bloque="equipamiento"><IconoBloque bloque="equipamiento" />Equipamiento</div>
           <div className="equip-grid">
             {/* Las sillas se eligen en el bloque ALQUILERES (arriba, con las recogidas):
                 según de quién sean hay que ir a buscarlas y devolverlas. */}

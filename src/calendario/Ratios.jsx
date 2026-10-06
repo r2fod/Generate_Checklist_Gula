@@ -42,7 +42,7 @@ export default function Ratios({ ratios, onCambiar, calibracion = {} }) {
         <Users size={16} aria-hidden="true" />
         <span className="cal-ratios-titulo">
           Gente por comensal
-          {tocados.length > 0 && <em> · {tocados.length} ajustado{tocados.length === 1 ? "" : "s"}</em>}
+          {tocados.length > 0 && <em>{tocados.length} ajustado{tocados.length === 1 ? "" : "s"}</em>}
         </span>
         <ChevronDown size={16} aria-hidden="true" className={`cal-ratios-flecha${abierto ? " es-abierta" : ""}`} />
       </button>

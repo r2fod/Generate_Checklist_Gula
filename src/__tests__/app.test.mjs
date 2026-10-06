@@ -292,6 +292,75 @@ async function main() {
     await ctx.close();
   }
 
+  // ── La configuración: cada bloque con su color, cada extra con su icono ─────
+  // "Que haya más contraste para diferenciar compras, recogidas, las opciones como
+  // paella, parisiene…" (el dueño). Recogidas y compras eran dos cajas grises iguales.
+  console.log("\n── Contraste en la configuración ──");
+  {
+    const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url({ ...EVENTO_COMPLETO, llevaPaella: true }), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('.logistica-block[data-bloque="compras"]');
+    const m = await page.evaluate(() => {
+      const raya = (b) => getComputedStyle(document.querySelector(`.logistica-block[data-bloque="${b}"]`)).borderLeftColor;
+      const extras = [...document.querySelectorAll('.checkbox-grid[data-bloque="extras"] .checkbox-label-normal')];
+      const paella = extras.find(e => /Lleva paella/.test(e.textContent));
+      const pinta = (valor) => { const d = document.createElement("i"); d.style.color = valor; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+      return {
+        rayas: ["logistica", "alquileres", "recogidas", "compras"].map(raya),
+        extras: extras.length,
+        conIcono: extras.filter(e => e.querySelector(".extra-icono")).length,
+        paellaIcono: paella && getComputedStyle(paella.querySelector(".extra-icono")).backgroundColor,
+        marca: pinta("var(--accent)"),
+      };
+    });
+    ok(new Set(m.rayas).size === 4, `logística, alquileres, recogidas y compras, cada uno con su color (${m.rayas.join(" · ")})`);
+    ok(m.extras > 15 && m.conIcono === m.extras, `cada extra con su icono (${m.conIcono} de ${m.extras})`);
+    ok(m.paellaIcono === m.marca, "y el de lo marcado (la paella) se llena del color de la marca, para ver de un vistazo qué lleva");
+    await ctx.close();
+  }
+
+  // ── Nada partido: ni selectores con una opción suelta ni títulos en dos líneas ──
+  // "Mira bien la distribución para que no se corte nada o se ponga en 2 líneas" y "lo
+  // de las mesas qué mal se ve" (el dueño): "Mesas de los comensales" dejaba "Redonda
+  // 2m" sola en otra fila, y los nombres de categoría y de bloque se partían en el móvil.
+  console.log("\n── Distribución: nada partido ──");
+  for (const w of [320, 360, 390, 412, 1280]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: w < 768, hasTouch: w < 768 });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".segmented-control");
+    await page.waitForTimeout(400);
+    const m = await page.evaluate(() => {
+      const lineas = (el) => {
+        const r = document.createRange(); r.selectNodeContents(el);
+        const rs = [...r.getClientRects()].filter(x => x.width > 1 && x.height > 4).sort((a, b) => a.top - b.top);
+        let n = 0, fondo = -1e9; for (const x of rs) { if (x.top >= fondo - 2) { n++; fondo = x.bottom; } else fondo = Math.max(fondo, x.bottom); } return n;
+      };
+      const sueltas = [];
+      for (const c of document.querySelectorAll(".segmented-control")) {
+        const bs = [...c.children]; const porFila = new Map();
+        for (const b of bs) porFila.set(b.offsetTop, (porFila.get(b.offsetTop) || 0) + 1);
+        const filas = [...porFila.values()];
+        const ultima = bs[bs.length - 1];
+        const ocupaLaFila = ultima.getBoundingClientRect().width > c.getBoundingClientRect().width * 0.8;
+        if (filas.length > 1 && !(filas.slice(0, -1).every(n => n === filas[0]) && (filas.at(-1) === filas[0] || ocupaLaFila))) {
+          sueltas.push((c.previousElementSibling?.textContent || "?") + " " + filas.join("+"));
+        }
+      }
+      const partidos = [...document.querySelectorAll(".cat-name-texto, .bloque-titulos > :first-child, .section-title[data-bloque]")]
+        .filter(e => e.offsetParent && lineas(e) > 1).map(e => e.textContent.trim().slice(0, 30));
+      return { sueltas, partidos };
+    });
+    ok(m.sueltas.length === 0, `${w}px · ningún selector deja una opción suelta en otra fila${m.sueltas.length ? " → " + m.sueltas.join(", ") : ""}`);
+    // A 320px (un móvil de los más pequeños) el nombre más largo, "MOBILIARIO, SALA Y
+    // DECORACIÓN", sigue sin caber: se exige desde 360, el ancho de un móvil normal.
+    if (w >= 360) ok(m.partidos.length === 0, `${w}px · los nombres de categoría y de bloque, en una línea${m.partidos.length ? " → " + m.partidos.join(", ") : ""}`);
+    await ctx.close();
+  }
+
   // ── El contenedor acompaña al ancho de la ventana ───────────────────────────
   // Estaba clavado en 1320px: en un monitor de 1920 sobraban 300px muertos a cada lado
   // y la lista se quedaba en 868px por grande que fuera la pantalla. Se comprueba con
@@ -1473,8 +1542,11 @@ async function main() {
   console.log("\n── Contraste en los dos temas ──");
   const SONDA_CONTRASTE = `window.__contraste = () => {
     const lum = (c) => { const [r,g,b] = c.map(v => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*r+0.7152*g+0.0722*b; };
-    const parse = (s) => { const m=(s||"").match(/[\\d.]+/g); return m ? m.slice(0,3).map(Number) : null; };
-    const alpha = (s) => { const m=(s||"").match(/[\\d.]+/g); return m && m.length>3 ? Number(m[3]) : 1; };
+    // Con color-mix el navegador devuelve "color(srgb 0.97 0.96 0.99)", de 0 a 1 y con la
+    // transparencia tras "/": leído como rgb salía casi negro y daba contrastes de 1,00.
+    const esSrgb = (s) => /^color\\(/.test(s||"");
+    const parse = (s) => { const m=(s||"").match(/[\\d.]+/g); if (!m) return null; const v=m.slice(0,3).map(Number); return esSrgb(s) ? v.map(x => x*255) : v; };
+    const alpha = (s) => { if (esSrgb(s)) { const a=(s.match(/\\/\\s*([\\d.]+)/)||[])[1]; return a ? Number(a) : 1; } const m=(s||"").match(/[\\d.]+/g); return m && m.length>3 ? Number(m[3]) : 1; };
     const fondoDe = (el) => { let n=el; while(n && n!==document.documentElement){ const bg=getComputedStyle(n).backgroundColor; if(alpha(bg)>0.85) return parse(bg); n=n.parentElement; } return [255,255,255]; };
     const malos = [];
     document.querySelectorAll("span,label,button,strong,p,h1,h2,h3,td,th,a,div,em").forEach(e => {
@@ -4066,7 +4138,7 @@ async function main() {
     const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
     const p = await nuevaPagina(c);
-    const bloque = () => p.locator(".logistica-block").filter({ hasText: /RECOGIDAS \(/ });
+    const bloque = () => p.locator('.logistica-block[data-bloque="recogidas"]');
     const tarjetas = () => bloque().locator(".recogida-card").evaluateAll(cs => cs.map(x => ({
       concepto: (x.querySelector('input[type="text"]') || {}).value || "",
       fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),
@@ -4167,7 +4239,7 @@ async function main() {
       const c2 = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
       for (const h of HOSTS_NUBE) await c2.route(h, r => r.abort());
       const p2 = await nuevaPagina(c2);
-      const tarj = () => p2.locator(".logistica-block").filter({ hasText: /RECOGIDAS \(/ })
+      const tarj = () => p2.locator('.logistica-block[data-bloque="recogidas"]')
         .locator(".recogida-card").evaluateAll(cs => cs.map(x => ({
           concepto: (x.querySelector('input[type="text"]') || {}).value || "",
           fechas: [...x.querySelectorAll('input[type="date"]')].map(d => d.value),

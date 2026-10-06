@@ -301,6 +301,11 @@ con batería completa y capturas:
    cabecera, la fila del resumen y la barra; en el modo carga cada categoría dice
    "3/8" con su barra (`CabeceraCategoria`, la misma en la hoja). Las cantidades
    siguen en verde a propósito: verde = "cantidad", igual en todas las categorías.
+   **2b. Contraste en la configuración** — **hecho** (pedido aparte: "más contraste
+   para diferenciar compras, recogidas, las opciones como paella, parisiene…"): cada
+   bloque con su color e icono (`data-bloque`, `IconoBloque`/`TituloBloque`); logística,
+   alquileres, recogidas y compras en su panel con la raya de su color; cada extra con
+   su icono (`IconoExtra`), que se llena del color de la marca al marcarlo.
 3. **Iconos animados** (solo CSS, con `prefers-reduced-motion`): check que rebota,
    llama, hielo, camión; celebrar la categoría terminada.
 4. **Orden en el móvil**: la checklist primero; los ajustes del calendario detrás de un

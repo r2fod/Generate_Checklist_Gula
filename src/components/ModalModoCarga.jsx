@@ -551,9 +551,12 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
         <div className="preview-header con-tipo" data-tipo={tipoEvento} ref={cabeceraRef}>
           <div>
-            <div className="preview-header-title"><Package size={16} /> Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
+            {/* El título es el evento y "Modo carga" va delante del recuento: los dos
+                en la misma línea partían en tres a 320px ("Modo carga · Boda Fulanita
+                y / Mengano"). */}
+            <div className="preview-header-title"><Package size={16} /> {meta.nombreEvento || "Modo carga"}</div>
             <div className="preview-header-subtitle">
-              {totalMarcados} de {totalItems} {palabraModo}
+              {meta.nombreEvento ? "Modo carga · " : ""}{totalMarcados} de {totalItems} {palabraModo}
               {modo === "salida" && totalPreparados > 0 ? ` · ${totalPreparados} preparados` : ""}
               {modo !== "vuelta" && aMedias.length > 0 ? ` · ${aMedias.length} a medias` : ""}
               {totalRoturas > 0 ? ` · ${totalRoturas} roturas` : ""}

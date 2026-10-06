@@ -1425,11 +1425,101 @@ body {
   background: linear-gradient(90deg, var(--accent), rgba(201, 162, 75, 0.9));
 }
 
+/* Bloques de la configuración, cada uno con su color e icono (IconoBloque e IconoExtra,
+   en Iconos.jsx). "Que haya más contraste para diferenciar compras, recogidas, las
+   opciones como paella…" (el dueño): en un formulario de dos metros, todo era el mismo
+   título pequeño. data-bloque elige el color; lo demás sale de --bloque. */
+[data-bloque] {
+  --bloque-tinta: var(--bloque);
+  --bloque-chip: color-mix(in srgb, var(--bloque) 13%, var(--card-bg));
+  --bloque-fondo: color-mix(in srgb, var(--bloque) 6%, var(--card-bg));
+  --bloque-borde: color-mix(in srgb, var(--bloque) 25%, var(--border-color));
+}
+:root[data-tema="oscuro"] [data-bloque] {
+  --bloque-tinta: color-mix(in srgb, var(--bloque) 55%, #fff);
+  --bloque-chip: color-mix(in srgb, var(--bloque) 28%, var(--card-bg));
+  --bloque-fondo: color-mix(in srgb, var(--bloque) 11%, var(--card-bg));
+  --bloque-borde: color-mix(in srgb, var(--bloque) 40%, var(--border-color));
+}
+[data-bloque="evento"]       { --bloque: var(--accent); }
+[data-bloque="logistica"]    { --bloque: #7c3aed; }
+[data-bloque="alquileres"]   { --bloque: #b45309; }
+[data-bloque="recogidas"]    { --bloque: #0e7490; }
+[data-bloque="compras"]      { --bloque: #c2410c; }
+[data-bloque="barra"]        { --bloque: #2563eb; }
+[data-bloque="extras"]       { --bloque: #be185d; }
+[data-bloque="equipamiento"] { --bloque: #475569; }
+
+.section-title[data-bloque] { color: var(--bloque-tinta); font-size: var(--fs-sm); }
+.section-title[data-bloque]::before { content: none; }
+.bloque-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
+  background: var(--bloque-chip, var(--accent-soft));
+  color: var(--bloque-tinta, var(--accent));
+}
+/* Logística, alquileres, recogidas y compras: cada uno en su panel, con la raya de su color */
+.logistica-block[data-bloque] {
+  padding: 12px;
+  background: var(--bloque-fondo);
+  border: 1px solid var(--bloque-borde);
+  border-left: 4px solid var(--bloque);
+  border-radius: var(--radius-md);
+}
+.logistica-block[data-bloque] > .form-label { color: var(--bloque-tinta); }
+.bloque-cabecera { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+/* El nombre del bloque en una línea y su explicación debajo, pequeña: con la explicación
+   entre paréntesis en el título, "RECOGIDAS (ALQUILERES/EQUIPO…)" ocupaba cuatro líneas
+   en mayúsculas a 320px. */
+.bloque-titulos { display: flex; flex-direction: column; min-width: 0; }
+.bloque-detalle {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+/* El tinte de los paneles les quitaba a los grises de apoyo lo justo para quedarse por
+   debajo del mínimo legible (4,43 y 4,32 sobre 4,5): dentro, un punto más fuertes. */
+:root:not([data-tema="oscuro"]) .logistica-block[data-bloque] { --text-muted: #646b78; }
+:root[data-tema="oscuro"] .logistica-block[data-bloque] { --text-label: #8892a6; }
+
+/* El resumen de la escaleta, en trozos que no se parten (Escaleta.jsx) */
+.escaleta-trozo { white-space: nowrap; }
+.escaleta-trozo + .escaleta-trozo::before { content: " · "; white-space: normal; }
+
+/* A 320–360px el nombre de categoría más largo ("MOBILIARIO, SALA Y DECORACIÓN") no
+   cabía en una línea ni con la píldora debajo: un punto menos de letra y de espaciado. */
+@media (max-width: 360px) {
+  .category-header { font-size: var(--fs-sm); letter-spacing: 0.2px; }
+  /* Y los paneles de color se meten en el margen de la tarjeta (15px en el móvil) lo
+     mismo que ocupan su raya y su relleno: el contenido conserva el ancho que tenía sin
+     panel. A 320px, sin esto, la fila de horas de logística perdía el sitio justo para
+     "08:00 – 20:00" en una línea. */
+  .logistica-block[data-bloque] { padding: 10px 8px 10px 9px; margin-left: -13px; margin-right: -9px; }
+}
+@media (max-width: 340px) {
+  .category-header { font-size: var(--fs-xs); letter-spacing: 0; }
+}
+.logistica-block[data-bloque] .recogida-card { background: var(--card-bg); }
+/* Los extras: el icono en el color del bloque mientras está apagado, y lleno del de
+   la marca al marcarlo, como el resto de la casilla — de un vistazo, qué lleva y qué no. */
+.extra-icono { width: 24px; height: 24px; margin-top: -2px; transition: background-color 0.2s, color 0.2s; }
+.checkbox-label-normal:has(input:checked) .extra-icono { background: var(--accent); color: #fff; }
+
 /* Form Grid */
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 12px;
+  /* Si una etiqueta parte en dos líneas ("PLUS FURGONETA PROPIA (€)" junto a "€ / HORA"),
+     los dos campos quedan a la misma altura en vez de escalonados. */
+  align-items: end;
 }
 
 .form-row > * {
@@ -1625,6 +1715,19 @@ body {
 .segment-btn:hover {
   color: var(--text-main);
 }
+
+/* Las opciones no caben en una fila (data-rejilla lo pone SegmentedControl midiendo):
+   de dos en dos, con esquinas de tarjeta en vez de cápsula. Antes: tres arriba, una
+   suelta abajo y la cápsula deformada ("Mesas de los comensales" en el móvil). Si son
+   impares, la última ocupa la fila entera. */
+.segmented-control[data-rejilla] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+.segmented-control[data-rejilla] .segment-btn { border-radius: var(--radius-sm); }
+.segmented-control[data-rejilla] .segment-btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
 .segment-btn.active {
   background: var(--solido-bg);
@@ -2187,9 +2290,9 @@ body {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition-smooth);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* El nombre entero, aunque ocupe dos líneas: recortado con "…" a 320px no se sabía
+     qué evento era ("Boda Fulanita y Me…"). */
+  overflow-wrap: anywhere;
 }
 
 .plantilla-nombre:hover {
@@ -2281,8 +2384,12 @@ body {
      su propia línea es la PÍLDORA (flex-wrap de la cabecera), así que no se pierde
      nunca: a 320px, sin tope, algo tenía que desbordar y la tarjeta redondeada con
      overflow oculto se tragaba el contador y la flecha ▼/▲ sin aviso. */
-  min-width: min-content;
-  flex: 1 1 0;
+  /* Y el nombre entero en UNA línea mientras quepa en la cabecera: con "flex: 1 1 0"
+     cedía él ante la píldora de ↑ ↓ ✎ y a 360px salía "ELECTRICIDAD / Y CAMIÓN" o
+     "MOBILIARIO, / SALA Y / DECORACIÓN". Ahora no encoge (1 0 auto): si no caben los
+     dos, la píldora baja a su línea, a la derecha. */
+  flex: 1 0 auto;
+  max-width: 100%;
 }
 
 .cat-name-texto {
@@ -3940,6 +4047,9 @@ hr {
   text-align: right;
   border-bottom: 1px solid var(--border-color);
 }
+/* La tabla ya se desliza de lado en el móvil: las cabeceras en una línea ("COSTE
+   TOTAL", no "COSTE / TOTAL"). */
+.resumen-tabla th { white-space: nowrap; }
 
 .resumen-tabla th:first-child,
 .resumen-tabla td:first-child {
@@ -6538,6 +6648,14 @@ hr {
    Salida 03:10 · inicio…") el flex lo encogía a la mitad. */
 .cal-ratios-cab > svg { flex-shrink: 0; }
 .cal-ratios-titulo em { font-style: normal; font-weight: 500; color: var(--text-muted); }
+.cal-ratios-titulo em::before { content: " · "; }
+/* En el móvil el resumen ("Salida 02:28 · inicio 12:30 · recogida hasta 23:25") va en
+   su propia línea y pequeño, debajo del título: en la misma, título y resumen se
+   partían a trozos en tres o cuatro líneas. */
+@media (max-width: 480px) {
+  .cal-ratios-titulo em { display: block; font-size: var(--fs-xs); margin-top: 1px; }
+  .cal-ratios-titulo em::before { content: none; }
+}
 
 .cal-ratios-flecha { flex: 0 0 auto; transition: transform 0.18s ease; }
 .cal-ratios-flecha.es-abierta { transform: rotate(180deg); }
