@@ -1540,7 +1540,7 @@ async function main() {
   // Se mide el contraste real de cada texto contra su fondo con la fórmula WCAG y se
   // exige el mínimo AA: 4,5 normal y 3 para texto grande o en negrita.
   console.log("\n── Contraste en los dos temas ──");
-  const SONDA_CONTRASTE = `window.__contraste = () => {
+  const SONDA_CONTRASTE = `window.__contraste = (raiz) => {
     const lum = (c) => { const [r,g,b] = c.map(v => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*r+0.7152*g+0.0722*b; };
     // Con color-mix el navegador devuelve "color(srgb 0.97 0.96 0.99)", de 0 a 1 y con la
     // transparencia tras "/": leído como rgb salía casi negro y daba contrastes de 1,00.
@@ -1549,7 +1549,7 @@ async function main() {
     const alpha = (s) => { if (esSrgb(s)) { const a=(s.match(/\\/\\s*([\\d.]+)/)||[])[1]; return a ? Number(a) : 1; } const m=(s||"").match(/[\\d.]+/g); return m && m.length>3 ? Number(m[3]) : 1; };
     const fondoDe = (el) => { let n=el; while(n && n!==document.documentElement){ const bg=getComputedStyle(n).backgroundColor; if(alpha(bg)>0.85) return parse(bg); n=n.parentElement; } return [255,255,255]; };
     const malos = [];
-    document.querySelectorAll("span,label,button,strong,p,h1,h2,h3,td,th,a,div,em").forEach(e => {
+    (raiz || document).querySelectorAll("span,label,button,strong,p,h1,h2,h3,td,th,a,div,em").forEach(e => {
       if (e.children.length || !e.offsetParent) return;
       const t = (e.textContent||"").trim(); if (!t) return;
       const cs = getComputedStyle(e);
@@ -1582,6 +1582,33 @@ async function main() {
     const malosCarga = await p.evaluate(() => window.__contraste());
     const todos = [...new Set([...malos, ...malosCarga])];
     ok(todos.length === 0, `${tema}: todo el texto llega al mínimo legible${todos.length ? ` → ${todos.slice(0, 4).join(", ")}${todos.length > 4 ? ` +${todos.length - 4}` : ""}` : ""}`);
+    await c.close();
+  }
+  // Con el ratón encima también. El hover de la fila de alquiler era un amarillo claro
+  // fijo, igual en los dos temas: en oscuro, texto blanco sobre amarillo (lo vio el dueño)
+  for (const tema of ["claro", "oscuro"]) {
+    const c = await navegador.newContext({ viewport: { width: 1440, height: 900 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(t => localStorage.setItem("gula_tema", t), tema);
+    await c.addInitScript(SONDA_CONTRASTE);
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 80, origenSillas: "Dealde" }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2200);
+    const hay = await p.locator(".item-row.is-alquiler").count();
+    const fila = p.locator(".item-row.is-alquiler").first();
+    await fila.scrollIntoViewIfNeeded();
+    await fila.hover();
+    await p.waitForTimeout(500);
+    const malos = hay ? await fila.evaluate(f => window.__contraste(f)) : [];
+    // El nombre lleva dentro la etiqueta "Alquiler" y la sonda solo mira hojas: se mide aparte
+    const nombre = hay ? await fila.evaluate(f => {
+      const lum = (s) => { const [r, g, b] = s.match(/[\d.]+/g).slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const a = lum(getComputedStyle(f.querySelector(".item-name")).color), b = lum(getComputedStyle(f).backgroundColor);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    }) : 0;
+    if (nombre < 4.5) malos.push(`«nombre» ${nombre.toFixed(2)}/4.5`);
+    ok(hay > 0 && malos.length === 0,
+      `${tema}: con el ratón encima, la fila de alquiler se sigue leyendo${malos.length ? ` → ${malos.slice(0, 3).join(", ")}` : ""}`);
     await c.close();
   }
 

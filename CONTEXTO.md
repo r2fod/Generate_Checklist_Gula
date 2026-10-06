@@ -560,6 +560,11 @@ propia herramienta, con su propia validación.
 Lista corta y con enlace mental al fichero, no la narrativa completa de cada uno (ya
 está en el historial de git y en las pruebas que los cubren):
 
+- **Hover con color a pelo en el tema oscuro** (6/10) — `.item-row.is-alquiler:hover`
+  ponía `#fef3c7` en los dos temas: con el ratón encima, texto blanco sobre amarillo.
+  Ahora `--alquiler-bg-hover` (claro/oscuro); y lo mismo, con regla oscura al lado, en
+  el ✕ de borrar, el silenciar nota y "Todo vuelto" del modo carga. La prueba de
+  contraste no pasaba el ratón por encima: ahora mide la fila de alquiler con hover.
 - **`buildChecklist()` no leía `leerRatios()`** — cambiar el ratio de personal (a mano o
   con el asistente) nunca llegaba a la checklist real, solo a la previsión del
   calendario. Tres generadores arreglados.

@@ -37,6 +37,7 @@
   --green-btn: #16794a;
   --green-btn-hover: #11603a;
   --alquiler-bg: #fdf6e3;
+  --alquiler-bg-hover: #fef3c7;
   --alquiler-text: #b45309;
   --accent-blue: #0f766e;
   --radius-lg: 20px;
@@ -126,6 +127,7 @@
   --green-btn: #17804d;
   --green-btn-hover: #1c9a5d;
   --alquiler-bg: #3a3117;
+  --alquiler-bg-hover: #43381a;
   --alquiler-text: #fbbf24;
   --accent-blue: #1aa391;
   --bg-subtle: #21252f;
@@ -2508,8 +2510,10 @@ body {
   background-color: var(--alquiler-bg);
 }
 
+/* Con su token: el amarillo claro a pelo se quedaba también en el tema oscuro, y con
+   el ratón encima la fila de alquiler era texto blanco sobre amarillo (lo vio el dueño) */
 .item-row.is-alquiler:hover {
-  background-color: #fef3c7;
+  background-color: var(--alquiler-bg-hover);
 }
 
 .item-name {
@@ -2679,6 +2683,7 @@ body {
   color: #dc2626;
   background: #fee2e2;
 }
+:root[data-tema="oscuro"] .item-action-borrar:hover { color: #f87171; background: rgba(220, 38, 38, 0.18); }
 
 /* Botón "+" para añadir/guardar una opción personalizada (SelectConOtro) */
 .item-action-add {
@@ -3725,6 +3730,7 @@ hr {
   transition: background 0.15s ease, color 0.15s ease;
 }
 .carga-nota-silenciar:hover { background: #f4e4bd; color: #7a5610; }
+:root[data-tema="oscuro"] .carga-nota-silenciar:hover { background: rgba(251, 191, 36, 0.16); color: #fcd34d; }
 .carga-nota-lista {
   margin-top: 10px;
   display: flex;
@@ -4242,6 +4248,9 @@ hr {
 .carga-todo-vuelto:hover { background: #d9f7e3; }
 .carga-todo-vuelto.is-desmarcar { border-color: var(--border-color-strong); color: var(--text-muted); background: var(--bg-color); }
 .carga-todo-vuelto.is-desmarcar:hover { background: #eef0f4; }
+/* En oscuro, los dos fondos claros de arriba dejaban el texto (verde claro o gris) sin contraste */
+:root[data-tema="oscuro"] .carga-todo-vuelto:hover { background: #1b3d28; }
+:root[data-tema="oscuro"] .carga-todo-vuelto.is-desmarcar:hover { background: var(--bg-subtle); }
 
 @media (max-width: 480px) {
   .carga-row-principal.carga-row-vuelta {
