@@ -130,8 +130,10 @@ self.addEventListener("activate", (e) => {
 // datos— salía "Falta el enlace" cada vez ("es súper molesto tener que ponerlo cada
 // vez", el dueño). El formulario pide "manifest.webmanifest?enviar=<código>" (ver
 // formulario/main.jsx) y aquí se devuelve el de siempre con el código en start_url: lo
-// que se instala lo lleva dentro. El id no cambia ("./index.html", el que ya tenía por
-// defecto): con otro, el móvil lo tomaría por otra app y no actualizaría la instalada.
+// que se instala lo lleva dentro. El id no cambia: el que tenía por defecto (su start_url
+// sin código), y ESCRITO ENTERO. Un id relativo se resuelve contra la raíz del dominio, no
+// contra la carpeta: "./index.html" daba el mismo id que la checklist, y el ordenador con
+// la checklist instalada la "actualizó" con el nombre y el icono del formulario.
 // Solo entra un código con pinta de código; cualquier otra cosa recibe el de siempre.
 const CODIGO_VALIDO = /^[\w-]{3,60}$/;
 async function manifiestoConCodigo(url) {
@@ -140,7 +142,7 @@ async function manifiestoConCodigo(url) {
   const codigo = url.searchParams.get("enviar") || "";
   if (!res || !res.ok || !CODIGO_VALIDO.test(codigo)) return res;
   const m = await res.clone().json();
-  m.id = m.id || "./index.html";
+  m.id = m.id || new URL(m.start_url || "./index.html", base).href;
   m.start_url = `./index.html?enviar=${encodeURIComponent(codigo)}`;
   return new Response(JSON.stringify(m), { headers: { "Content-Type": "application/manifest+json" } });
 }
