@@ -293,11 +293,11 @@
    Cinco tipos de evento y tres capas que NO son eventos (vacaciones, recogidas y días
    cerrados). Los eventos van en colores llenos y las capas en gris o rayado: de un
    vistazo tiene que verse qué es trabajo de catering y qué es información de apoyo. */
-.tipo-boda        { --cal-color: #d6336c; }
-.tipo-comunion    { --cal-color: #7048e8; }
-.tipo-corporativo { --cal-color: #1c7ed6; }
-.tipo-cumpleanos  { --cal-color: #f08c00; }
-.tipo-produccion  { --cal-color: #0ca678; }
+.tipo-boda        { --cal-color: var(--color-boda); }
+.tipo-comunion    { --cal-color: var(--color-comunion); }
+.tipo-corporativo { --cal-color: var(--color-corporativo); }
+.tipo-cumpleanos  { --cal-color: var(--color-cumpleanos); }
+.tipo-produccion  { --cal-color: var(--color-produccion); }
 .tipo-vacaciones  { --cal-color: #868e96; }
 .tipo-recogida    { --cal-color: #495057; }
 .tipo-cerrado     { --cal-color: #adb5bd; }

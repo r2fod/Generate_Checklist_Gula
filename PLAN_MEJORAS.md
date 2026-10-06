@@ -282,6 +282,28 @@ CONTEXTO.md, "Pendiente".
 |---|---|---|---|
 | C1 | **Coeficientes de niños** en comida, refrescos y equipamiento | Hoy solo el alcohol separa adultos (`alcoholPax`); el resto va sobre el total sin distinguir. Sin empezar a propósito — antes hay que medir un evento real | Medio, con datos reales delante |
 
+## E. Rediseño "premium" (pedido 2026-10-06)
+
+"Falta color para diferenciar cosas, iconos animados… lejos de una app premium".
+Análisis con capturas de las tres apps: (1) tres colores principales peleándose
+(verde del logo, añil, azul marino); (2) el color existe pero diminuto —cada categoría
+solo en su icono de 32 px, el tipo de evento solo en el calendario—; (3) en el móvil
+lo importante va abajo (la checklist tras Plantillas y Eventos guardados; el mes del
+calendario tras cinco paneles de ajustes); (4) ~70 animaciones sueltas, ninguna que
+responda a marcar una línea o terminar una categoría. Cinco fases, un PR cada una,
+con batería completa y capturas:
+
+1. **Marca y color por tipo** — **hecho**: acento = verde azulado del logo, color del
+   tipo de evento (`--color-*`, `.con-tipo`) en la cabecera de la checklist y del modo
+   carga, el calendario lee los mismos colores.
+2. **Categorías con su color**: cabecera teñida, barra de progreso y cantidades del
+   color de la categoría (`infoCategoria`, Iconos.jsx).
+3. **Iconos animados** (solo CSS, con `prefers-reduced-motion`): check que rebota,
+   llama, hielo, camión; celebrar la categoría terminada.
+4. **Orden en el móvil**: la checklist primero; los ajustes del calendario detrás de un
+   botón. La que más pruebas toca: va la cuarta.
+5. **Remate**: letra de títulos y detalles.
+
 ## D. Futuro
 
 **D1 (push de recordatorios, VAPID) — hecho.** App + service worker + Worker

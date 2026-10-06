@@ -221,6 +221,14 @@ operativo).
   objetivos, tareas, conversaciones, enrutado entre proveedores, tope de gasto, permisos
   por nivel, ocho compañeros animados + Jarvis, voz, conectores, diario de gasto.
 - **Repaso de la noche**: el Worker mira eventos aunque nadie abra la app.
+- **Rediseño, fase 1 — marca y color por tipo** (plan entero en PLAN_MEJORAS.md, E):
+  el acento (`--accent`, 122 usos) pasa del añil al verde azulado del logo (#0f766e;
+  en oscuro #1aa391, mismo contraste que tenía el añil) y la "tinta" de los botones
+  sólidos a un verde muy oscuro. Los colores por tipo de evento viven una sola vez en
+  `:root` (`--color-boda`…) y los leen el calendario (`.tipo-*`) y `.con-tipo`
+  (`data-tipo`): la cabecera de la checklist y la del modo carga llevan el icono lleno,
+  la raya de arriba y el tinte del suyo. Sin tipo, la marca. Los añiles escritos a mano
+  pasaron a `color-mix` con `--accent`.
 
 ## Lo desduplicado (y lo que NO se unificó)
 

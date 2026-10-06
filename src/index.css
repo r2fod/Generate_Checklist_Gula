@@ -7,11 +7,25 @@
      Vive aquí porque lo usan el logo de la cabecera y el del formulario, y tenían
      que ir a la vez. */
   --gula-degradado: linear-gradient(100deg, #0d9488, #16a34a, #65a30d, #22c55e, #14b8a6, #0d9488);
-  --primary-navy: #1f314d;
-  --primary-navy-hover: #16233a;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef0ff;
+  /* La marca es verde (ver el degradado de arriba): el color de acento, los títulos
+     de bloque y el "tinta" de los botones sólidos salen de ella. Antes el acento era
+     un añil que no estaba en el logo, y las tres apps tenían tres colores principales
+     peleándose (verde del logo, añil, azul marino). El acento es el verde azulado del
+     logo y no el verde de "hecho" (--ok-*, --green-qty): así "esto es Gula" y "esto
+     está bien" no se confunden. #0f766e da 5,5:1 sobre blanco. */
+  --primary-navy: #133a33;
+  --primary-navy-hover: #0c2a25;
+  --accent: #0f766e;
+  --accent-hover: #115e59;
+  --accent-soft: #e6f4f1;
+  /* Un color por tipo de evento, el MISMO en las tres apps: el calendario ya los
+     usaba para distinguir una boda de una comunión de un vistazo, y ahora la cabecera
+     de la checklist y la del modo carga llevan el del suyo (.con-tipo, más abajo). */
+  --color-boda: #d6336c;
+  --color-comunion: #7048e8;
+  --color-corporativo: #1c7ed6;
+  --color-cumpleanos: #f08c00;
+  --color-produccion: #0ca678;
   --bg-color: #f6f7fb;
   --card-bg: #ffffff;
   --border-color: #e8eaf0;
@@ -24,7 +38,7 @@
   --green-btn-hover: #11603a;
   --alquiler-bg: #fdf6e3;
   --alquiler-text: #b45309;
-  --accent-blue: #4f46e5;
+  --accent-blue: #0f766e;
   --radius-lg: 20px;
   --radius-md: 12px;
   --radius-sm: 10px;
@@ -67,13 +81,13 @@
   --ok-bg: #ecfdf3;
   --ok-borde: #a7e3bf;
   --ok-texto: #15803d;
-  --tinte-1: rgba(79, 70, 229, 0.07);
+  --tinte-1: rgba(15, 118, 110, 0.07);
   --tinte-2: rgba(201, 162, 75, 0.09);
   --tinte-3: rgba(34, 197, 94, 0.05);
   --superficie-velo: rgba(255, 255, 255, 0.85);
   --superficie-velo-suave: rgba(255, 255, 255, 0.55);
   --superficie-velo-borde: rgba(255, 255, 255, 0.9);
-  --fondo-acceso: linear-gradient(160deg, #f6f7fb 0%, #f1f3fb 55%, #eef0ff 100%);
+  --fondo-acceso: linear-gradient(160deg, #f6f7fb 0%, #f1f6f5 55%, #e6f4f1 100%);
   --aviso-bg-fuerte: #fef3c7;
   --hoy-bg: #fff7ed;
   --hoy-borde: #fdba74;
@@ -82,8 +96,8 @@
   --lila-icono: #7c3aed;
   /* Botón/segmento sólido de marca: fondo y su texto van SIEMPRE en pareja, para
      que invertir el tema no deje texto blanco sobre fondo claro. */
-  --solido-bg: #1f314d;
-  --solido-bg-hover: #16233a;
+  --solido-bg: #133a33;
+  --solido-bg-hover: #0c2a25;
   --solido-texto: #ffffff;
   --hecho-bg: #f0fdf4;
   --hecho-borde: #bbf7d0;
@@ -96,11 +110,11 @@
    oscuro no puede descuadrar nada. Los pastel de categoría vienen de JS en
    estilos en línea y se atenúan aparte, más abajo. */
 :root[data-tema="oscuro"] {
-  --primary-navy: #dbe3f0;
-  --primary-navy-hover: #eef2f9;
-  --accent: #8b83f5;
-  --accent-hover: #a29bf7;
-  --accent-soft: #262a44;
+  --primary-navy: #d3ebe5;
+  --primary-navy-hover: #e9f6f2;
+  --accent: #1aa391;
+  --accent-hover: #22b8a4;
+  --accent-soft: #18302d;
   --bg-color: #12141c;
   --card-bg: #1b1e28;
   --border-color: #2c3040;
@@ -113,7 +127,7 @@
   --green-btn-hover: #1c9a5d;
   --alquiler-bg: #3a3117;
   --alquiler-text: #fbbf24;
-  --accent-blue: #8b83f5;
+  --accent-blue: #1aa391;
   --bg-subtle: #21252f;
   --border-light: #2c3040;
   --fila-par: #1b1e28;
@@ -128,21 +142,21 @@
   --ok-bg: #14301f;
   --ok-borde: #276b43;
   --ok-texto: #6ee7a0;
-  --tinte-1: rgba(139, 131, 245, 0.10);
+  --tinte-1: rgba(26, 163, 145, 0.09);
   --tinte-2: rgba(201, 162, 75, 0.07);
   --tinte-3: rgba(34, 197, 94, 0.05);
   --superficie-velo: rgba(27, 30, 40, 0.88);
   --superficie-velo-suave: rgba(27, 30, 40, 0.55);
   --superficie-velo-borde: rgba(255, 255, 255, 0.09);
-  --fondo-acceso: linear-gradient(160deg, #0e1017 0%, #141722 55%, #1a1d2c 100%);
+  --fondo-acceso: linear-gradient(160deg, #0e1017 0%, #121a1a 55%, #14231f 100%);
   --aviso-bg-fuerte: #3d2f11;
   --hoy-bg: #3a2a15;
   --hoy-borde: #8a5a22;
   --error-texto-fuerte: #f87171;
   --lila-suave: #262a44;
   --lila-icono: #a78bfa;
-  --solido-bg: #4f46e5;
-  --solido-bg-hover: #635bf0;
+  --solido-bg: #0f766e;
+  --solido-bg-hover: #0d9488;
   --solido-texto: #ffffff;
   --hecho-bg: #16301f;
   --hecho-borde: #2b6b45;
@@ -405,7 +419,7 @@ body {
 
 /* Header — floating, light, sticky */
 .app-header {
-  background: var(--superficie-velo);
+  background: linear-gradient(115deg, color-mix(in srgb, var(--tipo, var(--accent)) 10%, transparent), transparent 55%), var(--superficie-velo);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   color: var(--text-main);
@@ -484,12 +498,22 @@ body {
   width: 44px;
   height: 44px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent-soft), #e7ecff);
-  color: var(--accent);
-  border: 1px solid #dfe3ff;
+  background: var(--tipo, var(--accent));
+  color: #fff;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.14);
+  box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--tipo, var(--accent)) 70%, transparent);
 }
+
+/* El color del tipo de evento (--color-* en :root), para la cabecera de la checklist
+   y la del modo carga: data-tipo lo elige y lo demás (el icono, el tinte del fondo,
+   la raya de arriba) lee --tipo. Un evento sin tipo conocido se queda con la marca. */
+.con-tipo { --tipo: var(--accent); border-top: 3px solid var(--tipo); }
+.con-tipo[data-tipo="boda"] { --tipo: var(--color-boda); }
+.con-tipo[data-tipo="comunion"] { --tipo: var(--color-comunion); }
+.con-tipo[data-tipo="corporativo"] { --tipo: var(--color-corporativo); }
+.con-tipo[data-tipo="cumpleanos"] { --tipo: var(--color-cumpleanos); }
+.con-tipo[data-tipo="produccion"] { --tipo: var(--color-produccion); }
 
 .header-info h1 {
   font-size: var(--fs-xl);
@@ -2110,7 +2134,7 @@ body {
 .buscador-eventos-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .buscador-eventos-limpiar {
   position: absolute;
@@ -2911,7 +2935,7 @@ hr {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: linear-gradient(135deg, var(--accent-soft), var(--card-bg) 70%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tipo, var(--accent)) 11%, var(--card-bg)), var(--card-bg) 70%);
   border-bottom: 1px solid var(--border-color);
   padding: 18px 24px;
   display: flex;
@@ -4384,7 +4408,7 @@ hr {
   height: 340px;
   top: -80px;
   right: -60px;
-  background: radial-gradient(circle, rgba(79, 70, 229, 0.35), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 35%, transparent), transparent 70%);
   animation: login-flotar-1 15s ease-in-out infinite;
 }
 
@@ -4628,7 +4652,7 @@ hr {
 
 /* Color pastel en los iconos que hasta ahora salían en gris/negro por toda la app.
    Se excluyen los que ya llevan su color propio (botones de borrar, verdes, etc.). */
-.preview-header-title > svg { color: var(--accent); }
+.preview-header-title > svg { color: var(--tipo, var(--accent)); }
 .dialogo-titulo > svg { color: var(--accent); }
 .carga-nombre + .carga-cantidad, .carga-cantidad { color: var(--text-muted); }
 /* Sobre el fondo amarillo de alquiler, el gris apagado de siempre se queda corto de
