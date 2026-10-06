@@ -49,10 +49,11 @@ siguen aquí.**
   recuadro "Falta por preparar") tapa el primer ítem. Hay que decidir qué se pliega
   por defecto; #222 propone una parte. Detalle en `CONTEXTO.md`, "Auditoría visual
   móvil…", punto 3.
-- **Limpieza de datos del calendario** (en la app, no en el código): unos 29 apuntes
-  en el mes equivocado, varios repetidos y dos "Posible…" ya confirmados. Ya hay
-  herramienta: "Limpiar el calendario", en los ajustes del calendario. Falta que el
-  dueño lo revise y confirme allí; el 4/12 y el "Día cerrado" del 2/11, a mano.
+- **Limpieza de datos del calendario** (en la app, no en el código): revisado contra
+  la hoja el 6/10. Quedan 19 apuntes en el mes equivocado (11 próximos: 28–31/10,
+  2/11 y 4/12). Las sugerencias de "Limpiar el calendario" no los ven (solo miran
+  eventos), así que se pegan con "Pegar una lista de lo que sobra" (la lista va al
+  dueño aparte) y se borran de una vez. Falta que el dueño lo pulse.
   Detalle en `CONTEXTO.md`, "Estado de HOY".
 - **Dónde se enseña `subconsciente.js`**: está construido y probado, pero ninguna
   pantalla lo llama.

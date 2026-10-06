@@ -262,6 +262,10 @@ operativo).
   mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
   nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
   el "Borrar" del editor: no pide permisos nuevos. El banco lo prueba con `?sucio=1`.
+  Lo que no ve (tareas, recogidas, días cerrados en el día malo) se marca pegando una
+  lista JSON de ids o de `{fecha, titulo}` ("Pegar una lista de lo que sobra",
+  `grupoDeLista`): sale como un grupo más, arriba, todo marcado salvo lo que tiene
+  checklist o personal, y dice cuántos de la lista ya no estaban.
 - **Borrar un apunte no borra su checklist, pero la quita del formulario**: el formulario
   lista el ARCHIVO de checklists (`publico/{código}`, lo publica la app), no el
   calendario, y cada repetido había dejado su checklist en blanco (`sinConfigurar`).
@@ -573,22 +577,29 @@ fusionarlos por mucho que estén en verde.
 - 2026-09-30 se volvió a cruzar la hoja de Google "CALENDARIO GULA" (pestaña del
   calendario de 2026 + la de bodas, que trae también las de 2027) con lo que había en
   la app, y el dueño pegó con "Añadir varios apuntes de golpe" los 30 que faltaban.
-- **Sobran todavía, a borrar a mano en la app (o con permiso expreso del dueño)**:
-  unos 29 apuntes que la importación del 14/9 puso en el mes equivocado. Son días del
-  mes anterior/siguiente que la hoja pinta al principio o al final de cada mes y se
-  leyeron con el mes del bloque:
-  - 1 y 3 de abril: son del 1 y 3 de mayo;
-  - 1–5 de junio: son del 1–5 de julio;
-  - 28–31 de octubre: son del 28–30 de septiembre;
-  - 4 de diciembre: es del 4 de julio.
+- 2026-10-06 tercera vuelta (hoja contra los 521 apuntes de la app): las 44 bodas de
+  la lista, bien; faltaban 4 y se añadieron con "Añadir varios apuntes de golpe" con
+  permiso del dueño (quedan 525).
+- **Sobran todavía, a borrar en la app**: 19
+  apuntes que la importación del 14/9 puso en el mes equivocado. Son días del mes
+  anterior/siguiente que la hoja pinta al principio o al final de cada mes y se
+  leyeron con el mes del bloque. La versión buena de cada uno ya está en su día:
+  - próximos (11): 28, 29, 30 y 31 de octubre (son del 28/9 al 1/10, ya confirmados),
+    el "Día cerrado" del 2/11 (ya no está en la hoja) y el 4 de diciembre (es del 4/7);
+  - pasados (8): 1 y 3 de abril (turnos del 1 y 3 de mayo), 1, 2, 3 y 5 de junio
+    (son del 1–5 de julio).
 
-  Además hay un "Día cerrado" el 2/11 que ya no está en la hoja, varios repetidos (el
-  mismo evento con dos títulos distintos, uno de la hoja y otro creado en la app) y
-  dos producciones del 8 y 9 de octubre que siguen también como "Posible …" junto a la
-  versión confirmada. **Para eso está "Limpiar el calendario"** (en los ajustes del
-  calendario, solo con permiso de escribir): los encuentra, marca el que sobra y borra
-  al confirmar, con "Deshacer". El 4 de diciembre (5 meses de diferencia) y el "Día
-  cerrado" del 2/11 no los detecta: esos, a mano.
+  Las sugerencias de "Limpiar el calendario" NO los ven: solo miran los tipos que son
+  evento (`esTipoEvento`: boda, comunión, corporativo, cumpleaños, producción) y casi
+  todos estos son tarea, recogida o día cerrado; dice "todo en orden" con ellos dentro.
+  Y el dueño no quiere borrarlos uno a uno: **"Pegar una lista de lo que sobra"** (al
+  final de "Limpiar el calendario", `grupoDeLista` en limpieza.js) los marca todos de
+  una vez a partir de la lista de ids que se le pasa aparte (lleva nombres: nunca al
+  repositorio), y se borran con el mismo "Borrar N marcados", con confirmación y
+  "Deshacer". Borrar lo pulsa el dueño: la IA no borra datos de la app.
+- Opcional, ya pasado: unos 25 apuntes que son turnos del personal ("LIBRE",
+  "TRABAJA", "COCINA", "LIMPIEZA", horas sueltas como "14:00") de enero a junio,
+  leídos de las filas con etiqueta en A/B.
 - **Cómo leer esa hoja sin repetir el fallo** (lo que funcionó):
   - Son dos bloques de 7 columnas (C–I enero–junio, K–Q julio–diciembre), con una fila
     de mes y otra de "L M X J V S D", y luego filas de números de día seguidas de las
@@ -599,6 +610,14 @@ fusionarlos por mucho que estén en verde.
     de otro mes, los tapados con texto ("Día cerrado") y las erratas ("16 17 17 19").
     Una fila puede mezclar números y apuntes: los números de sábado/domingo de un mes
     nuevo a veces van en la misma fila que apuntes de la semana.
+  - Fila con más números que textos = fila de días: las 7 columnas pasan a la semana
+    nueva, y un texto en ella es un apunte de ese día (un "Día cerrado" que tapa el
+    número). Con más textos que números, los textos siguen en su día y solo avanzan
+    las columnas con número (el 1 y 2 de agosto al final de una fila de apuntes de
+    julio).
+  - La etiqueta en A/B solo vale para la mitad izquierda (C–I): en la misma fila, la
+    derecha (K–Q) trae apuntes normales (una boda de octubre en la fila de turnos de
+    abril).
   - Se ignoran: las filas con etiqueta en A/B (turnos del personal), las columnas
     fuera del bloque (importes, notas sueltas) y todo lo que va debajo del calendario
     (otra tabla, "APERTURA GULA BAR", con su propio mini-calendario que da fechas

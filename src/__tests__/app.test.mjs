@@ -5510,6 +5510,30 @@ async function main() {
         `${w}px · al confirmar se borran, y queda solo lo que hay que decidir a mano`);
       await p.locator(".cal-limpiar-hecho button", { hasText: "Deshacer" }).click(); await p.waitForTimeout(300);
       ok(/4 por revisar/.test(await cab.innerText()) && await cuantos() === antes, `${w}px · y «Deshacer» los devuelve tal cual`);
+
+      // Lo que las sugerencias no ven —una recogida y un día cerrado: solo miran
+      // eventos— llega en una lista pegada. "No quiero hacerlo uno a uno" (el dueño).
+      const enDias = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+      await p.locator(".cal-limpiar-abrir-pegar").click();
+      await p.locator(".cal-limpiar-pegar textarea").fill(JSON.stringify([
+        { fecha: enDias(4), titulo: "RECOGER CAMIÓN" }, { fecha: enDias(12), titulo: "Cerrado" }, "2030-01-01_no-existe",
+      ]));
+      await p.locator(".cal-limpiar-pegar .btn-green").click(); await p.waitForTimeout(300);
+      ok(/5 por revisar/.test(await cab.innerText()) && await p.locator(".cal-limpiar-grupo.es-lista .cal-limpiar-fila").count() === 2,
+        `${w}px · la lista pegada sale como un grupo más, con la recogida y el día cerrado que las sugerencias no veían`);
+      ok(await p.locator(".cal-limpiar input:checked").count() === 5,
+        `${w}px · y van marcados, junto a los 3 que ya sugería: nada de uno a uno`);
+      ok(/2 encontrados/.test(await p.locator(".cal-limpiar-de-lista").innerText()) && /1 ya no está/.test(await p.locator(".cal-limpiar-de-lista").innerText()),
+        `${w}px · dice cuántos ha encontrado y cuántos de la lista ya no están`);
+      ok(!await seMueveDeLado(p), `${w}px · con la lista pegada tampoco se mueve de lado`);
+      await p.locator(".cal-limpiar-borrar").click(); await p.waitForTimeout(200);
+      ok(/¿Borrar 5 apuntes\?/.test(await p.locator(".cal-limpiar-acciones").innerText()), `${w}px · y también pregunta antes de borrar`);
+      await p.locator(".cal-limpiar-borrar", { hasText: "Sí, borrar" }).click(); await p.waitForTimeout(300);
+      ok(/1 por revisar/.test(await cab.innerText()) && /Borrados 5 apuntes/.test(await p.locator(".cal-limpiar-hecho").innerText())
+        && await p.locator(".cal-limpiar-abrir-pegar").isVisible(),
+        `${w}px · al confirmar se borran los 5 de una vez y la lista ya hecha desaparece`);
+      await p.locator(".cal-limpiar-hecho button", { hasText: "Deshacer" }).click(); await p.waitForTimeout(300);
+      ok(/4 por revisar/.test(await cab.innerText()), `${w}px · y «Deshacer» los devuelve`);
       await c.close();
     }
 

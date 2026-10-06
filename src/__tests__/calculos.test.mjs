@@ -23,7 +23,7 @@ import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js"
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
-import { sugerenciasDeLimpieza } from "../calendario/limpieza.js";
+import { sugerenciasDeLimpieza, grupoDeLista } from "../calendario/limpieza.js";
 import { nucleoDeTitulo } from "../texto.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
@@ -1231,6 +1231,41 @@ console.log("\n══ Limpiar el calendario: qué sobra tras las importaciones �
   ]);
   ok(!sugerenciasDeLimpieza(largos).some(g => g.clase === "dia"),
     "tres días o más seguidos son un evento largo, y dos con su checklist cada uno se montaron a propósito: ninguno sale como «días seguidos»");
+}
+
+console.log("\n══ Limpiar el calendario: marcar lo que sobra desde una lista pegada ══");
+{
+  // Lo que las sugerencias no ven (tareas, recogidas, días cerrados en el mes
+  // equivocado: solo miran eventos) lo encuentra quien cruza la hoja con la app, y lo
+  // pasa en una lista. "No quiero hacerlo uno a uno" (el dueño): se pega y se marca todo.
+  const cal = saneaLista([
+    { fecha: "2026-09-28", titulo: "Tarea Zeta", tipo: "tarea" },
+    { fecha: "2026-10-28", titulo: "Tarea Zeta", tipo: "tarea" },
+    { fecha: "2026-11-02", titulo: "Día cerrado", tipo: "cerrado" },
+    { id: "2026-12-04_id-a-mano", fecha: "2026-12-04", titulo: "Evento Ypsilon", tipo: "corporativo" },
+    { fecha: "2026-10-30", titulo: "Boda Con Gente", tipo: "boda", personal: [{ nombre: "Fulanita", rol: "camarero" }] },
+  ]);
+  const r = grupoDeLista(cal, JSON.stringify([
+    "2026-10-28_tarea-zeta",
+    { fecha: "2026-11-02", titulo: "DÍA CERRADO" },
+    { fecha: "2026-12-04", titulo: "Evento Ypsilon" },
+    "2026-10-28_tarea-zeta",
+    "2026-01-01_no-existe",
+    { fecha: "2026-10-30", titulo: "Boda con gente" },
+  ]));
+  ok(!r.error && r.grupo && r.grupo.clase === "lista", "una lista válida da un grupo propio");
+  ok(r.grupo.apuntes.map(a => a.fecha).join() === "2026-10-28,2026-10-30,2026-11-02,2026-12-04",
+    "encuentra por id y por fecha+título (sin mayúsculas ni tildes), sin repetir, en orden de fecha");
+  ok(r.grupo.apuntes.some(a => a.id === "2026-12-04_id-a-mano"),
+    "también el que tiene un id que no sale de su título (por fecha+título, no por id calculado)");
+  ok(r.grupo.quitar.join() === "2026-10-28_tarea-zeta,2026-11-02_dia-cerrado,2026-12-04_id-a-mano",
+    "marca todo lo de la lista menos lo que tiene personal o checklist: ese se enseña sin marcar");
+  ok(!r.grupo.quitar.includes("2026-09-28_tarea-zeta"), "el del día bueno, que no está en la lista, no se toca");
+  ok(r.noEstan.join() === "2026-01-01_no-existe", "y dice lo que no ha encontrado, para no dar por borrado lo que no estaba");
+  ok(grupoDeLista(cal, "esto no es json").error && grupoDeLista(cal, '{"id":"x"}').error,
+    "si no es una lista JSON, error y no se marca nada");
+  const nada = grupoDeLista(cal, '["2026-01-01_no-existe"]');
+  ok(!nada.error && nada.grupo === null && nada.noEstan.length === 1, "si no encuentra ninguno, no hay grupo pero sí la lista de no encontrados");
 }
 
 console.log("\n══ Dos apuntes iguales el mismo día se numeran para distinguirlos ══");
