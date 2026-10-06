@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { CabeceraCategoria, IconoCategoria, IconoItem, estiloCategoria } from "./Iconos.jsx";
 import { conCortes } from "./cortes.jsx";
+import { useAcabaDe } from "./useAcabaDe.js";
 import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
@@ -50,8 +51,12 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
   const guardar = () => { onPendiente(dataKey, { faltan: faltanTxt, nota: notaTxt }); setEditando(false); };
   // Ya ha llegado todo: queda preparado del todo (y marcarlo quita lo pendiente)
   const yaEstaTodo = () => { if (!marcado) onToggle(dataKey); else onPendiente(dataKey, null); setEditando(false); };
+  // Al marcarla, la casilla rebota, el icono reacciona y la fila se ilumina un momento:
+  // con una caja en la otra mano, se nota que ha entrado sin mirar dos veces
+  const [salta, terminar] = useAcabaDe(marcado, enPreparacion);
   return (
-    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""} ${pendiente ? "is-pendiente" : ""}`}
+    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""} ${pendiente ? "is-pendiente" : ""}${salta ? " acaba-de-marcarse" : ""}`}
+         onAnimationEnd={e => { if (e.target === e.currentTarget) terminar(); }}
          data-revisar={marcaRevisar ? dataKey : undefined} data-pendiente={pendiente ? dataKey : undefined}>
       {/* En Prep. (con el reloj de arena) la fila va en rejilla: cada cosa en su
           columna en todas las filas, en vez de que el reloj o la cantidad bajen de
@@ -150,8 +155,11 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
   // En lo que se gasta (bebida, comida, combustible, desechable) que no vuelva nada es
   // lo normal, no una rotura: no se sugiere marcarlo como tal (ver consumibles.js).
   const sugerirRoturas = faltan > 0 && !roturaValor && !consumible;
+  // La pastilla "todo" rebota como la casilla de las otras pestañas (no al teclear)
+  const [salta, terminar] = useAcabaDe(vinoTodo);
   return (
-    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""} ${esAlquiler ? "is-alquiler" : ""}`}>
+    <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""} ${esAlquiler ? "is-alquiler" : ""}${salta ? " acaba-de-marcarse" : ""}`}
+         onAnimationEnd={e => { if (e.target === e.currentTarget) terminar(); }}>
       {/* La pastilla "todo" va en la línea del nombre, que es donde está la casilla de
           marcar en Prep. y en Salida: es la misma acción y tiene que estar en el mismo
           sitio. Debajo se apilaba, y entre eso y los dos campos cada item ocupaba cuatro
@@ -906,6 +914,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
             <div className="preview-category con-cat" key={cat.nombre} style={estiloCategoria(cat.nombre)}>
               <CabeceraCategoria
                 nombre={cat.nombre}
+                grupo={modo}
                 hechos={cat.items.filter(([, , , lo]) => estaHecho(`${cat.nombre}::${lo}`)).length}
                 total={cat.items.length}
               />

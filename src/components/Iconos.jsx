@@ -4,7 +4,15 @@ import {
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cake,
   ClipboardList, Tag, RotateCcw, ShoppingCart, Sparkles, Refrigerator, Layers, Soup,
   ConciergeBell, Fuel, PartyPopper, Popcorn, Sofa, Ham, Droplet, Croissant, Milk,
+  Check,
 } from "lucide-react";
+import { useAcabaDe } from "./useAcabaDe.js";
+
+// Los iconos que se mueven a su manera (fase 3 del rediseño): la llama tiembla, el copo
+// gira y el camión arranca. Los demás dan un saltito. Solo CSS ("Iconos con vida" en
+// index.css): aquí únicamente se les pone la clase según el dibujo, no según el texto.
+const ANIMACION = new Map([[Flame, "anim-llama"], [Snowflake, "anim-hielo"], [Truck, "anim-camion"]]);
+const claseAnim = (Comp) => ANIMACION.get(Comp);
 
 // Icono decorativo + color pastel por categoría, buscado por fragmento del nombre
 // (varía según el tipo de evento: "Cocina y fuego", "Cocina y Electro"...)
@@ -46,7 +54,7 @@ export function infoCategoria(nombre) {
 // Icono SVG (lucide) de una categoría, buscado por su nombre.
 export function IconoCategoria({ nombre, size = 16 }) {
   const Comp = infoCategoria(nombre).Comp || Boxes;
-  return <Comp size={size} strokeWidth={2.2} />;
+  return <Comp size={size} strokeWidth={2.2} className={claseAnim(Comp)} />;
 }
 // Los dos colores de una categoría como variables CSS, para ponerlos UNA vez en su
 // contenedor (con la clase .con-cat): el icono, la raya, el tinte de la cabecera y la
@@ -57,16 +65,23 @@ export function estiloCategoria(nombre) {
   return { "--cat": texto, "--cat-suave": color };
 }
 // Cabecera de una categoría en la hoja y en el modo carga (las dos eran la misma
-// copia). Con hechos/total enseña cuánto lleva: "3/8" y su barra.
-export function CabeceraCategoria({ nombre, hechos, total }) {
+// copia). Con hechos/total enseña cuánto lleva: "3/8" y su barra. Al completarla se
+// celebra (una vez, al marcar lo último; no al abrir con ella ya hecha). `grupo` es la
+// pestaña del modo carga: cambiar de Prep. a Salida no es terminar nada.
+export function CabeceraCategoria({ nombre, hechos, total, grupo }) {
   const conCuenta = total > 0 && Number.isFinite(hechos);
+  const completa = conCuenta && hechos === total;
+  const [celebra, terminar] = useAcabaDe(completa, grupo);
   return (
-    <div className="preview-category-header">
+    <div className={`preview-category-header${celebra ? " celebra" : ""}`}
+         onAnimationEnd={e => { if (e.target === e.currentTarget) terminar(); }}>
       <span className="cat-icon-mini"><IconoCategoria nombre={nombre} /></span>
       <span className="cat-cabecera-nombre">{nombre}</span>
       {conCuenta && (
         <>
-          <span className={`cat-cuenta${hechos === total ? " es-completa" : ""}`}>{hechos}/{total}</span>
+          <span className={`cat-cuenta${completa ? " es-completa" : ""}`}>
+            {completa && <Check size={11} strokeWidth={3} aria-hidden="true" />}{hechos}/{total}
+          </span>
           <span className="cat-progreso" aria-hidden="true"><span style={{ width: `${(hechos / total) * 100}%` }} /></span>
         </>
       )}
@@ -118,7 +133,8 @@ function iconoItem(label) {
 }
 export function IconoItem({ label, size = 15 }) {
   const { I, c } = iconoItem(label);
-  return <I size={size} strokeWidth={2} className="item-icon" style={{ color: c }} />;
+  const anim = claseAnim(I);
+  return <I size={size} strokeWidth={2} className={anim ? `item-icon ${anim}` : "item-icon"} style={{ color: c }} />;
 }
 
 // ─── BLOQUES Y EXTRAS DE LA CONFIGURACIÓN ───
@@ -132,7 +148,7 @@ const ICONO_BLOQUE = {
 };
 export function IconoBloque({ bloque }) {
   const Icono = ICONO_BLOQUE[bloque] || Boxes;
-  return <span className="bloque-icono" aria-hidden="true"><Icono size={14} strokeWidth={2.3} /></span>;
+  return <span className="bloque-icono" aria-hidden="true"><Icono size={14} strokeWidth={2.3} className={claseAnim(Icono)} /></span>;
 }
 // El icono y el título de un bloque juntos, con su explicación debajo en pequeño (antes
 // iba entre paréntesis en el propio título y ocupaba cuatro líneas en el móvil).
@@ -160,5 +176,5 @@ const ICONO_EXTRA = {
 };
 export function IconoExtra({ nombre }) {
   const Icono = ICONO_EXTRA[nombre];
-  return Icono ? <span className="bloque-icono extra-icono" aria-hidden="true"><Icono size={15} strokeWidth={2.2} /></span> : null;
+  return Icono ? <span className="bloque-icono extra-icono" aria-hidden="true"><Icono size={15} strokeWidth={2.2} className={claseAnim(Icono)} /></span> : null;
 }

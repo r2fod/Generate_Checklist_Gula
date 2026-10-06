@@ -3144,6 +3144,9 @@ hr {
 .preview-category:hover .cat-icon-mini { transform: scale(1.1) rotate(-5deg); }
 .cat-cabecera-nombre { flex: 1 1 auto; min-width: 0; }
 .cat-cuenta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   color: var(--cat-tinta, var(--text-muted));
@@ -4239,6 +4242,7 @@ hr {
 .carga-vino-todo input[type="checkbox"] { width: 16px; height: 16px; min-width: 16px; margin: 0; accent-color: #16a34a; }
 .carga-vino-todo.is-on { color: var(--ok-texto); background: var(--ok-bg); border-color: #a7e3bf; }
 .carga-row.is-vino-todo { background: #f4fcf6; }
+:root[data-tema="oscuro"] .carga-row.is-vino-todo { background: var(--ok-bg); }
 .carga-todo-vuelto {
   align-self: flex-start;
   border-color: #a7e3bf;
@@ -4825,6 +4829,98 @@ hr {
 .preview-header-title, .preview-header-subtitle, .dialogo-titulo { display: flex; align-items: center; gap: 7px; }
 .item-icon { opacity: 0.92; flex-shrink: 0; transition: transform 0.2s ease, opacity 0.2s ease; }
 .item-row:hover .item-icon { opacity: 1; transform: scale(1.2) rotate(-5deg); }
+
+/* ─── ICONOS CON VIDA (fase 3 del rediseño) ───────────────────────────────────
+   Pocas y con un porqué: que se note lo que acabas de hacer (marcar una línea, cerrar
+   una categoría) y que los iconos que lo piden se muevan a su manera. Las clases las
+   ponen Iconos.jsx (anim-llama/-hielo/-camion, según el dibujo) y useAcabaDe.js
+   (acaba-de-marcarse, celebra: solo al marcar, nunca al abrir con todo ya hecho).
+   Todo se apaga con prefers-reduced-motion al final del bloque. */
+.anim-llama { transform-origin: 50% 90%; }
+
+/* Con el ratón encima (solo donde hay ratón: en el móvil un hover se queda pegado) */
+@media (hover: hover) {
+  :is(.item-row, .carga-row, .category-header, .preview-category-header, .checkbox-label-normal, .section-title, .bloque-cabecera):hover .anim-llama {
+    animation: icono-llama 0.9s ease-in-out infinite;
+  }
+  :is(.item-row, .carga-row, .category-header, .preview-category-header, .checkbox-label-normal, .section-title, .bloque-cabecera):hover .anim-hielo {
+    animation: icono-hielo-gira 3s linear infinite;
+  }
+  :is(.item-row, .carga-row, .category-header, .preview-category-header, .checkbox-label-normal, .section-title, .bloque-cabecera):hover .anim-camion {
+    animation: icono-camion 0.7s ease-in-out;
+  }
+}
+
+/* Al marcar una línea en el modo carga: la casilla (o la pastilla "todo" de la vuelta)
+   rebota, el icono reacciona y la fila se ilumina un momento y vuelve a su color */
+.carga-row.acaba-de-marcarse { animation: carga-fila-hecha 0.7s ease-out; }
+.carga-row.acaba-de-marcarse input[type="checkbox"],
+.carga-row.acaba-de-marcarse .carga-vino-todo { animation: carga-check-salta 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.carga-row.acaba-de-marcarse .item-icon { animation: icono-salta 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.carga-row.acaba-de-marcarse .item-icon.anim-llama { animation: icono-llama 0.6s ease-in-out; }
+.carga-row.acaba-de-marcarse .item-icon.anim-hielo { animation: icono-hielo 0.6s ease-out; }
+.carga-row.acaba-de-marcarse .item-icon.anim-camion { animation: icono-camion 0.6s ease-in-out; }
+
+/* Categoría terminada: la cuenta salta con un aro, el icono da un brinco y un brillo
+   cruza la cabecera. Una vez, al marcar lo último. */
+.preview-category-header.celebra .cat-cuenta { animation: cat-celebra-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.preview-category-header.celebra .cat-icon-mini { animation: icono-salta 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.preview-category-header.celebra::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --brillo: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(100deg, transparent 38%, var(--brillo) 50%, transparent 62%) no-repeat;
+  background-size: 250% 100%;
+  animation: cat-celebra-brillo 0.9s ease-out forwards;
+}
+:root[data-tema="oscuro"] .preview-category-header.celebra::after { --brillo: rgba(255, 255, 255, 0.14); }
+
+@keyframes carga-fila-hecha { from { background-color: rgba(34, 197, 94, 0.26); } }
+@keyframes carga-check-salta {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.32); }
+  65%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@keyframes icono-salta {
+  0%, 100% { transform: none; }
+  40%      { transform: scale(1.35) rotate(-8deg); }
+}
+@keyframes icono-llama {
+  0%, 100% { transform: none; }
+  25%      { transform: scale(1.1, 1.22) skewX(-5deg); }
+  50%      { transform: scale(0.95, 1.04) skewX(4deg); }
+  75%      { transform: scale(1.06, 1.16) skewX(-2deg); }
+}
+/* El copo tiene seis brazos: media vuelta lo deja igual que estaba */
+@keyframes icono-hielo {
+  from { transform: none; }
+  50%  { transform: rotate(90deg) scale(1.25); }
+  to   { transform: rotate(180deg); }
+}
+@keyframes icono-hielo-gira { to { transform: rotate(360deg); } }
+/* El camión se va por la derecha y vuelve a entrar por la izquierda */
+@keyframes icono-camion {
+  0%   { transform: none; opacity: 1; }
+  40%  { transform: translateX(9px); opacity: 0; }
+  41%  { transform: translateX(-9px); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes cat-celebra-pop {
+  0%   { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--hecho-texto) 55%, transparent); }
+  40%  { transform: scale(1.28); }
+  100% { transform: scale(1); box-shadow: 0 0 0 12px transparent; }
+}
+@keyframes cat-celebra-brillo { from { background-position: 100% 0; } to { background-position: 0 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-llama, .anim-hielo, .anim-camion,
+  .carga-row.acaba-de-marcarse, .carga-row.acaba-de-marcarse *,
+  .preview-category-header.celebra * { animation: none !important; }
+  .preview-category-header.celebra::after { display: none; }
+}
 .item-edit-flag { color: var(--accent, #c9a24b); display: inline; opacity: 0.9; margin-left: 3px; }
 .item-edit-flag svg { display: inline; vertical-align: -1px; }
 .tag-alquiler { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; vertical-align: middle; }

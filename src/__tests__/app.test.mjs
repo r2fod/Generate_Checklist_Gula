@@ -292,6 +292,74 @@ async function main() {
     await ctx.close();
   }
 
+  // ── Iconos con vida (fase 3 del rediseño) ────────────────────────────────────
+  // Al marcar una línea la casilla rebota y la fila se ilumina; al cerrar una categoría
+  // se celebra. Solo al marcar: una animación CSS puesta con la clase sin más arranca
+  // también al montarse, y abrir el modo carga con cincuenta líneas hechas sería una
+  // traca. Y con "reducir movimiento" no se mueve nada.
+  console.log("\n── Iconos con vida ──");
+  for (const reducido of [false, true]) {
+    const ctx = await navegador.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: reducido ? "reduce" : "no-preference" });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url({ ...EVENTO_COMPLETO, llevaPaella: true, llevamosHielo: true }), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-section .cat-icon");
+    const pre = reducido ? "con «reducir movimiento»" : "";
+    if (!reducido) {
+      const iconos = await page.evaluate(() => ["llama", "hielo", "camion"].map(a => document.querySelectorAll(`.anim-${a}`).length));
+      ok(iconos.every(n => n > 0), `la llama, el copo y el camión llevan su animación → ${iconos.join("/")}`);
+    }
+    const fila = page.locator(".item-row:has(.anim-llama)").first();
+    await fila.scrollIntoViewIfNeeded();
+    await fila.hover();
+    await page.waitForTimeout(200);
+    const llama = await fila.locator(".anim-llama").evaluate(e => getComputedStyle(e).animationName);
+    ok(llama === (reducido ? "none" : "icono-llama"), `${pre || "con el ratón encima"} la llama ${reducido ? "se queda quieta" : "tiembla"} → ${llama}`);
+
+    await page.locator("button", { hasText: "Modo carga" }).first().click();
+    await page.waitForSelector(".carga-modal .preview-category .cat-cuenta");
+    const alAbrir = await page.evaluate(() => document.querySelectorAll(".acaba-de-marcarse, .celebra").length);
+    // La categoría con menos líneas (más de una), para cerrarla entera
+    const idx = await page.evaluate(() => {
+      const n = [...document.querySelectorAll(".carga-modal .preview-category")].map(c => c.querySelectorAll(".carga-lista input[type=checkbox]").length);
+      return n.reduce((m, v, i) => (v > 1 && (n[m] < 2 || v < n[m]) ? i : m), 0);
+    });
+    const cat = page.locator(".carga-modal .preview-category").nth(idx);
+    await cat.scrollIntoViewIfNeeded();
+    const cajas = cat.locator(".carga-lista input[type=checkbox]");
+    const n = await cajas.count();
+    await cajas.nth(0).click();
+    await page.waitForTimeout(120);
+    const marcada = await cat.locator(".carga-row").first().evaluate(r => ({
+      clase: r.classList.contains("acaba-de-marcarse"), fila: getComputedStyle(r).animationName, caja: getComputedStyle(r.querySelector("input")).animationName,
+    }));
+    if (reducido) {
+      ok(marcada.fila === "none" && marcada.caja === "none", `${pre}, marcar no anima nada → ${marcada.fila}/${marcada.caja}`);
+    } else {
+      ok(alAbrir === 0, "al abrir el modo carga no salta nada");
+      ok(marcada.clase && marcada.fila === "carga-fila-hecha" && marcada.caja === "carga-check-salta",
+        `al marcar, la casilla rebota y la fila se ilumina → ${marcada.caja}, ${marcada.fila}`);
+      await page.waitForTimeout(1000);
+      ok(!(await cat.locator(".carga-row").first().evaluate(r => r.classList.contains("acaba-de-marcarse"))),
+        "y la marca se quita al acabar (si no, plegar y abrir la categoría lo repetiría)");
+      for (let i = 1; i < n; i++) { await cajas.nth(i).click(); await page.waitForTimeout(60); }
+      await page.waitForTimeout(200);
+      const cab = await cat.locator(".preview-category-header").evaluate(h => ({
+        celebra: h.classList.contains("celebra"), cuenta: h.querySelector(".cat-cuenta").innerText, anim: getComputedStyle(h.querySelector(".cat-cuenta")).animationName,
+      }));
+      ok(cab.celebra && cab.cuenta === `${n}/${n}` && cab.anim === "cat-celebra-pop",
+        `al marcar lo último, la categoría se celebra → ${cab.cuenta}, ${cab.anim}`);
+      await page.waitForTimeout(1300);
+      await page.locator(".carga-modal button", { hasText: /Prep/ }).first().click();
+      await page.waitForTimeout(300);
+      await page.locator(".carga-modal button", { hasText: /Salida/ }).first().click();
+      await page.waitForTimeout(150);
+      const tras = await page.evaluate(() => document.querySelectorAll(".acaba-de-marcarse, .celebra").length);
+      ok(tras === 0, `pasar de Prep. a Salida no cuenta como marcar: no salta ni se celebra nada (${tras})`);
+    }
+    await ctx.close();
+  }
+
   // ── La configuración: cada bloque con su color, cada extra con su icono ─────
   // "Que haya más contraste para diferenciar compras, recogidas, las opciones como
   // paella, parisiene…" (el dueño). Recogidas y compras eran dos cajas grises iguales.
@@ -1580,7 +1648,14 @@ async function main() {
     await p.locator("button", { hasText: "Modo carga" }).first().click();
     await p.waitForTimeout(1100);
     const malosCarga = await p.evaluate(() => window.__contraste());
-    const todos = [...new Set([...malos, ...malosCarga])];
+    // Y la vuelta con todo marcado: su fila "vino todo" era un verde casi blanco fijo,
+    // también en oscuro, con el texto claro encima
+    await p.locator(".carga-modal button", { hasText: /Vuelta/ }).first().click();
+    await p.waitForTimeout(500);
+    await p.locator(".carga-todo-vuelto").click();
+    await p.waitForTimeout(900);
+    const malosVuelta = await p.evaluate(() => window.__contraste());
+    const todos = [...new Set([...malos, ...malosCarga, ...malosVuelta])];
     ok(todos.length === 0, `${tema}: todo el texto llega al mínimo legible${todos.length ? ` → ${todos.slice(0, 4).join(", ")}${todos.length > 4 ? ` +${todos.length - 4}` : ""}` : ""}`);
     await c.close();
   }
