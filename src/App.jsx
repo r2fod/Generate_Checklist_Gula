@@ -292,7 +292,7 @@ function resumirCambios(prev, nuevo) {
 
 // FASES_TIEMPO y estimarTiemposCarga están en ./tiempos-carga.js (compartidas con
 // ModalModoCarga).
-// calcularCalibracion y checklistDeEventoGuardado están en ./calibracion.js.
+// calcularCalibracion está en ./calibracion.js.
 // sumarMinutosHora está en ./tiempos-carga.js.
 
 // fmtRecogidas y fmtCompras están en ./checklist-format.js.
