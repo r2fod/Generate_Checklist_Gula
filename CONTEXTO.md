@@ -246,6 +246,21 @@ operativo).
   llena del de la marca al marcarlo. La explicación de cada bloque va debajo del título
   en pequeño (`TituloBloque detalle=`), no entre paréntesis; las pruebas buscan el
   bloque por `data-bloque`, no por su texto.
+- **Rediseño, fase 3 — iconos con vida**: al marcar una línea del modo carga la
+  casilla (o la pastilla "todo" de la vuelta) rebota, el icono reacciona y la fila se
+  ilumina; al marcar lo último de una categoría, la cuenta salta con un aro, lleva ✓ y
+  un brillo cruza la cabecera. La llama, el copo y el camión (`anim-llama/-hielo/-camion`,
+  los pone Iconos.jsx según el DIBUJO) se mueven a su manera con el ratón encima, solo
+  donde hay ratón (`@media (hover: hover)`). Todo en "Iconos con vida" (index.css) y
+  apagado con `prefers-reduced-motion`.
+  - **Solo al marcar, nunca al abrir**: una animación CSS puesta con una clase arranca
+    también al montarse, y abrir el modo carga con cincuenta líneas hechas sería una
+    traca. `useAcabaDe(valor, grupo)` da `true` solo cuando el valor pasa de no a sí
+    con el componente ya montado; `grupo` es la pestaña (Prep. y Salida son la misma
+    fila con otra marca: cambiar de pestaña no es marcar). La clase se quita en
+    `animationend` del propio contenedor, si no, plegar y abrir lo repetiría.
+  - De paso: la fila "vino todo" de la vuelta era `#f4fcf6` fijo también en oscuro, con
+    el texto claro encima. Ahora `--ok-bg`; la prueba de contraste mira la vuelta.
 - **Distribución: nada partido ni cortado** ("que no se corte nada o se ponga en 2
   líneas", y la captura de "Mesas de los comensales" con "Redonda 2m" sola abajo).
   Revisadas las tres apps a 320–1280 con un script que mide texto recortado, controles

@@ -306,8 +306,10 @@ con batería completa y capturas:
    bloque con su color e icono (`data-bloque`, `IconoBloque`/`TituloBloque`); logística,
    alquileres, recogidas y compras en su panel con la raya de su color; cada extra con
    su icono (`IconoExtra`), que se llena del color de la marca al marcarlo.
-3. **Iconos animados** (solo CSS, con `prefers-reduced-motion`): check que rebota,
-   llama, hielo, camión; celebrar la categoría terminada.
+3. **Iconos animados** — **hecho** (solo CSS, con `prefers-reduced-motion`): la
+   casilla del modo carga rebota y la fila se ilumina al marcar; la llama tiembla, el
+   copo gira y el camión arranca (`anim-*`); la categoría terminada se celebra. Solo al
+   marcar, nunca al abrir (`useAcabaDe`).
 4. **Orden en el móvil**: la checklist primero; los ajustes del calendario detrás de un
    botón. La que más pruebas toca: va la cuarta.
 5. **Remate**: letra de títulos y detalles. Visto en las capturas de la fase 2: en
