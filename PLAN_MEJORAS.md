@@ -310,8 +310,9 @@ con batería completa y capturas:
    casilla del modo carga rebota y la fila se ilumina al marcar; la llama tiembla, el
    copo gira y el camión arranca (`anim-*`); la categoría terminada se celebra. Solo al
    marcar, nunca al abrir (`useAcabaDe`).
-4. **Orden en el móvil**: la checklist primero; los ajustes del calendario detrás de un
-   botón. La que más pruebas toca: va la cuarta.
+4. **Orden en el móvil** — **hecho**: en una columna (≤1180px) la checklist primero y
+   la configuración debajo, con atajos para ir y volver; "Añadir item" plegado en el
+   móvil; los ajustes del calendario detrás de un botón en el móvil (`Ajustes.jsx`).
 5. **Remate**: letra de títulos y detalles. Visto en las capturas de la fase 2: en
    la hoja (Ver la hoja) en escritorio, al bajar asoma una franja de la lista por
    encima de la cabecera fija.

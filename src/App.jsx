@@ -6,7 +6,7 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy, ClipboardCheck,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Tag, Pencil, Undo2, RotateCcw,
-  AlertTriangle, ArrowRight, Bell, Copy, Search,
+  AlertTriangle, ArrowRight, ArrowUp, Bell, Copy, Search, SlidersHorizontal,
   Moon, Sun, Download, Upload, Eye,
   MapPin,
 } from "lucide-react";
@@ -435,6 +435,13 @@ function leerEstadoGuardado() {
 
 // FilaItem está en ./components/FilaItem.jsx.
 
+// Lleva a una parte de la pantalla (los atajos de una columna: la checklist, la
+// configuración, los eventos guardados). Con "reducir movimiento", de golpe.
+function irA(id) {
+  const suave = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById(id)?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
+}
+
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App({ onCerrarSesion } = {}) {
   // El archivo de eventos (colección "indice") es del EQUIPO y sus reglas piden sesión
@@ -733,6 +740,8 @@ export default function App({ onCerrarSesion } = {}) {
   // Lista de frases con lo que acaba de cambiar desde otro dispositivo (null = sin aviso)
   const [hayCambiosRemotos, setHayCambiosRemotos] = useState(null);
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
+  // En el móvil "Añadir item" va plegado: abierto ocupaba la primera pantalla entera
+  const [anadirAbierto, setAnadirAbierto] = useState(false);
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
   const [nuevoItemAlquiler, setNuevoItemAlquiler] = useState(false);
@@ -3869,7 +3878,26 @@ export default function App({ onCerrarSesion } = {}) {
         })()}
 
         <div className="main-layout">
+        {/* En una columna (móvil y tableta) la checklist va PRIMERO: era lo último, tras
+            Plantillas, Eventos guardados y la configuración entera (siete pantallas de
+            móvil antes de la primera línea). La configuración sigue debajo, y estos
+            atajos llevan a ella sin bajar a ciegas. En dos columnas no se ven. */}
+        {!soloMarcar && (
+          <nav className="atajos-una-columna" aria-label="Ir a">
+            <button type="button" className="btn btn-outline" onClick={() => irA("cfg-evento")}>
+              <SlidersHorizontal size={15} aria-hidden="true" /> Configurar el evento
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => irA("cfg-guardados")}>
+              <FolderOpen size={15} aria-hidden="true" /> Eventos guardados
+            </button>
+          </nav>
+        )}
         <div className="config-sidebar">
+        {!soloMarcar && (
+          <button type="button" className="btn btn-outline atajo-volver" onClick={() => irA("checklist-lista")}>
+            <ArrowUp size={15} aria-hidden="true" /> Volver a la checklist
+          </button>
+        )}
 
         {/* AÑADIR VARIOS ITEMS (pegando texto) */}
         {/* El estado "ya hay items pegados" se marca con una clase, no con colores en
@@ -3911,7 +3939,7 @@ export default function App({ onCerrarSesion } = {}) {
 
         {/* EVENTOS GUARDADOS */}
         {!soloMarcar && (
-        <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
+        <div id="cfg-guardados" className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.09s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Eventos guardados</span>
             {/* Arriba, con el título, solo la acción de cada día — igual que "Guardar
@@ -3975,7 +4003,7 @@ export default function App({ onCerrarSesion } = {}) {
 
         {/* CONFIG */}
         {!soloMarcar && (
-        <div className="config-card animate-entrance" style={{ animationDelay: "0.1s" }}>
+        <div id="cfg-evento" className="config-card animate-entrance" style={{ animationDelay: "0.1s" }}>
           <div className="section-title" data-bloque="evento"><IconoBloque bloque="evento" />Evento</div>
           <div className="form-row">
             <div className="form-group">
@@ -4895,7 +4923,7 @@ export default function App({ onCerrarSesion } = {}) {
         )}
 
         </div>
-        <div className="checklist-main">
+        <div id="checklist-lista" className="checklist-main">
 
         {/* BUSCADOR + DESHACER */}
         <div className="animate-entrance search-row" style={{ animationDelay: "0.2s" }}>
@@ -4907,7 +4935,13 @@ export default function App({ onCerrarSesion } = {}) {
 
         {/* AÑADIR ITEM PERSONALIZADO */}
         {!soloMarcar && (
-        <div className="config-card animate-entrance add-item-card" style={{ animationDelay: "0.22s" }}>
+        <div className={`config-card animate-entrance add-item-card${anadirAbierto ? " es-abierta" : ""}`} style={{ animationDelay: "0.22s" }}>
+          {/* Solo en el móvil (ver .add-item-abrir): cuatro campos y un botón eran media
+              pantalla entre el buscador y la primera categoría */}
+          <button type="button" className="add-item-abrir" aria-expanded={anadirAbierto} onClick={() => setAnadirAbierto(v => !v)}>
+            <ListPlus size={16} aria-hidden="true" /> Añadir un item a mano
+            <ChevronDown size={16} aria-hidden="true" className={`add-item-flecha${anadirAbierto ? " es-abierta" : ""}`} />
+          </button>
           <div className="add-item-row">
             <div className="form-group" style={{ flex: 2 }}>
               <span className="form-label">Añadir item personalizado</span>

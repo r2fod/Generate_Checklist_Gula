@@ -18,6 +18,7 @@ import Compartir from "./Compartir.jsx";
 import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
 import Limpiar from "./Limpiar.jsx";
+import Ajustes from "./Ajustes.jsx";
 import { saneaLista, saneaEquipo, aISO, checklistsPorCrear } from "./apuntes.js";
 import { leerRatios, ponRatios } from "../personal.js";
 // El asistente pide sesión de equipo para salir en la app, así que la batería tampoco
@@ -182,13 +183,13 @@ function Banco() {
             </button>
           </div>
         )}
-        <div className="cal-ajustes">
+        <Ajustes apuntes={apuntes} abiertosAlEntrar={!new URLSearchParams(window.location.search).get("cerrados")}>
         <Traer apuntes={apuntes} onTraer={(lista) => setApuntes(saneaLista(lista))} />
         <Limpiar apuntes={apuntes} onCambiar={(lista) => setApuntes(saneaLista(lista))} />
         <Compartir codigos={CODIGOS_DEMO} href={window.location.href} />
         <Equipo equipo={equipo} onCambiar={(e) => setEquipo(saneaEquipo(e))} />
         <Ratios ratios={ratios} onCambiar={(r) => setRatios(ponRatios(r))} />
-        </div>
+        </Ajustes>
         <Calendario apuntes={apuntes} equipo={equipo} onGuardar={guardar} onBorrar={borrar} mesInicial={mesInicial} />
       </>
     );

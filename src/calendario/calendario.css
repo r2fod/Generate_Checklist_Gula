@@ -1807,6 +1807,17 @@ button.cal-turnos.es-vacia {
 .cal-ajustes > * { margin-bottom: 0; }
 .app-wrapper > .cal-ajustes { margin-bottom: 0; }
 .cal-ajustes:empty { display: none; }
+/* En el móvil, todo eso detrás de un botón (Ajustes.jsx): eran media pantalla de barras
+   antes del mes. En pantalla grande el botón no está y se ve como siempre. */
+.cal-ajustes-bloque { margin-bottom: 14px; }
+.cal-ajustes-bloque > .cal-ajustes { margin-bottom: 0; }
+.app-wrapper > .cal-ajustes-bloque { margin-bottom: 0; }
+.cal-ajustes-boton { display: none; }
+@media (max-width: 768px) {
+  .cal-ajustes-bloque { display: flex; flex-direction: column; gap: 8px; }
+  .cal-ajustes-boton { display: block; margin-bottom: 0; }
+  .cal-ajustes-bloque:not(.es-abierto) > .cal-ajustes { display: none; }
+}
 
 /* ─── LIMPIAR EL CALENDARIO ───────────────────────────────────────────────────
    Un grupo por cada cosa que sobra, con su porqué arriba y una fila por apunte. La fila
