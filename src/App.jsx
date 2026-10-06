@@ -3315,6 +3315,7 @@ export default function App({ onCerrarSesion } = {}) {
       {modoCarga && (
         <React.Suspense fallback={<CargandoPanel texto="Abriendo Modo carga…" />}>
         <ModalModoCarga
+          tipoEvento={evento}
           onGuardarPrecios={handleGuardarPrecios}
           preciosAlDia={preciosAlDia}
           factoresBebida={factoresBebida}
@@ -3432,7 +3433,7 @@ export default function App({ onCerrarSesion } = {}) {
         </div>
 
         {/* HEADER */}
-        <header className="app-header animate-entrance">
+        <header className="app-header con-tipo animate-entrance" data-tipo={evento}>
           <div className="header-title-group">
             <div className="header-icon">{React.createElement(EVENTO_ICON[evento] || Heart, { size: 24, strokeWidth: 2.2 })}</div>
             <div className="header-info">

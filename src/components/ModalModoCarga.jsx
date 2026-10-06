@@ -236,7 +236,7 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
   );
 });
 
-export default function ModalModoCarga({ checklist: checklistCompleta, preparados = {}, pendientes = {}, onPendiente, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
+export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvento, preparados = {}, pendientes = {}, onPendiente, checkeados, vueltos, roturas, marcasRevisar = {}, onTogglePreparado, onToggleSale, onVuelve, onRoturas, notasCheck = {}, onToggleNota, cronos = {}, onCronoStart, onCronoPause, onCronoReset, onClose, sinCerrar = false, meta = {}, onGuardarPrecios, preciosAlDia = 0, factoresBebida = {}, calibracionBebida = {}, onCambiarBebida, factoresHielo = {}, calibracionHielo = {}, onCambiarHielo, factoresComida = {}, calibracionComida = {}, onCambiarComida, ratiosPersonal = {}, calibracionPersonal = {}, onCambiarRatios }) {
   // Los items sin cantidad real ("—" o vacíos, a decidir in situ) no aportan nada
   // durante la carga — solo lían. Se quedan fuera aquí igual que en Word/Vista previa.
   // Las categorías "Personal" (camareros/logística/cocina) y "Menús especiales" (cuántos
@@ -546,7 +546,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, preparado
   return (
     <div className={`preview-overlay ${sinCerrar ? "is-pantalla" : ""}`} onClick={sinCerrar ? undefined : onClose}>
       <div className="preview-modal carga-modal" onClick={e => e.stopPropagation()}>
-        <div className="preview-header" ref={cabeceraRef}>
+        <div className="preview-header con-tipo" data-tipo={tipoEvento} ref={cabeceraRef}>
           <div>
             <div className="preview-header-title"><Package size={16} /> Modo carga{meta.nombreEvento ? ` · ${meta.nombreEvento}` : ""}</div>
             <div className="preview-header-subtitle">

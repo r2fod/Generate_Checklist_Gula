@@ -227,6 +227,36 @@ async function main() {
     ok(desbordan.length === 0, `${tema}: sin desbordamiento en ${ANCHOS.length} anchos${desbordan.length ? ` → ${desbordan.join(", ")}` : ""}`);
   }
 
+  // ── Cada tipo de evento con SU color, el mismo que en el calendario ──────────
+  // "Falta color para diferenciar cosas" (el dueño): la cabecera de la checklist y la
+  // del modo carga llevan el color del tipo (--color-* en :root, que es también lo que
+  // pinta el calendario). Se compara el color pintado con el de la variable, no con un
+  // número a mano: si alguien cambia la paleta, la prueba sigue valiendo.
+  console.log("\n── El color del tipo de evento en la cabecera ──");
+  for (const tipo of ["boda", "produccion"]) {
+    const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url({ ...EVENTO_COMPLETO, evento: tipo }), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".app-header .header-icon");
+    const colores = await page.evaluate((t) => {
+      const pinta = (valor) => { const d = document.createElement("i"); d.style.color = valor; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+      return {
+        icono: getComputedStyle(document.querySelector(".app-header .header-icon")).backgroundColor,
+        raya: getComputedStyle(document.querySelector(".app-header")).borderTopColor,
+        delTipo: pinta(`var(--color-${t})`),
+        marca: pinta("var(--accent)"),
+      };
+    }, tipo);
+    ok(colores.icono === colores.delTipo && colores.raya === colores.delTipo && colores.delTipo !== colores.marca,
+      `${tipo}: el icono y la raya de la cabecera van del color de su tipo (${colores.delTipo}), no del de la marca`);
+    await page.locator("button", { hasText: "Modo carga" }).first().click();
+    await page.waitForSelector(".carga-modal .preview-header");
+    const carga = await page.evaluate(() => getComputedStyle(document.querySelector(".carga-modal .preview-header")).borderTopColor);
+    ok(carga === colores.delTipo, `${tipo}: y el modo carga, el mismo color`);
+    await ctx.close();
+  }
+
   // ── El contenedor acompaña al ancho de la ventana ───────────────────────────
   // Estaba clavado en 1320px: en un monitor de 1920 sobraban 300px muertos a cada lado
   // y la lista se quedaba en 868px por grande que fuera la pantalla. Se comprueba con
