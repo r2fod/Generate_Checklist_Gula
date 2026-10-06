@@ -2,6 +2,8 @@ import {
   Plug, Armchair, CookingPot, Utensils, Wine, Shirt, UtensilsCrossed,
   SprayCan, Coffee, CupSoda, Martini, Truck, Package, Users, Boxes,
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cake,
+  ClipboardList, Tag, RotateCcw, ShoppingCart, Sparkles, Refrigerator, Layers, Soup,
+  ConciergeBell, Fuel, PartyPopper, Popcorn, Sofa, Ham, Droplet, Croissant, Milk,
 } from "lucide-react";
 
 // Icono decorativo + color pastel por categoría, buscado por fragmento del nombre
@@ -117,4 +119,38 @@ function iconoItem(label) {
 export function IconoItem({ label, size = 15 }) {
   const { I, c } = iconoItem(label);
   return <I size={size} strokeWidth={2} className="item-icon" style={{ color: c }} />;
+}
+
+// ─── BLOQUES Y EXTRAS DE LA CONFIGURACIÓN ───
+// "Que haya más contraste para diferenciar compras, recogidas, las opciones como
+// paella, parisiene…" (el dueño): en un formulario de dos metros todo era el mismo
+// título pequeño en gris. Cada bloque lleva su icono aquí y su color en el CSS
+// (data-bloque en el padre), y cada extra su icono, buscado por su texto.
+const ICONO_BLOQUE = {
+  evento: ClipboardList, logistica: Truck, alquileres: Tag, recogidas: RotateCcw,
+  compras: ShoppingCart, barra: Martini, extras: Sparkles, equipamiento: Refrigerator,
+};
+export function IconoBloque({ bloque }) {
+  const Icono = ICONO_BLOQUE[bloque] || Boxes;
+  return <span className="bloque-icono" aria-hidden="true"><Icono size={14} strokeWidth={2.3} /></span>;
+}
+// El icono y el título de un bloque juntos: en el móvil el título largo parte en dos
+// líneas al lado de su icono, en vez de dejar el icono solo en una línea.
+export function TituloBloque({ bloque, children }) {
+  return <span className="bloque-cabecera"><IconoBloque bloque={bloque} /><span>{children}</span></span>;
+}
+const ICONO_EXTRA = {
+  "Doble servicio": Layers, "Doble tenedor": Utensils, "Doble cuchillo": Utensils,
+  "Doble cuchara": Utensils, "Doble copa de vino": Wine, "Doble vaso de agua": GlassWater,
+  "Doble copa de cava": Wine, "Entrante de chupito": Soup, "Entrante compartido": UtensilsCrossed,
+  "Solo bandeja": ConciergeBell, "Lleva paella": CookingPot, "Hay frituras": Flame,
+  "Plancha de gas": Fuel, "Brindis con cava": PartyPopper, "Lleva palomitera": Popcorn,
+  "Lleva chill out": Sofa, "Hay jamonero": Ham, "Hay tarta": Cake, "Aguas pequeñas": Droplet,
+  "Hay desayuno": Croissant, "Café para invitados": Coffee, "Servilletas de tela": Shirt,
+  "Jarras de cristal": Milk, "Llevamos cristalería": Wine, "Llevamos hielo": Snowflake,
+  "La bebida la pone Gula": Beer,
+};
+export function IconoExtra({ nombre }) {
+  const Icono = ICONO_EXTRA[nombre];
+  return Icono ? <span className="bloque-icono extra-icono" aria-hidden="true"><Icono size={15} strokeWidth={2.2} /></span> : null;
 }

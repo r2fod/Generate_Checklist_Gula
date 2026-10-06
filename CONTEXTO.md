@@ -236,6 +236,15 @@ operativo).
   `.con-cat` y el CSS deriva `--cat-fondo/-tinta/-raya/-tinte`, invertidos en oscuro.
   La hoja y el modo carga comparten `CabeceraCategoria`; en el modo carga lleva "3/8" y
   su barra, contados con `estaHecho`, la MISMA regla que el recuento de arriba.
+- **Rediseño, contraste en la configuración**: la tarjeta "Evento" es un formulario de
+  dos metros donde Compras y Recogidas eran dos cajas grises iguales y los 25 extras
+  (paella, frituras/parisiene, tarta…) la misma fila repetida. Ahora `data-bloque` da a
+  cada bloque su color (`--bloque`, del que salen tinta, chip, fondo y borde, invertidos
+  en oscuro) y su icono (`IconoBloque`/`TituloBloque` en Iconos.jsx); logística,
+  alquileres, recogidas y compras van en su panel con la raya de su color. Cada extra
+  lleva su icono (`IconoExtra`, buscado por su texto) en el color del bloque, que se
+  llena del de la marca al marcarlo. Los textos de los títulos no cambian (las pruebas
+  buscan "RECOGIDAS (").
 
 ## Lo desduplicado (y lo que NO se unificó)
 

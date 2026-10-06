@@ -1425,6 +1425,60 @@ body {
   background: linear-gradient(90deg, var(--accent), rgba(201, 162, 75, 0.9));
 }
 
+/* Bloques de la configuración, cada uno con su color e icono (IconoBloque e IconoExtra,
+   en Iconos.jsx). "Que haya más contraste para diferenciar compras, recogidas, las
+   opciones como paella…" (el dueño): en un formulario de dos metros, todo era el mismo
+   título pequeño. data-bloque elige el color; lo demás sale de --bloque. */
+[data-bloque] {
+  --bloque-tinta: var(--bloque);
+  --bloque-chip: color-mix(in srgb, var(--bloque) 13%, var(--card-bg));
+  --bloque-fondo: color-mix(in srgb, var(--bloque) 6%, var(--card-bg));
+  --bloque-borde: color-mix(in srgb, var(--bloque) 25%, var(--border-color));
+}
+:root[data-tema="oscuro"] [data-bloque] {
+  --bloque-tinta: color-mix(in srgb, var(--bloque) 55%, #fff);
+  --bloque-chip: color-mix(in srgb, var(--bloque) 28%, var(--card-bg));
+  --bloque-fondo: color-mix(in srgb, var(--bloque) 11%, var(--card-bg));
+  --bloque-borde: color-mix(in srgb, var(--bloque) 40%, var(--border-color));
+}
+[data-bloque="evento"]       { --bloque: var(--accent); }
+[data-bloque="logistica"]    { --bloque: #7c3aed; }
+[data-bloque="alquileres"]   { --bloque: #b45309; }
+[data-bloque="recogidas"]    { --bloque: #0e7490; }
+[data-bloque="compras"]      { --bloque: #c2410c; }
+[data-bloque="barra"]        { --bloque: #2563eb; }
+[data-bloque="extras"]       { --bloque: #be185d; }
+[data-bloque="equipamiento"] { --bloque: #475569; }
+
+.section-title[data-bloque] { color: var(--bloque-tinta); font-size: var(--fs-sm); }
+.section-title[data-bloque]::before { content: none; }
+.bloque-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
+  background: var(--bloque-chip, var(--accent-soft));
+  color: var(--bloque-tinta, var(--accent));
+}
+/* Logística, alquileres, recogidas y compras: cada uno en su panel, con la raya de su color */
+.logistica-block[data-bloque] {
+  padding: 12px;
+  background: var(--bloque-fondo);
+  border: 1px solid var(--bloque-borde);
+  border-left: 4px solid var(--bloque);
+  border-radius: var(--radius-md);
+}
+.logistica-block[data-bloque] > .form-label { color: var(--bloque-tinta); }
+.bloque-cabecera { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.logistica-block[data-bloque] .recogida-card { background: var(--card-bg); }
+/* Los extras: el icono en el color del bloque mientras está apagado, y lleno del de
+   la marca al marcarlo, como el resto de la casilla — de un vistazo, qué lleva y qué no. */
+.extra-icono { width: 24px; height: 24px; margin-top: -2px; transition: background-color 0.2s, color 0.2s; }
+.checkbox-label-normal:has(input:checked) .extra-icono { background: var(--accent); color: #fff; }
+
 /* Form Grid */
 .form-row {
   display: grid;

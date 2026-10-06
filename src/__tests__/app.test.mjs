@@ -292,6 +292,35 @@ async function main() {
     await ctx.close();
   }
 
+  // ── La configuración: cada bloque con su color, cada extra con su icono ─────
+  // "Que haya más contraste para diferenciar compras, recogidas, las opciones como
+  // paella, parisiene…" (el dueño). Recogidas y compras eran dos cajas grises iguales.
+  console.log("\n── Contraste en la configuración ──");
+  {
+    const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url({ ...EVENTO_COMPLETO, llevaPaella: true }), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('.logistica-block[data-bloque="compras"]');
+    const m = await page.evaluate(() => {
+      const raya = (b) => getComputedStyle(document.querySelector(`.logistica-block[data-bloque="${b}"]`)).borderLeftColor;
+      const extras = [...document.querySelectorAll('.checkbox-grid[data-bloque="extras"] .checkbox-label-normal')];
+      const paella = extras.find(e => /Lleva paella/.test(e.textContent));
+      const pinta = (valor) => { const d = document.createElement("i"); d.style.color = valor; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+      return {
+        rayas: ["logistica", "alquileres", "recogidas", "compras"].map(raya),
+        extras: extras.length,
+        conIcono: extras.filter(e => e.querySelector(".extra-icono")).length,
+        paellaIcono: paella && getComputedStyle(paella.querySelector(".extra-icono")).backgroundColor,
+        marca: pinta("var(--accent)"),
+      };
+    });
+    ok(new Set(m.rayas).size === 4, `logística, alquileres, recogidas y compras, cada uno con su color (${m.rayas.join(" · ")})`);
+    ok(m.extras > 15 && m.conIcono === m.extras, `cada extra con su icono (${m.conIcono} de ${m.extras})`);
+    ok(m.paellaIcono === m.marca, "y el de lo marcado (la paella) se llena del color de la marca, para ver de un vistazo qué lleva");
+    await ctx.close();
+  }
+
   // ── El contenedor acompaña al ancho de la ventana ───────────────────────────
   // Estaba clavado en 1320px: en un monitor de 1920 sobraban 300px muertos a cada lado
   // y la lista se quedaba en 868px por grande que fuera la pantalla. Se comprueba con
