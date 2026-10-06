@@ -257,6 +257,41 @@ async function main() {
     await ctx.close();
   }
 
+  // ── Cada categoría con su color, y en el modo carga lo que lleva hecho ─────────
+  // Los colores de una categoría van UNA vez en su contenedor (estiloCategoria →
+  // --cat/--cat-suave) y de ahí salen el icono, la raya y la barra. En oscuro se
+  // invierten sin el filtro de antes, que apagaba el bloque entero, texto incluido.
+  console.log("\n── El color de cada categoría y su cuenta en el modo carga ──");
+  for (const tema of ["claro", "oscuro"]) {
+    const ctx = await navegador.newContext({ viewport: { width: 390, height: 844 } });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    await ctx.addInitScript(t => localStorage.setItem("gula_tema", t), tema);
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-section .cat-icon");
+    const seccion = await page.evaluate(() => {
+      const sec = document.querySelector(".category-section");
+      const pinta = (valor) => { const d = document.createElement("i"); d.style.color = valor; sec.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+      const icono = getComputedStyle(sec.querySelector(".cat-icon"));
+      return { raya: getComputedStyle(sec).borderTopColor, suyaRaya: pinta("var(--cat-raya)"), fondo: icono.backgroundColor, suyoFondo: pinta("var(--cat-fondo)"), filtro: icono.filter };
+    });
+    ok(seccion.raya === seccion.suyaRaya && seccion.fondo === seccion.suyoFondo && seccion.filtro === "none",
+      `${tema}: la raya y el icono de la categoría salen de sus variables, sin filtros encima`);
+
+    await page.locator("button", { hasText: "Modo carga" }).first().click();
+    await page.waitForSelector(".carga-modal .preview-category .cat-cuenta");
+    const primera = page.locator(".carga-modal .preview-category").first();
+    const antes = await primera.locator(".cat-cuenta").innerText();
+    const [, total] = antes.split("/").map(Number);
+    await primera.locator(".carga-lista input[type=checkbox]").first().click();
+    await page.waitForTimeout(400);
+    const despues = await primera.locator(".cat-cuenta").innerText();
+    const ancho = await primera.locator(".cat-progreso > span").evaluate(e => e.getBoundingClientRect().width);
+    ok(antes === `0/${total}` && despues === `1/${total}` && ancho > 0,
+      `${tema}: la cabecera de la categoría cuenta lo cargado (${antes} → ${despues}) y su barra avanza`);
+    await ctx.close();
+  }
+
   // ── El contenedor acompaña al ancho de la ventana ───────────────────────────
   // Estaba clavado en 1320px: en un monitor de 1920 sobraban 300px muertos a cada lado
   // y la lista se quedaba en 868px por grande que fuera la pantalla. Se comprueba con

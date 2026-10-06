@@ -46,6 +46,31 @@ export function IconoCategoria({ nombre, size = 16 }) {
   const Comp = infoCategoria(nombre).Comp || Boxes;
   return <Comp size={size} strokeWidth={2.2} />;
 }
+// Los dos colores de una categoría como variables CSS, para ponerlos UNA vez en su
+// contenedor (con la clase .con-cat): el icono, la raya, el tinte de la cabecera y la
+// barra de progreso los leen de ahí. Antes cada sitio copiaba el pastel en línea, y el
+// tema oscuro solo podía apagarlos con un filtro sobre todo el bloque.
+export function estiloCategoria(nombre) {
+  const { color, texto } = infoCategoria(nombre);
+  return { "--cat": texto, "--cat-suave": color };
+}
+// Cabecera de una categoría en la hoja y en el modo carga (las dos eran la misma
+// copia). Con hechos/total enseña cuánto lleva: "3/8" y su barra.
+export function CabeceraCategoria({ nombre, hechos, total }) {
+  const conCuenta = total > 0 && Number.isFinite(hechos);
+  return (
+    <div className="preview-category-header">
+      <span className="cat-icon-mini"><IconoCategoria nombre={nombre} /></span>
+      <span className="cat-cabecera-nombre">{nombre}</span>
+      {conCuenta && (
+        <>
+          <span className={`cat-cuenta${hechos === total ? " es-completa" : ""}`}>{hechos}/{total}</span>
+          <span className="cat-progreso" aria-hidden="true"><span style={{ width: `${(hechos / total) * 100}%` }} /></span>
+        </>
+      )}
+    </div>
+  );
+}
 
 // Icono por MATERIAL: se elige según palabras clave del nombre del item (el primero
 // que coincide gana, por eso el orden importa). Es decorativo — una pista visual.
