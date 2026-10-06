@@ -296,13 +296,18 @@ con batería completa y capturas:
 1. **Marca y color por tipo** — **hecho**: acento = verde azulado del logo, color del
    tipo de evento (`--color-*`, `.con-tipo`) en la cabecera de la checklist y del modo
    carga, el calendario lee los mismos colores.
-2. **Categorías con su color**: cabecera teñida, barra de progreso y cantidades del
-   color de la categoría (`infoCategoria`, Iconos.jsx).
+2. **Categorías con su color** — **hecho**: `estiloCategoria` pone `--cat`/`--cat-suave`
+   una vez en el contenedor (`.con-cat`) y de ahí salen icono, raya, tinte de la
+   cabecera, la fila del resumen y la barra; en el modo carga cada categoría dice
+   "3/8" con su barra (`CabeceraCategoria`, la misma en la hoja). Las cantidades
+   siguen en verde a propósito: verde = "cantidad", igual en todas las categorías.
 3. **Iconos animados** (solo CSS, con `prefers-reduced-motion`): check que rebota,
    llama, hielo, camión; celebrar la categoría terminada.
 4. **Orden en el móvil**: la checklist primero; los ajustes del calendario detrás de un
    botón. La que más pruebas toca: va la cuarta.
-5. **Remate**: letra de títulos y detalles.
+5. **Remate**: letra de títulos y detalles. Visto en las capturas de la fase 2: en
+   la hoja (Ver la hoja) en escritorio, al bajar asoma una franja de la lista por
+   encima de la cabecera fija.
 
 ## D. Futuro
 

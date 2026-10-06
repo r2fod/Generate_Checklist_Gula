@@ -3,7 +3,7 @@ import {
   Package, ClipboardCheck, Truck, Undo2, BarChart3, Clock, AlertTriangle, Check,
   Bell, BellOff, Euro, FileText, Pause, Play, RotateCcw, X, Tag, Hourglass,
 } from "lucide-react";
-import { IconoCategoria, IconoItem, infoCategoria } from "./Iconos.jsx";
+import { CabeceraCategoria, IconoCategoria, IconoItem, estiloCategoria } from "./Iconos.jsx";
 import { conCortes } from "./cortes.jsx";
 import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from "../checklist-format.js";
 import { esConsumible } from "../consumibles.js";
@@ -294,9 +294,12 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
   const preparadosSinCargar = checklist.flatMap(c => c.items
     .map(([, , , lo]) => `${c.nombre}::${lo}`)
     .filter(k => preparados[k] && !checkeados[k]));
-  const totalMarcados = modo === "preparacion" ? totalPreparados
-    : modo === "salida" ? contarSi(k => checkeados[k])
-    : contarSi(k => { const v = vueltos[k]; return v !== undefined && v !== ""; });
+  // Qué cuenta como hecho en la pestaña abierta: lo usan el recuento de arriba y el de
+  // cada categoría, que no pueden discrepar.
+  const estaHecho = (k) => modo === "preparacion" ? !!preparados[k]
+    : modo === "salida" ? !!checkeados[k]
+    : vueltos[k] !== undefined && vueltos[k] !== "";
+  const totalMarcados = contarSi(estaHecho);
   const palabraModo = modo === "preparacion" ? "preparados" : modo === "salida" ? "cargados" : "vueltos";
   // Items marcados a los que alguien les ha cambiado la cantidad DESPUÉS: siguen
   // marcados (es trabajo hecho, no se borra) pero hay que volver a contarlos. El aviso
@@ -772,9 +775,9 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                   <div className="resumen-titulo">En qué se va</div>
                   <div className="resumen-ranking">
                     {ranking.map(c => (
-                      <div className="resumen-ranking-fila" key={c.nombre}>
+                      <div className="resumen-ranking-fila con-cat" key={c.nombre} style={estiloCategoria(c.nombre)}>
                         <span className="resumen-ranking-nombre">
-                          <span className="cat-icon-mini" style={{ background: infoCategoria(c.nombre).color, color: infoCategoria(c.nombre).texto }}>
+                          <span className="cat-icon-mini">
                             <IconoCategoria nombre={c.nombre} size={11} />
                           </span>
                           {c.nombre}
@@ -782,7 +785,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                         <span className="resumen-ranking-barra">
                           <span
                             className="resumen-ranking-relleno"
-                            style={{ width: `${granTotal > 0 ? Math.max(2, (c.subtotal / granTotal) * 100) : 0}%`, background: infoCategoria(c.nombre).color }}
+                            style={{ width: `${granTotal > 0 ? Math.max(2, (c.subtotal / granTotal) * 100) : 0}%` }}
                           />
                         </span>
                         <span className="resumen-ranking-cifra">{fmtEur(c.subtotal)}</span>
@@ -808,8 +811,8 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                   </thead>
                   {filasPorCategoria.map(cat => (
                     <tbody key={cat.nombre}>
-                      <tr className="resumen-cat-header" style={{ background: infoCategoria(cat.nombre).color }}>
-                        <td colSpan={7} style={{ color: infoCategoria(cat.nombre).texto }}><IconoCategoria nombre={cat.nombre} size={14} /> {cat.nombre}</td>
+                      <tr className="resumen-cat-header con-cat" style={estiloCategoria(cat.nombre)}>
+                        <td colSpan={7}><IconoCategoria nombre={cat.nombre} size={14} /> {cat.nombre}</td>
                       </tr>
                       {cat.filas.map(f => (
                         <tr key={f.key}>
@@ -897,11 +900,12 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
             >{todoVuelto ? <><X size={15} /> Desmarcar todo</> : <><Check size={15} /> Marcar todo como vuelto</>}</button>
           )}
           {checklist.map(cat => (
-            <div className="preview-category" key={cat.nombre}>
-              <div className="preview-category-header" style={{ borderLeftColor: infoCategoria(cat.nombre).color }}>
-                <span className="cat-icon-mini" style={{ background: infoCategoria(cat.nombre).color, color: infoCategoria(cat.nombre).texto }}><IconoCategoria nombre={cat.nombre} /></span>
-                <span>{cat.nombre}</span>
-              </div>
+            <div className="preview-category con-cat" key={cat.nombre} style={estiloCategoria(cat.nombre)}>
+              <CabeceraCategoria
+                nombre={cat.nombre}
+                hechos={cat.items.filter(([, , , lo]) => estaHecho(`${cat.nombre}::${lo}`)).length}
+                total={cat.items.length}
+              />
               <div className="carga-lista">
                 {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual]) => {
                   const dataKey = `${cat.nombre}::${labelOriginal}`;

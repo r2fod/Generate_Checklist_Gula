@@ -3,7 +3,7 @@ import {
   EVENTOS, PALABRAS_ALQUILER, fmtCantidadCompleta, quitarItemsSinCantidad,
   fmtLogistica, totalLogistica, fmtRecogidas, fmtCompras,
 } from "../checklist-format.js";
-import { IconoCategoria, infoCategoria } from "./Iconos.jsx";
+import { CabeceraCategoria, estiloCategoria } from "./Iconos.jsx";
 
 export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey, pax, ninos, meta = {}, onClose, sinCerrar = false }) {
   const checklist = quitarItemsSinCantidad(checklistCompleta);
@@ -74,11 +74,8 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
             </div>
           )}
           {checklist.map(cat => (
-            <div className="preview-category" key={cat.nombre}>
-              <div className="preview-category-header" style={{ borderLeftColor: infoCategoria(cat.nombre).color }}>
-                <span className="cat-icon-mini" style={{ background: infoCategoria(cat.nombre).color, color: infoCategoria(cat.nombre).texto }}><IconoCategoria nombre={cat.nombre} /></span>
-                <span>{cat.nombre}</span>
-              </div>
+            <div className="preview-category con-cat" key={cat.nombre} style={estiloCategoria(cat.nombre)}>
+              <CabeceraCategoria nombre={cat.nombre} />
               <div className="preview-table-wrap">
                 <table className="preview-table">
                   <thead>

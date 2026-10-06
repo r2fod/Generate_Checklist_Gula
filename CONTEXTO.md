@@ -229,6 +229,13 @@ operativo).
   (`data-tipo`): la cabecera de la checklist y la del modo carga llevan el icono lleno,
   la raya de arriba y el tinte del suyo. Sin tipo, la marca. Los añiles escritos a mano
   pasaron a `color-mix` con `--accent`.
+- **Rediseño, fase 2 — cada categoría con su color**: el pastel de cada categoría se
+  copiaba en línea en cinco sitios (lista, hoja, modo carga, resumen y su barra) y en
+  oscuro se apagaba con un `filter` sobre el bloque entero, texto incluido. Ahora
+  `estiloCategoria` (Iconos.jsx) pone `--cat`/`--cat-suave` UNA vez en el contenedor
+  `.con-cat` y el CSS deriva `--cat-fondo/-tinta/-raya/-tinte`, invertidos en oscuro.
+  La hoja y el modo carga comparten `CabeceraCategoria`; en el modo carga lleva "3/8" y
+  su barra, contados con `estaHecho`, la MISMA regla que el recuento de arriba.
 
 ## Lo desduplicado (y lo que NO se unificó)
 

@@ -166,18 +166,24 @@
   --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
 }
-/* Los pastel de categoría y los iconos de material se pintan desde JS en estilos
-   en línea, que ganan a cualquier regla: se bajan de intensidad con un filtro para
-   que sigan distinguiéndose sin deslumbrar sobre el fondo oscuro. */
-:root[data-tema="oscuro"] .cat-icon,
-:root[data-tema="oscuro"] .cat-icon-mini,
-:root[data-tema="oscuro"] .preview-category-header {
-  filter: brightness(0.42) saturate(1.5);
+/* Color de cada categoría. estiloCategoria (Iconos.jsx) pone --cat (el tono fuerte) y
+   --cat-suave (el pastel) en su contenedor .con-cat, y de ahí salen el resto: el icono,
+   la raya, el tinte de la cabecera y la barra de progreso. En oscuro se invierten (el
+   pastel pasa a ser la tinta y el fondo se mezcla con la tarjeta), sin el filtro que
+   antes apagaba bloques enteros —texto incluido— para que no deslumbraran. */
+.con-cat {
+  --cat-fondo: var(--cat-suave);
+  --cat-tinta: var(--cat);
+  --cat-raya: color-mix(in srgb, var(--cat) 45%, var(--cat-suave));
+  --cat-tinte: color-mix(in srgb, var(--cat-suave) 85%, transparent);
 }
-:root[data-tema="oscuro"] .cat-icon svg,
-:root[data-tema="oscuro"] .cat-icon-mini svg {
-  filter: brightness(2.4);
+:root[data-tema="oscuro"] .con-cat {
+  --cat-fondo: color-mix(in srgb, var(--cat-suave) 20%, var(--card-bg));
+  --cat-tinta: var(--cat-suave);
+  --cat-raya: color-mix(in srgb, var(--cat-suave) 55%, var(--card-bg));
+  --cat-tinte: color-mix(in srgb, var(--cat-suave) 10%, transparent);
 }
+.con-cat .cat-icon, .con-cat .cat-icon-mini { background: var(--cat-fondo); color: var(--cat-tinta); }
 :root[data-tema="oscuro"] .item-icon { filter: brightness(1.55) saturate(1.15); }
 
 * {
@@ -2227,6 +2233,7 @@ body {
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-color);
+  border-top: 3px solid var(--cat-raya, var(--border-color));
   background: var(--card-bg);
   transition: box-shadow 0.25s ease;
   box-shadow: var(--shadow-sm);
@@ -2238,7 +2245,7 @@ body {
 }
 
 .category-header {
-  background: var(--card-bg);
+  background: linear-gradient(90deg, var(--cat-tinte, transparent), transparent 65%), var(--card-bg);
   color: var(--text-main);
   padding: 16px 22px;
   font-size: var(--fs-md);
@@ -3001,8 +3008,9 @@ hr {
   align-items: center;
   gap: 9px;
   padding: 10px 16px;
-  background: linear-gradient(90deg, rgba(0,0,0,0.015), transparent 60%), var(--card-bg);
-  border-left: 4px solid var(--accent);
+  position: relative;
+  background: linear-gradient(90deg, var(--cat-tinte, transparent), transparent 70%), var(--card-bg);
+  border-left: 4px solid var(--cat-raya, var(--accent));
   color: var(--text-main);
   font-weight: 700;
   font-size: var(--fs-sm);
@@ -3022,6 +3030,20 @@ hr {
 }
 .cat-icon-mini svg { display: block; }
 .preview-category:hover .cat-icon-mini { transform: scale(1.1) rotate(-5deg); }
+.cat-cabecera-nombre { flex: 1 1 auto; min-width: 0; }
+.cat-cuenta {
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--cat-tinta, var(--text-muted));
+  background: var(--cat-fondo, var(--bg-subtle));
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0;
+}
+.cat-cuenta.es-completa { background: var(--hecho-bg); color: var(--hecho-texto); }
+/* Lo que lleva hecho la categoría, como una raya por debajo de su cabecera */
+.cat-progreso { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--border-light); }
+.cat-progreso > span { display: block; height: 100%; background: var(--cat-raya, var(--accent)); transition: width 0.4s cubic-bezier(0.34, 1.3, 0.64, 1); }
 
 .preview-table-wrap {
   overflow-x: auto;
@@ -3232,7 +3254,7 @@ hr {
   overflow: hidden;
   min-width: 0;
 }
-.resumen-ranking-relleno { display: block; height: 100%; border-radius: var(--radius-pill); }
+.resumen-ranking-relleno { display: block; height: 100%; border-radius: var(--radius-pill); background: var(--cat-raya, var(--accent)); }
 .resumen-ranking-cifra { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-main); }
 .resumen-ranking-pct { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
 @media (max-width: 480px) {
@@ -3963,10 +3985,10 @@ hr {
 }
 
 .resumen-cat-header td {
-  background: var(--bg-color);
+  background: var(--cat-fondo, var(--bg-color));
   text-align: left;
   font-weight: 700;
-  color: var(--text-main);
+  color: var(--cat-tinta, var(--text-main));
   white-space: normal;
 }
 
@@ -5161,10 +5183,6 @@ hr {
   border-color: var(--hecho-borde);
   color: var(--hecho-texto);
 }
-
-/* Resumen: el nombre de la categoría lleva su color de marca en un estilo en línea,
-   que en oscuro queda casi negro sobre fondo oscuro. Aquí manda el color del tema. */
-:root[data-tema="oscuro"] .resumen-cat-header td { color: var(--text-main) !important; }
 
 /* ─── MODAL "AÑADIR VARIOS ITEMS" ──────────────────────────────────────────────
    Era el único sitio de la app con los colores escritos a mano en el JSX (#fff,
