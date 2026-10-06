@@ -6912,6 +6912,11 @@ hr {
 .asis-fondo {
   position: fixed;
   inset: 0;
+  /* Pegado a la zona que se VE (useZonaVisible.js): con el teclado abierto, encima de
+     él y entero, en vez de a pantalla completa con la cabecera fuera de la vista. */
+  top: var(--zona-arriba, 0px);
+  bottom: auto;
+  height: var(--zona-alto, 100%);
   z-index: 60;
   display: flex;
   align-items: flex-end;
