@@ -27,7 +27,9 @@ export default function Escaleta({ datos }) {
         <CalendarClock size={16} aria-hidden="true" />
         <span className="cal-ratios-titulo">
           Escaleta del día
-          <em> · {resumenEscaleta(tramos)}</em>
+          {/* Cada dato en su trozo, que no se parte: en el móvil el resumen salta de línea
+              entre "Salida 02:28" e "inicio 12:30", no a mitad de uno. */}
+          <em>{resumenEscaleta(tramos).split(" · ").map(t => <span key={t} className="escaleta-trozo">{t}</span>)}</em>
         </span>
         {tarde && <AlertTriangle size={15} aria-hidden="true" className="escaleta-alerta-icono" />}
         <ChevronDown size={16} aria-hidden="true" className={`cal-ratios-flecha${abierto ? " es-abierta" : ""}`} />

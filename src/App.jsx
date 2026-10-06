@@ -4111,7 +4111,7 @@ export default function App({ onCerrarSesion } = {}) {
           </div>
           <div className="logistica-block" data-bloque="logistica">
             <span className="form-label logistica-label-rec">
-              <TituloBloque bloque="logistica">EQUIPO DE LOGÍSTICA (cada uno con su horario)</TituloBloque>
+              <TituloBloque bloque="logistica" detalle="Cada uno con su horario">EQUIPO DE LOGÍSTICA</TituloBloque>
               <span className="logistica-recomendado" title="Recomendado: 1 persona de logística cada 60 pax. Se usa para repartir el tiempo de carga/descarga.">
                 <Truck size={12} /> Recomendado: {Math.max(1, Math.ceil(pax / 60))}
                 {logisticaEquipo.length < Math.max(1, Math.ceil(pax / 60)) && (
@@ -4222,7 +4222,7 @@ export default function App({ onCerrarSesion } = {}) {
               escribirlas a mano evento tras evento. Ahora van juntos y cada uno crea
               las suyas con las fechas sacadas de la del evento. */}
           <div className="logistica-block" data-bloque="alquileres">
-            <span className="form-label"><TituloBloque bloque="alquileres">ALQUILERES (material de otros — crea su recogida y su devolución)</TituloBloque></span>
+            <span className="form-label"><TituloBloque bloque="alquileres" detalle="Material de otros: crea su recogida y su devolución">ALQUILERES</TituloBloque></span>
             <div className="equip-grid alquileres-grid">
               <SegmentedControl
                 label="Sillas"
@@ -4406,7 +4406,7 @@ export default function App({ onCerrarSesion } = {}) {
             )}
           </div>
           <div className="logistica-block" data-bloque="recogidas">
-            <span className="form-label"><TituloBloque bloque="recogidas">RECOGIDAS (alquileres/equipo de otros a devolver o recoger)</TituloBloque></span>
+            <span className="form-label"><TituloBloque bloque="recogidas" detalle="Alquileres y equipo de otros a devolver o recoger">RECOGIDAS</TituloBloque></span>
             {recogidas.map((r, i) => (
               <div className="recogida-card" key={i}>
                 <div className="recogida-card-top">
@@ -4487,7 +4487,7 @@ export default function App({ onCerrarSesion } = {}) {
             >+ Añadir recogida</button>
           </div>
           <div className="logistica-block" data-bloque="compras">
-            <span className="form-label"><TituloBloque bloque="compras">COMPRAS (qué falta comprar, con fecha límite y aviso)</TituloBloque></span>
+            <span className="form-label"><TituloBloque bloque="compras" detalle="Qué falta comprar, con fecha límite y aviso">COMPRAS</TituloBloque></span>
             {compras.map((c, i) => (
               <div className="recogida-card" key={i}>
                 <div className="recogida-card-top">

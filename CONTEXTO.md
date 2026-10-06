@@ -243,8 +243,27 @@ operativo).
   en oscuro) y su icono (`IconoBloque`/`TituloBloque` en Iconos.jsx); logística,
   alquileres, recogidas y compras van en su panel con la raya de su color. Cada extra
   lleva su icono (`IconoExtra`, buscado por su texto) en el color del bloque, que se
-  llena del de la marca al marcarlo. Los textos de los títulos no cambian (las pruebas
-  buscan "RECOGIDAS (").
+  llena del de la marca al marcarlo. La explicación de cada bloque va debajo del título
+  en pequeño (`TituloBloque detalle=`), no entre paréntesis; las pruebas buscan el
+  bloque por `data-bloque`, no por su texto.
+- **Distribución: nada partido ni cortado** ("que no se corte nada o se ponga en 2
+  líneas", y la captura de "Mesas de los comensales" con "Redonda 2m" sola abajo).
+  Revisadas las tres apps a 320–1280 con un script que mide texto recortado, controles
+  en varias líneas y selectores con opciones sueltas. Arreglado: `SegmentedControl` mide
+  con un `ResizeObserver` si sus opciones caben en una fila y, si no, pone
+  `data-rejilla` → de dos en dos (impar: la última ocupa la fila); el nombre de categoría
+  no encoge (`flex: 1 0 auto`) y es la píldora ↑ ↓ ✎ la que baja; títulos de bloque con
+  la explicación debajo; el resumen de los plegables (`.cal-ratios-titulo em`) en su
+  línea en el móvil, con el " · " por CSS; la escaleta en trozos que no se parten; el
+  título del modo carga es el evento ("Modo carga" pasa al recuento); campos de una fila
+  alineados abajo (`.form-row { align-items: end }`); cabeceras de la tabla del resumen
+  sin partir; nombres de eventos guardados enteros, sin "…". Los paneles de color, en el
+  móvil, se meten en el margen de la tarjeta lo mismo que ocupan raya y relleno (a 320px
+  le quitaban a la fila de horas de logística el sitio de "08:00 – 20:00"), y llevan los
+  grises de apoyo un punto más fuertes (el tinte los dejaba en 4,3–4,4 sobre 4,5). La
+  sonda de contraste de app.test.mjs leía `color(srgb …)` (lo que da `color-mix`) como
+  rgb de 0 a 255 y daba contrastes falsos de 1,00: arreglada. Queda a 320px un nombre
+  de categoría en dos líneas ("MOBILIARIO, SALA Y DECORACIÓN"; publicado tenía tres).
 
 ## Lo desduplicado (y lo que NO se unificó)
 

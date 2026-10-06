@@ -134,10 +134,18 @@ export function IconoBloque({ bloque }) {
   const Icono = ICONO_BLOQUE[bloque] || Boxes;
   return <span className="bloque-icono" aria-hidden="true"><Icono size={14} strokeWidth={2.3} /></span>;
 }
-// El icono y el título de un bloque juntos: en el móvil el título largo parte en dos
-// líneas al lado de su icono, en vez de dejar el icono solo en una línea.
-export function TituloBloque({ bloque, children }) {
-  return <span className="bloque-cabecera"><IconoBloque bloque={bloque} /><span>{children}</span></span>;
+// El icono y el título de un bloque juntos, con su explicación debajo en pequeño (antes
+// iba entre paréntesis en el propio título y ocupaba cuatro líneas en el móvil).
+export function TituloBloque({ bloque, detalle, children }) {
+  return (
+    <span className="bloque-cabecera">
+      <IconoBloque bloque={bloque} />
+      <span className="bloque-titulos">
+        <span>{children}</span>
+        {detalle && <span className="bloque-detalle">{detalle}</span>}
+      </span>
+    </span>
+  );
 }
 const ICONO_EXTRA = {
   "Doble servicio": Layers, "Doble tenedor": Utensils, "Doble cuchillo": Utensils,

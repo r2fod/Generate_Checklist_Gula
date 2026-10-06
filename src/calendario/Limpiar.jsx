@@ -92,7 +92,7 @@ export default function Limpiar({ apuntes, onCambiar }) {
         <Sparkles size={16} aria-hidden="true" />
         <span className="cal-ratios-titulo">
           Limpiar el calendario
-          <em> · {grupos.length ? `${grupos.length} por revisar` : "todo en orden"}</em>
+          <em>{grupos.length ? `${grupos.length} por revisar` : "todo en orden"}</em>
         </span>
         <ChevronDown size={16} aria-hidden="true" className={`cal-ratios-flecha${abierto ? " es-abierta" : ""}`} />
       </button>
