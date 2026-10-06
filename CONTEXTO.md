@@ -333,12 +333,20 @@ operativo).
   dependía del almacén del navegador — que no es el suyo si el enlace se abre desde
   WhatsApp en otro navegador o el móvil limpia datos. Ahora `formulario/main.jsx` pide
   `manifest.webmanifest?enviar=<código>` y `public/sw.js` (`manifiestoConCodigo`) sirve
-  el de siempre con el código en `start_url` y el mismo `id` (`./index.html`, el que
-  tenía por defecto: con otro, el móvil no actualizaría la app instalada). La primera
-  visita aún no la controla el service worker: ahí se queda como antes. Una app ya
-  instalada se corrige sola la próxima vez que se abra con el código (Chrome revisa el
-  manifiesto al abrirla). Prueba: lo que el navegador entiende como manifiesto (CDP
-  `Page.getAppManifest`).
+  el de siempre con el código en `start_url` y el mismo `id` (el que tenía por defecto,
+  su `start_url` sin código, **escrito entero**: con otro, el móvil no actualizaría la
+  app instalada). La primera visita aún no la controla el service worker: ahí se queda
+  como antes. Una app ya instalada se corrige sola la próxima vez que se abra con el
+  código (Chrome revisa el manifiesto al abrirla). Prueba: lo que el navegador entiende
+  como manifiesto (CDP `Page.getAppManifest`) y su identidad ya resuelta
+  (`Page.getAppId`).
+  - **Fallo que costó un día (6/10):** el `id` iba como `"./index.html"`. Un `id`
+    relativo se resuelve contra la RAÍZ del dominio, no contra la carpeta del
+    manifiesto, así que daba `/index.html`: el mismo que la checklist (`../index.html`
+    en `checklist/`, `./index.html` en la raíz, a propósito). El ordenador con la
+    checklist instalada vio "su" manifiesto con otro nombre y otro icono y ofreció
+    "Actualización de aplicación disponible": la checklist acabó llamándose "Formulario
+    Gula" y con su icono. Para comparar ids, `Page.getAppId`; nunca el texto del `id`.
 - **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no

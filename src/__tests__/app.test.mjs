@@ -2496,7 +2496,12 @@ async function main() {
     const m = await manifiesto();
     ok(m.start_url === "./index.html?enviar=PRUEBA1",
       `lo que se instalaría abre el formulario CON su código → ${m.start_url}`);
-    ok(m.id === "./index.html", "y con la identidad de siempre: el móvil actualiza la app instalada, no la toma por otra");
+    // La identidad se mira ya resuelta (Page.getAppId), que es como la compara el navegador:
+    // el id "./index.html" parecía el de siempre y resolvía al de la checklist
+    const appId = async () => (await cdp.send("Page.getAppId")).appId;
+    const idForm = await appId();
+    ok(idForm === new URL(BASE_FORM).href,
+      `y con la identidad de siempre: el móvil actualiza la app instalada, no la toma por otra → ${idForm}`);
     // Abierto sin código (el icono instalado antes de esto): lo recuerda, y desde ahí el
     // manifiesto ya lo lleva, que es lo que actualiza el icono viejo
     await p.goto(BASE_FORM, { waitUntil: "load" });
@@ -2507,6 +2512,11 @@ async function main() {
     ok(raro.start_url === "./index.html", "un código con pinta rara no entra en el manifiesto: se sirve el de siempre");
     const ck = await p.evaluate(async () => (await fetch("../checklist/manifest.webmanifest?enviar=PRUEBA1")).json());
     ok(ck.start_url === "./index.html", "y el de la checklist no se toca aunque le pongan un código");
+    await p.goto(BASE, { waitUntil: "load" });
+    await p.waitForTimeout(500);
+    const idCk = await appId();
+    ok(idCk && idCk !== idForm,
+      `y no es la de la checklist: con la checklist instalada, abrir el formulario no le pone su nombre ni su icono → ${idCk}`);
     await c.close();
   }
 
