@@ -458,6 +458,16 @@ media opacidad**: con transparencia cada pieza solapada suma color y deja costur
 
 ### Lecciones que no hay que repetir
 
+- **Con el teclado abierto, el panel sigue a la zona que SE VE** (`useZonaVisible.js`,
+  `--zona-alto`/`--zona-arriba` en `.asis-fondo`). En el móvil abrir el teclado no
+  encoge la pantalla "de diseño": encoge `visualViewport` y lo desplaza para enseñar el
+  campo, y el panel fijo a pantalla completa perdía la cabecera y los mensajes, con un
+  hueco en blanco encima del campo (captura del dueño, Android). Bajar al último mensaje
+  mueve SOLO la lista (`scrollTop`): `scrollIntoView` movía también la página. Se hizo
+  solo para el asistente y no con `interactive-widget=resizes-content` en el viewport,
+  que cambiaría el teclado en toda la app (el botón flotante se subiría encima de los
+  campos). La batería lo prueba con una zona visible de mentira.
+
 1. **Barrera de datos**: cada herramienta declara `datos: true/false`. Un proveedor que
    entrena con lo que recibe solo ve las de calcular, nunca las de nombres. Desconocida
    = sensible por defecto.

@@ -5344,6 +5344,67 @@ async function main() {
     // probarlo sin login. El Worker se sustituye por dos respuestas fijas: una que pide
     // apuntar_tarea, otra que cierra en texto — así no hace falta clave de ningún
     // proveedor.
+    // ── El asistente con el teclado abierto ──
+    // En el móvil, abrir el teclado encoge la zona que SE VE (visualViewport) y no la
+    // pantalla: el panel a pantalla completa perdía la cabecera y los mensajes, y quedaba
+    // un hueco en blanco encima del campo (captura del dueño). Aquí no hay teclado de
+    // verdad, así que se pone una zona visible de mentira y se "abre" el teclado
+    // encogiéndola: el panel tiene que seguirla, con su cabecera, el último mensaje y el
+    // campo de escribir a la vista, y volver a pantalla completa al cerrarlo.
+    console.log("\n── El asistente con el teclado abierto ──");
+    {
+      const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const WORKER = "https://worker-de-prueba.invalido/chat";
+      let n = 0;
+      await c.route(`${WORKER}*`, route => route.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({ texto: `Respuesta de prueba número ${++n}, con algo de texto para que ocupe sitio.`, proveedor: "gemini", disponibles: ["gemini"], uso: { entrada: 10, salida: 10 }, llamadas: [] }),
+      }));
+      await c.addInitScript(w => {
+        localStorage.setItem("gula_asistente_url", w);
+        // Sin teclado, la zona visible es la ventana entera (leída en cada momento: al
+        // arrancar la página todavía no tiene su alto).
+        const zona = new EventTarget();
+        let alto = null, arriba = 0;
+        Object.defineProperties(zona, {
+          height: { get: () => alto ?? innerHeight }, width: { get: () => innerWidth },
+          offsetTop: { get: () => arriba }, offsetLeft: { get: () => 0 }, scale: { get: () => 1 },
+        });
+        Object.defineProperty(window, "visualViewport", { value: zona, configurable: true });
+        window.__teclado = (a, t) => { alto = a; arriba = t; zona.dispatchEvent(new Event("resize")); };
+      }, WORKER);
+      const p = await nuevaPagina(c);
+      await p.goto(BANCO + "?asistente=1", { waitUntil: "domcontentloaded" });
+      await p.waitForSelector('.asis-escribir input[type="text"]');
+      for (const t of ["Hola", "¿Cuántas copas para 90?", "¿Y de cava?"]) {
+        await p.locator('.asis-escribir input[type="text"]').fill(t);
+        await p.locator('.asis-escribir button[type="submit"]').click();
+        await p.waitForTimeout(500);
+      }
+      const mide = () => p.evaluate(() => {
+        const r = (s) => document.querySelector(s)?.getBoundingClientRect();
+        const burbujas = [...document.querySelectorAll(".asis-hilo .asis-burbuja")];
+        const ultima = burbujas[burbujas.length - 1]?.getBoundingClientRect();
+        const lista = r(".asis-hilo");
+        return { fondo: r(".asis-fondo"), cab: r(".asis-cab"), campo: r('.asis-escribir input[type="text"]'), ultima, lista };
+      });
+      await p.evaluate(() => window.__teclado(380, 300));
+      await p.waitForTimeout(300);
+      const con = await mide();
+      const dentro = (x) => x && x.top >= 300 - 1 && x.bottom <= 680 + 1;
+      ok(Math.round(con.fondo.top) === 300 && Math.round(con.fondo.height) === 380,
+        `con el teclado abierto, el panel ocupa justo la zona que se ve (arriba ${Math.round(con.fondo.top)}, alto ${Math.round(con.fondo.height)})`);
+      ok(dentro(con.cab) && dentro(con.campo), "y se ven a la vez su cabecera y el campo de escribir");
+      ok(con.ultima && con.ultima.bottom <= con.lista.bottom + 1 && con.ultima.top >= con.lista.top - 1,
+        "y el último mensaje, no un hueco en blanco");
+      await p.evaluate(() => window.__teclado(844, 0));
+      await p.waitForTimeout(300);
+      const sin = await mide();
+      ok(Math.round(sin.fondo.top) === 0 && Math.round(sin.fondo.height) === 844, "al cerrar el teclado vuelve a la pantalla entera");
+      await c.close();
+    }
+
     console.log('\n── "Con permiso": aprobar una propuesta la aplica de verdad ──');
     {
       const c = await navegador.newContext({ viewport: { width: 1024, height: 900 } });

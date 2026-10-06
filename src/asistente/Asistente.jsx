@@ -7,7 +7,8 @@
 //     suelta un número sin decir de dónde sale no es un asistente en el que se pueda
 //     confiar cuando el número decide lo que se carga en el camión.
 //   · Si el proxy no está configurado, se explica cómo, en vez de fallar por la red.
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useZonaVisible } from "./useZonaVisible.js";
 import { Send, X, Settings, Loader2, Wrench, Brain, Trash2, MessageCircle, Coins, Check, Ban, User, ListTodo, History, Plus, MoonStar, Copy, Paperclip, Bell, BellOff } from "lucide-react";
 import { preguntarAuto, preguntar } from "./cliente.js";
 import { tokenDeSesion } from "../auth.js";
@@ -334,7 +335,17 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   // primera vez — esa parte SÍ es proactiva a propósito (ver saludoPendientes, más abajo).
   const vozDichaRef = useRef(hilo.length ? ([...hilo].reverse().find(m => m.de === "el")?.texto || "") : "");
 
-  useEffect(() => { if (finRef.current) finRef.current.scrollIntoView({ block: "end" }); }, [hilo, pensando]);
+  // Baja la conversación al último mensaje moviendo SOLO la lista: scrollIntoView movía
+  // también la página, y con el teclado abierto la desplazaba por debajo del panel.
+  const bajarAlFinal = useCallback(() => {
+    const lista = finRef.current?.parentElement;
+    if (lista) lista.scrollTop = lista.scrollHeight;
+  }, []);
+  useEffect(bajarAlFinal, [hilo, pensando, bajarAlFinal]);
+  // El panel sigue a la zona que se ve (con el teclado abierto, la de encima), y al
+  // encoger vuelve a enseñar el último mensaje (ver useZonaVisible.js).
+  const fondoRef = useRef(null);
+  useZonaVisible(fondoRef, bajarAlFinal);
 
   // Por dónde escribe el asistente. En "Confianza" se aplica y se cuenta; en "Con
   // permiso" se guarda para que lo apruebe una persona. La herramienta no sabe en cuál
@@ -487,7 +498,7 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
   const saludo = saludoPendientes(avisosConfig(), repaso, recordatoriosDeHoy(contexto.tareas || []), personalidad, contexto.avisoActualizacion);
 
   return (
-    <div className="asis-fondo" role="dialog" aria-label="Asistente" aria-modal="true">
+    <div className="asis-fondo" ref={fondoRef} role="dialog" aria-label="Asistente" aria-modal="true">
       {dialogo && <Dialogo config={dialogo} onCerrar={() => setDialogo(null)} />}
       {/* La pestaña va en la clase para que el CSS pueda tratarlas distinto: en el móvil
           Charla necesita toda la altura (lista de mensajes + campo de escribir), y las
