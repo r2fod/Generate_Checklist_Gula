@@ -1878,6 +1878,27 @@ button.cal-turnos.es-vacia {
 .cal-limpiar-pregunta { font-weight: 700; font-size: var(--fs-sm); margin-right: auto; }
 .cal-limpiar-borrar { color: var(--error-texto-fuerte); border-color: var(--error-borde); }
 .cal-limpiar-borrar:not(.btn-outline) { background: var(--error-bg); }
+/* Pegar una lista de lo que sobra: debajo de todo, con el mismo campo que "Añadir
+   varios apuntes de golpe" para que se reconozca como la misma clase de cosa. */
+.cal-limpiar-pegar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+.cal-limpiar-pegar .btn { min-height: 44px; }
+.cal-limpiar-abrir-pegar { align-self: flex-start; }
+.cal-limpiar-de-lista {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
 .cal-limpiar-hecho {
   display: flex;
   align-items: center;

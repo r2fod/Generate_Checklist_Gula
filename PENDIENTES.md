@@ -51,8 +51,9 @@ siguen aquí.**
   móvil…", punto 3.
 - **Limpieza de datos del calendario** (en la app, no en el código): revisado contra
   la hoja el 6/10. Quedan 19 apuntes en el mes equivocado (11 próximos: 28–31/10,
-  2/11 y 4/12), a borrar a mano tocando cada uno → "Borrar": "Limpiar el calendario"
-  no los ve porque solo mira eventos y estos son tareas, recogidas o días cerrados.
+  2/11 y 4/12). Las sugerencias de "Limpiar el calendario" no los ven (solo miran
+  eventos), así que se pegan con "Pegar una lista de lo que sobra" (la lista va al
+  dueño aparte) y se borran de una vez. Falta que el dueño lo pulse.
   Detalle en `CONTEXTO.md`, "Estado de HOY".
 - **Dónde se enseña `subconsciente.js`**: está construido y probado, pero ninguna
   pantalla lo llama.

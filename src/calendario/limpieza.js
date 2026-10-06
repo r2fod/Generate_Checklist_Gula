@@ -23,7 +23,7 @@
 // con volver a apuntarlo.
 //
 // Sin React ni navegador: entra la lista, salen los grupos. Se prueba con node.
-import { aFecha, esTipoEvento } from "./apuntes.js";
+import { aFecha, esTipoEvento, idDeApunte } from "./apuntes.js";
 import { aISO } from "../fecha.js";
 // Vive en texto.js: la usan también los repetidos del archivo de eventos (repetidos.js)
 import { nucleoDeTitulo } from "../texto.js";
@@ -37,6 +37,39 @@ const conTrabajo = (a) => !!(a.evento || (a.personal && a.personal.length));
 const peso = (a) => (conTrabajo(a) ? 1000 : 0)
   + ["hora", "pax", "sitio", "notas", "hasta"].filter(k => a[k]).length * 10
   + Math.min(a.titulo.length, 60) / 100;
+
+// ─── LO QUE SOBRA SEGÚN UNA LISTA ───
+// Lo que las sugerencias no pueden ver solas: solo miran eventos, y lo que dejó la
+// importación en el mes equivocado son sobre todo tareas, recogidas y días cerrados.
+// Quien cruza la hoja con la app sí sabe cuáles sobran, y lo pasa en una lista para
+// pegar: aquí se buscan y salen marcados, en vez de borrar uno a uno.
+//
+// La lista es JSON, como la de "Añadir varios apuntes de golpe": ids tal cual, o
+// apuntes con fecha y título. Por fecha+título se compara el título NORMALIZADO
+// (idDeApunte), no el id guardado: uno editado a mano puede tener un id que ya no sale
+// de su título. Lo que tiene checklist o personal se enseña, pero sin marcar.
+export function grupoDeLista(apuntes, texto) {
+  let bruto;
+  try { bruto = JSON.parse(texto); } catch { return { error: "Eso no es JSON válido. Tiene que ser una lista entre corchetes." }; }
+  if (!Array.isArray(bruto)) return { error: "Tiene que ser una lista entre corchetes." };
+  const lista = Array.isArray(apuntes) ? apuntes : [];
+  const clave = (fecha, titulo) => idDeApunte(String(fecha).trim(), String(titulo).trim());
+  const encontrados = new Map();
+  const noEstan = [];
+  for (const x of bruto) {
+    const id = typeof x === "string" ? x.trim() : (x && typeof x.id === "string" ? x.id.trim() : "");
+    const porFecha = x && typeof x === "object" && typeof x.fecha === "string" && typeof x.titulo === "string";
+    const a = (id && lista.find(b => b.id === id))
+      || (porFecha && lista.find(b => b.fecha === x.fecha.trim() && clave(b.fecha, b.titulo) === clave(x.fecha, x.titulo)));
+    if (a) encontrados.set(a.id, a);
+    else if (id || porFecha) noEstan.push(id || clave(x.fecha, x.titulo));
+  }
+  const delGrupo = [...encontrados.values()].sort((x, y) => x.fecha.localeCompare(y.fecha) || x.titulo.localeCompare(y.titulo));
+  return {
+    grupo: delGrupo.length ? { clase: "lista", apuntes: delGrupo, queda: null, quitar: delGrupo.filter(a => !conTrabajo(a)).map(a => a.id) } : null,
+    noEstan: [...new Set(noEstan)],
+  };
+}
 
 // El mismo día del mes de al lado, o null si ese día no existe (31 de abril)
 function mesDeAlLado(iso, n) {

@@ -262,6 +262,10 @@ operativo).
   mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
   nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
   el "Borrar" del editor: no pide permisos nuevos. El banco lo prueba con `?sucio=1`.
+  Lo que no ve (tareas, recogidas, días cerrados en el día malo) se marca pegando una
+  lista JSON de ids o de `{fecha, titulo}` ("Pegar una lista de lo que sobra",
+  `grupoDeLista`): sale como un grupo más, arriba, todo marcado salvo lo que tiene
+  checklist o personal, y dice cuántos de la lista ya no estaban.
 - **Borrar un apunte no borra su checklist, pero la quita del formulario**: el formulario
   lista el ARCHIVO de checklists (`publico/{código}`, lo publica la app), no el
   calendario, y cada repetido había dejado su checklist en blanco (`sinConfigurar`).
@@ -576,7 +580,7 @@ fusionarlos por mucho que estén en verde.
 - 2026-10-06 tercera vuelta (hoja contra los 521 apuntes de la app): las 44 bodas de
   la lista, bien; faltaban 4 y se añadieron con "Añadir varios apuntes de golpe" con
   permiso del dueño (quedan 525).
-- **Sobran todavía, a borrar A MANO en la app** (tocar el apunte → "Borrar"): 19
+- **Sobran todavía, a borrar en la app**: 19
   apuntes que la importación del 14/9 puso en el mes equivocado. Son días del mes
   anterior/siguiente que la hoja pinta al principio o al final de cada mes y se
   leyeron con el mes del bloque. La versión buena de cada uno ya está en su día:
@@ -585,10 +589,14 @@ fusionarlos por mucho que estén en verde.
   - pasados (8): 1 y 3 de abril (turnos del 1 y 3 de mayo), 1, 2, 3 y 5 de junio
     (son del 1–5 de julio).
 
-  La lista con títulos se le pasó al dueño aparte (lleva nombres). **"Limpiar el
-  calendario" NO los ve**: solo mira los tipos que son evento (`esTipoEvento`:
-  boda, comunión, corporativo, cumpleaños, producción) y casi todos estos son tarea,
-  recogida o día cerrado; dice "todo en orden" con ellos dentro.
+  Las sugerencias de "Limpiar el calendario" NO los ven: solo miran los tipos que son
+  evento (`esTipoEvento`: boda, comunión, corporativo, cumpleaños, producción) y casi
+  todos estos son tarea, recogida o día cerrado; dice "todo en orden" con ellos dentro.
+  Y el dueño no quiere borrarlos uno a uno: **"Pegar una lista de lo que sobra"** (al
+  final de "Limpiar el calendario", `grupoDeLista` en limpieza.js) los marca todos de
+  una vez a partir de la lista de ids que se le pasa aparte (lleva nombres: nunca al
+  repositorio), y se borran con el mismo "Borrar N marcados", con confirmación y
+  "Deshacer". Borrar lo pulsa el dueño: la IA no borra datos de la app.
 - Opcional, ya pasado: unos 25 apuntes que son turnos del personal ("LIBRE",
   "TRABAJA", "COCINA", "LIMPIEZA", horas sueltas como "14:00") de enero a junio,
   leídos de las filas con etiqueta en A/B.

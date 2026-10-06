@@ -3,6 +3,7 @@
 // evento leído también en el mes de al lado), a la vista y con su casilla. La cuenta de
 // qué sobra está en limpieza.js; aquí solo se enseña y se borra lo que la persona deja
 // marcado, después de confirmarlo, y con "Deshacer" mientras no se cierre la pantalla.
+// Y lo que esa cuenta no ve (solo mira eventos), desde una lista pegada (grupoDeLista).
 //
 // Borrar es escribir la lista sin esos apuntes (onCambiar), igual que el botón "Borrar"
 // del editor pero de golpe: no hace falta ningún permiso nuevo, y quien entra con el
@@ -12,7 +13,7 @@
 // vista de dentro de la checklist.
 import { useMemo, useState } from "react";
 import { Check, ChevronDown, Sparkles } from "lucide-react";
-import { sugerenciasDeLimpieza } from "./limpieza.js";
+import { sugerenciasDeLimpieza, grupoDeLista } from "./limpieza.js";
 import { aFecha } from "./apuntes.js";
 
 const MOTIVO = {
@@ -20,11 +21,13 @@ const MOTIVO = {
   posible: "Era «posible» y ya está confirmado ese día",
   mes: "El mismo evento con un mes justo de diferencia",
   dia: "El mismo evento en días seguidos",
+  lista: "Los de la lista que has pegado",
 };
-// Solo el del mes y el de días seguidos necesitan explicación: los otros se ven a simple vista
+// Solo el del mes, el de días seguidos y el de la lista necesitan explicación: los otros se ven a simple vista
 const AYUDA = {
   mes: "La hoja de pared pinta al principio y al final de cada mes días del mes de al lado, y al traerla se leyeron con el mes equivocado. Mira cuál es el día de verdad.",
   dia: "Uno de los dos tiene el día mal. Mira cuál es el bueno y marca el otro.",
+  lista: "Lo que tiene checklist o personal sale sin marcar: ese, decídelo tú.",
 };
 
 const fechaConDia = (iso) => {
@@ -33,15 +36,34 @@ const fechaConDia = (iso) => {
 };
 
 export default function Limpiar({ apuntes, onCambiar }) {
-  const grupos = useMemo(() => sugerenciasDeLimpieza(apuntes), [apuntes]);
+  // La lista pegada se guarda como texto y se vuelve a buscar con cada cambio del
+  // calendario: si otro dispositivo borra uno mientras tanto, deja de salir marcado.
+  const [textoLista, setTextoLista] = useState("");
+  const deLista = useMemo(() => (textoLista ? grupoDeLista(apuntes, textoLista) : null), [apuntes, textoLista]);
+  const sugerencias = useMemo(() => sugerenciasDeLimpieza(apuntes), [apuntes]);
+  const grupos = useMemo(() => (deLista?.grupo ? [deLista.grupo, ...sugerencias] : sugerencias), [deLista, sugerencias]);
   const sugeridos = useMemo(() => new Set(grupos.flatMap(g => g.quitar)), [grupos]);
   const [abierto, setAbierto] = useState(false);
   // null = los que sugiere limpieza.js; en cuanto se toca una casilla, lo que se marque
   const [marcados, setMarcados] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const [borrados, setBorrados] = useState(null);
+  const [pegando, setPegando] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [errorLista, setErrorLista] = useState("");
 
   if (!apuntes.length) return null;
+
+  const marcarLista = () => {
+    const r = grupoDeLista(apuntes, texto);
+    if (r.error) return setErrorLista(r.error);
+    setTextoLista(texto);
+    setTexto("");
+    setPegando(false);
+    setMarcados(null); // que manden las marcas de la lista recién pegada
+    setConfirmando(false);
+  };
+  const quitarLista = () => { setTextoLista(""); setMarcados(null); setConfirmando(false); };
 
   const elegidos = marcados ?? sugeridos;
   const aBorrar = apuntes.filter(a => elegidos.has(a.id));
@@ -57,6 +79,7 @@ export default function Limpiar({ apuntes, onCambiar }) {
     setBorrados(aBorrar);
     setMarcados(null);
     setConfirmando(false);
+    setTextoLista(""); // ya está hecho: si siguiera, saldrían todos como "no están"
   };
   const deshacer = () => {
     onCambiar([...apuntes, ...borrados]);
@@ -93,7 +116,7 @@ export default function Limpiar({ apuntes, onCambiar }) {
               </p>
               <ul className="cal-limpiar-lista">
                 {grupos.map(g => (
-                  <li key={g.apuntes.map(a => a.id).join("|")} className="cal-limpiar-grupo">
+                  <li key={`${g.clase}:${g.apuntes.map(a => a.id).join("|")}`} className={`cal-limpiar-grupo es-${g.clase}`}>
                     <span className="cal-limpiar-motivo">{MOTIVO[g.clase]}</span>
                     {AYUDA[g.clase] && <span className="cal-limpiar-ayuda">{AYUDA[g.clase]}</span>}
                     {g.apuntes.map(a => {
@@ -133,6 +156,40 @@ export default function Limpiar({ apuntes, onCambiar }) {
               </div>
             </>
           )}
+
+          {/* Lo que las sugerencias no ven (tareas, recogidas, días cerrados) llega en una
+              lista de quien ha cruzado la hoja con la app: se pega y sale todo marcado. */}
+          <div className="cal-limpiar-pegar">
+            {deLista ? (
+              <div className="cal-limpiar-de-lista" role="status">
+                <span>
+                  {deLista.grupo ? `De la lista: ${deLista.grupo.apuntes.length} encontrados, arriba.` : "No he encontrado ninguno de la lista."}
+                  {deLista.noEstan.length > 0 && ` ${deLista.noEstan.length === 1 ? "1 ya no está" : `${deLista.noEstan.length} ya no están`} en el calendario.`}
+                </span>
+                <button type="button" className="btn btn-ghost" onClick={quitarLista}>Quitar la lista</button>
+              </div>
+            ) : pegando ? (
+              <>
+                <span className="cal-limpiar-ayuda">Pega la lista de lo que sobra (la que te han pasado). Solo se marca: no se borra nada hasta que lo confirmes.</span>
+                <textarea
+                  className="cal-traer-texto"
+                  rows={4}
+                  value={texto}
+                  onChange={e => { setTexto(e.target.value); setErrorLista(""); }}
+                  placeholder='["2026-10-28_ejemplo", {"fecha":"2026-11-02","titulo":"Día cerrado"}]'
+                />
+                {errorLista && <span className="cal-traer-error">{errorLista}</span>}
+                <div className="cal-traer-botones">
+                  <button type="button" className="btn btn-green" disabled={!texto.trim()} onClick={marcarLista}>Marcar los de la lista</button>
+                  <button type="button" className="btn btn-ghost" onClick={() => { setPegando(false); setTexto(""); setErrorLista(""); }}>Cancelar</button>
+                </div>
+              </>
+            ) : (
+              <button type="button" className="btn btn-outline cal-limpiar-abrir-pegar" onClick={() => setPegando(true)}>
+                Pegar una lista de lo que sobra
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
