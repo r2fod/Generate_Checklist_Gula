@@ -4300,11 +4300,11 @@ hr {
 }
 
 /* ─── EL RESUMEN EN EL MÓVIL: UNA LISTA, NO UNA TABLA ──────────────────────────
-   Siete columnas en 380px había que arrastrarlas de lado, la mitad de las celdas eran
-   guiones y el nombre se partía en tres líneas. En el móvil cada categoría es una
-   tarjeta con su color y su subtotal, y cada producto una fila: el nombre entero, lo
-   cargado (y lo que cuesta) a la derecha y, debajo, solo los datos que hay. La tabla
-   sigue en pantalla grande, donde las siete columnas caben y se comparan bien. */
+   Siete columnas en 380px había que arrastrarlas de lado y el nombre se partía en tres
+   líneas. En el móvil cada categoría es una tarjeta con su color y su subtotal, y cada
+   producto una fila: el nombre entero y, debajo, los MISMOS seis datos que la tabla
+   (carga, vuelta, consumo, roturas, coste ud. y total), cada uno con su nombre, en
+   tres columnas. La tabla sigue en pantalla grande. */
 .resumen-lista { display: none; }
 @media (max-width: 640px) {
   .resumen-tabla-wrap { display: none; }
@@ -4341,10 +4341,9 @@ hr {
   }
   .resumen-lista-filas { list-style: none; margin: 0; padding: 0; }
   .resumen-lista-fila {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 12px;
-    row-gap: 3px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
     padding: 10px 14px;
     border-bottom: 1px solid var(--border-light);
   }
@@ -4355,38 +4354,46 @@ hr {
     gap: 8px;
     min-width: 0;
     font-size: var(--fs-base);
+    font-weight: 600;
     color: var(--text-main);
     overflow-wrap: break-word;
   }
   .resumen-lista-nombre .item-icon { margin-top: 3px; }
-  .resumen-lista-cifras {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+  .resumen-lista-datos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin: 0;
+  }
+  .resumen-lista-datos > div {
+    min-width: 0;
+    padding: 4px 7px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-subtle);
+  }
+  .resumen-lista-datos dt {
+    font-size: var(--fs-3xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--text-muted);
+  }
+  .resumen-lista-datos dd {
+    margin: 0;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--text-main);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .resumen-lista-cifras strong { font-size: var(--fs-base); color: var(--text-main); }
-  .resumen-lista-cifras em { font-style: normal; font-size: var(--fs-xs); font-weight: 700; color: var(--accent); }
-  /* Debajo del nombre, sangrado bajo el texto (no bajo el icono) */
-  .resumen-lista-datos {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 6px;
-    padding-left: 22px;
-  }
-  .resumen-lista-datos > span {
-    font-size: var(--fs-xs);
-    color: var(--text-muted);
-    background: var(--bg-subtle);
-    padding: 2px 8px;
-    border-radius: var(--radius-pill);
-    font-variant-numeric: tabular-nums;
-  }
-  .resumen-lista-datos > .es-ok { background: var(--ok-bg); color: var(--ok-texto); }
-  .resumen-lista-datos > .es-rotura { background: var(--error-bg); color: var(--error-texto-fuerte); font-weight: 700; }
-  .resumen-lista-datos > .es-mal { background: var(--aviso-bg); color: var(--aviso-texto); font-weight: 700; }
+  .resumen-lista-datos > .es-rotura { background: var(--error-bg); }
+  .resumen-lista-datos > .es-rotura dd { color: var(--error-texto-fuerte); }
+  .resumen-lista-datos > .es-mal { background: var(--aviso-bg); }
+  .resumen-lista-datos > .es-mal dd { color: var(--aviso-texto); }
+  .resumen-lista-datos > .es-sinprecio dd { color: var(--text-muted); }
+  .resumen-lista-datos > .es-total dd { color: var(--accent); }
   .resumen-lista-total {
     display: flex;
     justify-content: space-between;
@@ -4399,15 +4406,6 @@ hr {
     font-weight: 800;
   }
   .resumen-lista-total strong { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
-}
-/* "Para la próxima vez": el título de los paneles de calibrar, al final del Resumen */
-.resumen-titulo-proxima {
-  margin-top: 8px;
-  font-size: var(--fs-2xs);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--text-muted);
 }
 
 .carga-row-vuelta {
