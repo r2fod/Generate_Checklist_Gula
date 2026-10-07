@@ -208,7 +208,7 @@ export const PREGUNTAS = [
       { valor: "cuchara", texto: "Canapés en cuchara de porcelana", conNumero: "¿Cuántos canapés distintos en cuchara?", campoNumero: "numCucharasPorcelana" },
       {
         valor: "otro", texto: "Añadir más", conLista: true, campoLista: "coctelOtros",
-        listaEjemplo: "¿Qué es? (ej: vasito de cristal)", listaNumero: "¿Cuántos por persona?",
+        listaEjemplo: "Ej: vasitos", listaNumero: "¿Cuántos por persona?",
         listaClave: "porPersona", listaSufijo: " por persona",
       },
     ],
