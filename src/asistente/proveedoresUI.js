@@ -25,6 +25,15 @@ export const notaDe = (id) => (id === "compatible" ? "tu proveedor"
 // dejar la pantalla sin nada que elegir. El orden es el mismo que usa el enrutado
 // automático (ORDEN, en enrutado.js): primero lo gratis, luego lo bueno, luego lo
 // limitado — así lo que se ve arriba en Ajustes es lo mismo que se usaría solo.
+// Lo que sale de "Probar los proveedores": los que han respondido de verdad. Con eso se
+// pone al día la lista de arriba sin esperar a la siguiente pregunta — antes solo se
+// actualizaba al recibir una respuesta, y un proveedor recién configurado en el Worker
+// no aparecía ("sigo sin ver los proveedores de IA que agregué", el dueño). Vacío si no
+// ha respondido ninguno: entonces se deja la lista como estaba, no se borra.
+export function disponiblesDeLaPrueba(pings) {
+  return (Array.isArray(pings) ? pings : []).filter(p => p && p.estado === "ok" && p.nombre).map(p => p.nombre);
+}
+
 export function proveedoresElegibles(disponibles) {
   const lista = disponibles && disponibles.length ? disponibles : ["gemini"];
   return ORDEN.filter(id => lista.includes(id))

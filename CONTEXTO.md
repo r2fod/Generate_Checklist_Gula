@@ -275,6 +275,73 @@ operativo).
     si el limpiador tiene algo. Lo usan la app suelta, la vista de la checklist y el
     banco. **El banco los abre al entrar** (`abiertosAlEntrar`): sus pruebas son de lo
     de DENTRO de cada panel a nueve anchos; el botón se prueba con `?cerrados=1`.
+- **Rediseño, fase 5 — remate**: una cabecera `sticky` se queda a la distancia del
+  PADDING de quien hace scroll, no en su borde. En la hoja el que hace scroll es el
+  fondo oscuro (`.preview-overlay`, 32px arriba en escritorio, 24 en tableta), así que
+  la cabecera se pegaba a 32px y por encima asomaba la lista. Ahora ese hueco va en
+  `--hueco-arriba` (cada cambio de padding del fondo la cambia también) y la cabecera
+  y la barra de pestañas del modo carga van con `top: calc(-1 * var(--hueco-arriba))`.
+  El nombre del evento va con la talla de título de pantalla (`--fs-2xl`; `--fs-xl` en
+  el móvil, antes `--fs-xl`/`--fs-lg`, casi como un título de bloque), `letter-spacing`
+  negativo y `text-wrap: balance`; las cantidades (lista, modo carga, hoja) con
+  `tabular-nums`.
+- **El formulario con los colores de cada tipo** ("que sea igual para que sea todo
+  más parejo en colores", el dueño): cada evento de "¿De qué evento son los datos?"
+  lleva `data-tipo` y sale con su icono en el color del tipo, sobre su fondo suave, y
+  una raya de ese color a la izquierda; las opciones de "¿Qué tipo de evento es?",
+  igual. Los colores son los mismos `--color-*` de la checklist (index.css, `:is(...)
+  [data-tipo]`).
+- **El tipo de evento se pregunta siempre**, también al elegir un evento que ya existe:
+  sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
+  saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
+  corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **El formulario, con su sección del cóctel y por temas** ("lo de chupito de cristal
+  debería ir en una sección de cóctel... hay chupito de cristal, cuchara de porcelana,
+  añadir más y el campo de algo más que aclarar", el dueño). Detrás de "¿Hay cóctel?"
+  (si no es 0) va `coctelLleva`: chupitos en vaso de cristal (el `llevaEntrante` de
+  siempre), canapés en cuchara de porcelana con cuántos distintos (`llevaCucharasPorcelana`
+  + `numCucharasPorcelana`, nuevos; en la app casilla "Cucharas de porcelana" y su
+  número, y en la checklist "Cucharas de porcelana (canapés)" = gente × canapés + 10%,
+  en Vajilla / "Vajilla, Cubertería y Cristalería" en cumpleaños) y "Añadir más", una
+  lista de qué y cuántos por persona que al aplicar el envío se suma a `itemsManuales`
+  en esa categoría sin duplicar (`itemsDelEnvio`). El "¿algo más que aclarar?" es el de
+  cada pregunta. Sin cóctel, chupitos y cucharas se apagan.
+  - **Brindis, barriles y aguas pequeñas, con la barra** (`barraLleva`), no en lo
+    presupuestado entre la barbacoa y el jamonero. La paella se pregunta justo detrás
+    del menú y el café cierra lo que se come. Menú infantil, fuera de los rodajes.
+  - **Envíos y borradores de antes**: `respuestasAlDia()` pasa el chupito de
+    `entrante` a `coctelLleva` y lo de la barra de `extras` a `barraLleva`; lo usan
+    `aRespuestasDeLaApp`, `resumirEnvio`, `cambiosEntreRespuestas` y el formulario al
+    cargar unas respuestas. Un envío viejo carga lo mismo que cargaba.
+  - **En la app, "Entrante de chupito" pasa a "Chupitos de cristal"** ("quitar del
+    entrante lo de chupito para que no esté duplicado", el dueño): solo el texto de la
+    casilla, el campo sigue siendo `llevaEntrante`. El item de la checklist conserva su
+    nombre ("Vasos chupito cristal (entrante)"): es su identidad, y cambiarlo pide migrar
+    las marcas y cantidades de los eventos guardados.
+  - `conLista` admite su propio número (`listaClave`, `listaNumero`, `listaEjemplo`,
+    `listaSufijo`); los buffets siguen con `mesas`.
+- **Asistente, "Probar los proveedores" pone al día la lista de Ajustes** ("sigo sin
+  ver los proveedores de IA que agregué", el dueño). La lista de proveedores a elegir
+  sale de `disponibles`, lo que el Worker dice que tiene clave, y la app solo se
+  enteraba al recibir una respuesta. Ahora, al probar, pasa a ser la de los que
+  responden (`disponiblesDeLaPrueba`). Si siguen sin salir, es el Worker: o no está
+  pegado el código nuevo (`worker/pegar.js`) o la clave tiene otro nombre (los que
+  lee: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `ZAI_API_KEY`, `MISTRAL_API_KEY`,
+  `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+  `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`, `COMPATIBLE_API_KEY` +
+  `COMPATIBLE_URL`). `…workers.dev/__estado` lo dice abierto en el navegador.
+- **El Resumen del modo carga, en el móvil una lista** ("Resumen sigue estando feo,
+  hazlo más premium", el dueño): por debajo de 640px la tabla de siete columnas
+  (`.resumen-tabla-wrap`) se esconde y sale `.resumen-lista`: una tarjeta por categoría
+  con su color y su subtotal, y una fila por producto con el nombre entero, lo cargado y
+  lo que cuesta a la derecha y, debajo, solo lo que hay ("volvió todo", "vuelven 2",
+  "gastado 1", "2 rotas", "3,00€/ud"). Sin guiones ni "0,00€". En pantalla grande, la
+  tabla. Orden nuevo: cifras → "En qué se va" → productos → "Para la próxima vez" (los
+  paneles de calibrar, que antes iban arriba y empujaban las cifras). Se quitó el
+  "Coste estimado" de la barra: era el mismo número que la ficha grande.
+  - Fallo propio cazado con capturas: la barra de pestañas del modo carga se quedaba
+    cortada en el escritorio si se le restaba `--hueco-arriba` como a la hoja. Ahí el
+    que hace scroll es el panel (`.carga-modal`), no el fondo: va con `top: 0`.
 - **Cabeceras de categoría, todas del mismo alto** ("¿por qué una es más grande que
   otra?", el dueño, con COCINA y MENAJE Y UTENSILIOS en el móvil): con ↑ ↓ ✎ en la
   píldora, a un nombre largo no le cabía al lado y la píldora bajaba a su línea (71px

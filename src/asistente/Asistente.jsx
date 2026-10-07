@@ -26,7 +26,7 @@ import { queHacerConLaUrl } from "./proxy.js";
 import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
 import { VOCES_GEMINI, vozGeminiValida } from "./vozGemini.js";
 import { avisosConfig, saludoPendientes } from "./avisosConfig.js";
-import { proveedoresElegibles } from "./proveedoresUI.js";
+import { proveedoresElegibles, disponiblesDeLaPrueba } from "./proveedoresUI.js";
 import Dialogo from "../components/Dialogo.jsx";
 
 const CLAVE_URL = "gula_asistente_url";
@@ -232,6 +232,8 @@ export default function Asistente({ contexto, onCerrar, onOlvidar }) {
       const d = await r.json().catch(() => ({}));
       if (!r.ok || d.error) { setAvisoSalud({ mal: true, texto: d.error || `Ha fallado (${r.status}).` }); return; }
       setAvisoSalud({ pings: d.pings || [] });
+      const responden = disponiblesDeLaPrueba(d.pings);
+      if (responden.length) { setDisponibles(responden); guardarJSON(CLAVE_DISPONIBLES, responden); }
     } catch (e) {
       setAvisoSalud({ mal: true, texto: `No se ha podido llegar al proxy: ${e.message}` });
     } finally {

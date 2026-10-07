@@ -6,7 +6,7 @@
 //   npm run test
 //
 import { chromium } from "playwright-core";
-import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
+import { aRespuestasDeLaApp, itemsDelEnvio } from "../formulario/preguntas.js";
 import { recogidasConAlquileres } from "../alquileres.js";
 import { enDiasISO } from "../fecha.js";
 import { spawn } from "child_process";
@@ -405,6 +405,161 @@ async function main() {
       ok(m.atajos === null && m.volver === null && m.lado && m.anadir && !m.plegar,
         `${w}px · en dos columnas nada cambia: sin atajos, la configuración al lado y "Añadir item" abierto`);
     }
+    await ctx.close();
+  }
+
+  // ── Remate (fase 5 del rediseño): la hoja, el título y las cifras ────────────
+  // En la hoja, al bajar, asomaba una franja de la lista por encima de la cabecera
+  // fija: una cabecera pegajosa se queda a la distancia del padding de quien hace
+  // scroll (el fondo oscuro, 32px en escritorio y 24 en tableta), no en su borde.
+  // Y el nombre del evento va con la talla de título de pantalla de la escala.
+  console.log("\n── Remate: la hoja, el título y las cifras ──");
+  for (const [w, h] of [[1280, 800], [700, 900], [390, 844]]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769 });
+    for (const hs of HOSTS_NUBE) await ctx.route(hs, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-header");
+    await page.waitForTimeout(400);
+    const tipos = await page.evaluate(() => ({
+      titulo: parseFloat(getComputedStyle(document.querySelector(".header-info h1")).fontSize),
+      cifras: getComputedStyle(document.querySelector(".item-qty-input")).fontVariantNumeric,
+    }));
+    ok(tipos.titulo >= (w < 769 ? 17 : 20) && /tabular-nums/.test(tipos.cifras),
+      `${w}px · el nombre del evento con talla de título (${tipos.titulo}px) y las cantidades con cifras del mismo ancho`);
+    await page.locator(".compartir-menu-wrap > .btn").first().click(); await page.waitForTimeout(300);
+    await page.locator(".compartir-menu button", { hasText: "Ver la hoja" }).first().click();
+    await page.waitForSelector(".preview-modal .preview-header");
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { document.querySelector(".preview-overlay").scrollTop = 900; });
+    await page.waitForTimeout(300);
+    const arriba = await page.evaluate(() => Math.round(document.querySelector(".preview-modal .preview-header").getBoundingClientRect().top));
+    ok(arriba === 0, `${w}px · al bajar por la hoja, la cabecera se pega arriba del todo, sin franja de lista por encima (${arriba}px)`);
+    // Y en el modo carga, que hace scroll en su propio panel, la barra de pestañas entera
+    await page.locator(".preview-close-btn").first().click();
+    await page.waitForTimeout(400);
+    await page.locator("button", { hasText: "Modo carga" }).first().click();
+    await page.waitForSelector(".carga-modo-toggle");
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { for (const e of [document.querySelector(".carga-modal"), document.querySelector(".preview-overlay")]) if (e) e.scrollTop = 1500; });
+    await page.waitForTimeout(300);
+    const barra = await page.evaluate(() => {
+      const t = document.querySelector(".carga-modo-toggle").getBoundingClientRect(), m = document.querySelector(".carga-modal").getBoundingClientRect();
+      return Math.round(t.top - Math.max(m.top, 0));
+    });
+    ok(barra >= 0, `${w}px · en el modo carga, al bajar, la barra de pestañas se ve entera (${barra}px)`);
+    await ctx.close();
+  }
+
+  // ── El formulario: los colores de cada tipo, y el tipo siempre se puede cambiar ──
+  // "Que sea igual (que la checklist) para que sea todo más parejo en colores" y "ya no
+  // se puede poner el tipo de evento, ¿y si se quiere cambiar?" (el dueño). Sin nube no
+  // hay lista de eventos: el evento ya elegido se simula con el borrador que guarda el
+  // propio formulario (gula_formulario_<código>), como si se volviera a abrir a medias.
+  console.log("\n── El formulario: colores por tipo y el tipo editable ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Produ de prueba", paso: 0, respuestas: { tipo: "produccion", nombre: "Produ de prueba" },
+    })));
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(600);
+    const m = await p.evaluate(() => ({
+      titulo: document.querySelector(".form-titulo").innerText,
+      elegida: document.querySelector(".form-opcion.es-elegida")?.innerText || "",
+      colores: [...document.querySelectorAll(".form-opcion[data-tipo] .form-opcion-icono")].map(i => getComputedStyle(i).color),
+    }));
+    ok(/tipo de evento/i.test(m.titulo) && /Producción/.test(m.elegida),
+      `en un evento que ya existe se pregunta el tipo, con el suyo marcado → "${m.elegida}"`);
+    ok(m.colores.length === 5 && new Set(m.colores).size === 5,
+      `cada tipo con su color, el mismo que en la checklist (${new Set(m.colores).size} colores distintos)`);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(500);
+    const borrador = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA2") || "{}"));
+    ok(borrador.respuestas && borrador.respuestas.tipo === "boda" && borrador.eventoDestino === "Produ de prueba",
+      "y se puede cambiar: el envío del mismo evento lleva el tipo nuevo");
+    await c.close();
+  }
+
+  // ── El formulario: el cóctel con su sección ─────────────────────────────────
+  // "Lo de chupito de cristal debería ir en una sección de cóctel donde te pregunte si
+  // hay chupito de cristal, si hay cuchara de porcelana, una opción de añadir más y
+  // luego el campo de algo más que aclarar" (el dueño): el chupito iba con la comida,
+  // en "¿Lleva entrante?". Ahora va detrás de las horas de cóctel, en su pregunta.
+  console.log("\n── El formulario: la sección del cóctel ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Boda de prueba", paso: 9,
+      respuestas: { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 },
+    })));
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(600);
+    const opciones = await p.locator(".form-opcion").allInnerTexts();
+    ok(/qué se sirve en el cóctel/i.test(await p.locator(".form-titulo").innerText())
+      && ["Chupitos en vaso de cristal", "Canapés en cuchara de porcelana", "Añadir más"].every(t => opciones.some(o => o.includes(t))),
+      `detrás de las horas de cóctel, lo que se sirve en él → ${opciones.join(" · ")}`);
+    await p.locator(".form-opcion", { hasText: "cuchara de porcelana" }).click();
+    await p.locator(".form-opcion", { hasText: "Añadir más" }).click();
+    await p.waitForTimeout(300);
+    ok(await p.locator(".form-subcampo", { hasText: "canapés distintos" }).isVisible()
+      && await p.locator(".form-lista-otro-nota", { hasText: "por persona" }).isVisible(),
+      "las cucharas piden cuántos canapés, y lo añadido cuántos por persona");
+    await p.locator(".form-lista-otro-fila input[type=text]").first().fill("Vasito de cristal");
+    await p.locator(".form-lista-otro-fila input[type=number]").first().fill("2");
+    await p.waitForTimeout(400);
+    const borrador = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA2") || "{}").respuestas || {});
+    ok(JSON.stringify(borrador.coctelLleva) === JSON.stringify(["cuchara", "otro"])
+      && borrador.coctelOtros?.[0]?.nombre === "Vasito de cristal" && borrador.coctelOtros[0].porPersona === 2,
+      `y se guarda con su número por persona → ${JSON.stringify(borrador.coctelOtros)}`);
+    ok(await p.locator(".form-comentario-abrir", { hasText: "aclarar" }).isVisible()
+      && await p.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0,
+      "con su \"¿algo más que aclarar?\" debajo, y sin arrastrar de lado");
+    await c.close();
+  }
+
+  // ── El Resumen del modo carga, en el móvil una lista ─────────────────────────
+  // "Resumen sigue estando feo, arréglalo y hazlo más premium" (el dueño, con la tabla
+  // de siete columnas en el móvil: arrastrar de lado, celdas de guiones y nombres en
+  // tres líneas). En el móvil, una tarjeta por categoría y una fila por producto con
+  // solo lo que hay; en pantalla grande, la tabla. Y primero cómo ha ido (las cifras y
+  // la lista); los paneles de calibrar, al final.
+  console.log("\n── El Resumen, en el móvil una lista ──");
+  for (const [w, h] of [[390, 844], [320, 700], [1280, 900]]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769 });
+    for (const hs of HOSTS_NUBE) await ctx.route(hs, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-header");
+    await page.locator("button", { hasText: "Modo carga" }).first().click(); await page.waitForTimeout(800);
+    await page.locator(".carga-modo-toggle button").filter({ hasText: "Vuelta" }).first().click(); await page.waitForTimeout(500);
+    await page.locator(".carga-todo-vuelto").click(); await page.waitForTimeout(800);
+    await page.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click(); await page.waitForTimeout(800);
+    const m = await page.evaluate(() => {
+      const ve = (s) => { const e = document.querySelector(s); return !!(e && e.offsetParent); };
+      const nombres = [...document.querySelectorAll(".resumen-lista-nombre")].filter(e => e.offsetParent);
+      const lista = document.querySelector(".resumen-lista"), panel = document.querySelector(".resumen-titulo-proxima");
+      return {
+        lista: ve(".resumen-lista"), tabla: ve(".resumen-tabla-wrap"), filas: nombres.length,
+        recortados: nombres.filter(e => e.scrollWidth > e.clientWidth + 1).length,
+        guiones: [...document.querySelectorAll(".resumen-lista-cifras strong")].filter(e => e.offsetParent && e.textContent.trim() === "—").length,
+        calibrarAlFinal: !panel || !lista || !lista.offsetParent || panel.getBoundingClientRect().top > lista.getBoundingClientRect().bottom,
+        lado: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    if (w <= 640) {
+      ok(m.lista && !m.tabla && m.filas > 20 && m.recortados === 0 && m.guiones === 0 && m.lado <= 0,
+        `${w}px · el Resumen es una lista: ${m.filas} productos con su nombre entero, sin guiones ni arrastrar de lado`);
+    } else {
+      ok(m.tabla && !m.lista, `${w}px · en pantalla grande sigue la tabla`);
+    }
+    ok(m.calibrarAlFinal, `${w}px · los paneles de calibrar van al final, después de cómo ha ido`);
     await ctx.close();
   }
 
@@ -2472,9 +2627,9 @@ async function main() {
 
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
     // puede dejar el formulario atascado en ninguna pregunta. Mismo margen que el
-    // otro recorrido de más abajo (45, no pegado al número real de preguntas).
+    // otro recorrido de más abajo (60, no pegado al número real de preguntas).
     let vueltas = 0;
-    while (vueltas++ < 45) {
+    while (vueltas++ < 60) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -2649,11 +2804,11 @@ async function main() {
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
     // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
-    // encima del número de preguntas de una boda (34 hoy, `preguntasDe("boda", {})`),
+    // encima del número de preguntas de una boda (39 hoy, `preguntasDe("boda", {})`),
     // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
     // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;
-    while (vueltasBorrador++ < 45) {
+    while (vueltasBorrador++ < 60) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -2661,7 +2816,7 @@ async function main() {
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
-    ok(vueltasBorrador < 45, "el recorrido llega al repaso sin quedarse atascado");
+    ok(vueltasBorrador < 60, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
@@ -2870,6 +3025,29 @@ async function main() {
       "si las sillas las pone la finca, no se cargan ni se alquilan");
     ok(tiene(boda.nombres, "Barril de cerveza (50L)") && tiene(boda.nombres, "Chill out"),
       "y lo presupuestado aparece: barril y chill out");
+
+    // El cóctel con su sección: el chupito, las cucharas de porcelana de los canapés y
+    // lo de "Añadir más", que la app suma como items a mano al aplicar el envío
+    const coctelR = {
+      tipo: "boda", nombre: "Boda de prueba", adultos: 100, coctel: 2,
+      coctelLleva: ["chupito", "cuchara", "otro"], numCucharasPorcelana: 2,
+      coctelOtros: [{ nombre: "Vasito de cristal", porPersona: 1 }],
+    };
+    await p.goto(url({ ...aRespuestasDeLaApp(coctelR), itemsManuales: itemsDelEnvio(coctelR) }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    const enVajilla = await p.locator(".category-section").evaluateAll(ss => {
+      const v = ss.find(x => /^vajilla$/i.test(x.querySelector(".cat-name-texto")?.textContent.trim() || ""));
+      return v ? [...v.querySelectorAll(".item-row")].map(r => `${r.querySelector(".item-name")?.innerText.trim()}=${r.querySelector(".item-qty-input")?.value}`) : [];
+    });
+    const nombresCoctel = await p.locator(".item-row .item-name").allInnerTexts();
+    ok(enVajilla.includes("Cucharas de porcelana (canapés)=220") && enVajilla.includes("Vasito de cristal=110"),
+      `del cóctel a la vajilla: cucharas de porcelana (100 × 2 canapés + margen) y lo añadido → ${enVajilla.filter(x => /porcelana|Vasito/.test(x)).join(", ")}`);
+    ok(tiene(nombresCoctel, "Vasos chupito cristal"), "y el chupito, sus vasos de cristal");
+    // "Quitar del entrante lo de chupito para que no esté duplicado" (el dueño): en la
+    // app la casilla ya no dice "Entrante de chupito", va con el cóctel
+    const casillas = await p.locator(".checkbox-texto").allInnerTexts();
+    ok(casillas.some(t => t.startsWith("Chupitos de cristal")) && !casillas.some(t => /Entrante de chupito/i.test(t)),
+      "en la app, la casilla del chupito es del cóctel, no un entrante");
 
     // Un rodaje de tres días sin sombra y con generador de alquiler
     const produ = await desdeElFormulario({

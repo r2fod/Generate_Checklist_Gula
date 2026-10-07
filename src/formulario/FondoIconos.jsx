@@ -13,7 +13,7 @@ import {
   Users, Sun, Tent, Zap, Plug, Martini, Beer, GlassWater, Wine, Utensils,
   UtensilsCrossed, ChefHat, CookingPot, Flame, Armchair, Coffee, Package,
   StickyNote, CupSoda, Wind, Table, Table2, Droplet, Refrigerator, Snowflake,
-  Sparkles, Printer, Shirt, Flower2, PartyPopper, ShoppingCart, AlertTriangle,
+  Sparkles, Printer, Shirt, Flower2, PartyPopper, ShoppingCart, AlertTriangle, Soup, Plus,
 } from "lucide-react";
 
 // Qué flota en cada pregunta. Si una pregunta no está aquí, se usa el juego de
@@ -37,6 +37,10 @@ const ICONOS_POR_PREGUNTA = {
   // "sillas" sí usa bien) en vez de una mesa. Las 4 explícitas, sin ciclo.
   tipoMesa: [Table2, Table, Table, Table],
   coctel: [Martini, GlassWater, Wine],
+  // Uno por opción: el vaso del chupito, la cuchara de los canapés y "Añadir más"
+  coctelLleva: [GlassWater, Soup, Plus],
+  // Brindis, barril de 30L, barril de 50L y aguas pequeñas
+  barraLleva: [PartyPopper, Beer, Beer, Droplet],
   copas: [Beer, Martini, Wine, GlassWater],
   aguaPequena: [Droplet, GlassWater],
   servicio: [Utensils, UtensilsCrossed, Package],

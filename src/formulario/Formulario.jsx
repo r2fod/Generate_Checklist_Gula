@@ -6,7 +6,7 @@
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
-import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, fmtFechaCorta as fmtFecha } from "./preguntas.js";
+import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, respuestasAlDia, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
 import FondoIconos, { iconoDePregunta, iconoDeOpcion } from "./FondoIconos.jsx";
@@ -185,7 +185,9 @@ export default function Formulario({ codigo }) {
   const [avisosParaBoton, setAvisosParaBoton] = useState([]);
   const [codigoMalo, setCodigoMalo] = useState(false);
   const [eventoDestino, setEventoDestino] = useState(guardado.eventoDestino ?? null); // null = sin elegir
-  const [respuestas, setRespuestas] = useState(guardado.respuestas ?? {});
+  // respuestasAlDia: un borrador de antes de la sección del cóctel, con el chupito y el
+  // brindis en su pregunta de ahora (ver preguntas.js)
+  const [respuestas, setRespuestas] = useState(() => respuestasAlDia(guardado.respuestas ?? {}));
   const [paso, setPaso] = useState(guardado.paso ?? -1);
   const [busca, setBusca] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -339,9 +341,11 @@ export default function Formulario({ codigo }) {
   // Hay preguntas que dependen de otra respuesta (las carpas de alquiler solo si no hay
   // sombra), así que la lista se recalcula con lo contestado hasta ahora. La condicional
   // va justo detrás de la que la dispara, así que el paso siguiente cae en ella sola.
-  const preguntas = useMemo(() => preguntasDe(tipo, respuestas)
-    // Si han elegido un evento que ya existe, el tipo ya lo sabemos: no se pregunta
-    .filter(p => !(p.id === "tipo" && eventoDestino)), [tipo, eventoDestino, respuestas]);
+  // El tipo se pregunta SIEMPRE, también en un evento que ya existe: ahí sale marcado el
+  // que tiene y basta con pasar, pero se puede cambiar. Antes se saltaba y no había
+  // forma de corregir una checklist que el calendario había creado con otro tipo ("ya
+  // no se puede poner el tipo de evento, ¿y si se quiere cambiar?", el dueño).
+  const preguntas = useMemo(() => preguntasDe(tipo, respuestas), [tipo, respuestas]);
 
   // Los sitios de los próximos eventos, para ofrecerlos al escribir el sitio
   const sitiosConocidos = useMemo(
@@ -370,7 +374,7 @@ export default function Formulario({ codigo }) {
   };
 
   const abrirParaCambiar = (m) => {
-    setRespuestas(m.respuestas || {});
+    setRespuestas(respuestasAlDia(m.respuestas || {}));
     setEventoDestino(m.eventoDestino || "");
     setEnvioId(m.id);
     setVerMios(false);
@@ -450,7 +454,7 @@ export default function Formulario({ codigo }) {
             logística le llega la versión buena, no dos envíos del mismo evento. */}
         <button className="form-btn-principal" onClick={() => {
           const ultimo = leerMios()[0];
-          if (ultimo) { setRespuestas(ultimo.respuestas || {}); setEventoDestino(ultimo.eventoDestino || ""); setEnvioId(ultimo.id); }
+          if (ultimo) { setRespuestas(respuestasAlDia(ultimo.respuestas || {})); setEventoDestino(ultimo.eventoDestino || ""); setEnvioId(ultimo.id); }
           setEnviado(false);
           setPaso(999); // al repaso: se cambia lo que sea y se manda
         }}>
@@ -561,13 +565,15 @@ export default function Formulario({ codigo }) {
                 )}
                 <button
                 className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}${e.configurado ? " es-configurado" : ""}`}
+                // El color de su tipo, el mismo que en la checklist (index.css, data-tipo)
+                data-tipo={e.tipo || undefined}
                 onClick={() => {
                   setEventoDestino(e.nombre);
                   // Si ya se aplicó un envío de esta oficina antes, sus respuestas
                   // (filtradas, ver respuestasParaOficina) vienen puestas: así un
                   // evento "Ya configurado" se rellena solo en vez de preguntarlo
                   // todo de cero otra vez.
-                  setRespuestas(r => ({ ...r, ...(e.respuestasPrevias || {}), tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
+                  setRespuestas(r => ({ ...r, ...respuestasAlDia(e.respuestasPrevias || {}), tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
                   setPasoGuardado(null);
                   setPaso(0);
                 }}
@@ -823,6 +829,7 @@ export default function Formulario({ codigo }) {
             <div key={o.valor}>
               <button
                 className={`form-opcion ${elegida ? "es-elegida" : ""}`}
+                data-tipo={p.id === "tipo" ? o.valor : undefined}
                 onClick={() => {
                   pon(p.id, o.valor);
                   // Al elegir la opción se guarda ya el número propuesto: si no, lo que
@@ -912,7 +919,7 @@ export default function Formulario({ codigo }) {
                   // Al marcar por primera vez una de lista, se ofrece ya una fila para
                   // rellenar: una lista vacía recién abierta no invita a tocar nada.
                   if (activar && o.conLista && !(respuestas[o.campoLista] || []).length) {
-                    pon(o.campoLista, [{ nombre: "", mesas: 1 }]);
+                    pon(o.campoLista, [{ nombre: "", [o.listaClave || "mesas"]: 1 }]);
                   }
                 }}
               >
@@ -947,31 +954,34 @@ export default function Formulario({ codigo }) {
               })()}
               {/* conLista: varias cosas distintas bajo la misma casilla ("otro" buffet
                   puede ser gildas Y un rincón de gin-tonics, cada uno con sus mesas),
-                  no un número único como el resto de opciones. */}
+                  no un número único como el resto de opciones. Cada lista dice qué
+                  es su número (mesas en los buffets, por persona en el cóctel). */}
               {puesta && o.conLista && (() => {
                 const campo = o.campoLista;
+                const clave = o.listaClave || "mesas";
                 const lista = respuestas[campo] || [];
                 const cambiarFila = (i, clave, valor) =>
                   pon(campo, lista.map((f, j) => (j === i ? { ...f, [clave]: valor } : f)));
                 return (
                   <div className="form-lista-otro">
+                    {o.listaNumero && <span className="form-lista-otro-nota">Qué es y {o.listaNumero.replace(/[¿?]/g, "").toLowerCase()}</span>}
                     {lista.map((fila, i) => (
                       <div className="form-lista-otro-fila" key={i}>
                         <input
-                          type="text" className="form-input" placeholder="¿Qué es? (ej: gildas)"
+                          type="text" className="form-input" placeholder={o.listaEjemplo || "¿Qué es? (ej: gildas)"}
                           value={fila.nombre || ""}
                           onChange={e => cambiarFila(i, "nombre", e.target.value)}
                         />
                         <input
-                          type="number" min="1" className="form-input form-input-corto" aria-label="¿Cuántas mesas?"
-                          value={fila.mesas ?? ""}
+                          type="number" min="1" className="form-input form-input-corto" aria-label={o.listaNumero || "¿Cuántas mesas?"}
+                          value={fila[clave] ?? ""}
                           onChange={e => {
                             const v = e.target.value;
-                            if (v === "") { cambiarFila(i, "mesas", ""); return; }
+                            if (v === "") { cambiarFila(i, clave, ""); return; }
                             const n = parseInt(v, 10);
-                            if (!Number.isNaN(n)) cambiarFila(i, "mesas", Math.max(1, n));
+                            if (!Number.isNaN(n)) cambiarFila(i, clave, Math.max(1, n));
                           }}
-                          onBlur={() => { if (fila.mesas === "") cambiarFila(i, "mesas", 1); }}
+                          onBlur={() => { if (fila[clave] === "") cambiarFila(i, clave, 1); }}
                         />
                         <button
                           type="button" className="form-lista-otro-quitar"
@@ -982,7 +992,7 @@ export default function Formulario({ codigo }) {
                     ))}
                     <button
                       type="button" className="form-comentario-abrir"
-                      onClick={() => pon(campo, [...lista, { nombre: "", mesas: 1 }])}
+                      onClick={() => pon(campo, [...lista, { nombre: "", [clave]: 1 }])}
                     >+ Añadir otro</button>
                   </div>
                 );

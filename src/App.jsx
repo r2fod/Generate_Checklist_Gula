@@ -41,7 +41,7 @@ import {
 } from "./nube.js";
 import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
 import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
-import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio, notasFusionadas } from "./formulario/preguntas.js";
+import { aRespuestasDeLaApp, recogidasDelEnvio, comprasDelEnvio, itemsDelEnvio, cambiosEntreRespuestas, nombreDelEnvio, textoAvisoEnvio, notasFusionadas } from "./formulario/preguntas.js";
 import { nuevoCodigo, publicarProximos, borrarProximos, leerEnvios, borrarEnvio, marcarRevisado, repartirEnvios, suscribirEnvios, limpiarAvisos, sinApunteEnElCalendario } from "./formulario/envios.js";
 // Las tres pantallas gordas llegan por import() perezoso. Modo carga son 723 líneas que
 // solo ve quien carga un camión; la bandeja de la oficina y "añadir varios items" se
@@ -220,7 +220,7 @@ const ETIQUETAS_CAMPO = {
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   diasProduccion: "Días de producción",
-  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
+  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Chupitos de cristal (cóctel)", llevaCucharasPorcelana: "Cucharas de porcelana", numCucharasPorcelana: "Canapés en cuchara", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
   dobleTenedor: "Doble tenedor", dobleCuchillo: "Doble cuchillo", dobleCuchara: "Doble cuchara",
   dobleVino: "Doble copa de vino", dobleAgua: "Doble vaso de agua", dobleCava: "Doble copa de cava",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
@@ -491,7 +491,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [tamanoBarril, setTamanoBarril] = useState(estadoInicial.tamanoBarril ?? "No lleva");
   const [numBarriles, setNumBarriles]   = useState(estadoInicial.numBarriles ?? 1);
   const [llevaEntrante, setLlevaEntrante]             = useState(estadoInicial.llevaEntrante ?? false);
-  // Entrante compartido en plato (independiente del chupito): cuántas personas
+  // Canapés del cóctel en cuchara de porcelana: cuántos distintos (cada uno, una por persona)
+  const [llevaCucharasPorcelana, setLlevaCucharasPorcelana] = useState(estadoInicial.llevaCucharasPorcelana ?? false);
+  const [numCucharasPorcelana, setNumCucharasPorcelana] = useState(estadoInicial.numCucharasPorcelana ?? 1);
+  // Entrante compartido en plato (independiente de los chupitos del cóctel): cuántas personas
   // comparten cada plato y cuántos entrantes distintos se reparten
   const [entranteCompartido, setEntranteCompartido] = useState(estadoInicial.entranteCompartido ?? false);
   const [numEntrantesCompartir, setNumEntrantesCompartir] = useState(estadoInicial.numEntrantesCompartir ?? 1);
@@ -935,7 +938,7 @@ export default function App({ onCerrarSesion } = {}) {
     evento, nombreEvento, fechaEvento, horaInicio, ubicacion, notasEvento, pax, ninos,
     barraCoctel, horasCoctel, barraCopas, horasCopas, diasProduccion,
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
-    tamanoBarril, numBarriles, llevaEntrante, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
+    tamanoBarril, numBarriles, llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
     tipoHorno, tipoBBQ, estacion, mesVerano,
@@ -1039,6 +1042,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio: setDobleServicio, dobleTenedor: setDobleTenedor, dobleCuchillo: setDobleCuchillo, dobleCuchara: setDobleCuchara,
     dobleVino: setDobleVino, dobleAgua: setDobleAgua, dobleCava: setDobleCava,
     tamanoBarril: setTamanoBarril, numBarriles: setNumBarriles, llevaEntrante: setLlevaEntrante, soloBandeja: setSoloBandeja,
+    llevaCucharasPorcelana: setLlevaCucharasPorcelana, numCucharasPorcelana: setNumCucharasPorcelana,
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros, numMesasBuffet: setNumMesasBuffet,
@@ -2020,6 +2024,16 @@ export default function App({ onCerrarSesion } = {}) {
         if (estado.compras.some(x => (x.concepto || "").trim().toLowerCase() === c.concepto.toLowerCase())) return;
         estado.compras = [...estado.compras, c];
       });
+      // Lo añadido en el cóctel ("Añadir más": vasitos, conos...), a la checklist como
+      // items a mano. También se suma sin duplicar: si ya estaba, manda el que había
+      // (puede tener la cantidad corregida). Si la categoría se renombró, va a la nueva.
+      const renombradas = estado.categoriasRenombradas || {};
+      estado.itemsManuales = Array.isArray(estado.itemsManuales) ? estado.itemsManuales.slice() : [];
+      itemsDelEnvio(envio.respuestas || {}).forEach(it => {
+        const categoria = renombradas[it.categoria] ?? it.categoria;
+        if (estado.itemsManuales.some(x => x.categoria === categoria && (x.label || "").trim().toLowerCase() === it.label.toLowerCase())) return;
+        estado.itemsManuales = [...estado.itemsManuales, { ...it, categoria }];
+      });
       // Las hojas de alquiler (Dealde, Event Style...) se ACUMULAN, no se sustituyen:
       // el spread de arriba ya puso las del envío nuevo, aquí se le suman las que ya
       // hubiera guardadas. Se limita a las últimas TOPE_ARCHIVOS_ALQUILER para no
@@ -2639,7 +2653,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -2657,7 +2671,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
-    tipoHorno, llevaEntrante, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
+    tipoHorno, llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
@@ -4634,7 +4648,12 @@ export default function App({ onCerrarSesion } = {}) {
                 [dobleAgua, setDobleAgua, "Doble vaso de agua", "no suele doblar: se rellena el mismo"],
                 [dobleCava, setDobleCava, "Doble copa de cava", "no suele doblar: se rellena la misma"],
               ] : []),
-              [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
+              // Era "Entrante de chupito": el chupito es del cóctel, no un entrante (así lo
+              // pregunta el formulario). Solo cambia el texto; el campo sigue siendo llevaEntrante.
+              [llevaEntrante,        setLlevaEntrante,        "Chupitos de cristal",      "del cóctel: vasos de chupito de cristal"],
+              ...(evento !== "produccion"
+                ? [[llevaCucharasPorcelana, setLlevaCucharasPorcelana, "Cucharas de porcelana", llevaCucharasPorcelana ? `${numCucharasPorcelana} ${numCucharasPorcelana === 1 ? "canapé" : "canapés"} por persona (ajusta abajo)` : "canapés del cóctel"]]
+                : []),
               [entranteCompartido,   setEntranteCompartido,   "Entrante compartido",      "platos para compartir en mesa"],
               /* "Lleva canapés" ya no existe: las bandejas para pasar comida van siempre,
                  calculadas por pax. Lo que de verdad cambia la carga es si el servicio
@@ -4688,7 +4707,7 @@ export default function App({ onCerrarSesion } = {}) {
               esto, un rodaje sin paella ni frituras no enseñaba la fila entera y no
               había forma de decir cuántas planchas van (ni, con ellas, las bombonas). */}
           {(entranteCompartido || llevaPaella || tieneFrituras || llevaChillOut
-            || llevaPlanchaGas || evento === "produccion") && (
+            || llevaPlanchaGas || llevaCucharasPorcelana || evento === "produccion") && (
             <div className="controls-row" style={{ marginTop: 12 }}>
               {entranteCompartido && (
                 <>
@@ -4727,6 +4746,13 @@ export default function App({ onCerrarSesion } = {}) {
                     </span>
                   </div>
                 </>
+              )}
+              {llevaCucharasPorcelana && evento !== "produccion" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Canapés distintos en cuchara</span>
+                  <input type="number" className="form-input" value={numCucharasPorcelana} min="1" onChange={e => setNumCucharasPorcelana(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Una cuchara por persona y canapé</span>
+                </div>
               )}
               {tieneFrituras && (
                 <div className="form-group controls-mini">
