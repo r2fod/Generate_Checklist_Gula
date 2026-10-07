@@ -14,7 +14,7 @@ import { conectores, conectoresActivos, conHerramientasDeConectores, registrarCo
 import { todas, llevaDatos } from "../asistente/herramientas.js";
 import { comprimir, ahorro } from "../asistente/comprimir.js";
 import { candidatos, elige, mereceOtroIntento, preguntaLlevaDatos, preguntaPideCabeza, ORDEN, SIN_DATOS_DE_CLIENTES } from "../asistente/enrutado.js";
-import { proveedoresElegibles, NOMBRE_PROVEEDOR, notaDe } from "../asistente/proveedoresUI.js";
+import { proveedoresElegibles, NOMBRE_PROVEEDOR, notaDe, disponiblesDeLaPrueba } from "../asistente/proveedoresUI.js";
 import { saneaGasto, apuntar, resumen, euros, eurosTotales, puedePreguntar, esGratis, mesActual, PRECIOS, totales, costeDeUna } from "../asistente/gasto.js";
 import { avisosConfig, saludoPendientes } from "../asistente/avisosConfig.js";
 import { marcarActualizando, confirmaSiActualizado } from "../asistente/actualizacion.js";
@@ -2320,6 +2320,19 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   const soloDos = proveedoresElegibles(["claude", "groq"]);
   ok(soloDos.map(p => p.id).join(",") === "groq,claude",
     "con solo dos configurados, salen esos dos y en el orden de la cascada (groq antes que claude), no el orden en que llegaron");
+
+  // "Probar los proveedores" pone al día la lista: los que responden, ni más ni menos
+  const pings = [
+    { nombre: "gemini", estado: "ok", contesta: "ok" },
+    { nombre: "groq", estado: "ok", contesta: "ok" },
+    { nombre: "claude", estado: "error", motivo: "401" },
+    { nombre: "mistral", estado: "sin configurar", falta: "MISTRAL_API_KEY" },
+  ];
+  ok(disponiblesDeLaPrueba(pings).join(",") === "gemini,groq"
+    && proveedoresElegibles(disponiblesDeLaPrueba(pings)).map(p => p.id).join(",") === "gemini,groq",
+    "al probar los proveedores, la lista de Ajustes pasa a ser la de los que responden (un 401 o sin clave no salen)");
+  ok(disponiblesDeLaPrueba([]).length === 0 && disponiblesDeLaPrueba(null).length === 0,
+    "si no responde ninguno, no se toca la lista (no se deja Ajustes vacío)");
 
   ok(ORDEN.every(id => NOMBRE_PROVEEDOR[id]),
     "todos los proveedores del enrutado tienen nombre para pantalla (nadie se queda con el id en crudo)");

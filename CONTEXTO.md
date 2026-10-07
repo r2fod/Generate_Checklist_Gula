@@ -285,6 +285,26 @@ operativo).
   el móvil, antes `--fs-xl`/`--fs-lg`, casi como un título de bloque), `letter-spacing`
   negativo y `text-wrap: balance`; las cantidades (lista, modo carga, hoja) con
   `tabular-nums`.
+- **El formulario con los colores de cada tipo** ("que sea igual para que sea todo
+  más parejo en colores", el dueño): cada evento de "¿De qué evento son los datos?"
+  lleva `data-tipo` y sale con su icono en el color del tipo, sobre su fondo suave, y
+  una raya de ese color a la izquierda; las opciones de "¿Qué tipo de evento es?",
+  igual. Los colores son los mismos `--color-*` de la checklist (index.css, `:is(...)
+  [data-tipo]`).
+- **El tipo de evento se pregunta siempre**, también al elegir un evento que ya existe:
+  sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
+  saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
+  corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **Asistente, "Probar los proveedores" pone al día la lista de Ajustes** ("sigo sin
+  ver los proveedores de IA que agregué", el dueño). La lista de proveedores a elegir
+  sale de `disponibles`, lo que el Worker dice que tiene clave, y la app solo se
+  enteraba al recibir una respuesta. Ahora, al probar, pasa a ser la de los que
+  responden (`disponiblesDeLaPrueba`). Si siguen sin salir, es el Worker: o no está
+  pegado el código nuevo (`worker/pegar.js`) o la clave tiene otro nombre (los que
+  lee: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `ZAI_API_KEY`, `MISTRAL_API_KEY`,
+  `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+  `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`, `COMPATIBLE_API_KEY` +
+  `COMPATIBLE_URL`). `…workers.dev/__estado` lo dice abierto en el navegador.
 - **El Resumen del modo carga, en el móvil una lista** ("Resumen sigue estando feo,
   hazlo más premium", el dueño): por debajo de 640px la tabla de siete columnas
   (`.resumen-tabla-wrap`) se esconde y sale `.resumen-lista`: una tarjeta por categoría

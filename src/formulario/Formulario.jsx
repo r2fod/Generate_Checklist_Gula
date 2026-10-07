@@ -339,9 +339,11 @@ export default function Formulario({ codigo }) {
   // Hay preguntas que dependen de otra respuesta (las carpas de alquiler solo si no hay
   // sombra), así que la lista se recalcula con lo contestado hasta ahora. La condicional
   // va justo detrás de la que la dispara, así que el paso siguiente cae en ella sola.
-  const preguntas = useMemo(() => preguntasDe(tipo, respuestas)
-    // Si han elegido un evento que ya existe, el tipo ya lo sabemos: no se pregunta
-    .filter(p => !(p.id === "tipo" && eventoDestino)), [tipo, eventoDestino, respuestas]);
+  // El tipo se pregunta SIEMPRE, también en un evento que ya existe: ahí sale marcado el
+  // que tiene y basta con pasar, pero se puede cambiar. Antes se saltaba y no había
+  // forma de corregir una checklist que el calendario había creado con otro tipo ("ya
+  // no se puede poner el tipo de evento, ¿y si se quiere cambiar?", el dueño).
+  const preguntas = useMemo(() => preguntasDe(tipo, respuestas), [tipo, respuestas]);
 
   // Los sitios de los próximos eventos, para ofrecerlos al escribir el sitio
   const sitiosConocidos = useMemo(
@@ -561,6 +563,8 @@ export default function Formulario({ codigo }) {
                 )}
                 <button
                 className={`form-evento form-evento-con-icono${enviado ? " es-enviado" : ""}${e.configurado ? " es-configurado" : ""}`}
+                // El color de su tipo, el mismo que en la checklist (index.css, data-tipo)
+                data-tipo={e.tipo || undefined}
                 onClick={() => {
                   setEventoDestino(e.nombre);
                   // Si ya se aplicó un envío de esta oficina antes, sus respuestas
@@ -823,6 +827,7 @@ export default function Formulario({ codigo }) {
             <div key={o.valor}>
               <button
                 className={`form-opcion ${elegida ? "es-elegida" : ""}`}
+                data-tipo={p.id === "tipo" ? o.valor : undefined}
                 onClick={() => {
                   pon(p.id, o.valor);
                   // Al elegir la opción se guarda ya el número propuesto: si no, lo que

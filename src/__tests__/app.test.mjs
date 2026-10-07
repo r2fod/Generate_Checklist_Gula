@@ -451,6 +451,39 @@ async function main() {
     await ctx.close();
   }
 
+  // ── El formulario: los colores de cada tipo, y el tipo siempre se puede cambiar ──
+  // "Que sea igual (que la checklist) para que sea todo más parejo en colores" y "ya no
+  // se puede poner el tipo de evento, ¿y si se quiere cambiar?" (el dueño). Sin nube no
+  // hay lista de eventos: el evento ya elegido se simula con el borrador que guarda el
+  // propio formulario (gula_formulario_<código>), como si se volviera a abrir a medias.
+  console.log("\n── El formulario: colores por tipo y el tipo editable ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Produ de prueba", paso: 0, respuestas: { tipo: "produccion", nombre: "Produ de prueba" },
+    })));
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(600);
+    const m = await p.evaluate(() => ({
+      titulo: document.querySelector(".form-titulo").innerText,
+      elegida: document.querySelector(".form-opcion.es-elegida")?.innerText || "",
+      colores: [...document.querySelectorAll(".form-opcion[data-tipo] .form-opcion-icono")].map(i => getComputedStyle(i).color),
+    }));
+    ok(/tipo de evento/i.test(m.titulo) && /Producción/.test(m.elegida),
+      `en un evento que ya existe se pregunta el tipo, con el suyo marcado → "${m.elegida}"`);
+    ok(m.colores.length === 5 && new Set(m.colores).size === 5,
+      `cada tipo con su color, el mismo que en la checklist (${new Set(m.colores).size} colores distintos)`);
+    await p.locator(".form-opcion", { hasText: "Boda" }).first().click();
+    await p.waitForTimeout(500);
+    const borrador = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA2") || "{}"));
+    ok(borrador.respuestas && borrador.respuestas.tipo === "boda" && borrador.eventoDestino === "Produ de prueba",
+      "y se puede cambiar: el envío del mismo evento lleva el tipo nuevo");
+    await c.close();
+  }
+
   // ── El Resumen del modo carga, en el móvil una lista ─────────────────────────
   // "Resumen sigue estando feo, arréglalo y hazlo más premium" (el dueño, con la tabla
   // de siete columnas en el móvil: arrastrar de lado, celdas de guiones y nombres en

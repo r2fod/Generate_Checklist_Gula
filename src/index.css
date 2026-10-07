@@ -517,11 +517,14 @@ body {
    y la del modo carga: data-tipo lo elige y lo demás (el icono, el tinte del fondo,
    la raya de arriba) lee --tipo. Un evento sin tipo conocido se queda con la marca. */
 .con-tipo { --tipo: var(--accent); border-top: 3px solid var(--tipo); }
-.con-tipo[data-tipo="boda"] { --tipo: var(--color-boda); }
-.con-tipo[data-tipo="comunion"] { --tipo: var(--color-comunion); }
-.con-tipo[data-tipo="corporativo"] { --tipo: var(--color-corporativo); }
-.con-tipo[data-tipo="cumpleanos"] { --tipo: var(--color-cumpleanos); }
-.con-tipo[data-tipo="produccion"] { --tipo: var(--color-produccion); }
+/* Los mismos colores en el formulario: cada evento de la lista y cada opción de "¿Qué
+   tipo de evento es?" llevan data-tipo ("que sea igual para que sea todo más parejo en
+   colores", el dueño) */
+:is(.con-tipo, .form-evento, .form-opcion)[data-tipo="boda"] { --tipo: var(--color-boda); }
+:is(.con-tipo, .form-evento, .form-opcion)[data-tipo="comunion"] { --tipo: var(--color-comunion); }
+:is(.con-tipo, .form-evento, .form-opcion)[data-tipo="corporativo"] { --tipo: var(--color-corporativo); }
+:is(.con-tipo, .form-evento, .form-opcion)[data-tipo="cumpleanos"] { --tipo: var(--color-cumpleanos); }
+:is(.con-tipo, .form-evento, .form-opcion)[data-tipo="produccion"] { --tipo: var(--color-produccion); }
 
 /* El nombre del evento es el título de la pantalla: va con la talla que la escala
    reserva para eso (--fs-2xl, --fs-xl en el móvil) y no con la de un título de bloque,
@@ -6347,6 +6350,20 @@ hr {
    (form-mio) reutiliza form-evento tal cual, en columna, y no debe moverse. */
 .form-evento.form-evento-con-icono { flex-direction: row; align-items: center; gap: 10px; }
 .form-evento-icono { flex-shrink: 0; color: var(--accent); opacity: 0.75; }
+/* Con su tipo (como en la checklist): el icono en el color del tipo, sobre su fondo
+   suave, y una raya del mismo color a la izquierda de la tarjeta */
+.form-evento.form-evento-con-icono[data-tipo] { border-left: 4px solid var(--tipo); }
+.form-evento[data-tipo] .form-evento-icono {
+  box-sizing: content-box;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  color: var(--tipo);
+  background: color-mix(in srgb, var(--tipo) 13%, transparent);
+  opacity: 1;
+}
+.form-opcion[data-tipo] .form-opcion-icono { color: var(--tipo); opacity: 1; }
+.form-opcion[data-tipo]:hover { border-color: var(--tipo); }
+.form-opcion[data-tipo].es-elegida { border-color: var(--tipo); background: color-mix(in srgb, var(--tipo) 10%, var(--card-bg)); }
 .form-evento-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 /* Ya se le mandó algo desde este móvil: no lo saca de la lista (puede hacer falta
    una corrección), solo lo distingue de un vistazo con un verde suave y su check. */
