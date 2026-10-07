@@ -1815,7 +1815,13 @@ button.cal-turnos.es-vacia {
 .cal-ajustes-boton { display: none; }
 @media (max-width: 768px) {
   .cal-ajustes-bloque { display: flex; flex-direction: column; gap: 8px; }
-  .cal-ajustes-boton { display: block; margin-bottom: 0; }
+  .cal-ajustes-boton {
+    display: block;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    overflow: hidden;
+  }
   .cal-ajustes-bloque:not(.es-abierto) > .cal-ajustes { display: none; }
 }
 

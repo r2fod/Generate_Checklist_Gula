@@ -24,7 +24,9 @@ export default function Ajustes({ apuntes, conLimpiar = true, abiertosAlEntrar =
   if (!Children.toArray(children).length) return null;
   return (
     <div className={`cal-ajustes-bloque${abiertos ? " es-abierto" : ""}`}>
-      <div className="cal-ratios cal-ajustes-boton">
+      {/* Con la cabecera de los plegables (.cal-ratios-cab) pero SIN ser uno: las
+          pruebas buscan cada panel por .cal-ratios, y un segundo los confundía */}
+      <div className="cal-ajustes-boton">
         <button type="button" className="cal-ratios-cab" aria-expanded={abiertos} onClick={() => setAbiertos(v => !v)}>
           <SlidersHorizontal size={16} aria-hidden="true" />
           <span className="cal-ratios-titulo">
