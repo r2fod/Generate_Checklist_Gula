@@ -3719,7 +3719,10 @@ hr {
 
 .carga-modo-toggle {
   position: sticky;
-  top: calc(-1 * var(--hueco-arriba, 0px));
+  /* top: 0 y no el truco de .preview-header: aquí el que hace scroll es el propio panel
+     (.carga-modal, sin padding), no el fondo. Con el hueco restado, la barra se quedaba
+     cortada por arriba en el escritorio. */
+  top: 0;
   z-index: 3;
   display: flex;
   align-items: center;
@@ -4291,6 +4294,117 @@ hr {
   .resumen-tabla td {
     padding: 8px 5px;
   }
+}
+
+/* ─── EL RESUMEN EN EL MÓVIL: UNA LISTA, NO UNA TABLA ──────────────────────────
+   Siete columnas en 380px había que arrastrarlas de lado, la mitad de las celdas eran
+   guiones y el nombre se partía en tres líneas. En el móvil cada categoría es una
+   tarjeta con su color y su subtotal, y cada producto una fila: el nombre entero, lo
+   cargado (y lo que cuesta) a la derecha y, debajo, solo los datos que hay. La tabla
+   sigue en pantalla grande, donde las siete columnas caben y se comparan bien. */
+.resumen-lista { display: none; }
+@media (max-width: 640px) {
+  .resumen-tabla-wrap { display: none; }
+  .resumen-lista { display: flex; flex-direction: column; gap: 12px; }
+  .resumen-lista-cat {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .resumen-lista-cab {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 14px;
+    background: linear-gradient(90deg, var(--cat-tinte, transparent), transparent 75%), var(--card-bg);
+    border-left: 4px solid var(--cat-raya, var(--accent));
+    border-bottom: 1px solid var(--border-color);
+    font-weight: 700;
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-main);
+  }
+  .resumen-lista-cat-nombre { flex: 1 1 auto; min-width: 0; }
+  .resumen-lista-subtotal {
+    flex: 0 0 auto;
+    font-size: var(--fs-sm);
+    letter-spacing: 0;
+    text-transform: none;
+    font-variant-numeric: tabular-nums;
+    color: var(--cat-tinta, var(--text-main));
+  }
+  .resumen-lista-filas { list-style: none; margin: 0; padding: 0; }
+  .resumen-lista-fila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 3px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .resumen-lista-fila:last-child { border-bottom: 0; }
+  .resumen-lista-nombre {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    font-size: var(--fs-base);
+    color: var(--text-main);
+    overflow-wrap: break-word;
+  }
+  .resumen-lista-nombre .item-icon { margin-top: 3px; }
+  .resumen-lista-cifras {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .resumen-lista-cifras strong { font-size: var(--fs-base); color: var(--text-main); }
+  .resumen-lista-cifras em { font-style: normal; font-size: var(--fs-xs); font-weight: 700; color: var(--accent); }
+  /* Debajo del nombre, sangrado bajo el texto (no bajo el icono) */
+  .resumen-lista-datos {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    padding-left: 22px;
+  }
+  .resumen-lista-datos > span {
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    background: var(--bg-subtle);
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-variant-numeric: tabular-nums;
+  }
+  .resumen-lista-datos > .es-ok { background: var(--ok-bg); color: var(--ok-texto); }
+  .resumen-lista-datos > .es-rotura { background: var(--error-bg); color: var(--error-texto-fuerte); font-weight: 700; }
+  .resumen-lista-datos > .es-mal { background: var(--aviso-bg); color: var(--aviso-texto); font-weight: 700; }
+  .resumen-lista-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-weight: 800;
+  }
+  .resumen-lista-total strong { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+}
+/* "Para la próxima vez": el título de los paneles de calibrar, al final del Resumen */
+.resumen-titulo-proxima {
+  margin-top: 8px;
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
 }
 
 .carga-row-vuelta {

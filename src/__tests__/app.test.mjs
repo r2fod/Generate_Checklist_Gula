@@ -435,6 +435,58 @@ async function main() {
     await page.waitForTimeout(300);
     const arriba = await page.evaluate(() => Math.round(document.querySelector(".preview-modal .preview-header").getBoundingClientRect().top));
     ok(arriba === 0, `${w}px · al bajar por la hoja, la cabecera se pega arriba del todo, sin franja de lista por encima (${arriba}px)`);
+    // Y en el modo carga, que hace scroll en su propio panel, la barra de pestañas entera
+    await page.locator(".preview-close-btn").first().click();
+    await page.waitForTimeout(400);
+    await page.locator("button", { hasText: "Modo carga" }).first().click();
+    await page.waitForSelector(".carga-modo-toggle");
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { for (const e of [document.querySelector(".carga-modal"), document.querySelector(".preview-overlay")]) if (e) e.scrollTop = 1500; });
+    await page.waitForTimeout(300);
+    const barra = await page.evaluate(() => {
+      const t = document.querySelector(".carga-modo-toggle").getBoundingClientRect(), m = document.querySelector(".carga-modal").getBoundingClientRect();
+      return Math.round(t.top - Math.max(m.top, 0));
+    });
+    ok(barra >= 0, `${w}px · en el modo carga, al bajar, la barra de pestañas se ve entera (${barra}px)`);
+    await ctx.close();
+  }
+
+  // ── El Resumen del modo carga, en el móvil una lista ─────────────────────────
+  // "Resumen sigue estando feo, arréglalo y hazlo más premium" (el dueño, con la tabla
+  // de siete columnas en el móvil: arrastrar de lado, celdas de guiones y nombres en
+  // tres líneas). En el móvil, una tarjeta por categoría y una fila por producto con
+  // solo lo que hay; en pantalla grande, la tabla. Y primero cómo ha ido (las cifras y
+  // la lista); los paneles de calibrar, al final.
+  console.log("\n── El Resumen, en el móvil una lista ──");
+  for (const [w, h] of [[390, 844], [320, 700], [1280, 900]]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769 });
+    for (const hs of HOSTS_NUBE) await ctx.route(hs, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-header");
+    await page.locator("button", { hasText: "Modo carga" }).first().click(); await page.waitForTimeout(800);
+    await page.locator(".carga-modo-toggle button").filter({ hasText: "Vuelta" }).first().click(); await page.waitForTimeout(500);
+    await page.locator(".carga-todo-vuelto").click(); await page.waitForTimeout(800);
+    await page.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click(); await page.waitForTimeout(800);
+    const m = await page.evaluate(() => {
+      const ve = (s) => { const e = document.querySelector(s); return !!(e && e.offsetParent); };
+      const nombres = [...document.querySelectorAll(".resumen-lista-nombre")].filter(e => e.offsetParent);
+      const lista = document.querySelector(".resumen-lista"), panel = document.querySelector(".resumen-titulo-proxima");
+      return {
+        lista: ve(".resumen-lista"), tabla: ve(".resumen-tabla-wrap"), filas: nombres.length,
+        recortados: nombres.filter(e => e.scrollWidth > e.clientWidth + 1).length,
+        guiones: [...document.querySelectorAll(".resumen-lista-cifras strong")].filter(e => e.offsetParent && e.textContent.trim() === "—").length,
+        calibrarAlFinal: !panel || !lista || !lista.offsetParent || panel.getBoundingClientRect().top > lista.getBoundingClientRect().bottom,
+        lado: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    if (w <= 640) {
+      ok(m.lista && !m.tabla && m.filas > 20 && m.recortados === 0 && m.guiones === 0 && m.lado <= 0,
+        `${w}px · el Resumen es una lista: ${m.filas} productos con su nombre entero, sin guiones ni arrastrar de lado`);
+    } else {
+      ok(m.tabla && !m.lista, `${w}px · en pantalla grande sigue la tabla`);
+    }
+    ok(m.calibrarAlFinal, `${w}px · los paneles de calibrar van al final, después de cómo ha ido`);
     await ctx.close();
   }
 
