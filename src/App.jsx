@@ -220,7 +220,7 @@ const ETIQUETAS_CAMPO = {
   horaInicio: "Hora de inicio", ubicacion: "Ubicación", notasEvento: "Notas", pax: "Pax adultos", ninos: "Niños",
   barraCoctel: "Barra cóctel", horasCoctel: "Horas de cóctel", barraCopas: "Barra copas", horasCopas: "Horas de copas",
   diasProduccion: "Días de producción",
-  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Entrante de chupito", llevaCucharasPorcelana: "Cucharas de porcelana", numCucharasPorcelana: "Canapés en cuchara", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
+  dobleServicio: "Doble servicio", tamanoBarril: "Barril de cerveza", numBarriles: "Nº de barriles", llevaEntrante: "Chupitos de cristal (cóctel)", llevaCucharasPorcelana: "Cucharas de porcelana", numCucharasPorcelana: "Canapés en cuchara", llevaCanapes: "Lleva canapés", soloBandeja: "Servicio solo en bandeja",
   dobleTenedor: "Doble tenedor", dobleCuchillo: "Doble cuchillo", dobleCuchara: "Doble cuchara",
   dobleVino: "Doble copa de vino", dobleAgua: "Doble vaso de agua", dobleCava: "Doble copa de cava",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
@@ -494,7 +494,7 @@ export default function App({ onCerrarSesion } = {}) {
   // Canapés del cóctel en cuchara de porcelana: cuántos distintos (cada uno, una por persona)
   const [llevaCucharasPorcelana, setLlevaCucharasPorcelana] = useState(estadoInicial.llevaCucharasPorcelana ?? false);
   const [numCucharasPorcelana, setNumCucharasPorcelana] = useState(estadoInicial.numCucharasPorcelana ?? 1);
-  // Entrante compartido en plato (independiente del chupito): cuántas personas
+  // Entrante compartido en plato (independiente de los chupitos del cóctel): cuántas personas
   // comparten cada plato y cuántos entrantes distintos se reparten
   const [entranteCompartido, setEntranteCompartido] = useState(estadoInicial.entranteCompartido ?? false);
   const [numEntrantesCompartir, setNumEntrantesCompartir] = useState(estadoInicial.numEntrantesCompartir ?? 1);
@@ -4648,7 +4648,9 @@ export default function App({ onCerrarSesion } = {}) {
                 [dobleAgua, setDobleAgua, "Doble vaso de agua", "no suele doblar: se rellena el mismo"],
                 [dobleCava, setDobleCava, "Doble copa de cava", "no suele doblar: se rellena la misma"],
               ] : []),
-              [llevaEntrante,        setLlevaEntrante,        "Entrante de chupito",      "solo vasos de cristal"],
+              // Era "Entrante de chupito": el chupito es del cóctel, no un entrante (así lo
+              // pregunta el formulario). Solo cambia el texto; el campo sigue siendo llevaEntrante.
+              [llevaEntrante,        setLlevaEntrante,        "Chupitos de cristal",      "del cóctel: vasos de chupito de cristal"],
               ...(evento !== "produccion"
                 ? [[llevaCucharasPorcelana, setLlevaCucharasPorcelana, "Cucharas de porcelana", llevaCucharasPorcelana ? `${numCucharasPorcelana} ${numCucharasPorcelana === 1 ? "canapé" : "canapés"} por persona (ajusta abajo)` : "canapés del cóctel"]]
                 : []),

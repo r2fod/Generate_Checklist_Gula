@@ -3043,6 +3043,11 @@ async function main() {
     ok(enVajilla.includes("Cucharas de porcelana (canapés)=220") && enVajilla.includes("Vasito de cristal=110"),
       `del cóctel a la vajilla: cucharas de porcelana (100 × 2 canapés + margen) y lo añadido → ${enVajilla.filter(x => /porcelana|Vasito/.test(x)).join(", ")}`);
     ok(tiene(nombresCoctel, "Vasos chupito cristal"), "y el chupito, sus vasos de cristal");
+    // "Quitar del entrante lo de chupito para que no esté duplicado" (el dueño): en la
+    // app la casilla ya no dice "Entrante de chupito", va con el cóctel
+    const casillas = await p.locator(".checkbox-texto").allInnerTexts();
+    ok(casillas.some(t => t.startsWith("Chupitos de cristal")) && !casillas.some(t => /Entrante de chupito/i.test(t)),
+      "en la app, la casilla del chupito es del cóctel, no un entrante");
 
     // Un rodaje de tres días sin sombra y con generador de alquiler
     const produ = await desdeElFormulario({

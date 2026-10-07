@@ -1162,7 +1162,7 @@ export function aRespuestasDeLaApp(respuestas = {}) {
       estado.paxPorCamarero = r.servicio === "bandeja" ? 25 : 12;
     }
     // Lo del cóctel: el chupito es el interruptor de siempre de la app (llevaEntrante,
-    // "Entrante de chupito"), y las cucharas de porcelana el suyo. Lo de "Añadir más"
+    // hoy "Chupitos de cristal"), y las cucharas de porcelana el suyo. Lo de "Añadir más"
     // no es un campo: son items que se suman (itemsDelEnvio).
     if (Array.isArray(r.coctelLleva)) {
       estado.llevaEntrante = marcado("coctelLleva", "chupito");

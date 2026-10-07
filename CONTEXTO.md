@@ -313,6 +313,11 @@ operativo).
     `entrante` a `coctelLleva` y lo de la barra de `extras` a `barraLleva`; lo usan
     `aRespuestasDeLaApp`, `resumirEnvio`, `cambiosEntreRespuestas` y el formulario al
     cargar unas respuestas. Un envío viejo carga lo mismo que cargaba.
+  - **En la app, "Entrante de chupito" pasa a "Chupitos de cristal"** ("quitar del
+    entrante lo de chupito para que no esté duplicado", el dueño): solo el texto de la
+    casilla, el campo sigue siendo `llevaEntrante`. El item de la checklist conserva su
+    nombre ("Vasos chupito cristal (entrante)"): es su identidad, y cambiarlo pide migrar
+    las marcas y cantidades de los eventos guardados.
   - `conLista` admite su propio número (`listaClave`, `listaNumero`, `listaEjemplo`,
     `listaSufijo`); los buffets siguen con `mesas`.
 - **Asistente, "Probar los proveedores" pone al día la lista de Ajustes** ("sigo sin
