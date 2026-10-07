@@ -626,6 +626,39 @@ async function main() {
     await c.close();
   }
 
+  // ── Todas las cabeceras de categoría del mismo alto ─────────────────────────
+  // "¿Por qué una es más grande que otra?" (el dueño, con COCINA y MENAJE Y UTENSILIOS
+  // en el móvil): con ↑ ↓ ✎ en la píldora, a un nombre largo no le cabía al lado y la
+  // píldora bajaba a su línea, 71px unas y 107 otras. En el móvil ↑ ↓ ✎ van al pie de
+  // la categoría y el nombre tiene sitio para dos líneas siempre. En el modo carga, igual.
+  console.log("\n── Las cabeceras de categoría, todas del mismo alto ──");
+  for (const w of [390, 320, 768, 1280]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: w < 769, hasTouch: w < 769 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, llevaPaella: true }), { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".category-header");
+    await p.waitForTimeout(500);
+    const altos = await p.locator(".category-header").evaluateAll(hs => [...new Set(hs.map(h => Math.round(h.getBoundingClientRect().height)))]);
+    ok(altos.length === 1, `${w}px · las cabeceras de la checklist miden todas lo mismo → ${altos.join(", ")}px`);
+    if (w <= 560) {
+      const nombres = () => p.locator(".cat-name-texto").allInnerTexts();
+      const antes = await nombres();
+      const pie = p.locator(".category-section").first().locator(".cat-pie-edicion");
+      await pie.locator("button", { hasText: "Bajar" }).click();
+      await p.waitForTimeout(300);
+      const despues = await nombres();
+      ok(await p.locator(".category-header .cat-edit-btn").first().isHidden() && despues[1] === antes[0] && despues[0] === antes[1],
+        `${w}px · ↑ ↓ ✎ van al pie de la categoría y funcionan ("${antes[0]}" baja un puesto)`);
+    }
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForSelector(".carga-modal .preview-category-header");
+    await p.waitForTimeout(400);
+    const enCarga = await p.locator(".carga-modal .preview-category-header").evaluateAll(hs => [...new Set(hs.map(h => Math.round(h.getBoundingClientRect().height)))]);
+    ok(enCarga.length === 1, `${w}px · y las del modo carga también → ${enCarga.join(", ")}px`);
+    await c.close();
+  }
+
   // ── Las palabras no se parten, ni con la letra del móvil grande ─────────────
   // Captura del dueño, a 393px con la letra de Android algo grande: "Cápsul/as café
   // (para/el/person/al)" en seis líneas y "Cervez/a Alham/bra". El nombre se quedaba
