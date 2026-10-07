@@ -275,6 +275,16 @@ operativo).
     si el limpiador tiene algo. Lo usan la app suelta, la vista de la checklist y el
     banco. **El banco los abre al entrar** (`abiertosAlEntrar`): sus pruebas son de lo
     de DENTRO de cada panel a nueve anchos; el botón se prueba con `?cerrados=1`.
+- **Rediseño, fase 5 — remate**: una cabecera `sticky` se queda a la distancia del
+  PADDING de quien hace scroll, no en su borde. En la hoja el que hace scroll es el
+  fondo oscuro (`.preview-overlay`, 32px arriba en escritorio, 24 en tableta), así que
+  la cabecera se pegaba a 32px y por encima asomaba la lista. Ahora ese hueco va en
+  `--hueco-arriba` (cada cambio de padding del fondo la cambia también) y la cabecera
+  y la barra de pestañas del modo carga van con `top: calc(-1 * var(--hueco-arriba))`.
+  El nombre del evento va con la talla de título de pantalla (`--fs-2xl`; `--fs-xl` en
+  el móvil, antes `--fs-xl`/`--fs-lg`, casi como un título de bloque), `letter-spacing`
+  negativo y `text-wrap: balance`; las cantidades (lista, modo carga, hoja) con
+  `tabular-nums`.
 - **Cabeceras de categoría, todas del mismo alto** ("¿por qué una es más grande que
   otra?", el dueño, con COCINA y MENAJE Y UTENSILIOS en el móvil): con ↑ ↓ ✎ en la
   píldora, a un nombre largo no le cabía al lado y la píldora bajaba a su línea (71px

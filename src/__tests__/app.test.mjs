@@ -408,6 +408,36 @@ async function main() {
     await ctx.close();
   }
 
+  // ── Remate (fase 5 del rediseño): la hoja, el título y las cifras ────────────
+  // En la hoja, al bajar, asomaba una franja de la lista por encima de la cabecera
+  // fija: una cabecera pegajosa se queda a la distancia del padding de quien hace
+  // scroll (el fondo oscuro, 32px en escritorio y 24 en tableta), no en su borde.
+  // Y el nombre del evento va con la talla de título de pantalla de la escala.
+  console.log("\n── Remate: la hoja, el título y las cifras ──");
+  for (const [w, h] of [[1280, 800], [700, 900], [390, 844]]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769 });
+    for (const hs of HOSTS_NUBE) await ctx.route(hs, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-header");
+    await page.waitForTimeout(400);
+    const tipos = await page.evaluate(() => ({
+      titulo: parseFloat(getComputedStyle(document.querySelector(".header-info h1")).fontSize),
+      cifras: getComputedStyle(document.querySelector(".item-qty-input")).fontVariantNumeric,
+    }));
+    ok(tipos.titulo >= (w < 769 ? 17 : 20) && /tabular-nums/.test(tipos.cifras),
+      `${w}px · el nombre del evento con talla de título (${tipos.titulo}px) y las cantidades con cifras del mismo ancho`);
+    await page.locator(".compartir-menu-wrap > .btn").first().click(); await page.waitForTimeout(300);
+    await page.locator(".compartir-menu button", { hasText: "Ver la hoja" }).first().click();
+    await page.waitForSelector(".preview-modal .preview-header");
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { document.querySelector(".preview-overlay").scrollTop = 900; });
+    await page.waitForTimeout(300);
+    const arriba = await page.evaluate(() => Math.round(document.querySelector(".preview-modal .preview-header").getBoundingClientRect().top));
+    ok(arriba === 0, `${w}px · al bajar por la hoja, la cabecera se pega arriba del todo, sin franja de lista por encima (${arriba}px)`);
+    await ctx.close();
+  }
+
   // ── La configuración: cada bloque con su color, cada extra con su icono ─────
   // "Que haya más contraste para diferenciar compras, recogidas, las opciones como
   // paella, parisiene…" (el dueño). Recogidas y compras eran dos cajas grises iguales.

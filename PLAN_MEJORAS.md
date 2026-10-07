@@ -313,9 +313,11 @@ con batería completa y capturas:
 4. **Orden en el móvil** — **hecho**: en una columna (≤1180px) la checklist primero y
    la configuración debajo, con atajos para ir y volver; "Añadir item" plegado en el
    móvil; los ajustes del calendario detrás de un botón en el móvil (`Ajustes.jsx`).
-5. **Remate**: letra de títulos y detalles. Visto en las capturas de la fase 2: en
-   la hoja (Ver la hoja) en escritorio, al bajar asoma una franja de la lista por
-   encima de la cabecera fija.
+5. **Remate** — **hecho**: la cabecera de la hoja (y la barra de pestañas del modo
+   carga) se pega arriba del todo al bajar, sin franja de lista por encima; el nombre
+   del evento con la talla de título de pantalla de la escala (`--fs-2xl`, `--fs-xl` en
+   el móvil), algo más apretado y en líneas parejas; cantidades con cifras del mismo
+   ancho (`tabular-nums`).
 
 ## D. Futuro
 
