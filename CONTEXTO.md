@@ -295,6 +295,26 @@ operativo).
   sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
   saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
   corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **El formulario, con su sección del cóctel y por temas** ("lo de chupito de cristal
+  debería ir en una sección de cóctel... hay chupito de cristal, cuchara de porcelana,
+  añadir más y el campo de algo más que aclarar", el dueño). Detrás de "¿Hay cóctel?"
+  (si no es 0) va `coctelLleva`: chupitos en vaso de cristal (el `llevaEntrante` de
+  siempre), canapés en cuchara de porcelana con cuántos distintos (`llevaCucharasPorcelana`
+  + `numCucharasPorcelana`, nuevos; en la app casilla "Cucharas de porcelana" y su
+  número, y en la checklist "Cucharas de porcelana (canapés)" = gente × canapés + 10%,
+  en Vajilla / "Vajilla, Cubertería y Cristalería" en cumpleaños) y "Añadir más", una
+  lista de qué y cuántos por persona que al aplicar el envío se suma a `itemsManuales`
+  en esa categoría sin duplicar (`itemsDelEnvio`). El "¿algo más que aclarar?" es el de
+  cada pregunta. Sin cóctel, chupitos y cucharas se apagan.
+  - **Brindis, barriles y aguas pequeñas, con la barra** (`barraLleva`), no en lo
+    presupuestado entre la barbacoa y el jamonero. La paella se pregunta justo detrás
+    del menú y el café cierra lo que se come. Menú infantil, fuera de los rodajes.
+  - **Envíos y borradores de antes**: `respuestasAlDia()` pasa el chupito de
+    `entrante` a `coctelLleva` y lo de la barra de `extras` a `barraLleva`; lo usan
+    `aRespuestasDeLaApp`, `resumirEnvio`, `cambiosEntreRespuestas` y el formulario al
+    cargar unas respuestas. Un envío viejo carga lo mismo que cargaba.
+  - `conLista` admite su propio número (`listaClave`, `listaNumero`, `listaEjemplo`,
+    `listaSufijo`); los buffets siguen con `mesas`.
 - **Asistente, "Probar los proveedores" pone al día la lista de Ajustes** ("sigo sin
   ver los proveedores de IA que agregué", el dueño). La lista de proveedores a elegir
   sale de `disponibles`, lo que el Worker dice que tiene clave, y la app solo se

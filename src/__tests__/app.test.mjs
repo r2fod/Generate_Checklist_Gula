@@ -6,7 +6,7 @@
 //   npm run test
 //
 import { chromium } from "playwright-core";
-import { aRespuestasDeLaApp } from "../formulario/preguntas.js";
+import { aRespuestasDeLaApp, itemsDelEnvio } from "../formulario/preguntas.js";
 import { recogidasConAlquileres } from "../alquileres.js";
 import { enDiasISO } from "../fecha.js";
 import { spawn } from "child_process";
@@ -481,6 +481,46 @@ async function main() {
     const borrador = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA2") || "{}"));
     ok(borrador.respuestas && borrador.respuestas.tipo === "boda" && borrador.eventoDestino === "Produ de prueba",
       "y se puede cambiar: el envío del mismo evento lleva el tipo nuevo");
+    await c.close();
+  }
+
+  // ── El formulario: el cóctel con su sección ─────────────────────────────────
+  // "Lo de chupito de cristal debería ir en una sección de cóctel donde te pregunte si
+  // hay chupito de cristal, si hay cuchara de porcelana, una opción de añadir más y
+  // luego el campo de algo más que aclarar" (el dueño): el chupito iba con la comida,
+  // en "¿Lleva entrante?". Ahora va detrás de las horas de cóctel, en su pregunta.
+  console.log("\n── El formulario: la sección del cóctel ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Boda de prueba", paso: 9,
+      respuestas: { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 },
+    })));
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(600);
+    const opciones = await p.locator(".form-opcion").allInnerTexts();
+    ok(/qué se sirve en el cóctel/i.test(await p.locator(".form-titulo").innerText())
+      && ["Chupitos en vaso de cristal", "Canapés en cuchara de porcelana", "Añadir más"].every(t => opciones.some(o => o.includes(t))),
+      `detrás de las horas de cóctel, lo que se sirve en él → ${opciones.join(" · ")}`);
+    await p.locator(".form-opcion", { hasText: "cuchara de porcelana" }).click();
+    await p.locator(".form-opcion", { hasText: "Añadir más" }).click();
+    await p.waitForTimeout(300);
+    ok(await p.locator(".form-subcampo", { hasText: "canapés distintos" }).isVisible()
+      && await p.locator(".form-lista-otro-nota", { hasText: "por persona" }).isVisible(),
+      "las cucharas piden cuántos canapés, y lo añadido cuántos por persona");
+    await p.locator(".form-lista-otro-fila input[type=text]").first().fill("Vasito de cristal");
+    await p.locator(".form-lista-otro-fila input[type=number]").first().fill("2");
+    await p.waitForTimeout(400);
+    const borrador = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA2") || "{}").respuestas || {});
+    ok(JSON.stringify(borrador.coctelLleva) === JSON.stringify(["cuchara", "otro"])
+      && borrador.coctelOtros?.[0]?.nombre === "Vasito de cristal" && borrador.coctelOtros[0].porPersona === 2,
+      `y se guarda con su número por persona → ${JSON.stringify(borrador.coctelOtros)}`);
+    ok(await p.locator(".form-comentario-abrir", { hasText: "aclarar" }).isVisible()
+      && await p.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 0,
+      "con su \"¿algo más que aclarar?\" debajo, y sin arrastrar de lado");
     await c.close();
   }
 
@@ -2587,9 +2627,9 @@ async function main() {
 
     // El resto se contesta con "No lo sé": es la respuesta que más se va a usar y no
     // puede dejar el formulario atascado en ninguna pregunta. Mismo margen que el
-    // otro recorrido de más abajo (45, no pegado al número real de preguntas).
+    // otro recorrido de más abajo (60, no pegado al número real de preguntas).
     let vueltas = 0;
-    while (vueltas++ < 45) {
+    while (vueltas++ < 60) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -2764,11 +2804,11 @@ async function main() {
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
     // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
-    // encima del número de preguntas de una boda (34 hoy, `preguntasDe("boda", {})`),
+    // encima del número de preguntas de una boda (39 hoy, `preguntasDe("boda", {})`),
     // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
     // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;
-    while (vueltasBorrador++ < 45) {
+    while (vueltasBorrador++ < 60) {
       const t = await p.locator(".form-titulo").innerText();
       if (/Está todo bien/i.test(t)) break;
       if (await rellenarObligatorio(t)) continue;
@@ -2776,7 +2816,7 @@ async function main() {
       if (await nose.count()) await nose.click(); else await p.locator(".form-btn-principal").click();
       await p.waitForTimeout(260);
     }
-    ok(vueltasBorrador < 45, "el recorrido llega al repaso sin quedarse atascado");
+    ok(vueltasBorrador < 60, "el recorrido llega al repaso sin quedarse atascado");
     await p.reload({ waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
     ok((await p.locator(".form-repaso-fila").allInnerTexts()).some(t => /Boda de Ana y Luis/.test(t)),
@@ -2985,6 +3025,24 @@ async function main() {
       "si las sillas las pone la finca, no se cargan ni se alquilan");
     ok(tiene(boda.nombres, "Barril de cerveza (50L)") && tiene(boda.nombres, "Chill out"),
       "y lo presupuestado aparece: barril y chill out");
+
+    // El cóctel con su sección: el chupito, las cucharas de porcelana de los canapés y
+    // lo de "Añadir más", que la app suma como items a mano al aplicar el envío
+    const coctelR = {
+      tipo: "boda", nombre: "Boda de prueba", adultos: 100, coctel: 2,
+      coctelLleva: ["chupito", "cuchara", "otro"], numCucharasPorcelana: 2,
+      coctelOtros: [{ nombre: "Vasito de cristal", porPersona: 1 }],
+    };
+    await p.goto(url({ ...aRespuestasDeLaApp(coctelR), itemsManuales: itemsDelEnvio(coctelR) }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(1900);
+    const enVajilla = await p.locator(".category-section").evaluateAll(ss => {
+      const v = ss.find(x => /^vajilla$/i.test(x.querySelector(".cat-name-texto")?.textContent.trim() || ""));
+      return v ? [...v.querySelectorAll(".item-row")].map(r => `${r.querySelector(".item-name")?.innerText.trim()}=${r.querySelector(".item-qty-input")?.value}`) : [];
+    });
+    const nombresCoctel = await p.locator(".item-row .item-name").allInnerTexts();
+    ok(enVajilla.includes("Cucharas de porcelana (canapés)=220") && enVajilla.includes("Vasito de cristal=110"),
+      `del cóctel a la vajilla: cucharas de porcelana (100 × 2 canapés + margen) y lo añadido → ${enVajilla.filter(x => /porcelana|Vasito/.test(x)).join(", ")}`);
+    ok(tiene(nombresCoctel, "Vasos chupito cristal"), "y el chupito, sus vasos de cristal");
 
     // Un rodaje de tres días sin sombra y con generador de alquiler
     const produ = await desdeElFormulario({

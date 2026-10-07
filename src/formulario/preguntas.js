@@ -58,7 +58,12 @@ const GASTROS_MINIMO = 4;
 // tamanoPaella/cuantasPaellas después de menu, entrantePersonas después de
 // entrante, estiloPlatoPostre después de estiloPlato, hielo después de
 // congelador, bebidaAparte/cristaleria después de coctel/copas, queDobla después de
-// menu). numBarras ya no depende de coctel/copas: se pregunta siempre.
+// menu, coctelLleva después de coctel). numBarras ya no depende de coctel/copas: se
+// pregunta siempre.
+//
+// El recorrido: quién y cuándo → el sitio → el cóctel → la barra → lo que se come
+// (menú, paella, entrante, café) → la cocina → lo presupuestado → lo distinto → mesa
+// y vajilla → lo que hay que ir a buscar → lo que hay que imprimir → el cierre.
 export const PREGUNTAS = [
   // ── Quién y cuándo ─────────────────────────────────────────────────────────
   {
@@ -184,11 +189,35 @@ export const PREGUNTAS = [
     soloEn: [...CON_BARRA, "produccion"],
   },
 
-  // ── Barra y bebida ─────────────────────────────────────────────────────────
+  // ── El cóctel ──────────────────────────────────────────────────────────────
   {
     id: "coctel", tipo: "horas", texto: "¿Hay cóctel o aperitivo? ¿Cuántas horas?",
     soloEn: CON_BARRA,
   },
+  {
+    // Lo que se sirve en el cóctel y pide su propia pieza. El chupito de cristal estaba
+    // dentro de "¿Lleva entrante?", con la comida, y es del cóctel; la cuchara de
+    // porcelana de los canapés no se preguntaba en ningún sitio. Cuántos vasos y
+    // cucharas salen de la gente: aquí solo se dice qué va. Lo que no está en la lista
+    // va en "Añadir más", cada cosa con cuántas van por persona, y llega a la checklist
+    // como un item más (ver itemsDelEnvio).
+    id: "coctelLleva", tipo: "marcar", texto: "¿Qué se sirve en el cóctel?",
+    nota: "Los vasos y las cucharas salen de la gente. Lo que no esté aquí, en «Añadir más».",
+    opciones: [
+      { valor: "chupito", texto: "Chupitos en vaso de cristal" },
+      { valor: "cuchara", texto: "Canapés en cuchara de porcelana", conNumero: "¿Cuántos canapés distintos en cuchara?", campoNumero: "numCucharasPorcelana" },
+      {
+        valor: "otro", texto: "Añadir más", conLista: true, campoLista: "coctelOtros",
+        listaEjemplo: "¿Qué es? (ej: vasito de cristal)", listaNumero: "¿Cuántos por persona?",
+        listaClave: "porPersona", listaSufijo: " por persona",
+      },
+    ],
+    soloEn: CON_BARRA,
+    // Sin cóctel no hay nada que servir en él; con "No lo sé" sí se pregunta
+    si: (r) => r.coctel !== 0,
+  },
+
+  // ── La barra ───────────────────────────────────────────────────────────────
   {
     id: "copas", tipo: "horas", texto: "¿Hay barra libre de copas? ¿Cuántas horas?",
     soloEn: CON_BARRA,
@@ -244,6 +273,29 @@ export const PREGUNTAS = [
     // comunión y corporativo comparten ese generador) — en cumpleaños contestar esto
     // no movía nada de la checklist.
     soloEn: ["boda", "comunion", "corporativo"],
+  },
+  {
+    // Brindis, barriles y aguas pequeñas iban en "¿Está presupuestado algo de esto?",
+    // mezclados con la barbacoa y el jamonero, muchas pantallas después de la barra.
+    // Son de la barra: se preguntan con ella. Los envíos de antes los traen en
+    // "extras" y respuestasAlDia() los pasa aquí.
+    id: "barraLleva", tipo: "marcar", texto: "¿Qué más lleva la barra?",
+    nota: "Si no lleva nada de esto, se deja sin marcar.",
+    opciones: [
+      { valor: "brindis", texto: "Brindis con cava" },
+      // Cuántos barriles: hasta ahora se daba por hecho que era uno. Los dos comparten
+      // campoNumero (la checklist solo soporta UN tamaño de barril a la vez, ver
+      // tamanoBarril en checklist-generadores.js) — "excluye" evita marcar los dos a la
+      // vez, que antes perdía en silencio cuál de los dos tamaños era el real.
+      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril50"] },
+      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril30"] },
+      // El interruptor real que enseña la línea "Aguas pequeñas (33cl)" en la checklist
+      // (llevaAguasPequenas) no lo preguntaba nadie: en un banquete se quedaba siempre
+      // apagado salvo que alguien se acordara de tocarlo a mano en la app. En producción
+      // esto no hace falta: las aguas pequeñas van siempre (ver "aguaPequena", abajo).
+      { valor: "aguasPequenas", texto: "Aguas pequeñas (botellines individuales)" },
+    ],
+    soloEn: CON_BARRA,
   },
   {
     // En un rodaje las aguas pequeñas van siempre (son el agua de beber de todo el
@@ -308,65 +360,10 @@ export const PREGUNTAS = [
     si: (r) => Array.isArray(r.menu) && r.menu.includes("dosPlatos"),
   },
   {
-    // Los dos entrantes NO son excluyentes: en la app son dos interruptores distintos
-    // (el de chupito carga vasos de chupito, el compartido carga platos extra) y hay
-    // menús que llevan los dos. Antes esta pregunta obligaba a elegir uno y se perdía
-    // el otro. Muchas veces tampoco es un entrante para compartir, son dos: por eso
-    // lleva su número, y cada uno multiplica sus platos.
-    id: "entrante", tipo: "marcar", texto: "¿Lleva entrante?",
-    // "Individual" no es un caso raro de "para compartir" (no tiene sentido elegir
-    // "compartir" para decir que NO se comparte): es su propio botón, con ratio 1
-    // fijo y sin preguntar nada más después — antes había que marcar "compartir" y
-    // esperar a la siguiente pantalla para decir "en realidad es individual".
-    nota: "Puede llevar varios a la vez: de chupito, individual y/o para compartir entre varios.",
-    opciones: [
-      { valor: "chupito", texto: "De chupito" },
-      { valor: "individual", texto: "Individual (un plato por persona)", conNumero: "¿Cuántos entrantes distintos?" },
-      { valor: "compartir", texto: "Para compartir (varias personas por plato)", conNumero: "¿Cuántos entrantes distintos?" },
-    ],
-    soloEn: CON_BARRA,
-  },
-  {
-    // Solo si hay entrante para compartir: es lo que decide cuántos platos extra se
-    // cargan (un plato cada 3 personas no es lo mismo que cada 4).
-    id: "entrantePersonas", tipo: "opciones", texto: "El entrante para compartir, ¿cada cuántas personas?",
-    // "Individual" no es un caso raro que tocara meter en "Otro número" escribiendo un
-    // 1: pasa bastante — el "compartir" era para llevar la cuenta de cuántos entrantes
-    // distintos hay, no que tengan que repartirse entre varios comensales.
-    opciones: [
-      { valor: 1, texto: "Individual (un plato por persona)" },
-      { valor: 3, texto: "Un plato cada 3 personas" },
-      { valor: 4, texto: "Un plato cada 4 personas" },
-      {
-        valor: "otras", texto: "Otro número",
-        conNumero: "¿Cada cuántas personas?",
-        campoNumero: "entrantePersonasOtras",
-        sugerido: () => 3,
-      },
-    ],
-    soloEn: CON_BARRA,
-    si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
-  },
-  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
-  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
-  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
-  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
-  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
-  // a los invitados.
-  {
-    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
-    opciones: [
-      { valor: "invitados", texto: "Para los invitados" },
-      { valor: "personal", texto: "Solo para el personal" },
-    ],
-  },
-  {
-    // Es el equipo para HACER la paella (paellera, trípode, bombona), no qué hay de
-    // comer — por eso no va pegada a "menu" cortando el hilo de "qué se come" (menú
-    // → paella → cuántas → entrante → café), pero tampoco va enterrada varias
-    // preguntas dentro de "Cocina y equipamiento" (nevera/congelador/hielo/horno son
-    // de CUALQUIER menú, no tienen nada que ver con haber dicho paella hace un
-    // momento). Aquí, justo al cerrar "qué se come", es el puente entre las dos.
+    // Justo detrás del menú (y de "qué se dobla"): quien acaba de marcar la paella es
+    // quien sabe de qué tamaño y cuántas, y después el entrante y el café cierran lo
+    // que se come. Antes iba detrás del café y se preguntaba la paella tres pantallas
+    // después de haberla marcado.
     //
     // La talla salía sola del pax (hasta 40 pequeña, hasta 80 mediana, y grande de ahí
     // para arriba) y nunca se preguntaba. Pero el pax no lo sabe todo: con el mismo
@@ -411,6 +408,58 @@ export const PREGUNTAS = [
     si: (r) => Array.isArray(r.menu) && r.menu.includes("paella"),
   },
 
+  {
+    // Los entrantes NO son excluyentes: hay menús que llevan individual y para
+    // compartir a la vez. Antes esta pregunta obligaba a elegir uno y se perdía el
+    // otro. Muchas veces tampoco es un entrante para compartir, son dos: por eso
+    // lleva su número, y cada uno multiplica sus platos.
+    id: "entrante", tipo: "marcar", texto: "¿Lleva entrante?",
+    // "Individual" no es un caso raro de "para compartir" (no tiene sentido elegir
+    // "compartir" para decir que NO se comparte): es su propio botón, con ratio 1
+    // fijo y sin preguntar nada más después — antes había que marcar "compartir" y
+    // esperar a la siguiente pantalla para decir "en realidad es individual".
+    // El de chupito ya no está aquí: es del cóctel (coctelLleva).
+    nota: "Puede llevar los dos a la vez: individual y para compartir entre varios.",
+    opciones: [
+      { valor: "individual", texto: "Individual (un plato por persona)", conNumero: "¿Cuántos entrantes distintos?" },
+      { valor: "compartir", texto: "Para compartir (varias personas por plato)", conNumero: "¿Cuántos entrantes distintos?" },
+    ],
+    soloEn: CON_BARRA,
+  },
+  {
+    // Solo si hay entrante para compartir: es lo que decide cuántos platos extra se
+    // cargan (un plato cada 3 personas no es lo mismo que cada 4).
+    id: "entrantePersonas", tipo: "opciones", texto: "El entrante para compartir, ¿cada cuántas personas?",
+    // "Individual" no es un caso raro que tocara meter en "Otro número" escribiendo un
+    // 1: pasa bastante — el "compartir" era para llevar la cuenta de cuántos entrantes
+    // distintos hay, no que tengan que repartirse entre varios comensales.
+    opciones: [
+      { valor: 1, texto: "Individual (un plato por persona)" },
+      { valor: 3, texto: "Un plato cada 3 personas" },
+      { valor: 4, texto: "Un plato cada 4 personas" },
+      {
+        valor: "otras", texto: "Otro número",
+        conNumero: "¿Cada cuántas personas?",
+        campoNumero: "entrantePersonasOtras",
+        sugerido: () => 3,
+      },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => Array.isArray(r.entrante) && r.entrante.includes("compartir"),
+  },
+  // El café se calculaba SIEMPRE para invitados, sin preguntar: en un evento donde
+  // el cliente no lo pide (o ya lleva el suyo) sobraba cafetera, tazas y cápsulas
+  // enteras. Aplica a los cinco tipos de evento porque los cinco llevan café — el
+  // "no" no lo quita del todo: el equipo siempre tiene su cafetera de mantenimiento
+  // aparte (ver aRespuestasDeLaApp/calcCafe), esto solo decide si además se sirve
+  // a los invitados.
+  {
+    id: "cafe", tipo: "opciones", texto: "El café, ¿es para los invitados o solo para el personal?",
+    opciones: [
+      { valor: "invitados", texto: "Para los invitados" },
+      { valor: "personal", texto: "Solo para el personal" },
+    ],
+  },
   // ── Cocina y equipamiento ──────────────────────────────────────────────────
   {
     // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
@@ -504,15 +553,9 @@ export const PREGUNTAS = [
   // ── Lo que se haya presupuestado ───────────────────────────────────────────
   {
     id: "extras", tipo: "marcar", texto: "¿Está presupuestado algo de esto?",
+    // Brindis, barriles y aguas pequeñas ya no van aquí: son de la barra (barraLleva)
     opciones: [
-      { valor: "brindis", texto: "Brindis con cava", soloEn: CON_BARRA },
       { valor: "chillout", texto: "Chill out", conNumero: "¿Cuántos?", soloEn: CON_BARRA },
-      // Cuántos barriles: hasta ahora se daba por hecho que era uno. Los dos comparten
-      // campoNumero (la checklist solo soporta UN tamaño de barril a la vez, ver
-      // tamanoBarril en checklist-generadores.js) — "excluye" evita marcar los dos a la
-      // vez, que antes perdía en silencio cuál de los dos tamaños era el real.
-      { valor: "barril30", texto: "Barril de cerveza de 30L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril50"], soloEn: CON_BARRA },
-      { valor: "barril50", texto: "Barril de cerveza de 50L", conNumero: "¿Cuántos?", campoNumero: "numBarriles", excluye: ["barril30"], soloEn: CON_BARRA },
       // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
       // se añade otra pantalla a un formulario que ya tiene quince
       { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
@@ -521,11 +564,6 @@ export const PREGUNTAS = [
       // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
       { valor: "desayuno", texto: "Desayuno o recena", soloEn: CON_BARRA },
-      // El interruptor real que enseña la línea "Aguas pequeñas (33cl)" en la checklist
-      // (llevaAguasPequenas) no lo preguntaba nadie: en un banquete se quedaba siempre
-      // apagado salvo que alguien se acordara de tocarlo a mano en la app. En producción
-      // esto no hace falta: las aguas pequeñas van siempre (ver "aguaPequena", más abajo).
-      { valor: "aguasPequenas", texto: "Aguas pequeñas (botellines individuales)", soloEn: CON_BARRA },
       // Estaba en "¿Qué lleva el menú?", junto a la paella y el frito, pero no es
       // comida del menú: es un servicio que se presupuesta aparte y que carga platos
       // extra de postre — igual que el desayuno, justo aquí arriba (mismo cálculo en
@@ -813,7 +851,8 @@ export const PREGUNTAS = [
     id: "excepcionesMesa", tipo: "marcar", texto: "¿Alguna mesa necesita algo distinto de lo normal?",
     nota: "Marca lo que aplique y di en cuántas mesas. Si no hay ninguna excepción, se deja sin marcar.",
     opciones: [
-      { valor: "menuInfantil", texto: "Menú infantil", conNumero: "Cantidad en mesa" },
+      // En un rodaje no hay niños
+      { valor: "menuInfantil", texto: "Menú infantil", conNumero: "Cantidad en mesa", soloEn: CON_BARRA },
       { valor: "otro", texto: "Otro", conNumero: "Cantidad en mesa" },
     ],
   },
@@ -886,7 +925,7 @@ export function resumirRespuesta(p, r, tipo) {
       if (o.conLista) {
         return (Array.isArray(r[o.campoLista]) ? r[o.campoLista] : [])
           .filter(x => (x.nombre || "").trim())
-          .map(x => `${x.nombre.trim()} (${x.mesas || 1})`);
+          .map(x => `${x.nombre.trim()} (${x[o.listaClave || "mesas"] || 1}${o.listaSufijo || ""})`);
       }
       const n = o.conNumero ? r[o.campoNumero || `${o.valor}Numero`] : null;
       return [n ? `${o.texto} (${n})` : o.texto];
@@ -939,7 +978,8 @@ export function textoAvisoEnvio(e) {
 
 // El envío entero en palabras, para la bandeja: pregunta y respuesta, en el orden en
 // que se contestaron, marcando lo que se dejó sin contestar.
-export function resumirEnvio(respuestas = {}) {
+export function resumirEnvio(enviadas = {}) {
+  const respuestas = respuestasAlDia(enviadas);
   const tipo = respuestas.tipo || "boda";
   return preguntasDe(tipo, respuestas).map(p => ({
     id: p.id,
@@ -949,11 +989,33 @@ export function resumirEnvio(respuestas = {}) {
   }));
 }
 
+// ─── RESPUESTAS DE ANTES DE LA SECCIÓN DEL CÓCTEL ──────────────────────────────
+// El chupito iba dentro de "entrante", y el brindis, los barriles y las aguas
+// pequeñas dentro de "extras". Un envío o un borrador de entonces se pasa a las
+// preguntas de ahora, para que diga lo mismo que decía y el formulario lo enseñe en
+// su sitio. Lo usan aRespuestasDeLaApp y Formulario.jsx al cargar unas respuestas.
+const DE_LA_BARRA = ["brindis", "barril30", "barril50", "aguasPequenas"];
+export function respuestasAlDia(r = {}) {
+  const s = { ...r };
+  // Con "entrante" contestado, el chupito (marcado o no) ya estaba dicho: se pasa
+  // tal cual, y así aplicar un envío viejo sin chupito lo sigue quitando
+  if (Array.isArray(r.entrante) && r.coctelLleva === undefined) {
+    s.coctelLleva = r.entrante.includes("chupito") ? ["chupito"] : [];
+  }
+  if (Array.isArray(r.entrante)) s.entrante = r.entrante.filter(v => v !== "chupito");
+  if (Array.isArray(r.extras) && r.barraLleva === undefined) {
+    s.barraLleva = r.extras.filter(v => DE_LA_BARRA.includes(v));
+  }
+  if (Array.isArray(r.extras)) s.extras = r.extras.filter(v => !DE_LA_BARRA.includes(v));
+  return s;
+}
+
 // ─── RESPUESTAS → CONFIGURACIÓN DE LA APP ──────────────────────────────────────
 // Devuelve SOLO los campos que se han contestado. Lo que quede sin respuesta (o
 // contestado con "No lo sé") no aparece, así el evento se queda con el valor por
 // defecto de la app y tú lo ajustas al confirmarlo.
-export function aRespuestasDeLaApp(r = {}) {
+export function aRespuestasDeLaApp(respuestas = {}) {
+  const r = respuestasAlDia(respuestas);
   const marcado = (id, v) => Array.isArray(r[id]) && r[id].includes(v);
   const puesto = (v) => v !== undefined && v !== null && v !== "";
   const estado = {};
@@ -1099,10 +1161,21 @@ export function aRespuestasDeLaApp(r = {}) {
       // 100 personas son seis camareros donde se ponen tres o cuatro.
       estado.paxPorCamarero = r.servicio === "bandeja" ? 25 : 12;
     }
-    // Los tres entrantes son independientes: un menú puede llevar chupito, individual
-    // y compartido a la vez
+    // Lo del cóctel: el chupito es el interruptor de siempre de la app (llevaEntrante,
+    // "Entrante de chupito"), y las cucharas de porcelana el suyo. Lo de "Añadir más"
+    // no es un campo: son items que se suman (itemsDelEnvio).
+    if (Array.isArray(r.coctelLleva)) {
+      estado.llevaEntrante = marcado("coctelLleva", "chupito");
+      estado.llevaCucharasPorcelana = marcado("coctelLleva", "cuchara");
+      if (estado.llevaCucharasPorcelana && r.numCucharasPorcelana > 0) estado.numCucharasPorcelana = r.numCucharasPorcelana;
+    } else if (r.coctel === 0) {
+      // Sin cóctel no hay qué servir en él: ni chupitos ni cucharas
+      estado.llevaEntrante = false;
+      estado.llevaCucharasPorcelana = false;
+    }
+    // Los dos entrantes son independientes: un menú puede llevar individual y
+    // compartido a la vez
     if (Array.isArray(r.entrante)) {
-      estado.llevaEntrante = marcado("entrante", "chupito");
       const entranteIndividual = marcado("entrante", "individual");
       const entranteCompartir = marcado("entrante", "compartir");
       estado.entranteCompartido = entranteIndividual || entranteCompartir;
@@ -1132,20 +1205,23 @@ export function aRespuestasDeLaApp(r = {}) {
     }
     if (puesto(r.sillas)) estado.origenSillas = r.sillas === "finca" ? "No llevan" : r.sillas;
     if (puesto(r.tipoMesa)) estado.tipoMesa = r.tipoMesa;
+    // Lo de la barra (respuestasAlDia ya pasó aquí lo que un envío viejo traía en extras)
+    if (Array.isArray(r.barraLleva)) {
+      estado.tieneBrindisCava = marcado("barraLleva", "brindis");
+      estado.tamanoBarril = marcado("barraLleva", "barril50") ? "50L"
+        : marcado("barraLleva", "barril30") ? "30L" : "No lleva";
+      if (estado.tamanoBarril !== "No lleva" && r.numBarriles > 0) estado.numBarriles = r.numBarriles;
+      // El interruptor real de la checklist (llevaAguasPequenas) no lo preguntaba nadie
+      // en un banquete: se quedaba siempre en su valor por defecto (apagado).
+      estado.llevaAguasPequenas = marcado("barraLleva", "aguasPequenas");
+    }
     if (Array.isArray(r.extras)) {
-      estado.tieneBrindisCava = marcado("extras", "brindis");
       estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";
       estado.hayDesayuno = marcado("extras", "desayuno");
-      estado.tamanoBarril = marcado("extras", "barril50") ? "50L"
-        : marcado("extras", "barril30") ? "30L" : "No lleva";
-      if (estado.tamanoBarril !== "No lleva" && r.numBarriles > 0) estado.numBarriles = r.numBarriles;
       estado.llevaJarrasCristal = marcado("extras", "jarras");
       // Estaba en "menu" (aRespuestasDeLaApp lo leía de "menu"/"jamonero"), pero no es
       // comida del menú: es un servicio presupuestado, como el desayuno justo arriba.
       estado.llevaJamonero = marcado("extras", "jamonero");
-      // El interruptor real de la checklist (llevaAguasPequenas) no lo preguntaba nadie
-      // en un banquete: se quedaba siempre en su valor por defecto (apagado).
-      estado.llevaAguasPequenas = marcado("extras", "aguasPequenas");
       estado.llevaChillOut = marcado("extras", "chillout");
       if (estado.llevaChillOut && r.chilloutNumero > 0) estado.numChillOut = r.chilloutNumero;
       estado.llevaPalomitera = marcado("extras", "palomitera");
@@ -1283,7 +1359,8 @@ export function archivosDelEnvio(r = {}) {
 // Cuando la oficina corrige algo, lo que importa no es el envío entero: es qué han
 // cambiado. Se compara pregunta a pregunta y se dice en palabras ("Cuánta gente:
 // 120 adultos → 140 adultos"), que es lo que se lee de un vistazo en el aviso.
-export function cambiosEntreRespuestas(antes = {}, ahora = {}) {
+export function cambiosEntreRespuestas(antesEnviadas = {}, ahoraEnviadas = {}) {
+  const antes = respuestasAlDia(antesEnviadas), ahora = respuestasAlDia(ahoraEnviadas);
   const tipo = ahora.tipo || antes.tipo || "boda";
   const cambios = [];
   preguntasDe(tipo, ahora).forEach(p => {
@@ -1335,4 +1412,23 @@ export function comprasDelEnvio(r = {}) {
     .map(l => l.replace(/^[\s•·*-]+/, "").trim())
     .filter(Boolean)
     .map(concepto => ({ concepto, cantidad: "", comprado: false }));
+}
+
+// Lo que se ha añadido a mano en el cóctel ("Añadir más": vasitos, cucharitas de
+// madera...), como items de la checklist. Va aparte de aRespuestasDeLaApp por lo
+// mismo que las compras: se SUMAN a los que el evento ya tuviera. Cuántos, con la
+// gente que se ha dicho y el mismo margen que la app (un 10% más, redondeando
+// arriba); sin gente se deja en blanco para ponerlo en la app. La categoría es la de
+// las cucharas de porcelana, que cambia de nombre según el generador del evento.
+export function itemsDelEnvio(r = {}) {
+  if (r.tipo === "produccion" || !(Array.isArray(r.coctelLleva) && r.coctelLleva.includes("otro"))) return [];
+  const gente = (parseInt(r.adultos, 10) || 0) + (parseInt(r.ninos, 10) || 0);
+  const categoria = r.tipo === "cumpleanos" ? "Vajilla, Cubertería y Cristalería" : "Vajilla";
+  return (Array.isArray(r.coctelOtros) ? r.coctelOtros : [])
+    .filter(x => (x.nombre || "").trim())
+    .map(x => ({
+      label: x.nombre.trim(),
+      cantidad: gente ? String(Math.ceil((gente * (Number(x.porPersona) || 1) * 11) / 10)) : "",
+      categoria,
+    }));
 }

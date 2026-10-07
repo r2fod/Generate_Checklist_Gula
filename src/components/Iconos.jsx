@@ -166,7 +166,7 @@ export function TituloBloque({ bloque, detalle, children }) {
 const ICONO_EXTRA = {
   "Doble servicio": Layers, "Doble tenedor": Utensils, "Doble cuchillo": Utensils,
   "Doble cuchara": Utensils, "Doble copa de vino": Wine, "Doble vaso de agua": GlassWater,
-  "Doble copa de cava": Wine, "Entrante de chupito": Soup, "Entrante compartido": UtensilsCrossed,
+  "Doble copa de cava": Wine, "Entrante de chupito": Soup, "Cucharas de porcelana": Utensils, "Entrante compartido": UtensilsCrossed,
   "Solo bandeja": ConciergeBell, "Lleva paella": CookingPot, "Hay frituras": Flame,
   "Plancha de gas": Fuel, "Brindis con cava": PartyPopper, "Lleva palomitera": Popcorn,
   "Lleva chill out": Sofa, "Hay jamonero": Ham, "Hay tarta": Cake, "Aguas pequeñas": Droplet,

@@ -187,6 +187,14 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
 }
 
 // ─── BUILD CHECKLIST ──────────────────────────────────────────────────────────
+// Cucharas de porcelana del cóctel: una por persona y canapé, con el margen de siempre.
+// Con un solo canapé el número a secas; con varios, dicho cuántos son.
+function cucharasPorcelana(totalPax, canapes) {
+  const n = Math.max(1, Number(canapes) || 1);
+  const u = conMargen(totalPax * n);
+  return n === 1 ? String(u) : conSufijo(u, `${n} canapés × pax`);
+}
+
 export function buildChecklist(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const cats = generadorDe(evtKey)(evtKey, pax, horasCoctel, horasCopas, ninos, opts);
   // Los menús especiales se cuentan de las alergias de las notas y salen los PRIMEROS,
@@ -235,6 +243,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ = "", tipoHorno = "",
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
     tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
+    llevaCucharasPorcelana, numCucharasPorcelana = 1,
     numGastros = 0,
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
@@ -494,6 +503,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
       ["Cucharas café", String(conMargen(totalPax * 0.8))],
     ] : []),
     opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
+    // Los canapés del cóctel en cuchara: una por persona y canapé, que no se friegan a
+    // mitad del cóctel
+    opt(llevaCucharasPorcelana, ["Cucharas de porcelana (canapés)", cucharasPorcelana(totalPax, numCucharasPorcelana)]),
   ]});
 
   const personal = calcPersonal(pax, numCamareros, numStaff, divisorCam);
@@ -564,6 +576,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
+    llevaCucharasPorcelana, numCucharasPorcelana = 1,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera, cafeParaInvitados = true,
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante = 4, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
@@ -720,6 +733,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(hayBarra, ["Vasos de chupito de plástico (barra libre)", conSufijo(Math.max(1, conMargen(pax * 1.5 / 80)), "paq. (80 uds)")]),
     opt(!!cristal.chupito, ["Vasos chupito cristal (entrante)", cristal.chupito ? String(cristal.chupito.u) : ""]),
     opt(entranteCompartido, ["Platos extra entrante", conSufijo(numEntrantesCompartir * Math.ceil(totalPax / personasPorPlatoEntrante), `${numEntrantesCompartir} × cada ${personasPorPlatoEntrante} pax`)]),
+    opt(llevaCucharasPorcelana, ["Cucharas de porcelana (canapés)", cucharasPorcelana(totalPax, numCucharasPorcelana)]),
     // Herramientas de barra/servicio de bebida: van con la cristalería, no con el mobiliario
     ["Champanera metálica grande", String(champaneras(pax))], ["Cubiteras esmaltadas + pie", "2"], ["Pinzas de hielo", "2"], ["Abridores de cerveza", "2"],
     ["Pinzas largas", "2"], ["Copas metálicas", "—"], ["Conchas", "—"],

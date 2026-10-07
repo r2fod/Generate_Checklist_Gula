@@ -6264,6 +6264,7 @@ hr {
   gap: 8px;
   padding: 8px 4px 2px 14px;
 }
+.form-lista-otro-nota { font-size: var(--fs-xs); color: var(--text-muted); }
 .form-lista-otro-fila { display: flex; gap: 8px; align-items: center; }
 .form-lista-otro-fila .form-input { flex: 1; min-width: 0; }
 .form-lista-otro-fila .form-input-corto { flex: 0 0 64px; max-width: 64px; }

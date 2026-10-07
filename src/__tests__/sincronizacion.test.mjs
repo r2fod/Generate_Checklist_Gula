@@ -587,6 +587,81 @@ console.log("\n══ Un envío sobre un evento que ya existe ══");
     "una fecha de recogida puesta a mano no se mueve ni cambiando la del evento");
 }
 
+// ── La sección del cóctel ─────────────────────────────────────────────────────
+// "Lo de chupito de cristal debería ir en una sección de cóctel donde te pregunte si hay
+// chupito de cristal, si hay cuchara de porcelana, una opción de añadir más y luego el
+// campo de algo más que aclarar" (el dueño). El chupito iba en "¿Lleva entrante?", con
+// la comida; el brindis, los barriles y las aguas pequeñas, en lo presupuestado. Los
+// envíos de antes tienen que seguir diciendo lo mismo (respuestasAlDia).
+console.log("\n══ La sección del cóctel ══");
+{
+  const { aRespuestasDeLaApp, preguntasDe, opcionesDe, PREGUNTAS, resumirEnvio, itemsDelEnvio, respuestasAlDia } = await import("../formulario/preguntas.js");
+  const { buildChecklist } = await import("../checklist-generadores.js");
+  const ids = (t, r) => preguntasDe(t, r).map(p => p.id);
+
+  const boda = ids("boda", { coctel: 2 });
+  ok(boda.indexOf("coctelLleva") === boda.indexOf("coctel") + 1 && boda.indexOf("copas") > boda.indexOf("coctelLleva"),
+    "lo que se sirve en el cóctel va justo detrás de sus horas, antes de la barra");
+  ok(!ids("boda", { coctel: 0 }).includes("coctelLleva") && ids("boda", { coctel: null }).includes("coctelLleva")
+    && !ids("produccion", {}).includes("coctelLleva"),
+    "sin cóctel no se pregunta (con \"no lo sé\" sí), y en un rodaje nunca");
+  ok(!opcionesDe(PREGUNTAS.find(p => p.id === "entrante"), "boda").some(o => o.valor === "chupito"),
+    "el chupito ya no está en \"¿Lleva entrante?\"");
+  const conBarra = ids("boda", { coctel: 2 });
+  ok(conBarra.indexOf("barraLleva") > conBarra.indexOf("copas") && conBarra.indexOf("barraLleva") < conBarra.indexOf("servicio")
+    && !opcionesDe(PREGUNTAS.find(p => p.id === "extras"), "boda").some(o => ["brindis", "barril30", "barril50", "aguasPequenas"].includes(o.valor)),
+    "brindis, barriles y aguas pequeñas, con la barra y no entre lo presupuestado");
+
+  const nuevo = aRespuestasDeLaApp({
+    tipo: "boda", adultos: 100, coctel: 2, coctelLleva: ["chupito", "cuchara"], numCucharasPorcelana: 3,
+    barraLleva: ["brindis", "barril50"], numBarriles: 2, extras: ["jamonero"],
+  });
+  ok(nuevo.llevaEntrante === true && nuevo.llevaCucharasPorcelana === true && nuevo.numCucharasPorcelana === 3,
+    `el chupito y las cucharas llegan a la app → ${nuevo.numCucharasPorcelana} canapés en cuchara`);
+  ok(nuevo.tieneBrindisCava === true && nuevo.tamanoBarril === "50L" && nuevo.numBarriles === 2 && nuevo.llevaJamonero === true,
+    "y lo de la barra, igual que cuando iba en lo presupuestado");
+  const sinCoctel = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, coctel: 0 });
+  ok(sinCoctel.llevaEntrante === false && sinCoctel.llevaCucharasPorcelana === false,
+    "sin cóctel no hay chupitos ni cucharas que cargar");
+
+  // Un envío de antes: el chupito en el entrante y el brindis en lo presupuestado
+  const viejo = { tipo: "boda", adultos: 80, coctel: 2, entrante: ["chupito", "compartir"], extras: ["brindis", "jarras"] };
+  const deAntes = aRespuestasDeLaApp(viejo);
+  ok(deAntes.llevaEntrante === true && deAntes.entranteCompartido === true && deAntes.tieneBrindisCava === true && deAntes.llevaJarrasCristal === true,
+    "un envío de antes sigue cargando lo mismo: chupito, entrante, brindis y jarras");
+  const filas = resumirEnvio(viejo);
+  const fila = (id) => filas.find(f => f.id === id)?.respuesta;
+  ok(fila("coctelLleva") === "Chupitos en vaso de cristal" && fila("barraLleva") === "Brindis con cava",
+    `y en la bandeja se lee en su sitio de ahora → cóctel "${fila("coctelLleva")}", barra "${fila("barraLleva")}"`);
+  ok(JSON.stringify(respuestasAlDia({ entrante: ["compartir"] }).coctelLleva) === "[]"
+    && respuestasAlDia({ coctelLleva: ["cuchara"], entrante: ["chupito"] }).coctelLleva.join() === "cuchara",
+    "un entrante de antes sin chupito dice que no lo lleva; uno de ahora no se toca");
+
+  // Las cucharas, en la vajilla: una por persona y canapé, con margen
+  const linea = (evt, opts) => buildChecklist(evt, 100, 2, 4, 0, opts).flatMap(c => c.items.map(i => [c.nombre, ...i]))
+    .find(x => x[1] === "Cucharas de porcelana (canapés)");
+  const una = linea("boda", { llevaCucharasPorcelana: true }), dos = linea("cumpleanos", { llevaCucharasPorcelana: true, numCucharasPorcelana: 2 });
+  ok(una[0] === "Vajilla" && una[2] === "110" && dos[2].u === 220 && linea("boda", {})[2] === null,
+    `las cucharas de porcelana salen de la gente → ${una[2]} con un canapé, ${dos[2].u} con dos; sin marcar, nada`);
+
+  // "Añadir más": items a mano en la misma categoría, por persona y con el margen
+  const items = itemsDelEnvio({ tipo: "boda", adultos: 100, ninos: 10, coctelLleva: ["otro"],
+    coctelOtros: [{ nombre: "Vasito de cristal", porPersona: 2 }, { nombre: "  " }] });
+  ok(items.length === 1 && items[0].label === "Vasito de cristal" && items[0].cantidad === "242" && items[0].categoria === "Vajilla",
+    `lo añadido llega como item: ${JSON.stringify(items[0])}`);
+  ok(itemsDelEnvio({ tipo: "cumpleanos", coctelLleva: ["otro"], coctelOtros: [{ nombre: "Cono", porPersona: 1 }] })[0].cantidad === ""
+    && itemsDelEnvio({ tipo: "boda", coctelLleva: ["chupito"], coctelOtros: [{ nombre: "Cono" }] }).length === 0,
+    "sin gente se deja la cantidad en blanco, y sin marcar \"Añadir más\" no llega nada");
+
+  // Lo de cada tipo: en un rodaje no hay niños
+  ok(!opcionesDe(PREGUNTAS.find(p => p.id === "excepcionesMesa"), "produccion").some(o => o.valor === "menuInfantil")
+    && opcionesDe(PREGUNTAS.find(p => p.id === "excepcionesMesa"), "comunion").some(o => o.valor === "menuInfantil"),
+    "un rodaje no pregunta por menú infantil; una comunión sí");
+  const comida = ids("boda", { menu: ["paella"], entrante: ["compartir"] });
+  ok(comida.indexOf("tamanoPaella") === comida.indexOf("menu") + 1 && comida.indexOf("cafe") > comida.indexOf("entrantePersonas"),
+    "la paella se pregunta justo al marcarla, y el café cierra lo que se come");
+}
+
 // ── Un menú puede llevar los dos entrantes ────────────────────────────────────
 // En la app el de chupito y el de compartir son dos interruptores distintos (uno
 // carga vasos de chupito, el otro platos extra) y hay menús que llevan los dos. El
@@ -1387,7 +1462,7 @@ console.log("\n══ Armario caliente ══");
 // vistazo y el formulario ya tiene quince pantallas.
 console.log("\n══ Jarras, aguas y barriles ══");
 {
-  const { aRespuestasDeLaApp, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const { aRespuestasDeLaApp, opcionesDe, preguntasDe, PREGUNTAS } = await import("../formulario/preguntas.js");
   const extras = PREGUNTAS.find(p => p.id === "extras");
   const ops = (t) => opcionesDe(extras, t).map(o => o.valor);
 
@@ -1397,8 +1472,11 @@ console.log("\n══ Jarras, aguas y barriles ══");
   // un banquete: se quedaba siempre apagado salvo que alguien se acordara de tocarlo a
   // mano en la app. En rodaje no hace falta: ahí van siempre, solo se pregunta el
   // envase (ver "Envase de las aguas pequeñas", debajo).
-  ok(ops("boda").includes("aguasPequenas") && !ops("produccion").includes("aguasPequenas"),
-    "las aguas pequeñas sí se preguntan aquí para un banquete, pero no en rodaje");
+  // Ahora con la barra (barraLleva), no entre lo presupuestado: ver "La sección del cóctel"
+  const deBarra = (t) => preguntasDe(t, {}).some(p => p.id === "barraLleva")
+    && opcionesDe(PREGUNTAS.find(p => p.id === "barraLleva"), t).some(o => o.valor === "aguasPequenas");
+  ok(deBarra("boda") && !deBarra("produccion") && !ops("boda").includes("aguasPequenas"),
+    "las aguas pequeñas sí se preguntan, con la barra, para un banquete, pero no en rodaje");
 
   const e = aRespuestasDeLaApp({
     tipo: "boda", nombre: "B", fecha: "2027-08-11", adultos: 100,
