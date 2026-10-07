@@ -5421,16 +5421,22 @@ hr {
      ("MENAJE Y UTENSILIOS") no cabía al lado y la píldora bajaba a su propia línea: unas
      medían 71px y otras 107 ("¿por qué una es más grande que otra?", el dueño). En el
      móvil ↑ ↓ ✎ van al pie de la categoría (.cat-pie-edicion), la píldora se queda en
-     cuenta y flecha, y el nombre tiene sitio para dos líneas siempre, las use o no. */
+     cuenta, y el nombre tiene sitio para dos líneas siempre, las use o no. */
   .category-header .cat-edit-btn { display: none; }
-  .category-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .category-header { display: grid; grid-template-columns: minmax(0, 1fr); position: relative; }
   .category-header .cat-name { max-width: none; }
   .category-header .cat-name-texto { display: flex; align-items: center; min-height: 2lh; }
-  /* ↑ ↓ ✎ a 40px de ancho cada uno se llevaban casi la mitad de la cabecera y el
-     nombre no cabía. Pierden ancho, no alto: la zona de toque sigue en 34×40. */
-  .category-header .cat-count { gap: 2px; padding: 4px 8px; }
-  .category-header .cat-count .arrow { margin-left: 4px; }
-  .category-header .cat-edit-btn { min-width: 34px; }
+  /* Y la cuenta, como insignia sobre el icono: a la derecha se comía 63px y a 360px
+     "MOBILIARIO, SALA Y DECORACIÓN" ya no cabía en una línea. La flecha sobra: abre y
+     cierra toda la cabecera, y el pie de la categoría dice que está abierta. */
+  .category-header .cat-count {
+    position: absolute; left: 24px; top: calc(50% - 22px); margin: 0;
+    min-width: 20px; height: 18px; padding: 0 5px; gap: 0; justify-content: center;
+    font-size: var(--fs-3xs); line-height: 1; border-radius: var(--radius-pill);
+    background: var(--card-bg); color: var(--cat-tinta, var(--text-main));
+    border: 1.5px solid var(--cat-raya, var(--border-color-strong));
+  }
+  .category-header .cat-count .arrow { display: none; }
   .item-list-wrapper .item-row:first-child { padding-top: 11px; }
 
   /* Modales (Vista previa / Modo carga): cuerpo y cabecera más ajustados */

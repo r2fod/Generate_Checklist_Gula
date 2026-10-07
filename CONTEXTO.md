@@ -279,11 +279,14 @@ operativo).
   otra?", el dueño, con COCINA y MENAJE Y UTENSILIOS en el móvil): con ↑ ↓ ✎ en la
   píldora, a un nombre largo no le cabía al lado y la píldora bajaba a su línea (71px
   unas, 107 otras; 14 de 20 nombres a 390px). Por debajo de 560px ↑ ↓ ✎ van al pie de
-  la categoría (`.cat-pie-edicion`, con los mismos `aria-label`), la píldora se queda en
-  cuenta y flecha, y el nombre tiene sitio para dos líneas siempre (`min-height: 2lh`).
+  la categoría (`.cat-pie-edicion`, con los mismos `aria-label`), la cuenta pasa a
+  insignia sobre el icono (sin flecha: a la derecha se comía 63px y a 360px "MOBILIARIO,
+  SALA Y DECORACIÓN" ya no cabía en una línea), y el nombre tiene sitio para dos líneas
+  siempre (`min-height: 2lh`).
   En el modo carga y la hoja, lo mismo (`.cat-cabecera-nombre`). Por encima de 560px
   caben al lado de cualquier nombre. Prueba: un solo alto por anchura, en la checklist
-  y en el modo carga, a 320/390/768/1280.
+  y en el modo carga, a 320/390/768/1280; y en el móvil, la insignia sobre el icono sin
+  pisar el nombre.
 - **Distribución: nada partido ni cortado** ("que no se corte nada o se ponga en 2
   líneas", y la captura de "Mesas de los comensales" con "Redonda 2m" sola abajo).
   Revisadas las tres apps a 320–1280 con un script que mide texto recortado, controles
