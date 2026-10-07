@@ -613,7 +613,7 @@ async function main() {
       return pill.right <= box.right + 0.5 && pill.left >= box.left - 0.5;
     }));
     ok(categorias.length > 5 && categorias.every(Boolean),
-      `el contador y la flecha de las ${categorias.length} categorías caben dentro de su tarjeta`);
+      `el contador de las ${categorias.length} categorías cabe dentro de su tarjeta`);
 
     // Hallazgo 2: el subtítulo de la cabecera tiene que traer la hora y el sitio, no
     // solo el día — antes se cortaba con "…" justo antes de llegar a ellos.
@@ -623,6 +623,47 @@ async function main() {
 
     ok((await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) === 0,
       "y nada de esto desborda la pantalla");
+    await c.close();
+  }
+
+  // ── Todas las cabeceras de categoría del mismo alto ─────────────────────────
+  // "¿Por qué una es más grande que otra?" (el dueño, con COCINA y MENAJE Y UTENSILIOS
+  // en el móvil): con ↑ ↓ ✎ en la píldora, a un nombre largo no le cabía al lado y la
+  // píldora bajaba a su línea, 71px unas y 107 otras. En el móvil ↑ ↓ ✎ van al pie de
+  // la categoría y el nombre tiene sitio para dos líneas siempre. En el modo carga, igual.
+  console.log("\n── Las cabeceras de categoría, todas del mismo alto ──");
+  for (const w of [390, 320, 768, 1280]) {
+    const c = await navegador.newContext({ viewport: { width: w, height: 900 }, isMobile: w < 769, hasTouch: w < 769 });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    const p = await nuevaPagina(c);
+    await p.goto(url({ evento: "boda", pax: 100, llevaPaella: true }), { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".category-header");
+    await p.waitForTimeout(500);
+    const altos = await p.locator(".category-header").evaluateAll(hs => [...new Set(hs.map(h => Math.round(h.getBoundingClientRect().height)))]);
+    ok(altos.length === 1, `${w}px · las cabeceras de la checklist miden todas lo mismo → ${altos.join(", ")}px`);
+    if (w <= 560) {
+      const nombres = () => p.locator(".cat-name-texto").allInnerTexts();
+      const antes = await nombres();
+      const pie = p.locator(".category-section").first().locator(".cat-pie-edicion");
+      await pie.locator("button", { hasText: "Bajar" }).click();
+      await p.waitForTimeout(300);
+      const despues = await nombres();
+      ok(await p.locator(".category-header .cat-edit-btn").first().isHidden() && despues[1] === antes[0] && despues[0] === antes[1],
+        `${w}px · ↑ ↓ ✎ van al pie de la categoría y funcionan ("${antes[0]}" baja un puesto)`);
+      // Y la cuenta, de insignia sobre el icono: a la derecha se comía el sitio del
+      // nombre y a 360px "MOBILIARIO, SALA Y DECORACIÓN" ya no cabía en una línea
+      const insignias = await p.locator(".category-header").evaluateAll(hs => hs.map(h => {
+        const n = h.querySelector(".cat-count").getBoundingClientRect(), i = h.querySelector(".cat-icon").getBoundingClientRect();
+        const t = h.querySelector(".cat-name-texto").getBoundingClientRect();
+        return n.left > i.left && n.left < i.right && n.top < i.top + 4 && n.right <= t.left;
+      }));
+      ok(insignias.length > 5 && insignias.every(Boolean), `${w}px · la cuenta va de insignia sobre el icono, sin pisar el nombre`);
+    }
+    await p.locator("button", { hasText: "Modo carga" }).first().click();
+    await p.waitForSelector(".carga-modal .preview-category-header");
+    await p.waitForTimeout(400);
+    const enCarga = await p.locator(".carga-modal .preview-category-header").evaluateAll(hs => [...new Set(hs.map(h => Math.round(h.getBoundingClientRect().height)))]);
+    ok(enCarga.length === 1, `${w}px · y las del modo carga también → ${enCarga.join(", ")}px`);
     await c.close();
   }
 

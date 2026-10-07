@@ -2468,6 +2468,43 @@ body {
   color: var(--accent);
 }
 
+/* ↑ ↓ ✎ al pie de la categoría: solo en el móvil (ver ".category-header" en el bloque
+   de 560px, donde salen de la cabecera; por encima caben al lado de cualquier nombre) */
+.cat-pie-edicion { display: none; }
+@media (max-width: 560px) {
+  .cat-pie-edicion {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    padding: 6px 12px 8px;
+    border-top: 1px solid var(--border-light);
+  }
+  .cat-pie-texto { margin-right: auto; font-size: var(--fs-xs); color: var(--text-label); font-weight: 600; }
+  .cat-pie-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 40px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cat-pie-btn:disabled { opacity: 0.35; cursor: default; }
+}
+/* A 320px los tres botones y la palabra "Categoría" no caben en una fila: sobra la palabra */
+@media (max-width: 380px) {
+  .cat-pie-texto { display: none; }
+  .cat-pie-btn { padding: 0 8px; }
+}
+
 .category-header .cat-count .arrow {
   display: inline-block;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -3186,6 +3223,12 @@ hr {
 .cat-icon-mini svg { display: block; }
 .preview-category:hover .cat-icon-mini { transform: scale(1.1) rotate(-5deg); }
 .cat-cabecera-nombre { flex: 1 1 auto; min-width: 0; }
+/* En el móvil, el mismo alto en todas (como .category-header): sitio para dos líneas
+   siempre. Un nombre largo ("MOBILIARIO, SALA Y DECORACIÓN") pasaba a dos y esa
+   cabecera salía más alta que las demás. */
+@media (max-width: 560px) {
+  .cat-cabecera-nombre { display: flex; align-items: center; min-height: 2lh; }
+}
 .cat-cuenta {
   display: inline-flex;
   align-items: center;
@@ -5374,11 +5417,26 @@ hr {
   }
   .category-header { padding: 11px 14px; }
   .category-header .cat-icon { width: 28px; height: 28px; min-width: 28px; }
-  /* ↑ ↓ ✎ a 40px de ancho cada uno se llevaban casi la mitad de la cabecera y el
-     nombre no cabía. Pierden ancho, no alto: la zona de toque sigue en 34×40. */
-  .category-header .cat-count { gap: 2px; padding: 4px 8px; }
-  .category-header .cat-count .arrow { margin-left: 4px; }
-  .category-header .cat-edit-btn { min-width: 34px; }
+  /* TODAS las cabeceras de la misma altura. Con ↑ ↓ ✎ en la píldora, un nombre largo
+     ("MENAJE Y UTENSILIOS") no cabía al lado y la píldora bajaba a su propia línea: unas
+     medían 71px y otras 107 ("¿por qué una es más grande que otra?", el dueño). En el
+     móvil ↑ ↓ ✎ van al pie de la categoría (.cat-pie-edicion), la píldora se queda en
+     cuenta, y el nombre tiene sitio para dos líneas siempre, las use o no. */
+  .category-header .cat-edit-btn { display: none; }
+  .category-header { display: grid; grid-template-columns: minmax(0, 1fr); position: relative; }
+  .category-header .cat-name { max-width: none; }
+  .category-header .cat-name-texto { display: flex; align-items: center; min-height: 2lh; }
+  /* Y la cuenta, como insignia sobre el icono: a la derecha se comía 63px y a 360px
+     "MOBILIARIO, SALA Y DECORACIÓN" ya no cabía en una línea. La flecha sobra: abre y
+     cierra toda la cabecera, y el pie de la categoría dice que está abierta. */
+  .category-header .cat-count {
+    position: absolute; left: 24px; top: calc(50% - 22px); margin: 0;
+    min-width: 20px; height: 18px; padding: 0 5px; gap: 0; justify-content: center;
+    font-size: var(--fs-3xs); line-height: 1; border-radius: var(--radius-pill);
+    background: var(--card-bg); color: var(--cat-tinta, var(--text-main));
+    border: 1.5px solid var(--cat-raya, var(--border-color-strong));
+  }
+  .category-header .cat-count .arrow { display: none; }
   .item-list-wrapper .item-row:first-child { padding-top: 11px; }
 
   /* Modales (Vista previa / Modo carga): cuerpo y cabecera más ajustados */

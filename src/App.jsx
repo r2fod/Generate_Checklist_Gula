@@ -5055,6 +5055,16 @@ export default function App({ onCerrarSesion } = {}) {
                       </button>
                     </div>
                   )}
+                  {/* En el móvil ↑ ↓ ✎ van aquí, al pie: en la cabecera, junto a un nombre
+                      largo, no cabían y la píldora bajaba a otra línea, así que unas
+                      cabeceras salían mucho más altas que otras ("¿por qué una es más
+                      grande que otra?", el dueño). En pantalla grande siguen arriba. */}
+                  <div className="cat-pie-edicion">
+                    <span className="cat-pie-texto">Categoría</span>
+                    <button type="button" className="cat-pie-btn" onClick={() => handleMoverCategoria(cat.nombre, -1)} disabled={idx === 0} aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={14} aria-hidden="true" /> Subir</button>
+                    <button type="button" className="cat-pie-btn" onClick={() => handleMoverCategoria(cat.nombre, 1)} disabled={idx === checklist.length - 1} aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={14} aria-hidden="true" /> Bajar</button>
+                    <button type="button" className="cat-pie-btn" onClick={() => handleRenombrarCategoria(cat.nombre)} aria-label={`Renombrar categoría ${cat.nombre}`}><Pencil size={13} aria-hidden="true" /> Renombrar</button>
+                  </div>
                 </div>
               </div>
             </div>
