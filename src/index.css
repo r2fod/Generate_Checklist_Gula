@@ -1376,6 +1376,32 @@ body {
   white-space: nowrap;
 }
 
+/* El botón que pliega "Añadir item" solo existe en el móvil (App.jsx, anadirAbierto) */
+.add-item-abrir { display: none; }
+@media (max-width: 768px) {
+  .add-item-abrir {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-main);
+    font: inherit;
+    font-weight: 700;
+    font-size: var(--fs-sm);
+    cursor: pointer;
+  }
+  .add-item-abrir svg { color: var(--accent); flex-shrink: 0; }
+  .add-item-abrir .add-item-flecha { margin-left: auto; color: var(--text-muted); transition: transform 0.18s ease; }
+  .add-item-abrir .add-item-flecha.es-abierta { transform: rotate(180deg); }
+  .add-item-card:not(.es-abierta) { padding-top: 4px; padding-bottom: 4px; }
+  .add-item-card:not(.es-abierta) > .add-item-row { display: none; }
+  .add-item-card.es-abierta > .add-item-abrir { margin-bottom: 10px; }
+}
+
 .add-item-alquiler-check {
   display: flex;
   align-items: center;
@@ -2770,11 +2796,26 @@ hr {
   margin: 2px 0;
 }
 
+/* Los atajos y el "volver" solo existen en una columna (ver más abajo). ".btn" va
+   después en el CSS y ganaría a la clase sola: por eso el selector doble. */
+.atajos-una-columna, .btn.atajo-volver { display: none; }
+
 /* Responsiveness */
 @media (max-width: 1180px) {
   .main-layout {
     grid-template-columns: 1fr;
   }
+
+  /* En una columna la checklist va primero y la configuración debajo: lo que se viene a
+     ver es la lista, y antes quedaba a siete pantallas de móvil. Los atajos de arriba
+     llevan a la configuración y "Volver a la checklist" trae de vuelta (App.jsx). */
+  .atajos-una-columna { order: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .atajos-una-columna .btn { flex: 1 1 160px; justify-content: center; }
+  .checklist-main { order: 1; }
+  .config-sidebar { order: 2; }
+  .btn.atajo-volver { display: flex; justify-content: center; }
+  /* La cabecera va fija por encima hasta 768px: que no tape lo que se busca */
+  #checklist-lista, #cfg-evento, #cfg-guardados { scroll-margin-top: 110px; }
 
   .config-sidebar {
     position: static;
@@ -2822,6 +2863,8 @@ hr {
     position: static;
     border-radius: var(--radius-md);
   }
+  /* Aquí la cabecera no es fija, pero al bajar asoma la barra fija (.barra-fija, 58px) */
+  #checklist-lista, #cfg-evento, #cfg-guardados { scroll-margin-top: 70px; }
 
   /* En móvil la cabecera va justa —el subtítulo ya se recorta a dos líneas— así que
      el logo se esconde antes que quitarle sitio al nombre del evento y a su fecha.

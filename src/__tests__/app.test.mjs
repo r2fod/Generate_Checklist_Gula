@@ -360,6 +360,54 @@ async function main() {
     await ctx.close();
   }
 
+  // ── Orden en el móvil (fase 4 del rediseño) ─────────────────────────────────
+  // En una columna la checklist va primero: la primera categoría salía a siete
+  // pantallas de móvil, tras Plantillas, Eventos guardados y la configuración entera.
+  // La configuración sigue debajo, con atajos para ir y volver; en dos columnas, nada
+  // cambia. Y en el móvil "Añadir item" va plegado: abierto era media pantalla.
+  console.log("\n── Orden en el móvil ──");
+  for (const [w, h] of [[390, 844], [320, 760], [1280, 900]]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769, reducedMotion: "reduce" });
+    for (const hs of HOSTS_NUBE) await ctx.route(hs, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-section .cat-icon");
+    await page.waitForTimeout(400);
+    const m = await page.evaluate(() => {
+      const top = (s) => { const e = document.querySelector(s); return e && e.offsetParent ? Math.round(e.getBoundingClientRect().top + scrollY) : null; };
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      return {
+        cat: top(".category-section"), config: top("#cfg-evento"), atajos: top(".atajos-una-columna"), volver: top(".atajo-volver"),
+        anadir: !!document.querySelector(".add-item-row")?.offsetParent, plegar: !!document.querySelector(".add-item-abrir")?.offsetParent,
+        lado: r(".config-sidebar").right <= r(".checklist-main").left,
+      };
+    });
+    const aLaVista = (id) => page.evaluate(i => { const t = document.getElementById(i).getBoundingClientRect().top; return t >= 0 && t < innerHeight / 2; }, id);
+    if (w < 1181) {
+      ok(m.cat < h && m.cat < m.config,
+        `${w}px · la primera categoría sale en la primera pantalla, antes que la configuración (${m.cat} / ${m.config})`);
+      await page.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).click();
+      await page.waitForTimeout(300);
+      const enConfig = await aLaVista("cfg-evento");
+      await page.locator(".atajos-una-columna button", { hasText: "Eventos guardados" }).click().catch(() => {});
+      await page.waitForTimeout(300);
+      const enGuardados = await aLaVista("cfg-guardados");
+      await page.locator(".atajo-volver").click();
+      await page.waitForTimeout(300);
+      ok(enConfig && enGuardados && await aLaVista("checklist-lista"),
+        `${w}px · los atajos llevan a la configuración y a los guardados, y "Volver a la checklist" trae de vuelta`);
+      ok(!m.anadir && m.plegar, `${w}px · "Añadir item" va plegado`);
+      await page.locator(".add-item-abrir").click();
+      await page.locator(".add-item-row input").first().fill("Vela de prueba");
+      ok(await page.locator(".add-item-row").isVisible() && await page.locator(".add-item-btn").isEnabled(),
+        `${w}px · y se abre con su botón, listo para escribir`);
+    } else {
+      ok(m.atajos === null && m.volver === null && m.lado && m.anadir && !m.plegar,
+        `${w}px · en dos columnas nada cambia: sin atajos, la configuración al lado y "Añadir item" abierto`);
+    }
+    await ctx.close();
+  }
+
   // ── La configuración: cada bloque con su color, cada extra con su icono ─────
   // "Que haya más contraste para diferenciar compras, recogidas, las opciones como
   // paella, parisiene…" (el dueño). Recogidas y compras eran dos cajas grises iguales.
@@ -5123,6 +5171,35 @@ async function main() {
       ok(despues.length === antes.length && despues.includes("Renombrada"),
         `${w}px · cambiarle el nombre a alguien lo cambia sin duplicarlo (${antes.length} → ${despues.length})`);
 
+      await c.close();
+    }
+
+    // En el móvil los ajustes (traer, limpiar, compartir, equipo...) van detrás de un
+    // botón: eran media pantalla de barras antes del mes. En ancho, a la vista como
+    // siempre. El banco los abre al entrar para las pruebas de cada panel; aquí se piden
+    // cerrados, que es como arrancan la app y la vista de dentro de la checklist.
+    for (const w of [390, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 844 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`calendario ajustes ${w}px: ${e}`));
+      await p.goto(BANCO + "?cerrados=1&sucio=1", { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-mes");
+      const m = await p.evaluate(() => ({
+        boton: !!document.querySelector(".cal-ajustes-boton")?.offsetParent,
+        paneles: !!document.querySelector(".cal-ajustes .cal-equipo")?.offsetParent,
+        aviso: document.querySelector(".cal-ajustes-boton em")?.textContent || "",
+        mes: Math.round(document.querySelector(".cal-mes").getBoundingClientRect().top),
+      }));
+      if (w < 769) {
+        ok(/por revisar/.test(m.aviso), `${w}px · el botón de los ajustes dice lo que hay por limpiar → «${m.aviso}»`);
+        await p.locator(".cal-ajustes-boton button").click();
+        const abierto = await p.evaluate(() => Math.round(document.querySelector(".cal-mes").getBoundingClientRect().top));
+        ok(m.boton && !m.paneles && m.mes < 520 && abierto - m.mes > 200,
+          `${w}px · los ajustes van detrás del botón y el mes sube (${abierto}px abiertos → ${m.mes}px cerrados)`);
+        ok(await p.locator(".cal-ajustes .cal-equipo").isVisible(), `${w}px · al pulsarlo salen los ajustes`);
+      } else {
+        ok(!m.boton && m.paneles, `${w}px · en ancho no hay botón: los ajustes a la vista, como siempre`);
+      }
       await c.close();
     }
 

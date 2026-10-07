@@ -261,6 +261,20 @@ operativo).
     `animationend` del propio contenedor, si no, plegar y abrir lo repetiría.
   - De paso: la fila "vino todo" de la vuelta era `#f4fcf6` fijo también en oscuro, con
     el texto claro encima. Ahora `--ok-bg`; la prueba de contraste mira la vuelta.
+- **Rediseño, fase 4 — orden en el móvil**: en una columna (≤1180px) la checklist va
+  PRIMERO (`order` en `.main-layout`): la primera categoría salía a ~6.800px, tras
+  Plantillas, Eventos guardados y la configuración entera; ahora en la primera pantalla.
+  La configuración sigue debajo; los atajos `.atajos-una-columna` ("Configurar el
+  evento", "Eventos guardados") y "Volver a la checklist" (`.atajo-volver`) llevan con
+  `irA(id)` a `#cfg-evento`, `#cfg-guardados` y `#checklist-lista`, con
+  `scroll-margin-top` para no quedar debajo de la cabecera fija (tableta) o de
+  `.barra-fija` (móvil, 58px). En dos columnas no se ven. En el móvil "Añadir item" va
+  plegado (`anadirAbierto`, `.add-item-abrir`): abierto era media pantalla.
+  - **Calendario**: los ajustes (traer, limpiar, compartir, asistente, equipo, ratios)
+    van en `Ajustes.jsx`, que en el móvil los esconde tras un botón con "N por revisar"
+    si el limpiador tiene algo. Lo usan la app suelta, la vista de la checklist y el
+    banco. **El banco los abre al entrar** (`abiertosAlEntrar`): sus pruebas son de lo
+    de DENTRO de cada panel a nueve anchos; el botón se prueba con `?cerrados=1`.
 - **Distribución: nada partido ni cortado** ("que no se corte nada o se ponga en 2
   líneas", y la captura de "Mesas de los comensales" con "Redonda 2m" sola abajo).
   Revisadas las tres apps a 320–1280 con un script que mide texto recortado, controles

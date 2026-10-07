@@ -27,6 +27,7 @@ import { encadenar } from "../asistente/escrituraTareas.js";
 import useCalendarioNube from "./useCalendarioNube.js";
 import Traer from "./Traer.jsx";
 import Limpiar from "./Limpiar.jsx";
+import Ajustes from "./Ajustes.jsx";
 import { enlaceDeLaUrl } from "./enlace.js";
 
 // Sin esto el calendario arrancaba SIEMPRE en claro: aplicarTemaInicial() se llamaba en
@@ -62,8 +63,9 @@ function AppCalendario() {
         </div>
       )}
 
-      {/* Los ajustes plegables, juntos en un bloque (ver .cal-ajustes) */}
-      <div className="cal-ajustes">
+      {/* Los ajustes plegables, juntos en un bloque (ver .cal-ajustes) y, en el móvil,
+          detrás de un botón (Ajustes.jsx) */}
+      <Ajustes apuntes={apuntes} conLimpiar={!soloVer}>
       {/* Traer apuntes de golpe pegándolos, NUNCA desde un archivo del repositorio. Los
           nombres de clientes y las vacaciones del equipo son datos de personas, y tanto
           el repositorio como lo publicado en GitHub Pages son públicos: eso vive en
@@ -99,7 +101,7 @@ function AppCalendario() {
 
       {!soloVer && <Equipo equipo={equipo} onCambiar={cambiarEquipo} />}
       {!soloVer && <Ratios ratios={ratios} onCambiar={cambiarRatios} />}
-      </div>
+      </Ajustes>
 
       {/* Desde un enlace no se ofrece abrir la checklist: es otra app y pide cuenta,
           así que el botón solo llevaría a una pantalla de login. */}

@@ -15,6 +15,7 @@ import Compartir from "./Compartir.jsx";
 import Ratios from "./Ratios.jsx";
 import Traer from "./Traer.jsx";
 import Limpiar from "./Limpiar.jsx";
+import Ajustes from "./Ajustes.jsx";
 import useCalendarioNube from "./useCalendarioNube.js";
 
 // Aquí dentro siempre se entra con cuenta —es la checklist del equipo—, así que no hay
@@ -82,7 +83,7 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrear
                   </button>
                 </div>
               )}
-              <div className="cal-ajustes">
+              <Ajustes apuntes={apuntes}>
               <Traer apuntes={apuntes} onTraer={traer} />
               <Limpiar apuntes={apuntes} onCambiar={traer} />
               {/* Los enlaces para compartir, también desde aquí: el calendario se abre
@@ -92,7 +93,7 @@ export default function CalendarioEnChecklist({ onCerrar, onAbrirEvento, onCrear
               <Compartir codigos={codigos} href={window.location.href} />
               <Equipo equipo={equipo} onCambiar={cambiarEquipo} />
               <Ratios ratios={ratios} onCambiar={cambiarRatios} />
-              </div>
+              </Ajustes>
               {/* onAbrirEvento aquí NO cambia de página: abre el evento guardado en esta
                   misma app, que es justo lo que se venía a hacer. */}
               <Calendario
