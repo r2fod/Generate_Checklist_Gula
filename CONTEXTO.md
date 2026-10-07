@@ -333,12 +333,15 @@ operativo).
 - **El Resumen del modo carga, en el móvil una lista** ("Resumen sigue estando feo,
   hazlo más premium", el dueño): por debajo de 640px la tabla de siete columnas
   (`.resumen-tabla-wrap`) se esconde y sale `.resumen-lista`: una tarjeta por categoría
-  con su color y su subtotal, y una fila por producto con el nombre entero, lo cargado y
-  lo que cuesta a la derecha y, debajo, solo lo que hay ("volvió todo", "vuelven 2",
-  "gastado 1", "2 rotas", "3,00€/ud"). Sin guiones ni "0,00€". En pantalla grande, la
-  tabla. Orden nuevo: cifras → "En qué se va" → productos → "Para la próxima vez" (los
-  paneles de calibrar, que antes iban arriba y empujaban las cifras). Se quitó el
-  "Coste estimado" de la barra: era el mismo número que la ficha grande.
+  con su color y su subtotal, y una fila por producto con el nombre entero y, debajo,
+  los MISMOS seis datos que la tabla con su nombre (carga, vuelta, consumo, roturas,
+  coste ud., total), en tres columnas. En pantalla grande, la tabla.
+  - **Corregido después** ("has quitado lo de roturas y lo que había antes, fíjate
+    bien por qué lo quitas", el dueño): la primera versión enseñaba solo los datos que
+    había (las roturas, solo si las había), quitó el "Coste estimado" de la barra y
+    movió los paneles de calibrar al final. Vuelto todo a como estaba: la lista cambia
+    la forma, no lo que se ve. Prueba: los seis datos en cada producto, una rotura
+    apuntada a mano se ve, el coste estimado arriba y los paneles antes de las cifras.
   - Fallo propio cazado con capturas: la barra de pestañas del modo carga se quedaba
     cortada en el escritorio si se le restaba `--hueco-arriba` como a la hoja. Ahí el
     que hace scroll es el panel (`.carga-modal`), no el fondo: va con `top: 0`.

@@ -36,4 +36,5 @@
 - Out of scope: staff logistics (per person, schedules) and financial summary (budget/margin) live in the owner's other app, to be merged later. Don't plan or build them here. Kitchen (`PLAN_COCINA.md`) and inventory (`PLAN_INVENTARIO.md`) DO stay in this app.
 - "In production" = "Publicar" job green (battery + gh-pages), not just merged.
 - Calendar data from the Drive sheet: JSON to the owner, NEVER committed. Compare with the current calendar first (exact normalized title per date); "Traer" only adds. Method: `CONTEXTO.md` → "Estado de HOY".
+- Redesigns change the form, never what is shown: don't drop data, lines or panels (or move them out of sight) without asking ("has quitado lo de roturas y lo que había antes").
 - Same rules for any AI (`GEMINI.md` imports this file).

@@ -690,6 +690,12 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
               {filasPorCategoria.length > 0 && (
                 <button className="btn btn-outline" onClick={exportarResumenCSV} title="Descarga el resumen en CSV (se abre en Excel, Sheets o Numbers)"><FileText size={14} /> Exportar (Excel)</button>
               )}
+              {granTotal > 0 && (
+                <span className="resumen-coste-total">
+                  Coste estimado: <strong>{fmtEur(granTotal)}</strong>
+                  {porPax !== null && <> · {fmtEur(porPax)}/pax</>}
+                </span>
+              )}
             </div>
             {editandoPrecios && (
               <div className="resumen-bloque">
@@ -706,6 +712,42 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                   onBlur={e => { if (e.target.value.trim()) { handleGuardarPrecios(e.target.value); e.target.value = ""; } }}
                 />
               </div>
+            )}
+            {/* Debajo de los precios y no arriba: primero se mira cómo ha ido el evento,
+                y solo después se decide si hay que cargar distinto la próxima vez. */}
+            {onCambiarBebida && (
+              <PanelBebida
+                factores={factoresBebida}
+                calibracion={calibracionBebida}
+                onCambiar={onCambiarBebida}
+              />
+            )}
+
+            {/* Justo debajo: el hielo se mira en el mismo momento, con la misma vuelta. */}
+            {onCambiarHielo && (
+              <PanelHielo
+                factores={factoresHielo}
+                calibracion={calibracionHielo}
+                onCambiar={onCambiarHielo}
+              />
+            )}
+            {/* Y la comida: las paelleras y bandejas también vuelven, y también se miden. */}
+            {onCambiarComida && (
+              <PanelComida
+                factores={factoresComida}
+                calibracion={calibracionComida}
+                onCambiar={onCambiarComida}
+              />
+            )}
+{/* Mismo panel que el calendario, mismo motivo que estar aquí: en cuanto hay
+                3 eventos con el camarero puesto a mano, aquí sale el ratio real y un
+                botón para usarlo (ver calibracionPersonal en calibracion.js). */}
+            {onCambiarRatios && (
+              <Ratios
+                ratios={ratiosPersonal}
+                calibracion={calibracionPersonal}
+                onCambiar={onCambiarRatios}
+              />
             )}
             {filasPorCategoria.length === 0 ? (
               <p className="resumen-vacio">No hay items con cantidad para resumir.</p>
@@ -766,43 +808,36 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
               )}
 
               {/* En el móvil, una lista en vez de la tabla: siete columnas en 380px había que
-                  arrastrarlas de lado, la mitad eran guiones y el nombre se partía en tres
-                  líneas ("Resumen sigue estando feo", el dueño). Aquí cada producto con su
-                  nombre entero, lo cargado a la derecha y debajo SOLO lo que hay: vuelta,
-                  consumo, roturas y precio. La tabla sigue en pantalla grande (CSS). */}
+                  arrastrarlas de lado y el nombre se partía en tres líneas ("Resumen sigue
+                  estando feo", el dueño). Cada producto con su nombre entero y debajo LOS
+                  MISMOS seis datos que la tabla, cada uno con su nombre: carga, vuelta,
+                  consumo, roturas, coste ud. y total. Antes salían solo los que había, y así
+                  no se veían las roturas ("has quitado lo de roturas", el dueño). */}
               <div className="resumen-lista">
                 {filasPorCategoria.map(cat => (
                   <section key={cat.nombre} className="resumen-lista-cat con-cat" style={estiloCategoria(cat.nombre)}>
                     <div className="resumen-lista-cab">
                       <span className="cat-icon-mini"><IconoCategoria nombre={cat.nombre} size={13} /></span>
                       <span className="resumen-lista-cat-nombre">{cat.nombre}</span>
-                      {cat.subtotal > 0 && <strong className="resumen-lista-subtotal">{fmtEur(cat.subtotal)}</strong>}
+                      <strong className="resumen-lista-subtotal">{fmtEur(cat.subtotal)}</strong>
                     </div>
                     <ul className="resumen-lista-filas">
-                      {cat.filas.map(f => {
-                        // Lo normal (volvió todo, sin roturas) en una sola etiqueta: "vuelven 3 ·
-                        // consumo 0" en cada fila era ruido. Solo se detalla lo que se sale de ahí.
-                        const todoVolvio = f.vuelta != null && f.cargaInicial != null
-                          && Number(f.vuelta) === Number(f.cargaInicial) && !(f.roturas > 0) && !f.vueltaImposible;
-                        const datos = [
-                          todoVolvio && <span key="t" className="es-ok">volvió todo</span>,
-                          !todoVolvio && f.vuelta != null && <span key="v" className={f.vueltaImposible ? "es-mal" : ""}>vuelven {f.vuelta}{f.vueltaImposible ? " ⚠️" : ""}</span>,
-                          !todoVolvio && f.consumoReal > 0 && <span key="c">gastado {f.consumoReal}</span>,
-                          f.roturas > 0 && <span key="r" className="es-rotura">{f.roturas} {f.roturas === 1 ? "rota" : "rotas"}</span>,
-                          f.precio !== undefined && <span key="p">{fmtEur(f.precio)}/ud</span>,
-                        ].filter(Boolean);
-                        return (
-                          <li key={f.key} className="resumen-lista-fila">
-                            <span className="resumen-lista-nombre"><IconoItem label={f.label} size={14} /><span>{conCortes(f.label)}</span></span>
-                            <span className="resumen-lista-cifras">
-                              {/* Sin cifra ("Todas", "Las que haya") no se pinta un guion: no hay nada que decir */}
-                              {f.cargaInicial != null && <strong>{f.cargaInicial}{f.sufijo ? ` ${f.sufijo}` : ""}</strong>}
-                              {f.costeTotal > 0 && <em>{fmtEur(f.costeTotal)}</em>}
-                            </span>
-                            {datos.length > 0 && <span className="resumen-lista-datos">{datos}</span>}
-                          </li>
-                        );
-                      })}
+                      {cat.filas.map(f => (
+                        <li key={f.key} className="resumen-lista-fila">
+                          <span className="resumen-lista-nombre"><IconoItem label={f.label} size={14} /><span>{conCortes(f.label)}</span></span>
+                          <dl className="resumen-lista-datos">
+                            <div><dt>Carga</dt><dd>{f.cargaInicial ?? "—"}{f.sufijo ? ` ${f.sufijo}` : ""}</dd></div>
+                            <div className={f.vueltaImposible ? "es-mal" : ""}
+                                 title={f.vueltaImposible ? `Vuelven ${f.vuelta} de ${f.cargaInicial} cargadas: imposible. Revísalo, porque así esta línea no cobra la merma.` : undefined}>
+                              <dt>Vuelta</dt><dd>{f.vuelta ?? "—"}{f.vueltaImposible ? " ⚠️" : ""}</dd>
+                            </div>
+                            <div><dt>Consumo</dt><dd>{f.consumoReal ?? "—"}</dd></div>
+                            <div className={f.roturas > 0 ? "es-rotura" : ""}><dt>Roturas</dt><dd>{f.roturas > 0 ? f.roturas : "—"}</dd></div>
+                            <div className={f.precio === undefined && f.cargaInicial !== null ? "es-sinprecio" : ""}><dt>Coste ud.</dt><dd>{f.precio !== undefined ? fmtEur(f.precio) : "—"}</dd></div>
+                            <div className="es-total"><dt>Total</dt><dd>{f.costeTotal !== null ? fmtEur(f.costeTotal) : "—"}</dd></div>
+                          </dl>
+                        </li>
+                      ))}
                     </ul>
                   </section>
                 ))}
@@ -861,46 +896,6 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                 </table>
               </div>
               </>
-            )}
-            {/* Al final, después de las cifras y la lista: primero se mira cómo ha ido el
-                evento, y solo después se decide si hay que cargar distinto la próxima vez.
-                Antes iban arriba, y las cifras quedaban debajo de cuatro paneles. */}
-            {(onCambiarBebida || onCambiarHielo || onCambiarComida || onCambiarRatios) && (
-              <div className="resumen-titulo resumen-titulo-proxima">Para la próxima vez</div>
-            )}
-            {onCambiarBebida && (
-              <PanelBebida
-                factores={factoresBebida}
-                calibracion={calibracionBebida}
-                onCambiar={onCambiarBebida}
-              />
-            )}
-
-            {/* Justo debajo: el hielo se mira en el mismo momento, con la misma vuelta. */}
-            {onCambiarHielo && (
-              <PanelHielo
-                factores={factoresHielo}
-                calibracion={calibracionHielo}
-                onCambiar={onCambiarHielo}
-              />
-            )}
-            {/* Y la comida: las paelleras y bandejas también vuelven, y también se miden. */}
-            {onCambiarComida && (
-              <PanelComida
-                factores={factoresComida}
-                calibracion={calibracionComida}
-                onCambiar={onCambiarComida}
-              />
-            )}
-{/* Mismo panel que el calendario, mismo motivo que estar aquí: en cuanto hay
-                3 eventos con el camarero puesto a mano, aquí sale el ratio real y un
-                botón para usarlo (ver calibracionPersonal en calibracion.js). */}
-            {onCambiarRatios && (
-              <Ratios
-                ratios={ratiosPersonal}
-                calibracion={calibracionPersonal}
-                onCambiar={onCambiarRatios}
-              />
             )}
           </div>
         ) : (

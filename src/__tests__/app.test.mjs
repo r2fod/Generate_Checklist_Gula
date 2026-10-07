@@ -526,10 +526,11 @@ async function main() {
 
   // ── El Resumen del modo carga, en el móvil una lista ─────────────────────────
   // "Resumen sigue estando feo, arréglalo y hazlo más premium" (el dueño, con la tabla
-  // de siete columnas en el móvil: arrastrar de lado, celdas de guiones y nombres en
-  // tres líneas). En el móvil, una tarjeta por categoría y una fila por producto con
-  // solo lo que hay; en pantalla grande, la tabla. Y primero cómo ha ido (las cifras y
-  // la lista); los paneles de calibrar, al final.
+  // de siete columnas en el móvil: arrastrar de lado y nombres en tres líneas). En el
+  // móvil, una tarjeta por categoría y una fila por producto; en pantalla grande, la
+  // tabla. Y sin perder nada de lo que había ("has quitado lo de roturas y lo que había
+  // antes", el dueño): cada producto con los seis datos de la tabla, roturas incluidas,
+  // el coste estimado arriba y los paneles de calibrar en su sitio, antes de las cifras.
   console.log("\n── El Resumen, en el móvil una lista ──");
   for (const [w, h] of [[390, 844], [320, 700], [1280, 900]]) {
     const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769 });
@@ -540,26 +541,38 @@ async function main() {
     await page.locator("button", { hasText: "Modo carga" }).first().click(); await page.waitForTimeout(800);
     await page.locator(".carga-modo-toggle button").filter({ hasText: "Vuelta" }).first().click(); await page.waitForTimeout(500);
     await page.locator(".carga-todo-vuelto").click(); await page.waitForTimeout(800);
+    // Una rotura apuntada a mano: tiene que verse también en la lista del móvil
+    await page.locator(".carga-roturas:not(.carga-vuelve-cantidad) input").first().fill("2"); await page.waitForTimeout(500);
     await page.locator(".carga-modo-toggle button").filter({ hasText: "Resumen" }).first().click(); await page.waitForTimeout(800);
+    // Un precio de prueba, para que haya coste que enseñar arriba
+    await page.locator(".resumen-precios-bar button", { hasText: "Precios" }).click();
+    await page.locator(".resumen-bloque textarea").fill("Regletas: 2");
+    await page.locator(".resumen-bloque textarea").blur(); await page.waitForTimeout(600);
     const m = await page.evaluate(() => {
       const ve = (s) => { const e = document.querySelector(s); return !!(e && e.offsetParent); };
-      const nombres = [...document.querySelectorAll(".resumen-lista-nombre")].filter(e => e.offsetParent);
-      const lista = document.querySelector(".resumen-lista"), panel = document.querySelector(".resumen-titulo-proxima");
+      const filas = [...document.querySelectorAll(".resumen-lista-fila")].filter(e => e.offsetParent);
+      const nombres = filas.map(f => f.querySelector(".resumen-lista-nombre"));
+      // El primer panel de calibrar del cuerpo (la escaleta de la cabecera también es un .cal-ratios)
+      const panel = document.querySelector(".carga-modal .preview-body .cal-ratios"), fichas = document.querySelector(".resumen-fichas");
       return {
-        lista: ve(".resumen-lista"), tabla: ve(".resumen-tabla-wrap"), filas: nombres.length,
+        lista: ve(".resumen-lista"), tabla: ve(".resumen-tabla-wrap"), filas: filas.length,
         recortados: nombres.filter(e => e.scrollWidth > e.clientWidth + 1).length,
-        guiones: [...document.querySelectorAll(".resumen-lista-cifras strong")].filter(e => e.offsetParent && e.textContent.trim() === "—").length,
-        calibrarAlFinal: !panel || !lista || !lista.offsetParent || panel.getBoundingClientRect().top > lista.getBoundingClientRect().bottom,
+        seisDatos: filas.every(f => [...f.querySelectorAll(".resumen-lista-datos dt")].map(d => d.textContent).join() === "Carga,Vuelta,Consumo,Roturas,Coste ud.,Total"),
+        rotura: filas.some(f => f.querySelector(".es-rotura dd")?.textContent.trim() === "2"),
+        costeArriba: ve(".resumen-coste-total"),
+        panelesAntes: !panel || !fichas || panel.getBoundingClientRect().top < fichas.getBoundingClientRect().top,
         lado: document.documentElement.scrollWidth - innerWidth,
       };
     });
     if (w <= 640) {
-      ok(m.lista && !m.tabla && m.filas > 20 && m.recortados === 0 && m.guiones === 0 && m.lado <= 0,
-        `${w}px · el Resumen es una lista: ${m.filas} productos con su nombre entero, sin guiones ni arrastrar de lado`);
+      ok(m.lista && !m.tabla && m.filas > 20 && m.recortados === 0 && m.lado <= 0,
+        `${w}px · el Resumen es una lista: ${m.filas} productos con su nombre entero, sin arrastrar de lado`);
+      ok(m.seisDatos && m.rotura,
+        `${w}px · cada producto con los seis datos de la tabla, y la rotura apuntada se ve`);
     } else {
       ok(m.tabla && !m.lista, `${w}px · en pantalla grande sigue la tabla`);
     }
-    ok(m.calibrarAlFinal, `${w}px · los paneles de calibrar van al final, después de cómo ha ido`);
+    ok(m.costeArriba && m.panelesAntes, `${w}px · el coste estimado arriba y los paneles de calibrar en su sitio, como antes`);
     await ctx.close();
   }
 
