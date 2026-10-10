@@ -363,10 +363,12 @@ async function main() {
   // ── Orden en el móvil (fase 4 del rediseño) ─────────────────────────────────
   // En una columna la checklist va primero: la primera categoría salía a siete
   // pantallas de móvil, tras Plantillas, Eventos guardados y la configuración entera.
-  // La configuración sigue debajo, con atajos para ir y volver; en dos columnas, nada
-  // cambia. Y en el móvil "Añadir item" va plegado: abierto era media pantalla.
+  // La configuración sigue debajo; sus atajos la abren AHÍ, debajo de ellos ("que te
+  // lleve abajo no me gusta", el dueño), y al bajar hasta la checklist vuelve a su
+  // sitio sin que la lista salte. En dos columnas, nada cambia. Y en el móvil "Añadir
+  // item" va plegado: abierto era media pantalla.
   console.log("\n── Orden en el móvil ──");
-  for (const [w, h] of [[390, 844], [320, 760], [1280, 900]]) {
+  for (const [w, h] of [[390, 844], [320, 760], [900, 1000], [1280, 900]]) {
     const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769, reducedMotion: "reduce" });
     for (const hs of HOSTS_NUBE) await ctx.route(hs, r => r.abort());
     const page = await nuevaPagina(ctx);
@@ -386,21 +388,50 @@ async function main() {
     if (w < 1181) {
       ok(m.cat < h && m.cat < m.config,
         `${w}px · la primera categoría sale en la primera pantalla, antes que la configuración (${m.cat} / ${m.config})`);
+      // Se abre ahí: encima de la lista, justo debajo de su botón, y sin mover la pantalla
+      const abierta = (id) => page.evaluate(i => {
+        const t = document.getElementById(i).getBoundingClientRect(), b = document.querySelector(".atajos-una-columna").getBoundingClientRect();
+        return { encima: t.top < document.getElementById("checklist-lista").getBoundingClientRect().top, pegada: t.top - b.bottom < 40, y: Math.round(scrollY) };
+      }, id);
+      const yAntes = await page.evaluate(() => Math.round(scrollY));
       await page.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).click();
       await page.waitForTimeout(300);
-      const enConfig = await aLaVista("cfg-evento");
-      await page.locator(".atajos-una-columna button", { hasText: "Eventos guardados" }).click().catch(() => {});
+      const evento = await abierta("cfg-evento");
+      ok(evento.encima && evento.pegada && evento.y === yAntes
+        && await page.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).getAttribute("aria-expanded") === "true",
+        `${w}px · "Configurar el evento" se abre ahí, debajo de su botón, sin llevar abajo`);
+      await page.locator(".atajos-una-columna button", { hasText: "Eventos guardados" }).click();
       await page.waitForTimeout(300);
-      const enGuardados = await aLaVista("cfg-guardados");
+      const guardados = await abierta("cfg-guardados");
+      const encimaDeLaLista = await page.evaluate(() => {
+        const lista = document.getElementById("checklist-lista").getBoundingClientRect().top;
+        return [...document.querySelectorAll(".config-sidebar > *")].filter(e => e.offsetParent && e.getBoundingClientRect().top < lista).map(e => e.id || e.className);
+      });
+      ok(guardados.encima && guardados.pegada && encimaDeLaLista.length === 1,
+        `${w}px · "Eventos guardados" igual, y solo una tarjeta abierta cada vez (${encimaDeLaLista.join(", ")})`);
+      // Bajando hasta la checklist la tarjeta vuelve abajo, y la lista no se mueve
+      // Se mide en cuanto se cierra: lo que pase después es la tira fija de arriba, que
+      // aparece al pasar de la cabecera (con panel o sin él)
+      const alBajar = await page.evaluate(async () => {
+        const lista = document.getElementById("checklist-lista"), alto = document.getElementById("cfg-guardados").offsetHeight;
+        scrollTo({ top: lista.getBoundingClientRect().top + scrollY - 2, behavior: "instant" });
+        const antes = lista.getBoundingClientRect().top;
+        for (let i = 0; i < 30 && document.querySelector(".main-layout").dataset.panel; i++) await new Promise(r => requestAnimationFrame(r));
+        return { cerrada: !document.querySelector(".main-layout").dataset.panel, salto: Math.round(Math.abs(lista.getBoundingClientRect().top - antes)), alto };
+      });
+      ok(alBajar.cerrada && alBajar.salto <= 8,
+        `${w}px · al bajar hasta la checklist se esconde sola, sin que la lista salte (${alBajar.salto}px; la tarjeta medía ${alBajar.alto})`);
       await page.locator(".atajo-volver").click();
       await page.waitForTimeout(300);
-      ok(enConfig && enGuardados && await aLaVista("checklist-lista"),
-        `${w}px · los atajos llevan a la configuración y a los guardados, y "Volver a la checklist" trae de vuelta`);
-      ok(!m.anadir && m.plegar, `${w}px · "Añadir item" va plegado`);
-      await page.locator(".add-item-abrir").click();
-      await page.locator(".add-item-row input").first().fill("Vela de prueba");
-      ok(await page.locator(".add-item-row").isVisible() && await page.locator(".add-item-btn").isEnabled(),
-        `${w}px · y se abre con su botón, listo para escribir`);
+      ok(await aLaVista("checklist-lista"), `${w}px · y desde abajo, "Volver a la checklist" sigue trayendo de vuelta`);
+      // Plegado solo en el móvil: en la tableta cabe abierto
+      if (w < 769) {
+        ok(!m.anadir && m.plegar, `${w}px · "Añadir item" va plegado`);
+        await page.locator(".add-item-abrir").click();
+        await page.locator(".add-item-row input").first().fill("Vela de prueba");
+        ok(await page.locator(".add-item-row").isVisible() && await page.locator(".add-item-btn").isEnabled(),
+          `${w}px · y se abre con su botón, listo para escribir`);
+      }
     } else {
       ok(m.atajos === null && m.volver === null && m.lado && m.anadir && !m.plegar,
         `${w}px · en dos columnas nada cambia: sin atajos, la configuración al lado y "Añadir item" abierto`);

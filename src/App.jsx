@@ -745,6 +745,45 @@ export default function App({ onCerrarSesion } = {}) {
   const [nuevoItemLabel, setNuevoItemLabel] = useState("");
   // En el móvil "Añadir item" va plegado: abierto ocupaba la primera pantalla entera
   const [anadirAbierto, setAnadirAbierto] = useState(false);
+  // En una columna, la tarjeta que se ha abierto con su atajo ("evento" o "guardados")
+  // y sale ahí, debajo de los botones, en vez de llevar hasta abajo (ver más abajo)
+  const [panelArriba, setPanelArriba] = useState(null);
+  const listaAntesDeCerrarRef = React.useRef(null);
+  // La tarjeta abierta arriba con su atajo vuelve a su sitio (debajo de la checklist) en
+  // cuanto se baja hasta la lista: se abre para tocar algo, y al seguir hacia la lista ya
+  // no hace falta pasar por encima de ella. Al irse de arriba la lista subiría de golpe
+  // lo que medía la tarjeta: se mide dónde estaba la lista y se devuelve ahí, sin salto.
+  // El anclaje del navegador (overflow-anchor) se apaga en ese momento para no corregir
+  // dos veces.
+  useEffect(() => {
+    if (!panelArriba) return undefined;
+    let pendiente = false;
+    const mirar = () => {
+      pendiente = false;
+      // El propio scroll de la corrección llega aquí cuando ya se ha cerrado
+      const lista = document.getElementById("checklist-lista");
+      if (!lista || !document.querySelector(".main-layout[data-panel]")) return;
+      // Por debajo de la tira fija de arriba (si se ve), que es donde empieza la pantalla útil
+      const barra = document.querySelector(".barra-fija")?.getBoundingClientRect();
+      const tope = barra && barra.height > 0 ? Math.max(0, barra.bottom) : 0;
+      const arriba = lista.getBoundingClientRect().top;
+      if (arriba > tope + 8) return;
+      listaAntesDeCerrarRef.current = arriba;
+      document.documentElement.style.overflowAnchor = "none";
+      setPanelArriba(null);
+    };
+    const alMover = () => { if (!pendiente) { pendiente = true; requestAnimationFrame(mirar); } };
+    window.addEventListener("scroll", alMover, { passive: true });
+    return () => window.removeEventListener("scroll", alMover);
+  }, [panelArriba]);
+  React.useLayoutEffect(() => {
+    const antes = listaAntesDeCerrarRef.current;
+    if (panelArriba !== null || antes === null) return;
+    listaAntesDeCerrarRef.current = null;
+    const lista = document.getElementById("checklist-lista");
+    if (lista) window.scrollBy({ top: lista.getBoundingClientRect().top - antes, behavior: "instant" });
+    requestAnimationFrame(() => { document.documentElement.style.overflowAnchor = ""; });
+  }, [panelArriba]);
   const [nuevoItemCantidad, setNuevoItemCantidad] = useState("");
   const [nuevoItemCategoria, setNuevoItemCategoria] = useState("");
   const [nuevoItemAlquiler, setNuevoItemAlquiler] = useState(false);
@@ -3891,18 +3930,26 @@ export default function App({ onCerrarSesion } = {}) {
           );
         })()}
 
-        <div className="main-layout">
+        <div className="main-layout" data-panel={panelArriba || undefined}>
         {/* En una columna (móvil y tableta) la checklist va PRIMERO: era lo último, tras
             Plantillas, Eventos guardados y la configuración entera (siete pantallas de
-            móvil antes de la primera línea). La configuración sigue debajo, y estos
-            atajos llevan a ella sin bajar a ciegas. En dos columnas no se ven. */}
+            móvil antes de la primera línea). La configuración sigue debajo. Estos atajos
+            la abren AHÍ, debajo de ellos, en vez de llevar hasta abajo ("que te lleve
+            abajo no me gusta", el dueño); al bajar hasta la checklist vuelve a su sitio.
+            En dos columnas no se ven. */}
         {!soloMarcar && (
-          <nav className="atajos-una-columna" aria-label="Ir a">
-            <button type="button" className="btn btn-outline" onClick={() => irA("cfg-evento")}>
-              <SlidersHorizontal size={15} aria-hidden="true" /> Configurar el evento
+          <nav className="atajos-una-columna" aria-label="Abrir">
+            <button type="button" className={`btn btn-outline${panelArriba === "evento" ? " es-abierto" : ""}`}
+              aria-expanded={panelArriba === "evento"} aria-controls="cfg-evento"
+              onClick={() => setPanelArriba(p => (p === "evento" ? null : "evento"))}>
+              {/* Abierto, el icono pasa a ser el de cerrar: una flecha aparte no cabía y
+                  partía el botón en dos líneas hasta 412px */}
+              {panelArriba === "evento" ? <ChevronUp size={15} aria-hidden="true" /> : <SlidersHorizontal size={15} aria-hidden="true" />} Configurar el evento
             </button>
-            <button type="button" className="btn btn-outline" onClick={() => irA("cfg-guardados")}>
-              <FolderOpen size={15} aria-hidden="true" /> Eventos guardados
+            <button type="button" className={`btn btn-outline${panelArriba === "guardados" ? " es-abierto" : ""}`}
+              aria-expanded={panelArriba === "guardados"} aria-controls="cfg-guardados"
+              onClick={() => setPanelArriba(p => (p === "guardados" ? null : "guardados"))}>
+              {panelArriba === "guardados" ? <ChevronUp size={15} aria-hidden="true" /> : <FolderOpen size={15} aria-hidden="true" />} Eventos guardados
             </button>
           </nav>
         )}
