@@ -265,11 +265,22 @@ operativo).
   PRIMERO (`order` en `.main-layout`): la primera categoría salía a ~6.800px, tras
   Plantillas, Eventos guardados y la configuración entera; ahora en la primera pantalla.
   La configuración sigue debajo; los atajos `.atajos-una-columna` ("Configurar el
-  evento", "Eventos guardados") y "Volver a la checklist" (`.atajo-volver`) llevan con
-  `irA(id)` a `#cfg-evento`, `#cfg-guardados` y `#checklist-lista`, con
+  evento", "Eventos guardados") la abren ahí (ver abajo) y "Volver a la checklist"
+  (`.atajo-volver`) lleva con `irA(id)` a `#checklist-lista`, con
   `scroll-margin-top` para no quedar debajo de la cabecera fija (tableta) o de
   `.barra-fija` (móvil, 58px). En dos columnas no se ven. En el móvil "Añadir item" va
   plegado (`anadirAbierto`, `.add-item-abrir`): abierto era media pantalla.
+  - **Los atajos abren su tarjeta ahí, no llevan abajo** ("que te lleve abajo no me
+    gusta; que se despliegue y si haces scroll hasta la checklist se esconda", el
+    dueño). `panelArriba` ("evento" | "guardados") pone `data-panel` en
+    `.main-layout`: la columna de configuración sube encima de la lista (`order: 1`)
+    con solo esa tarjeta, con `panel-despliega`. Al bajar hasta la checklist (su borde
+    llega a la tira fija) vuelve a su sitio, entera, y se corrige el scroll con lo que
+    medía para que la lista no salte (`overflow-anchor: none` en ese momento, para no
+    corregir dos veces). Abierto, el icono del botón pasa a ▲ (una flecha aparte partía
+    el botón en dos líneas hasta 412px). No se usó `display: contents` para subir cada
+    tarjeta sola: Chrome no la recolocaba a tiempo y la lista saltaba igual.
+    "Volver a la checklist" sigue para cuando se baja hasta la configuración.
   - **Calendario**: los ajustes (traer, limpiar, compartir, asistente, equipo, ratios)
     van en `Ajustes.jsx`, que en el móvil los esconde tras un botón con "N por revisar"
     si el limpiador tiene algo. Lo usan la app suelta, la vista de la checklist y el
