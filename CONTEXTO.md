@@ -469,6 +469,16 @@ operativo).
     checklist instalada vio "su" manifiesto con otro nombre y otro icono y ofreció
     "Actualización de aplicación disponible": la checklist acabó llamándose "Formulario
     Gula" y con su icono. Para comparar ids, `Page.getAppId`; nunca el texto del `id`.
+  - **Repasado en producción el 11/10** (el dueño volvió a verlo: dos "Formulario
+    Gula.app" en su Mac). Con `Page.getAppId` sobre la app publicada: checklist =
+    `r2fod.github.io/index.html`; calendario y formulario (con y sin código), cada uno
+    la suya en su carpeta. La otra app del dueño en el mismo dominio (`gula-logistics`)
+    no pide esa identidad. El código está bien desde #260: lo que queda es la app ya
+    instalada que se renombró aquel día, y se arregla desde ella — abrir la checklist,
+    aceptar "Actualización de aplicación disponible" (ahora vuelve a "Checklist Gula")
+    o desinstalarla y reinstalarla. La identidad de la checklist es la raíz del dominio
+    a propósito de no cambiar la ya instalada: no moverla sin avisar, dejaría huérfanas
+    las instaladas.
 - **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
