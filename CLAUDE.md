@@ -37,4 +37,5 @@
 - "In production" = "Publicar" job green (battery + gh-pages), not just merged.
 - Calendar data from the Drive sheet: JSON to the owner, NEVER committed. Compare with the current calendar first (exact normalized title per date); "Traer" only adds. Method: `CONTEXTO.md` → "Estado de HOY".
 - Redesigns change the form, never what is shown: don't drop data, lines or panels (or move them out of sight) without asking ("has quitado lo de roturas y lo que había antes").
+- Gemini via MCP (`google-gemini`) is connected in Claude Desktop: lean on it — second opinion on analysis/design, screenshot and image review, research. Each in its strength: Claude decides, writes the code and verifies; Gemini's answer is input to check, not truth.
 - Same rules for any AI (`GEMINI.md` imports this file).
