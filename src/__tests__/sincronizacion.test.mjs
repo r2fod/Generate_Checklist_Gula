@@ -728,6 +728,13 @@ console.log("\n══ La barbacoa, con su pregunta ══");
     && aRespuestasDeLaApp({ tipo: "boda", adultos: 80, extras: ["jarras"] }).tipoBBQ === "No lleva"
     && resumirEnvio({ tipo: "boda", extras: ["barbacoa"] }).find(f => f.id === "barbacoa").respuesta === "Sí",
     "un envío de antes sigue cargando lo mismo, y en la bandeja se lee en su pregunta");
+  // En el repaso y la bandeja, con 1 en singular ("1 tronas", "1 pequeñas redondas")
+  const fila = (r, id) => resumirEnvio({ tipo: "boda", ...r }).find(f => f.id === id).respuesta;
+  ok(fila({ barbacoa: "si", barbacoasLadrillo: 1, barbacoasRedondas: 2, barbacoasRectangular: 1 }, "barbacoasCuantas")
+      === "1 grande de ladrillo · 2 pequeñas redondas · 1 pequeña rectangular"
+    && fila({ adultos: 1, ninos: 1, tronas: 1 }, "gente") === "1 adulto · 1 niño · 1 trona"
+    && fila({ adultos: 90, tronas: 2 }, "gente") === "90 adultos · 2 tronas",
+    "con 1, en singular; con más, en plural");
 }
 
 // ── La cafetera, y no preguntar lo que no hace falta ─────────────────────────
@@ -748,7 +755,7 @@ console.log("\n══ La cafetera, y lo que no hace falta preguntar ══");
   const nota = (adultos) => PREGUNTAS.find(p => p.id === "cafetera").nota({ tipo: "boda", adultos });
   ok(/150 personas salen unos 330 cafés: irían 3 Nespresso\./.test(nota(150)),
     "y la nota dice cuántos cafés salen con la gente, para elegir con eso");
-  ok(/basta una Nespresso/.test(nota(40)) && /mejor la grande \(3 cargas\)/.test(nota(220)) && /Tenemos 4 Nespresso y 1 de bar/.test(nota(40)),
+  ok(/basta una Nespresso/.test(nota(40)) && /mejor la grande \(3 cargas\)/.test(nota(220)) && /Tenemos 4 Nespresso y 1 de bar/.test(nota(40)) && /el personal lleva su Nespresso aparte/.test(nota(220)),
     "y recomienda con el almacén: una Nespresso, varias o, si no llegan, la grande");
   ok(!ids("boda", { servicio: "bandeja" }).includes("estiloPlato") && !ids("boda", { distinto: ["sinPlatos"] }).includes("estiloPlato")
     && ids("boda", {}).includes("estiloPlato"),

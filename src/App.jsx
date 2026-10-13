@@ -4426,7 +4426,7 @@ export default function App({ onCerrarSesion } = {}) {
                     type="number" className="form-input" value={platosBuffet || ""} min="0" placeholder="0"
                     onChange={e => setPlatosBuffet(Math.max(0, parseInt(e.target.value) || 0))}
                   />
-                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Se suman a los platos de postre</span>
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Se suman a los platos de postre (o van aparte si no los hay)</span>
                 </div>
               )}
               {/* Las tronas de los bebés: en blanco no va ninguna. En el almacén hay 3 */}
@@ -4439,7 +4439,7 @@ export default function App({ onCerrarSesion } = {}) {
                     onChange={e => setNumTronas(e.target.value === "" ? null : Math.max(0, parseInt(e.target.value) || 0))}
                   />
                   <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-                    {numTronas > TRONAS_EN_ALMACEN ? `Hay ${TRONAS_EN_ALMACEN} en almacén: faltan ${numTronas - TRONAS_EN_ALMACEN}` : `Hay ${TRONAS_EN_ALMACEN} en almacén`}
+                    {numTronas > TRONAS_EN_ALMACEN ? `Hay ${TRONAS_EN_ALMACEN} en almacén: ${numTronas - TRONAS_EN_ALMACEN === 1 ? "falta 1" : `faltan ${numTronas - TRONAS_EN_ALMACEN}`}` : `Hay ${TRONAS_EN_ALMACEN} en almacén`}
                   </span>
                 </div>
               )}
@@ -4930,7 +4930,7 @@ export default function App({ onCerrarSesion } = {}) {
                       onChange={e => fn(e.target.value === "" ? null : Math.max(0, parseInt(e.target.value) || 0))}
                     />
                     <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
-                      {val > b.hay ? `Hay ${b.hay} en almacén: faltan ${val - b.hay}` : `Hay ${b.hay} en almacén`}
+                      {val > b.hay ? `Hay ${b.hay} en almacén: ${val - b.hay === 1 ? "falta 1" : `faltan ${val - b.hay}`}` : `Hay ${b.hay} en almacén`}
                     </span>
                   </div>
                 ))}

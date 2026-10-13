@@ -6145,6 +6145,9 @@ hr {
   color: var(--text-main);
   margin: 6px 0 0;
 }
+/* El foco va al título en cada pregunta (para el lector de pantalla), pero no es un
+   botón: sin el recuadro, que al abrir el enlace salía rodeándolo */
+.form-titulo:focus { outline: none; }
 .form-titulo-icono {
   flex-shrink: 0;
   color: var(--accent);

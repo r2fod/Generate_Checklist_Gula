@@ -800,6 +800,12 @@ console.log("\n══ Las Nespresso, según la gente ══");
   const rodaje = buildChecklist("produccion", 200, 0, 0, 0, {}).find(c => c.nombre === "Café").items.find(x => x[0] === "Cafetera Nespresso")[1];
   ok(rodaje.u === 4 && rodaje.sufijo(5) === "hay 4 · falta 1", "en un rodaje no hay Nespresso del personal: las 4 libres");
   ok(nespresso("boda", 200, { tipoCafetera: "Grande" }) === undefined, "con la grande, ninguna Nespresso de invitados");
+  // "Si se agrega la cafetera grande industrial, que se agregue una Nespresso para el
+  // personal" (el dueño): con la grande el personal no se queda sin la suya
+  const conGrande = (tipo) => buildChecklist(tipo, 150, 2, 4, 0, { tipoCafetera: "Grande" }).find(c => c.nombre === "Café").items.map(x => x[0]);
+  ok(["boda", "comunion", "corporativo", "cumpleanos"].every(t => conGrande(t).includes("Cafetera grande (industrial)")
+    && conGrande(t).includes("Cafetera Nespresso (para el personal)") && conGrande(t).includes("Cápsulas café (para el personal)")),
+    "con la grande va también la Nespresso del personal, con sus cápsulas, en todos los tipos con personal");
 }
 
 console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");

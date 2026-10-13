@@ -17,6 +17,7 @@ import {
   Ban, Hash, Pencil, Truck, Sofa, Popcorn, Croissant, Ham, Milk, Candy, Apple,
   HandPlatter, Layers, UserRound, Microwave, Heater, Boxes, Box, Palette,
   ScrollText, Tag, Baby, CakeSlice, Salad, RectangleHorizontal, Circle, ShoppingBasket,
+  BrickWallFire, Store, Bean,
 } from "lucide-react";
 
 // Qué flota en cada pregunta. Si una pregunta no está aquí, se usa el juego de
@@ -53,10 +54,13 @@ const ICONOS_POR_PREGUNTA = {
   entrante: [CupSoda, Utensils, ChefHat],
   entrantePersonas: [Users, Utensils],
   cafe: [Coffee, CupSoda],
+  cafetera: [Coffee, Bean, Milk],
   nevera: [Refrigerator, Snowflake],
   congelador: [Snowflake, Refrigerator],
   hielo: [Snowflake, GlassWater],
   horno: [Flame, ChefHat, CookingPot],
+  barbacoa: [Flame, BrickWallFire],
+  barbacoasCuantas: [BrickWallFire, Flame],
   armarioCaliente: [Flame, Package],
   mesasCalientes: [Flame, Utensils],
   cuantosGastros: [CookingPot, Package],
@@ -77,6 +81,7 @@ const ICONOS_POR_PREGUNTA = {
   alergias: [AlertTriangle, Heart],
   excepcionesMesa: [Utensils, StickyNote],
   buffets: [ChefHat, Utensils, CookingPot],
+  buffetPlatos: [UtensilsCrossed, Layers],
   notas: [StickyNote, Clock],
   // Las pantallas que no son una pregunta también llevan el suyo
   elegir: [CalendarDays, MapPin, Heart],
@@ -97,7 +102,7 @@ const ICONO_TITULO = {
   cuantosGastros: Boxes, extras: Sparkles, mobiliarioAlquiler: Sofa, otroAlquiler: Truck,
   buffets: UtensilsCrossed, buffetPlatos: Layers, queDobla: Layers, manteles: Palette,
   estiloPlato: Palette, estiloPlatoPostre: CakeSlice, minutas: ScrollText, etiquetas: Tag,
-  barbacoa: Flame, barbacoasCuantas: Flame, cafetera: Coffee,
+  barbacoa: Flame, barbacoasCuantas: BrickWallFire, cafetera: Coffee,
 };
 export function iconoDePregunta(idPregunta) {
   return ICONO_TITULO[idPregunta] || (ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO)[0];
@@ -122,6 +127,7 @@ const ICONO_OPCION = {
   entrante: { individual: UserRound, compartir: Users },
   entrantePersonas: { 1: UserRound, 3: Users, 4: Users },
   cafe: { invitados: Users, personal: ChefHat },
+  cafetera: { Nespresso: Coffee, Bar: Store, Grande: Bean },
   nevera: { Mediana: Refrigerator, Grande: Refrigerator },
   congelador: { Mediana: Snowflake, Grande: Snowflake },
   horno: { Pequeño: Microwave, Grande: Microwave, Ambos: Microwave },
