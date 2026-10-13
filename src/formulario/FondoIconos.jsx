@@ -14,6 +14,9 @@ import {
   UtensilsCrossed, ChefHat, CookingPot, Flame, Armchair, Coffee, Package,
   StickyNote, CupSoda, Wind, Table, Table2, Droplet, Refrigerator, Snowflake,
   Sparkles, Printer, Shirt, Flower2, PartyPopper, ShoppingCart, AlertTriangle, Soup, Plus,
+  Ban, Hash, Pencil, Truck, Sofa, Popcorn, Croissant, Ham, Milk, Candy, Apple,
+  HandPlatter, Layers, UserRound, Microwave, Heater, Boxes, Box, Palette,
+  ScrollText, Tag, Baby, CakeSlice, Salad, RectangleHorizontal, Circle, ShoppingBasket,
 } from "lucide-react";
 
 // Qué flota en cada pregunta. Si una pregunta no está aquí, se usa el juego de
@@ -82,16 +85,76 @@ const ICONOS_POR_PREGUNTA = {
 };
 const POR_DEFECTO = [Utensils, GlassWater, ChefHat];
 
-// El mismo juego de iconos por pregunta sirve también en primer plano: uno fijo
-// junto al título, y uno por cada opción (repitiendo el juego si hay más
-// opciones que iconos) — así el formulario queda coherente sin mantener un
-// segundo mapa aparte.
+// ─── LOS ICONOS EN PRIMER PLANO: EL DEL TÍTULO Y EL DE CADA OPCIÓN ───────────────
+// Salían del juego del fondo, por posición: la primera opción el primer icono, la
+// segunda el segundo... y así "Corner de vermut" llevaba una olla y "Fruta" unos
+// cubiertos ("que tengan sentido con la frase", el dueño). Ahora cada uno dice lo
+// suyo: el título, de qué va la pregunta; cada opción, lo que contesta.
+const ICONO_TITULO = {
+  tipo: PartyPopper, dias: CalendarDays, coctelLleva: HandPlatter, copas: Wine,
+  bebidaAparte: CupSoda, cristaleria: Wine, numBarras: Beer, barraLleva: Beer,
+  entrante: Salad, entrantePersonas: Users, horno: Microwave, armarioCaliente: Heater,
+  cuantosGastros: Boxes, extras: Sparkles, mobiliarioAlquiler: Sofa, otroAlquiler: Truck,
+  buffets: UtensilsCrossed, buffetPlatos: Layers, queDobla: Layers, manteles: Palette,
+  estiloPlato: Palette, estiloPlatoPostre: CakeSlice, minutas: ScrollText, etiquetas: Tag,
+};
 export function iconoDePregunta(idPregunta) {
-  return (ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO)[0];
+  return ICONO_TITULO[idPregunta] || (ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO)[0];
 }
-export function iconoDeOpcion(idPregunta, indice) {
-  const juego = ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO;
-  return juego[indice % juego.length];
+
+// Por opción: lo que dice cada respuesta. Lo que no está aquí sale de reglas comunes
+// (iconoDeOpcion, abajo): "no" tacha, "otro número" es una almohadilla y un "sí"
+// lleva el icono de su pregunta (¿carpas? sí → una carpa).
+const ICONO_OPCION = {
+  tipo: { boda: Heart, comunion: Church, corporativo: Briefcase, cumpleanos: Cake, produccion: Clapperboard },
+  sillas: { finca: MapPin, Dealde: Truck, Carvillo: Truck, Nuestras: Armchair },
+  tipoMesa: { "Rectangular 1,8m": RectangleHorizontal, "Redonda 1,5m": Circle, "Redonda 1,8m": Circle, "Redonda 2m": Circle },
+  coctelLleva: { chupito: GlassWater, cuchara: Soup, otro: Plus },
+  bebidaAparte: { no: Wine, si: ShoppingBasket },
+  numBarras: { 1: Beer, 2: Beer },
+  barraLleva: { brindis: PartyPopper, barril30: Beer, barril50: Beer, aguasPequenas: Droplet },
+  aguaPequena: { Plástico: Droplet, Cartón: Box },
+  servicio: { sentados: Utensils, bandeja: HandPlatter },
+  menu: { paella: CookingPot, frito: Flame, dosPlatos: Layers },
+  queDobla: { tenedor: Utensils, cuchillo: Utensils, cuchara: Soup, vino: Wine, agua: GlassWater, cava: Wine },
+  tamanoPaella: { Pequeña: CookingPot, Mediana: CookingPot, Grande: CookingPot },
+  entrante: { individual: UserRound, compartir: Users },
+  entrantePersonas: { 1: UserRound, 3: Users, 4: Users },
+  cafe: { invitados: Users, personal: ChefHat },
+  nevera: { Mediana: Refrigerator, Grande: Refrigerator },
+  congelador: { Mediana: Snowflake, Grande: Snowflake },
+  horno: { Pequeño: Microwave, Grande: Microwave, Ambos: Microwave },
+  cuantosGastros: { auto: Boxes },
+  extras: { chillout: Sofa, jarras: Milk, barbacoa: Flame, palomitera: Popcorn, desayuno: Croissant, jamonero: Ham },
+  buffets: { quesos: UtensilsCrossed, dulce: Candy, ibericos: Ham, croquetas: Flame, fruta: Apple, vermut: Wine, aperol: Martini },
+  distinto: { planchaGas: Flame, bandejasMadera: HandPlatter, bandejasPlata: HandPlatter },
+  servilletasTela: { si: Shirt, no: StickyNote },
+  estiloPlatoPostre: { "Mismo que el principal": Layers },
+  excepcionesMesa: { menuInfantil: Baby },
+};
+const NO = new Set(["no", "No lleva"]);
+export function iconoDeOpcion(idPregunta, opcion) {
+  const valor = opcion && opcion.valor;
+  const texto = (opcion && opcion.texto) || "";
+  const propio = ICONO_OPCION[idPregunta] && ICONO_OPCION[idPregunta][valor];
+  if (propio) return propio;
+  // "No llevamos platos", "No hace falta", "No lleva": un no se tacha
+  if (NO.has(valor) || /^no\b/i.test(texto)) return Ban;
+  if (/^otr/i.test(String(valor))) return /número/i.test(texto) ? Hash : /escrib/i.test(texto) ? Pencil : Plus;
+  if (/^auto$/i.test(String(valor))) return Users;
+  return iconoDePregunta(idPregunta);
+}
+
+// El gesto de cada icono, al aparecer en el título y al elegir la opción: la llama
+// parpadea, el copo gira, las copas brindan, el camión arranca, el corazón late y el
+// "no" niega. El resto da un brinco. Solo CSS (index.css, "form-gesto-").
+const GESTOS = new Map([
+  [Flame, "llama"], [Snowflake, "hielo"], [Truck, "camion"], [Heart, "latido"], [Baby, "latido"],
+  [Ban, "no"], [PartyPopper, "giro"], [Sparkles, "giro"], [Flower2, "giro"],
+  ...[Wine, Martini, GlassWater, Beer, CupSoda, Milk, Coffee].map(I => [I, "brindis"]),
+]);
+export function gestoDeIcono(Icono) {
+  return `form-gesto-${GESTOS.get(Icono) || "bote"}`;
 }
 
 // Sitios fijos (en %), tamaños y ritmos. Van a mano y no al azar para que el fondo

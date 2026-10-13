@@ -306,6 +306,19 @@ operativo).
   sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
   saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
   corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **Iconos del formulario con sentido, y con su gesto** ("mejora los iconos del
+  formulario para que tengan sentido con la frase y anímalos", el dueño). Salían del
+  juego del fondo por posición (el "Corner de vermut" con una olla). Ahora en
+  `FondoIconos.jsx`: `ICONO_TITULO` (de qué va la pregunta) e `ICONO_OPCION` (lo que dice
+  cada respuesta); lo que no está ahí sale de reglas: un "no" se tacha (Ban), "otro
+  número" es una almohadilla, "otro (escribirlo)" un lápiz, "según la gente" unas
+  personas, y un "sí" lleva el icono de su pregunta. `gestoDeIcono` da a cada icono su
+  gesto (CSS `form-gesto-*`: la llama parpadea, el copo gira, las copas brindan, el
+  camión arranca, el corazón late, el "no" niega, el resto un brinco): el título lo hace
+  al llegar y la opción al elegirla (y con el ratón encima). Va en un envoltorio
+  (`.form-titulo-gesto`, `.form-opcion-gesto`) para no repetir la entrada del icono. Al
+  elegir una opción se pasa de pantalla a los 240 ms (antes 120) para que se vea.
+  Quietos con "reducir movimiento". El fondo flotante no cambia.
 - **Buffets con platos, tronas, corners y manteles** (el dueño, por partes: "que te
   pregunte si para el buffet hacen falta platos", "mira si pregunta lo de la trona",
   "corner de vermut, que ponga extra de vermut", "corner de Aperol: cava, agua con gas
