@@ -748,7 +748,7 @@ console.log("\n══ La cafetera, y lo que no hace falta preguntar ══");
   const nota = (adultos) => PREGUNTAS.find(p => p.id === "cafetera").nota({ tipo: "boda", adultos });
   ok(/150 personas salen unos 330 cafés: irían 3 Nespresso\./.test(nota(150)),
     "y la nota dice cuántos cafés salen con la gente, para elegir con eso");
-  ok(/basta una Nespresso/.test(nota(40)) && /mejor la grande \(3 cargas\)/.test(nota(220)) && /Tenemos 4 Nespresso y 1 de bar/.test(nota(40)),
+  ok(/basta una Nespresso/.test(nota(40)) && /mejor la grande \(3 cargas\)/.test(nota(220)) && /Tenemos 4 Nespresso y 1 de bar/.test(nota(40)) && /el personal lleva su Nespresso aparte/.test(nota(220)),
     "y recomienda con el almacén: una Nespresso, varias o, si no llegan, la grande");
   ok(!ids("boda", { servicio: "bandeja" }).includes("estiloPlato") && !ids("boda", { distinto: ["sinPlatos"] }).includes("estiloPlato")
     && ids("boda", {}).includes("estiloPlato"),

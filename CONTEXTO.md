@@ -333,6 +333,10 @@ operativo).
   por encima, "hay 3 libres (otra va al personal) · falta 1". La de bar y la grande
   son una de cada, sin cambios. En el formulario, la nota de `cafetera` recomienda con
   la gente: "basta una Nespresso", "irían N Nespresso" o "mejor la grande (N cargas)".
+  Con la grande (o la de bar) el personal sigue llevando su "Cafetera Nespresso (para
+  el personal)" con sus cápsulas ("si se agrega la grande industrial, que se agregue una
+  Nespresso para el personal", el dueño): ya salía, ahora con su prueba y dicho en la
+  nota. En un rodaje no: el equipo tiene la cafetera de mantenimiento.
 - **Lo nuevo, con su icono y revisado en todos los anchos** ("mira bien cómo se adapta
   todo a las pantallas y revisa los iconos de lo nuevo", el dueño). Repaso a 320, 360,
   414, 768, 1024, 1440 y 1920 del formulario (gente con tronas, cóctel, cafetera,

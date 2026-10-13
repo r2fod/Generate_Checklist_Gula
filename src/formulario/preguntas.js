@@ -499,7 +499,7 @@ export const PREGUNTAS = [
       const n = Math.ceil(pax / 50);
       const cuales = n <= 1 ? "basta una Nespresso" : n <= 3 ? `irían ${n} Nespresso` : `mejor la grande (${Math.ceil(pax / 100)} cargas)`;
       const cafes = pax ? `Con ${pax} personas salen unos ${Math.round(pax * 2.2)} cafés: ${cuales}. ` : "";
-      return `${cafes}Tenemos 4 Nespresso y 1 de bar, con cápsulas, y 1 grande con café molido (cargas de unos 100 cafés).`;
+      return `${cafes}Tenemos 4 Nespresso y 1 de bar, con cápsulas, y 1 grande con café molido (cargas de unos 100 cafés). Con cualquiera, el personal lleva su Nespresso aparte.`;
     },
     opciones: [
       { valor: "Nespresso", texto: "Nespresso (una cada 50 personas)" },
