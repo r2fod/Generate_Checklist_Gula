@@ -3179,6 +3179,49 @@ console.log("\n── La unidad de los que no traían ninguna ──");
     "y sin ella, las cajas automáticas de siempre");
 }
 
+// ─── Manteles, rollo de papel, tronas, platos de buffet y corners ──────────────
+// "Que cuente los manteles teniendo en cuenta las mesas de 1,8, las de buffet y las de
+// las barras, y que no falte el rollo de mantel de papel, que es para las mesas de
+// cocina" (el dueño). Lo que ya se contaba (todas las mesas de 1,8, las altas y las de
+// repuesto) se queda igual: se suman las de buffet y las barras.
+console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──");
+{
+  const linea = (evt, opts, re, pax = 100, ninos = 10) => buildChecklist(evt, pax, 2, 4, ninos, { llevaPlatos: true, ...opts })
+    .flatMap(c => c.items.map(i => [c.nombre, ...i])).find(x => re.test(x[1]));
+  const num = (x) => (x ? Number(typeof x[2] === "object" ? x[2]?.u : x[2]) : null);
+  const manteles = (evt, opts) => num(linea(evt, opts, /^Manteles/));
+  ok(manteles("boda", { numMesasBuffet: 2, numBarras: 2 }) === manteles("boda", { numBarras: 2 }) + 2,
+    "cada mesa de buffet suma su mantel");
+  // De 1 a 3 barras con 100 pax: 2 manteles de barra más, y 8 mesas altas más (4 por barra)
+  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 2 + 8,
+    "cada barra suma el suyo (y sus mesas altas, como siempre)");
+  ok(manteles("cumpleanos", { numMesasBuffet: 1 }) === manteles("cumpleanos", {}) + 1,
+    "en un cumpleaños, igual con los buffets");
+  ok(["boda", "cumpleanos", "produccion"].every(evt => num(linea(evt, { diasProduccion: ["20"] }, /^Rollo de mantel de papel/)) === 1),
+    "el rollo de mantel de papel, en las tres checklists");
+
+  ok(linea("boda", {}, /^Tronas/)[2] === "10" && linea("boda", { numTronas: 2 }, /^Tronas/)[2] === "2"
+    && linea("boda", { numTronas: 0 }, /^Tronas/)[2] === "—",
+    "las tronas: las que se digan; sin decir, una por niño como siempre");
+
+  const postre = (opts) => num(linea("boda", opts, /^Platos postre/, 100, 0));
+  ok(postre({ platosBuffet: 1 }) === postre({}) + 100 && postre({ platosBuffet: 2 }) === postre({}) + 200,
+    "los platos de los buffets se suman a los de postre, por persona");
+
+  ok(num(linea("boda", { llevaCornerVermut: true }, /^Vermut rojo/)) === 2 * num(linea("boda", {}, /^Vermut rojo/))
+    && num(linea("boda", { llevaCornerVermut: true }, /^Vermut blanco/)) === 2 * num(linea("boda", {}, /^Vermut blanco/)),
+    "el corner de vermut suma su propio vermut al del aperitivo");
+  ok(linea("cumpleanos", {}, /^Vermut rojo/)[2] === null && num(linea("cumpleanos", { llevaCornerVermut: true }, /^Vermut rojo/)) > 0,
+    "en un cumpleaños el vermut solo sale con el corner");
+
+  const cava = (opts) => num(linea("boda", opts, /^Cava$/));
+  ok(cava({ llevaCornerAperol: true }) === cava({}) + 12 && num(linea("boda", { llevaCornerAperol: true }, /^Aperol/)) === 6
+    && num(linea("boda", { llevaCornerAperol: true }, /^Agua con gas 0,75L/)) === 4,
+    "el corner de Aperol: un spritz por adulto (100 → 12 de cava, 6 de Aperol, 4 de agua con gas de 0,75)");
+  ok(linea("boda", {}, /^Aperol/)[2] === null && linea("boda", { llevaCornerAperol: true, llevaBebida: false }, /^Aperol/)[2] === null,
+    "sin corner no sale, y si la bebida la trae el cliente tampoco");
+}
+
 console.log("\n──────────────────────────────────────────────────────────");
 console.log(`  ${pasan} comprobaciones pasadas, ${fallos.length} fallidas`);
 if (fallos.length) { console.log("\n  Fallos:"); fallos.forEach(f => console.log(`   · ${f}`)); process.exit(1); }

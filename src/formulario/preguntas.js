@@ -92,10 +92,13 @@ export const PREGUNTAS = [
     id: "gente", tipo: "numeros", texto: "¿Cuánta gente?",
     // El staff (cocina, refuerzo, proveedores que comen) no son invitados, pero están
     // ahí y beben agua y usan vasos: la app los cuenta aparte, con los camareros.
-    nota: "El staff son los que están trabajando y no van en el número de invitados.",
+    // Las tronas no se preguntaban: la checklist cargaba una por niño, y un niño de diez
+    // años no come en trona. Aquí se dicen las que hacen falta de verdad (los bebés).
+    nota: "El staff son los que están trabajando y no van en el número de invitados. Tronas, solo las de los bebés.",
     campos: [
       { id: "adultos", etiqueta: "Adultos", min: 0 },
       { id: "ninos", etiqueta: "Niños", min: 0 },
+      { id: "tronas", etiqueta: "Tronas", min: 0 },
       { id: "staff", etiqueta: "Staff", min: 0 },
     ],
     soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
@@ -629,11 +632,35 @@ export const PREGUNTAS = [
       { valor: "ibericos", texto: "Ibéricos", conNumero: "¿Cuántas mesas?" },
       { valor: "croquetas", texto: "Croquetas / frito", conNumero: "¿Cuántas mesas?" },
       { valor: "fruta", texto: "Fruta", conNumero: "¿Cuántas mesas?" },
+      // Un corner de vermut se bebe aparte del aperitivo: suma su propio vermut (ver
+      // llevaCornerVermut en checklist-generadores.js), no solo la mesa
+      { valor: "vermut", texto: "Corner de vermut", conNumero: "¿Cuántas mesas?", soloEn: CON_BARRA },
+      // Y el de Aperol: su cava, su Aperol y su agua con gas (llevaCornerAperol)
+      { valor: "aperol", texto: "Corner de Aperol", conNumero: "¿Cuántas mesas?", soloEn: CON_BARRA },
       // "Otro" no es UN buffet más: son los que no están en la lista (gildas, un
       // photocall de gin-tonics...) y pueden ser varios distintos el mismo evento, cada
       // uno con su propio nombre y sus propias mesas — por eso lleva lista, no número.
       { valor: "otro", texto: "Otro", conLista: true, campoLista: "buffetsOtros" },
     ],
+  },
+  {
+    // Los buffets solo cargaban sus mesas: si se come de ellos en plato, esos platos no
+    // estaban en ningún sitio. Van con los de postre (plato pequeño), igual que los del
+    // jamonero o la tarta. En un rodaje no se pregunta: ahí el buffet ES el servicio y
+    // sus platos ya salen de la gente.
+    id: "buffetPlatos", tipo: "opciones", texto: "¿Los buffets llevan platos?",
+    nota: "Platos pequeños, de los de postre. Si se coge con la mano o en servilleta, no hacen falta.",
+    opciones: [
+      { valor: "no", texto: "No hacen falta" },
+      {
+        valor: "si", texto: "Sí, platos pequeños",
+        conNumero: "¿Cuántos por persona?",
+        campoNumero: "platosBuffetPorPersona",
+        sugerido: () => 1,
+      },
+    ],
+    soloEn: CON_BARRA,
+    si: (r) => Array.isArray(r.buffets) && r.buffets.length > 0,
   },
 
   // ── Lo que se sale de lo normal ────────────────────────────────────────────
@@ -1123,6 +1150,10 @@ export function aRespuestasDeLaApp(respuestas = {}) {
   // envío anterior tiene que bajar a 0, no quedarse con el número viejo. Solo si la
   // pantalla NUNCA se contestó (r.buffets === undefined) se deja lo que ya hubiera.
   if (Array.isArray(r.buffets)) {
+    if (tipo !== "produccion") {
+      estado.llevaCornerVermut = r.buffets.includes("vermut");
+      estado.llevaCornerAperol = r.buffets.includes("aperol");
+    }
     // "otro" no tiene un solo número: son las mesas de todos los buffets sin lista
     // propia que se hayan añadido (gildas, rincón de gin-tonics...), sumadas.
     estado.numMesasBuffet = r.buffets.length ? r.buffets.reduce((acc, v) => {
@@ -1151,6 +1182,7 @@ export function aRespuestasDeLaApp(respuestas = {}) {
   } else {
     pon("pax", r.adultos);
     pon("ninos", r.ninos);
+    pon("numTronas", r.tronas);
     pon("numStaff", r.staff);
     if (puesto(r.coctel)) { estado.barraCoctel = r.coctel > 0; estado.horasCoctel = r.coctel || 0; }
     if (puesto(r.copas)) { estado.barraCopas = r.copas > 0; estado.horasCopas = r.copas || 0; }
@@ -1251,6 +1283,10 @@ export function aRespuestasDeLaApp(respuestas = {}) {
       : soloPlata && !soloMadera ? "Plata" : "Mixto";
   }
 
+  // Platos de los buffets: por persona, con los de postre. "No" es una respuesta (0).
+  if (puesto(r.buffetPlatos) && tipo !== "produccion") {
+    estado.platosBuffet = r.buffetPlatos === "si" ? (Number(r.platosBuffetPorPersona) > 0 ? Number(r.platosBuffetPorPersona) : 1) : 0;
+  }
   if (puesto(r.manteles)) {
     estado.colorManteles = r.manteles;
     if (r.manteles === "Ambos" && r.porcentajeBeige > 0) estado.porcentajeBeige = r.porcentajeBeige;
