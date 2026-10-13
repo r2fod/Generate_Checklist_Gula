@@ -79,6 +79,43 @@ function calcMesasCocina(pax) {
   return 6;
 }
 
+// Tronas: las que se han dicho (los bebés). Sin decir, como siempre: una por niño, que
+// es de más (un niño de diez años no come en trona) pero es lo que cargaban los eventos
+// guardados antes de la pregunta.
+function lineaTronas(numTronas, ninos) {
+  const n = numTronas !== null && numTronas !== undefined && numTronas !== "" ? Number(numTronas) || 0 : ninos;
+  return n > 0 ? String(n) : "—";
+}
+
+// Las mesas de las barras de bebida, para los manteles: las que se han dicho ("¿Cuántas
+// barras?"); sin decirlo, una si hay barra.
+function mesasDeBarra(numBarras, hayBarra) {
+  return numBarras > 0 ? numBarras : hayBarra ? 1 : 0;
+}
+
+// Platos de los buffets: por persona, con los de postre (plato pequeño)
+function platosDeBuffet(totalPax, porPersona) {
+  return porPersona > 0 ? Math.ceil(totalPax * porPersona) : 0;
+}
+
+// Corner de Aperol: un spritz por adulto, con la receta de siempre (3 de cava, 2 de
+// Aperol y 1 de soda: 90, 60 y 30 ml). Cava y agua con gas en botellas de 0,75L y el
+// Aperol de litro. Se cambia en la lista si se espera más.
+const SPRITZ_POR_ADULTO = 1;
+function cornerAperol(adultos) {
+  const n = Math.max(0, adultos || 0) * SPRITZ_POR_ADULTO;
+  if (!n) return { cava: 0, aperol: 0, aguaConGas: 0 };
+  return {
+    cava: Math.ceil((n * 0.09) / 0.75),
+    aperol: Math.ceil((n * 0.06) / 1),
+    aguaConGas: Math.ceil((n * 0.03) / 0.75),
+  };
+}
+
+// El rollo de mantel de papel, para las mesas de cocina: faltaba en las tres checklists.
+// Uno; se cambia en la lista si hace falta otro.
+const ROLLO_PAPEL = ["Rollo de mantel de papel (mesas de cocina)", "1"];
+
 // Buscar la ubicación del evento en Google Maps. Lo que se escribe es el nombre del
 // sitio ("Finca La Alquería"), no unas coordenadas, y Maps lo busca igual de bien: se
 // usa la URL de búsqueda, que funciona en el navegador, en Android y en iPhone (donde
@@ -244,6 +281,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
     tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     llevaCucharasPorcelana, numCucharasPorcelana = 1,
+    numTronas = null, llevaCornerVermut = false, llevaCornerAperol = false, platosBuffet = 0,
     numGastros = 0,
     soloBandeja,
     llevaPlatosPostre = llevaPlatos,
@@ -319,6 +357,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
   // faltaba agua y refresco para veinticinco personas.
   const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey, llevaHielo, llevaBebida });
+  const aperol     = cornerAperol(llevaCornerAperol && llevaBebida ? pax : 0);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
   // el cóctel/aperitivo no sirve cubatas. El vino, el agua y el cava NO miran las horas:
@@ -393,7 +432,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esCorporativo, ["Atril + micrófono", "—"]),
     opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
     ["Cajas de madera para alturas", alturasBuffet(numMesasBuffet) > 0 ? String(alturasBuffet(numMesasBuffet)) : "—"],
-    ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
+    ["Tronas", lineaTronas(numTronas, ninos)], ["Cestas de mimbre", "—"],
     opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas, evtKey).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
@@ -466,7 +505,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 2 + mesasAltas, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
+    // Las mesas de buffet y las de las barras también se visten: no estaban en la cuenta
+    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 2 + mesasAltas + numMesasBuffet + mesasDeBarra(numBarras, hayBarra), colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
+    [...ROLLO_PAPEL],
     ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
     ["Plancha de vapor (manteles)", "1"],
     ...(usaTela
@@ -480,7 +521,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
      El entrante sí se queda aparte porque suele llevar su propio plato de plato/bol distinto. */}
   const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0)
     + (evtKey === "boda" && llevaTarta ? totalPax : 0)
-    + (hayDesayuno ? totalPax : 0);
+    + (hayDesayuno ? totalPax : 0)
+    + platosDeBuffet(totalPax, platosBuffet);
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
@@ -541,7 +583,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(tercerosRestantes > 0, ["Cerveza Alhambra (tercios)", String(tercerosRestantes)]),
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")], ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
     ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
-    ["Cava", conSufijo(bebidas.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15Packs, "packs (6 uds)")],
+    ["Cava", conSufijo(bebidas.cava + aperol.cava, "botellas")], ["Agua 1,5L (Solán de Cabras, cliente)", conSufijo(bebidas.agua15Packs, "packs (6 uds)")],
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
@@ -552,8 +594,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     // en la lista de compra es una línea que alguien acaba comprando por si acaso.
     opt(horasCopas > 0, ["Tónica", conSufijo(bebidas.tonica, "botellas")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
+    opt(aperol.aperol > 0, ["Aperol (1L)", conSufijo(aperol.aperol, "botellas")]),
+    opt(aperol.aguaConGas > 0, ["Agua con gas 0,75L (Aperol)", conSufijo(aperol.aguaConGas, "botellas")]),
     ["Cerveza 0,0", String(bebidas.cerveza00)], ["Cerveza sin gluten", String(bebidas.sinGluten)],
-    ["Vermut rojo", String(bebidas.vermutRojo)], ["Vermut blanco", String(bebidas.vermutBlanco)],
+    // Con corner de vermut, el suyo además del del aperitivo
+    ["Vermut rojo", String(bebidas.vermutRojo * (llevaCornerVermut ? 2 : 1))],
+    ["Vermut blanco", String(bebidas.vermutBlanco * (llevaCornerVermut ? 2 : 1))],
     // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
     // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
     // el número de cuando se generó, ver App.jsx donde se resuelve).
@@ -577,6 +623,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, llevaPaella, tipoHorno, tieneFrituras, numFrituras, llevaEntrante, soloBandeja,
     llevaCucharasPorcelana, numCucharasPorcelana = 1,
+    numTronas = null, llevaCornerVermut = false, llevaCornerAperol = false, platosBuffet = 0,
     tieneBrindisCava, mesVerano, fuerzaTextilTela, colorManteles, porcentajeBeige, tipoCafetera, cafeParaInvitados = true,
     tamanoBarril = "No lleva", numBarriles = 1,
     llevaJamonero, personasPorPlatoEntrante = 4, llevaAguasPequenas, hayDesayuno, llevaMobiliarioAlquiler,
@@ -604,6 +651,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const divisorCam = opts.paxPorCamarero > 0 ? opts.paxPorCamarero : (leerRatios().cumpleanos || 20);
 
   const bebidas = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: "cumpleanos", llevaHielo, llevaBebida });
+  const aperol = cornerAperol(llevaCornerAperol && llevaBebida ? pax : 0);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas: el cóctel/aperitivo no sirve cubatas
   const cristal = calcCristaleria(totalPax, horasCopas, { vino: dobleVino, agua: dobleAgua, cava: dobleCava }, tieneBrindisCava, llevaEntrante, hayDesayuno ? Math.ceil(totalPax * 1.2) : 0, llevaCristaleria);
@@ -645,7 +693,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
-    ["Tronas", ninos > 0 ? String(ninos) : "—"], ["Cestas de mimbre", "—"],
+    ["Tronas", lineaTronas(numTronas, ninos)], ["Cestas de mimbre", "—"],
     opt(llevaPalomitera, ["Carrito palomitera", "1"]),
     opt(llevaChillOut, ["Chill out", String(numChillOut)]),
     // En un cumpleaños siempre hay tarta y no se cargaba mesa para ella
@@ -695,7 +743,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 1, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
+    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 1 + numMesasBuffet + mesasDeBarra(0, hayBarra), colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
+    [...ROLLO_PAPEL],
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ...(usaTela
@@ -707,7 +756,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   {/* Jamón y desayuno se sirven en plato pequeño (mismo estilo que el postre): se suman
      al recuento de "Platos postre" en vez de generar una línea aparte. El entrante sí se
      queda aparte porque suele llevar su propio plato/bol distinto. */}
-  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0);
+  const platosPostreExtra = (llevaJamonero ? Math.ceil(pax * 0.3) : 0) + (hayDesayuno ? totalPax : 0)
+    + platosDeBuffet(totalPax, platosBuffet);
   // Con doble servicio no basta con doblar 1:1: hace falta margen extra para el cambio
   // de plato/cubierto entre pases (roturas, retrasos en el fregado, etc.)
   const platosDoble = conMargen(dobleServicio ? totalPax * 2 + 50 : totalPax);
@@ -754,8 +804,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(terciosCerveza > 0, ["Cerveza Alhambra (tercios)", String(terciosCerveza)]),
     ["Vino blanco", conSufijo(bebidas.vinoBlanco, "botellas")],
     ["Vino tinto", conSufijo(bebidas.vinoTinto, "botellas")],
-    ["Cava", conSufijo(bebidas.cava, "botellas")],
+    ["Cava", conSufijo(bebidas.cava + aperol.cava, "botellas")],
     ["Tinto de verano (1,5L)", conSufijo(bebidas.tintoVerano, "botellas")],
+    // En un cumpleaños no se calcula vermut: solo sale con un corner de vermut
+    opt(llevaCornerVermut, ["Vermut rojo", String(bebidas.vermutRojo)]),
+    opt(llevaCornerVermut, ["Vermut blanco", String(bebidas.vermutBlanco)]),
     ["Coca-Cola normal", String(bebidas.cocaNormal)], ["Coca-Cola Zero", String(bebidas.cocaZero)],
     ["Fanta naranja", String(bebidas.fantaNaranja)], ["Fanta limón", String(bebidas.fantaLimon)],
     ["Aquarius", String(bebidas.aquarius)], ["Sprite", String(bebidas.sprite)], ["Nestea", String(bebidas.nestea)],
@@ -763,6 +816,8 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     ["Agua Vidaqua 1,5L (personal)", conSufijo(personal.aguaVidaquaPacks, "packs (6 uds)")],
     opt(llevaAguasPequenas, ["Aguas pequeñas (33cl)", conSufijo(bebidas.aguasPequenasCajas, "cajas (35 uds)")]),
     ["Agua con gas", String(bebidas.aguaConGas)],
+    opt(aperol.aperol > 0, ["Aperol (1L)", conSufijo(aperol.aperol, "botellas")]),
+    opt(aperol.aguaConGas > 0, ["Agua con gas 0,75L (Aperol)", conSufijo(aperol.aguaConGas, "botellas")]),
     // El sufijo recibe una función, no el texto ya escrito: así "· N taxis" se
     // recalcula si alguien edita el kg a mano en la checklist (antes se quedaba con
     // el número de cuando se generó, ver App.jsx donde se resuelve).
@@ -973,6 +1028,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // Un mantel por mesa de servicio y de buffet (la del camión y la de cajas
     // sucias van sin vestir) + 1 de repuesto
     ...repartoManteles(mesasParaVestir(MESAS_BUFFET + MESA_CAMION, totalPax, tipoMesa) + 1, opts.colorManteles || colorPorDefecto("produccion"), opts.porcentajeBeige),
+    [...ROLLO_PAPEL],
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(nSala + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
     ["Bandeja camareros", String(nSala)],

@@ -225,7 +225,7 @@ const ETIQUETAS_CAMPO = {
   dobleVino: "Doble copa de vino", dobleAgua: "Doble vaso de agua", dobleCava: "Doble copa de cava",
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
-  llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros", numMesasBuffet: "Nº de mesas de buffet",
+  llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros", numMesasBuffet: "Nº de mesas de buffet", platosBuffet: "Platos de buffet por persona", numTronas: "Tronas", llevaCornerVermut: "Corner de vermut", llevaCornerAperol: "Corner de Aperol",
   tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
@@ -530,6 +530,12 @@ export default function App({ onCerrarSesion } = {}) {
   // checklist); un número manda y en producción sube el mínimo de siempre por pax,
   // nunca lo baja (ver checklist-generadores.js).
   const [numMesasBuffet, setNumMesasBuffet] = useState(estadoInicial.numMesasBuffet ?? 0);
+  // Platos (pequeños) por persona para los buffets: 0 = se come con la mano o en servilleta
+  const [platosBuffet, setPlatosBuffet] = useState(estadoInicial.platosBuffet ?? 0);
+  // Tronas: null = sin decir, y entonces va una por niño como siempre (checklist-generadores.js)
+  const [numTronas, setNumTronas] = useState(estadoInicial.numTronas ?? null);
+  const [llevaCornerVermut, setLlevaCornerVermut] = useState(estadoInicial.llevaCornerVermut ?? false);
+  const [llevaCornerAperol, setLlevaCornerAperol] = useState(estadoInicial.llevaCornerAperol ?? false);
   // Plancha de gas: en producción va fija; en el resto es opcional. Suma 1 bombona.
   const [llevaPlanchaGas, setLlevaPlanchaGas] = useState(estadoInicial.llevaPlanchaGas ?? false);
   // Cada plancha lleva SU bombona: antes la plancha era un sí/no y sumaba una sola, así
@@ -979,7 +985,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
     tamanoBarril, numBarriles, llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
-    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet,
+    llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol,
     tipoHorno, tipoBBQ, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
@@ -1085,6 +1091,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPaella: setLlevaPaella, tipoPaella: setTipoPaella, numPaellas: setNumPaellas,
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros, numMesasBuffet: setNumMesasBuffet,
+    platosBuffet: setPlatosBuffet, numTronas: setNumTronas, llevaCornerVermut: setLlevaCornerVermut, llevaCornerAperol: setLlevaCornerAperol,
     tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
@@ -2692,7 +2699,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
-    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet,
+    tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -2711,7 +2718,7 @@ export default function App({ onCerrarSesion } = {}) {
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
     tipoHorno, llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
-    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida,
+    llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol, llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
     tipoCafetera, cafeParaInvitados, extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta, personasPorPlatoEntrante,
     llevaAguasPequenas, tipoAguaPequena, hayDesayuno, entranteCompartido, numEntrantesCompartir, tipoNevera,
@@ -4404,6 +4411,29 @@ export default function App({ onCerrarSesion } = {}) {
                   onChange={e => setNumMesasBuffet(Math.max(0, parseInt(e.target.value) || 0))}
                 />
               </div>
+              {/* Si se come de los buffets en plato: van con los de postre (plato pequeño) */}
+              {evento !== "produccion" && numMesasBuffet > 0 && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Platos de buffet por persona</span>
+                  <input
+                    type="number" className="form-input" value={platosBuffet || ""} min="0" placeholder="0"
+                    onChange={e => setPlatosBuffet(Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Se suman a los platos de postre</span>
+                </div>
+              )}
+              {/* Las tronas de los bebés. En blanco, una por niño (lo de siempre) */}
+              {evento !== "produccion" && (
+                <div className="form-group controls-mini">
+                  <span className="form-label">Tronas</span>
+                  <input
+                    type="number" className="form-input" min="0" placeholder={String(ninos || 0)}
+                    value={numTronas ?? ""}
+                    onChange={e => setNumTronas(e.target.value === "" ? null : Math.max(0, parseInt(e.target.value) || 0))}
+                  />
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>En blanco, una por niño</span>
+                </div>
+              )}
               {/* Mesas altas: 2 por barra, 4 con 100 pax o más. En blanco, con barra libre
                   cae sola al cálculo viejo por pax; sin barra libre (el cliente trae su
                   bebida) se queda a 0 salvo que se conteste aquí a mano — es el único
@@ -4717,6 +4747,10 @@ export default function App({ onCerrarSesion } = {}) {
                 ? [[tieneBrindisCava, setTieneBrindisCava, "Brindis con cava", "dobla copas de cava"]]
                 : []),
               [llevaPalomitera,      setLlevaPalomitera,      "Lleva palomitera",         "carrito de palomitera propio"],
+              ...(evento !== "produccion"
+                ? [[llevaCornerVermut, setLlevaCornerVermut, "Corner de vermut", "suma su vermut rojo y blanco"],
+                  [llevaCornerAperol, setLlevaCornerAperol, "Corner de Aperol", "suma cava, Aperol y agua con gas 0,75L"]]
+                : []),
               [llevaChillOut,        setLlevaChillOut,        "Lleva chill out",          llevaChillOut ? `${numChillOut} (ajusta abajo)` : "sofás/zona chill out"],
               [llevaJamonero,        setLlevaJamonero,        "Hay jamonero",             "añade platos extra para el corte"],
               // La mesa y los platos de tarta se cargaban siempre, sin poder quitarlos, y

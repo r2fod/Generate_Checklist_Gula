@@ -306,6 +306,24 @@ operativo).
   sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
   saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
   corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **Buffets con platos, tronas, corners y manteles** (el dueño, por partes: "que te
+  pregunte si para el buffet hacen falta platos", "mira si pregunta lo de la trona",
+  "corner de vermut, que ponga extra de vermut", "corner de Aperol: cava, agua con gas
+  0,75 y Aperol", "los manteles teniendo en cuenta las mesas de buffet y de barras" y
+  "que no falte el rollo de mantel de papel, para las mesas de cocina"):
+  - Tras "buffets", `buffetPlatos` (si hay alguno, no en rodaje): platos pequeños por
+    persona → `platosBuffet`, que se suma a "Platos postre" como el jamonero o la tarta.
+  - "¿Cuánta gente?" pregunta las **tronas** (`numTronas`). Sin contestar, la checklist
+    sigue con una por niño (lo de siempre); en la app, campo "Tronas" en blanco = eso.
+  - **Corner de vermut** y **corner de Aperol** son buffets (cuentan sus mesas) y llegan
+    como `llevaCornerVermut` / `llevaCornerAperol`, también casillas en la app. Vermut:
+    el del aperitivo otra vez (en cumpleaños, que no lleva, solo el del corner). Aperol:
+    un spritz por adulto (90 ml de cava, 60 de Aperol, 30 de soda) → cava sumado a su
+    línea, "Aperol (1L)" y "Agua con gas 0,75L (Aperol)". Nada si el cliente trae la bebida.
+  - **Manteles**: lo de antes (todas las mesas de 1,8 con las de cocina, las altas y
+    las de repuesto) más una por mesa de buffet y una por barra (`numBarras`, lo que se
+    contesta; sin contestar, una si hay barra). No se fijan mesas por barra a mano.
+  - **"Rollo de mantel de papel (mesas de cocina)"**, 1, en las tres checklists.
 - **El formulario, con su sección del cóctel y por temas** ("lo de chupito de cristal
   debería ir en una sección de cóctel... hay chupito de cristal, cuchara de porcelana,
   añadir más y el campo de algo más que aclarar", el dueño). Detrás de "¿Hay cóctel?"

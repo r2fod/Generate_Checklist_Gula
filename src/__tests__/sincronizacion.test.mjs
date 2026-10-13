@@ -662,6 +662,41 @@ console.log("\n══ La sección del cóctel ══");
     "la paella se pregunta justo al marcarla, y el café cierra lo que se come");
 }
 
+// ── Buffets con platos, tronas y corners de vermut y de Aperol ────────────────
+// "Que te pregunte si para el buffet hacen falta platos y los agregue", "mira si
+// pregunta lo de la trona", "cuando pones corner de vermut que ponga extra de vermut" y
+// "corner de Aperol: cava, agua con gas 0,75 y Aperol" (el dueño).
+console.log("\n══ Buffets: platos, tronas y corners ══");
+{
+  const { aRespuestasDeLaApp, preguntasDe, opcionesDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const ids = (t, r) => preguntasDe(t, r).map(p => p.id);
+  const conBuffet = ids("boda", { buffets: ["quesos"] });
+  ok(conBuffet.indexOf("buffetPlatos") === conBuffet.indexOf("buffets") + 1 && !ids("boda", { buffets: [] }).includes("buffetPlatos")
+    && !ids("produccion", { buffets: ["quesos"] }).includes("buffetPlatos"),
+    "si hay buffets, justo detrás se pregunta si llevan platos (en un rodaje no)");
+  const si = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, buffets: ["quesos"], buffetPlatos: "si", platosBuffetPorPersona: 2 });
+  const no = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, buffets: ["quesos"], buffetPlatos: "no" });
+  const sinNumero = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, buffets: ["quesos"], buffetPlatos: "si" });
+  ok(si.platosBuffet === 2 && no.platosBuffet === 0 && sinNumero.platosBuffet === 1,
+    `los platos de los buffets llegan por persona (${si.platosBuffet}; "no" es 0; sin número, 1)`);
+
+  const gente = PREGUNTAS.find(p => p.id === "gente");
+  ok(gente.campos.some(c => c.id === "tronas"), "las tronas se preguntan con la gente");
+  ok(aRespuestasDeLaApp({ tipo: "comunion", adultos: 60, ninos: 12, tronas: 2 }).numTronas === 2
+    && aRespuestasDeLaApp({ tipo: "comunion", adultos: 60, ninos: 12 }).numTronas === undefined,
+    "y llegan a la app; sin contestar, no se toca nada (la checklist sigue con una por niño)");
+
+  const buffets = PREGUNTAS.find(p => p.id === "buffets");
+  ok(["vermut", "aperol"].every(v => opcionesDe(buffets, "boda").some(o => o.valor === v))
+    && !opcionesDe(buffets, "produccion").some(o => o.valor === "vermut" || o.valor === "aperol"),
+    "corner de vermut y de Aperol entre los buffets (no en un rodaje)");
+  const corners = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, buffets: ["vermut", "aperol"], vermutNumero: 1, aperolNumero: 2 });
+  ok(corners.llevaCornerVermut === true && corners.llevaCornerAperol === true && corners.numMesasBuffet === 3,
+    `los corners llegan a la app y cuentan sus mesas (${corners.numMesasBuffet})`);
+  const otros = aRespuestasDeLaApp({ tipo: "boda", adultos: 80, buffets: ["quesos"] });
+  ok(otros.llevaCornerVermut === false && otros.llevaCornerAperol === false, "y sin marcarlos, apagados");
+}
+
 // ── Un menú puede llevar los dos entrantes ────────────────────────────────────
 // En la app el de chupito y el de compartir son dos interruptores distintos (uno
 // carga vasos de chupito, el otro platos extra) y hay menús que llevan los dos. El

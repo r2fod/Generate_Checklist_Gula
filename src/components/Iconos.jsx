@@ -168,7 +168,7 @@ const ICONO_EXTRA = {
   "Doble cuchara": Utensils, "Doble copa de vino": Wine, "Doble vaso de agua": GlassWater,
   "Doble copa de cava": Wine, "Chupitos de cristal": GlassWater, "Cucharas de porcelana": Utensils, "Entrante compartido": UtensilsCrossed,
   "Solo bandeja": ConciergeBell, "Lleva paella": CookingPot, "Hay frituras": Flame,
-  "Plancha de gas": Fuel, "Brindis con cava": PartyPopper, "Lleva palomitera": Popcorn,
+  "Plancha de gas": Fuel, "Brindis con cava": PartyPopper, "Lleva palomitera": Popcorn, "Corner de vermut": Wine, "Corner de Aperol": Martini,
   "Lleva chill out": Sofa, "Hay jamonero": Ham, "Hay tarta": Cake, "Aguas pequeñas": Droplet,
   "Hay desayuno": Croissant, "Café para invitados": Coffee, "Servilletas de tela": Shirt,
   "Jarras de cristal": Milk, "Llevamos cristalería": Wine, "Llevamos hielo": Snowflake,
