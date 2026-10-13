@@ -113,10 +113,10 @@ export const PREGUNTAS = [
     // sin decirlo no va ninguna. En el almacén hay 3: si piden más, se avisa ya.
     nota: "El staff son los que están trabajando y no van en el número de invitados. Tronas, solo las de los bebés (si no hace falta ninguna, en blanco).",
     campos: [
-      { id: "adultos", etiqueta: "Adultos", min: 0 },
-      { id: "ninos", etiqueta: "Niños", min: 0 },
+      { id: "adultos", etiqueta: "Adultos", uno: "adulto", min: 0 },
+      { id: "ninos", etiqueta: "Niños", uno: "niño", min: 0 },
       {
-        id: "tronas", etiqueta: "Tronas", min: 0,
+        id: "tronas", etiqueta: "Tronas", uno: "trona", min: 0,
         aviso: (n) => (n > TRONAS_EN_ALMACEN
           ? `Tenemos ${TRONAS_EN_ALMACEN}: ${n - TRONAS_EN_ALMACEN === 1 ? "falta 1" : `faltan ${n - TRONAS_EN_ALMACEN}`}, hay que conseguirlas.`
           : ""),
@@ -565,9 +565,9 @@ export const PREGUNTAS = [
     id: "barbacoasCuantas", tipo: "numeros", texto: "¿Cuántas barbacoas de cada una?",
     nota: "Tenemos 2 grandes de ladrillo, 3 pequeñas redondas y 1 pequeña rectangular (las pequeñas, metálicas).",
     campos: [
-      { id: "barbacoasLadrillo", etiqueta: "Grandes de ladrillo", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.ladrillo) },
-      { id: "barbacoasRedondas", etiqueta: "Pequeñas redondas", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.redonda) },
-      { id: "barbacoasRectangular", etiqueta: "Pequeña rectangular", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.rectangular) },
+      { id: "barbacoasLadrillo", etiqueta: "Grandes de ladrillo", uno: "grande de ladrillo", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.ladrillo) },
+      { id: "barbacoasRedondas", etiqueta: "Pequeñas redondas", uno: "pequeña redonda", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.redonda) },
+      { id: "barbacoasRectangular", etiqueta: "Pequeña rectangular", varios: "pequeñas rectangulares", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.rectangular) },
     ],
     soloEn: ["boda", "comunion", "corporativo"],
     si: (r) => r.barbacoa === "si",
@@ -1002,7 +1002,10 @@ export const fmtFechaCorta = (iso) => {
 export function resumirRespuesta(p, r, tipo) {
   const v = r[p.id];
   if (p.tipo === "textos") return p.campos.map(c => r[c.id]).filter(Boolean).join(" · ") || "sin contestar";
-  if (p.tipo === "numeros") return p.campos.map(c => r[c.id] ? `${r[c.id]} ${c.etiqueta.toLowerCase()}` : "").filter(Boolean).join(" · ") || "sin contestar";
+  // Con 1, en singular ("1 trona", no "1 tronas"): `uno` y `varios` lo dicen cuando la
+  // etiqueta no vale para los dos
+  const nombre = (c, n) => (Number(n) === 1 ? c.uno : c.varios) || c.etiqueta.toLowerCase();
+  if (p.tipo === "numeros") return p.campos.map(c => r[c.id] ? `${r[c.id]} ${nombre(c, r[c.id])}` : "").filter(Boolean).join(" · ") || "sin contestar";
   if (p.tipo === "cuando") return [fmtFechaCorta(r.fecha), r.horaInicio, r.horaFin && `a ${r.horaFin}`].filter(Boolean).join(" · ") || "sin contestar";
   if (p.tipo === "texto-largo") {
     const txt = r[p.campo || "notas"];

@@ -728,6 +728,13 @@ console.log("\n══ La barbacoa, con su pregunta ══");
     && aRespuestasDeLaApp({ tipo: "boda", adultos: 80, extras: ["jarras"] }).tipoBBQ === "No lleva"
     && resumirEnvio({ tipo: "boda", extras: ["barbacoa"] }).find(f => f.id === "barbacoa").respuesta === "Sí",
     "un envío de antes sigue cargando lo mismo, y en la bandeja se lee en su pregunta");
+  // En el repaso y la bandeja, con 1 en singular ("1 tronas", "1 pequeñas redondas")
+  const fila = (r, id) => resumirEnvio({ tipo: "boda", ...r }).find(f => f.id === id).respuesta;
+  ok(fila({ barbacoa: "si", barbacoasLadrillo: 1, barbacoasRedondas: 2, barbacoasRectangular: 1 }, "barbacoasCuantas")
+      === "1 grande de ladrillo · 2 pequeñas redondas · 1 pequeña rectangular"
+    && fila({ adultos: 1, ninos: 1, tronas: 1 }, "gente") === "1 adulto · 1 niño · 1 trona"
+    && fila({ adultos: 90, tronas: 2 }, "gente") === "90 adultos · 2 tronas",
+    "con 1, en singular; con más, en plural");
 }
 
 // ── La cafetera, y no preguntar lo que no hace falta ─────────────────────────

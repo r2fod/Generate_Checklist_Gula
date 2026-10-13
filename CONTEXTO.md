@@ -354,6 +354,13 @@ operativo).
   - Panel: "Hay 2 en almacén: falta 1" en singular (decía "faltan 1"), en barbacoas y
     tronas; los platos de buffet "se suman a los platos de postre (o van aparte si no
     los hay)", como hace la checklist desde la cafetera.
+  - Repaso de errores ("comprueba que no haya bugs"): 28.800 checklists con todas las
+    combinaciones de tipo, gente (0 a 500), cafetera, café, barbacoa y cuántas, tronas,
+    corners y platos de buffet, sin una cantidad rara ni una línea repetida; y el
+    formulario entero (notas, avisos, envío → app) con respuestas vacías, viejas y
+    llenas. Lo único: el repaso y la bandeja decían "1 tronas", "1 pequeñas redondas".
+    Ahora los campos de `numeros` pueden llevar `uno` (y `varios`) y con 1 sale en
+    singular ("1 adulto · 1 niño · 1 trona").
 - **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
   barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
   3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el
