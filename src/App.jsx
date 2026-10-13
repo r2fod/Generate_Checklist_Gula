@@ -74,7 +74,7 @@ import { alSobrarTiempo } from "./precarga.js";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
 import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
-import { buildChecklist, enlaceMapa, GASTROS_MINIMO, TRONAS_EN_ALMACEN } from "./checklist-generadores.js";
+import { buildChecklist, enlaceMapa, GASTROS_MINIMO, TRONAS_EN_ALMACEN, BARBACOAS } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
 import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida,
   calibracionPersonal, huecosDeCatalogo } from "./calibracion.js";
@@ -226,7 +226,7 @@ const ETIQUETAS_CAMPO = {
   llevaPaella: "Lleva paella", tipoPaella: "Tamaño de paella", numPaellas: "Nº de paellas",
   estiloPlatoPrincipal: "Estilo plato principal", estiloPlatoPostre: "Estilo plato postre",
   llevaArmarioCaliente: "Armario caliente", llevaMesasCalientes: "Mesas calientes", llevaPlanchaGas: "Plancha de gas", numPlanchasGas: "Nº planchas de gas", llevaPlatos: "Platos", llevaPlatosPostre: "Platos de postre", llevaCubiertos: "Cubiertos", numCamareros: "Nº camareros", paxPorCamarero: "Pax por camarero", numStaff: "Nº staff", tipoBandejas: "Bandejas", numGastros: "Nº de gastros", numMesasBuffet: "Nº de mesas de buffet", platosBuffet: "Platos de buffet por persona", numTronas: "Tronas", llevaCornerVermut: "Corner de vermut", llevaCornerAperol: "Corner de Aperol",
-  tipoHorno: "Horno", tipoBBQ: "Barbacoa", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
+  tipoHorno: "Horno", tipoBBQ: "Barbacoa", barbacoasLadrillo: "Barbacoas de ladrillo", barbacoasRedondas: "Barbacoas redondas", barbacoasRectangular: "Barbacoa rectangular", estacion: "Temporada", tieneBrindisCava: "Brindis con cava",
   tieneFrituras: "Frituras", numFrituras: "Nº frituras", fuerzaTextilTela: "Servilletas de tela",
   llevaChillOut: "Chill out", numChillOut: "Nº chill out",
   llevaPalomitera: "Palomitera", llevaJarrasCristal: "Jarras de cristal", llevaCristaleria: "Llevamos cristalería", llevaHielo: "Llevamos hielo", llevaBebida: "La bebida la pone Gula", tipoCafetera: "Cafetera",
@@ -558,6 +558,10 @@ export default function App({ onCerrarSesion } = {}) {
   const [tipoBandejas, setTipoBandejas] = useState(estadoInicial.tipoBandejas ?? "Mixto");
   const [tipoHorno, setTipoHorno]       = useState(estadoInicial.tipoHorno ?? "Pequeño");
   const [tipoBBQ, setTipoBBQ]           = useState(estadoInicial.tipoBBQ ?? "No lleva");
+  // Cuántas de cada barbacoa del almacén; null = sin decir (va la de siempre por pax)
+  const [barbacoasLadrillo, setBarbacoasLadrillo] = useState(estadoInicial.barbacoasLadrillo ?? null);
+  const [barbacoasRedondas, setBarbacoasRedondas] = useState(estadoInicial.barbacoasRedondas ?? null);
+  const [barbacoasRectangular, setBarbacoasRectangular] = useState(estadoInicial.barbacoasRectangular ?? null);
   // Los eventos guardados hasta ahora llevan mesVerano: true (era el único valor
   // posible, no había control) y ningún dato de temporada. Los que YA HAN PASADO se
   // quedan fijados en lo que tuvieran, para que su lista no cambie de cifras; los que
@@ -986,7 +990,7 @@ export default function App({ onCerrarSesion } = {}) {
     tamanoBarril, numBarriles, llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, llevaCanapes, soloBandeja, llevaPaella, tipoPaella, numPaellas, // llevaCanapes: solo se conserva para no perderlo al guardar
     estiloPlatoPrincipal, estiloPlatoPostre,
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol,
-    tipoHorno, tipoBBQ, estacion, mesVerano,
+    tipoHorno, tipoBBQ, barbacoasLadrillo, barbacoasRedondas, barbacoasRectangular, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
@@ -1092,7 +1096,8 @@ export default function App({ onCerrarSesion } = {}) {
     estiloPlatoPrincipal: setEstiloPlatoPrincipal, estiloPlatoPostre: setEstiloPlatoPostre,
     llevaArmarioCaliente: setLlevaArmarioCaliente, llevaMesasCalientes: setLlevaMesasCalientes, llevaPlanchaGas: setLlevaPlanchaGas, numPlanchasGas: setNumPlanchasGas, llevaPlatos: setLlevaPlatos, llevaPlatosPostre: setLlevaPlatosPostre, llevaCubiertos: setLlevaCubiertos, numCamareros: setNumCamareros, paxPorCamarero: setPaxPorCamarero, numStaff: setNumStaff, tipoBandejas: setTipoBandejas, numGastros: setNumGastros, numMesasBuffet: setNumMesasBuffet,
     platosBuffet: setPlatosBuffet, numTronas: setNumTronas, llevaCornerVermut: setLlevaCornerVermut, llevaCornerAperol: setLlevaCornerAperol,
-    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion, tieneBrindisCava: setTieneBrindisCava,
+    tipoHorno: setTipoHorno, tipoBBQ: setTipoBBQ, estacion: setEstacion,
+    barbacoasLadrillo: setBarbacoasLadrillo, barbacoasRedondas: setBarbacoasRedondas, barbacoasRectangular: setBarbacoasRectangular, tieneBrindisCava: setTieneBrindisCava,
     tieneFrituras: setTieneFrituras, numFrituras: setNumFrituras, fuerzaTextilTela: setFuerzaTextilTela,
     llevaChillOut: setLlevaChillOut, numChillOut: setNumChillOut,
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, llevaCristaleria: setLlevaCristaleria, llevaHielo: setLlevaHielo, llevaBebida: setLlevaBebida, tipoCafetera: setTipoCafetera,
@@ -2699,6 +2704,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ: tipoBBQ.toLowerCase(),
+    barbacoasLadrillo, barbacoasRedondas, barbacoasRectangular,
     tipoHorno: tipoHorno.toLowerCase(), llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol,
     llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, numCarpas, llevaGenerador,
     llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
@@ -2717,6 +2723,7 @@ export default function App({ onCerrarSesion } = {}) {
     dobleServicio, dobleTenedor, dobleCuchillo, dobleCuchara, dobleVino, dobleAgua, dobleCava,
     tamanoBarril, numBarriles, llevaPaella, mesVerano, tieneBrindisCava,
     fuerzaTextilTela, colorManteles, porcentajeBeige, tieneFrituras, numFrituras, llevaChillOut, numChillOut, tipoBandejas, tipoBBQ,
+    barbacoasLadrillo, barbacoasRedondas, barbacoasRectangular,
     tipoHorno, llevaEntrante, llevaCucharasPorcelana, numCucharasPorcelana, soloBandeja, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos,
     llevaPlatosPostre, llevaCubiertos, numCamareros, numStaff, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol, llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida,
     llevaCarpas, numCarpas, llevaGenerador, llevaMobiliarioAlquiler, llevaParabanes, numParabanes, numBarras,
@@ -4906,6 +4913,28 @@ export default function App({ onCerrarSesion } = {}) {
                 interruptor porque casi siempre van. */}
             {evento !== "cumpleanos" && evento !== "produccion" && (
               <SegmentedControl label="Barbacoa" value={tipoBBQ} onChange={setTipoBBQ} options={["No lleva", "Pequeña", "Grande"]} />
+            )}
+            {/* Con barbacoa, cuántas de cada una de las del almacén. En blanco, la de
+                siempre (una cada 60 pax del tamaño de arriba). */}
+            {evento !== "cumpleanos" && evento !== "produccion" && tipoBBQ !== "No lleva" && (
+              <div className="controls-row">
+                {[
+                  [BARBACOAS.ladrillo, barbacoasLadrillo, setBarbacoasLadrillo, "Grandes de ladrillo"],
+                  [BARBACOAS.redonda, barbacoasRedondas, setBarbacoasRedondas, "Pequeñas redondas"],
+                  [BARBACOAS.rectangular, barbacoasRectangular, setBarbacoasRectangular, "Pequeña rectangular"],
+                ].map(([b, val, fn, lab]) => (
+                  <div className="form-group controls-mini" key={lab}>
+                    <span className="form-label">{lab}</span>
+                    <input
+                      type="number" className="form-input" min="0" placeholder="0" value={val ?? ""}
+                      onChange={e => fn(e.target.value === "" ? null : Math.max(0, parseInt(e.target.value) || 0))}
+                    />
+                    <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
+                      {val > b.hay ? `Hay ${b.hay} en almacén: faltan ${val - b.hay}` : `Hay ${b.hay} en almacén`}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
             <div className="equip-pareja">
               {/* Cuántos manteles lo sigue calculando la app por las mesas; aquí solo

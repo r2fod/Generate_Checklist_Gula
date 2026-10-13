@@ -95,6 +95,27 @@ function lineaTronas(numTronas) {
   });
 }
 
+// Las barbacoas del almacén (el dueño: "3 grandes de ladrillo, 3 pequeñas metálicas
+// redondas y una pequeña rectangular"). Repetido en preguntas.js para el aviso.
+export const BARBACOAS = {
+  ladrillo: { etiqueta: "Barbacoa grande de ladrillo", hay: 3 },
+  redonda: { etiqueta: "Barbacoa pequeña redonda (metálica)", hay: 3 },
+  rectangular: { etiqueta: "Barbacoa pequeña rectangular", hay: 1 },
+};
+// [[tipo, cuántas]] si se ha dicho alguna; null si no (y entonces va la de siempre)
+function barbacoasPorTipo(ladrillo, redondas, rectangular) {
+  const n = (v) => Math.max(0, Number(v) || 0);
+  const lista = [["ladrillo", n(ladrillo)], ["redonda", n(redondas)], ["rectangular", n(rectangular)]];
+  return lista.some(([, c]) => c > 0) ? lista : null;
+}
+// Cuántas, y lo que falta si se piden más de las que hay (se recalcula al editarla)
+function lineaDeAlmacen(n, hay) {
+  return conSufijo(n, (cargadas) => {
+    const faltan = Math.max(0, cargadas - hay);
+    return faltan > 0 ? `de ${hay} en almacén · ${faltan === 1 ? "falta 1" : `faltan ${faltan}`}` : `de ${hay} en almacén`;
+  });
+}
+
 // Las mesas de las barras de bebida, para los manteles: las que se han dicho ("¿Cuántas
 // barras?"); sin decirlo, una si hay barra.
 function mesasDeBarra(numBarras, hayBarra) {
@@ -286,6 +307,7 @@ function categoriaAlcoholes(destilados, extras = []) {
 function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const {
     dobleServicio, tamanoBarril = "No lleva", numBarriles = 1, llevaPaella, tipoBandejas, tipoBBQ = "", tipoHorno = "",
+    barbacoasLadrillo = null, barbacoasRedondas = null, barbacoasRectangular = null,
     mesVerano, tieneBrindisCava, fuerzaTextilTela, colorManteles, porcentajeBeige,
     tieneFrituras, numFrituras, llevaEntrante, llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas = 1, llevaPlatos, llevaCubiertos, numCamareros, numStaff = 0,
     llevaCucharasPorcelana, numCucharasPorcelana = 1,
@@ -474,7 +496,19 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // pantalla con una sola línea a 0, que no dice nada a quien carga.
   if (bombonas > 0) paellaItems.push(["Bombonas llenas", String(bombonas)]);
   if (tipoBBQ !== "no lleva") {
-    paellaItems.push([`Barbacoa${tipoBBQ ? ` ${tipoBBQ}` : ""}`, String(Math.max(1, Math.ceil(pax / 60)))], ["Reja BBQ grande", "1"], ["Carbón", String(Math.max(2, Math.ceil(pax / 30)))], ["Leña", "1"], ["Pastillas de encender", "1"]);
+    // Con cuántas de cada (las del almacén: grandes de ladrillo, pequeñas redondas y la
+    // rectangular), una línea por tipo, con lo que falte si se piden más de las que hay.
+    // Sin decirlo, la de siempre: una "Barbacoa grande/pequeña" cada 60 pax (y con su
+    // mismo nombre, que es la identidad de la línea en los eventos ya guardados).
+    const porTipo = barbacoasPorTipo(barbacoasLadrillo, barbacoasRedondas, barbacoasRectangular);
+    const total = porTipo ? porTipo.reduce((a, [, n]) => a + n, 0) : Math.max(1, Math.ceil(pax / 60));
+    if (porTipo) porTipo.filter(([, n]) => n > 0).forEach(([tipo, n]) => paellaItems.push([BARBACOAS[tipo].etiqueta, lineaDeAlmacen(n, BARBACOAS[tipo].hay)]));
+    else paellaItems.push([`Barbacoa${tipoBBQ ? ` ${tipoBBQ}` : ""}`, String(total)]);
+    // La reja es de las grandes; carbón por la gente (y al menos un saco por barbacoa) y
+    // leña, un saco por barbacoa. Sin números, las cantidades de siempre.
+    const grandes = porTipo ? porTipo[0][1] : 1;
+    if (grandes > 0) paellaItems.push(["Reja BBQ grande", String(grandes)]);
+    paellaItems.push(["Carbón", String(Math.max(2, Math.ceil(pax / 30), total))], ["Leña", String(porTipo ? total : 1)], ["Pastillas de encender", "1"]);
   }
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 

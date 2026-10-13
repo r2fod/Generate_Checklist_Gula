@@ -3220,6 +3220,34 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
     "sin corner no sale, y si la bebida la trae el cliente tampoco");
 }
 
+// ─── La barbacoa: cuántas de cada, con su carbón y su leña ─────────────────────
+// "Debería preguntar si lleva barbacoa, y si lleva agregar carbón y leña, y que puedas
+// decir cuántas grandes o pequeñas: tenemos 3 grandes de ladrillo, 3 pequeñas metálicas
+// redondas y una pequeña rectangular" (el dueño).
+console.log("\n── La barbacoa, por tipo ──");
+{
+  const fuego = (opts) => buildChecklist("boda", 100, 2, 4, 0, opts).find(c => c.nombre === "Paella y fuego").items
+    .filter(i => i[1] !== null).map(i => [i[0], typeof i[1] === "object" ? i[1] : i[1]]);
+  const de = (lineas, re) => lineas.find(([l]) => re.test(l));
+  const antes = fuego({ tipoBBQ: "grande" });
+  ok(de(antes, /^Barbacoa grande$/)[1] === "2" && de(antes, /^Reja BBQ grande/)[1] === "1"
+    && de(antes, /^Carbón/)[1] === "4" && de(antes, /^Leña/)[1] === "1",
+    "sin decir cuántas, lo de siempre: \"Barbacoa grande\" por pax, con su reja, carbón y leña");
+  ok(!fuego({ tipoBBQ: "no lleva" }).some(([l]) => /Barbacoa|Carbón|Leña/.test(l)), "y sin barbacoa, nada de eso");
+  const con = fuego({ tipoBBQ: "grande", barbacoasLadrillo: 4, barbacoasRedondas: 1 });
+  ok(de(con, /^Barbacoa grande de ladrillo/)[1].u === 4 && de(con, /^Barbacoa pequeña redonda/)[1].u === 1
+    && !de(con, /^Barbacoa pequeña rectangular/) && !de(con, /^Barbacoa grande$/),
+    "diciendo cuántas, una línea por cada tipo que va");
+  ok(de(con, /^Barbacoa grande de ladrillo/)[1].sufijo(4) === "de 3 en almacén · falta 1"
+    && de(con, /^Barbacoa pequeña redonda/)[1].sufijo(1) === "de 3 en almacén",
+    "y con más de las que hay en el almacén, lo dice");
+  ok(de(con, /^Reja BBQ grande/)[1] === "4" && de(con, /^Carbón/)[1] === "5" && de(con, /^Leña/)[1] === "5",
+    "una reja por barbacoa grande, y carbón y leña para todas (al menos un saco cada una)");
+  const pequenas = fuego({ tipoBBQ: "pequeña", barbacoasRedondas: 2, barbacoasRectangular: 1 });
+  ok(!de(pequenas, /^Reja BBQ grande/) && de(pequenas, /^Barbacoa pequeña rectangular/)[1].sufijo(1) === "de 1 en almacén",
+    "solo pequeñas: sin la reja de las grandes");
+}
+
 console.log("\n──────────────────────────────────────────────────────────");
 console.log(`  ${pasan} comprobaciones pasadas, ${fallos.length} fallidas`);
 if (fallos.length) { console.log("\n  Fallos:"); fallos.forEach(f => console.log(`   · ${f}`)); process.exit(1); }

@@ -306,6 +306,19 @@ operativo).
   sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
   saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
   corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
+  barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
+  3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el
+  dueño). Era una casilla de "extras" que cargaba una grande. Ahora `barbacoa` (sí/no,
+  detrás del horno, boda/comunión/empresa) y, si la lleva, `barbacoasCuantas` (numeros,
+  con aviso si se piden más de las del almacén) → `barbacoasLadrillo`,
+  `barbacoasRedondas`, `barbacoasRectangular` (null = sin decir). En la checklist
+  (`BARBACOAS` en checklist-generadores.js): una línea por tipo con "de N en almacén ·
+  faltan M", una "Reja BBQ grande" por cada grande, carbón por la gente con un saco
+  mínimo por barbacoa y un saco de leña por barbacoa. **Sin números, lo de siempre**
+  ("Barbacoa grande/pequeña" cada 60 pax, mismo nombre e identidad, mismo carbón y
+  leña). En la app, bajo "Barbacoa", tres campos con lo que hay en almacén. Envíos de
+  antes: `respuestasAlDia` pasa la casilla de "extras" a la pregunta.
 - **Iconos del formulario con sentido, y con su gesto** ("mejora los iconos del
   formulario para que tengan sentido con la frase y anímalos", el dueño). Salían del
   juego del fondo por posición (el "Corner de vermut" con una olla). Ahora en

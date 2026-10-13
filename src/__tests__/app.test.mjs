@@ -2903,7 +2903,7 @@ async function main() {
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
     // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
-    // encima del número de preguntas de una boda (39 hoy, `preguntasDe("boda", {})`),
+    // encima del número de preguntas de una boda (40 hoy, `preguntasDe("boda", {})`),
     // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
     // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;

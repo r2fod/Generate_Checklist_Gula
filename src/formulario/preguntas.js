@@ -48,6 +48,12 @@ const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 // que GASTROS_MINIMO (ver "cuantosGastros"): importar de ahí metería el motor entero en
 // el formulario. Si cambia, se cambia en los dos sitios.
 const TRONAS_EN_ALMACEN = 3;
+// Las barbacoas del almacén, por tipo. Mismo reparto que BARBACOAS en
+// checklist-generadores.js (repetido por lo mismo que las tronas).
+const BARBACOAS_EN_ALMACEN = { ladrillo: 3, redonda: 3, rectangular: 1 };
+const avisoAlmacen = (hay) => (n) => (n > hay
+  ? `Tenemos ${hay}: ${n - hay === 1 ? "falta 1" : `faltan ${n - hay}`}, hay que conseguirlas.`
+  : "");
 
 // Mismo valor que GASTROS_MINIMO en checklist-generadores.js — ver el porqué de la
 // duplicación en la pregunta "cuantosGastros", más abajo.
@@ -516,6 +522,29 @@ export const PREGUNTAS = [
     ],
   },
   {
+    // Era una casilla entre lo presupuestado ("Barbacoa") que cargaba UNA grande y
+    // ya está. Ahora se pregunta aparte, y si la lleva, cuántas de cada una de las que
+    // hay: van con su carbón, su leña y sus pastillas de encender.
+    id: "barbacoa", tipo: "opciones", texto: "¿Lleva barbacoa?",
+    nota: "Si la lleva, van con su carbón, su leña y las pastillas de encender.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      { valor: "si", texto: "Sí" },
+    ],
+    soloEn: ["boda", "comunion", "corporativo"],
+  },
+  {
+    id: "barbacoasCuantas", tipo: "numeros", texto: "¿Cuántas barbacoas de cada una?",
+    nota: "Tenemos 3 grandes de ladrillo, 3 pequeñas redondas (metálicas) y 1 pequeña rectangular.",
+    campos: [
+      { id: "barbacoasLadrillo", etiqueta: "Grandes de ladrillo", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.ladrillo) },
+      { id: "barbacoasRedondas", etiqueta: "Pequeñas redondas", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.redonda) },
+      { id: "barbacoasRectangular", etiqueta: "Pequeña rectangular", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.rectangular) },
+    ],
+    soloEn: ["boda", "comunion", "corporativo"],
+    si: (r) => r.barbacoa === "si",
+  },
+  {
     // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
     // devolverlo. Al marcarlo se crea su recogida sola. En un rodaje no se lleva.
     id: "armarioCaliente", tipo: "opciones", texto: "¿Lleva armario caliente?",
@@ -573,7 +602,7 @@ export const PREGUNTAS = [
       // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
       // se añade otra pantalla a un formulario que ya tiene quince
       { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
-      { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
+      // La barbacoa tiene su propia pregunta (barbacoa / barbacoasCuantas), en la cocina
       // El mobiliario de alquiler tiene su propia pregunta (mobiliarioAlquiler): aquí
       // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
@@ -1045,6 +1074,9 @@ export function respuestasAlDia(r = {}) {
     s.barraLleva = r.extras.filter(v => DE_LA_BARRA.includes(v));
   }
   if (Array.isArray(r.extras)) s.extras = r.extras.filter(v => !DE_LA_BARRA.includes(v));
+  // La barbacoa también era una casilla de "extras": contestado eso, ya estaba dicha
+  if (Array.isArray(r.extras) && r.barbacoa === undefined) s.barbacoa = r.extras.includes("barbacoa") ? "si" : "no";
+  if (Array.isArray(s.extras)) s.extras = s.extras.filter(v => v !== "barbacoa");
   return s;
 }
 
@@ -1259,7 +1291,6 @@ export function aRespuestasDeLaApp(respuestas = {}) {
       estado.llevaAguasPequenas = marcado("barraLleva", "aguasPequenas");
     }
     if (Array.isArray(r.extras)) {
-      estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";
       estado.hayDesayuno = marcado("extras", "desayuno");
       estado.llevaJarrasCristal = marcado("extras", "jarras");
       // Estaba en "menu" (aRespuestasDeLaApp lo leía de "menu"/"jamonero"), pero no es
@@ -1294,6 +1325,17 @@ export function aRespuestasDeLaApp(respuestas = {}) {
       : soloPlata && !soloMadera ? "Plata" : "Mixto";
   }
 
+  // Barbacoa: sí/no, y cuántas de cada si se dice. Sin número va la de siempre (una
+  // grande por cada 60 pax, ver checklist-generadores.js); con números, esas.
+  if (puesto(r.barbacoa) && tipo !== "produccion") {
+    const n = (v) => Math.max(0, parseInt(v, 10) || 0);
+    const ladrillo = n(r.barbacoasLadrillo), redondas = n(r.barbacoasRedondas), rectangular = n(r.barbacoasRectangular);
+    const dichas = r.barbacoa === "si" && ladrillo + redondas + rectangular > 0;
+    estado.tipoBBQ = r.barbacoa !== "si" ? "No lleva" : (dichas && !ladrillo ? "Pequeña" : "Grande");
+    estado.barbacoasLadrillo = dichas ? ladrillo : null;
+    estado.barbacoasRedondas = dichas ? redondas : null;
+    estado.barbacoasRectangular = dichas ? rectangular : null;
+  }
   // Platos de los buffets: por persona, con los de postre. "No" es una respuesta (0).
   if (puesto(r.buffetPlatos) && tipo !== "produccion") {
     estado.platosBuffet = r.buffetPlatos === "si" ? (Number(r.platosBuffetPorPersona) > 0 ? Number(r.platosBuffetPorPersona) : 1) : 0;
