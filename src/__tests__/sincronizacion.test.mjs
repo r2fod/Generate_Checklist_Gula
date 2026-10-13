@@ -700,6 +700,64 @@ console.log("\n══ Buffets: platos, tronas y corners ══");
   ok(otros.llevaCornerVermut === false && otros.llevaCornerAperol === false, "y sin marcarlos, apagados");
 }
 
+// ── La barbacoa, con su pregunta y cuántas de cada ───────────────────────────
+console.log("\n══ La barbacoa, con su pregunta ══");
+{
+  const { aRespuestasDeLaApp, preguntasDe, opcionesDe, PREGUNTAS, resumirEnvio } = await import("../formulario/preguntas.js");
+  const ids = (r) => preguntasDe("boda", r).map(p => p.id);
+  const con = ids({ barbacoa: "si" });
+  ok(con.indexOf("barbacoa") === con.indexOf("horno") + 1 && con.indexOf("barbacoasCuantas") === con.indexOf("barbacoa") + 1
+    && !ids({ barbacoa: "no" }).includes("barbacoasCuantas") && !preguntasDe("produccion", {}).some(p => p.id === "barbacoa"),
+    "se pregunta en la cocina, detrás del horno; cuántas, solo si la lleva (y en un rodaje, nada)");
+  ok(!opcionesDe(PREGUNTAS.find(p => p.id === "extras"), "boda").some(o => o.valor === "barbacoa"),
+    "ya no es una casilla de lo presupuestado");
+  const cuantas = PREGUNTAS.find(p => p.id === "barbacoasCuantas");
+  ok(cuantas.campos.map(c => c.aviso(c.id === "barbacoasRectangular" ? 2 : 4)).join(" | ")
+    === "Tenemos 2: faltan 2, hay que conseguirlas. | Tenemos 3: falta 1, hay que conseguirlas. | Tenemos 1: falta 1, hay que conseguirlas.",
+    "cada tipo avisa si se piden más de las que hay (2, 3 y 1)");
+  const e = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, barbacoa: "si", barbacoasLadrillo: 2, barbacoasRedondas: 1 });
+  ok(e.tipoBBQ === "Grande" && e.barbacoasLadrillo === 2 && e.barbacoasRedondas === 1 && e.barbacoasRectangular === 0,
+    "las de cada tipo llegan a la app");
+  const pequenas = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, barbacoa: "si", barbacoasRedondas: 2 });
+  const sinNumero = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, barbacoa: "si" });
+  const no = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, barbacoa: "no" });
+  ok(pequenas.tipoBBQ === "Pequeña" && sinNumero.tipoBBQ === "Grande" && sinNumero.barbacoasLadrillo === null && no.tipoBBQ === "No lleva",
+    "solo pequeñas = pequeña; sin decir cuántas, la de siempre; y \"no\" la quita");
+  // Un envío de antes: la barbacoa era una casilla de "extras"
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 80, extras: ["barbacoa"] }).tipoBBQ === "Grande"
+    && aRespuestasDeLaApp({ tipo: "boda", adultos: 80, extras: ["jarras"] }).tipoBBQ === "No lleva"
+    && resumirEnvio({ tipo: "boda", extras: ["barbacoa"] }).find(f => f.id === "barbacoa").respuesta === "Sí",
+    "un envío de antes sigue cargando lo mismo, y en la bandeja se lee en su pregunta");
+}
+
+// ── La cafetera, y no preguntar lo que no hace falta ─────────────────────────
+// "Cuando te pregunta café para invitados, que puedas elegir qué cafetera, y analiza
+// bien las preguntas para que sea lo más inteligente y profesional" (el dueño). La
+// cafetera era lo único de la configuración que el formulario no preguntaba.
+console.log("\n══ La cafetera, y lo que no hace falta preguntar ══");
+{
+  const { aRespuestasDeLaApp, preguntasDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const ids = (t, r) => preguntasDe(t, r).map(p => p.id);
+  const inv = ids("boda", { cafe: "invitados" });
+  ok(inv.indexOf("cafetera") === inv.indexOf("cafe") + 1 && !ids("boda", { cafe: "personal" }).includes("cafetera")
+    && ids("produccion", { cafe: "invitados" }).includes("cafetera"),
+    "con café para los invitados se pregunta la cafetera, justo detrás (también en un rodaje); solo personal, no");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 200, cafe: "invitados", cafetera: "Grande" }).tipoCafetera === "Grande"
+    && aRespuestasDeLaApp({ tipo: "boda", cafe: "personal", cafetera: "Grande" }).tipoCafetera === undefined,
+    "la cafetera llega a la app; si el café es solo del personal, no se toca");
+  const nota = (adultos) => PREGUNTAS.find(p => p.id === "cafetera").nota({ tipo: "boda", adultos });
+  ok(/150 personas salen unos 330 cafés: irían 3 Nespresso\./.test(nota(150)),
+    "y la nota dice cuántos cafés salen con la gente, para elegir con eso");
+  ok(/basta una Nespresso/.test(nota(40)) && /mejor la grande \(3 cargas\)/.test(nota(220)) && /Tenemos 4 Nespresso y 1 de bar/.test(nota(40)),
+    "y recomienda con el almacén: una Nespresso, varias o, si no llegan, la grande");
+  ok(!ids("boda", { servicio: "bandeja" }).includes("estiloPlato") && !ids("boda", { distinto: ["sinPlatos"] }).includes("estiloPlato")
+    && ids("boda", {}).includes("estiloPlato"),
+    "el estilo del plato no se pregunta si no van platos (de pie en bandeja, o \"no llevamos platos\")");
+  ok(!ids("boda", { estiloPlato: "Verde", distinto: ["sinPlatosPostre"] }).includes("estiloPlatoPostre")
+    && ids("boda", { estiloPlato: "Verde" }).includes("estiloPlatoPostre"),
+    "ni el de postre si no van platos de postre");
+}
+
 // ── Un menú puede llevar los dos entrantes ────────────────────────────────────
 // En la app el de chupito y el de compartir son dos interruptores distintos (uno
 // carga vasos de chupito, el otro platos extra) y hay menús que llevan los dos. El

@@ -306,6 +306,47 @@ operativo).
   sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
   saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
   corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **La cafetera, y no preguntar lo que no hace falta** ("cuando pregunta café para
+  invitados, que puedas elegir qué cafetera; analiza bien las preguntas para que sea lo
+  más inteligente y profesional", el dueño). Repaso de la configuración contra el
+  formulario: de lo que la oficina puede saber, solo faltaba la cafetera (lo demás que no
+  pregunta es logística o de la propia checklist: camareros, bandejas extra, recogidas,
+  marcas). Cambios:
+  - `cafetera` detrás de "café para los invitados" (en todos los tipos): Nespresso, de
+    bar o la grande; la nota dice cuántos cafés salen con la gente (pax ×
+    2,2, la misma cuenta que las cápsulas) → `tipoCafetera`. Con café solo del personal
+    no se pregunta ni se toca.
+  - El estilo del plato (`estiloPlato`) ya no se pregunta comiendo de pie en bandeja ni
+    con "no llevamos platos" (`hayPlatos`); el de postre, tampoco con "no llevamos
+    platos de postre".
+  - Fallo de los platos de buffet (#269): iban sumados a "Platos postre", que no sale
+    en bandeja ni sin platos de postre, y se perdían. Ahí salen en su propia línea,
+    "Platos pequeños (buffets)" (boda/comunión/empresa y cumpleaños).
+- **Las cafeteras, con lo que hay en el almacén** ("cafeteras tenemos 1 de bar, 1
+  industrial que va con café molido y 4 Nespresso: ponlo de forma inteligente", el
+  dueño). Antes iba siempre UNA Nespresso, fueran 30 o 300. Ahora (`lineaNespresso`,
+  `NESPRESSO_EN_ALMACEN = 4`, `INVITADOS_POR_NESPRESSO = 50` en checklist-generadores.js)
+  va una cada 50 invitados (supuesto: lo que saca una en la sobremesa), de las libres:
+  3 en boda/comunión/empresa y cumpleaños, porque la cuarta es la del personal; 4 en un
+  rodaje. Con 50 o menos, la línea sigue siendo "1" sin más. Con más de las que hay
+  carga las libres y avisa "para N pax harían falta M: mejor la grande"; subida a mano
+  por encima, "hay 3 libres (otra va al personal) · falta 1". La de bar y la grande
+  son una de cada, sin cambios. En el formulario, la nota de `cafetera` recomienda con
+  la gente: "basta una Nespresso", "irían N Nespresso" o "mejor la grande (N cargas)".
+- **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
+  barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
+  3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el
+  dueño; corregido: "grandes de ladrillo tenemos 2, redondas pequeñas metálicas 3 y 1
+  rectangular metálica"). Era una casilla de "extras" que cargaba una grande. Ahora `barbacoa` (sí/no,
+  detrás del horno, boda/comunión/empresa) y, si la lleva, `barbacoasCuantas` (numeros,
+  con aviso si se piden más de las del almacén) → `barbacoasLadrillo`,
+  `barbacoasRedondas`, `barbacoasRectangular` (null = sin decir). En la checklist
+  (`BARBACOAS` en checklist-generadores.js): una línea por tipo con "de N en almacén ·
+  faltan M", una "Reja BBQ grande" por cada grande, carbón por la gente con un saco
+  mínimo por barbacoa y un saco de leña por barbacoa. **Sin números, lo de siempre**
+  ("Barbacoa grande/pequeña" cada 60 pax, mismo nombre e identidad, mismo carbón y
+  leña). En la app, bajo "Barbacoa", tres campos con lo que hay en almacén. Envíos de
+  antes: `respuestasAlDia` pasa la casilla de "extras" a la pregunta.
 - **Iconos del formulario con sentido, y con su gesto** ("mejora los iconos del
   formulario para que tengan sentido con la frase y anímalos", el dueño). Salían del
   juego del fondo por posición (el "Corner de vermut" con una olla). Ahora en

@@ -560,13 +560,16 @@ async function main() {
   // (el dueño): salían por posición (el "Corner de vermut" con una olla, la "Fruta"
   // con unos cubiertos). Ahora cada opción lleva el suyo y hace su gesto al elegirla.
   console.log("\n── El formulario: iconos con sentido y con gesto ──");
+  // El paso de los buffets se busca, no se fija: cada pregunta nueva de antes lo mueve
+  const { preguntasDe } = await import("../formulario/preguntas.js");
+  const respuestasBuffets = { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 };
+  const pasoBuffets = preguntasDe("boda", respuestasBuffets).findIndex(q => q.id === "buffets");
   for (const reducido of [false, true]) {
     const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: reducido ? "reduce" : "no-preference" });
     for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
-    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
-      eventoDestino: "Boda de prueba", paso: 26,
-      respuestas: { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 },
-    })));
+    await c.addInitScript(([paso, respuestas]) => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Boda de prueba", paso, respuestas,
+    })), [pasoBuffets, respuestasBuffets]);
     const p = await nuevaPagina(c);
     await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
     await p.waitForSelector(".form-titulo");
@@ -2903,7 +2906,7 @@ async function main() {
     // Con tope y rellenando lo obligatorio: sin tope, una pregunta que no deja pasar
     // (el día, que ahora es obligatorio) deja esta prueba dando vueltas para siempre
     // en vez de fallar y decir por qué. El tope tiene que ir con margen de verdad por
-    // encima del número de preguntas de una boda (39 hoy, `preguntasDe("boda", {})`),
+    // encima del número de preguntas de una boda (40 hoy, `preguntasDe("boda", {})`),
     // no pegado a esa cifra: cada pregunta nueva que se añada no tiene por qué tocar
     // este número, y pegado justo fallaba solo con añadir dos preguntas más.
     let vueltasBorrador = 0;

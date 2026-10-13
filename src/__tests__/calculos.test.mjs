@@ -781,6 +781,27 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "y sin invitados, en un rodaje solo queda esa línea de mantenimiento");
 }
 
+// ─── Las Nespresso, según la gente ────────────────────────────────────────────
+// "Cafeteras tenemos 1 de bar, 1 industrial que va con café molido y 4 Nespresso: ponlo
+// en la checklist de forma inteligente" (el dueño). Antes iba siempre UNA Nespresso,
+// fueran 30 o 300.
+console.log("\n══ Las Nespresso, según la gente ══");
+{
+  const nespresso = (tipo, pax, opts = {}) => buildChecklist(tipo, pax, 2, 4, 0, opts)
+    .find(c => c.nombre === "Café").items.find(x => x[0] === "Cafetera Nespresso")?.[1];
+  ok(nespresso("boda", 40) === "1", "con poca gente, la de siempre, tal cual");
+  const cien = nespresso("boda", 100);
+  ok(cien.u === 2 && cien.sufijo(2) === "una cada 50 pax", "con 100, dos: una cada 50 invitados");
+  const doscientos = nespresso("boda", 200);
+  ok(doscientos.u === 3 && doscientos.sufijo(3) === "para 200 pax harían falta 4: mejor la grande",
+    "con 200 no llegan: se llevan las 3 libres (la cuarta va al personal) y dice que mejor la grande");
+  ok(doscientos.sufijo(4) === "hay 3 libres (otra va al personal) · falta 1",
+    "y si se suben a mano más de las que hay, lo dice");
+  const rodaje = buildChecklist("produccion", 200, 0, 0, 0, {}).find(c => c.nombre === "Café").items.find(x => x[0] === "Cafetera Nespresso")[1];
+  ok(rodaje.u === 4 && rodaje.sufijo(5) === "hay 4 · falta 1", "en un rodaje no hay Nespresso del personal: las 4 libres");
+  ok(nespresso("boda", 200, { tipoCafetera: "Grande" }) === undefined, "con la grande, ninguna Nespresso de invitados");
+}
+
 console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
 {
   // Antes las carpas solo existían en producción (siempre al aire libre). En el resto
@@ -3205,6 +3226,12 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
   const postre = (opts) => num(linea("boda", opts, /^Platos postre/, 100, 0));
   ok(postre({ platosBuffet: 1 }) === postre({}) + 100 && postre({ platosBuffet: 2 }) === postre({}) + 200,
     "los platos de los buffets se suman a los de postre, por persona");
+  // Comiendo de pie en bandeja la línea de postre no sale: los de buffet no se pierden
+  ok(linea("boda", { platosBuffet: 1, soloBandeja: true }, /^Platos postre/, 100, 0)[2] === null
+    && num(linea("boda", { platosBuffet: 1, soloBandeja: true }, /^Platos pequeños \(buffets\)/, 100, 0)) === 100
+    && num(linea("cumpleanos", { platosBuffet: 2, llevaPlatosPostre: false }, /^Platos pequeños \(buffets\)/, 100, 0)) === 200
+    && linea("boda", { platosBuffet: 1 }, /^Platos pequeños \(buffets\)/, 100, 0)[2] === null,
+    "y si no van platos de postre (o todo es en bandeja), los de buffet salen en su propia línea");
 
   ok(num(linea("boda", { llevaCornerVermut: true }, /^Vermut rojo/)) === 2 * num(linea("boda", {}, /^Vermut rojo/))
     && num(linea("boda", { llevaCornerVermut: true }, /^Vermut blanco/)) === 2 * num(linea("boda", {}, /^Vermut blanco/)),
@@ -3218,6 +3245,34 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
     "el corner de Aperol: un spritz por adulto (100 → 12 de cava, 6 de Aperol, 4 de agua con gas de 0,75)");
   ok(linea("boda", {}, /^Aperol/)[2] === null && linea("boda", { llevaCornerAperol: true, llevaBebida: false }, /^Aperol/)[2] === null,
     "sin corner no sale, y si la bebida la trae el cliente tampoco");
+}
+
+// ─── La barbacoa: cuántas de cada, con su carbón y su leña ─────────────────────
+// "Debería preguntar si lleva barbacoa, y si lleva agregar carbón y leña, y que puedas
+// decir cuántas grandes o pequeñas" y "grandes de ladrillo tenemos 2, redondas pequeñas
+// metálicas 3 y 1 rectangular metálica" (el dueño).
+console.log("\n── La barbacoa, por tipo ──");
+{
+  const fuego = (opts) => buildChecklist("boda", 100, 2, 4, 0, opts).find(c => c.nombre === "Paella y fuego").items
+    .filter(i => i[1] !== null).map(i => [i[0], typeof i[1] === "object" ? i[1] : i[1]]);
+  const de = (lineas, re) => lineas.find(([l]) => re.test(l));
+  const antes = fuego({ tipoBBQ: "grande" });
+  ok(de(antes, /^Barbacoa grande$/)[1] === "2" && de(antes, /^Reja BBQ grande/)[1] === "1"
+    && de(antes, /^Carbón/)[1] === "4" && de(antes, /^Leña/)[1] === "1",
+    "sin decir cuántas, lo de siempre: \"Barbacoa grande\" por pax, con su reja, carbón y leña");
+  ok(!fuego({ tipoBBQ: "no lleva" }).some(([l]) => /Barbacoa|Carbón|Leña/.test(l)), "y sin barbacoa, nada de eso");
+  const con = fuego({ tipoBBQ: "grande", barbacoasLadrillo: 4, barbacoasRedondas: 1 });
+  ok(de(con, /^Barbacoa grande de ladrillo/)[1].u === 4 && de(con, /^Barbacoa pequeña redonda/)[1].u === 1
+    && !de(con, /^Barbacoa pequeña rectangular/) && !de(con, /^Barbacoa grande$/),
+    "diciendo cuántas, una línea por cada tipo que va");
+  ok(de(con, /^Barbacoa grande de ladrillo/)[1].sufijo(4) === "de 2 en almacén · faltan 2"
+    && de(con, /^Barbacoa pequeña redonda/)[1].sufijo(1) === "de 3 en almacén",
+    "y con más de las que hay en el almacén, lo dice");
+  ok(de(con, /^Reja BBQ grande/)[1] === "4" && de(con, /^Carbón/)[1] === "5" && de(con, /^Leña/)[1] === "5",
+    "una reja por barbacoa grande, y carbón y leña para todas (al menos un saco cada una)");
+  const pequenas = fuego({ tipoBBQ: "pequeña", barbacoasRedondas: 2, barbacoasRectangular: 1 });
+  ok(!de(pequenas, /^Reja BBQ grande/) && de(pequenas, /^Barbacoa pequeña rectangular/)[1].sufijo(1) === "de 1 en almacén",
+    "solo pequeñas: sin la reja de las grandes");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

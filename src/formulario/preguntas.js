@@ -44,10 +44,21 @@ export const TIPOS_EVENTO = [
 
 const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 
+// Si van platos: ni comiendo de pie todo en bandeja, ni con "no llevamos platos".
+// Sin contestar, sí (es lo normal).
+const hayPlatos = (r = {}) => r.servicio !== "bandeja"
+  && !(Array.isArray(r.distinto) && r.distinto.includes("sinPlatos"));
+
 // Mismo número que TRONAS_EN_ALMACEN en checklist-generadores.js, repetido por lo mismo
 // que GASTROS_MINIMO (ver "cuantosGastros"): importar de ahí metería el motor entero en
 // el formulario. Si cambia, se cambia en los dos sitios.
 const TRONAS_EN_ALMACEN = 3;
+// Las barbacoas del almacén, por tipo. Mismo reparto que BARBACOAS en
+// checklist-generadores.js (repetido por lo mismo que las tronas).
+const BARBACOAS_EN_ALMACEN = { ladrillo: 2, redonda: 3, rectangular: 1 };
+const avisoAlmacen = (hay) => (n) => (n > hay
+  ? `Tenemos ${hay}: ${n - hay === 1 ? "falta 1" : `faltan ${n - hay}`}, hay que conseguirlas.`
+  : "");
 
 // Mismo valor que GASTROS_MINIMO en checklist-generadores.js — ver el porqué de la
 // duplicación en la pregunta "cuantosGastros", más abajo.
@@ -474,6 +485,29 @@ export const PREGUNTAS = [
       { valor: "personal", texto: "Solo para el personal" },
     ],
   },
+  {
+    // La cafetera era lo único de la configuración que el formulario no preguntaba: el
+    // evento se quedaba con la Nespresso aunque fueran 300 invitados. Todas son
+    // nuestras: 4 Nespresso y 1 de bar con cápsulas, y 1 grande con cargas de unos 100
+    // cafés de café molido. La nota recomienda con la gente: una Nespresso cada 50 (la
+    // checklist lleva las que hagan falta) y, si no llegan las 3 libres (la cuarta va
+    // al personal), la grande. Solo si hay café para los invitados: el del personal
+    // lleva siempre su propia Nespresso.
+    id: "cafetera", tipo: "opciones", texto: "¿Con qué cafetera?",
+    nota: (r) => {
+      const pax = paxDeLaGente(r);
+      const n = Math.ceil(pax / 50);
+      const cuales = n <= 1 ? "basta una Nespresso" : n <= 3 ? `irían ${n} Nespresso` : `mejor la grande (${Math.ceil(pax / 100)} cargas)`;
+      const cafes = pax ? `Con ${pax} personas salen unos ${Math.round(pax * 2.2)} cafés: ${cuales}. ` : "";
+      return `${cafes}Tenemos 4 Nespresso y 1 de bar, con cápsulas, y 1 grande con café molido (cargas de unos 100 cafés).`;
+    },
+    opciones: [
+      { valor: "Nespresso", texto: "Nespresso (una cada 50 personas)" },
+      { valor: "Bar", texto: "De bar (portátil, con cápsulas)" },
+      { valor: "Grande", texto: "La grande (industrial, café molido)" },
+    ],
+    si: (r) => r.cafe === "invitados",
+  },
   // ── Cocina y equipamiento ──────────────────────────────────────────────────
   {
     // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
@@ -514,6 +548,29 @@ export const PREGUNTAS = [
       { valor: "Ambos", texto: "Los dos" },
       { valor: "No lleva", texto: "No lleva" },
     ],
+  },
+  {
+    // Era una casilla entre lo presupuestado ("Barbacoa") que cargaba UNA grande y
+    // ya está. Ahora se pregunta aparte, y si la lleva, cuántas de cada una de las que
+    // hay: van con su carbón, su leña y sus pastillas de encender.
+    id: "barbacoa", tipo: "opciones", texto: "¿Lleva barbacoa?",
+    nota: "Si la lleva, van con su carbón, su leña y las pastillas de encender.",
+    opciones: [
+      { valor: "no", texto: "No lleva" },
+      { valor: "si", texto: "Sí" },
+    ],
+    soloEn: ["boda", "comunion", "corporativo"],
+  },
+  {
+    id: "barbacoasCuantas", tipo: "numeros", texto: "¿Cuántas barbacoas de cada una?",
+    nota: "Tenemos 2 grandes de ladrillo, 3 pequeñas redondas y 1 pequeña rectangular (las pequeñas, metálicas).",
+    campos: [
+      { id: "barbacoasLadrillo", etiqueta: "Grandes de ladrillo", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.ladrillo) },
+      { id: "barbacoasRedondas", etiqueta: "Pequeñas redondas", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.redonda) },
+      { id: "barbacoasRectangular", etiqueta: "Pequeña rectangular", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.rectangular) },
+    ],
+    soloEn: ["boda", "comunion", "corporativo"],
+    si: (r) => r.barbacoa === "si",
   },
   {
     // Es alquiler de Dealde, así que no basta con cargarlo: hay que ir a buscarlo y
@@ -573,7 +630,7 @@ export const PREGUNTAS = [
       // Van aquí y no en una pregunta propia: son cosas que se presupuestan, y así no
       // se añade otra pantalla a un formulario que ya tiene quince
       { valor: "jarras", texto: "Jarras de cristal en mesa", soloEn: ["boda", "comunion", "corporativo"] },
-      { valor: "barbacoa", texto: "Barbacoa", soloEn: ["boda", "comunion", "corporativo"] },
+      // La barbacoa tiene su propia pregunta (barbacoa / barbacoasCuantas), en la cocina
       // El mobiliario de alquiler tiene su propia pregunta (mobiliarioAlquiler): aquí
       // era solo un sí/no que no dejaba decir qué es ni a quién se le alquila.
       { valor: "palomitera", texto: "Palomitera", soloEn: CON_BARRA },
@@ -736,6 +793,8 @@ export const PREGUNTAS = [
     // sale tal cual en la checklist y ES la identidad del item, así que "blanco",
     // "blancos" y "el blanco liso" serían tres cosas distintas y cada corrección
     // perdería las marcas de carga.
+    // Solo si hay platos: comiendo de pie en bandeja, o con "no llevamos platos", la
+    // pregunta no cambiaba nada y era una pantalla de más.
     id: "estiloPlato", tipo: "opciones", texto: "¿Qué plato lleva?",
     opciones: [
       { valor: "Blanco liso", texto: "Blanco liso" },
@@ -748,6 +807,7 @@ export const PREGUNTAS = [
       },
     ],
     soloEn: CON_BARRA,
+    si: (r) => hayPlatos(r),
   },
   {
     // Solo si han dicho el plato principal: si no lo saben, tampoco van a saber el de
@@ -770,7 +830,9 @@ export const PREGUNTAS = [
       },
     ],
     soloEn: CON_BARRA,
-    si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null,
+    // Y el de postre, además, si no se ha dicho que no van platos de postre
+    si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null && hayPlatos(r)
+      && !(Array.isArray(r.distinto) && r.distinto.includes("sinPlatosPostre")),
   },
   {
     // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
@@ -1045,6 +1107,9 @@ export function respuestasAlDia(r = {}) {
     s.barraLleva = r.extras.filter(v => DE_LA_BARRA.includes(v));
   }
   if (Array.isArray(r.extras)) s.extras = r.extras.filter(v => !DE_LA_BARRA.includes(v));
+  // La barbacoa también era una casilla de "extras": contestado eso, ya estaba dicha
+  if (Array.isArray(r.extras) && r.barbacoa === undefined) s.barbacoa = r.extras.includes("barbacoa") ? "si" : "no";
+  if (Array.isArray(s.extras)) s.extras = s.extras.filter(v => v !== "barbacoa");
   return s;
 }
 
@@ -1114,6 +1179,8 @@ export function aRespuestasDeLaApp(respuestas = {}) {
   // Café para invitados por defecto (estadoInicial.cafeParaInvitados ?? true en
   // calcCafe): así ningún evento guardado antes de esta pregunta cambia de cantidad.
   if (puesto(r.cafe)) estado.cafeParaInvitados = r.cafe !== "personal";
+  // La cafetera, si hay café para los invitados (la del personal va aparte, siempre)
+  if (r.cafe === "invitados" && puesto(r.cafetera)) estado.tipoCafetera = r.cafetera;
 
   // Carpas: antes solo se preguntaba en producción (siempre al aire libre); ahora se
   // pregunta en todos los tipos, así que sale del bloque de producción y va aquí, con
@@ -1259,7 +1326,6 @@ export function aRespuestasDeLaApp(respuestas = {}) {
       estado.llevaAguasPequenas = marcado("barraLleva", "aguasPequenas");
     }
     if (Array.isArray(r.extras)) {
-      estado.tipoBBQ = marcado("extras", "barbacoa") ? "Grande" : "No lleva";
       estado.hayDesayuno = marcado("extras", "desayuno");
       estado.llevaJarrasCristal = marcado("extras", "jarras");
       // Estaba en "menu" (aRespuestasDeLaApp lo leía de "menu"/"jamonero"), pero no es
@@ -1294,6 +1360,17 @@ export function aRespuestasDeLaApp(respuestas = {}) {
       : soloPlata && !soloMadera ? "Plata" : "Mixto";
   }
 
+  // Barbacoa: sí/no, y cuántas de cada si se dice. Sin número va la de siempre (una
+  // grande por cada 60 pax, ver checklist-generadores.js); con números, esas.
+  if (puesto(r.barbacoa) && tipo !== "produccion") {
+    const n = (v) => Math.max(0, parseInt(v, 10) || 0);
+    const ladrillo = n(r.barbacoasLadrillo), redondas = n(r.barbacoasRedondas), rectangular = n(r.barbacoasRectangular);
+    const dichas = r.barbacoa === "si" && ladrillo + redondas + rectangular > 0;
+    estado.tipoBBQ = r.barbacoa !== "si" ? "No lleva" : (dichas && !ladrillo ? "Pequeña" : "Grande");
+    estado.barbacoasLadrillo = dichas ? ladrillo : null;
+    estado.barbacoasRedondas = dichas ? redondas : null;
+    estado.barbacoasRectangular = dichas ? rectangular : null;
+  }
   // Platos de los buffets: por persona, con los de postre. "No" es una respuesta (0).
   if (puesto(r.buffetPlatos) && tipo !== "produccion") {
     estado.platosBuffet = r.buffetPlatos === "si" ? (Number(r.platosBuffetPorPersona) > 0 ? Number(r.platosBuffetPorPersona) : 1) : 0;
