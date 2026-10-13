@@ -1032,6 +1032,10 @@ export default function Formulario({ codigo }) {
               value={respuestas[c.id] ?? ""}
               onChange={e => pon(c.id, Math.max(0, parseInt(e.target.value, 10) || 0))}
             />
+            {/* Lo que el número dice nada más escribirlo (las tronas que faltan) */}
+            {c.aviso && c.aviso(Number(respuestas[c.id]) || 0) && (
+              <span className="form-nota form-nota-falta">{c.aviso(Number(respuestas[c.id]) || 0)}</span>
+            )}
           </label>
         ))}
 

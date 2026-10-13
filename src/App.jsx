@@ -74,7 +74,7 @@ import { alSobrarTiempo } from "./precarga.js";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
 import { leerPrecios, guardarPrecios, fusionarPreciosNube } from "./precios.js";
 import { TIPOS_MESA, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
-import { buildChecklist, enlaceMapa, GASTROS_MINIMO } from "./checklist-generadores.js";
+import { buildChecklist, enlaceMapa, GASTROS_MINIMO, TRONAS_EN_ALMACEN } from "./checklist-generadores.js";
 import { HORA_OSCURO, HORA_CLARO, leerPreferenciaTema, temaSegunPreferencia } from "./tema.js";
 import { calcularCalibracion, calibracionBebida, calibracionHielo, calibracionComida,
   calibracionPersonal, huecosDeCatalogo } from "./calibracion.js";
@@ -532,7 +532,7 @@ export default function App({ onCerrarSesion } = {}) {
   const [numMesasBuffet, setNumMesasBuffet] = useState(estadoInicial.numMesasBuffet ?? 0);
   // Platos (pequeños) por persona para los buffets: 0 = se come con la mano o en servilleta
   const [platosBuffet, setPlatosBuffet] = useState(estadoInicial.platosBuffet ?? 0);
-  // Tronas: null = sin decir, y entonces va una por niño como siempre (checklist-generadores.js)
+  // Tronas: solo las que se digan; sin decir (null) no va ninguna (checklist-generadores.js)
   const [numTronas, setNumTronas] = useState(estadoInicial.numTronas ?? null);
   const [llevaCornerVermut, setLlevaCornerVermut] = useState(estadoInicial.llevaCornerVermut ?? false);
   const [llevaCornerAperol, setLlevaCornerAperol] = useState(estadoInicial.llevaCornerAperol ?? false);
@@ -4422,16 +4422,18 @@ export default function App({ onCerrarSesion } = {}) {
                   <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Se suman a los platos de postre</span>
                 </div>
               )}
-              {/* Las tronas de los bebés. En blanco, una por niño (lo de siempre) */}
+              {/* Las tronas de los bebés: en blanco no va ninguna. En el almacén hay 3 */}
               {evento !== "produccion" && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Tronas</span>
                   <input
-                    type="number" className="form-input" min="0" placeholder={String(ninos || 0)}
+                    type="number" className="form-input" min="0" placeholder="0"
                     value={numTronas ?? ""}
                     onChange={e => setNumTronas(e.target.value === "" ? null : Math.max(0, parseInt(e.target.value) || 0))}
                   />
-                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>En blanco, una por niño</span>
+                  <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>
+                    {numTronas > TRONAS_EN_ALMACEN ? `Hay ${TRONAS_EN_ALMACEN} en almacén: faltan ${numTronas - TRONAS_EN_ALMACEN}` : `Hay ${TRONAS_EN_ALMACEN} en almacén`}
+                  </span>
                 </div>
               )}
               {/* Mesas altas: 2 por barra, 4 con 100 pax o más. En blanco, con barra libre

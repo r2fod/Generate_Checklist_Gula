@@ -681,10 +681,13 @@ console.log("\n══ Buffets: platos, tronas y corners ══");
     `los platos de los buffets llegan por persona (${si.platosBuffet}; "no" es 0; sin número, 1)`);
 
   const gente = PREGUNTAS.find(p => p.id === "gente");
-  ok(gente.campos.some(c => c.id === "tronas"), "las tronas se preguntan con la gente");
+  const campoTronas = gente.campos.find(c => c.id === "tronas");
+  ok(!!campoTronas, "las tronas se preguntan con la gente");
+  ok(campoTronas.aviso(3) === "" && campoTronas.aviso(5) === "Tenemos 3: faltan 2, hay que conseguirlas.",
+    `y si piden más de las 3 del almacén, se avisa al escribirlo → "${campoTronas.aviso(5)}"`);
   ok(aRespuestasDeLaApp({ tipo: "comunion", adultos: 60, ninos: 12, tronas: 2 }).numTronas === 2
     && aRespuestasDeLaApp({ tipo: "comunion", adultos: 60, ninos: 12 }).numTronas === undefined,
-    "y llegan a la app; sin contestar, no se toca nada (la checklist sigue con una por niño)");
+    "y llegan a la app; sin contestar, no se toca nada (y en la checklist no va ninguna)");
 
   const buffets = PREGUNTAS.find(p => p.id === "buffets");
   ok(["vermut", "aperol"].every(v => opcionesDe(buffets, "boda").some(o => o.valor === v))

@@ -326,8 +326,11 @@ operativo).
   "que no falte el rollo de mantel de papel, para las mesas de cocina"):
   - Tras "buffets", `buffetPlatos` (si hay alguno, no en rodaje): platos pequeños por
     persona → `platosBuffet`, que se suma a "Platos postre" como el jamonero o la tarta.
-  - "¿Cuánta gente?" pregunta las **tronas** (`numTronas`). Sin contestar, la checklist
-    sigue con una por niño (lo de siempre); en la app, campo "Tronas" en blanco = eso.
+  - "¿Cuánta gente?" pregunta las **tronas** (`numTronas`). **Solo van las que se dicen**
+    ("si se deja en blanco no debería poner ninguna", el dueño): sin número no sale la
+    línea, haya niños o no (antes, una por niño). En el almacén hay 3
+    (`TRONAS_EN_ALMACEN`, repetido en preguntas.js): con más, el formulario avisa al
+    escribirlo, la app lo dice bajo el campo y la línea lleva "de 3 en almacén · faltan N".
   - **Corner de vermut** y **corner de Aperol** son buffets (cuentan sus mesas) y llegan
     como `llevaCornerVermut` / `llevaCornerAperol`, también casillas en la app. Vermut:
     el del aperitivo otra vez (en cumpleaños, que no lleva, solo el del corner). Aperol:
@@ -1514,7 +1517,8 @@ mismo criterio que ya pedía para el formulario):
 2. **Mejoras del formulario — HECHO, las seis.** Bug de las tronas: investigado a fondo
    (reproducción real con Playwright por los dos caminos posibles) y no se reprodujo —
    `Tronas` sale directo de `ninos` en los tres builders y ya estaba en las dependencias
-   del `useMemo`; se deja una prueba de guarda por si reaparece por otra vía. El resto,
+   del `useMemo`; se deja una prueba de guarda por si reaparece por otra vía (**después:
+   ya no salen de los niños, solo las que se dicen — ver "Buffets con platos, tronas"**). El resto,
    implementado y con test: botón "ir al resumen" en cualquier pregunta; comentario libre
    y colapsable por pregunta (a `notasEvento`, sin duplicar al reenviar); pregunta de
    café (invitados/solo personal — `calcCafe` en `checklist-generadores.js`, con reserva

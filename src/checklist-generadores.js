@@ -79,12 +79,20 @@ function calcMesasCocina(pax) {
   return 6;
 }
 
-// Tronas: las que se han dicho (los bebés). Sin decir, como siempre: una por niño, que
-// es de más (un niño de diez años no come en trona) pero es lo que cargaban los eventos
-// guardados antes de la pregunta.
-function lineaTronas(numTronas, ninos) {
-  const n = numTronas !== null && numTronas !== undefined && numTronas !== "" ? Number(numTronas) || 0 : ninos;
-  return n > 0 ? String(n) : "—";
+// Tronas: SOLO las que se dicen ("si se deja en blanco no debería poner ninguna", el
+// dueño). Antes salía una por niño, y un niño de diez años no come en trona. En el
+// almacén hay 3: si se piden más, la línea dice cuántas faltan, como las carpas.
+export const TRONAS_EN_ALMACEN = 3;
+function cuantasTronas(numTronas) {
+  return Math.max(0, Number(numTronas) || 0);
+}
+function lineaTronas(numTronas) {
+  return conSufijo(cuantasTronas(numTronas), (cargadas) => {
+    const faltan = Math.max(0, cargadas - TRONAS_EN_ALMACEN);
+    return faltan > 0
+      ? `de ${TRONAS_EN_ALMACEN} en almacén · ${faltan === 1 ? "falta 1" : `faltan ${faltan}`}`
+      : `de ${TRONAS_EN_ALMACEN} en almacén`;
+  });
 }
 
 // Las mesas de las barras de bebida, para los manteles: las que se han dicho ("¿Cuántas
@@ -432,7 +440,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(esCorporativo, ["Atril + micrófono", "—"]),
     opt(esCorporativo, ["Photocall / roll-up corporativo", "—"]),
     ["Cajas de madera para alturas", alturasBuffet(numMesasBuffet) > 0 ? String(alturasBuffet(numMesasBuffet)) : "—"],
-    ["Tronas", lineaTronas(numTronas, ninos)], ["Cestas de mimbre", "—"],
+    opt(cuantasTronas(numTronas) > 0, ["Tronas", lineaTronas(numTronas)]), ["Cestas de mimbre", "—"],
     opt(llevaPaella, ["Descansadores de paella", String(calcPaella(pax, tipoPaella, numPaellas, evtKey).n)]),
     ["Cubo basura cocina", "2"],
     // "Nevera roja" es la propia nevera grande de la empresa, no un mueble aparte
@@ -693,7 +701,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
-    ["Tronas", lineaTronas(numTronas, ninos)], ["Cestas de mimbre", "—"],
+    opt(cuantasTronas(numTronas) > 0, ["Tronas", lineaTronas(numTronas)]), ["Cestas de mimbre", "—"],
     opt(llevaPalomitera, ["Carrito palomitera", "1"]),
     opt(llevaChillOut, ["Chill out", String(numChillOut)]),
     // En un cumpleaños siempre hay tarta y no se cargaba mesa para ella

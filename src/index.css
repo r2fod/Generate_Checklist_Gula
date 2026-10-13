@@ -6166,6 +6166,8 @@ hr {
   color: var(--text-muted);
   margin: 0;
 }
+/* Lo que falta (tronas de más de las que hay): en color de aviso, no gris */
+.form-campo .form-nota.form-nota-falta { color: var(--aviso-texto); font-weight: 600; font-size: var(--fs-sm); text-transform: none; letter-spacing: normal; }
 
 .form-error {
   font-size: var(--fs-md);
