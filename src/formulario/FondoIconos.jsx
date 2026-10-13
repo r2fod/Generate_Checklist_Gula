@@ -97,7 +97,7 @@ const ICONO_TITULO = {
   cuantosGastros: Boxes, extras: Sparkles, mobiliarioAlquiler: Sofa, otroAlquiler: Truck,
   buffets: UtensilsCrossed, buffetPlatos: Layers, queDobla: Layers, manteles: Palette,
   estiloPlato: Palette, estiloPlatoPostre: CakeSlice, minutas: ScrollText, etiquetas: Tag,
-  barbacoa: Flame, barbacoasCuantas: Flame,
+  barbacoa: Flame, barbacoasCuantas: Flame, cafetera: Coffee,
 };
 export function iconoDePregunta(idPregunta) {
   return ICONO_TITULO[idPregunta] || (ICONOS_POR_PREGUNTA[idPregunta] || POR_DEFECTO)[0];

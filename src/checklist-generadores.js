@@ -579,6 +579,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     // El plato de postre va aparte del principal: se puede llevar postre aunque el
     // resto vaya en bandeja (y al revés), así que tiene su propio "No llevan".
     opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
+    // Los platos de los buffets iban sumados a los de postre: comiendo de pie en
+    // bandeja (o sin platos de postre) esa línea no sale, y se perdían con ella
+    opt((soloBandeja || !llevaPlatosPostre) && platosBuffet > 0, ["Platos pequeños (buffets)", String(platosDeBuffet(totalPax, platosBuffet))]),
     ...(llevaCubiertos ? [
       ["Tenedores grandes", String(tenedorDoble + (hayDesayuno ? totalPax : 0))],
       ["Cuchillos grandes", String(cuchilloDoble + (hayDesayuno ? totalPax : 0))],
@@ -811,6 +814,9 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
       [`Platos trinchero (${estiloPlatoPrincipal})`, String(platosDoble)], ["Platos metálicos", "—"],
     ] : []),
     opt(!soloBandeja && llevaPlatosPostre, [`Platos postre (${estiloPlatoPostre})`, String(platosDoble + platosPostreExtra)]),
+    // Los platos de los buffets iban sumados a los de postre: comiendo de pie en
+    // bandeja (o sin platos de postre) esa línea no sale, y se perdían con ella
+    opt((soloBandeja || !llevaPlatosPostre) && platosBuffet > 0, ["Platos pequeños (buffets)", String(platosDeBuffet(totalPax, platosBuffet))]),
     ["Jarras de cristal", String(Math.max(2, conMargen(totalPax / 8)))],
     ...(llevaCubiertos ? [
       ["Tenedores grandes", String(tenedorDoble + (hayDesayuno ? totalPax : 0))],

@@ -730,6 +730,31 @@ console.log("\n══ La barbacoa, con su pregunta ══");
     "un envío de antes sigue cargando lo mismo, y en la bandeja se lee en su pregunta");
 }
 
+// ── La cafetera, y no preguntar lo que no hace falta ─────────────────────────
+// "Cuando te pregunta café para invitados, que puedas elegir qué cafetera, y analiza
+// bien las preguntas para que sea lo más inteligente y profesional" (el dueño). La
+// cafetera era lo único de la configuración que el formulario no preguntaba.
+console.log("\n══ La cafetera, y lo que no hace falta preguntar ══");
+{
+  const { aRespuestasDeLaApp, preguntasDe, PREGUNTAS } = await import("../formulario/preguntas.js");
+  const ids = (t, r) => preguntasDe(t, r).map(p => p.id);
+  const inv = ids("boda", { cafe: "invitados" });
+  ok(inv.indexOf("cafetera") === inv.indexOf("cafe") + 1 && !ids("boda", { cafe: "personal" }).includes("cafetera")
+    && ids("produccion", { cafe: "invitados" }).includes("cafetera"),
+    "con café para los invitados se pregunta la cafetera, justo detrás (también en un rodaje); solo personal, no");
+  ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 200, cafe: "invitados", cafetera: "Grande" }).tipoCafetera === "Grande"
+    && aRespuestasDeLaApp({ tipo: "boda", cafe: "personal", cafetera: "Grande" }).tipoCafetera === undefined,
+    "la cafetera llega a la app; si el café es solo del personal, no se toca");
+  ok(/150 personas salen unos 330 cafés/.test(PREGUNTAS.find(p => p.id === "cafetera").nota({ tipo: "boda", adultos: 150 })),
+    "y la nota dice cuántos cafés salen con la gente, para elegir con eso");
+  ok(!ids("boda", { servicio: "bandeja" }).includes("estiloPlato") && !ids("boda", { distinto: ["sinPlatos"] }).includes("estiloPlato")
+    && ids("boda", {}).includes("estiloPlato"),
+    "el estilo del plato no se pregunta si no van platos (de pie en bandeja, o \"no llevamos platos\")");
+  ok(!ids("boda", { estiloPlato: "Verde", distinto: ["sinPlatosPostre"] }).includes("estiloPlatoPostre")
+    && ids("boda", { estiloPlato: "Verde" }).includes("estiloPlatoPostre"),
+    "ni el de postre si no van platos de postre");
+}
+
 // ── Un menú puede llevar los dos entrantes ────────────────────────────────────
 // En la app el de chupito y el de compartir son dos interruptores distintos (uno
 // carga vasos de chupito, el otro platos extra) y hay menús que llevan los dos. El

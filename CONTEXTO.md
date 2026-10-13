@@ -306,6 +306,22 @@ operativo).
   sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
   saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
   corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **La cafetera, y no preguntar lo que no hace falta** ("cuando pregunta café para
+  invitados, que puedas elegir qué cafetera; analiza bien las preguntas para que sea lo
+  más inteligente y profesional", el dueño). Repaso de la configuración contra el
+  formulario: de lo que la oficina puede saber, solo faltaba la cafetera (lo demás que no
+  pregunta es logística o de la propia checklist: camareros, bandejas extra, recogidas,
+  marcas). Cambios:
+  - `cafetera` detrás de "café para los invitados" (en todos los tipos): Nespresso (la de
+    siempre), de bar o la grande; la nota dice cuántos cafés salen con la gente (pax ×
+    2,2, la misma cuenta que las cápsulas) → `tipoCafetera`. Con café solo del personal
+    no se pregunta ni se toca.
+  - El estilo del plato (`estiloPlato`) ya no se pregunta comiendo de pie en bandeja ni
+    con "no llevamos platos" (`hayPlatos`); el de postre, tampoco con "no llevamos
+    platos de postre".
+  - Fallo de los platos de buffet (#269): iban sumados a "Platos postre", que no sale
+    en bandeja ni sin platos de postre, y se perdían. Ahí salen en su propia línea,
+    "Platos pequeños (buffets)" (boda/comunión/empresa y cumpleaños).
 - **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
   barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
   3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el

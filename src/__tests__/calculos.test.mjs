@@ -3205,6 +3205,12 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
   const postre = (opts) => num(linea("boda", opts, /^Platos postre/, 100, 0));
   ok(postre({ platosBuffet: 1 }) === postre({}) + 100 && postre({ platosBuffet: 2 }) === postre({}) + 200,
     "los platos de los buffets se suman a los de postre, por persona");
+  // Comiendo de pie en bandeja la línea de postre no sale: los de buffet no se pierden
+  ok(linea("boda", { platosBuffet: 1, soloBandeja: true }, /^Platos postre/, 100, 0)[2] === null
+    && num(linea("boda", { platosBuffet: 1, soloBandeja: true }, /^Platos pequeños \(buffets\)/, 100, 0)) === 100
+    && num(linea("cumpleanos", { platosBuffet: 2, llevaPlatosPostre: false }, /^Platos pequeños \(buffets\)/, 100, 0)) === 200
+    && linea("boda", { platosBuffet: 1 }, /^Platos pequeños \(buffets\)/, 100, 0)[2] === null,
+    "y si no van platos de postre (o todo es en bandeja), los de buffet salen en su propia línea");
 
   ok(num(linea("boda", { llevaCornerVermut: true }, /^Vermut rojo/)) === 2 * num(linea("boda", {}, /^Vermut rojo/))
     && num(linea("boda", { llevaCornerVermut: true }, /^Vermut blanco/)) === 2 * num(linea("boda", {}, /^Vermut blanco/)),

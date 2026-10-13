@@ -44,6 +44,11 @@ export const TIPOS_EVENTO = [
 
 const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 
+// Si van platos: ni comiendo de pie todo en bandeja, ni con "no llevamos platos".
+// Sin contestar, sí (es lo normal).
+const hayPlatos = (r = {}) => r.servicio !== "bandeja"
+  && !(Array.isArray(r.distinto) && r.distinto.includes("sinPlatos"));
+
 // Mismo número que TRONAS_EN_ALMACEN en checklist-generadores.js, repetido por lo mismo
 // que GASTROS_MINIMO (ver "cuantosGastros"): importar de ahí metería el motor entero en
 // el formulario. Si cambia, se cambia en los dos sitios.
@@ -480,6 +485,25 @@ export const PREGUNTAS = [
       { valor: "personal", texto: "Solo para el personal" },
     ],
   },
+  {
+    // La cafetera era lo único de la configuración que el formulario no preguntaba: el
+    // evento se quedaba con la Nespresso aunque fueran 300 invitados. Las tres son
+    // nuestras; la grande hace cargas de unos 100 cafés con café molido y las otras
+    // dos van con cápsulas. Solo si hay café para los invitados: el del personal lleva
+    // siempre su propia Nespresso.
+    id: "cafetera", tipo: "opciones", texto: "¿Con qué cafetera?",
+    nota: (r) => {
+      const pax = paxDeLaGente(r);
+      const cafes = pax ? `Con ${pax} personas salen unos ${Math.round(pax * 2.2)} cafés. ` : "";
+      return `${cafes}La grande hace cargas de unos 100 cafés con café molido; la Nespresso y la de bar van con cápsulas.`;
+    },
+    opciones: [
+      { valor: "Nespresso", texto: "Nespresso (la de siempre)" },
+      { valor: "Bar", texto: "De bar (portátil, con cápsulas)" },
+      { valor: "Grande", texto: "La grande (industrial, café molido)" },
+    ],
+    si: (r) => r.cafe === "invitados",
+  },
   // ── Cocina y equipamiento ──────────────────────────────────────────────────
   {
     // Mismas palabras que los selectores de la app, para que lo que contesten se pueda
@@ -765,6 +789,8 @@ export const PREGUNTAS = [
     // sale tal cual en la checklist y ES la identidad del item, así que "blanco",
     // "blancos" y "el blanco liso" serían tres cosas distintas y cada corrección
     // perdería las marcas de carga.
+    // Solo si hay platos: comiendo de pie en bandeja, o con "no llevamos platos", la
+    // pregunta no cambiaba nada y era una pantalla de más.
     id: "estiloPlato", tipo: "opciones", texto: "¿Qué plato lleva?",
     opciones: [
       { valor: "Blanco liso", texto: "Blanco liso" },
@@ -777,6 +803,7 @@ export const PREGUNTAS = [
       },
     ],
     soloEn: CON_BARRA,
+    si: (r) => hayPlatos(r),
   },
   {
     // Solo si han dicho el plato principal: si no lo saben, tampoco van a saber el de
@@ -799,7 +826,9 @@ export const PREGUNTAS = [
       },
     ],
     soloEn: CON_BARRA,
-    si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null,
+    // Y el de postre, además, si no se ha dicho que no van platos de postre
+    si: (r) => r.estiloPlato !== undefined && r.estiloPlato !== null && hayPlatos(r)
+      && !(Array.isArray(r.distinto) && r.distinto.includes("sinPlatosPostre")),
   },
   {
     // La mesa de la tarta y sus platos se cargaban SIEMPRE en boda y comunión, hubiera
@@ -1146,6 +1175,8 @@ export function aRespuestasDeLaApp(respuestas = {}) {
   // Café para invitados por defecto (estadoInicial.cafeParaInvitados ?? true en
   // calcCafe): así ningún evento guardado antes de esta pregunta cambia de cantidad.
   if (puesto(r.cafe)) estado.cafeParaInvitados = r.cafe !== "personal";
+  // La cafetera, si hay café para los invitados (la del personal va aparte, siempre)
+  if (r.cafe === "invitados" && puesto(r.cafetera)) estado.tipoCafetera = r.cafetera;
 
   // Carpas: antes solo se preguntaba en producción (siempre al aire libre); ahora se
   // pregunta en todos los tipos, así que sale del bloque de producción y va aquí, con
