@@ -745,8 +745,11 @@ console.log("\n══ La cafetera, y lo que no hace falta preguntar ══");
   ok(aRespuestasDeLaApp({ tipo: "boda", adultos: 200, cafe: "invitados", cafetera: "Grande" }).tipoCafetera === "Grande"
     && aRespuestasDeLaApp({ tipo: "boda", cafe: "personal", cafetera: "Grande" }).tipoCafetera === undefined,
     "la cafetera llega a la app; si el café es solo del personal, no se toca");
-  ok(/150 personas salen unos 330 cafés/.test(PREGUNTAS.find(p => p.id === "cafetera").nota({ tipo: "boda", adultos: 150 })),
+  const nota = (adultos) => PREGUNTAS.find(p => p.id === "cafetera").nota({ tipo: "boda", adultos });
+  ok(/150 personas salen unos 330 cafés: irían 3 Nespresso\./.test(nota(150)),
     "y la nota dice cuántos cafés salen con la gente, para elegir con eso");
+  ok(/basta una Nespresso/.test(nota(40)) && /mejor la grande \(3 cargas\)/.test(nota(220)) && /Tenemos 4 Nespresso y 1 de bar/.test(nota(40)),
+    "y recomienda con el almacén: una Nespresso, varias o, si no llegan, la grande");
   ok(!ids("boda", { servicio: "bandeja" }).includes("estiloPlato") && !ids("boda", { distinto: ["sinPlatos"] }).includes("estiloPlato")
     && ids("boda", {}).includes("estiloPlato"),
     "el estilo del plato no se pregunta si no van platos (de pie en bandeja, o \"no llevamos platos\")");

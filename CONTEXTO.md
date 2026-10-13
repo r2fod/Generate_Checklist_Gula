@@ -312,8 +312,8 @@ operativo).
   formulario: de lo que la oficina puede saber, solo faltaba la cafetera (lo demás que no
   pregunta es logística o de la propia checklist: camareros, bandejas extra, recogidas,
   marcas). Cambios:
-  - `cafetera` detrás de "café para los invitados" (en todos los tipos): Nespresso (la de
-    siempre), de bar o la grande; la nota dice cuántos cafés salen con la gente (pax ×
+  - `cafetera` detrás de "café para los invitados" (en todos los tipos): Nespresso, de
+    bar o la grande; la nota dice cuántos cafés salen con la gente (pax ×
     2,2, la misma cuenta que las cápsulas) → `tipoCafetera`. Con café solo del personal
     no se pregunta ni se toca.
   - El estilo del plato (`estiloPlato`) ya no se pregunta comiendo de pie en bandeja ni
@@ -322,6 +322,17 @@ operativo).
   - Fallo de los platos de buffet (#269): iban sumados a "Platos postre", que no sale
     en bandeja ni sin platos de postre, y se perdían. Ahí salen en su propia línea,
     "Platos pequeños (buffets)" (boda/comunión/empresa y cumpleaños).
+- **Las cafeteras, con lo que hay en el almacén** ("cafeteras tenemos 1 de bar, 1
+  industrial que va con café molido y 4 Nespresso: ponlo de forma inteligente", el
+  dueño). Antes iba siempre UNA Nespresso, fueran 30 o 300. Ahora (`lineaNespresso`,
+  `NESPRESSO_EN_ALMACEN = 4`, `INVITADOS_POR_NESPRESSO = 50` en checklist-generadores.js)
+  va una cada 50 invitados (supuesto: lo que saca una en la sobremesa), de las libres:
+  3 en boda/comunión/empresa y cumpleaños, porque la cuarta es la del personal; 4 en un
+  rodaje. Con 50 o menos, la línea sigue siendo "1" sin más. Con más de las que hay
+  carga las libres y avisa "para N pax harían falta M: mejor la grande"; subida a mano
+  por encima, "hay 3 libres (otra va al personal) · falta 1". La de bar y la grande
+  son una de cada, sin cambios. En el formulario, la nota de `cafetera` recomienda con
+  la gente: "basta una Nespresso", "irían N Nespresso" o "mejor la grande (N cargas)".
 - **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
   barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
   3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el

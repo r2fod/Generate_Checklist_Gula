@@ -487,18 +487,22 @@ export const PREGUNTAS = [
   },
   {
     // La cafetera era lo único de la configuración que el formulario no preguntaba: el
-    // evento se quedaba con la Nespresso aunque fueran 300 invitados. Las tres son
-    // nuestras; la grande hace cargas de unos 100 cafés con café molido y las otras
-    // dos van con cápsulas. Solo si hay café para los invitados: el del personal lleva
-    // siempre su propia Nespresso.
+    // evento se quedaba con la Nespresso aunque fueran 300 invitados. Todas son
+    // nuestras: 4 Nespresso y 1 de bar con cápsulas, y 1 grande con cargas de unos 100
+    // cafés de café molido. La nota recomienda con la gente: una Nespresso cada 50 (la
+    // checklist lleva las que hagan falta) y, si no llegan las 3 libres (la cuarta va
+    // al personal), la grande. Solo si hay café para los invitados: el del personal
+    // lleva siempre su propia Nespresso.
     id: "cafetera", tipo: "opciones", texto: "¿Con qué cafetera?",
     nota: (r) => {
       const pax = paxDeLaGente(r);
-      const cafes = pax ? `Con ${pax} personas salen unos ${Math.round(pax * 2.2)} cafés. ` : "";
-      return `${cafes}La grande hace cargas de unos 100 cafés con café molido; la Nespresso y la de bar van con cápsulas.`;
+      const n = Math.ceil(pax / 50);
+      const cuales = n <= 1 ? "basta una Nespresso" : n <= 3 ? `irían ${n} Nespresso` : `mejor la grande (${Math.ceil(pax / 100)} cargas)`;
+      const cafes = pax ? `Con ${pax} personas salen unos ${Math.round(pax * 2.2)} cafés: ${cuales}. ` : "";
+      return `${cafes}Tenemos 4 Nespresso y 1 de bar, con cápsulas, y 1 grande con café molido (cargas de unos 100 cafés).`;
     },
     opciones: [
-      { valor: "Nespresso", texto: "Nespresso (la de siempre)" },
+      { valor: "Nespresso", texto: "Nespresso (una cada 50 personas)" },
       { valor: "Bar", texto: "De bar (portátil, con cápsulas)" },
       { valor: "Grande", texto: "La grande (industrial, café molido)" },
     ],

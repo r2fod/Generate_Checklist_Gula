@@ -781,6 +781,27 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "y sin invitados, en un rodaje solo queda esa línea de mantenimiento");
 }
 
+// ─── Las Nespresso, según la gente ────────────────────────────────────────────
+// "Cafeteras tenemos 1 de bar, 1 industrial que va con café molido y 4 Nespresso: ponlo
+// en la checklist de forma inteligente" (el dueño). Antes iba siempre UNA Nespresso,
+// fueran 30 o 300.
+console.log("\n══ Las Nespresso, según la gente ══");
+{
+  const nespresso = (tipo, pax, opts = {}) => buildChecklist(tipo, pax, 2, 4, 0, opts)
+    .find(c => c.nombre === "Café").items.find(x => x[0] === "Cafetera Nespresso")?.[1];
+  ok(nespresso("boda", 40) === "1", "con poca gente, la de siempre, tal cual");
+  const cien = nespresso("boda", 100);
+  ok(cien.u === 2 && cien.sufijo(2) === "una cada 50 pax", "con 100, dos: una cada 50 invitados");
+  const doscientos = nespresso("boda", 200);
+  ok(doscientos.u === 3 && doscientos.sufijo(3) === "para 200 pax harían falta 4: mejor la grande",
+    "con 200 no llegan: se llevan las 3 libres (la cuarta va al personal) y dice que mejor la grande");
+  ok(doscientos.sufijo(4) === "hay 3 libres (otra va al personal) · falta 1",
+    "y si se suben a mano más de las que hay, lo dice");
+  const rodaje = buildChecklist("produccion", 200, 0, 0, 0, {}).find(c => c.nombre === "Café").items.find(x => x[0] === "Cafetera Nespresso")[1];
+  ok(rodaje.u === 4 && rodaje.sufijo(5) === "hay 4 · falta 1", "en un rodaje no hay Nespresso del personal: las 4 libres");
+  ok(nespresso("boda", 200, { tipoCafetera: "Grande" }) === undefined, "con la grande, ninguna Nespresso de invitados");
+}
+
 console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
 {
   // Antes las carpas solo existían en producción (siempre al aire libre). En el resto

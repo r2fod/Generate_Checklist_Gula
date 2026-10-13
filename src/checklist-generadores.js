@@ -185,10 +185,29 @@ function calcPersonal(pax, numCamareros, numStaff = 0, divisor = 20, minimoSala 
 // prepara el servicio.
 
 // Categoría de Café, compartida por los 3 tipos de evento
-// Las 3 cafeteras son propiedad de la empresa (no alquiler):
-// - Nespresso: cápsulas, cantidad calculada para cubrir el pax.
-// - Bar: cafetera tipo bar (portátil), también funciona con cápsulas, no café molido.
-// - Grande: la única cafetera industrial, hace cargas de ~100 cafés con café molido.
+// Las cafeteras son propiedad de la empresa (no alquiler). En el almacén (el dueño: "1
+// cafetera bar, 1 industrial que va con café molido, 4 Nespresso"):
+// - Nespresso (4): cápsulas. Una saca el café de unos 50 invitados en la sobremesa, así
+//   que se llevan las que pida la gente, de las que queden libres (la del personal sale
+//   de las mismas 4). Si ni con todas llega, la línea lo dice: toca la grande.
+// - Bar (1): cafetera tipo bar (portátil), también funciona con cápsulas, no café molido.
+// - Grande (1): la única cafetera industrial, hace cargas de ~100 cafés con café molido.
+export const NESPRESSO_EN_ALMACEN = 4;
+export const INVITADOS_POR_NESPRESSO = 50;
+
+function lineaNespresso(totalPax, conPersonal) {
+  const hacen = Math.max(1, Math.ceil(totalPax / INVITADOS_POR_NESPRESSO));
+  // Con poca gente, la de siempre, tal cual
+  if (hacen === 1) return "1";
+  const libres = NESPRESSO_EN_ALMACEN - (conPersonal ? 1 : 0);
+  return conSufijo(Math.min(hacen, libres), (cargadas) => {
+    if (cargadas > libres) {
+      const faltan = cargadas - libres;
+      return `hay ${libres}${conPersonal ? " libres (otra va al personal)" : ""} · ${faltan === 1 ? "falta 1" : `faltan ${faltan}`}`;
+    }
+    return hacen > libres ? `para ${totalPax} pax harían falta ${hacen}: mejor la grande` : `una cada ${INVITADOS_POR_NESPRESSO} pax`;
+  });
+}
 // En una producción se bebe café todo el día, desde que se monta a las 6 hasta que se
 // recoge: no tiene nada que ver con los 2-3 cafés de sobremesa de un banquete. Por eso
 // el ratio se pasa desde fuera en vez de salir del interruptor de desayuno.
@@ -220,7 +239,7 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
   } else if (tipoCafetera === "Bar") {
     items.push(["Cafetera de bar", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   } else {
-    items.push(["Cafetera Nespresso", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
+    items.push(["Cafetera Nespresso", lineaNespresso(totalPax, numPersonal > 0)], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   }
   // Con desayuno se sirve más café por persona (todos toman, no solo parte de los pax)
   const factorLeche = hayDesayuno ? 0.9 : 0.6;
