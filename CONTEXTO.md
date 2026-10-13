@@ -333,6 +333,23 @@ operativo).
   por encima, "hay 3 libres (otra va al personal) · falta 1". La de bar y la grande
   son una de cada, sin cambios. En el formulario, la nota de `cafetera` recomienda con
   la gente: "basta una Nespresso", "irían N Nespresso" o "mejor la grande (N cargas)".
+- **Lo nuevo, con su icono y revisado en todos los anchos** ("mira bien cómo se adapta
+  todo a las pantallas y revisa los iconos de lo nuevo", el dueño). Repaso a 320, 360,
+  414, 768, 1024, 1440 y 1920 del formulario (gente con tronas, cóctel, cafetera,
+  barbacoa y cuántas, buffets y sus platos) y de la app (checklist con todo lo nuevo y
+  el panel): nada se sale de lado. Cambios:
+  - Checklist (`ICONOS_ITEM`, delante de los grupos que los cogían por una palabra
+    suelta): Aperol un cóctel (era una caja), tronas un bebé (era un sillón), barbacoa
+    de ladrillo `BrickWallFire`, leña `FlameKindling`, café molido un grano y el rollo de
+    mantel de papel un rollo (era una camiseta).
+  - Formulario: cada cafetera lo suyo (Nespresso la taza, la de bar un bar, la grande
+    un grano de café); "¿Cuántas barbacoas?" con la de ladrillo; fondo propio para
+    barbacoa, cafetera y platos de buffet.
+  - El título de cada pregunta lleva el foco (lector de pantalla) pero ya sin el
+    recuadro que lo rodeaba al abrir el enlace.
+  - Panel: "Hay 2 en almacén: falta 1" en singular (decía "faltan 1"), en barbacoas y
+    tronas; los platos de buffet "se suman a los platos de postre (o van aparte si no
+    los hay)", como hace la checklist desde la cafetera.
 - **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
   barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
   3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el

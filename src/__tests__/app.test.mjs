@@ -613,6 +613,59 @@ async function main() {
     await c.close();
   }
 
+  // ── Lo nuevo, con su icono y en todos los anchos ─────────────────────────────
+  // "Mira bien cómo se adapta todo a las pantallas y revisa los iconos de lo nuevo"
+  // (el dueño): el Aperol salía con una caja, las tronas con un sillón y el rollo de
+  // mantel de papel con una camiseta; las tres cafeteras, las tres con la misma taza.
+  console.log("\n── Lo nuevo: sus iconos y sin salirse de la pantalla ──");
+  {
+    const estadoNuevo = { evento: "boda", pax: 200, tipoBBQ: "Grande", barbacoasLadrillo: 3, barbacoasRedondas: 1, numTronas: 4, llevaCornerAperol: true, llevaCornerVermut: true, tipoCafetera: "Nespresso" };
+    for (const ancho of [320, 768, 1920]) {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: ancho < 768, hasTouch: ancho < 768 });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url(estadoNuevo), { waitUntil: "domcontentloaded" });
+      await p.waitForSelector(".item-row");
+      const icono = (texto) => p.locator(".item-row", { hasText: texto }).first().locator("svg.item-icon").getAttribute("class");
+      const desborda = await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+      if (ancho === 320) {
+        ok(/lucide-baby/.test(await icono("Tronas")) && /lucide-martini/.test(await icono("Aperol (1L)"))
+          && /lucide-glass-water/.test(await icono("Agua con gas 0,75L (Aperol)")) && /lucide-brick-wall-fire/.test(await icono("Barbacoa grande de ladrillo"))
+          && /lucide-flame-kindling/.test(await icono("Leña")) && /lucide-scroll/.test(await icono("Rollo de mantel de papel")),
+          "tronas un bebé, Aperol un cóctel (su agua con gas, agua), la de ladrillo su barbacoa, la leña sus troncos y el rollo de papel un rollo");
+      }
+      ok(!desborda, `a ${ancho}px la checklist con todo lo nuevo no se sale de lado`);
+      if (ancho === 320) {
+        await p.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).click();
+        await p.waitForTimeout(400);
+        const avisos = await p.locator(".form-group", { has: p.locator(".form-label", { hasText: /^(Grandes de ladrillo|Tronas)$/ }) }).allInnerTexts();
+        ok(avisos.some(t => /Hay 2 en almacén: falta 1/.test(t)) && avisos.some(t => /Hay 3 en almacén: falta 1/.test(t))
+          && !(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)),
+          "en el panel, \"falta 1\" en singular (no \"faltan 1\"), y tampoco se sale de lado");
+      }
+      await c.close();
+    }
+    // En el formulario: cada cafetera con lo suyo y el título del foco sin recuadro
+    const { preguntasDe } = await import("../formulario/preguntas.js");
+    const r = { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 200, cafe: "invitados" };
+    const c = await navegador.newContext({ viewport: { width: 320, height: 700 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, rr => rr.abort());
+    await c.addInitScript(([paso, respuestas]) => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Boda de prueba", paso, respuestas,
+    })), [preguntasDe("boda", r).findIndex(q => q.id === "cafetera"), r]);
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(400);
+    const clases = await p.locator(".form-opcion svg").evaluateAll(ss => ss.map(e => e.getAttribute("class")));
+    ok(/cafetera/.test(await p.locator(".form-titulo").innerText()) && /lucide-coffee/.test(clases[0]) && /lucide-store/.test(clases[1]) && /lucide-bean/.test(clases[2]),
+      "la Nespresso una taza, la de bar un bar y la grande un grano de café (va con café molido)");
+    ok(await p.evaluate(() => getComputedStyle(document.querySelector(".form-titulo")).outlineStyle) === "none"
+      && !(await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)),
+      "el título lleva el foco pero sin recuadro alrededor, y a 320px nada se sale");
+    await c.close();
+  }
+
   // ── El Resumen del modo carga, en el móvil una lista ─────────────────────────
   // "Resumen sigue estando feo, arréglalo y hazlo más premium" (el dueño, con la tabla
   // de siete columnas en el móvil: arrastrar de lado y nombres en tres líneas). En el

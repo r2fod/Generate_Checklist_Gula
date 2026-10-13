@@ -4,7 +4,7 @@ import {
   Beer, GlassWater, Flame, Snowflake, ChefHat, Zap, Tent, Radio, Table, Cake,
   ClipboardList, Tag, RotateCcw, ShoppingCart, Sparkles, Refrigerator, Layers,
   ConciergeBell, Fuel, PartyPopper, Popcorn, Sofa, Ham, Droplet, Croissant, Milk,
-  Check,
+  Check, Baby, Bean, BrickWallFire, FlameKindling, Scroll,
 } from "lucide-react";
 import { useAcabaDe } from "./useAcabaDe.js";
 
@@ -92,6 +92,15 @@ export function CabeceraCategoria({ nombre, hechos, total, grupo }) {
 // Icono por MATERIAL: se elige según palabras clave del nombre del item (el primero
 // que coincide gana, por eso el orden importa). Es decorativo — una pista visual.
 const ICONOS_ITEM = [
+  // Lo nuevo con su dibujo propio, delante de los grupos que lo cogerían por una
+  // palabra suelta: el Aperol salía como una caja, las tronas como un sillón, el
+  // rollo de mantel de papel como una camiseta.
+  { f: ["aperol ("], I: Martini, c: "#ea580c" },
+  { f: ["trona"], I: Baby, c: "#db2777" },
+  { f: ["ladrillo"], I: BrickWallFire, c: "#ea580c" },
+  { f: ["leña"], I: FlameKindling, c: "#ea580c" },
+  { f: ["café molido"], I: Bean, c: "#78350f" },
+  { f: ["rollo de mantel"], I: Scroll, c: "#a21caf" },
   { f: ["menú sin", "menu sin", "menú vegano", "menu vegano", "menú vegetariano", "menu vegetariano", "menú especial", "menu especial"], I: ChefHat, c: "#991b1b" },
   { f: ["vino", "tinto de verano", "vermut", "mistela", "cava", "champ", "sangr"], I: Wine, c: "#9d174d" },
   { f: ["cerveza", "barril", "tercio", "alhambra"], I: Beer, c: "#b45309" },
@@ -109,7 +118,7 @@ const ICONOS_ITEM = [
   { f: ["mantel", "servilleta", "delantal", "trapo", "bayeta", "lito", "textil", "camino"], I: Shirt, c: "#a21caf" },
   { f: ["fairy", "estropajo", "limpieza", "escoba", "mocho", "recogedor", "papel", "film", "chemine", "bolsa", "cenicero", "basura", "cubo"], I: SprayCan, c: "#059669" },
   { f: ["nevera", "congelador"], I: Snowflake, c: "#0284c7" },
-  { f: ["silla", "taburete", "sofá", "chill", "trona", "cesta"], I: Armchair, c: "#9333ea" },
+  { f: ["silla", "taburete", "sofá", "chill", "cesta"], I: Armchair, c: "#9333ea" },
   { f: ["tarta", "candy", "mesa dulce"], I: Cake, c: "#db2777" },
   { f: ["mesa", "caballete", "servilletero", "marcos", "deco", "cajas de madera"], I: Table, c: "#7c3aed" },
   { f: ["regleta", "alargador", "cable", "generador", "garrafa", "foco", "luz", "guirnalda", "eléctric", "electric", "imperdible", "brida", "rulo", "cinta"], I: Zap, c: "#ca8a04" },
