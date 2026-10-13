@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "rea
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, respuestasAlDia, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
-import FondoIconos, { iconoDePregunta, iconoDeOpcion } from "./FondoIconos.jsx";
+import FondoIconos, { iconoDePregunta, iconoDeOpcion, gestoDeIcono } from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
 import { leerMios, apuntarEnvio, olvidarEnvio, buscarEnvioPorNombre } from "./mios.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, silenciar } from "./instalar.js";
@@ -532,7 +532,7 @@ export default function Formulario({ codigo }) {
         <FondoIconos pregunta="elegir" />
         <LogoGula grande />
         <h1 className="form-titulo">
-          <IconoElegir className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} />
+          <span className={`form-titulo-gesto ${gestoDeIcono(IconoElegir)}`}><IconoElegir className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} /></span>
           ¿De qué evento son los datos?
         </h1>
         {/* Si se ha venido al inicio a media pregunta, lo primero es poder volver:
@@ -550,7 +550,7 @@ export default function Formulario({ codigo }) {
           {lista.map((e, i) => {
             // El mismo icono que ya distingue el tipo en la pregunta "tipo": boda,
             // comunión, empresa... así se reconoce de un vistazo sin leer el nombre.
-            const IconoEvento = iconoDeOpcion("tipo", Math.max(0, TIPOS_EVENTO.findIndex(t => t.valor === e.tipo)));
+            const IconoEvento = iconoDeOpcion("tipo", { valor: e.tipo });
             // Ya se le mandó algo desde este móvil: se distingue de un vistazo, sin
             // tener que abrirlo. No lo saca de la lista —puede hacer falta mandarle
             // una corrección o un dato más—, solo dice que ya tiene algo enviado.
@@ -800,7 +800,9 @@ export default function Formulario({ codigo }) {
           de cambiar el texto de golpe: se nota que has pasado de pregunta. */}
       <div className="form-entra" key={p.id}>
         <h1 className="form-titulo" tabIndex={-1} ref={tituloRef}>
-          <IconoTitulo className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} />
+          {/* El icono entra y luego hace su gesto (la llama parpadea, la copa brinda...):
+              la entrada va en el icono y el gesto en su envoltorio, para no pisarse */}
+          <span className={`form-titulo-gesto ${gestoDeIcono(IconoTitulo)}`}><IconoTitulo className="form-titulo-icono" aria-hidden="true" size={22} strokeWidth={1.75} /></span>
           {p.texto}
         </h1>
         {p.nota && <p className="form-nota">{typeof p.nota === "function" ? p.nota(respuestas) : p.nota}</p>}
@@ -824,7 +826,7 @@ export default function Formulario({ codigo }) {
           // piden las flores, el archivo del menú) no pasan solas de pantalla: hay que
           // dejar contestarlo antes.
           const arrastraAlgo = !!(o.conNumero || o.conCampos || o.conArchivo);
-          const IconoOpcion = iconoDeOpcion(p.id, i);
+          const IconoOpcion = iconoDeOpcion(p.id, o);
           return (
             <div key={o.valor}>
               <button
@@ -839,10 +841,11 @@ export default function Formulario({ codigo }) {
                     const campo = o.campoNumero || `${o.valor}Numero`;
                     if (respuestas[campo] === undefined) pon(campo, o.sugerido(respuestas));
                   }
-                  if (!arrastraAlgo) setTimeout(siguiente, 120);
+                  // Un instante para ver el gesto del icono elegido antes de pasar
+                  if (!arrastraAlgo) setTimeout(siguiente, 240);
                 }}
               >
-                <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                <span className={`form-opcion-gesto ${gestoDeIcono(IconoOpcion)}`}><IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} /></span>
                 {o.texto}
               </button>
               {elegida && o.conNumero && (() => {
@@ -897,13 +900,13 @@ export default function Formulario({ codigo }) {
           );
         })}
 
-        {p.tipo === "marcar" && opcionesDe(p, tipo).map((o, i) => {
+        {p.tipo === "marcar" && opcionesDe(p, tipo).map((o) => {
           // porDefecto: para preguntas donde lo normal es que casi todo venga
           // marcado (ej. "qué dobla" con primero+segundo) — se muestra premarcado
           // hasta que se toque algo, en vez de partir siempre de una lista vacía.
           const marcadas = respuestas[p.id] !== undefined ? respuestas[p.id] : (p.porDefecto || []);
           const puesta = marcadas.includes(o.valor);
-          const IconoOpcion = iconoDeOpcion(p.id, i);
+          const IconoOpcion = iconoDeOpcion(p.id, o);
           return (
             <div key={o.valor}>
               <button
@@ -923,7 +926,7 @@ export default function Formulario({ codigo }) {
                   }
                 }}
               >
-                <IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} />
+                <span className={`form-opcion-gesto ${gestoDeIcono(IconoOpcion)}`}><IconoOpcion className="form-opcion-icono" aria-hidden="true" size={18} strokeWidth={1.75} /></span>
                 {o.texto}
               </button>
               {/* El número se guarda donde diga la pregunta (campoNumero), como en las de

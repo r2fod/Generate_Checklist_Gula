@@ -6223,6 +6223,60 @@ hr {
   background: var(--accent-soft);
 }
 
+/* ─── EL GESTO DE CADA ICONO ───────────────────────────────────────────────────
+   "Que tengan sentido con la frase, y anímalos" (el dueño). Cada icono hace lo suyo
+   (FondoIconos.jsx, gestoDeIcono): la llama parpadea, el copo gira, las copas
+   brindan, el camión arranca, el corazón late, el "no" niega y el resto da un brinco.
+   El del título lo hace una vez al llegar la pregunta, después de su entrada; el de
+   una opción, al elegirla (y con el ratón encima, donde hay ratón). El gesto va en el
+   envoltorio y la entrada en el icono: así cambiar uno no repite el otro. */
+.form-titulo-gesto, .form-opcion-gesto { display: inline-flex; flex-shrink: 0; }
+.form-titulo-gesto { animation: var(--gesto, form-gesto-bote) 0.7s ease-in-out 0.45s both; }
+.form-opcion.es-elegida .form-opcion-gesto { animation: var(--gesto, form-gesto-bote) 0.6s ease-in-out; }
+@media (hover: hover) {
+  .form-opcion:hover .form-opcion-gesto { animation: var(--gesto, form-gesto-bote) 0.6s ease-in-out; }
+}
+.form-gesto-bote { --gesto: form-gesto-bote; }
+.form-gesto-llama { --gesto: icono-llama; transform-origin: 50% 90%; }
+.form-gesto-hielo { --gesto: icono-hielo; }
+.form-gesto-camion { --gesto: icono-camion; }
+.form-gesto-brindis { --gesto: form-gesto-brindis; transform-origin: 50% 100%; }
+.form-gesto-latido { --gesto: form-gesto-latido; }
+.form-gesto-no { --gesto: form-gesto-no; }
+.form-gesto-giro { --gesto: form-gesto-giro; }
+@keyframes form-gesto-bote {
+  0%, 100% { transform: none; }
+  40%      { transform: translateY(-4px) scale(1.15); }
+  70%      { transform: translateY(1px) scale(0.97); }
+}
+@keyframes form-gesto-brindis {
+  0%, 100% { transform: none; }
+  30%      { transform: rotate(-16deg); }
+  60%      { transform: rotate(10deg); }
+  80%      { transform: rotate(-4deg); }
+}
+@keyframes form-gesto-latido {
+  0%, 100% { transform: none; }
+  25%      { transform: scale(1.25); }
+  45%      { transform: scale(1); }
+  65%      { transform: scale(1.15); }
+}
+@keyframes form-gesto-no {
+  0%, 100% { transform: none; }
+  20%      { transform: translateX(-3px); }
+  40%      { transform: translateX(3px); }
+  60%      { transform: translateX(-2px); }
+  80%      { transform: translateX(2px); }
+}
+@keyframes form-gesto-giro {
+  0%, 100% { transform: none; }
+  30%      { transform: rotate(-18deg) scale(1.15); }
+  65%      { transform: rotate(14deg) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form-titulo-gesto, .form-opcion-gesto { animation: none !important; }
+}
+
 .form-campo {
   display: flex;
   flex-direction: column;

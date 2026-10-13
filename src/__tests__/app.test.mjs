@@ -555,6 +555,61 @@ async function main() {
     await c.close();
   }
 
+  // ── El formulario: cada icono con sentido, y con su gesto ────────────────────
+  // "Mejora los iconos del formulario para que tengan sentido con la frase y anímalos"
+  // (el dueño): salían por posición (el "Corner de vermut" con una olla, la "Fruta"
+  // con unos cubiertos). Ahora cada opción lleva el suyo y hace su gesto al elegirla.
+  console.log("\n── El formulario: iconos con sentido y con gesto ──");
+  for (const reducido of [false, true]) {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: reducido ? "reduce" : "no-preference" });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Boda de prueba", paso: 26,
+      respuestas: { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 },
+    })));
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(900);
+    const icono = (texto) => p.locator(".form-opcion", { hasText: texto }).first().locator("svg").getAttribute("class");
+    if (!reducido) {
+      ok(/buffet/i.test(await p.locator(".form-titulo").innerText())
+        && /lucide-wine/.test(await icono("Corner de vermut")) && /lucide-martini/.test(await icono("Corner de Aperol"))
+        && /lucide-apple/.test(await icono("Fruta")) && /lucide-ham/.test(await icono("Ibéricos")) && /lucide-plus/.test(await icono("Otro")),
+        "cada buffet con su icono: vermut una copa, Aperol un cóctel, fruta una manzana, ibéricos un jamón");
+    }
+    await p.locator(".form-opcion", { hasText: "Corner de vermut" }).click();
+    await p.waitForTimeout(120);
+    const m = await p.evaluate(() => {
+      const gesto = document.querySelector(".form-opcion.es-elegida .form-opcion-gesto");
+      return { opcion: getComputedStyle(gesto).animationName, titulo: getComputedStyle(document.querySelector(".form-titulo-gesto")).animationName };
+    });
+    if (!reducido) {
+      ok(m.opcion === "form-gesto-brindis" && m.titulo !== "none",
+        `al elegirlo, la copa brinda (${m.opcion}), y el título hace el suyo al llegar (${m.titulo})`);
+    } else {
+      ok(m.opcion === "none" && m.titulo === "none", "con \"reducir movimiento\", quietos");
+    }
+    await c.close();
+  }
+  {
+    // Un "no" se tacha, y un "sí" lleva el icono de su pregunta
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => localStorage.setItem("gula_formulario_PRUEBA2", JSON.stringify({
+      eventoDestino: "Boda de prueba", paso: 4,
+      respuestas: { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100 },
+    })));
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA2", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-titulo");
+    await p.waitForTimeout(700);
+    const clases = await p.locator(".form-opcion svg").evaluateAll(ss => ss.map(e => e.getAttribute("class")));
+    ok(/carpas/i.test(await p.locator(".form-titulo").innerText()) && clases.some(c => /lucide-ban/.test(c)) && clases.some(c => /lucide-tent/.test(c)),
+      `"No hacen falta" tachado y "Sí" con su carpa`);
+    await c.close();
+  }
+
   // ── El Resumen del modo carga, en el móvil una lista ─────────────────────────
   // "Resumen sigue estando feo, arréglalo y hazlo más premium" (el dueño, con la tabla
   // de siete columnas en el móvil: arrastrar de lado y nombres en tres líneas). En el
