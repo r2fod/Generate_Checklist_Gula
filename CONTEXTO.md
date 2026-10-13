@@ -325,7 +325,8 @@ operativo).
 - **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
   barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
   3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el
-  dueño). Era una casilla de "extras" que cargaba una grande. Ahora `barbacoa` (sí/no,
+  dueño; corregido: "grandes de ladrillo tenemos 2, redondas pequeñas metálicas 3 y 1
+  rectangular metálica"). Era una casilla de "extras" que cargaba una grande. Ahora `barbacoa` (sí/no,
   detrás del horno, boda/comunión/empresa) y, si la lleva, `barbacoasCuantas` (numeros,
   con aviso si se piden más de las del almacén) → `barbacoasLadrillo`,
   `barbacoasRedondas`, `barbacoasRectangular` (null = sin decir). En la checklist

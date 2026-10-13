@@ -55,7 +55,7 @@ const hayPlatos = (r = {}) => r.servicio !== "bandeja"
 const TRONAS_EN_ALMACEN = 3;
 // Las barbacoas del almacén, por tipo. Mismo reparto que BARBACOAS en
 // checklist-generadores.js (repetido por lo mismo que las tronas).
-const BARBACOAS_EN_ALMACEN = { ladrillo: 3, redonda: 3, rectangular: 1 };
+const BARBACOAS_EN_ALMACEN = { ladrillo: 2, redonda: 3, rectangular: 1 };
 const avisoAlmacen = (hay) => (n) => (n > hay
   ? `Tenemos ${hay}: ${n - hay === 1 ? "falta 1" : `faltan ${n - hay}`}, hay que conseguirlas.`
   : "");
@@ -559,7 +559,7 @@ export const PREGUNTAS = [
   },
   {
     id: "barbacoasCuantas", tipo: "numeros", texto: "¿Cuántas barbacoas de cada una?",
-    nota: "Tenemos 3 grandes de ladrillo, 3 pequeñas redondas (metálicas) y 1 pequeña rectangular.",
+    nota: "Tenemos 2 grandes de ladrillo, 3 pequeñas redondas y 1 pequeña rectangular (las pequeñas, metálicas).",
     campos: [
       { id: "barbacoasLadrillo", etiqueta: "Grandes de ladrillo", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.ladrillo) },
       { id: "barbacoasRedondas", etiqueta: "Pequeñas redondas", min: 0, aviso: avisoAlmacen(BARBACOAS_EN_ALMACEN.redonda) },

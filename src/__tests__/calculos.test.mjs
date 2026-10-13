@@ -3228,8 +3228,8 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
 
 // ─── La barbacoa: cuántas de cada, con su carbón y su leña ─────────────────────
 // "Debería preguntar si lleva barbacoa, y si lleva agregar carbón y leña, y que puedas
-// decir cuántas grandes o pequeñas: tenemos 3 grandes de ladrillo, 3 pequeñas metálicas
-// redondas y una pequeña rectangular" (el dueño).
+// decir cuántas grandes o pequeñas" y "grandes de ladrillo tenemos 2, redondas pequeñas
+// metálicas 3 y 1 rectangular metálica" (el dueño).
 console.log("\n── La barbacoa, por tipo ──");
 {
   const fuego = (opts) => buildChecklist("boda", 100, 2, 4, 0, opts).find(c => c.nombre === "Paella y fuego").items
@@ -3244,7 +3244,7 @@ console.log("\n── La barbacoa, por tipo ──");
   ok(de(con, /^Barbacoa grande de ladrillo/)[1].u === 4 && de(con, /^Barbacoa pequeña redonda/)[1].u === 1
     && !de(con, /^Barbacoa pequeña rectangular/) && !de(con, /^Barbacoa grande$/),
     "diciendo cuántas, una línea por cada tipo que va");
-  ok(de(con, /^Barbacoa grande de ladrillo/)[1].sufijo(4) === "de 3 en almacén · falta 1"
+  ok(de(con, /^Barbacoa grande de ladrillo/)[1].sufijo(4) === "de 2 en almacén · faltan 2"
     && de(con, /^Barbacoa pequeña redonda/)[1].sufijo(1) === "de 3 en almacén",
     "y con más de las que hay en el almacén, lo dice");
   ok(de(con, /^Reja BBQ grande/)[1] === "4" && de(con, /^Carbón/)[1] === "5" && de(con, /^Leña/)[1] === "5",

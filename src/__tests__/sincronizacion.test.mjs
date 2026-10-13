@@ -713,8 +713,8 @@ console.log("\n══ La barbacoa, con su pregunta ══");
     "ya no es una casilla de lo presupuestado");
   const cuantas = PREGUNTAS.find(p => p.id === "barbacoasCuantas");
   ok(cuantas.campos.map(c => c.aviso(c.id === "barbacoasRectangular" ? 2 : 4)).join(" | ")
-    === "Tenemos 3: falta 1, hay que conseguirlas. | Tenemos 3: falta 1, hay que conseguirlas. | Tenemos 1: falta 1, hay que conseguirlas.",
-    "cada tipo avisa si se piden más de las que hay (3, 3 y 1)");
+    === "Tenemos 2: faltan 2, hay que conseguirlas. | Tenemos 3: falta 1, hay que conseguirlas. | Tenemos 1: falta 1, hay que conseguirlas.",
+    "cada tipo avisa si se piden más de las que hay (2, 3 y 1)");
   const e = aRespuestasDeLaApp({ tipo: "boda", adultos: 100, barbacoa: "si", barbacoasLadrillo: 2, barbacoasRedondas: 1 });
   ok(e.tipoBBQ === "Grande" && e.barbacoasLadrillo === 2 && e.barbacoasRedondas === 1 && e.barbacoasRectangular === 0,
     "las de cada tipo llegan a la app");

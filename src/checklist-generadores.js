@@ -95,12 +95,12 @@ function lineaTronas(numTronas) {
   });
 }
 
-// Las barbacoas del almacén (el dueño: "3 grandes de ladrillo, 3 pequeñas metálicas
-// redondas y una pequeña rectangular"). Repetido en preguntas.js para el aviso.
+// Las barbacoas del almacén (el dueño: "grandes de ladrillo tenemos 2, redondas pequeñas
+// metálicas 3 y 1 rectangular metálica"). Repetido en preguntas.js para el aviso.
 export const BARBACOAS = {
-  ladrillo: { etiqueta: "Barbacoa grande de ladrillo", hay: 3 },
+  ladrillo: { etiqueta: "Barbacoa grande de ladrillo", hay: 2 },
   redonda: { etiqueta: "Barbacoa pequeña redonda (metálica)", hay: 3 },
-  rectangular: { etiqueta: "Barbacoa pequeña rectangular", hay: 1 },
+  rectangular: { etiqueta: "Barbacoa pequeña rectangular (metálica)", hay: 1 },
 };
 // [[tipo, cuántas]] si se ha dicho alguna; null si no (y entonces va la de siempre)
 function barbacoasPorTipo(ladrillo, redondas, rectangular) {
