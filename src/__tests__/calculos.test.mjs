@@ -709,18 +709,12 @@ console.log("\n══ El ratio ajustable llega de verdad a la checklist (bug rea
   ponRatios({});   // se dejan como estaban para el resto de la batería
 }
 
-console.log("\n══ Las tronas siguen al número de niños ══");
+console.log("\n══ Las tronas, las que se digan (no por niños) ══");
 {
-  // El dueño reportó tronas desactualizadas al corregir el número de niños desde el
-  // formulario. No se reprodujo: buildChecklist() recibe `ninos` como parámetro propio
-  // (no algo que haya que "recalcular" aparte) y "Tronas" sale directamente de él en
-  // los tres builders (checklist-generadores.js). Confirmado también con Playwright de
-  // verdad, en los dos caminos posibles — un arranque fresco con el ninos nuevo (lo que
-  // hace la app tras aplicar un envío: guarda el estado y recarga entera) y cambiar el
-  // campo Niños en caliente sin recargar — Tronas se actualiza sola en los dos, sin
-  // pulsar "Recalcular cantidades". Se deja esta prueba para que, si el fallo vuelve a
-  // aparecer, sea por otra vía (por ejemplo un valor puesto a mano que pisa el cálculo
-  // a propósito) y no por esto.
+  // Antes salían del número de niños y esta prueba lo vigilaba (el dueño había visto
+  // tronas sin actualizar al corregir los niños). Ahora no dependen de los niños: "si se
+  // deja en blanco no debería poner ninguna, solo se añade si se pone el número" (el
+  // dueño). Se comprueba que cambiar los niños no las mueve.
   const cantidadItem = (cats, label) => {
     for (const c of cats) {
       const it = c.items.filter(Boolean).find(x => x[0] === label);
@@ -728,14 +722,12 @@ console.log("\n══ Las tronas siguen al número de niños ══");
     }
     return undefined;
   };
-  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 5, {}), "Tronas") === "5",
-    "con 5 niños, la checklist de boda pide 5 tronas");
-  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 10, {}), "Tronas") === "10",
-    "y con 10, pide 10 — sin nada guardado de antes que pueda quedarse atrás");
-  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 0, {}), "Tronas") === "—",
-    "y sin niños, no se piden tronas");
-  ok(cantidadItem(buildChecklist("cumpleanos", 60, 0, 0, 8, {}), "Tronas") === "8",
-    "y en cumpleaños igual: 8 niños, 8 tronas");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 5, {}), "Tronas") === null
+    && cantidadItem(buildChecklist("cumpleanos", 60, 0, 0, 8, {}), "Tronas") === null,
+    "con niños y sin decir tronas, no va ninguna (boda y cumpleaños)");
+  ok(cantidadItem(buildChecklist("boda", 100, 2, 4, 5, { numTronas: 2 }), "Tronas").u === 2
+    && cantidadItem(buildChecklist("boda", 100, 2, 4, 10, { numTronas: 2 }), "Tronas").u === 2,
+    "y las dichas no cambian con los niños");
 }
 
 console.log("\n══ El café, para invitados o solo para el personal ══");
@@ -3200,9 +3192,15 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
   ok(["boda", "cumpleanos", "produccion"].every(evt => num(linea(evt, { diasProduccion: ["20"] }, /^Rollo de mantel de papel/)) === 1),
     "el rollo de mantel de papel, en las tres checklists");
 
-  ok(linea("boda", {}, /^Tronas/)[2] === "10" && linea("boda", { numTronas: 2 }, /^Tronas/)[2] === "2"
-    && linea("boda", { numTronas: 0 }, /^Tronas/)[2] === "—",
-    "las tronas: las que se digan; sin decir, una por niño como siempre");
+  // "Si se deja en blanco no debería poner ninguna; solo tenemos 3 en inventario" (el dueño)
+  const tronas = (opts) => linea("boda", opts, /^Tronas/)[2];
+  ok(tronas({}) === null && tronas({ numTronas: 0 }) === null && tronas({ numTronas: 2 }).u === 2,
+    "las tronas: solo las que se digan; sin decir, ninguna (aunque haya niños)");
+  ok(tronas({ numTronas: 2 }).sufijo(2) === "de 3 en almacén" && tronas({ numTronas: 5 }).sufijo(5) === "de 3 en almacén · faltan 2"
+    && tronas({ numTronas: 4 }).sufijo(4) === "de 3 en almacén · falta 1",
+    "y con más de las 3 del almacén, la línea dice cuántas faltan");
+  ok(linea("cumpleanos", {}, /^Tronas/)[2] === null && linea("cumpleanos", { numTronas: 1 }, /^Tronas/)[2].u === 1,
+    "en un cumpleaños, igual");
 
   const postre = (opts) => num(linea("boda", opts, /^Platos postre/, 100, 0));
   ok(postre({ platosBuffet: 1 }) === postre({}) + 100 && postre({ platosBuffet: 2 }) === postre({}) + 200,

@@ -44,6 +44,11 @@ export const TIPOS_EVENTO = [
 
 const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
 
+// Mismo número que TRONAS_EN_ALMACEN en checklist-generadores.js, repetido por lo mismo
+// que GASTROS_MINIMO (ver "cuantosGastros"): importar de ahí metería el motor entero en
+// el formulario. Si cambia, se cambia en los dos sitios.
+const TRONAS_EN_ALMACEN = 3;
+
 // Mismo valor que GASTROS_MINIMO en checklist-generadores.js — ver el porqué de la
 // duplicación en la pregunta "cuantosGastros", más abajo.
 const GASTROS_MINIMO = 4;
@@ -93,12 +98,18 @@ export const PREGUNTAS = [
     // El staff (cocina, refuerzo, proveedores que comen) no son invitados, pero están
     // ahí y beben agua y usan vasos: la app los cuenta aparte, con los camareros.
     // Las tronas no se preguntaban: la checklist cargaba una por niño, y un niño de diez
-    // años no come en trona. Aquí se dicen las que hacen falta de verdad (los bebés).
-    nota: "El staff son los que están trabajando y no van en el número de invitados. Tronas, solo las de los bebés.",
+    // años no come en trona. Aquí se dicen las que hacen falta de verdad (los bebés), y
+    // sin decirlo no va ninguna. En el almacén hay 3: si piden más, se avisa ya.
+    nota: "El staff son los que están trabajando y no van en el número de invitados. Tronas, solo las de los bebés (si no hace falta ninguna, en blanco).",
     campos: [
       { id: "adultos", etiqueta: "Adultos", min: 0 },
       { id: "ninos", etiqueta: "Niños", min: 0 },
-      { id: "tronas", etiqueta: "Tronas", min: 0 },
+      {
+        id: "tronas", etiqueta: "Tronas", min: 0,
+        aviso: (n) => (n > TRONAS_EN_ALMACEN
+          ? `Tenemos ${TRONAS_EN_ALMACEN}: ${n - TRONAS_EN_ALMACEN === 1 ? "falta 1" : `faltan ${n - TRONAS_EN_ALMACEN}`}, hay que conseguirlas.`
+          : ""),
+      },
       { id: "staff", etiqueta: "Staff", min: 0 },
     ],
     soloEn: ["boda", "comunion", "corporativo", "cumpleanos"],
