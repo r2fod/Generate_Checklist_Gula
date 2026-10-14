@@ -51,7 +51,7 @@ import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESO
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
 import { PERSONAS_POR_PAELLA, paellasPorPax, calcPaella } from "../paella.js";
 import { ponFactoresComida, leerFactoresComida, conFactorComida } from "../comida.js";
-import { SECTOR, compararRatios } from "../asistente/sector.js";
+import { SECTOR, compararRatios, comprobarBebidaSector } from "../asistente/sector.js";
 import { CAMBIOS, ultimoCambio } from "../cambios.js";
 import { ANCHO, ALTO, ITERACIONES, estadoInicial, paso, bordesDe } from "../asistente/grafoFisica.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -2867,6 +2867,24 @@ console.log("\n══ El sector, como banda de sanidad ══");
   // Los ratios propios de la casa que sector.js compara existen de verdad en sus
   // ficheros — que sector.js no se quede comparando contra un número que ya no existe.
   ok(PERSONAS_POR_PAELLA === 30, "la paella sigue en paella.js con el mismo valor que documenta sector.js");
+
+  // comprobarBebidaSector: avisa cuando un factor baja el ratio por debajo de la banda del sector
+  // (riesgo de falta si no se meten las vueltas de forma recurrente)
+  const vinoNormal = comprobarBebidaSector("vino", 1);
+  ok(!vinoNormal.peligroBajo && vinoNormal.ratioEfectivo === 0.72, "vino con factor 1 no da peligro bajo");
+
+  const vinoBajo = comprobarBebidaSector("vino", 0.4);
+  ok(vinoBajo.peligroBajo && vinoBajo.ratioEfectivo < 0.33, "vino con factor 0.4 cae por debajo de la banda del sector (0,29 < 0,33)");
+  ok(vinoBajo.aviso && vinoBajo.aviso.includes("Riesgo de falta si no se apuntaron todas las vueltas"), "avisa del riesgo de falta por vueltas no recurrentes");
+
+  const cervezaBaja = comprobarBebidaSector("cerveza", 0.4, { esVerano: true });
+  ok(cervezaBaja.peligroBajo && cervezaBaja.ratioEfectivo < 1.5, "cerveza verano con factor 0.4 cae por debajo del sector (1,2 < 1,5)");
+
+  const cavaBajo = comprobarBebidaSector("cava", 0.5);
+  ok(cavaBajo.peligroBajo && cavaBajo.ratioEfectivo < 0.125, "cava con factor 0.5 cae por debajo del sector (0,10 < 0,125)");
+
+  const refrescoBajo = comprobarBebidaSector("refresco", 0.3);
+  ok(refrescoBajo.peligroBajo && refrescoBajo.ratioEfectivo < 2.0, "refresco con factor 0.3 cae por debajo del sector (1,33 < 2,0)");
 }
 
 console.log("\n══ Qué ha cambiado, para quien lo usa ══");

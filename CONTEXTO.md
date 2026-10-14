@@ -870,7 +870,11 @@ está en el historial de git y en las pruebas que los cubren):
   mantel de papel;
 - #275 Sincronización concurrente protegida: elimina la sobreescritura accidental al arrancar
   la app con un evento en caché local mientras otra persona edita, e hidrata la pantalla
-  directamente con la versión fresca de la nube.
+  directamente con la versión fresca de la nube;
+- #276 Ratios de bebida: aviso si la calibración o ratio cae por debajo del sector. Como las
+  vueltas de bebida no se registran de forma recurrente, los factores automáticos tienden a la baja
+  arriesgando poner bebida de menos. Se añade comprobación centralizada contra el sector (`comprobarBebidaSector`),
+  avisos en el Panel de Bebida, advertencia en auditoría de oportunidades y en la revisión de eventos.
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
@@ -953,6 +957,15 @@ Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
 despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
 tanda de fusiones.
+
+**Ratios de bebida: aviso si la calibración o ratio cae por debajo del sector — HECHO**:
+- **Motivo**: Al no registrarse de forma recurrente las vueltas de bebida en los eventos terminados, los pocos eventos con devolución computada skewan el ratio de consumo hacia abajo. Como la calibración automática necesita solo 3 eventos para proponer un factor (ej. 0.4 o 0.5), aplicar ese factor arriesga cargar significativamente menos bebida de la necesaria.
+- **Solución implementada**:
+  - `src/asistente/sector.js`: Centralizada `comprobarBebidaSector(bebida, factor, { esVerano })` con bandas de referencia del sector (vino, cerveza, cava y refresco). Compara el ratio efectivo contra el mínimo del sector y marca `peligroBajo: true` con mensajes explicativos claros.
+  - `src/components/PanelBebida.jsx`: Los campos con factor que dejen el ratio bajo el sector se resaltan con borde ambar y aviso `< sector`. Los botones de factor medido histórico avisan con icono de alerta y nota de precaución si el dato medido cae bajo el sector, recordando revisar si faltaron devoluciones por apuntar.
+  - `src/asistente/revision.js`: `oportunidadesNegocio` detecta mediciones bajo el mínimo del sector y advierte explícitamente: `"Como las vueltas de bebida no se meten de forma recurrente, este factor podría poner bebida de menos."` `revisarEvento` genera aviso de rareza ("raro") en eventos configurados con ratios bajo el sector.
+  - `src/asistente/herramientas.js`: `comparar_con_sector` ampliado con comprobación de refrescos y soporte de factores por tipo de evento.
+  - Pruebas unitarias añadidas en `calculos.test.mjs` y `asistente.test.mjs`.
 
 **Formulario: buffets configuran mesas de verdad, y reorden por bloques — HECHO
 (PR #184, tras #182/#183 ya fusionados)**:

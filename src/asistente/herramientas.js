@@ -30,7 +30,7 @@ import { escaletaDelEvento, resumenEscaleta } from "../escaleta.js";
 import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
 import { personalNecesario, leerRatios, saneaRatios } from "../personal.js";
 import { catsDeEventoGuardado } from "../calibracion.js";
-import { RATIOS_BEBIDA, TIPOS_BEBIDA, CLAVES_BEBIDA, esFactorValido, leerFactores, FACTOR_NEUTRO } from "../bebida.js";
+import { RATIOS_BEBIDA, TIPOS_BEBIDA, CLAVES_BEBIDA, esFactorValido, leerFactores, FACTOR_NEUTRO, factoresDeTipo } from "../bebida.js";
 import { CLAVES_COMIDA } from "../comida.js";
 import { CLAVES_CRISTALERIA, esFactorValido as esFactorCristaleriaValido, leerFactoresCristaleria, factorCristaleria } from "../cristaleria.js";
 import { PERSONAS_POR_PAELLA } from "../paella.js";
@@ -337,18 +337,25 @@ export const HERRAMIENTAS = {
       parameters: {
         type: "object",
         properties: {
-          ratio: { type: "string", description: "Parte del nombre de un ratio concreto (por ejemplo 'paella' o 'hielo'). Vacío para compararlos todos." },
+          ratio: { type: "string", description: "Parte del nombre de un ratio concreto (por ejemplo 'paella', 'vino' o 'hielo'). Vacío para compararlos todos." },
+          tipo: { type: "string", description: "Tipo de evento opcional (boda, comunion, corporativo, cumpleanos, produccion) para aplicar sus factores de bebida vigentes." },
         },
       },
     },
-    corre: (ctx, { ratio = "" } = {}) => {
+    corre: (ctx, { ratio = "", tipo = "" } = {}) => {
       const ratiosCamareros = leerRatios();
+      const factores = tipo && TIPOS_BEBIDA.includes(tipo) ? factoresDeTipo(tipo) : null;
+      const fVino = factores ? factores.vino : 1;
+      const fCerveza = factores ? factores.cerveza : 1;
+      const fCava = factores ? factores.cava : 1;
+      const fRefresco = factores ? factores.refresco : 1;
       const actuales = {
         camareros_banquete: ratiosCamareros.boda,
         camareros_corporativo: ratiosCamareros.corporativo,
-        vino: RATIOS_BEBIDA.vino,
-        cerveza_verano: RATIOS_BEBIDA.cerveza.verano,
-        cava: RATIOS_BEBIDA.cava,
+        vino: Math.round(RATIOS_BEBIDA.vino * fVino * 100) / 100,
+        cerveza_verano: Math.round(RATIOS_BEBIDA.cerveza.verano * fCerveza * 100) / 100,
+        cava: Math.round(RATIOS_BEBIDA.cava * fCava * 100) / 100,
+        refresco: Math.round(4.44 * fRefresco * 100) / 100,
         hielo_verano: KG_HIELO_POR_PAX.verano,
         hielo_invierno: KG_HIELO_POR_PAX.invierno,
         paella: PERSONAS_POR_PAELLA,

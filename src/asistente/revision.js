@@ -19,8 +19,10 @@ import { menusEspeciales, alergiasDeLasNotas } from "../menus-especiales.js";
 import { PAX_POR_CAMARERO, leerRatios } from "../personal.js";
 import { TIPOS_MESA } from "../mesas.js";
 import { hoyISO, enDiasISO } from "../fecha.js";
-import { BEBIDAS, factorDe } from "../bebida.js";
+import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, factoresDeTipo } from "../bebida.js";
 import { COMIDAS } from "../comida.js";
+import { comprobarBebidaSector } from "./sector.js";
+import { enTexto } from "../texto.js";
 
 // En el navegador es el día de quien mira; en el Worker, que va en UTC, es el mismo día
 // que daba antes. Una sola cuenta para los dos (ver src/fecha.js).
@@ -75,6 +77,21 @@ export function revisarEvento(nombre, e = {}) {
     if (ratio > medido * 1.6) {
       pon("raro", `Van ${camareros} camareros para ${total} comensales (1 cada ${Math.round(ratio)}), y lo medido aquí es 1 cada ${medido}.`, "Si es un almuerzo ligero puede estar bien; si no, van a ir cortos.");
     }
+  }
+
+  // El ratio de bebida si el evento tiene un factor que lo deja por debajo del sector
+  if (e.evento && TIPOS_BEBIDA.includes(e.evento)) {
+    const factoresAct = factoresDeTipo(e.evento);
+    CLAVES_BEBIDA.forEach(clave => {
+      const f = factoresAct[clave];
+      if (f && f < 1) {
+        const esVer = e.fechaEvento ? MES_CALIDO.includes(new Date(`${e.fechaEvento}T00:00:00`).getMonth()) : true;
+        const comp = comprobarBebidaSector(clave, f, { esVerano: esVer });
+        if (comp && comp.peligroBajo) {
+          pon("raro", `El ratio de ${BEBIDAS[clave].nombre.toLowerCase()} para ${e.evento} (factor ×${enTexto(f)}) queda por debajo del sector (${enTexto(comp.ratioEfectivo)} ${comp.unidad} vs mínimo ${enTexto(comp.banda[0])}). Si no se registran todas las vueltas, puede faltar bebida.`, "Revisa el ajuste en Modo carga → Resumen → Cuánto se bebe.");
+        }
+      }
+    });
   }
 
   // Alergias escritas que el contador no ha sabido leer: el peor caso posible, porque
@@ -204,15 +221,28 @@ export function oportunidadesNegocio({
       ? `solo se usó un ${pct} %: se carga de más`
       : `se usó un ${pct} %: se carga de menos`;
     const nombre = m.area === "hielo" ? "el hielo" : m.nombre;
-    pon(
-      `En ${m.nEventos} ${TIPO_PLURAL[m.tipo]} con la vuelta marcada, ${nombre} ${dir}. Aplicar ${m.factor} cargaría lo que de verdad se usa.`,
-      "En el panel del Modo carga hay un botón con el número medido, o me lo dices y lo aplico.",
-      {
-        que: "aplicar_calibracion",
-        resumen: `Aplicar el factor medido ${m.factor} a ${nombre} en ${TIPO_SINGULAR[m.tipo]} (${m.nEventos} eventos)`,
-        datos: { area: m.area, tipo: m.tipo, clave: m.clave, factor: m.factor },
-      },
-    );
+    const comp = m.area === "bebida" ? comprobarBebidaSector(m.clave, m.factor) : null;
+    if (comp && comp.peligroBajo) {
+      pon(
+        `⚠️ En ${m.nEventos} ${TIPO_PLURAL[m.tipo]} con la vuelta marcada, ${nombre} daría un factor medido de ${m.factor} (${enTexto(comp.ratioEfectivo)} ${comp.unidad}), que cae por debajo del sector (${enTexto(comp.banda[0])}–${enTexto(comp.banda[1])}). Como las vueltas de bebida no se meten de forma recurrente, este factor podría poner bebida de menos.`,
+        "Comprueba si faltan devoluciones reales en esos eventos antes de aplicar el factor.",
+        {
+          que: "aplicar_calibracion",
+          resumen: `Aplicar con precaución factor medido ${m.factor} a ${nombre} en ${TIPO_SINGULAR[m.tipo]} (queda por debajo del sector)`,
+          datos: { area: m.area, tipo: m.tipo, clave: m.clave, factor: m.factor },
+        },
+      );
+    } else {
+      pon(
+        `En ${m.nEventos} ${TIPO_PLURAL[m.tipo]} con la vuelta marcada, ${nombre} ${dir}. Aplicar ${m.factor} cargaría lo que de verdad se usa.`,
+        "En el panel del Modo carga hay un botón con el número medido, o me lo dices y lo aplico.",
+        {
+          que: "aplicar_calibracion",
+          resumen: `Aplicar el factor medido ${m.factor} a ${nombre} en ${TIPO_SINGULAR[m.tipo]} (${m.nEventos} eventos)`,
+          datos: { area: m.area, tipo: m.tipo, clave: m.clave, factor: m.factor },
+        },
+      );
+    }
   });
 
   // ── Roturas sin precio ──
