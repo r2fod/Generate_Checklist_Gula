@@ -2120,6 +2120,7 @@ tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
   demuestra.
 - Verificación: `npm run test` completo antes de fusionar.
 
+<<<<<<< HEAD
 **Palabras partidas y nombres cortados en el móvil — HECHO**: captura del dueño a
 393px con la letra de Android algo grande: "Cápsul/as café (para/el/person/al)" en
 seis líneas, "Cervez/a Alham/bra", "BEBIDAS F…" y la lista leyéndose a través de la
@@ -2176,6 +2177,14 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
   "Lo que pone debajo de la cantidad" (sin "=", debajo y a la derecha de la caja,
   singular/plural al teclear) y el de hielo/carpas en singular; puras de
   `envaseSegunCantidad()` en `calculos.test.mjs`.
+
+**Protección contra sobreescritura concurrente al abrir la app — HECHO**:
+- **Bug cazado**: al abrir la app con un evento activo en `localStorage`, el `useEffect` de auto-guardado de archivo (`estadoActualJSON`) saltaba a los 1,2s en el montaje inicial sin que el usuario tocara nada, subiendo a Firestore la foto vieja local y pisando las cantidades que un compañero estuviera editando en ese instante.
+- **Solución en `App.jsx`**:
+  - `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` inicializados con `estadoActualJSON`: los efectos de guardado comprueban si el estado actual es idéntico al último guardado/cargado (`estadoActualJSON === ref.current`) y abortan de inmediato en el arranque sin programar timers de guardado.
+  - En la sincronización inicial de la nube (`sincronizar`), si el evento abierto en pantalla existe en el archivo remoto, se hidrata la pantalla con la versión fresca de la nube mediante `settersSyncRef` y se actualiza la referencia, evitando que la copia obsoleta de `localStorage` persista en pantalla o se re-suba.
+  - Las suscripciones en tiempo real (`suscribirArchivoNube` y `suscribirEventoNube`) actualizan `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` al aplicar cambios remotos, evitando ecos y bucles de re-guardado.
+- Test nuevo en `sincronizacion.test.mjs`: "Arranque con evento abierto no pisa cambios de otra persona".
 
 **Dos planes grandes, sin código todavía**: `PLAN_COCINA.md` y `PLAN_INVENTARIO.md`.
 Presupuesto no: lo lleva otra app del dueño (ver al principio de este archivo).

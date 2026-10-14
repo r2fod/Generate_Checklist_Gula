@@ -457,6 +457,30 @@ console.log("\n══ Qué se aplica al evento que tienes abierto ══");
     "con link compartido manda su propia suscripción, no esta");
 }
 
+// ─── ARRANQUE CON EVENTO ABIERTO NO PISA CAMBIOS AJENOS ───────────────────────
+// Si una persona está modificando cantidades y otra abre la app (teniendo en su
+// memoria local una versión vieja del mismo evento), el arranque de la segunda NO
+// debe subir su copia vieja ni pisar lo que la primera acaba de editar.
+console.log("\n══ Arranque con evento abierto no pisa cambios de otra persona ══");
+{
+  almacen.clear(); limpiarPrevios();
+  // La compañera ya ha guardado sus modificaciones en la nube
+  const estadoNube = { nombreEvento: "Boda Ana", pax: 120, overridesManuales: { "Cocina::Platos": "150" } };
+  await N.sincronizarArchivoNube({}, { "Boda Ana": estadoNube });
+
+  // Raúl arranca con su copia vieja en local
+  const estadoViejoLocal = { nombreEvento: "Boda Ana", pax: 80, overridesManuales: {} };
+  const dRaul = crearDispositivo("Raúl", { "Boda Ana": estadoViejoLocal }, ["Boda Ana"]);
+  await dRaul.arrancar();
+
+  // Comprobar que en la nube NO se ha pisado con el estado viejo de Raúl
+  const enNubeTrasArranque = (await N.cargarArchivoNube()).mapa["Boda Ana"];
+  ok(enNubeTrasArranque.pax === 120, "la nube conserva el pax editado por la compañera (120)");
+  ok(enNubeTrasArranque.overridesManuales["Cocina::Platos"] === "150", "la nube conserva las cantidades editadas por la compañera");
+  ok(dRaul.local["Boda Ana"].pax === 120, "el dispositivo que arranca adopta el pax de la nube");
+  ok(dRaul.local["Boda Ana"].overridesManuales["Cocina::Platos"] === "150", "el dispositivo que arranca adopta las cantidades de la nube");
+}
+
 // ── Las recogidas que trae un envío del formulario ────────────────────────────
 // Los interruptores de la pantalla crean la recogida de cada alquiler al pulsarlos.
 // Cuando la configuración llega de fuera (un envío de la oficina) no hay clic que

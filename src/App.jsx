@@ -1062,7 +1062,8 @@ export default function App({ onCerrarSesion } = {}) {
   // Referencias para distinguir nuestros propios guardados de los de otra persona
   const estadoActualJSONRef = React.useRef(estadoActualJSON);
   estadoActualJSONRef.current = estadoActualJSON;
-  const ultimoGuardadoNubeRef = React.useRef(null);
+  const ultimoGuardadoNubeRef = React.useRef(estadoActualJSON);
+  const ultimoArchivoGuardadoJSONRef = React.useRef(estadoActualJSON);
 
   // Las marcas de tiempo de NUESTROS últimos guardados. Sirven para reconocer el eco de
   // lo que hemos escrito nosotros cuando vuelve por la suscripción.
@@ -1130,12 +1131,16 @@ export default function App({ onCerrarSesion } = {}) {
   // nunca pisa lo que haya puesto otra persona (ver el porqué largo en nube.js).
   useEffect(() => {
     if (!nubeActiva() || !eventoNubeId) return;
+    // Si no ha cambiado nada respecto a lo ya guardado/cargado, no se auto-guarda en el arranque
+    if (estadoActualJSON === ultimoGuardadoNubeRef.current) return;
     const t = setTimeout(() => {
       const local = getEstadoActual();
       const baseline = ultimoGuardadoNubeRef.current ? JSON.parse(ultimoGuardadoNubeRef.current) : null;
       guardarEventoNube(eventoNubeId, local, baseline)
         .then(({ actualizado, fusion }) => {
-          ultimoGuardadoNubeRef.current = JSON.stringify(fusion);
+          const fusionJSON = JSON.stringify(fusion);
+          ultimoGuardadoNubeRef.current = fusionJSON;
+          ultimoArchivoGuardadoJSONRef.current = fusionJSON;
           apuntarGuardadoPropio(actualizado);
           setErrorNube(null);
           // La fusión puede traer un campo que este aparato no tenía —alguien lo
@@ -1181,6 +1186,7 @@ export default function App({ onCerrarSesion } = {}) {
       // Marcar ANTES de aplicar: así el guardado automático que provocará este
       // cambio de estado no se re-detecta como "cambio de otra persona"
       ultimoGuardadoNubeRef.current = remotoJSON;
+      ultimoArchivoGuardadoJSONRef.current = remotoJSON;
       Object.entries(remoto).forEach(([k, v]) => {
         // Un doc remoto guardado sin nombre (típico: se puso el nombre solo en el
         // diálogo de guardar, no en el campo) no debe borrar el nombre que ya
@@ -1688,6 +1694,9 @@ export default function App({ onCerrarSesion } = {}) {
       if (!remoto) return;
       const listaCambios = resumirCambios(previo, remoto).filter(t => !/^Foto de cantidades/.test(t));
       if (!listaCambios.length) return; // es nuestro propio guardado de vuelta
+      const remotoJSON = JSON.stringify(remoto);
+      ultimoArchivoGuardadoJSONRef.current = remotoJSON;
+      if (remoto.eventoNubeId) ultimoGuardadoNubeRef.current = remotoJSON;
       Object.entries(remoto).forEach(([k, v]) => {
         if (k === "nombreEvento" && !v && previo.nombreEvento) return;
         if (settersSyncRef.current[k]) settersSyncRef.current[k](v);
@@ -1736,6 +1745,32 @@ export default function App({ onCerrarSesion } = {}) {
         });
         guardarLocal(fusionado);
         ultimaEscrituraLocalRef.current = Date.now();
+        // Si el evento que tenemos ABIERTO en pantalla está en la nube, se actualiza
+        // la pantalla con la versión fresca de la nube para no pisarla con la copia
+        // vieja del localStorage del arranque:
+        const nombreAbierto = eventoActivoRef.current || (nombreEvento || "").trim();
+        if (nombreAbierto && remoto[nombreAbierto]) {
+          const remotoEstado = sanearEstado(remoto[nombreAbierto]);
+          let previoEstado;
+          try { previoEstado = JSON.parse(estadoActualJSONRef.current); } catch { previoEstado = {}; }
+          if (JSON.stringify(previoEstado) !== JSON.stringify(remotoEstado)) {
+            const cambios = resumirCambios(previoEstado, remotoEstado).filter(t => !/^Foto de cantidades/.test(t));
+            const remotoJSON = JSON.stringify(remotoEstado);
+            ultimoArchivoGuardadoJSONRef.current = remotoJSON;
+            if (remotoEstado.eventoNubeId) {
+              ultimoGuardadoNubeRef.current = remotoJSON;
+            }
+            Object.entries(remotoEstado).forEach(([k, v]) => {
+              if (k === "nombreEvento" && !v && previoEstado.nombreEvento) return;
+              if (settersSyncRef.current[k]) settersSyncRef.current[k](v);
+            });
+            if (cambios.length > 0) {
+              setHayCambiosRemotos(cambios);
+              clearTimeout(window.__avisoSyncTimer);
+              window.__avisoSyncTimer = setTimeout(() => setHayCambiosRemotos(null), 25000);
+            }
+          }
+        }
         // Sin sesión del equipo no se sube nada del archivo: sus reglas la exigen y el
         // intento acaba siempre en un rechazo. Quien abre un link de un evento solo
         // trabaja sobre ese evento.
@@ -1768,7 +1803,9 @@ export default function App({ onCerrarSesion } = {}) {
       // así el siguiente "Guardar evento" ya viene precargado sin volver a escribirlo
       setNombreEvento(nombre);
       marcarEventoActivo(nombre); // a partir de ahora este evento se auto-guarda solo
-      guardarEventos({ ...eventosGuardados, [nombre]: { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales } });
+      const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales };
+      ultimoArchivoGuardadoJSONRef.current = JSON.stringify(nuevoEstado);
+      guardarEventos({ ...eventosGuardados, [nombre]: nuevoEstado });
       setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3500);
     },
@@ -1793,6 +1830,11 @@ export default function App({ onCerrarSesion } = {}) {
     const ocupadoPorOtro = !esElActivo && !!eventosGuardados[nombre];
     setNombreOcupado(ocupadoPorOtro);
     if (ocupadoPorOtro) return;
+    // Si no ha cambiado nada respecto a lo que ya está en el archivo o se acaba de cargar
+    // de la nube, no hay nada que auto-guardar. Esto evita que al abrir la app salte un
+    // guardado a los 1,2s con la copia vieja de este móvil y pise lo que un compañero
+    // esté editando en ese momento.
+    if (estadoActualJSON === ultimoArchivoGuardadoJSONRef.current) return;
     const t = setTimeout(() => {
       setEventosGuardados(prev => {
         // Se vuelve a comprobar aquí dentro: entre el cambio y el guardado han pasado
@@ -1803,8 +1845,10 @@ export default function App({ onCerrarSesion } = {}) {
         const actualizado = { ...prev };
         // Renombrar el evento activo lo mueve, no lo duplica
         if (activoAhora && activoAhora !== nombre && actualizado[activoAhora]) delete actualizado[activoAhora];
-        actualizado[nombre] = { ...getEstadoActual(), nombreEvento: nombre };
+        const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre };
+        actualizado[nombre] = nuevoEstado;
         marcarEventoActivo(nombre);
+        ultimoArchivoGuardadoJSONRef.current = JSON.stringify(nuevoEstado);
         // Sin esto la referencia se queda vieja y el siguiente cálculo de "qué ha
         // cambiado" compara contra un mapa desfasado.
         eventosGuardadosRef.current = actualizado;
