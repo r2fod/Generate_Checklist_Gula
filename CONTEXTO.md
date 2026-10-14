@@ -854,17 +854,23 @@ está en el historial de git y en las pruebas que los cubren):
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
 
-## Qué queda pendiente ahora mismo (2026-09-30)
+## Qué queda pendiente ahora mismo (2026-10-14)
 
-### Estado de HOY (2026-09-30) — léelo primero si retomas (Claude, Gemini u otra IA)
+### Estado de HOY (2026-10-14) — léelo primero si retomas (Claude, Gemini u otra IA)
 
 **En producción** (publicado en `gh-pages`, comprobado en Actions): todo `main` hasta
-#245. Lo último de esta tanda, cada uno con su entrada "— HECHO" más abajo:
-- #241 calendario con todos los apuntes a la vista, sin "+N" ni nombres cortados;
-- #242 todas las filas con su unidad, y editable a mano (`unidadesManuales`);
-- #243 y #244 calendario del móvil por semanas, con la lista debajo de cada una y la
-  semana en curso la primera;
-- #245 Modo carga: lo que falta por preparar (`pendientes`).
+#275. Lo último de esta tanda, cada uno con su entrada "— HECHO" más abajo:
+- #246 a #255 Limpieza de calendario, revisión de repetidos, formulario directo sin
+  checklists intermedias, manifest PWA;
+- #256 a #266 Rediseño visual (fases 1–5: verde corporativo, cabeceras de categorías,
+  resumen en lista en Modo carga, contraste y accesibilidad completa);
+- #267 a #273 Móvil sin palabras partidas, formulario con iconos animados según contexto,
+  buffets con platos, tronas (máx 3 de almacén), barbacoas desglosadas por tipo (ladrillo,
+  redondas, metálica con carbón y leña), cafeteras (Nespresso según pax + de bar + grande),
+  mantel de papel;
+- #275 Sincronización concurrente protegida: elimina la sobreescritura accidental al arrancar
+  la app con un evento en caché local mientras otra persona edita, e hidrata la pantalla
+  directamente con la versión fresca de la nube.
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
@@ -2120,7 +2126,6 @@ tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
   demuestra.
 - Verificación: `npm run test` completo antes de fusionar.
 
-<<<<<<< HEAD
 **Palabras partidas y nombres cortados en el móvil — HECHO**: captura del dueño a
 393px con la letra de Android algo grande: "Cápsul/as café (para/el/person/al)" en
 seis líneas, "Cervez/a Alham/bra", "BEBIDAS F…" y la lista leyéndose a través de la
@@ -2185,6 +2190,9 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
   - En la sincronización inicial de la nube (`sincronizar`), si el evento abierto en pantalla existe en el archivo remoto, se hidrata la pantalla con la versión fresca de la nube mediante `settersSyncRef` y se actualiza la referencia, evitando que la copia obsoleta de `localStorage` persista en pantalla o se re-suba.
   - Las suscripciones en tiempo real (`suscribirArchivoNube` y `suscribirEventoNube`) actualizan `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` al aplicar cambios remotos, evitando ecos y bucles de re-guardado.
 - Test nuevo en `sincronizacion.test.mjs`: "Arranque con evento abierto no pisa cambios de otra persona".
+- **Comprobación de cálculo de mesas de cocina**:
+  - Mesas rectangulares de 1,8m (almacén propio Gula): las 4 a 6 mesas de apoyo de cocina se suman directamente con las mesas de comer en la misma línea `"Mesas de 1,8m"`.
+  - Mesas redondas (alquiler externo): se desglosan por separado: `"Mesas de 1,8m"` para cocina y `"Mesas redondas ... (alquiler)"` para comensales.
 
 **Dos planes grandes, sin código todavía**: `PLAN_COCINA.md` y `PLAN_INVENTARIO.md`.
 Presupuesto no: lo lleva otra app del dueño (ver al principio de este archivo).
