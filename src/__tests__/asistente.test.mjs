@@ -772,6 +772,17 @@ console.log("\n── ¿Esto tiene sentido? ──");
   ok(tono(alquiler, "acuerdate").some(a => /sillas/i.test(a.texto)), "recuerda las sillas de alquiler");
   ok(tono(alquiler, "acuerdate").some(a => /generador/i.test(a.texto)), "y el generador con su gasolina");
 
+  // Aviso si el ratio configurado para la bebida cae por debajo del mínimo del sector
+  const previoBebida = leerFactores();
+  ponFactores({ boda: { vino: 0.4 } });
+  const conVinoBajo = revisarEvento("Boda vino bajo", {
+    evento: "boda", pax: 100, fechaEvento: dentroDeUnMes, horaInicio: "13:00",
+    ubicacion: "F", logisticaEquipo: [{ nombre: "A" }],
+  });
+  ok(tono(conVinoBajo, "raro").some(a => a.texto.includes("vino") && a.texto.includes("sector") && a.texto.includes("vueltas")),
+    "revisarEvento avisa si el ratio de bebida configurado cae por debajo del sector");
+  ponFactores(previoBebida);
+
   // El repaso de todos solo saca los que tienen algo
   const todos = revisarProximos({
     "Con problema": { evento: "boda", fechaEvento: dentroDeUnMes },
@@ -1851,6 +1862,13 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     calibracionBebida: { comunion: { vino: { factor: 0.5, nEventos: 3 } } },
     factoresBebida: { comunion: { vino: 0.5 } },
   }).length === 0, "una medida ya aplicada no se repite");
+
+  // Si la medida cae por debajo del sector, avisa del peligro por vueltas no recurrentes
+  const conMedidaBaja = oportunidadesNegocio({
+    calibracionBebida: { boda: { vino: { factor: 0.4, nEventos: 4 } } },
+  });
+  ok(conMedidaBaja.length === 1 && conMedidaBaja[0].texto.includes("sector") && conMedidaBaja[0].texto.includes("vueltas de bebida no se meten de forma recurrente"),
+    "oportunidadesNegocio advierte del peligro de poner bebida de menos si el factor cae bajo el sector");
 
   // El hielo y la comida pasan por su área.
   ok(oportunidadesNegocio({ calibracionHielo: { boda: { factor: 0.8, nEventos: 4 } } })[0]

@@ -7123,6 +7123,7 @@ hr {
 
 /* Lo que alguien ha ajustado se distingue de lo que viene de fábrica */
 .cal-ratio.es-cambiado { border-left-color: var(--ok-texto); }
+.cal-ratio.es-bajo-sector { border-left-color: var(--aviso-texto); }
 
 .cal-ratio-nombre {
   display: flex;
@@ -7142,6 +7143,14 @@ hr {
   font-weight: 700;
   padding: 1px 6px;
   border-radius: var(--radius-pill);
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+}
+
+.cal-ratio-avisa.es-peligro {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   background: var(--aviso-bg-fuerte);
   color: var(--aviso-texto);
 }
@@ -7253,6 +7262,14 @@ hr {
 .cal-ratio-medido.es-puesto {
   border-style: solid;
   cursor: default;
+}
+
+.cal-ratio-medido.es-alerta-sector {
+  border-color: var(--aviso-texto);
+  color: var(--aviso-texto);
+}
+.cal-ratio-medido.es-alerta-sector:hover {
+  background: var(--aviso-bg-fuerte, rgba(251, 191, 36, 0.15));
 }
 
 @media (prefers-reduced-motion: reduce) {

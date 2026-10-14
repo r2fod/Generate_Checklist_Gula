@@ -9,9 +9,10 @@
 // enseña el número que sale del histórico y un botón para usarlo — que es la diferencia
 // entre un ajuste a ojo y uno medido.
 import { useState } from "react";
-import { Wine, ChevronDown, RotateCcw, Check } from "lucide-react";
+import { Wine, ChevronDown, RotateCcw, Check, AlertTriangle } from "lucide-react";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, FACTOR_NEUTRO, factorDe, conFactor } from "../bebida.js";
 import { enTexto, enNumero } from "../texto.js";
+import { comprobarBebidaSector } from "../asistente/sector.js";
 
 // Los nombres como los lee quien ajusta: la MISMA lista para los dos paneles de ratios
 // (bebida y hielo) — una sola fuente, no dos que se separen.
@@ -50,8 +51,7 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
           <p className="cal-ratios-nota">
             Un multiplicador sobre lo que carga la app hoy: 1 es lo de siempre, 0,6 es un 40% menos.
             Todos arrancan en 1 a propósito — el ratio salió de bodas y nadie ha medido las demás.
-            En cuanto haya 3 eventos con la vuelta apuntada, aquí sale el número real y un botón
-            para usarlo.
+            {" "}<strong>Ojo con las vueltas:</strong> si no se apuntan devoluciones de forma recurrente, el ratio medido saldrá a la baja y pondrá bebida de menos. Si un valor cae por debajo de la banda del sector, se resalta con aviso.
           </p>
 
           {/* La bebida primero y los tipos después: son 4 × 5 casillas, y enseñarlas todas
@@ -74,11 +74,20 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
             const medida = (calibracion[tipo] || {})[bebida];
             const yaEsLaMedida = medida && Math.abs(medida.factor - valor) < 0.005;
             const texto = enCurso[tipo] !== undefined ? enCurso[tipo] : enTexto(valor);
+
+            const compActual = comprobarBebidaSector(bebida, valor);
+            const compMedida = medida ? comprobarBebidaSector(bebida, medida.factor) : null;
+
             return (
-              <div className={`cal-ratio${cambiado ? " es-cambiado" : ""}`} key={tipo}>
+              <div className={`cal-ratio${cambiado ? " es-cambiado" : ""}${compActual?.peligroBajo ? " es-bajo-sector" : ""}`} key={tipo}>
                 <span className="cal-ratio-nombre">
                   {NOMBRE_TIPO[tipo]}
                   {!medida && <em className="cal-ratio-avisa">sin medir</em>}
+                  {compActual?.peligroBajo && (
+                    <em className="cal-ratio-avisa es-peligro" title={compActual.aviso}>
+                      <AlertTriangle size={11} aria-hidden="true" /> {compActual.avisoCorto}
+                    </em>
+                  )}
                 </span>
                 <label className="cal-ratio-campo">
                   <span className="cal-ratio-uno">×</span>
@@ -100,17 +109,27 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
                     un botón porque lo único que hay que hacer con él es usarlo. */}
                 {medida && !yaEsLaMedida && (
                   <button
-                    type="button" className="cal-ratio-medido"
-                    title={`Medido en ${medida.nEventos} eventos con la vuelta apuntada`}
+                    type="button"
+                    className={`cal-ratio-medido${compMedida?.peligroBajo ? " es-alerta-sector" : ""}`}
+                    title={compMedida?.peligroBajo
+                      ? `Medido en ${medida.nEventos} eventos pero queda por debajo del sector (${enTexto(compMedida.ratioEfectivo)} vs mín ${enTexto(compMedida.banda[0])} ${compMedida.unidad}). ¡Cuidado si faltaron vueltas por registrar!`
+                      : `Medido en ${medida.nEventos} eventos con la vuelta apuntada`}
                     onClick={() => { setEnCurso(p => { const q = { ...p }; delete q[tipo]; return q; }); poner(tipo, medida.factor); }}
                   >
-                    <Check size={12} aria-hidden="true" /> {enTexto(medida.factor)}
-                    <em> · {medida.nEventos} ev.</em>
+                    {compMedida?.peligroBajo ? <AlertTriangle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
+                    {" "}{enTexto(medida.factor)}
+                    <em> · {medida.nEventos} ev.{compMedida?.peligroBajo ? " (bajo sector)" : ""}</em>
                   </button>
                 )}
                 {medida && yaEsLaMedida && (
-                  <span className="cal-ratio-medido es-puesto" title={`Medido en ${medida.nEventos} eventos`}>
-                    <Check size={12} aria-hidden="true" /> medido
+                  <span
+                    className={`cal-ratio-medido es-puesto${compMedida?.peligroBajo ? " es-alerta-sector" : ""}`}
+                    title={compMedida?.peligroBajo
+                      ? `Medido en ${medida.nEventos} eventos pero queda por debajo del sector. Revisar si faltan vueltas.`
+                      : `Medido en ${medida.nEventos} eventos`}
+                  >
+                    {compMedida?.peligroBajo ? <AlertTriangle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
+                    {" "}medido{compMedida?.peligroBajo ? " (bajo sector)" : ""}
                   </span>
                 )}
                 <button
