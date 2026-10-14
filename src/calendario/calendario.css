@@ -52,7 +52,11 @@
 }
 
 .cal-hoy, .cal-nuevo { min-height: 44px; }
-.cal-vistas { margin-left: auto; }
+/* "Mes / Año / Equipo" y "+ Apunte" van en la misma barra: los dos con 44px justos
+   (antes 44 y 48, uno más alto que el otro). */
+.cal-nuevo { padding-top: 0; padding-bottom: 0; }
+.cal-vistas { margin-left: auto; min-height: 44px; }
+.cal-vistas .segment-btn { min-height: 36px; }
 
 /* ─── LA REJILLA DEL MES ──────────────────────────────────────────────────── */
 .cal-mes {
