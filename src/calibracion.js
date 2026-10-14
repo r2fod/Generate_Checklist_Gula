@@ -5,6 +5,7 @@ import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, esFactorValido } from "
 import { COMIDAS, CLAVES_COMIDA } from "./comida.js";
 import { hoyISO, enDiasISO } from "./fecha.js";
 import { PAX_POR_CAMARERO, saneaRatios } from "./personal.js";
+import { factorMinimoSector } from "./asistente/sector.js";
 
 // ─── CALIBRACIÓN CON LOS TIEMPOS REALES ───────────────────────────────────────
 // Las estimaciones de tiempos-carga.js son de sector. En cuanto hay eventos con el
@@ -178,10 +179,18 @@ export function calibracionBebida(eventosGuardados = {}, factoresActuales = {}) 
   Object.entries(proporciones).forEach(([tipo, porBebida]) => {
     Object.entries(porBebida).forEach(([bebida, lista]) => {
       if (lista.length < MIN_EVENTOS_MEDIR) return;
-      const factor = redondeaFactor(mediana(lista) * factorDe(factoresActuales, tipo, bebida));
+      const factorCalculado = redondeaFactor(mediana(lista) * factorDe(factoresActuales, tipo, bebida));
+      // Suelo de seguridad del sector: si no hay vueltas sistemáticas o la medición cae en picado,
+      // la calibración nunca propone un factor que baje del mínimo del mercado para no poner bebida de menos.
+      const suelo = factorMinimoSector(bebida);
+      const factor = suelo && Number.isFinite(factorCalculado) ? Math.max(suelo, factorCalculado) : factorCalculado;
       if (!esFactorValido(factor)) return;
       if (!salida[tipo]) salida[tipo] = {};
-      salida[tipo][bebida] = { factor, nEventos: lista.length };
+      salida[tipo][bebida] = {
+        factor,
+        nEventos: lista.length,
+        ...(factor > factorCalculado ? { factorBruto: factorCalculado, ajustadoPorSuelo: true } : {}),
+      };
     });
   });
   return salida;
