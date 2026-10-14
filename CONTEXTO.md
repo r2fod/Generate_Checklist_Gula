@@ -582,6 +582,15 @@ operativo).
     o desinstalarla y reinstalarla. La identidad de la checklist es la raíz del dominio
     a propósito de no cambiar la ya instalada: no moverla sin avisar, dejaría huérfanas
     las instaladas.
+- **Simetría: lo que va en la misma fila, del mismo alto** (14/10, captura del dueño:
+  "CÓCTEL / APERITIVO" partía en dos líneas y su tarjeta quedaba más alta y escalonada
+  junto a "COPAS"). Lo causó el `align-items: end` de `.form-row` (#258, para alinear
+  campos cuando una etiqueta parte): con tarjetas en la fila hace lo contrario. Ahora
+  `.form-row:has(> .range-group)` estira y el deslizador va abajo en las dos. En el
+  calendario, "Mes / Año / Equipo" y "+ Apunte" pasan a 44px los dos. Revisadas las
+  tres apps (checklist, modo carga con sus cuatro pestañas, calendario y las 25
+  preguntas del formulario) a 360–1920 con un script que mide, en cada fila de cajas
+  de un flex/grid, si alguna es más alta que sus vecinas: quedan cero.
 - **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
