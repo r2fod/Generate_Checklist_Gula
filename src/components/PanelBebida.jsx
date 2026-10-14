@@ -9,10 +9,10 @@
 // enseña el número que sale del histórico y un botón para usarlo — que es la diferencia
 // entre un ajuste a ojo y uno medido.
 import { useState } from "react";
-import { Wine, ChevronDown, RotateCcw, Check, AlertTriangle } from "lucide-react";
+import { Wine, ChevronDown, RotateCcw, Check, AlertTriangle, ShieldCheck } from "lucide-react";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, FACTOR_NEUTRO, factorDe, conFactor } from "../bebida.js";
 import { enTexto, enNumero } from "../texto.js";
-import { comprobarBebidaSector } from "../asistente/sector.js";
+import { comprobarBebidaSector, comprobarCambioBrusco } from "../asistente/sector.js";
 
 // Los nombres como los lee quien ajusta: la MISMA lista para los dos paneles de ratios
 // (bebida y hielo) — una sola fuente, no dos que se separen.
@@ -77,15 +77,26 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
 
             const compActual = comprobarBebidaSector(bebida, valor);
             const compMedida = medida ? comprobarBebidaSector(bebida, medida.factor) : null;
+            const bruscoMedida = medida ? comprobarCambioBrusco(valor, medida.factor) : null;
 
             return (
               <div className={`cal-ratio${cambiado ? " es-cambiado" : ""}${compActual?.peligroBajo ? " es-bajo-sector" : ""}`} key={tipo}>
                 <span className="cal-ratio-nombre">
                   {NOMBRE_TIPO[tipo]}
                   {!medida && <em className="cal-ratio-avisa">sin medir</em>}
+                  {medida?.ajustadoPorSuelo && (
+                    <em className="cal-ratio-avisa es-suelo" title={`La medición daba ×${enTexto(medida.factorBruto)}, pero se frena en el suelo de seguridad del sector (×${enTexto(medida.factor)}) para no poner bebida de menos.`}>
+                      <ShieldCheck size={11} aria-hidden="true" /> suelo sector
+                    </em>
+                  )}
                   {compActual?.peligroBajo && (
                     <em className="cal-ratio-avisa es-peligro" title={compActual.aviso}>
                       <AlertTriangle size={11} aria-hidden="true" /> {compActual.avisoCorto}
+                    </em>
+                  )}
+                  {bruscoMedida?.esBrusco && !compActual?.peligroBajo && (
+                    <em className="cal-ratio-avisa es-brusco" title={bruscoMedida.aviso}>
+                      <AlertTriangle size={11} aria-hidden="true" /> {bruscoMedida.deltaPct > 0 ? "+" : ""}{bruscoMedida.deltaPct}% salto
                     </em>
                   )}
                 </span>
@@ -110,15 +121,17 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
                 {medida && !yaEsLaMedida && (
                   <button
                     type="button"
-                    className={`cal-ratio-medido${compMedida?.peligroBajo ? " es-alerta-sector" : ""}`}
+                    className={`cal-ratio-medido${compMedida?.peligroBajo ? " es-alerta-sector" : ""}${bruscoMedida?.esBrusco ? " es-brusco" : ""}`}
                     title={compMedida?.peligroBajo
                       ? `Medido en ${medida.nEventos} eventos pero queda por debajo del sector (${enTexto(compMedida.ratioEfectivo)} vs mín ${enTexto(compMedida.banda[0])} ${compMedida.unidad}). ¡Cuidado si faltaron vueltas por registrar!`
-                      : `Medido en ${medida.nEventos} eventos con la vuelta apuntada`}
+                      : (bruscoMedida?.esBrusco
+                          ? `${bruscoMedida.aviso} (Medido en ${medida.nEventos} eventos)`
+                          : `Medido en ${medida.nEventos} eventos con la vuelta apuntada`)}
                     onClick={() => { setEnCurso(p => { const q = { ...p }; delete q[tipo]; return q; }); poner(tipo, medida.factor); }}
                   >
-                    {compMedida?.peligroBajo ? <AlertTriangle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
+                    {compMedida?.peligroBajo || bruscoMedida?.esBrusco ? <AlertTriangle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
                     {" "}{enTexto(medida.factor)}
-                    <em> · {medida.nEventos} ev.{compMedida?.peligroBajo ? " (bajo sector)" : ""}</em>
+                    <em> · {medida.nEventos} ev.{medida.ajustadoPorSuelo ? " (suelo)" : (bruscoMedida?.esBrusco ? ` (${bruscoMedida.deltaPct}%)` : "")}</em>
                   </button>
                 )}
                 {medida && yaEsLaMedida && (
@@ -129,7 +142,7 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
                       : `Medido en ${medida.nEventos} eventos`}
                   >
                     {compMedida?.peligroBajo ? <AlertTriangle size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
-                    {" "}medido{compMedida?.peligroBajo ? " (bajo sector)" : ""}
+                    {" "}medido{medida.ajustadoPorSuelo ? " (suelo)" : ""}{compMedida?.peligroBajo ? " (bajo sector)" : ""}
                   </span>
                 )}
                 <button

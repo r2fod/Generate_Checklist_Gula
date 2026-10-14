@@ -51,7 +51,7 @@ import { apunta, leerDiario, borrarDiario, comoTexto, sinDatosPersonales, SUCESO
 import { disponiblesEn as disponiblesEnApuntes } from "../calendario/apuntes.js";
 import { PERSONAS_POR_PAELLA, paellasPorPax, calcPaella } from "../paella.js";
 import { ponFactoresComida, leerFactoresComida, conFactorComida } from "../comida.js";
-import { SECTOR, compararRatios, comprobarBebidaSector } from "../asistente/sector.js";
+import { SECTOR, compararRatios, comprobarBebidaSector, factorMinimoSector, comprobarCambioBrusco } from "../asistente/sector.js";
 import { CAMBIOS, ultimoCambio } from "../cambios.js";
 import { ANCHO, ALTO, ITERACIONES, estadoInicial, paso, bordesDe } from "../asistente/grafoFisica.js";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -2067,6 +2067,13 @@ console.log("\n══ Las mesas de los comensales ══");
   ok(!calibracionBebida(conImposible, {}).comunion,
     "una línea con más vuelta que carga tira ese evento entero, y quedan dos");
 
+  // Suelo de seguridad del sector: una vuelta enorme (ej. vuelve el 85% del vino, consumo de solo el 15%)
+  // no baja el factor por debajo del suelo del sector (0,46 en vino)
+  const consumoBajo = { a: conVueltaVino(0.85), b: conVueltaVino(0.85), c: conVueltaVino(0.85) };
+  const calSuelo = calibracionBebida(consumoBajo, {});
+  ok(calSuelo.comunion && calSuelo.comunion.vino.factor === 0.46 && calSuelo.comunion.vino.ajustadoPorSuelo,
+    `un consumo medido de 0,15 se frena en el suelo del sector (0,46) → ${calSuelo.comunion && calSuelo.comunion.vino.factor}`);
+
   // Un evento sin vueltos, uno con el tipo cambiado a mano y uno vacío no revientan nada
   ok(Object.keys(calibracionBebida({ x: { evento: "boda", pax: 50 }, y: {}, z: { evento: "inventado", vueltos: {} } }, {})).length === 0,
     "eventos sin datos, vacíos o de un tipo que no existe se ignoran sin reventar");
@@ -2885,6 +2892,20 @@ console.log("\n══ El sector, como banda de sanidad ══");
 
   const refrescoBajo = comprobarBebidaSector("refresco", 0.3);
   ok(refrescoBajo.peligroBajo && refrescoBajo.ratioEfectivo < 2.0, "refresco con factor 0.3 cae por debajo del sector (1,33 < 2,0)");
+
+  // Suelos mínimos del sector
+  ok(factorMinimoSector("vino") === 0.46, "suelo de vino es 0,46 (0,33 / 0,72)");
+  ok(factorMinimoSector("cerveza") === 0.50, "suelo de cerveza es 0,50");
+  ok(factorMinimoSector("cava") === 0.63, "suelo de cava es 0,63");
+  ok(factorMinimoSector("refresco") === 0.45, "suelo de refresco es 0,45");
+
+  // comprobarCambioBrusco: detecta variaciones >= 15% o 20%
+  const bruscoFuerte = comprobarCambioBrusco(1.0, 0.70);
+  ok(bruscoFuerte.esBrusco && bruscoFuerte.deltaPct === -30, "detecta variación brusca de -30%");
+  ok(bruscoFuerte.aviso && bruscoFuerte.aviso.includes("Variación brusca"), "da mensaje explicativo");
+
+  const leve = comprobarCambioBrusco(1.0, 0.95);
+  ok(!leve.esBrusco && leve.deltaPct === -5, "variación leve (-5%) no es brusca");
 }
 
 console.log("\n══ Qué ha cambiado, para quien lo usa ══");

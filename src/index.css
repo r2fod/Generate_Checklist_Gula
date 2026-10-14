@@ -7155,6 +7155,22 @@ hr {
   color: var(--aviso-texto);
 }
 
+.cal-ratio-avisa.es-brusco {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--aviso-bg-fuerte);
+  color: var(--aviso-texto);
+}
+
+.cal-ratio-avisa.es-suelo {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--accent-soft, rgba(46, 125, 50, 0.12));
+  color: var(--ok-texto);
+}
+
 .cal-ratio-campo {
   display: inline-flex;
   align-items: center;
@@ -7270,6 +7286,9 @@ hr {
 }
 .cal-ratio-medido.es-alerta-sector:hover {
   background: var(--aviso-bg-fuerte, rgba(251, 191, 36, 0.15));
+}
+.cal-ratio-medido.es-brusco {
+  border-color: var(--aviso-texto);
 }
 
 @media (prefers-reduced-motion: reduce) {

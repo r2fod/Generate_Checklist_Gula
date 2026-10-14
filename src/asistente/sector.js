@@ -172,6 +172,46 @@ export function comprobarBebidaSector(bebida, factor = 1, { esVerano = true } = 
 }
 
 /**
+ * Factores mínimos seguros según la banda del sector para evitar que la calibración automática
+ * o un ajuste ponga bebida de menos cuando no hay vueltas sistemáticas.
+ */
+export const SUELO_SECTOR_BEBIDA = {
+  vino: 0.46,      // 0.33 bot/pax mín sector / 0.72 base
+  cerveza: 0.50,   // 1.5 tercios mín sector / 3.0 base verano (o 1.0 / 2.0 invierno)
+  cava: 0.63,      // 0.125 bot/pax mín sector / 0.20 base
+  refresco: 0.45,  // 2.0 uds mín sector / 4.44 base neta
+};
+
+/**
+ * Devuelve el factor mínimo seguro admisible para una bebida según el sector.
+ * @param {string} bebida Clave de bebida ('vino', 'cerveza', 'cava', 'refresco')
+ * @returns {number}
+ */
+export function factorMinimoSector(bebida) {
+  return SUELO_SECTOR_BEBIDA[bebida] ?? 0.40;
+}
+
+/**
+ * Comprueba si la variación entre dos factores supone un cambio brusco (>= 15% o 20%),
+ * alertando de posibles distorsiones cuando las vueltas de bebida no se registran de forma recurrente.
+ * @param {number} actual Factor actual de referencia
+ * @param {number} nuevo Factor propuesto o medido
+ * @param {number} [umbralPct=15] Porcentaje a partir del cual se considera brusco
+ * @returns {{ esBrusco: boolean, deltaPct: number, aviso: string | null }}
+ */
+export function comprobarCambioBrusco(actual = 1, nuevo = 1, umbralPct = 15) {
+  const act = typeof actual === "number" && Number.isFinite(actual) && actual > 0 ? actual : 1;
+  const nvo = typeof nuevo === "number" && Number.isFinite(nuevo) && nuevo > 0 ? nuevo : 1;
+  const deltaPct = Math.round(((nvo - act) / act) * 100);
+  const esBrusco = Math.abs(deltaPct) >= umbralPct;
+  let aviso = null;
+  if (esBrusco) {
+    aviso = `Variación brusca (${deltaPct > 0 ? "+" : ""}${deltaPct}% respecto al valor vigente ×${act}). Puede deberse a que no se registraron vueltas en todos los eventos.`;
+  }
+  return { esBrusco, deltaPct, aviso };
+}
+
+/**
  * Compara ratios propios contra la banda del sector. No inventa nada: un ratio que no
  * está en `actuales` sale con tono "sin-dato" en vez de omitirse, para que quien
  * pregunte sepa que existe una banda del sector pero no hay número propio con el que

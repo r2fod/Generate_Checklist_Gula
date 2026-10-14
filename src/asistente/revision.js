@@ -21,7 +21,7 @@ import { TIPOS_MESA } from "../mesas.js";
 import { hoyISO, enDiasISO } from "../fecha.js";
 import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, factorDe, factoresDeTipo } from "../bebida.js";
 import { COMIDAS } from "../comida.js";
-import { comprobarBebidaSector } from "./sector.js";
+import { comprobarBebidaSector, comprobarCambioBrusco } from "./sector.js";
 import { enTexto } from "../texto.js";
 
 // En el navegador es el día de quien mira; en el Worker, que va en UTC, es el mismo día
@@ -222,6 +222,7 @@ export function oportunidadesNegocio({
       : `se usó un ${pct} %: se carga de menos`;
     const nombre = m.area === "hielo" ? "el hielo" : m.nombre;
     const comp = m.area === "bebida" ? comprobarBebidaSector(m.clave, m.factor) : null;
+    const brusco = m.area === "bebida" ? comprobarCambioBrusco(m.actual, m.factor) : null;
     if (comp && comp.peligroBajo) {
       pon(
         `⚠️ En ${m.nEventos} ${TIPO_PLURAL[m.tipo]} con la vuelta marcada, ${nombre} daría un factor medido de ${m.factor} (${enTexto(comp.ratioEfectivo)} ${comp.unidad}), que cae por debajo del sector (${enTexto(comp.banda[0])}–${enTexto(comp.banda[1])}). Como las vueltas de bebida no se meten de forma recurrente, este factor podría poner bebida de menos.`,
@@ -229,6 +230,16 @@ export function oportunidadesNegocio({
         {
           que: "aplicar_calibracion",
           resumen: `Aplicar con precaución factor medido ${m.factor} a ${nombre} en ${TIPO_SINGULAR[m.tipo]} (queda por debajo del sector)`,
+          datos: { area: m.area, tipo: m.tipo, clave: m.clave, factor: m.factor },
+        },
+      );
+    } else if (brusco && brusco.esBrusco) {
+      pon(
+        `⚠️ En ${m.nEventos} ${TIPO_PLURAL[m.tipo]} con la vuelta marcada, ${nombre} ${dir}. Supone una variación brusca (${brusco.deltaPct > 0 ? "+" : ""}${brusco.deltaPct}% respecto al actual). Como las vueltas no se apuntan siempre, revisa que no sea un dato sesgado antes de aplicar ${m.factor}.`,
+        "Comprueba si en esos eventos se devolvió bebida sin apuntar antes de cambiar el ratio.",
+        {
+          que: "aplicar_calibracion",
+          resumen: `Aplicar factor medido ${m.factor} a ${nombre} en ${TIPO_SINGULAR[m.tipo]} (${brusco.deltaPct > 0 ? "+" : ""}${brusco.deltaPct}% respecto al actual)`,
           datos: { area: m.area, tipo: m.tipo, clave: m.clave, factor: m.factor },
         },
       );

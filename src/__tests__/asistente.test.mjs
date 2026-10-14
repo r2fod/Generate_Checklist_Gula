@@ -1851,6 +1851,8 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   ok(conMedida.length === 1 && conMedida[0].tono === "oportunidad", "una medida sin aplicada es una oportunidad");
   ok(conMedida[0].texto.includes("50 %") && conMedida[0].texto.includes("de más"),
     "y dice que se carga de más, con el porcentaje");
+  ok(conMedida[0].texto.includes("variación brusca"),
+    "y advierte de variación brusca (-50% respecto al valor actual)");
   ok(conMedida[0].propuesta && conMedida[0].propuesta.que === "aplicar_calibracion"
       && conMedida[0].propuesta.datos.area === "bebida"
       && conMedida[0].propuesta.datos.clave === "vino"
