@@ -2846,9 +2846,8 @@ hr {
   margin: 2px 0;
 }
 
-/* Los atajos y el "volver" solo existen en una columna (ver más abajo). ".btn" va
-   después en el CSS y ganaría a la clase sola: por eso el selector doble. */
-.atajos-una-columna, .btn.atajo-volver { display: none; }
+/* Los atajos solo existen en una columna (ver más abajo) */
+.atajos-una-columna { display: none; }
 @keyframes panel-despliega {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
@@ -2863,23 +2862,27 @@ hr {
     grid-template-columns: 1fr;
   }
 
-  /* En una columna la checklist va primero y la configuración debajo: lo que se viene a
-     ver es la lista, y antes quedaba a siete pantallas de móvil. "Volver a la checklist"
-     trae de vuelta desde abajo (App.jsx). */
+  /* En una columna la checklist va primero: lo que se viene a ver es la lista, y antes
+     quedaba a siete pantallas de móvil. La configuración NO vive debajo: seguía ahí y,
+     tras abrirla con su atajo, se veía otra vez entera al acabar la lista ("quiero
+     quitar el de abajo", el dueño). Solo existe abierta con sus atajos. */
   .atajos-una-columna { order: 0; display: flex; flex-wrap: wrap; gap: 8px; }
   .atajos-una-columna .btn { flex: 1 1 160px; justify-content: center; }
   .checklist-main { order: 2; }
-  .config-sidebar { order: 3; }
-  .btn.atajo-volver { display: flex; justify-content: center; }
-  /* Los atajos abren su tarjeta AHÍ, debajo de ellos, en vez de llevar hasta abajo
-     ("que te lleve abajo no me gusta", el dueño): la columna de configuración sube
-     encima de la lista con solo esa tarjeta, y al bajar hasta la checklist vuelve a su
-     sitio, entera (App.jsx). Con display: contents cada tarjeta podría subir sola, pero
-     Chrome no recoloca a tiempo un hijo de un display: contents al cambiarle el orden:
-     la tarjeta seguía arriba unos fotogramas y la lista daba el salto igual. */
+  .main-layout:not([data-panel]) > .config-sidebar { display: none; }
+  /* Los atajos abren su tarjeta AHÍ, debajo de ellos ("que te lleve abajo no me gusta",
+     el dueño): la columna de configuración sale encima de la lista con solo lo de ese
+     atajo, y al bajar hasta la checklist se cierra (App.jsx). "Configurar el evento"
+     trae también "Añadir varios items" y "Eventos guardados" las Plantillas, que no
+     tienen atajo propio y sin esto se quedarían sin sitio. Con display: contents cada
+     tarjeta podría subir sola, pero Chrome no recoloca a tiempo un hijo de un display:
+     contents al cambiarle el orden: la tarjeta seguía arriba unos fotogramas y la lista
+     daba el salto igual. */
   .main-layout[data-panel] > .config-sidebar { order: 1; }
-  .main-layout[data-panel="evento"] > .config-sidebar > :not(#cfg-evento),
-  .main-layout[data-panel="guardados"] > .config-sidebar > :not(#cfg-guardados) { display: none; }
+  .main-layout[data-panel="evento"] > .config-sidebar > :not(#cfg-evento, .add-material-btn),
+  .main-layout[data-panel="guardados"] > .config-sidebar > :not(#cfg-guardados, #cfg-plantillas) { display: none; }
+  /* Lo que se ha pedido, primero, pegado a su botón; las Plantillas, debajo */
+  .main-layout[data-panel="guardados"] > .config-sidebar > #cfg-plantillas { order: 1; }
   .main-layout[data-panel] > .config-sidebar > .config-card { animation: panel-despliega 0.28s ease-out both; }
   .atajos-una-columna .btn.es-abierto { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
   /* La cabecera va fija por encima hasta 768px: que no tape lo que se busca */
