@@ -875,6 +875,9 @@ está en el historial de git y en las pruebas que los cubren):
   vueltas de bebida no se registran de forma recurrente, los factores automáticos tienden a la baja
   arriesgando poner bebida de menos. Se añade comprobación centralizada contra el sector (`comprobarBebidaSector`),
   avisos en el Panel de Bebida, advertencia en auditoría de oportunidades y en la revisión de eventos.
+- #277/#278 Bebida: suelo automático del sector en la calibración y aviso de cambio brusco.
+- Móvil/tableta: la configuración ya no se repite debajo de la checklist; solo se ve
+  abierta con "Configurar el evento" o "Eventos guardados" (ver su entrada "— HECHO").
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
@@ -957,6 +960,25 @@ Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
 despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
 tanda de fusiones.
+
+**Móvil/tableta: la configuración ya no sale repetida debajo de la checklist — HECHO**:
+- **Motivo**: en una columna (≤1180px) la columna de configuración vivía debajo de la
+  checklist y los atajos de arriba la subían al abrirlos. Al bajar hasta la lista se
+  cerraba y volvía abajo, así que al acabar la checklist se veía otra vez entera: parecía
+  repetida ("quiero quitar el de abajo y que solo se vea si le das a configurar evento o
+  eventos guardados sin duplicar código", el dueño).
+- **Solución** (solo CSS + quitar lo que sobraba, sin duplicar marcado):
+  - `index.css`: sin atajo abierto, `.config-sidebar` va `display: none` en una columna.
+    "Configurar el evento" trae `#cfg-evento` y encima "Añadir varios items pegando
+    texto"; "Eventos guardados" trae `#cfg-guardados` y debajo las Plantillas
+    (`#cfg-plantillas`, id nuevo). Plantillas y "Añadir varios items" no tenían atajo y se
+    habrían quedado sin sitio: el dueño eligió dónde van.
+  - `App.jsx`: fuera el botón "Volver a la checklist" (y `irA`, `ArrowUp`), que solo
+    servía para volver desde abajo. El cierre al bajar hasta la lista, sin salto, sigue igual.
+  - En dos columnas (>1180px) no cambia nada.
+  - Pruebas ("Orden en el móvil"): sin atajo no se ve nada de la configuración, cada atajo
+    trae lo suyo y su compañera en ese orden, y al final de la página no reaparece. "Resumen
+    del evento" abre el atajo antes de medir las cajas de texto.
 
 **Ratios de bebida: suelo automático del sector y aviso de cambio brusco — HECHO**:
 - **Motivo**: Al no registrarse de forma recurrente las vueltas de bebida en los eventos terminados, los pocos eventos con devolución computada skewan el ratio de consumo hacia abajo. Como la calibración automática necesita solo 3 eventos para proponer un factor (ej. 0.4 o 0.5), aplicar ese factor arriesga cargar significativamente menos bebida de la necesaria y obligaba a revisar o cambiar los ratios a mano.

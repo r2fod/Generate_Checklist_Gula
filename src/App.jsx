@@ -6,7 +6,7 @@ import {
   Save, RefreshCw, Link2, FileText, Printer, MessageCircle, ClipboardCopy, ClipboardCheck,
   ListPlus, FolderOpen, CalendarDays, CalendarClock, Clock, X, Check,
   ChevronUp, ChevronDown, Tag, Pencil, Undo2, RotateCcw,
-  AlertTriangle, ArrowRight, ArrowUp, Bell, Copy, Search, SlidersHorizontal,
+  AlertTriangle, ArrowRight, Bell, Copy, Search, SlidersHorizontal,
   Moon, Sun, Download, Upload, Eye,
   MapPin,
 } from "lucide-react";
@@ -435,13 +435,6 @@ function leerEstadoGuardado() {
 
 // FilaItem está en ./components/FilaItem.jsx.
 
-// Lleva a una parte de la pantalla (los atajos de una columna: la checklist, la
-// configuración, los eventos guardados). Con "reducir movimiento", de golpe.
-function irA(id) {
-  const suave = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  document.getElementById(id)?.scrollIntoView({ behavior: suave ? "smooth" : "auto", block: "start" });
-}
-
 // ─── APP PRINCIPAL ────────────────────────────────────────────────────────────
 export default function App({ onCerrarSesion } = {}) {
   // El archivo de eventos (colección "indice") es del EQUIPO y sus reglas piden sesión
@@ -756,12 +749,13 @@ export default function App({ onCerrarSesion } = {}) {
   // En el móvil "Añadir item" va plegado: abierto ocupaba la primera pantalla entera
   const [anadirAbierto, setAnadirAbierto] = useState(false);
   // En una columna, la tarjeta que se ha abierto con su atajo ("evento" o "guardados")
-  // y sale ahí, debajo de los botones, en vez de llevar hasta abajo (ver más abajo)
+  // y sale ahí, debajo de los botones. Sin atajo abierto la configuración no se ve: antes
+  // vivía también debajo de la checklist y se veía repetida (ver index.css)
   const [panelArriba, setPanelArriba] = useState(null);
   const listaAntesDeCerrarRef = React.useRef(null);
-  // La tarjeta abierta arriba con su atajo vuelve a su sitio (debajo de la checklist) en
-  // cuanto se baja hasta la lista: se abre para tocar algo, y al seguir hacia la lista ya
-  // no hace falta pasar por encima de ella. Al irse de arriba la lista subiría de golpe
+  // La tarjeta abierta arriba con su atajo se cierra sola en cuanto se baja hasta la
+  // lista: se abre para tocar algo, y al seguir hacia la lista ya no hace falta pasar
+  // por encima de ella. Al irse de arriba la lista subiría de golpe
   // lo que medía la tarjeta: se mide dónde estaba la lista y se devuelve ahí, sin salto.
   // El anclaje del navegador (overflow-anchor) se apaga en ese momento para no corregir
   // dos veces.
@@ -3991,10 +3985,11 @@ export default function App({ onCerrarSesion } = {}) {
         <div className="main-layout" data-panel={panelArriba || undefined}>
         {/* En una columna (móvil y tableta) la checklist va PRIMERO: era lo último, tras
             Plantillas, Eventos guardados y la configuración entera (siete pantallas de
-            móvil antes de la primera línea). La configuración sigue debajo. Estos atajos
-            la abren AHÍ, debajo de ellos, en vez de llevar hasta abajo ("que te lleve
-            abajo no me gusta", el dueño); al bajar hasta la checklist vuelve a su sitio.
-            En dos columnas no se ven. */}
+            móvil antes de la primera línea). La configuración solo se ve con estos atajos,
+            que la abren AHÍ, debajo de ellos; al bajar hasta la checklist se cierra. Antes
+            seguía también debajo de la lista y se veía repetida ("quiero quitar el de
+            abajo", el dueño). "Configurar el evento" trae además "Añadir varios items", y
+            "Eventos guardados" las Plantillas. En dos columnas no se ven. */}
         {!soloMarcar && (
           <nav className="atajos-una-columna" aria-label="Abrir">
             <button type="button" className={`btn btn-outline${panelArriba === "evento" ? " es-abierto" : ""}`}
@@ -4012,11 +4007,6 @@ export default function App({ onCerrarSesion } = {}) {
           </nav>
         )}
         <div className="config-sidebar">
-        {!soloMarcar && (
-          <button type="button" className="btn btn-outline atajo-volver" onClick={() => irA("checklist-lista")}>
-            <ArrowUp size={15} aria-hidden="true" /> Volver a la checklist
-          </button>
-        )}
 
         {/* AÑADIR VARIOS ITEMS (pegando texto) */}
         {/* El estado "ya hay items pegados" se marca con una clase, no con colores en
@@ -4035,7 +4025,7 @@ export default function App({ onCerrarSesion } = {}) {
 
         {/* PLANTILLAS GUARDADAS */}
         {!soloMarcar && (
-        <div className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.08s" }}>
+        <div id="cfg-plantillas" className="config-card plantillas-card animate-entrance" style={{ animationDelay: "0.08s" }}>
           <div className="plantillas-header">
             <span className="section-title" style={{ marginBottom: 0 }}>Plantillas</span>
             <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarPlantilla} title="Guarda solo la configuración (pax, extras, equipamiento...) como plantilla reutilizable, SIN nombre/fecha/ubicación"><Save size={14} /> Guardar actual</button>
