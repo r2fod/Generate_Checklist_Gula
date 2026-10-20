@@ -58,10 +58,10 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${esAlquiler ? "is-alquiler" : ""} ${pendiente ? "is-pendiente" : ""}${salta ? " acaba-de-marcarse" : ""}`}
          onAnimationEnd={e => { if (e.target === e.currentTarget) terminar(); }}
          data-revisar={marcaRevisar ? dataKey : undefined} data-pendiente={pendiente ? dataKey : undefined}>
-      {/* En Prep. (con el reloj de arena) la fila va en rejilla: cada cosa en su
-          columna en todas las filas, en vez de que el reloj o la cantidad bajen de
-          línea según lo largo que sea el nombre. Ver .carga-row-prep en index.css. */}
-      <label className={`carga-row-principal ${enPreparacion && onPendiente ? "carga-row-prep" : ""}`}>
+      {/* En Prep. y en Salida la fila va en rejilla: cada cosa en su columna en todas
+          las filas, en vez de que el reloj o la cantidad bajen de línea según lo largo
+          que sea el nombre. Ver .carga-row-rejilla en index.css. */}
+      <label className="carga-row-principal carga-row-rejilla">
         <input type="checkbox" checked={marcado} onChange={() => onToggle && onToggle(dataKey)} />
         <span className="carga-nombre">
           {/* El tag va FUERA de carga-nombre-texto (que es el nombre puro: algo lo lee
