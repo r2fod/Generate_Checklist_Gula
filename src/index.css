@@ -4435,6 +4435,35 @@ hr {
      pone el grupo de controles, no este bloque. */
   padding-bottom: 6px;
 }
+/* En rejilla, como Prep.: el nombre, la cantidad y la pastilla "todo", cada uno en su
+   columna y en todas las filas igual. En flex, según lo larga que fuera la palabra más
+   larga del nombre, la pastilla se quedaba a la derecha o bajaba sola a la izquierda
+   ("unos a un lado y otros a otro", el dueño: a 411px, 84 filas de una forma y 33 de la
+   otra). La cantidad se parte en dos líneas antes que empujar la pastilla. */
+.carga-row-principal.carga-row-vuelta {
+  display: grid;
+  grid-template-columns: minmax(min-content, 1fr) auto auto;
+  gap: 6px 0;
+}
+/* El nombre, al menos 6em (o su palabra más larga): una cantidad larga ("de 441 para
+   200 pax") se parte antes que dejarlo en una columnita */
+.carga-row-vuelta > .carga-nombre { grid-column: 1; grid-row: 1; min-width: 6em; }
+.carga-row-vuelta > .carga-cantidad {
+  grid-column: 2;
+  grid-row: 1;
+  margin-left: 12px;
+  white-space: normal;
+  text-align: right;
+}
+.carga-row-vuelta > .carga-vino-todo { grid-column: 3; grid-row: 1; margin-left: 12px; }
+/* Cuando no cabe (móvil estrecho o letra grande), TODAS las filas pasan a la misma
+   forma: el nombre y la cantidad arriba, y la pastilla debajo, alineada con el nombre. */
+@container cargafila (max-width: 20em) {
+  .carga-row-principal.carga-row-vuelta { grid-template-columns: minmax(min-content, 1fr) auto; }
+  /* Sin la pastilla al lado, el nombre tiene sitio para no bajar de 7em */
+  .carga-row-vuelta > .carga-nombre { min-width: 7em; }
+  .carga-row-vuelta > .carga-vino-todo { grid-column: 1 / -1; grid-row: 2; justify-self: start; margin-left: 0; }
+}
 
 /* Los dos números de la vuelta ("vuelve" y "roturas"), en una fila y alineados entre
    ellos. Antes iban sueltos, uno debajo de otro, y con sangrías distintas de la
@@ -4500,17 +4529,7 @@ hr {
 
 @media (max-width: 480px) {
   .carga-row-principal.carga-row-vuelta {
-    flex-wrap: wrap;
     padding-bottom: 6px;
-  }
-
-  /* Sin esto, la pastilla "vino todo" (fija, ~105px) le dejaba al nombre menos de
-     80px de los 264 de la fila: hasta "Regletas" se partía a media palabra
-     ("Regleta" / "s"). El nombre no necesitaba partirse, necesitaba sitio: pide al
-     menos 110px (o su palabra más larga, si es mayor: ver .carga-nombre), y la
-     pastilla es la que cae a su propia línea cuando no cabe. */
-  .carga-row-vuelta .carga-nombre {
-    flex-basis: 110px;
   }
 
   /* En móvil los dos números pegan al borde: 46px de sangría se comen el ancho que
@@ -4526,8 +4545,8 @@ hr {
   }
 }
 
-/* Prep. (la fila con el reloj de arena), en rejilla: cada cosa en su columna en todas
-   las filas. En flex, según lo largo del nombre, unas veces bajaba la cantidad, otras
+/* Prep. (la fila con el reloj de arena) y Salida, en rejilla: cada cosa en su columna
+   en todas las filas (en Salida, sin reloj, esa columna se queda vacía y sin hueco). En flex, según lo largo del nombre, unas veces bajaba la cantidad, otras
    el reloj, otras las dos (a 393px con la letra al 115%, 22 filas de 136, en cuatro
    formas distintas; a 320px, casi todas).
    - El nombre nunca baja de su palabra más larga (min-content): no se parte por dentro.
@@ -4536,40 +4555,42 @@ hr {
    - Lo que falta, debajo, de la columna del nombre al borde.
    Los huecos van en márgenes y no en gap: una columna vacía (sin marcas) no deja hueco. */
 .carga-row { container: cargafila / inline-size; }
-.carga-row-principal.carga-row-prep {
+.carga-row-principal.carga-row-rejilla {
   display: grid;
   grid-template-columns: auto minmax(min-content, 1fr) auto auto auto;
   gap: 6px 0;
 }
-.carga-row-prep > input[type="checkbox"] { grid-column: 1; grid-row: 1; margin: 0 14px 0 0; }
-.carga-row-prep > .carga-nombre { grid-column: 2; grid-row: 1; }
-.carga-row-prep > .carga-marcas { grid-column: 3; grid-row: 1; margin-left: 8px; }
-.carga-row-prep > .carga-cantidad {
+.carga-row-rejilla > input[type="checkbox"] { grid-column: 1; grid-row: 1; margin: 0 14px 0 0; }
+/* Al menos 6em (o su palabra más larga): una cantidad larga se parte antes que dejar
+   el nombre en una columnita de 57px, letra a letra casi */
+.carga-row-rejilla > .carga-nombre { grid-column: 2; grid-row: 1; min-width: 6em; }
+.carga-row-rejilla > .carga-marcas { grid-column: 3; grid-row: 1; margin-left: 8px; }
+.carga-row-rejilla > .carga-cantidad {
   grid-column: 4;
   grid-row: 1;
   margin-left: 12px;
   white-space: normal;
   text-align: right;
 }
-.carga-row-prep > .carga-pendiente-btn { grid-column: 5; grid-row: 1; margin-left: 12px; }
-.carga-row-prep > .carga-pendiente-tag { grid-column: 2 / -1; grid-row: 2; margin: 0; padding: 0; }
+.carga-row-rejilla > .carga-pendiente-btn { grid-column: 5; grid-row: 1; margin-left: 12px; }
+.carga-row-rejilla > .carga-pendiente-tag { grid-column: 2 / -1; grid-row: 2; margin: 0; padding: 0; }
 /* Cuando ni así cabe (320px, o la letra grande del móvil por debajo de ~360px), todas
    las filas pasan a la misma forma de dos pisos: el nombre arriba con todo el ancho, y
    la cantidad y el reloj abajo a la derecha. Lo que falta, en un tercer piso. Se mide en
    em de la propia fila: con la letra al 115% cambia antes, que es justo cuando hace
    falta. */
 @container cargafila (max-width: 17.5em) {
-  .carga-row-principal.carga-row-prep {
+  .carga-row-principal.carga-row-rejilla {
     grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     gap: 2px 0;
     padding-top: 11px;
     padding-bottom: 11px;
   }
-  .carga-row-prep > .carga-nombre { grid-column: 2 / -1; min-width: 0; }
-  .carga-row-prep > .carga-marcas { grid-row: 2; }
-  .carga-row-prep > .carga-cantidad { grid-row: 2; }
-  .carga-row-prep > .carga-pendiente-btn { grid-row: 2; }
-  .carga-row-prep > .carga-pendiente-tag { grid-row: 3; }
+  .carga-row-rejilla > .carga-nombre { grid-column: 2 / -1; min-width: 0; }
+  .carga-row-rejilla > .carga-marcas { grid-row: 2; }
+  .carga-row-rejilla > .carga-cantidad { grid-row: 2; }
+  .carga-row-rejilla > .carga-pendiente-btn { grid-row: 2; }
+  .carga-row-rejilla > .carga-pendiente-tag { grid-row: 3; }
 }
 /* Las marcas de "cargado"/"prep."/"revisar", juntas: van en la misma columna */
 .carga-marcas { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }

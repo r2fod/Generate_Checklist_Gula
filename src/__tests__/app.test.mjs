@@ -1672,6 +1672,47 @@ async function main() {
     await c.close();
   }
 
+  // ── Modo carga: todas las filas con la misma forma ──────────────────────────
+  // "Mira cómo se ven algunas distribuciones, unos a un lado y otros a otro: arregla
+  // eso, que se ve feo" (el dueño, con la Vuelta en el móvil): en flex, según lo larga
+  // que fuera la palabra más larga del nombre, la pastilla "todo" se quedaba a la
+  // derecha o bajaba sola a la izquierda (a 411px, 84 filas de una forma y 33 de otra),
+  // y en Salida la cantidad igual (a 320px, 97 y 18). Ahora las tres pestañas van en
+  // rejilla: a cada ancho, una sola forma para todas las filas.
+  console.log("\n── Modo carga: a cada ancho, todas las filas con la misma forma ──");
+  {
+    const estadoFormas = { evento: "boda", pax: 100, nombreEvento: "Boda formas",
+      itemsManuales: [{ categoria: "Menaje y cocina", label: "VASO CHUPITO CRISTAL GRANDE", cantidad: "30" }] };
+    for (const [ancho, letra] of [[320, 1], [360, 1], [390, 1], [411, 1], [411, 1.15]]) {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: true, hasTouch: true });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url(estadoFormas), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1500);
+      if (letra !== 1) await p.addStyleTag({ content: `html { font-size: ${letra * 100}% !important; }` });
+      await p.locator("button", { hasText: "Modo carga" }).first().click();
+      await p.waitForTimeout(1000);
+      for (const pestana of ["Prep.", "Salida", "Vuelta"]) {
+        await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: pestana }).first().click();
+        await p.waitForTimeout(600);
+        const m = await p.evaluate(() => {
+          const formas = new Set(); let nombreMin = 999;
+          for (const r of document.querySelectorAll(".carga-row-principal")) {
+            const n = r.querySelector(".carga-nombre").getBoundingClientRect();
+            const q = r.querySelector(".carga-cantidad").getBoundingClientRect();
+            const t = r.querySelector(".carga-vino-todo")?.getBoundingClientRect();
+            formas.add(`${q.top < n.bottom - 4 ? "cantidad-al-lado" : "cantidad-debajo"}${t ? (t.top < n.bottom - 4 ? "/todo-al-lado" : "/todo-debajo") : ""}`);
+            nombreMin = Math.min(nombreMin, n.width);
+          }
+          return { formas: [...formas], nombreMin: Math.round(nombreMin), desborda: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+        });
+        ok(m.formas.length === 1 && !m.desborda && m.nombreMin >= 80,
+          `${pestana} a ${ancho}px${letra !== 1 ? " con la letra grande" : ""}: una sola forma (${m.formas.join(", ")}), el nombre con al menos ${m.nombreMin}px y sin salirse`);
+      }
+      await c.close();
+    }
+  }
+
   // ── Modo carga también avisa de los items de alquiler ───────────────────────
   // La lista normal (FilaItem.jsx) pinta de amarillo y pone el cartelito "ALQUILER"
   // en items de un proveedor externo (por nombre, o marcados a mano con el ✎), pero

@@ -337,6 +337,18 @@ operativo).
   el personal)" con sus cápsulas ("si se agrega la grande industrial, que se agregue una
   Nespresso para el personal", el dueño): ya salía, ahora con su prueba y dicho en la
   nota. En un rodaje no: el equipo tiene la cafetera de mantenimiento.
+- **Modo carga: a cada ancho, todas las filas con la misma forma** ("mira cómo se ven
+  algunas distribuciones, unos a un lado y otros a otro: arregla eso, que se ve feo", el
+  dueño, con la Vuelta en el móvil). En flex, según la palabra más larga del nombre, la
+  pastilla "todo" de Vuelta se quedaba a la derecha o bajaba sola a la izquierda (a
+  411px, 84 filas de una forma y 33 de otra) y en Salida la cantidad igual (a 320px, 97 y
+  18). Ahora Vuelta va en rejilla como Prep. (`.carga-row-vuelta`: nombre, cantidad y
+  pastilla en su columna; con la fila por debajo de 20em, todas con la pastilla debajo
+  del nombre) y Salida usa la misma rejilla que Prep. (`.carga-row-rejilla`, antes
+  `.carga-row-prep`). El nombre nunca baja de 6em (7em en Vuelta estrecha): una cantidad
+  larga ("de 225 (9 bateas de 25)") se parte en líneas antes que aplastarlo. Prueba en
+  app.test.mjs ("a cada ancho, todas las filas con la misma forma"): las tres pestañas a
+  320, 360, 390 y 411 (y con la letra al 115%), una sola forma por ancho.
 - **Lo nuevo, con su icono y revisado en todos los anchos** ("mira bien cómo se adapta
   todo a las pantallas y revisa los iconos de lo nuevo", el dueño). Repaso a 320, 360,
   414, 768, 1024, 1440 y 1920 del formulario (gente con tronas, cóctel, cafetera,
