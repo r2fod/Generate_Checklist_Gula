@@ -18,10 +18,10 @@
 - Visual UI: Verify screenshots (`CONTEXTO.md`), not green tests.
 - Tests: Required per feature/fix same commit. Real API fixture shapes only.
 - SSRF Security: Check ALL redirect hops. Block `::ffff:a.b.c.d`.
-- AI Branches: Human security review required before main merge.
+- AI Branches: security-sensitive ones (auth, rules, SSRF, XSS) need human review before main merge; the rest follow the Merge rule below.
 
 ## WORKFLOW
-- File Lock: Do NOT edit source during test/deploy.
+- File Lock: don't edit source while the test battery or a deploy is running: both build from the working tree, so an edit changes what is being tested.
 - Async Test: `setsid nohup npm run test > test.log 2>&1 &` | Check: `pgrep -f "npm [r]un test"`
 - Git: Auto commit+push on green test. Delete merged feature branches.
 

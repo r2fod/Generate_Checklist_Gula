@@ -268,7 +268,9 @@ async function claude(cuerpo, env) {
     },
     body: JSON.stringify({
       model: env.ANTHROPIC_MODEL || "claude-opus-5",
-      max_tokens: 2048,
+      // Claude Opus 5 piensa por defecto y lo que piensa cuenta dentro de max_tokens:
+      // con 2048 la respuesta se podía cortar a medias
+      max_tokens: 16000,
       system: cuerpo.sistema,
       messages: mensajes,
       tools: cuerpo.herramientas.map(h => ({
@@ -277,12 +279,28 @@ async function claude(cuerpo, env) {
     }),
   });
   if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  const d = await r.json();
-  const bloques = d.content || [];
-  const u = d.usage || {};
+  return respuestaDeClaude(await r.json());
+}
+
+// Lo que contesta Claude, a lo que entiende la app. Antes no se miraba por qué había
+// parado: un rechazo llegaba como texto vacío y una respuesta cortada por largo, a
+// medias y sin aviso. Ahora el rechazo es un error que se ve, y lo cortado lo dice (y no
+// se ejecuta ninguna herramienta, que podría venir con los datos a medias).
+export function respuestaDeClaude(d) {
+  const bloques = (d && d.content) || [];
+  const u = (d && d.usage) || {};
+  const uso = { entrada: u.input_tokens || 0, salida: u.output_tokens || 0 };
+  const texto = bloques.filter(b => b.type === "text").map(b => b.text).join("").trim();
+  if (d && d.stop_reason === "refusal") {
+    const motivo = d.stop_details && d.stop_details.category ? ` (${d.stop_details.category})` : "";
+    throw new Error(`Claude no ha querido contestar a esto${motivo}. Prueba a preguntarlo de otra forma.`);
+  }
+  if (d && d.stop_reason === "max_tokens") {
+    if (!texto) throw new Error("Claude se ha quedado sin sitio para contestar. Prueba con una pregunta más concreta.");
+    return { uso, texto: `${texto}…\n\n(La respuesta se ha cortado por larga.)`, llamadas: [] };
+  }
   return {
-    uso: { entrada: u.input_tokens || 0, salida: u.output_tokens || 0 },
-    texto: bloques.filter(b => b.type === "text").map(b => b.text).join("").trim(),
+    uso, texto,
     llamadas: bloques.filter(b => b.type === "tool_use").map(b => ({ id: b.id, nombre: b.name, argumentos: b.input || {} })),
   };
 }
