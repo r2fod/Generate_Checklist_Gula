@@ -38,7 +38,7 @@ import { hoyISO, enDiasISO } from "../fecha.js";
 import { alSobrarTiempo, olvidarPrecargas } from "../precarga.js";
 import { gestoDeHerramienta } from "../asistente/gestos.js";
 import { repasar, avisoDePeso, TECHO_DOCUMENTO } from "../../worker/repaso.js";
-import { clavesGemini, vozElegida, salud, urlAnalizable, fetchValidando, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves, peticionPushCifrada } from "../../worker/index.js";
+import { clavesGemini, vozElegida, salud, urlAnalizable, fetchValidando, extraerWeb, visionGemini, tareasParaPush, payloadDeRecordatorio, vapidClaves, peticionPushCifrada, respuestaDeClaude } from "../../worker/index.js";
 import { saneaEstrategia, estrategiaEnFrase } from "../asistente/estrategia.js";
 import { idDeAparato, CLAVE_ID, CLAVE_SUSC, clavePúblicaABytes, suscripcionLista } from "../asistente/push.js";
 import { VOCES_GEMINI, CLAVES_VOZ_GEMINI, vozGeminiValida } from "../asistente/vozGemini.js";
@@ -259,6 +259,9 @@ console.log("\n── Consultar de verdad ──");
   ok(ejecutar("ver_calendario", { desde: "2026-10-01" }, CTX).total === 1, "el calendario filtra por fechas");
   ok(ejecutar("simular_checklist", { tipo: "boda", adultos: 80 }, CTX).categorias.length > 5,
     "y se puede simular un evento que todavía no existe");
+  const fuegoSimulado = ejecutar("simular_checklist", { tipo: "boda", adultos: 80, categoria: "fuego" }, CTX).categorias.flatMap(c => c.items);
+  ok(!fuegoSimulado.some(i => /^(Barbacoa|Carbón|Leña)/.test(i)),
+    "con lo que trae un evento nuevo: sin barbacoa, carbón ni leña que nadie ha pedido");
 
   // El progreso de carga: mismos números que ya calcula App.jsx (totalConceptos/
   // itemsCargados/itemsPreparados/itemsVueltos), no una reconstrucción aparte.
@@ -2362,6 +2365,37 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
     "la nota de cada uno dice lo que es: gratis, de pago, o el hueco abierto");
   ok(SIN_DATOS_DE_CLIENTES.every(id => notaDe(id) === "sin clientes"),
     "y los que no pueden ver datos de clientes lo dicen en su nota, para que se sepa antes de elegirlos a mano");
+}
+
+// ── Claude: por qué ha parado ─────────────────────────────────────────────────
+// Un rechazo llegaba como texto vacío y una respuesta cortada por largo, a medias y sin
+// aviso (el worker no miraba stop_reason). Las formas son las de la API de mensajes.
+console.log("\n── Claude: rechazos y respuestas cortadas ──");
+{
+  const normal = respuestaDeClaude({ id: "msg_01", type: "message", role: "assistant", model: "claude-opus-5",
+    content: [{ type: "thinking", thinking: "", signature: "EqQBCgIYAhIM" }, { type: "text", text: "Hacen falta 120 kg de hielo." }],
+    stop_reason: "end_turn", stop_details: null, usage: { input_tokens: 812, output_tokens: 40 } });
+  ok(normal.texto === "Hacen falta 120 kg de hielo." && normal.llamadas.length === 0 && normal.uso.entrada === 812 && normal.uso.salida === 40,
+    "una respuesta normal: su texto (sin el bloque de pensamiento) y lo gastado");
+  const herramienta = respuestaDeClaude({ id: "msg_02", type: "message", role: "assistant", model: "claude-opus-5",
+    content: [{ type: "tool_use", id: "toolu_01A", name: "calcular_hielo", input: { comensales: 100 } }],
+    stop_reason: "tool_use", stop_details: null, usage: { input_tokens: 900, output_tokens: 60 } });
+  ok(herramienta.llamadas.length === 1 && herramienta.llamadas[0].nombre === "calcular_hielo" && herramienta.llamadas[0].argumentos.comensales === 100,
+    "y una llamada a herramienta pasa tal cual");
+  const cortada = respuestaDeClaude({ id: "msg_03", type: "message", role: "assistant", model: "claude-opus-5",
+    content: [{ type: "text", text: "La boda lleva" }, { type: "tool_use", id: "toolu_01B", name: "ver_evento", input: {} }],
+    stop_reason: "max_tokens", stop_details: null, usage: { input_tokens: 900, output_tokens: 16000 } });
+  ok(/^La boda lleva…/.test(cortada.texto) && /se ha cortado/.test(cortada.texto) && cortada.llamadas.length === 0,
+    "cortada por largo: lo dice, y no ejecuta una herramienta que podría venir a medias");
+  let sinSitio = "";
+  try { respuestaDeClaude({ content: [{ type: "thinking", thinking: "", signature: "x" }], stop_reason: "max_tokens", usage: {} }); }
+  catch (e) { sinSitio = e.message; }
+  ok(/sin sitio para contestar/.test(sinSitio), "y si no llegó a escribir nada, es un error que se ve, no una burbuja vacía");
+  let rechazo = "";
+  try { respuestaDeClaude({ id: "msg_04", type: "message", role: "assistant", model: "claude-opus-5", content: [],
+    stop_reason: "refusal", stop_details: { type: "refusal", category: "cyber", explanation: "…" }, usage: { input_tokens: 50, output_tokens: 0 } }); }
+  catch (e) { rechazo = e.message; }
+  ok(/no ha querido contestar/.test(rechazo) && /cyber/.test(rechazo), "un rechazo también se dice, con su motivo");
 }
 
 console.log("\n──────────────────────────────────────────────────────────");

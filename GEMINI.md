@@ -14,9 +14,9 @@
 3. `PLAN_MEJORAS.md`, `PLAN_COCINA.md` y `PLAN_INVENTARIO.md` solo si el dueño pide algo
    de esos planes.
 
-## Lo que en `CLAUDE.md` es de Claude y aquí no aplica
-- Las líneas de firma de los commits ("Co-Authored-By: Claude…", "Claude-Session: …"):
-  firma como te toque a ti, pero el mensaje, en español como siempre.
-- Nada más: idioma, privacidad (repo público, cero datos reales), pruebas por cambio,
+## Lo que es de Claude y aquí no aplica
+- Las líneas de firma que verás en los commits del historial ("Co-Authored-By: Claude…",
+  "Claude-Session: …"): firma como te toque a ti, pero el mensaje, en español como siempre.
+- Nada más de `CLAUDE.md`: idioma, privacidad (repo público, cero datos reales), pruebas por cambio,
   batería completa antes de fusionar, capturas para lo visual y actualizar
   `CONTEXTO.md` en el mismo commit valen igual.

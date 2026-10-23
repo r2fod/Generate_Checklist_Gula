@@ -220,8 +220,8 @@ export const HERRAMIENTAS = {
   ver_escaleta: {
     datos: true,
     esquema: {
-      description: "A qué hora toca cada cosa el día del evento: salir del obrador, cargar, montar, el servicio y la recogida.",
-      parameters: { type: "object", properties: { nombre: { type: "string", description: "Nombre del evento." } } },
+      description: "A qué hora toca cada cosa el día del evento: salir del obrador, cargar, montar, el servicio y la recogida. Necesita la hora de inicio del evento: sin ella devuelve un error y no hay escaleta. Los tramos con aOjo son estimados, y avisoLogistica sale cuando la hora a la que entra el equipo no cuadra con la que pide la cuenta.",
+      parameters: { type: "object", properties: { nombre: { type: "string", description: "Nombre del evento. Vacío para el que está abierto." } } },
     },
     corre: (ctx, { nombre = "" } = {}) => {
       const ev = buscaEvento(ctx, nombre);
@@ -292,9 +292,9 @@ export const HERRAMIENTAS = {
         type: "object",
         properties: {
           comensales: { type: "number", description: "Comensales totales, niños incluidos." },
-          verano: { type: "boolean" },
+          verano: { type: "boolean", description: "Si el evento cae en meses cálidos: sale más hielo por persona." },
           horasBarra: { type: "number", description: "Horas de barra en total. 0 si no hay." },
-          hayCongelador: { type: "boolean" },
+          hayCongelador: { type: "boolean", description: "Si en el sitio hay arca o congelador donde guardar el hielo. Sin él se carga de más por lo que se derrite." },
           tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion. Vacío si no se sabe." },
         },
         required: ["comensales"],
@@ -310,12 +310,12 @@ export const HERRAMIENTAS = {
   calcular_personal: {
     datos: false,
     esquema: {
-      description: "Cuánta gente hace falta (sala, cocina y logística) para un evento de un tipo y un número de comensales.",
+      description: "Cuánta gente hace falta (sala, cocina y logística) para un evento de un tipo y un número de comensales. Devuelve sala, cocina, logistica y total; sinMedir sale a true cuando el ratio de camareros de ese tipo sigue siendo el de partida y nadie lo ha medido.",
       parameters: {
         type: "object",
         properties: {
           tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
-          comensales: { type: "number" },
+          comensales: { type: "number", description: "Comensales del evento (el pax total)." },
         },
         required: ["tipo", "comensales"],
       },
@@ -713,7 +713,7 @@ export const HERRAMIENTAS = {
     datos: true,
     escribe: true,
     esquema: {
-      description: "Da una tarea por hecha.",
+      description: "Da por hecha una tarea pendiente. Busca la primera sin hacer cuyo texto contiene lo que se le pasa, sin tildes ni mayúsculas: basta un trozo que la distinga. Si ninguna se parece, devuelve un error y no marca nada.",
       parameters: { type: "object", properties: { texto: { type: "string", description: "La tarea, o parte de ella." } }, required: ["texto"] },
     },
     corre: (ctx, { texto = "" } = {}) => {
@@ -736,10 +736,10 @@ export const HERRAMIENTAS = {
         type: "object",
         properties: {
           tipo: { type: "string", description: "boda, comunion, corporativo, cumpleanos o produccion." },
-          adultos: { type: "number" },
-          ninos: { type: "number" },
-          horasCoctel: { type: "number" },
-          horasCopas: { type: "number" },
+          adultos: { type: "number", description: "Comensales adultos." },
+          ninos: { type: "number", description: "Niños, aparte de los adultos. 0 si no hay." },
+          horasCoctel: { type: "number", description: "Horas de barra de cóctel/aperitivo. 0 si no hay." },
+          horasCopas: { type: "number", description: "Horas de barra de copas. 0 si no hay." },
           categoria: { type: "string", description: "Parte del nombre de una categoría, para no traerlo todo." },
         },
         required: ["tipo", "adultos"],
@@ -749,7 +749,9 @@ export const HERRAMIENTAS = {
       const a = Math.max(0, Math.round(adultos) || 0);
       if (!a) return { error: "Hacen falta los comensales adultos." };
       let cats;
-      try { cats = buildChecklist(tipo, a, Number(horasCoctel) || 0, Number(horasCopas) || 0, Math.max(0, Math.round(ninos) || 0), {}); }
+      // Con lo que trae un evento nuevo en la app (sin barbacoa, horno pequeño): con {} el
+      // generador cargaba una barbacoa con su carbón y su leña en todos los simulados
+      try { cats = buildChecklist(tipo, a, Number(horasCoctel) || 0, Number(horasCopas) || 0, Math.max(0, Math.round(ninos) || 0), { tipoBBQ: "no lleva", tipoHorno: "pequeño" }); }
       catch (e) { return { error: `No sé montar una checklist de tipo "${tipo}".` }; }
       const salida = cats
         .filter(c => !categoria || normaliza(c.nombre).includes(normaliza(categoria)))
