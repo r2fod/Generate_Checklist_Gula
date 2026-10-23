@@ -815,6 +815,28 @@ async function main() {
     await ctx.close();
   }
 
+  // ── Simetría: lo que va en la misma fila, del mismo alto ─────────────────────
+  // "Mira que todo esté simétrico, que hay cosas con más altura que otras" (el dueño,
+  // con captura: "CÓCTEL / APERITIVO" partía en dos líneas y su tarjeta quedaba más alta
+  // y escalonada respecto a "COPAS"). Y en el calendario "Mes / Año / Equipo" medía 44 y
+  // "+ Apunte" 48, uno junto al otro.
+  console.log("\n── Simetría: lo que va en la misma fila, del mismo alto ──");
+  for (const w of [390, 1280]) {
+    const ctx = await navegador.newContext({ viewport: { width: w, height: 1000 }, isMobile: w < 768, hasTouch: w < 768 });
+    for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
+    const page = await nuevaPagina(ctx);
+    await page.goto(url({ ...EVENTO_COMPLETO, barraCoctel: true, barraCopas: true }), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".range-group");
+    await page.evaluate(() => document.querySelectorAll("details:not([open])").forEach(d => { d.open = true; }));
+    const barra = await page.evaluate(() => [...document.querySelectorAll(".range-group")].map(e => Math.round(e.getBoundingClientRect().height)));
+    ok(barra.length === 2 && barra[0] === barra[1], `${w}px · Cóctel y Copas, las dos tarjetas del mismo alto (${barra.join(" / ")})`);
+    await page.goto(`http://localhost:${PUERTO}/pruebas/calendario.html`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".cal-mes");
+    const cal = await page.evaluate(() => [".cal-vistas", ".cal-nuevo", ".cal-hoy", ".cal-nav-btn"].map(s => Math.round(document.querySelector(s)?.getBoundingClientRect().height || 0)));
+    ok(new Set(cal).size === 1, `${w}px · en la barra del calendario los botones miden lo mismo (${cal.join(" / ")})`);
+    await ctx.close();
+  }
+
   // ── El contenedor acompaña al ancho de la ventana ───────────────────────────
   // Estaba clavado en 1320px: en un monitor de 1920 sobraban 300px muertos a cada lado
   // y la lista se quedaba en 868px por grande que fuera la pantalla. Se comprueba con
