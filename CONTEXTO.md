@@ -945,7 +945,14 @@ fusionarlos por mucho que estén en verde.
   final de "Limpiar el calendario", `grupoDeLista` en limpieza.js) los marca todos de
   una vez a partir de la lista de ids que se le pasa aparte (lleva nombres: nunca al
   repositorio), y se borran con el mismo "Borrar N marcados", con confirmación y
-  "Deshacer". Borrar lo pulsa el dueño: la IA no borra datos de la app.
+  "Deshacer". Borrar lo pulsa el dueño: la IA no borra datos de la app. La excepción:
+  el "Posible X" que la hoja ya trae confirmado ("deberías quitar los posibles", el
+  dueño, 25/10). Ese lo quita la IA, sin esperar a que lo borre él: copia de seguridad
+  del documento, la lista entera reescrita como la escribe la app (`saneaLista`, con la
+  copia de mirar si la hay) y con la condición de que nadie lo haya tocado desde que se
+  leyó (`currentDocument.updateTime`). El 25/10 se quitaron así dos (un evento de empresa
+  y una producción de finales de octubre), con sus confirmados ya en el calendario. Su
+  checklist en blanco sigue en Eventos guardados: esa la borra el dueño.
 - Opcional, ya pasado: unos 25 apuntes que son turnos del personal ("LIBRE",
   "TRABAJA", "COCINA", "LIMPIEZA", horas sueltas como "14:00") de enero a junio,
   leídos de las filas con etiqueta en A/B.
