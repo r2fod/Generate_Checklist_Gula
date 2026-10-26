@@ -27,7 +27,8 @@ import { aplicarTemaInicial } from '../tema.js'
 // a qué buzón mandar: "Falta el enlace" después de haber hecho todos los pasos bien.
 // En Android no se notaba porque allí la app instalada sí comparte el almacén.
 function codigo() {
-  const dela = new URLSearchParams(window.location.search).get("enviar") || "";
+  // En mayúsculas, como se hacen todos (ver codigoDeTexto)
+  const dela = (new URLSearchParams(window.location.search).get("enviar") || "").toUpperCase();
   if (dela) {
     guardar(window.localStorage, dela);
     return dela;

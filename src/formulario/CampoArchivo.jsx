@@ -7,7 +7,9 @@
 import { useState, useRef } from "react";
 import { prepararArchivo, motivoEnPalabras, pesoEnPalabras } from "./archivos.js";
 
-export default function CampoArchivo({ etiqueta, archivo, onCambio }) {
+// onCargando avisa al formulario mientras se prepara la foto: si mandaban en ese rato,
+// el envío salía sin el adjunto y nadie se enteraba.
+export default function CampoArchivo({ etiqueta, archivo, onCambio, onCargando }) {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
   const refSubir = useRef(null);
@@ -18,8 +20,12 @@ export default function CampoArchivo({ etiqueta, archivo, onCambio }) {
     e.target.value = ""; // para poder elegir el mismo archivo otra vez
     if (!file) return;
     setError(""); setCargando(true);
-    const r = await prepararArchivo(file);
-    setCargando(false);
+    if (onCargando) onCargando(true);
+    let r;
+    try { r = await prepararArchivo(file); } finally {
+      setCargando(false);
+      if (onCargando) onCargando(false);
+    }
     if (!r.ok) { setError(motivoEnPalabras(r.motivo)); return; }
     onCambio(r.archivo);
   };

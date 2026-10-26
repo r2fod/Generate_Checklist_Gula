@@ -6201,6 +6201,9 @@ hr {
 }
 /* Lo que falta (tronas de más de las que hay): en color de aviso, no gris */
 .form-campo .form-nota.form-nota-falta { color: var(--aviso-texto); font-weight: 600; font-size: var(--fs-sm); text-transform: none; letter-spacing: normal; }
+/* Una aclaración bajo un campo (el nombre de un evento que ya existe, que no se edita) */
+.form-campo .form-nota.form-nota-campo { color: var(--text-muted); font-weight: 400; font-size: var(--fs-sm); text-transform: none; letter-spacing: normal; }
+.form-campo .form-input[readonly] { color: var(--text-muted); cursor: default; }
 
 .form-error {
   font-size: var(--fs-md);

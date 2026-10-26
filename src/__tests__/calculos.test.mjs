@@ -514,6 +514,12 @@ console.log("\n══ El código del buzón: que no se pierda al guardar la app 
   ok(codigoDeTexto("") === "" && codigoDeTexto(null) === "" && codigoDeTexto(undefined) === "",
     "y con el campo vacío no se inventa nada");
   ok(codigoDeTexto("hola que tal") === "", "ni con texto suelto que no es un código");
+  // Los códigos se hacen siempre en mayúsculas y la nube distingue: tecleado a mano en
+  // minúsculas (sobre todo en el iPhone) salía "este enlace ya no vale"
+  ok(codigoDeTexto("abcdefghjk") === "ABCDEFGHJK" && codigoDeTexto("https://ejemplo.com/formulario/?enviar=abc123") === "ABC123",
+    "tecleado en minúsculas, a pelo o en el enlace, vale igual");
+  ok(leerGuardado({ getItem: () => "abc123" }) === "ABC123",
+    "y lo que se guardó en minúsculas antes de esto también");
 
   // La dirección tiene que acabar llevando el código, porque es lo que el móvil se
   // guarda al añadir a la pantalla de inicio.

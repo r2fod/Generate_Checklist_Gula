@@ -18,7 +18,8 @@
 const CLAVE = "gula_formulario_codigo";
 
 export function leerGuardado(almacen) {
-  try { return (almacen && almacen.getItem(CLAVE)) || ""; } catch (e) { return ""; }
+  // En mayúsculas también lo guardado: antes se guardaba tal cual lo tecleaban
+  try { return ((almacen && almacen.getItem(CLAVE)) || "").toUpperCase(); } catch (e) { return ""; }
 }
 
 export function guardar(almacen, codigo) {
@@ -33,12 +34,14 @@ export function codigoDeTexto(texto) {
   if (!t) return "";
   const enElEnlace = t.match(/[?&]enviar=([^&#\s]+)/i);
   if (enElEnlace) {
-    try { return decodeURIComponent(enElEnlace[1]).trim(); } catch (e) { return enElEnlace[1].trim(); }
+    try { return decodeURIComponent(enElEnlace[1]).trim().toUpperCase(); } catch (e) { return enElEnlace[1].trim().toUpperCase(); }
   }
   // Un código suelto: letras y números, sin espacios ni barras. Si lleva pinta de
   // enlace pero no trae ?enviar=, es que han pegado el enlace equivocado.
+  // En mayúsculas porque los códigos solo se hacen en mayúsculas (nuevoCodigo) y la
+  // nube distingue: tecleado a mano en minúsculas salía "este enlace ya no vale".
   if (/[/\s]/.test(t)) return "";
-  return /^[\w-]{3,60}$/.test(t) ? t : "";
+  return /^[\w-]{3,60}$/.test(t) ? t.toUpperCase() : "";
 }
 
 // La dirección que debería tener la página para que, al añadirla a la pantalla de

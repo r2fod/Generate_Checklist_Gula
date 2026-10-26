@@ -6,7 +6,7 @@
 //   npm run test
 //
 import { chromium } from "playwright-core";
-import { aRespuestasDeLaApp, itemsDelEnvio } from "../formulario/preguntas.js";
+import { aRespuestasDeLaApp, itemsDelEnvio, preguntasDe } from "../formulario/preguntas.js";
 import { recogidasConAlquileres } from "../alquileres.js";
 import { enDiasISO } from "../fecha.js";
 import { spawn } from "child_process";
@@ -571,6 +571,66 @@ async function main() {
     await c.close();
   }
 
+  // ── El formulario: nombre fijo, "Deshacer" y el adjunto a medias ─────────────
+  // Tres cosas de la auditoría (PLAN_MEJORAS E3) que se veían de una forma y hacían
+  // otra: el nombre de un evento que ya existe se podía cambiar, pero la app lo
+  // descartaba; el "Deshacer" del "No lo sé" no salía nunca; y se podía mandar con la
+  // foto aún preparándose, y el envío salía sin ella.
+  console.log("\n── El formulario: nombre fijo, Deshacer y el adjunto a medias ──");
+  {
+    const base = { tipo: "produccion", nombre: "Produ de prueba", generador: "si", etiquetas: "si" };
+    const ids = preguntasDe("produccion", base).map(q => q.id);
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(([paso, respuestas]) => {
+      // En un ordenador la foto se prepara al momento: se frena para ver qué pasa en ese rato
+      const leer = FileReader.prototype.readAsDataURL;
+      FileReader.prototype.readAsDataURL = function (f) { setTimeout(() => leer.call(this, f), 1500); };
+      if (sessionStorage.getItem("sembrado")) return;
+      localStorage.setItem("gula_formulario_PRUEBA4", JSON.stringify({ eventoDestino: "Produ de prueba", paso, respuestas }));
+      sessionStorage.setItem("sembrado", "1");
+    }, [ids.indexOf("nombreYsitio"), base]);
+    const p = await nuevaPagina(c);
+    const guardado = () => p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA4") || "{}").respuestas || {});
+    const irA = async (texto) => {
+      await p.locator(".form-btn-resumen").first().click();
+      await p.locator(".form-repaso-fila", { hasText: texto }).first().click();
+      await p.waitForTimeout(300);
+    };
+    await p.goto(BASE_FORM + "?enviar=PRUEBA4", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-campo input");
+    const campos = await p.evaluate(() => [...document.querySelectorAll(".form-campo input")].map(i => i.readOnly));
+    const nota = await p.locator(".form-nota-campo").count();
+    ok(campos[0] === true && campos[1] === false && nota === 1,
+      `el nombre de un evento que ya existe no se edita (con su nota) y el sitio sí (${JSON.stringify(campos)}, nota ${nota})`);
+
+    await irA("generador");
+    await p.locator(".form-btn-nose").first().click();
+    await p.waitForTimeout(400);
+    const aviso = await p.locator(".form-deshacer").first().innerText().catch(() => "");
+    ok(/generador/i.test(aviso) && (await guardado()).generador === null,
+      `"No lo sé" con algo puesto ofrece deshacerlo en la pantalla siguiente ("${aviso.replace(/\s+/g, " ").trim()}")`);
+    await p.locator(".form-deshacer button").first().click();
+    await p.waitForTimeout(300);
+    ok((await guardado()).generador === "si" && await p.locator(".form-deshacer").count() === 0,
+      "y \"Deshacer\" devuelve lo que había");
+
+    await irA("etiquetas");
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    await p.locator(".form-archivo input[type=file]").first().setInputFiles({ name: "etiqueta.png", mimeType: "image/png", buffer: png });
+    await p.locator(".form-btn-resumen").first().click();
+    await p.waitForTimeout(200);
+    const boton = p.locator(".form-acciones .form-btn-principal").first();
+    const mientras = { texto: await boton.innerText(), quieto: await boton.isDisabled() };
+    ok(mientras.quieto && /Preparando/.test(mientras.texto),
+      `con la foto preparándose no se puede mandar ("${mientras.texto}")`);
+    await p.waitForTimeout(2500);
+    const despues = { texto: await boton.innerText(), quieto: await boton.isDisabled(), archivo: !!(await guardado()).etiquetasArchivo };
+    ok(!despues.quieto && !/Preparando/.test(despues.texto) && despues.archivo,
+      `y en cuanto está, se puede, con el archivo dentro ("${despues.texto}", archivo ${despues.archivo})`);
+    await c.close();
+  }
+
   // ── El formulario: el cóctel con su sección ─────────────────────────────────
   // "Lo de chupito de cristal debería ir en una sección de cóctel donde te pregunte si
   // hay chupito de cristal, si hay cuchara de porcelana, una opción de añadir más y
@@ -617,7 +677,6 @@ async function main() {
   // con unos cubiertos). Ahora cada opción lleva el suyo y hace su gesto al elegirla.
   console.log("\n── El formulario: iconos con sentido y con gesto ──");
   // El paso de los buffets se busca, no se fija: cada pregunta nueva de antes lo mueve
-  const { preguntasDe } = await import("../formulario/preguntas.js");
   const respuestasBuffets = { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 };
   const pasoBuffets = preguntasDe("boda", respuestasBuffets).findIndex(q => q.id === "buffets");
   for (const reducido of [false, true]) {
@@ -2422,6 +2481,15 @@ async function main() {
     const leer = async (p, tipo, pax) => {
       await p.goto(url({ evento: tipo, pax, ninos: 0, ...EXTRAS }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1900);
+      // Con la batería cargada, a veces a los 1,9 s faltaba una categoría entera por
+      // pintar ("Electricidad y camión" de una boda) y salía como nombres que cambian.
+      // Se espera a que el número de filas se quede quieto entre dos lecturas.
+      await p.waitForFunction(() => {
+        const n = document.querySelectorAll(".item-row").length;
+        const quieto = n > 0 && n === window.__filasAntes;
+        window.__filasAntes = n;
+        return quieto;
+      }, null, { polling: 400, timeout: 8000 }).catch(() => {});
       return p.evaluate(() => {
         const filas = [];
         document.querySelectorAll(".category-section").forEach(sec => {
