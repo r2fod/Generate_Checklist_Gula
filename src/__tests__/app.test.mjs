@@ -2385,6 +2385,14 @@ async function main() {
     await page.waitForTimeout(500);
     ok(JSON.stringify(antesFrituras) !== JSON.stringify(await listaItems(page)),
       "y el nº de sartenes parisiene también mueve la carga");
+    // Borrar y reescribir (PLAN_MEJORAS E2.5): al vaciar el campo saltaba a "1" y
+    // escribir "2" daba "12"
+    await campo("Nº sartenes parisiene").fill("");
+    await campo("Nº sartenes parisiene").pressSequentially("2");
+    await campo("Nº sartenes parisiene").blur();
+    await page.waitForTimeout(400);
+    const sartenes = await campo("Nº sartenes parisiene").inputValue();
+    ok(sartenes === "2", `borrar el nº de sartenes y escribir 2 deja 2, no 12 ("${sartenes}")`);
 
     // Cada plancha de gas lleva SU bombona. Antes la plancha era un sí/no y sumaba una
     // sola: poniendo una segunda a mano el gas no subía y se salía con una de menos.
@@ -2834,6 +2842,84 @@ async function main() {
     ok(pax === 200, `un borrador con el mismo nombre NO pisa el evento guardado (sigue con ${pax} pax)`);
     ok(await p.locator(".aviso-nombre-ocupado").count() === 1,
       "y se avisa de que ese nombre ya está cogido");
+    await c.close();
+  }
+
+  // ── Guardar, duplicar, borrar y cambiar de tipo: sin pisar ni resucitar ──────
+  // De la auditoría (PLAN_MEJORAS E2): "Guardar evento" y "Duplicar" con el nombre de
+  // otro evento lo pisaban sin avisar; borrar el evento ABIERTO volvía a aparecer con
+  // el autoguardado; y las carpas que encendía pasar a producción se quedaban al volver.
+  console.log("\n── Guardar, duplicar, borrar y carpas: sin pisar ni resucitar ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 1500, height: 1100 } });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => {
+      if (sessionStorage.getItem("sembrado")) return;
+      sessionStorage.setItem("sembrado", "1");
+      localStorage.setItem("gula_eventos_guardados", JSON.stringify({
+        "Boda Ana y Luis": { evento: "boda", pax: 200, nombreEvento: "Boda Ana y Luis" },
+      }));
+      localStorage.removeItem("gula_evento_activo");
+    });
+    const p = await nuevaPagina(c);
+    const archivo = () => p.evaluate(() => JSON.parse(localStorage.getItem("gula_eventos_guardados") || "{}"));
+    const dialogo = () => p.locator(".dialogo-modal").first().innerText().catch(() => "");
+    const confirmar = async (texto) => {
+      if (texto !== undefined) await p.locator(".dialogo-modal input").fill(texto);
+      await p.locator(".dialogo-acciones button").last().click();
+      await p.waitForTimeout(500);
+    };
+    await p.goto(url({ evento: "boda", pax: 30 }), { waitUntil: "domcontentloaded" });
+    await p.waitForTimeout(2100);
+
+    await p.locator("button", { hasText: "Guardar evento" }).first().click();
+    await p.waitForTimeout(500);
+    await confirmar("Boda Ana y Luis");
+    const pregunta = await dialogo();
+    ok(/Ya hay un evento guardado/.test(pregunta) && (await archivo())["Boda Ana y Luis"].pax === 200,
+      `"Guardar evento" con el nombre de otro pregunta antes de sustituirlo ("${pregunta.split("\n")[0]}")`);
+    await p.locator("button", { hasText: /Cancelar/i }).first().click();
+    await p.waitForTimeout(400);
+    ok((await archivo())["Boda Ana y Luis"].pax === 200, "y cancelar lo deja como estaba");
+
+    await p.locator("button", { hasText: "Guardar evento" }).first().click();
+    await p.waitForTimeout(500);
+    await confirmar("Boda Pepe");
+    await p.locator(`[aria-label="Duplicar evento Boda Pepe"]`).first().click();
+    await p.waitForTimeout(500);
+    await confirmar("Boda Ana y Luis");
+    const otraVez = await dialogo();
+    ok(/Ya hay un evento llamado/.test(otraVez) && (await archivo())["Boda Ana y Luis"].pax === 200,
+      `"Duplicar" con el nombre de otro vuelve a pedir el nombre, sin pisarlo ("${otraVez.split("\n")[0]}")`);
+    await confirmar("Boda Pepe (2)");
+    ok((await archivo())["Boda Pepe (2)"]?.pax === 30, "y con otro nombre la copia se hace");
+
+    // Boda Pepe es el abierto (se acaba de guardar): borrarlo y tocar algo después
+    await p.locator(`[aria-label="Borrar evento guardado Boda Pepe"]`).first().click();
+    await p.waitForTimeout(500);
+    await confirmar();
+    await p.locator("input[type=number]").first().fill("31");
+    await p.waitForTimeout(4500);
+    const tras = await archivo();
+    const activo = await p.evaluate(() => localStorage.getItem("gula_evento_activo"));
+    ok(!tras["Boda Pepe"] && !activo,
+      `borrar el evento abierto lo borra de verdad: no vuelve con el autoguardado (${JSON.stringify(Object.keys(tras))}, activo ${activo})`);
+
+    // Carpas: las que pone solas la producción se van con ella; las puestas a mano, no
+    const carpas = () => p.locator(".segment-group").filter({ has: p.locator(".segment-label", { hasText: /^Carpas$/ }) })
+      .first().locator(".segment-btn.active").innerText().catch(() => "");
+    const tipo = async (t) => { await p.locator("select.form-select").first().selectOption(t); await p.waitForTimeout(500); };
+    await tipo("produccion");
+    const enRodaje = await carpas();
+    await tipo("boda");
+    const deVuelta = await carpas();
+    ok(enRodaje === "Llevan" && deVuelta === "No llevan",
+      `pasar por producción y volver a boda no deja las carpas puestas (${enRodaje} → ${deVuelta})`);
+    await p.locator(".segment-group").filter({ has: p.locator(".segment-label", { hasText: /^Carpas$/ }) })
+      .first().locator(".segment-btn", { hasText: /^Llevan$/ }).click();
+    await tipo("produccion");
+    await tipo("boda");
+    ok(await carpas() === "Llevan", "pero las que se pusieron a mano se quedan");
     await c.close();
   }
 

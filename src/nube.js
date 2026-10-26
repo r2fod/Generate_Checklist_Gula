@@ -128,6 +128,20 @@ export async function guardarEventoNube(id, estado, baseline = null) {
   return { actualizado, fusion };
 }
 
+// Pone las tareas en fila: cada una empieza cuando ha acabado la anterior, bien o mal.
+// Es para los guardados del evento abierto: dos seguidos salían a la vez desde el MISMO
+// baseline, y si el segundo (el nuevo) confirmaba antes, el primero se repetía encima
+// y dejaba en la nube el valor viejo. En fila, cada uno lee el baseline que dejó el
+// anterior y solo sube lo suyo.
+export function enFila() {
+  let ultima = Promise.resolve();
+  return (tarea) => {
+    const esta = ultima.then(() => tarea());
+    ultima = esta.catch(() => {});
+    return esta;
+  };
+}
+
 // Borra la copia compartida de un evento. Se llama al borrar el evento guardado: sin
 // esto, cada evento que se comparte alguna vez deja su documento en la nube PARA
 // SIEMPRE, aunque el evento ya no exista en ningún sitio. Nadie los referencia y nadie
