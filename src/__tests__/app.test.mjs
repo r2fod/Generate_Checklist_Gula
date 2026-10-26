@@ -2481,6 +2481,15 @@ async function main() {
     const leer = async (p, tipo, pax) => {
       await p.goto(url({ evento: tipo, pax, ninos: 0, ...EXTRAS }), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1900);
+      // Con la batería cargada, a veces a los 1,9 s faltaba una categoría entera por
+      // pintar ("Electricidad y camión" de una boda) y salía como nombres que cambian.
+      // Se espera a que el número de filas se quede quieto entre dos lecturas.
+      await p.waitForFunction(() => {
+        const n = document.querySelectorAll(".item-row").length;
+        const quieto = n > 0 && n === window.__filasAntes;
+        window.__filasAntes = n;
+        return quieto;
+      }, null, { polling: 400, timeout: 8000 }).catch(() => {});
       return p.evaluate(() => {
         const filas = [];
         document.querySelectorAll(".category-section").forEach(sec => {
