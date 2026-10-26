@@ -858,6 +858,9 @@ async function main() {
     for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
     const page = await nuevaPagina(ctx);
     await page.goto(url({ ...EVENTO_COMPLETO, barraCoctel: true, barraCopas: true }), { waitUntil: "domcontentloaded" });
+    // En móvil la configuración va cerrada tras su atajo; en dos columnas, ya a la vista
+    await page.waitForFunction(() => [...document.querySelectorAll(".atajos-una-columna, .config-sidebar")].some(e => e.offsetParent));
+    await abrirConfig(page);
     await page.waitForSelector(".range-group");
     await page.evaluate(() => document.querySelectorAll("details:not([open])").forEach(d => { d.open = true; }));
     const barra = await page.evaluate(() => [...document.querySelectorAll(".range-group")].map(e => Math.round(e.getBoundingClientRect().height)));
