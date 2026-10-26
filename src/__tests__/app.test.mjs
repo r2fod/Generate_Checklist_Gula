@@ -539,6 +539,38 @@ async function main() {
     await c.close();
   }
 
+  // ── El formulario: "Es un evento nuevo" empieza limpio ───────────────────────
+  // Con un borrador de una boda a medias, "Es un evento nuevo" salía con "Boda" ya
+  // marcada y con sus respuestas: el formulario de una producción preguntaba lo de una
+  // boda ("ya no hace las preguntas correctas según el tipo de evento", el dueño).
+  console.log("\n── El formulario: un evento nuevo no arrastra el borrador de otro ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => {
+      if (sessionStorage.getItem("sembrado")) return;
+      localStorage.setItem("gula_formulario_PRUEBA3", JSON.stringify({
+        eventoDestino: "Boda de prueba", paso: 3, respuestas: { tipo: "boda", nombre: "Boda de prueba", coctel: 2, sillas: "Dealde", adultos: 120 },
+      }));
+      sessionStorage.setItem("sembrado", "1");
+    });
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA3", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-btn-inicio");
+    await p.locator(".form-btn-inicio").first().click();
+    await p.locator("button", { hasText: "Es un evento nuevo" }).first().click();
+    await p.waitForTimeout(500);
+    const marcada = await p.locator(".form-opcion.es-elegida").count();
+    const guardado = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA3") || "{}").respuestas || {});
+    ok(marcada === 0 && Object.keys(guardado).length === 0,
+      `"Es un evento nuevo" empieza sin tipo marcado y sin las respuestas de la boda (${marcada} marcadas, ${JSON.stringify(guardado)})`);
+    await p.locator(".form-opcion", { hasText: "Producción" }).first().click();
+    await p.waitForTimeout(300);
+    const tipo = await p.evaluate(() => (JSON.parse(localStorage.getItem("gula_formulario_PRUEBA3") || "{}").respuestas || {}).tipo);
+    ok(tipo === "produccion", `y queda como producción, con sus preguntas (${tipo})`);
+    await c.close();
+  }
+
   // ── El formulario: el cóctel con su sección ─────────────────────────────────
   // "Lo de chupito de cristal debería ir en una sección de cóctel donde te pregunte si
   // hay chupito de cristal, si hay cuchara de porcelana, una opción de añadir más y
