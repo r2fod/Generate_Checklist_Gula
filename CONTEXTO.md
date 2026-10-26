@@ -661,6 +661,20 @@ operativo).
     enlace ya no vale".
   - **"Deshacer" del "No lo sé"** sale de verdad, en la pantalla siguiente y diciendo de
     qué pregunta: el efecto que cambia de pantalla lo borraba al llegar a ella.
+- **App: la auditoría E2 de PLAN_MEJORAS (26/10)**, los cinco seguían vivos:
+  - **"Guardar evento" con el nombre de OTRO evento** pregunta antes ("Sustituir"); antes
+    lo pisaba sin avisar (el autoguardado sí lo miraba, `ocupadoPorOtro`). **"Duplicar"**
+    con un nombre que ya existe vuelve a pedir el nombre. Los dos, y el borrado, leen el
+    archivo de `eventosGuardadosRef` (el de ahora), no el de cuando se abrió el diálogo.
+  - **Borrar el evento abierto** lo suelta entero (activo, nombre y `eventoNubeId`) y la
+    pantalla queda como borrador: antes el autoguardado lo volvía a escribir y a subir.
+  - **Guardados del evento abierto en fila** (`enFila`, nube.js): dos seguidos salían
+    con el mismo baseline y, con la red lenta, el viejo llegaba tarde y dejaba su valor
+    en la nube. Ahora cada uno sale al acabar el anterior y lee el baseline al salir.
+  - **Carpas al salir de producción**: se apagan solo si las encendió el paso a
+    producción (`carpasDeProduccionRef`); las puestas a mano se quedan.
+  - **`CampoNumero`** (barriles, cucharas de porcelana, sartenes, planchas de gas, chill
+    out): se puede borrar y reescribir; antes vaciar saltaba a "1" y escribir "2" daba "12".
 - **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no

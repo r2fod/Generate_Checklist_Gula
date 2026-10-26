@@ -38,6 +38,7 @@ import {
   cargarTareasNube, guardarTareasNube, suscribirTareasNube,
   cargarRatiosNube, guardarRatiosNube, suscribirRatiosNube,
   cargarCristaleriaNube, guardarCristaleriaNube, suscribirCristaleriaNube,
+  enFila,
 } from "./nube.js";
 import { leerRatios, ponRatios, ratiosCambiados } from "./personal.js";
 import { ponFactoresCristaleria, factoresCristaleriaCambiados } from "./cristaleria.js";
@@ -69,6 +70,7 @@ import {
 } from "./checklist-format.js";
 import { IconoCategoria, estiloCategoria, IconoBloque, TituloBloque, IconoExtra } from "./components/Iconos.jsx";
 import CargandoPanel from "./components/CargandoPanel.jsx";
+import CampoNumero from "./components/CampoNumero.jsx";
 import useSuscripcionDiferida from "./asistente/suscripcionDiferida.js";
 import { alSobrarTiempo } from "./precarga.js";
 import { estimarTiemposCarga, sumarMinutosHora } from "./tiempos-carga.js";
@@ -1058,6 +1060,9 @@ export default function App({ onCerrarSesion } = {}) {
   estadoActualJSONRef.current = estadoActualJSON;
   const ultimoGuardadoNubeRef = React.useRef(estadoActualJSON);
   const ultimoArchivoGuardadoJSONRef = React.useRef(estadoActualJSON);
+  // Los guardados del evento abierto van de uno en uno (ver enFila en nube.js)
+  const filaNubeRef = React.useRef(null);
+  if (!filaNubeRef.current) filaNubeRef.current = enFila();
 
   // Las marcas de tiempo de NUESTROS últimos guardados. Sirven para reconocer el eco de
   // lo que hemos escrito nosotros cuando vuelve por la suscripción.
@@ -1129,8 +1134,12 @@ export default function App({ onCerrarSesion } = {}) {
     if (estadoActualJSON === ultimoGuardadoNubeRef.current) return;
     const t = setTimeout(() => {
       const local = getEstadoActual();
-      const baseline = ultimoGuardadoNubeRef.current ? JSON.parse(ultimoGuardadoNubeRef.current) : null;
-      guardarEventoNube(eventoNubeId, local, baseline)
+      // El baseline se lee al salir de la fila, no al entrar: así es el que dejó el
+      // guardado anterior y este solo sube lo que ha cambiado después
+      filaNubeRef.current(() => {
+        const baseline = ultimoGuardadoNubeRef.current ? JSON.parse(ultimoGuardadoNubeRef.current) : null;
+        return guardarEventoNube(eventoNubeId, local, baseline);
+      })
         .then(({ actualizado, fusion }) => {
           const fusionJSON = JSON.stringify(fusion);
           ultimoGuardadoNubeRef.current = fusionJSON;
@@ -1341,6 +1350,8 @@ export default function App({ onCerrarSesion } = {}) {
   // si no, el único alquiler que nadie llega a pulsar sería justo el que más se olvida.
   // Al salir de producción se retiran el generador y las carpas de alquiler, que solo
   // existen ahí.
+  // Si las carpas las encendió solas el paso a producción (no alguien a mano)
+  const carpasDeProduccionRef = React.useRef(false);
   const handleCambiarTipoEvento = (tipo) => {
     setEvento(tipo);
     if (tipo === "produccion") {
@@ -1350,7 +1361,7 @@ export default function App({ onCerrarSesion } = {}) {
       // Fuera de producción empiezan apagadas (estado inicial de llevaCarpas), así que
       // sin este empujón un evento que arrancó boda y cambia a rodaje se quedaría sin
       // ellas aunque siempre las llevara.
-      if (!llevaCarpas) setLlevaCarpas(true);
+      if (!llevaCarpas) { setLlevaCarpas(true); carpasDeProduccionRef.current = true; }
       if (llevaGenerador) sincronizaAlquiler("generador", true, conceptoAlquiler("generador"));
       // En un rodaje no se alquila mobiliario: si venía marcado, se apaga con su recogida
       if (llevaMobiliarioAlquiler) {
@@ -1361,6 +1372,11 @@ export default function App({ onCerrarSesion } = {}) {
     }
     sincronizaAlquiler("generador", false);
     if (alquilaCarpas) { setAlquilaCarpas(false); sincronizaAlquiler("carpas", false); }
+    // Las carpas que puso solas la producción se van con ella: una boda que pasó por
+    // "Producción" sin querer se quedaba con carpas, paredes y pesas. Las que alguien
+    // puso a mano se quedan.
+    if (carpasDeProduccionRef.current && llevaCarpas) setLlevaCarpas(false);
+    carpasDeProduccionRef.current = false;
   };
   // Al poner o cambiar la fecha del evento se recolocan las fechas de los alquileres
   // que sigan con las propuestas por la app. Las que se hayan tocado a mano se quedan.
@@ -1790,18 +1806,36 @@ export default function App({ onCerrarSesion } = {}) {
     valorInicial: nombreEvento || "",
     textoConfirmar: "Guardar evento",
     onConfirm: (nombre) => {
-      // Se actualiza la foto de cantidades automáticas al guardar: a partir de ahora
-      // "Recalcular" comparará contra los valores de ESTE guardado, no de uno anterior
-      setValoresCalculados(valoresBaseActuales);
-      // El campo "Nombre del evento" se sincroniza con el nombre elegido al guardar:
-      // así el siguiente "Guardar evento" ya viene precargado sin volver a escribirlo
-      setNombreEvento(nombre);
-      marcarEventoActivo(nombre); // a partir de ahora este evento se auto-guarda solo
-      const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales };
-      ultimoArchivoGuardadoJSONRef.current = JSON.stringify(nuevoEstado);
-      guardarEventos({ ...eventosGuardados, [nombre]: nuevoEstado });
-      setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
-      setTimeout(() => setGuardadoEventoMsg(""), 3500);
+      const guardar = () => {
+        // Se actualiza la foto de cantidades automáticas al guardar: a partir de ahora
+        // "Recalcular" comparará contra los valores de ESTE guardado, no de uno anterior
+        setValoresCalculados(valoresBaseActuales);
+        // El campo "Nombre del evento" se sincroniza con el nombre elegido al guardar:
+        // así el siguiente "Guardar evento" ya viene precargado sin volver a escribirlo
+        setNombreEvento(nombre);
+        marcarEventoActivo(nombre); // a partir de ahora este evento se auto-guarda solo
+        const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales };
+        ultimoArchivoGuardadoJSONRef.current = JSON.stringify(nuevoEstado);
+        // Del archivo de AHORA, no del de cuando se abrió el diálogo: si mientras tanto
+        // entró un evento desde otro móvil, con la copia vieja se habría dado por borrado
+        guardarEventos({ ...eventosGuardadosRef.current, [nombre]: nuevoEstado });
+        setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
+        setTimeout(() => setGuardadoEventoMsg(""), 3500);
+      };
+      // Un nombre que ya es de OTRO evento lo pisaba sin avisar (el autoguardado sí lo
+      // mira, ver ocupadoPorOtro). Ahora se pregunta antes de sustituirlo.
+      if (nombre !== eventoActivoRef.current && eventosGuardadosRef.current?.[nombre]) {
+        setDialogo({
+          tipo: "confirm",
+          titulo: `Ya hay un evento guardado como "${nombre}"`,
+          mensaje: "Si sigues, ese evento se sustituye por esta checklist y se pierde lo que tenía. Para guardarlo aparte, ponle otro nombre.",
+          textoConfirmar: "Sustituir",
+          peligro: true,
+          onConfirm: guardar,
+        });
+        return;
+      }
+      guardar();
     },
   });
   // Auto-guardado. Antes solo se re-guardaba solo el evento que ya habías guardado o
@@ -2180,6 +2214,7 @@ export default function App({ onCerrarSesion } = {}) {
       mensaje: "Se sustituirá todo lo que hay ahora en pantalla por la checklist guardada.",
       textoConfirmar: "Abrir evento",
       onConfirm: () => {
+        carpasDeProduccionRef.current = false; // las carpas del evento que se abre son suyas
         // Si el evento se guardó con el campo "Nombre del evento" vacío (se puso el
         // nombre solo en el diálogo de guardar), al abrirlo se usa el nombre con el
         // que está archivado — así el próximo guardado ya viene con nombre puesto
@@ -2662,9 +2697,17 @@ export default function App({ onCerrarSesion } = {}) {
       textoConfirmar: "Borrar",
       peligro: true,
       onConfirm: () => {
-        const next = { ...eventosGuardados };
+        const next = { ...eventosGuardadosRef.current };
         delete next[nombre];
         guardarEventos(next);
+        // Borrar el que tienes abierto no lo borraba: el autoguardado lo veía como el
+        // activo y lo volvía a escribir (y a subir) en cuanto se tocaba algo. Se suelta
+        // entero —activo, nombre y copia en la nube— y la pantalla queda como borrador.
+        if (nombre === eventoActivoRef.current) {
+          marcarEventoActivo("");
+          setNombreEvento("");
+          setEventoNubeId(null);
+        }
         // Si falla no se avisa: el evento ya está borrado de donde importa y volver
         // atrás por esto sería peor. Queda un documento suelto, como hasta ahora.
         if (idNube && nubeActiva()) borrarEventoNube(idNube).catch(() => {});
@@ -2674,19 +2717,25 @@ export default function App({ onCerrarSesion } = {}) {
 
   // Duplica un evento guardado: copia toda su configuración con otro nombre, pero como
   // evento independiente y "en limpio" (sin los checks de carga/vuelta/roturas ni el link).
-  const handleDuplicarEvento = (nombre) => setDialogo({
+  // `ocupado`: el nombre que se intentó y ya era de otro evento (se vuelve a preguntar).
+  const handleDuplicarEvento = (nombre, ocupado = "") => setDialogo({
     tipo: "prompt",
-    titulo: "Duplicar evento",
-    mensaje: `Crea una copia de "${nombre}" con la misma configuración pero limpia (sin los checks de Modo carga).`,
+    titulo: ocupado ? `Ya hay un evento llamado "${ocupado}"` : "Duplicar evento",
+    mensaje: ocupado
+      ? "La copia necesita otro nombre: con ese se habría sustituido el evento que ya existe."
+      : `Crea una copia de "${nombre}" con la misma configuración pero limpia (sin los checks de Modo carga).`,
     placeholder: `${nombre} (copia)`,
-    valorInicial: `${nombre} (copia)`,
+    valorInicial: ocupado ? `${ocupado} (2)` : `${nombre} (copia)`,
     textoConfirmar: "Duplicar",
     onConfirm: (nuevo) => {
-      const base = eventosGuardados[nombre];
+      const archivo = eventosGuardadosRef.current || {};
+      const base = archivo[nombre];
       const nom = (nuevo || "").trim();
       if (!base || !nom) return;
+      // Con el nombre de otro evento lo pisaba sin avisar: se vuelve a pedir el nombre
+      if (archivo[nom]) { handleDuplicarEvento(nombre, nom); return; }
       const copia = { ...base, nombreEvento: nom, eventoNubeId: null, preparados: {}, pendientes: {}, checkeados: {}, vueltos: {}, roturas: {}, marcasRevisar: {}, cronos: {} };
-      guardarEventos({ ...eventosGuardados, [nom]: copia });
+      guardarEventos({ ...archivo, [nom]: copia });
       setGuardadoEventoMsg(`✓ Duplicado como "${nom}"`);
       setTimeout(() => setGuardadoEventoMsg(""), 3000);
     },
@@ -4747,7 +4796,7 @@ export default function App({ onCerrarSesion } = {}) {
               {tamanoBarril !== "No lleva" && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº barriles</span>
-                  <input type="number" className="form-input" value={numBarriles} min="1" onChange={e => setNumBarriles(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <CampoNumero valor={numBarriles} onCambio={setNumBarriles} />
                 </div>
               )}
             </div>
@@ -4874,14 +4923,14 @@ export default function App({ onCerrarSesion } = {}) {
               {llevaCucharasPorcelana && evento !== "produccion" && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Canapés distintos en cuchara</span>
-                  <input type="number" className="form-input" value={numCucharasPorcelana} min="1" onChange={e => setNumCucharasPorcelana(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <CampoNumero valor={numCucharasPorcelana} onCambio={setNumCucharasPorcelana} />
                   <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Una cuchara por persona y canapé</span>
                 </div>
               )}
               {tieneFrituras && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº sartenes parisiene (frituras)</span>
-                  <input type="number" className="form-input" value={numFrituras} min="1" onChange={e => setNumFrituras(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <CampoNumero valor={numFrituras} onCambio={setNumFrituras} />
                   <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Ajusta bombonas, difusor, trípode y espumadera</span>
                 </div>
               )}
@@ -4890,14 +4939,14 @@ export default function App({ onCerrarSesion } = {}) {
               {(llevaPlanchaGas || evento === "produccion") && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº planchas de gas</span>
-                  <input type="number" className="form-input" value={numPlanchasGas} min="1" onChange={e => setNumPlanchasGas(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <CampoNumero valor={numPlanchasGas} onCambio={setNumPlanchasGas} />
                   <span style={{ fontSize: "var(--fs-xs)", color: "var(--text-muted)" }}>Cada plancha suma su bombona</span>
                 </div>
               )}
               {llevaChillOut && (
                 <div className="form-group controls-mini">
                   <span className="form-label">Nº chill out</span>
-                  <input type="number" className="form-input" value={numChillOut} min="1" onChange={e => setNumChillOut(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <CampoNumero valor={numChillOut} onCambio={setNumChillOut} />
                 </div>
               )}
             </div>
@@ -5031,6 +5080,7 @@ export default function App({ onCerrarSesion } = {}) {
               value={llevaCarpas ? "Llevan" : "No llevan"}
               onChange={v => {
                 setLlevaCarpas(v === "Llevan");
+                carpasDeProduccionRef.current = false; // ya las ha decidido alguien a mano
                 // Sin carpas no hay carpas que alquilar: se apaga también su recogida
                 if (v !== "Llevan" && alquilaCarpas) {
                   setAlquilaCarpas(false);
