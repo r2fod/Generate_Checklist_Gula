@@ -1406,6 +1406,27 @@ console.log("\n══ La diferencia entre dos versiones de un envío ══");
 // sin nombre" y no sabe de qué le hablan, y sin día no se pueden calcular las
 // recogidas (flores, minutas, alquileres), que es lo que hace que alguien vaya a
 // buscarlas a tiempo.
+console.log("\n══ Elegir otro evento no arrastra las respuestas del anterior ══");
+{
+  // "Ya no hace las preguntas correctas según el tipo de evento" (el dueño): con un
+  // borrador de una boda a medias, elegir una producción de la lista la empezaba con el
+  // cóctel, las sillas y la gente de la boda.
+  const { respuestasAlElegir, preguntasDe } = await import("../formulario/preguntas.js");
+  const borrador = { tipo: "boda", nombre: "Boda A", coctel: 2, copas: 4, sillas: "Dealde", adultos: 120 };
+  const produ = { nombre: "Produ B", tipo: "produccion", sitio: "Nave", fecha: "2027-08-11" };
+  const r = respuestasAlElegir(produ, borrador, "Boda A");
+  ok(r.tipo === "produccion" && r.nombre === "Produ B" && r.coctel === undefined && r.sillas === undefined && r.adultos === undefined,
+    `otro evento empieza sin las respuestas del anterior → ${JSON.stringify(r)}`);
+  const ids = preguntasDe(r.tipo, r).map(p => p.id);
+  ok(ids.includes("dias") && ids.includes("generador") && !ids.includes("coctel"),
+    "y con las preguntas de su tipo: días y generador de la producción, no el cóctel de la boda");
+  const mismo = respuestasAlElegir({ nombre: "Boda A", tipo: "boda", sitio: "", fecha: "2027-09-01" }, borrador, "Boda A");
+  ok(mismo.coctel === 2 && mismo.sillas === "Dealde", "el mismo evento sigue con lo que ya llevaba contestado");
+  const conPrevias = respuestasAlElegir({ ...produ, respuestasPrevias: { carpas: "no", tipo: "boda" } }, borrador, "Boda A");
+  ok(conPrevias.carpas === "no" && conPrevias.tipo === "produccion" && conPrevias.coctel === undefined,
+    "y uno ya configurado trae lo suyo, con el tipo del evento y nada del borrador");
+}
+
 console.log("\n══ Lo obligatorio del formulario ══");
 {
   const { respuestasQueFaltan, preguntasDe } = await import("../formulario/preguntas.js");

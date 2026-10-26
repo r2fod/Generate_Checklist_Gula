@@ -617,6 +617,17 @@ operativo).
     o desinstalarla y reinstalarla. La identidad de la checklist es la raíz del dominio
     a propósito de no cambiar la ya instalada: no moverla sin avisar, dejaría huérfanas
     las instaladas.
+- **Formulario: otro evento no arrastra el borrador del anterior** (26/10, "ya no hace
+  las preguntas correctas según el tipo de evento", el dueño). Las preguntas por tipo
+  (`soloEn`) y la lista que publica la app (`tipo: e.evento`) estaban bien —comprobado
+  recorriendo el formulario entero con cada tipo y con eventos de la lista simulados—.
+  Lo que fallaba era el borrador: "Es un evento nuevo" no limpiaba las respuestas y salía
+  con el tipo del evento anterior ya marcado (una boda), y elegir otro evento de la lista
+  mezclaba sus datos con los del borrador (una producción con el cóctel, las sillas y la
+  gente de la boda de antes, que además se mandaban con ella). Ahora `respuestasAlElegir`
+  (preguntas.js) solo conserva el borrador si es el MISMO evento, "Es un evento nuevo"
+  empieza de cero, y los dos limpian `envioId` (no se puede "corregir" un envío de otro
+  evento). Sigue igual que al abrir el formulario se retome el borrador donde se dejó.
 - **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no

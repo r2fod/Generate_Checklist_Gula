@@ -1092,6 +1092,21 @@ export function resumirEnvio(enviadas = {}) {
   }));
 }
 
+// ─── CON QUÉ RESPUESTAS SE EMPIEZA UN EVENTO DE LA LISTA ───────────────────────
+// Las suyas (si esta oficina ya le mandó algo, vienen en respuestasPrevias) y su tipo,
+// nombre, sitio y fecha. Del borrador, solo si es el MISMO evento (se sigue con él).
+// Antes se mezclaba siempre con el borrador de lo último que se rellenó: una producción
+// salía con el cóctel, las sillas y la gente de la boda anterior, y esas respuestas se
+// mandaban con ella ("ya no hace las preguntas correctas según el tipo", el dueño).
+export function respuestasAlElegir(evento, borrador = {}, eventoDelBorrador = null) {
+  const base = evento.nombre === eventoDelBorrador ? borrador : {};
+  return {
+    ...base,
+    ...respuestasAlDia(evento.respuestasPrevias || {}),
+    tipo: evento.tipo, nombre: evento.nombre, sitio: evento.sitio, fecha: evento.fecha,
+  };
+}
+
 // ─── RESPUESTAS DE ANTES DE LA SECCIÓN DEL CÓCTEL ──────────────────────────────
 // El chupito iba dentro de "entrante", y el brindis, los barriles y las aguas
 // pequeñas dentro de "extras". Un envío o un borrador de entonces se pasa a las

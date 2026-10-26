@@ -6,7 +6,7 @@
 // Esta pantalla NO entra en la app: se abre con ?enviar=<código> y desde aquí no hay
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
-import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, respuestasAlDia, fmtFechaCorta as fmtFecha } from "./preguntas.js";
+import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, respuestasAlDia, respuestasAlElegir, fmtFechaCorta as fmtFecha } from "./preguntas.js";
 import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
 import FondoIconos, { iconoDePregunta, iconoDeOpcion, gestoDeIcono } from "./FondoIconos.jsx";
@@ -568,12 +568,14 @@ export default function Formulario({ codigo }) {
                 // El color de su tipo, el mismo que en la checklist (index.css, data-tipo)
                 data-tipo={e.tipo || undefined}
                 onClick={() => {
-                  setEventoDestino(e.nombre);
                   // Si ya se aplicó un envío de esta oficina antes, sus respuestas
                   // (filtradas, ver respuestasParaOficina) vienen puestas: así un
                   // evento "Ya configurado" se rellena solo en vez de preguntarlo
-                  // todo de cero otra vez.
-                  setRespuestas(r => ({ ...r, ...respuestasAlDia(e.respuestasPrevias || {}), tipo: e.tipo, nombre: e.nombre, sitio: e.sitio, fecha: e.fecha }));
+                  // todo de cero otra vez. Lo del borrador, solo si es este mismo
+                  // evento (respuestasAlElegir): el de otro no se arrastra.
+                  setRespuestas(r => respuestasAlElegir(e, r, eventoDestino));
+                  if (e.nombre !== eventoDestino) setEnvioId("");
+                  setEventoDestino(e.nombre);
                   setPasoGuardado(null);
                   setPaso(0);
                 }}
@@ -620,7 +622,10 @@ export default function Formulario({ codigo }) {
             onChange={e => setBusca(e.target.value)}
           />
         )}
-        <button className="form-btn-principal" onClick={() => { setEventoDestino(""); setPasoGuardado(null); setPaso(0); }}>
+        {/* Nuevo es nuevo: sin las respuestas ni el tipo del borrador de antes (salía
+            marcado el de la boda anterior y preguntaba lo de una boda). Para seguir
+            con el borrador está "Seguir con…", arriba. */}
+        <button className="form-btn-principal" onClick={() => { setRespuestas({}); setEnvioId(""); setEventoDestino(""); setPasoGuardado(null); setPaso(0); }}>
           + Es un evento nuevo
         </button>
         {mios.length > 0 && (
