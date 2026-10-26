@@ -1085,6 +1085,29 @@ console.log("\n══ buscarEnvioPorNombre: sin mayúsculas ni espacios de sobra
     "nada si no hay envío con ese nombre");
   ok(buscarEnvioPorNombre(mios, "") === null && buscarEnvioPorNombre(mios, undefined) === null,
     "y sin nombre que buscar, tampoco hay falso positivo");
+
+  // La "Comida de empresa" de cada año se llama igual: con fecha, el envío del año
+  // pasado no cuenta como ya mandado para el de este
+  const anuales = [{ id: "c25", eventoDestino: "Comida Empresa", nombre: "Comida Empresa", fecha: "2025-12-12", enviado: 1 }];
+  ok(buscarEnvioPorNombre(anuales, "Comida Empresa", "2026-12-12") === null,
+    "mismo nombre en otra fecha: no es el mismo envío");
+  ok(buscarEnvioPorNombre(anuales, "Comida Empresa", "2025-12-12")?.id === "c25"
+    && buscarEnvioPorNombre(anuales, "Comida Empresa")?.id === "c25"
+    && buscarEnvioPorNombre([{ ...anuales[0], fecha: "" }], "Comida Empresa", "2026-12-12")?.id === "c25",
+    "en su fecha sí, y sin fecha por alguno de los dos lados se sigue mirando solo el nombre");
+}
+
+// ── Corregir un envío: solo se manda otro si de verdad ya no se puede corregir ──────
+// Un corte de red caía en el mismo hueco que "logística ya lo revisó": se mandaba un
+// envío nuevo (duplicado) y se decía, en falso, que ya estaba revisado.
+console.log("\n══ noSePuedeCorregir: revisado o borrado sí, la red no ══");
+{
+  const { noSePuedeCorregir } = await import("../formulario/envios.js");
+  ok(noSePuedeCorregir({ code: "permission-denied" }) && noSePuedeCorregir({ code: "not-found" }),
+    "revisado (las reglas lo niegan) o borrado de la bandeja: se manda uno nuevo");
+  ok(!noSePuedeCorregir({ code: "unavailable" }) && !noSePuedeCorregir({ code: "deadline-exceeded" })
+    && !noSePuedeCorregir(new Error("sin-nube")) && !noSePuedeCorregir(undefined),
+    "un corte o la nube sin conectar: error y se reintenta el mismo");
 }
 
 // ── Flores y minutas: no son material, son un sitio y un día ──────────────────

@@ -7,7 +7,7 @@
 // forma de llegar a la checklist, ni a la configuración, ni a los eventos.
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from "react";
 import { preguntasDe, opcionesDe, TIPOS_EVENTO, resumirRespuesta, respuestasQueFaltan, respuestasAlDia, respuestasAlElegir, fmtFechaCorta as fmtFecha } from "./preguntas.js";
-import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, limpiarAvisos } from "./envios.js";
+import { leerProximos, suscribirProximos, enviarFormulario, corregirEnvio, noSePuedeCorregir, limpiarAvisos } from "./envios.js";
 import logoGula from "../assets/gula-logo.webp";
 import FondoIconos, { iconoDePregunta, iconoDeOpcion, gestoDeIcono } from "./FondoIconos.jsx";
 import CampoArchivo from "./CampoArchivo.jsx";
@@ -207,8 +207,11 @@ export default function Formulario({ codigo }) {
   const [verMios, setVerMios] = useState(false);
   // Lo que falta por contestar en la pregunta actual, cuando intentan pasar de largo
   const [aviso, setAviso] = useState("");
-  // Lo último que borró un "No lo sé", para poder deshacerlo sin volver a escribirlo
+  // Lo último que borró un "No lo sé", para poder deshacerlo sin volver a escribirlo.
+  // Lleva en qué pantalla se ofrece (`en`): la de después, que es donde se queda.
   const [deshacer, setDeshacer] = useState(null);
+  // Fotos o archivos que se están preparando todavía: mientras haya alguno no se manda
+  const [archivosEnCurso, setArchivosEnCurso] = useState(0);
   // La barra de progreso no retrocede: al aparecer una pregunta condicional (las
   // carpas de un rodaje) la lista crece y, sin esto, la barra daba un salto atrás
   const [avance, setAvance] = useState(0);
@@ -360,7 +363,9 @@ export default function Formulario({ codigo }) {
     const total = Math.max(1, preguntas.length);
     setAvance(a => Math.max(a, Math.round((Math.min(paso, total) / total) * 100)));
     setAviso("");
-    setDeshacer(null);
+    // El "Deshacer" se queda solo en la pantalla a la que llevó el "No lo sé". Antes se
+    // borraba aquí también al llegar a ella, y no se veía nunca.
+    setDeshacer(d => (d && d.en === paso ? d : null));
     if (tituloRef.current) { try { tituloRef.current.focus({ preventScroll: true }); } catch (e) { /* da igual */ } }
   }, [paso, preguntas.length]);
 
@@ -554,7 +559,7 @@ export default function Formulario({ codigo }) {
             // Ya se le mandó algo desde este móvil: se distingue de un vistazo, sin
             // tener que abrirlo. No lo saca de la lista —puede hacer falta mandarle
             // una corrección o un dato más—, solo dice que ya tiene algo enviado.
-            const enviado = buscarEnvioPorNombre(mios, e.nombre);
+            const enviado = buscarEnvioPorNombre(mios, e.nombre, e.fecha);
             // Separador entre "por configurar" y "ya configurados": solo si hay
             // mezcla de los dos (primerConfiguradoIdx > 0, y no -1).
             const esInicioDeConfigurados = i === primerConfiguradoIdx && primerConfiguradoIdx > 0;
@@ -642,7 +647,7 @@ export default function Formulario({ codigo }) {
   if (paso >= preguntas.length) {
     const falta = respuestasQueFaltan(respuestas);
     const sinContestar = (pr) => respuestas[pr.id] === undefined || respuestas[pr.id] === null;
-    const yaMandado = buscarEnvioPorNombre(mios, respuestas.nombre || eventoDestino);
+    const yaMandado = buscarEnvioPorNombre(mios, respuestas.nombre || eventoDestino, respuestas.fecha);
     const enviar = async () => {
       setEnviando(true); setError("");
       try {
@@ -650,10 +655,12 @@ export default function Formulario({ codigo }) {
         let eraCambio = !!envioId;
         if (envioId) {
           // Corregir el que ya mandaron. Si logística ya lo ha revisado, la nube lo
-          // rechaza: entonces se manda uno nuevo, que es lo honesto.
+          // rechaza: entonces se manda uno nuevo, que es lo honesto. Cualquier otro
+          // fallo (la red) sale como error y se reintenta el mismo, sin duplicar.
           try {
             await corregirEnvio(envioId, respuestas, eventoDestino || "");
           } catch (e) {
+            if (!noSePuedeCorregir(e)) throw e;
             id = await enviarFormulario(codigo, respuestas, eventoDestino || "");
             eraCambio = false;
           }
@@ -736,9 +743,9 @@ export default function Formulario({ codigo }) {
               }
               enviar();
             }}
-            disabled={enviando}
+            disabled={enviando || archivosEnCurso > 0}
           >
-            {enviando ? "Enviando..." : falta.length ? "Falta algo" : envioId ? "Mandar el cambio" : "Enviar"}
+            {enviando ? "Enviando..." : archivosEnCurso > 0 ? "Preparando el archivo..." : falta.length ? "Falta algo" : envioId ? "Mandar el cambio" : "Enviar"}
           </button>
         </div>
       </div>
@@ -755,7 +762,7 @@ export default function Formulario({ codigo }) {
     const habia = respuestas[p.id];
     const campos = (p.campos || []).map(c => [c.id, respuestas[c.id]]).filter(([, v]) => v !== undefined && v !== "");
     if ((habia !== undefined && habia !== null && habia !== "") || campos.length) {
-      setDeshacer({ id: p.id, valor: habia, campos });
+      setDeshacer({ id: p.id, texto: p.texto, valor: habia, campos, en: paso + 1 });
     }
     campos.forEach(([id]) => pon(id, ""));
     pon(p.id, null);
@@ -813,9 +820,9 @@ export default function Formulario({ codigo }) {
         {p.nota && <p className="form-nota">{typeof p.nota === "function" ? p.nota(respuestas) : p.nota}</p>}
       </div>
       {aviso && <p className="form-error" role="alert">{aviso}</p>}
-      {deshacer && deshacer.id === p.id && (
+      {deshacer && deshacer.en === paso && (
         <p className="form-deshacer">
-          Se ha quitado lo que habías puesto.
+          Se ha quitado lo que habías puesto en «{deshacer.texto}».
           <button onClick={() => {
             pon(deshacer.id, deshacer.valor);
             deshacer.campos.forEach(([id, v]) => pon(id, v));
@@ -899,6 +906,7 @@ export default function Formulario({ codigo }) {
                   etiqueta={o.conArchivo.etiqueta}
                   archivo={respuestas[`${p.id}${o.conArchivo.sufijo}`]}
                   onCambio={(a) => pon(`${p.id}${o.conArchivo.sufijo}`, a)}
+                  onCargando={(si) => setArchivosEnCurso(n => Math.max(0, n + (si ? 1 : -1)))}
                 />
               )}
             </div>
@@ -1020,7 +1028,14 @@ export default function Formulario({ codigo }) {
               list={c.sugerencias === "sitiosRecientes" ? "form-sitios" : undefined}
               value={respuestas[c.id] ?? ""}
               onChange={e => pon(c.id, e.target.value)}
+              // El nombre de un evento que ya existe no se cambia desde aquí: la app lo
+              // busca por ese nombre y lo tecleado se descartaba sin decir nada (el sitio
+              // sí se aplica, y por eso parecía que el nombre también).
+              readOnly={c.id === "nombre" && !!eventoDestino}
             />
+            {c.id === "nombre" && eventoDestino && (
+              <span className="form-nota form-nota-campo">Es el nombre que tiene en el calendario. Para cambiarlo, díselo a logística.</span>
+            )}
           </label>
         ))}
         {p.tipo === "textos" && sitiosConocidos.length > 0 && (

@@ -53,8 +53,11 @@ export function olvidarEnvio(id) {
 // mayúsculas ni espacios de sobra. Lo usan tanto el aviso de "ya mandaste esto"
 // del repaso como la marca de "enviado" en la lista de elegir evento: es la
 // misma pregunta ("¿ya se mandó algo para este nombre?") hecha en dos sitios.
-export function buscarEnvioPorNombre(mios, nombre) {
+// Con fecha, además tiene que ser el mismo día: la "Comida de empresa" de cada año se
+// llama igual, y el envío del año pasado salía como ya mandado para la de este.
+export function buscarEnvioPorNombre(mios, nombre, fecha = "") {
   const buscado = (nombre || "").trim().toLowerCase();
   if (!buscado) return null;
-  return mios.find(m => (m.eventoDestino || m.nombre || "").trim().toLowerCase() === buscado) || null;
+  return mios.find(m => (m.eventoDestino || m.nombre || "").trim().toLowerCase() === buscado
+    && (!fecha || !m.fecha || m.fecha === fecha)) || null;
 }

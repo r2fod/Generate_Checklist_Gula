@@ -225,6 +225,14 @@ export async function corregirEnvio(id, respuestas, eventoDestino = "") {
   });
 }
 
+// Si corregirEnvio falla porque el envío ya no admite cambios (logística lo revisó, y
+// las reglas lo niegan, o lo borró de la bandeja), lo honesto es mandar uno nuevo. Un
+// corte de red no es eso: mandar otro ahí duplicaba el envío y encima decía, en
+// falso, que logística ya lo había revisado.
+export function noSePuedeCorregir(e) {
+  return e?.code === "permission-denied" || e?.code === "not-found";
+}
+
 // La app escucha el buzón en vivo: así un envío nuevo (o uno corregido) se ve al
 // momento sin tener que abrir nada ni recargar. Devuelve la función para dejar de
 // escuchar.

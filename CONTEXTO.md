@@ -628,6 +628,10 @@ operativo).
   (preguntas.js) solo conserva el borrador si es el MISMO evento, "Es un evento nuevo"
   empieza de cero, y los dos limpian `envioId` (no se puede "corregir" un envío de otro
   evento). Sigue igual que al abrir el formulario se retome el borrador donde se dejó.
+  Producción: las 28 preguntas que le salen están puestas a propósito para rodaje
+  (flores "todos los eventos" en #82, las sillas del rodaje en #97, carpas para todos el
+  5/9, y buffets, café y manteles mueven la checklist de producción). Solo se quita una
+  si el dueño dice cuál.
 - **Simetría: lo que va en la misma fila, del mismo alto** (14/10, captura del dueño:
   "CÓCTEL / APERITIVO" partía en dos líneas y su tarjeta quedaba más alta y escalonada
   junto a "COPAS"). Lo causó el `align-items: end` de `.form-row` (#258, para alinear
@@ -637,6 +641,26 @@ operativo).
   tres apps (checklist, modo carga con sus cuatro pestañas, calendario y las 25
   preguntas del formulario) a 360–1920 con un script que mide, en cada fila de cajas
   de un flex/grid, si alguna es más alta que sus vecinas: quedan cero.
+- **Formulario: la auditoría E3 de PLAN_MEJORAS (26/10)**, los seis que seguían vivos
+  (el E3.1 era el borrador de arriba):
+  - **Adjunto a medio preparar**: `CampoArchivo` avisa con `onCargando` y "Enviar" se
+    queda en "Preparando el archivo..." mientras haya alguno. Antes se podía mandar en
+    ese rato y el envío salía sin la foto.
+  - **Corregir un envío** solo manda uno nuevo si de verdad ya no se puede corregir
+    (`noSePuedeCorregir`: `permission-denied` = revisado, `not-found` = borrado). Un corte
+    de red salía igual: envío duplicado y un "logística ya lo revisó" falso. Ahora es
+    error y se reintenta el mismo.
+  - **El nombre de un evento que ya existe no se edita** (con su nota: "díselo a
+    logística"). La app lo busca por ese nombre y lo tecleado se descartaba en silencio,
+    mientras el sitio, en la misma pantalla, sí se aplicaba.
+  - **`buscarEnvioPorNombre` mira también la fecha**: la "Comida de empresa" de cada año
+    salía como ya mandada por el envío del año anterior. Sin fecha por algún lado, solo
+    el nombre, como antes.
+  - **El código en mayúsculas** (`codigoDeTexto`, `leerGuardado`, `?enviar=`): se hacen
+    siempre en mayúsculas y la nube distingue; tecleado a mano en minúsculas salía "este
+    enlace ya no vale".
+  - **"Deshacer" del "No lo sé"** sale de verdad, en la pantalla siguiente y diciendo de
+    qué pregunta: el efecto que cambia de pantalla lo borraba al llegar a ella.
 - **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
   las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
   empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
