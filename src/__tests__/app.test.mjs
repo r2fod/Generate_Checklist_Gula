@@ -677,7 +677,6 @@ async function main() {
   // con unos cubiertos). Ahora cada opción lleva el suyo y hace su gesto al elegirla.
   console.log("\n── El formulario: iconos con sentido y con gesto ──");
   // El paso de los buffets se busca, no se fija: cada pregunta nueva de antes lo mueve
-  const { preguntasDe } = await import("../formulario/preguntas.js");
   const respuestasBuffets = { tipo: "boda", nombre: "Boda de prueba", fecha: "2027-06-12", adultos: 100, coctel: 2 };
   const pasoBuffets = preguntasDe("boda", respuestasBuffets).findIndex(q => q.id === "buffets");
   for (const reducido of [false, true]) {
