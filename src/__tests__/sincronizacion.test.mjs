@@ -457,6 +457,30 @@ console.log("\n══ Qué se aplica al evento que tienes abierto ══");
     "con link compartido manda su propia suscripción, no esta");
 }
 
+// ─── ARRANQUE CON EVENTO ABIERTO NO PISA CAMBIOS AJENOS ───────────────────────
+// Si una persona está modificando cantidades y otra abre la app (teniendo en su
+// memoria local una versión vieja del mismo evento), el arranque de la segunda NO
+// debe subir su copia vieja ni pisar lo que la primera acaba de editar.
+console.log("\n══ Arranque con evento abierto no pisa cambios de otra persona ══");
+{
+  almacen.clear(); limpiarPrevios();
+  // La compañera ya ha guardado sus modificaciones en la nube
+  const estadoNube = { nombreEvento: "Boda Ana", pax: 120, overridesManuales: { "Cocina::Platos": "150" } };
+  await N.sincronizarArchivoNube({}, { "Boda Ana": estadoNube });
+
+  // Raúl arranca con su copia vieja en local
+  const estadoViejoLocal = { nombreEvento: "Boda Ana", pax: 80, overridesManuales: {} };
+  const dRaul = crearDispositivo("Raúl", { "Boda Ana": estadoViejoLocal }, ["Boda Ana"]);
+  await dRaul.arrancar();
+
+  // Comprobar que en la nube NO se ha pisado con el estado viejo de Raúl
+  const enNubeTrasArranque = (await N.cargarArchivoNube()).mapa["Boda Ana"];
+  ok(enNubeTrasArranque.pax === 120, "la nube conserva el pax editado por la compañera (120)");
+  ok(enNubeTrasArranque.overridesManuales["Cocina::Platos"] === "150", "la nube conserva las cantidades editadas por la compañera");
+  ok(dRaul.local["Boda Ana"].pax === 120, "el dispositivo que arranca adopta el pax de la nube");
+  ok(dRaul.local["Boda Ana"].overridesManuales["Cocina::Platos"] === "150", "el dispositivo que arranca adopta las cantidades de la nube");
+}
+
 // ── Las recogidas que trae un envío del formulario ────────────────────────────
 // Los interruptores de la pantalla crean la recogida de cada alquiler al pulsarlos.
 // Cuando la configuración llega de fuera (un envío de la oficina) no hay clic que
@@ -1382,6 +1406,27 @@ console.log("\n══ La diferencia entre dos versiones de un envío ══");
 // sin nombre" y no sabe de qué le hablan, y sin día no se pueden calcular las
 // recogidas (flores, minutas, alquileres), que es lo que hace que alguien vaya a
 // buscarlas a tiempo.
+console.log("\n══ Elegir otro evento no arrastra las respuestas del anterior ══");
+{
+  // "Ya no hace las preguntas correctas según el tipo de evento" (el dueño): con un
+  // borrador de una boda a medias, elegir una producción de la lista la empezaba con el
+  // cóctel, las sillas y la gente de la boda.
+  const { respuestasAlElegir, preguntasDe } = await import("../formulario/preguntas.js");
+  const borrador = { tipo: "boda", nombre: "Boda A", coctel: 2, copas: 4, sillas: "Dealde", adultos: 120 };
+  const produ = { nombre: "Produ B", tipo: "produccion", sitio: "Nave", fecha: "2027-08-11" };
+  const r = respuestasAlElegir(produ, borrador, "Boda A");
+  ok(r.tipo === "produccion" && r.nombre === "Produ B" && r.coctel === undefined && r.sillas === undefined && r.adultos === undefined,
+    `otro evento empieza sin las respuestas del anterior → ${JSON.stringify(r)}`);
+  const ids = preguntasDe(r.tipo, r).map(p => p.id);
+  ok(ids.includes("dias") && ids.includes("generador") && !ids.includes("coctel"),
+    "y con las preguntas de su tipo: días y generador de la producción, no el cóctel de la boda");
+  const mismo = respuestasAlElegir({ nombre: "Boda A", tipo: "boda", sitio: "", fecha: "2027-09-01" }, borrador, "Boda A");
+  ok(mismo.coctel === 2 && mismo.sillas === "Dealde", "el mismo evento sigue con lo que ya llevaba contestado");
+  const conPrevias = respuestasAlElegir({ ...produ, respuestasPrevias: { carpas: "no", tipo: "boda" } }, borrador, "Boda A");
+  ok(conPrevias.carpas === "no" && conPrevias.tipo === "produccion" && conPrevias.coctel === undefined,
+    "y uno ya configurado trae lo suyo, con el tipo del evento y nada del borrador");
+}
+
 console.log("\n══ Lo obligatorio del formulario ══");
 {
   const { respuestasQueFaltan, preguntasDe } = await import("../formulario/preguntas.js");

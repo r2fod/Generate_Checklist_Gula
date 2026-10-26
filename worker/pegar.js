@@ -2,6 +2,8 @@ import { createECDH } from "node:crypto";
 //#region src/texto.js
 /** @param {unknown} t @returns {string} */
 const sinTildes = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+/** @param {number} n @returns {string} */
+const enTexto = (n) => String(Math.round(n * 100) / 100).replace(".", ",");
 //#endregion
 //#region src/menus-especiales.js
 const FAMILIAS = [
@@ -230,6 +232,232 @@ function enDiasISO(n, ahora = /* @__PURE__ */ new Date()) {
 	return aISO(d);
 }
 //#endregion
+//#region src/factorAjuste.js
+const MIN_FACTOR = .3;
+const MAX_FACTOR = 2;
+/** @param {unknown} n @returns {n is number} */
+function esFactorValido(n) {
+	return typeof n === "number" && Number.isFinite(n) && n >= MIN_FACTOR && n <= MAX_FACTOR;
+}
+//#endregion
+//#region src/bebida.js
+const RATIOS_BEBIDA = {
+	vino: .72,
+	cerveza: {
+		verano: 3,
+		invierno: 2
+	},
+	cava: .2,
+	refresco: 7.4
+};
+/** @type {Record<string, { nombre: string, sobre: "adultos"|"todos", items: string[] }>} */
+const BEBIDAS = {
+	vino: {
+		nombre: "Vino",
+		sobre: "adultos",
+		items: ["Vino blanco", "Vino tinto"]
+	},
+	cerveza: {
+		nombre: "Cerveza",
+		sobre: "adultos",
+		items: ["Cerveza Alhambra (tercios)"]
+	},
+	cava: {
+		nombre: "Cava",
+		sobre: "adultos",
+		items: ["Cava"]
+	},
+	refresco: {
+		nombre: "Refrescos",
+		sobre: "todos",
+		items: [
+			"Coca-Cola normal",
+			"Coca-Cola Zero",
+			"Fanta naranja",
+			"Fanta limón",
+			"Aquarius",
+			"Sprite",
+			"Nestea"
+		]
+	}
+};
+const TIPOS_BEBIDA = [
+	"boda",
+	"comunion",
+	"corporativo",
+	"cumpleanos",
+	"produccion"
+];
+const CLAVES_BEBIDA = Object.keys(BEBIDAS);
+/** @type {Factores} */
+let factores = {};
+/** @param {Factores|null|undefined} valores @param {string} tipo @param {string} bebida @returns {number} */
+function factorDe(valores, tipo, bebida) {
+	const fila = valores && valores[tipo];
+	const n = fila ? Number(fila[bebida]) : NaN;
+	return esFactorValido(n) ? n : 1;
+}
+/** @param {string} tipo @param {Factores} [valores] @returns {Record<string, number>} */
+function factoresDeTipo(tipo, valores = factores) {
+	/** @type {Record<string, number>} */
+	const salida = {};
+	CLAVES_BEBIDA.forEach((bebida) => {
+		salida[bebida] = factorDe(valores, tipo, bebida);
+	});
+	return salida;
+}
+//#endregion
+//#region src/asistente/sector.js
+/**
+* @typedef {{ nombre: string, unidad: string, banda: [number, number], fuente: string }} RatioSector
+*/
+/** @type {Record<string, RatioSector>} */
+const SECTOR = {
+	camareros_banquete: {
+		nombre: "Camareros (banquete sentado — boda, comunión)",
+		unidad: "pax por camarero",
+		banda: [12, 15],
+		fuente: "banquete sentado, fuentes públicas del sector"
+	},
+	camareros_corporativo: {
+		nombre: "Camareros (corporativo)",
+		unidad: "pax por camarero",
+		banda: [20, 30],
+		fuente: "evento corporativo/cóctel, fuentes públicas del sector"
+	},
+	vino: {
+		nombre: "Vino",
+		unidad: "botellas por adulto",
+		banda: [.33, .5],
+		fuente: "1 botella cada 2-3 personas, fuentes públicas del sector"
+	},
+	cerveza_verano: {
+		nombre: "Cerveza (verano, con barra)",
+		unidad: "tercios por adulto",
+		banda: [1.5, 2],
+		fuente: "con barra, fuentes públicas del sector"
+	},
+	cava: {
+		nombre: "Cava (solo brindis)",
+		unidad: "botellas por adulto",
+		banda: [.125, .167],
+		fuente: "1 botella cada 6-8 personas, solo brindis, fuentes públicas del sector"
+	},
+	hielo_verano: {
+		nombre: "Hielo (verano, con barra)",
+		unidad: "kg por pax",
+		banda: [.7, 1],
+		fuente: "con barra en verano, fuentes públicas del sector"
+	},
+	hielo_invierno: {
+		nombre: "Hielo (sin barra o invierno)",
+		unidad: "kg por pax",
+		banda: [.3, .5],
+		fuente: "sin barra o en invierno, fuentes públicas del sector (ya citado en el comentario de calculos.js)"
+	},
+	paella: {
+		nombre: "Paella",
+		unidad: "personas por paellera",
+		banda: [30, 35],
+		fuente: "≈150-200 g de arroz seco/persona, fuentes públicas del sector — SIN validar cuántas personas da cada talla de paellera de verdad"
+	},
+	refresco: {
+		nombre: "Refrescos",
+		unidad: "unidades por comensal",
+		banda: [2, 3.5],
+		fuente: "fuentes públicas del sector en eventos con celebración"
+	}
+};
+/** @typedef {"dentro" | "por-encima" | "por-debajo" | "sin-dato"} TonoComparacion */
+/**
+* @param {number} actual
+* @param {[number, number]} banda
+* @returns {{ tono: TonoComparacion, deltaPct: number }}
+*/
+function comparaUno(actual, banda) {
+	const [min, max] = banda;
+	if (actual >= min && actual <= max) return {
+		tono: "dentro",
+		deltaPct: 0
+	};
+	const limite = actual < min ? min : max;
+	const deltaPct = Math.round((actual - limite) / limite * 100);
+	return {
+		tono: actual < min ? "por-debajo" : "por-encima",
+		deltaPct
+	};
+}
+/**
+* Comprueba si un factor de bebida ajusta el ratio demasiado bajo respecto al sector
+* o si se desvía mucho de la banda. Esto previene que una calibración basada en vueltas
+* esporádicas o no recurrentes ponga bebida de menos.
+*
+* @param {string} bebida Clave de bebida ('vino', 'cerveza', 'cava', 'refresco')
+* @param {number} [factor=1] Factor multiplicador aplicado o medido
+* @param {{ esVerano?: boolean }} [opciones]
+* @returns {{
+*   bebida: string,
+*   factor: number,
+*   ratioBase: number,
+*   ratioEfectivo: number,
+*   banda: [number, number],
+*   unidad: string,
+*   tono: TonoComparacion,
+*   deltaPct: number,
+*   peligroBajo: boolean,
+*   aviso: string | null,
+*   avisoCorto: string | null
+* } | null}
+*/
+function comprobarBebidaSector(bebida, factor = 1, { esVerano = true } = {}) {
+	const f = typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+	let ratioBase = 0;
+	let banda = null;
+	let unidad = "";
+	if (bebida === "vino") {
+		ratioBase = RATIOS_BEBIDA.vino;
+		banda = SECTOR.vino.banda;
+		unidad = "bot/adulto";
+	} else if (bebida === "cerveza") {
+		ratioBase = esVerano ? RATIOS_BEBIDA.cerveza.verano : RATIOS_BEBIDA.cerveza.invierno;
+		banda = esVerano ? SECTOR.cerveza_verano.banda : [1, 1.5];
+		unidad = "tercios/adulto";
+	} else if (bebida === "cava") {
+		ratioBase = RATIOS_BEBIDA.cava;
+		banda = SECTOR.cava.banda;
+		unidad = "bot/adulto";
+	} else if (bebida === "refresco") {
+		ratioBase = 4.44;
+		banda = SECTOR.refresco ? SECTOR.refresco.banda : [2, 3.5];
+		unidad = "uds/pax";
+	} else return null;
+	const ratioEfectivo = Math.round(ratioBase * f * 100) / 100;
+	const { tono, deltaPct } = comparaUno(ratioEfectivo, banda);
+	const peligroBajo = tono === "por-debajo";
+	let aviso = null;
+	let avisoCorto = null;
+	if (peligroBajo) {
+		avisoCorto = `< sector (${ratioEfectivo} vs mín ${banda[0]})`;
+		aviso = `Ratio por debajo del sector (${ratioEfectivo} vs mín. ${banda[0]} ${unidad}) · Riesgo de falta si no se apuntaron todas las vueltas`;
+	} else if (deltaPct < -15) {
+		avisoCorto = `bajada fuerte (${deltaPct}%)`;
+		aviso = `Variación fuerte respecto al sector (${deltaPct}%). Comprobar que las vueltas estén completas.`;
+	}
+	return {
+		bebida,
+		factor: f,
+		ratioBase,
+		ratioEfectivo,
+		banda,
+		unidad,
+		tono,
+		deltaPct,
+		peligroBajo,
+		aviso,
+		avisoCorto
+	};
+}
+//#endregion
 //#region src/asistente/revision.js
 const hoy = hoyISO;
 const dias = (fecha) => Math.round((/* @__PURE__ */ new Date(`${fecha}T00:00:00`) - /* @__PURE__ */ new Date(`${hoy()}T00:00:00`)) / 864e5);
@@ -278,6 +506,16 @@ function revisarEvento(nombre, e = {}) {
 		const ratio = total / camareros;
 		const medido = leerRatios()[e.evento] || PAX_POR_CAMARERO[e.evento] || 10;
 		if (ratio > medido * 1.6) pon("raro", `Van ${camareros} camareros para ${total} comensales (1 cada ${Math.round(ratio)}), y lo medido aquí es 1 cada ${medido}.`, "Si es un almuerzo ligero puede estar bien; si no, van a ir cortos.");
+	}
+	if (e.evento && TIPOS_BEBIDA.includes(e.evento)) {
+		const factoresAct = factoresDeTipo(e.evento);
+		CLAVES_BEBIDA.forEach((clave) => {
+			const f = factoresAct[clave];
+			if (f && f < 1) {
+				const comp = comprobarBebidaSector(clave, f, { esVerano: e.fechaEvento ? MES_CALIDO.includes((/* @__PURE__ */ new Date(`${e.fechaEvento}T00:00:00`)).getMonth()) : true });
+				if (comp && comp.peligroBajo) pon("raro", `El ratio de ${BEBIDAS[clave].nombre.toLowerCase()} para ${e.evento} (factor ×${enTexto(f)}) queda por debajo del sector (${enTexto(comp.ratioEfectivo)} ${comp.unidad} vs mínimo ${enTexto(comp.banda[0])}). Si no se registran todas las vueltas, puede faltar bebida.`, "Revisa el ajuste en Modo carga → Resumen → Cuánto se bebe.");
+			}
+		});
 	}
 	const textoAlergias = alergiasDeLasNotas(e.notasEvento || "").trim();
 	const menus = menusEspeciales(textoAlergias);
@@ -676,7 +914,7 @@ async function claude(cuerpo, env) {
 		},
 		body: JSON.stringify({
 			model: env.ANTHROPIC_MODEL || "claude-opus-5",
-			max_tokens: 2048,
+			max_tokens: 16e3,
 			system: cuerpo.sistema,
 			messages: mensajes,
 			tools: cuerpo.herramientas.map((h) => ({
@@ -690,15 +928,31 @@ async function claude(cuerpo, env) {
 		})
 	});
 	if (!r.ok) throw new Error(`Claude ${r.status}: ${(await r.text()).slice(0, 300)}`);
-	const d = await r.json();
-	const bloques = d.content || [];
-	const u = d.usage || {};
+	return respuestaDeClaude(await r.json());
+}
+function respuestaDeClaude(d) {
+	const bloques = d && d.content || [];
+	const u = d && d.usage || {};
+	const uso = {
+		entrada: u.input_tokens || 0,
+		salida: u.output_tokens || 0
+	};
+	const texto = bloques.filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+	if (d && d.stop_reason === "refusal") {
+		const motivo = d.stop_details && d.stop_details.category ? ` (${d.stop_details.category})` : "";
+		throw new Error(`Claude no ha querido contestar a esto${motivo}. Prueba a preguntarlo de otra forma.`);
+	}
+	if (d && d.stop_reason === "max_tokens") {
+		if (!texto) throw new Error("Claude se ha quedado sin sitio para contestar. Prueba con una pregunta más concreta.");
+		return {
+			uso,
+			texto: `${texto}…\n\n(La respuesta se ha cortado por larga.)`,
+			llamadas: []
+		};
+	}
 	return {
-		uso: {
-			entrada: u.input_tokens || 0,
-			salida: u.output_tokens || 0
-		},
-		texto: bloques.filter((b) => b.type === "text").map((b) => b.text).join("").trim(),
+		uso,
+		texto,
 		llamadas: bloques.filter((b) => b.type === "tool_use").map((b) => ({
 			id: b.id,
 			nombre: b.name,
@@ -1424,4 +1678,4 @@ var worker_default = {
 	}
 };
 //#endregion
-export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, fetchValidando, payloadDeRecordatorio, peticionPushCifrada, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };
+export { avisosDelDia, clavesGemini, worker_default as default, extraerWeb, fetchValidando, payloadDeRecordatorio, peticionPushCifrada, respuestaDeClaude, salud, tareasParaPush, urlAnalizable, vapidClaves, visionGemini, vozElegida };

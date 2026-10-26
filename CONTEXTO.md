@@ -212,6 +212,29 @@ operativo).
 
 ## Lo hecho
 
+- **Auditoría de los prompts del asistente** (`/claude-api prompt-audit`, el dueño: "dale
+  caña"). Lo que había que arreglar:
+  - La ruta Claude del Worker (`claude-opus-5`) mandaba `max_tokens: 2048` sin `thinking`:
+    Claude Opus 5 piensa por defecto y eso cuenta dentro de `max_tokens`, así que la
+    respuesta se podía cortar a medias. Sube a 16000. Y ahora se mira `stop_reason`
+    (`respuestaDeClaude` en worker/index.js): un rechazo es un error que se ve, con su
+    motivo; lo cortado por largo lo dice y no ejecuta herramientas a medias.
+  - El sistema (`SISTEMA`, cliente.js) mandaba usar `aplicar_calibracion` y `apuntar_tarea`,
+    que en el nivel por defecto ("Solo consultar") no se ofrecen. Las mismas reglas,
+    sin nombrar herramientas: cuándo usar cada una ya lo dice su descripción.
+  - `simular_checklist` montaba con `{}` y cargaba siempre una barbacoa (con reja, carbón
+    y leña): ahora con lo que trae un evento nuevo en la app (sin barbacoa, horno
+    pequeño).
+  - Descripciones que faltaban: `calcular_hielo` (verano, congelador), `calcular_personal`
+    (qué devuelve), `simular_checklist` (adultos, niños, horas), `marcar_tarea` (cómo
+    busca) y `ver_escaleta` (sin hora no hay escaleta; `aOjo`, `avisoLogistica`).
+  - GEMINI.md decía que CLAUDE.md tenía líneas de firma de commit (nunca las tuvo: son
+    las del historial). CLAUDE.md: la revisión humana antes de fusionar es para las
+    ramas de seguridad, como ya decía la regla de "Merge"; y el "File Lock" lleva su
+    porqué.
+  Queda apuntado, sin hacer: los bloques de pensamiento de Claude no vuelven al modelo
+  entre herramientas (importa si se pasa a `claude-opus-5-5`), y la ruta Claude no usa
+  caché de prompt.
 - Calendario en colección propia, **dos enlaces**: el de mirar es otro documento, no se
   lee de vuelta → no puede tocar el real.
 - **Checklists creadas solas** a 14 días al abrir la app, `sinConfigurar`.
@@ -337,6 +360,18 @@ operativo).
   el personal)" con sus cápsulas ("si se agrega la grande industrial, que se agregue una
   Nespresso para el personal", el dueño): ya salía, ahora con su prueba y dicho en la
   nota. En un rodaje no: el equipo tiene la cafetera de mantenimiento.
+- **Modo carga: a cada ancho, todas las filas con la misma forma** ("mira cómo se ven
+  algunas distribuciones, unos a un lado y otros a otro: arregla eso, que se ve feo", el
+  dueño, con la Vuelta en el móvil). En flex, según la palabra más larga del nombre, la
+  pastilla "todo" de Vuelta se quedaba a la derecha o bajaba sola a la izquierda (a
+  411px, 84 filas de una forma y 33 de otra) y en Salida la cantidad igual (a 320px, 97 y
+  18). Ahora Vuelta va en rejilla como Prep. (`.carga-row-vuelta`: nombre, cantidad y
+  pastilla en su columna; con la fila por debajo de 20em, todas con la pastilla debajo
+  del nombre) y Salida usa la misma rejilla que Prep. (`.carga-row-rejilla`, antes
+  `.carga-row-prep`). El nombre nunca baja de 6em (7em en Vuelta estrecha): una cantidad
+  larga ("de 225 (9 bateas de 25)") se parte en líneas antes que aplastarlo. Prueba en
+  app.test.mjs ("a cada ancho, todas las filas con la misma forma"): las tres pestañas a
+  320, 360, 390 y 411 (y con la letra al 115%), una sola forma por ancho.
 - **Lo nuevo, con su icono y revisado en todos los anchos** ("mira bien cómo se adapta
   todo a las pantallas y revisa los iconos de lo nuevo", el dueño). Repaso a 320, 360,
   414, 768, 1024, 1440 y 1920 del formulario (gente con tronas, cóctel, cafetera,
@@ -582,6 +617,17 @@ operativo).
     o desinstalarla y reinstalarla. La identidad de la checklist es la raíz del dominio
     a propósito de no cambiar la ya instalada: no moverla sin avisar, dejaría huérfanas
     las instaladas.
+- **Formulario: otro evento no arrastra el borrador del anterior** (26/10, "ya no hace
+  las preguntas correctas según el tipo de evento", el dueño). Las preguntas por tipo
+  (`soloEn`) y la lista que publica la app (`tipo: e.evento`) estaban bien —comprobado
+  recorriendo el formulario entero con cada tipo y con eventos de la lista simulados—.
+  Lo que fallaba era el borrador: "Es un evento nuevo" no limpiaba las respuestas y salía
+  con el tipo del evento anterior ya marcado (una boda), y elegir otro evento de la lista
+  mezclaba sus datos con los del borrador (una producción con el cóctel, las sillas y la
+  gente de la boda de antes, que además se mandaban con ella). Ahora `respuestasAlElegir`
+  (preguntas.js) solo conserva el borrador si es el MISMO evento, "Es un evento nuevo"
+  empieza de cero, y los dos limpian `envioId` (no se puede "corregir" un envío de otro
+  evento). Sigue igual que al abrir el formulario se retome el borrador donde se dejó.
 - **Simetría: lo que va en la misma fila, del mismo alto** (14/10, captura del dueño:
   "CÓCTEL / APERITIVO" partía en dos líneas y su tarjeta quedaba más alta y escalonada
   junto a "COPAS"). Lo causó el `align-items: end` de `.form-row` (#258, para alinear
@@ -863,17 +909,30 @@ está en el historial de git y en las pruebas que los cubren):
   entraban en modo Automático. Ahora se ofrecen los que el Worker diga que tienen clave
   puesta (`proveedoresUI.js`), mismo orden que la cascada.
 
-## Qué queda pendiente ahora mismo (2026-09-30)
+## Qué queda pendiente ahora mismo (2026-10-14)
 
-### Estado de HOY (2026-09-30) — léelo primero si retomas (Claude, Gemini u otra IA)
+### Estado de HOY (2026-10-14) — léelo primero si retomas (Claude, Gemini u otra IA)
 
 **En producción** (publicado en `gh-pages`, comprobado en Actions): todo `main` hasta
-#245. Lo último de esta tanda, cada uno con su entrada "— HECHO" más abajo:
-- #241 calendario con todos los apuntes a la vista, sin "+N" ni nombres cortados;
-- #242 todas las filas con su unidad, y editable a mano (`unidadesManuales`);
-- #243 y #244 calendario del móvil por semanas, con la lista debajo de cada una y la
-  semana en curso la primera;
-- #245 Modo carga: lo que falta por preparar (`pendientes`).
+#275. Lo último de esta tanda, cada uno con su entrada "— HECHO" más abajo:
+- #246 a #255 Limpieza de calendario, revisión de repetidos, formulario directo sin
+  checklists intermedias, manifest PWA;
+- #256 a #266 Rediseño visual (fases 1–5: verde corporativo, cabeceras de categorías,
+  resumen en lista en Modo carga, contraste y accesibilidad completa);
+- #267 a #273 Móvil sin palabras partidas, formulario con iconos animados según contexto,
+  buffets con platos, tronas (máx 3 de almacén), barbacoas desglosadas por tipo (ladrillo,
+  redondas, metálica con carbón y leña), cafeteras (Nespresso según pax + de bar + grande),
+  mantel de papel;
+- #275 Sincronización concurrente protegida: elimina la sobreescritura accidental al arrancar
+  la app con un evento en caché local mientras otra persona edita, e hidrata la pantalla
+  directamente con la versión fresca de la nube;
+- #276 Ratios de bebida: aviso si la calibración o ratio cae por debajo del sector. Como las
+  vueltas de bebida no se registran de forma recurrente, los factores automáticos tienden a la baja
+  arriesgando poner bebida de menos. Se añade comprobación centralizada contra el sector (`comprobarBebidaSector`),
+  avisos en el Panel de Bebida, advertencia en auditoría de oportunidades y en la revisión de eventos.
+- #277/#278 Bebida: suelo automático del sector en la calibración y aviso de cambio brusco.
+- Móvil/tableta: la configuración ya no se repite debajo de la checklist; solo se ve
+  abierta con "Configurar el evento" o "Eventos guardados" (ver su entrada "— HECHO").
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni
@@ -906,7 +965,14 @@ fusionarlos por mucho que estén en verde.
   final de "Limpiar el calendario", `grupoDeLista` en limpieza.js) los marca todos de
   una vez a partir de la lista de ids que se le pasa aparte (lleva nombres: nunca al
   repositorio), y se borran con el mismo "Borrar N marcados", con confirmación y
-  "Deshacer". Borrar lo pulsa el dueño: la IA no borra datos de la app.
+  "Deshacer". Borrar lo pulsa el dueño: la IA no borra datos de la app. La excepción:
+  el "Posible X" que la hoja ya trae confirmado ("deberías quitar los posibles", el
+  dueño, 25/10). Ese lo quita la IA, sin esperar a que lo borre él: copia de seguridad
+  del documento, la lista entera reescrita como la escribe la app (`saneaLista`, con la
+  copia de mirar si la hay) y con la condición de que nadie lo haya tocado desde que se
+  leyó (`currentDocument.updateTime`). El 25/10 se quitaron así dos (un evento de empresa
+  y una producción de finales de octubre), con sus confirmados ya en el calendario. Su
+  checklist en blanco sigue en Eventos guardados: esa la borra el dueño.
 - Opcional, ya pasado: unos 25 apuntes que son turnos del personal ("LIBRE",
   "TRABAJA", "COCINA", "LIMPIEZA", horas sueltas como "14:00") de enero a junio,
   leídos de las filas con etiqueta en A/B.
@@ -956,6 +1022,41 @@ Los cinco PR de la sesión anterior, y #176/#177 de esta (condensar este archivo
 el logotipo en los iconos) ya están fusionados en `main`. Confirmado con git que el
 despliegue anterior (commit `b734764`) llegó a `gh-pages`; falta reconfirmar tras esta
 tanda de fusiones.
+
+**Móvil/tableta: la configuración ya no sale repetida debajo de la checklist — HECHO**:
+- **Motivo**: en una columna (≤1180px) la columna de configuración vivía debajo de la
+  checklist y los atajos de arriba la subían al abrirlos. Al bajar hasta la lista se
+  cerraba y volvía abajo, así que al acabar la checklist se veía otra vez entera: parecía
+  repetida ("quiero quitar el de abajo y que solo se vea si le das a configurar evento o
+  eventos guardados sin duplicar código", el dueño).
+- **Solución** (solo CSS + quitar lo que sobraba, sin duplicar marcado):
+  - `index.css`: sin atajo abierto, `.config-sidebar` va `display: none` en una columna.
+    "Configurar el evento" trae `#cfg-evento` y encima "Añadir varios items pegando
+    texto"; "Eventos guardados" trae `#cfg-guardados` y debajo las Plantillas
+    (`#cfg-plantillas`, id nuevo). Plantillas y "Añadir varios items" no tenían atajo y se
+    habrían quedado sin sitio: el dueño eligió dónde van.
+  - `App.jsx`: fuera el botón "Volver a la checklist" (y `irA`, `ArrowUp`), que solo
+    servía para volver desde abajo. El cierre al bajar hasta la lista, sin salto, sigue igual.
+  - En dos columnas (>1180px) no cambia nada.
+  - Pruebas ("Orden en el móvil"): sin atajo no se ve nada de la configuración, cada atajo
+    trae lo suyo y su compañera en ese orden, y al final de la página no reaparece. "Resumen
+    del evento" abre el atajo antes de medir las cajas de texto.
+
+**Ratios de bebida: suelo automático del sector y aviso de cambio brusco — HECHO**:
+- **Motivo**: Al no registrarse de forma recurrente las vueltas de bebida en los eventos terminados, los pocos eventos con devolución computada skewan el ratio de consumo hacia abajo. Como la calibración automática necesita solo 3 eventos para proponer un factor (ej. 0.4 o 0.5), aplicar ese factor arriesga cargar significativamente menos bebida de la necesaria y obligaba a revisar o cambiar los ratios a mano.
+- **Solución implementada**:
+  - `src/asistente/sector.js`:
+    - Centralizada `comprobarBebidaSector(bebida, factor, { esVerano })` con bandas de referencia del sector (vino, cerveza, cava y refresco).
+    - Definidos los suelos de seguridad del sector (`SUELO_SECTOR_BEBIDA` y `factorMinimoSector`): vino 0.46 (0.33 bot/pax), cerveza 0.50 (1.5 tercios/pax), cava 0.63 (0.125 bot/pax), refresco 0.45 (2.0 uds/pax).
+    - Función `comprobarCambioBrusco(actual, nuevo, umbralPct = 15)` que detecta saltos o bajadas abruptas en los ratios.
+  - `src/calibracion.js`: `calibracionBebida` aplica automáticamente el suelo mínimo del sector (`Math.max(suelo, factorCalculado)`). Una calibración nunca bajará del umbral de seguridad del mercado por muy bajas que sean las vueltas, marcando `ajustadoPorSuelo: true`.
+  - `src/components/PanelBebida.jsx`:
+    - Insignia de `🛡️ suelo sector` cuando el factor medido está acotado por el mínimo de seguridad.
+    - Alerta de `⚡ X% salto` cuando la propuesta o medición supone una variación brusca (>= 15%) respecto al factor configurado.
+    - Resaltado de campos activos bajo el sector (`< sector`).
+    - Tooltip preventivo en los botones de aplicar factor medido.
+  - `src/asistente/revision.js`: `oportunidadesNegocio` detecta mediciones bajo el mínimo del sector y advierte de vueltas incompletas o variaciones bruscas. `revisarEvento` genera aviso de rareza ("raro") en eventos configurados con ratios bajo el sector.
+  - Pruebas unitarias añadidas y verdes en `calculos.test.mjs` y `asistente.test.mjs`.
 
 **Formulario: buffets configuran mesas de verdad, y reorden por bloques — HECHO
 (PR #184, tras #182/#183 ya fusionados)**:
@@ -2185,6 +2286,17 @@ recortaba —el barrido responsive pasaba—, solo se leía mal.
   "Lo que pone debajo de la cantidad" (sin "=", debajo y a la derecha de la caja,
   singular/plural al teclear) y el de hielo/carpas en singular; puras de
   `envaseSegunCantidad()` en `calculos.test.mjs`.
+
+**Protección contra sobreescritura concurrente al abrir la app — HECHO**:
+- **Bug cazado**: al abrir la app con un evento activo en `localStorage`, el `useEffect` de auto-guardado de archivo (`estadoActualJSON`) saltaba a los 1,2s en el montaje inicial sin que el usuario tocara nada, subiendo a Firestore la foto vieja local y pisando las cantidades que un compañero estuviera editando en ese instante.
+- **Solución en `App.jsx`**:
+  - `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` inicializados con `estadoActualJSON`: los efectos de guardado comprueban si el estado actual es idéntico al último guardado/cargado (`estadoActualJSON === ref.current`) y abortan de inmediato en el arranque sin programar timers de guardado.
+  - En la sincronización inicial de la nube (`sincronizar`), si el evento abierto en pantalla existe en el archivo remoto, se hidrata la pantalla con la versión fresca de la nube mediante `settersSyncRef` y se actualiza la referencia, evitando que la copia obsoleta de `localStorage` persista en pantalla o se re-suba.
+  - Las suscripciones en tiempo real (`suscribirArchivoNube` y `suscribirEventoNube`) actualizan `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` al aplicar cambios remotos, evitando ecos y bucles de re-guardado.
+- Test nuevo en `sincronizacion.test.mjs`: "Arranque con evento abierto no pisa cambios de otra persona".
+- **Comprobación de cálculo de mesas de cocina**:
+  - Mesas rectangulares de 1,8m (almacén propio Gula): las 4 a 6 mesas de apoyo de cocina se suman directamente con las mesas de comer en la misma línea `"Mesas de 1,8m"`.
+  - Mesas redondas (alquiler externo): se desglosan por separado: `"Mesas de 1,8m"` para cocina y `"Mesas redondas ... (alquiler)"` para comensales.
 
 **Dos planes grandes, sin código todavía**: `PLAN_COCINA.md` y `PLAN_INVENTARIO.md`.
 Presupuesto no: lo lleva otra app del dueño (ver al principio de este archivo).

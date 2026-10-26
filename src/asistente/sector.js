@@ -12,6 +12,7 @@
 // Firestore: el dato vive en un solo sitio, con su fuente al lado.
 //
 // Sin React, sin nube: entran números, sale una comparación. Se prueba con node.
+import { RATIOS_BEBIDA } from "../bebida.js";
 
 /**
  * @typedef {{ nombre: string, unidad: string, banda: [number, number], fuente: string }} RatioSector
@@ -70,6 +71,12 @@ export const SECTOR = {
     banda: [30, 35],
     fuente: "≈150-200 g de arroz seco/persona, fuentes públicas del sector — SIN validar cuántas personas da cada talla de paellera de verdad",
   },
+  refresco: {
+    nombre: "Refrescos",
+    unidad: "unidades por comensal",
+    banda: [2.0, 3.5],
+    fuente: "fuentes públicas del sector en eventos con celebración",
+  },
 };
 
 /** @typedef {"dentro" | "por-encima" | "por-debajo" | "sin-dato"} TonoComparacion */
@@ -85,6 +92,123 @@ function comparaUno(actual, banda) {
   const limite = actual < min ? min : max;
   const deltaPct = Math.round(((actual - limite) / limite) * 100);
   return { tono: actual < min ? "por-debajo" : "por-encima", deltaPct };
+}
+
+/**
+ * Comprueba si un factor de bebida ajusta el ratio demasiado bajo respecto al sector
+ * o si se desvía mucho de la banda. Esto previene que una calibración basada en vueltas
+ * esporádicas o no recurrentes ponga bebida de menos.
+ *
+ * @param {string} bebida Clave de bebida ('vino', 'cerveza', 'cava', 'refresco')
+ * @param {number} [factor=1] Factor multiplicador aplicado o medido
+ * @param {{ esVerano?: boolean }} [opciones]
+ * @returns {{
+ *   bebida: string,
+ *   factor: number,
+ *   ratioBase: number,
+ *   ratioEfectivo: number,
+ *   banda: [number, number],
+ *   unidad: string,
+ *   tono: TonoComparacion,
+ *   deltaPct: number,
+ *   peligroBajo: boolean,
+ *   aviso: string | null,
+ *   avisoCorto: string | null
+ * } | null}
+ */
+export function comprobarBebidaSector(bebida, factor = 1, { esVerano = true } = {}) {
+  const f = typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+  let ratioBase = 0;
+  let banda = null;
+  let unidad = "";
+
+  if (bebida === "vino") {
+    ratioBase = RATIOS_BEBIDA.vino; // 0.72
+    banda = SECTOR.vino.banda;      // [0.33, 0.5]
+    unidad = "bot/adulto";
+  } else if (bebida === "cerveza") {
+    ratioBase = esVerano ? RATIOS_BEBIDA.cerveza.verano : RATIOS_BEBIDA.cerveza.invierno; // 3.0 o 2.0
+    banda = esVerano ? SECTOR.cerveza_verano.banda : [1.0, 1.5]; // [1.5, 2] en verano, [1.0, 1.5] en invierno
+    unidad = "tercios/adulto";
+  } else if (bebida === "cava") {
+    ratioBase = RATIOS_BEBIDA.cava; // 0.20
+    banda = SECTOR.cava.banda;      // [0.125, 0.167]
+    unidad = "bot/adulto";
+  } else if (bebida === "refresco") {
+    ratioBase = 4.44;               // consumo real neto (~0.60 * 7.4)
+    banda = SECTOR.refresco ? SECTOR.refresco.banda : [2.0, 3.5];
+    unidad = "uds/pax";
+  } else {
+    return null;
+  }
+
+  const ratioEfectivo = Math.round(ratioBase * f * 100) / 100;
+  const { tono, deltaPct } = comparaUno(ratioEfectivo, banda);
+  const peligroBajo = tono === "por-debajo";
+
+  let aviso = null;
+  let avisoCorto = null;
+  if (peligroBajo) {
+    avisoCorto = `< sector (${ratioEfectivo} vs mín ${banda[0]})`;
+    aviso = `Ratio por debajo del sector (${ratioEfectivo} vs mín. ${banda[0]} ${unidad}) · Riesgo de falta si no se apuntaron todas las vueltas`;
+  } else if (deltaPct < -15) {
+    avisoCorto = `bajada fuerte (${deltaPct}%)`;
+    aviso = `Variación fuerte respecto al sector (${deltaPct}%). Comprobar que las vueltas estén completas.`;
+  }
+
+  return {
+    bebida,
+    factor: f,
+    ratioBase,
+    ratioEfectivo,
+    banda,
+    unidad,
+    tono,
+    deltaPct,
+    peligroBajo,
+    aviso,
+    avisoCorto,
+  };
+}
+
+/**
+ * Factores mínimos seguros según la banda del sector para evitar que la calibración automática
+ * o un ajuste ponga bebida de menos cuando no hay vueltas sistemáticas.
+ */
+export const SUELO_SECTOR_BEBIDA = {
+  vino: 0.46,      // 0.33 bot/pax mín sector / 0.72 base
+  cerveza: 0.50,   // 1.5 tercios mín sector / 3.0 base verano (o 1.0 / 2.0 invierno)
+  cava: 0.63,      // 0.125 bot/pax mín sector / 0.20 base
+  refresco: 0.45,  // 2.0 uds mín sector / 4.44 base neta
+};
+
+/**
+ * Devuelve el factor mínimo seguro admisible para una bebida según el sector.
+ * @param {string} bebida Clave de bebida ('vino', 'cerveza', 'cava', 'refresco')
+ * @returns {number}
+ */
+export function factorMinimoSector(bebida) {
+  return SUELO_SECTOR_BEBIDA[bebida] ?? 0.40;
+}
+
+/**
+ * Comprueba si la variación entre dos factores supone un cambio brusco (>= 15% o 20%),
+ * alertando de posibles distorsiones cuando las vueltas de bebida no se registran de forma recurrente.
+ * @param {number} actual Factor actual de referencia
+ * @param {number} nuevo Factor propuesto o medido
+ * @param {number} [umbralPct=15] Porcentaje a partir del cual se considera brusco
+ * @returns {{ esBrusco: boolean, deltaPct: number, aviso: string | null }}
+ */
+export function comprobarCambioBrusco(actual = 1, nuevo = 1, umbralPct = 15) {
+  const act = typeof actual === "number" && Number.isFinite(actual) && actual > 0 ? actual : 1;
+  const nvo = typeof nuevo === "number" && Number.isFinite(nuevo) && nuevo > 0 ? nuevo : 1;
+  const deltaPct = Math.round(((nvo - act) / act) * 100);
+  const esBrusco = Math.abs(deltaPct) >= umbralPct;
+  let aviso = null;
+  if (esBrusco) {
+    aviso = `Variación brusca (${deltaPct > 0 ? "+" : ""}${deltaPct}% respecto al valor vigente ×${act}). Puede deberse a que no se registraron vueltas en todos los eventos.`;
+  }
+  return { esBrusco, deltaPct, aviso };
 }
 
 /**

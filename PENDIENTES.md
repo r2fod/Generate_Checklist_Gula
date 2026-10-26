@@ -1,6 +1,6 @@
 # Pendientes — la lista corta para retomar
 
-> Al día: 2026-09-30. Aquí solo va QUÉ falta y DE QUIÉN depende; el detalle está en
+> Al día: 2026-10-14. Aquí solo va QUÉ falta y DE QUIÉN depende; el detalle está en
 > lo que se enlaza. Al cerrar algo, se quita de aquí en el mismo commit (igual que
 > `CONTEXTO.md`). Repo público: ni nombres, ni importes, ni datos de clientes.
 

@@ -186,6 +186,21 @@ const listaItems = (p) => p.locator(".item-row").evaluateAll(rs => rs.map(r => {
 // Lo mismo desde un locator: la unidad de debajo del número, sea campo o texto
 const textoUnidad = (loc) => loc.evaluate(e => (e.tagName === "INPUT" ? e.value : e.textContent).trim());
 
+// En una columna (móvil y tableta) la configuración solo se ve abierta con su atajo de
+// arriba: antes vivía también debajo de la lista y se veía repetida. Las pruebas que la
+// miden o la tocan a esos anchos la abren antes; en dos columnas no hay atajo y no hace
+// nada. Ojo: al bajar hasta la checklist se cierra sola, como para quien la usa.
+async function abrirConfig(p, cual = "Configurar el evento") {
+  const b = p.locator(".atajos-una-columna button", { hasText: cual });
+  if (!(await b.isVisible().catch(() => false))) return;
+  if (await b.getAttribute("aria-expanded") !== "true") await b.click();
+  await p.waitForTimeout(350);
+}
+
+// Seleccionar todo multiplataforma: en macOS la tecla de comando es Meta, en Linux/Windows Control
+const TECLA_SELECT_ALL = process.platform === "darwin" ? "Meta+a" : "Control+a";
+const TECLA_SELECT_ALL_MAYUS = process.platform === "darwin" ? "Meta+A" : "Control+A";
+
 async function main() {
   const srv = await arrancarServidor();
   servidorGlobal = srv;
@@ -363,10 +378,11 @@ async function main() {
   // ── Orden en el móvil (fase 4 del rediseño) ─────────────────────────────────
   // En una columna la checklist va primero: la primera categoría salía a siete
   // pantallas de móvil, tras Plantillas, Eventos guardados y la configuración entera.
-  // La configuración sigue debajo; sus atajos la abren AHÍ, debajo de ellos ("que te
-  // lleve abajo no me gusta", el dueño), y al bajar hasta la checklist vuelve a su
-  // sitio sin que la lista salte. En dos columnas, nada cambia. Y en el móvil "Añadir
-  // item" va plegado: abierto era media pantalla.
+  // La configuración solo se ve con sus atajos, que la abren AHÍ, debajo de ellos ("que
+  // te lleve abajo no me gusta", el dueño), y al bajar hasta la checklist se cierra sin
+  // que la lista salte. Debajo de la lista ya no está: se veía repetida ("quiero quitar
+  // el de abajo"). En dos columnas, nada cambia. Y en el móvil "Añadir item" va
+  // plegado: abierto era media pantalla.
   console.log("\n── Orden en el móvil ──");
   for (const [w, h] of [[390, 844], [320, 760], [900, 1000], [1280, 900]]) {
     const ctx = await navegador.newContext({ viewport: { width: w, height: h }, isMobile: w < 769, hasTouch: w < 769, reducedMotion: "reduce" });
@@ -379,37 +395,41 @@ async function main() {
       const top = (s) => { const e = document.querySelector(s); return e && e.offsetParent ? Math.round(e.getBoundingClientRect().top + scrollY) : null; };
       const r = (s) => document.querySelector(s).getBoundingClientRect();
       return {
-        cat: top(".category-section"), config: top("#cfg-evento"), atajos: top(".atajos-una-columna"), volver: top(".atajo-volver"),
+        cat: top(".category-section"), config: top("#cfg-evento"), atajos: top(".atajos-una-columna"),
         anadir: !!document.querySelector(".add-item-row")?.offsetParent, plegar: !!document.querySelector(".add-item-abrir")?.offsetParent,
         lado: r(".config-sidebar").right <= r(".checklist-main").left,
       };
     });
-    const aLaVista = (id) => page.evaluate(i => { const t = document.getElementById(i).getBoundingClientRect().top; return t >= 0 && t < innerHeight / 2; }, id);
+    // Lo que se ve de la columna de configuración, en orden de pantalla
+    const visibles = () => page.evaluate(() => [...document.querySelectorAll(".config-sidebar > *")]
+      .filter(e => e.offsetParent).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+      .map(e => e.id || e.classList[0]));
     if (w < 1181) {
-      ok(m.cat < h && m.cat < m.config,
-        `${w}px · la primera categoría sale en la primera pantalla, antes que la configuración (${m.cat} / ${m.config})`);
+      ok(m.cat < h && m.config === null && (await visibles()).length === 0,
+        `${w}px · la primera categoría sale en la primera pantalla y la configuración no está ni arriba ni debajo de la lista (${m.cat})`);
       // Se abre ahí: encima de la lista, justo debajo de su botón, y sin mover la pantalla
       const abierta = (id) => page.evaluate(i => {
         const t = document.getElementById(i).getBoundingClientRect(), b = document.querySelector(".atajos-una-columna").getBoundingClientRect();
-        return { encima: t.top < document.getElementById("checklist-lista").getBoundingClientRect().top, pegada: t.top - b.bottom < 40, y: Math.round(scrollY) };
+        const col = document.querySelector(".config-sidebar").getBoundingClientRect();
+        return { encima: t.top < document.getElementById("checklist-lista").getBoundingClientRect().top, pegada: col.top - b.bottom < 40, y: Math.round(scrollY) };
       }, id);
       const yAntes = await page.evaluate(() => Math.round(scrollY));
       await page.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).click();
       await page.waitForTimeout(300);
       const evento = await abierta("cfg-evento");
+      const conEvento = await visibles();
       ok(evento.encima && evento.pegada && evento.y === yAntes
         && await page.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).getAttribute("aria-expanded") === "true",
         `${w}px · "Configurar el evento" se abre ahí, debajo de su botón, sin llevar abajo`);
+      ok(conEvento.join() === "add-material-btn,cfg-evento",
+        `${w}px · y trae "Añadir varios items" encima de la configuración, nada más (${conEvento.join(", ")})`);
       await page.locator(".atajos-una-columna button", { hasText: "Eventos guardados" }).click();
       await page.waitForTimeout(300);
       const guardados = await abierta("cfg-guardados");
-      const encimaDeLaLista = await page.evaluate(() => {
-        const lista = document.getElementById("checklist-lista").getBoundingClientRect().top;
-        return [...document.querySelectorAll(".config-sidebar > *")].filter(e => e.offsetParent && e.getBoundingClientRect().top < lista).map(e => e.id || e.className);
-      });
-      ok(guardados.encima && guardados.pegada && encimaDeLaLista.length === 1,
-        `${w}px · "Eventos guardados" igual, y solo una tarjeta abierta cada vez (${encimaDeLaLista.join(", ")})`);
-      // Bajando hasta la checklist la tarjeta vuelve abajo, y la lista no se mueve
+      const conGuardados = await visibles();
+      ok(guardados.encima && guardados.pegada && conGuardados.join() === "cfg-guardados,cfg-plantillas",
+        `${w}px · "Eventos guardados" igual, primero lo suyo y debajo las Plantillas (${conGuardados.join(", ")})`);
+      // Bajando hasta la checklist la tarjeta se cierra, y la lista no se mueve
       // Se mide en cuanto se cierra: lo que pase después es la tira fija de arriba, que
       // aparece al pasar de la cabecera (con panel o sin él)
       const alBajar = await page.evaluate(async () => {
@@ -421,9 +441,13 @@ async function main() {
       });
       ok(alBajar.cerrada && alBajar.salto <= 8,
         `${w}px · al bajar hasta la checklist se esconde sola, sin que la lista salte (${alBajar.salto}px; la tarjeta medía ${alBajar.alto})`);
-      await page.locator(".atajo-volver").click();
-      await page.waitForTimeout(300);
-      ok(await aLaVista("checklist-lista"), `${w}px · y desde abajo, "Volver a la checklist" sigue trayendo de vuelta`);
+      // Y al acabar la lista no vuelve a salir: la página termina en la checklist
+      const alFinal = await page.evaluate(() => {
+        scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" });
+        return Math.round(document.documentElement.scrollHeight - document.getElementById("checklist-lista").getBoundingClientRect().bottom - scrollY);
+      });
+      ok((await visibles()).length === 0 && alFinal < 400,
+        `${w}px · y debajo de la lista ya no se repite la configuración (${alFinal}px tras la lista)`);
       // Plegado solo en el móvil: en la tableta cabe abierto
       if (w < 769) {
         ok(!m.anadir && m.plegar, `${w}px · "Añadir item" va plegado`);
@@ -433,7 +457,7 @@ async function main() {
           `${w}px · y se abre con su botón, listo para escribir`);
       }
     } else {
-      ok(m.atajos === null && m.volver === null && m.lado && m.anadir && !m.plegar,
+      ok(m.atajos === null && m.lado && m.anadir && !m.plegar,
         `${w}px · en dos columnas nada cambia: sin atajos, la configuración al lado y "Añadir item" abierto`);
     }
     await ctx.close();
@@ -512,6 +536,38 @@ async function main() {
     const borrador = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA2") || "{}"));
     ok(borrador.respuestas && borrador.respuestas.tipo === "boda" && borrador.eventoDestino === "Produ de prueba",
       "y se puede cambiar: el envío del mismo evento lleva el tipo nuevo");
+    await c.close();
+  }
+
+  // ── El formulario: "Es un evento nuevo" empieza limpio ───────────────────────
+  // Con un borrador de una boda a medias, "Es un evento nuevo" salía con "Boda" ya
+  // marcada y con sus respuestas: el formulario de una producción preguntaba lo de una
+  // boda ("ya no hace las preguntas correctas según el tipo de evento", el dueño).
+  console.log("\n── El formulario: un evento nuevo no arrastra el borrador de otro ──");
+  {
+    const c = await navegador.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+    await c.addInitScript(() => {
+      if (sessionStorage.getItem("sembrado")) return;
+      localStorage.setItem("gula_formulario_PRUEBA3", JSON.stringify({
+        eventoDestino: "Boda de prueba", paso: 3, respuestas: { tipo: "boda", nombre: "Boda de prueba", coctel: 2, sillas: "Dealde", adultos: 120 },
+      }));
+      sessionStorage.setItem("sembrado", "1");
+    });
+    const p = await nuevaPagina(c);
+    await p.goto(BASE_FORM + "?enviar=PRUEBA3", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector(".form-btn-inicio");
+    await p.locator(".form-btn-inicio").first().click();
+    await p.locator("button", { hasText: "Es un evento nuevo" }).first().click();
+    await p.waitForTimeout(500);
+    const marcada = await p.locator(".form-opcion.es-elegida").count();
+    const guardado = await p.evaluate(() => JSON.parse(localStorage.getItem("gula_formulario_PRUEBA3") || "{}").respuestas || {});
+    ok(marcada === 0 && Object.keys(guardado).length === 0,
+      `"Es un evento nuevo" empieza sin tipo marcado y sin las respuestas de la boda (${marcada} marcadas, ${JSON.stringify(guardado)})`);
+    await p.locator(".form-opcion", { hasText: "Producción" }).first().click();
+    await p.waitForTimeout(300);
+    const tipo = await p.evaluate(() => (JSON.parse(localStorage.getItem("gula_formulario_PRUEBA3") || "{}").respuestas || {}).tipo);
+    ok(tipo === "produccion", `y queda como producción, con sus preguntas (${tipo})`);
     await c.close();
   }
 
@@ -727,6 +783,8 @@ async function main() {
     for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
     const page = await nuevaPagina(ctx);
     await page.goto(url({ ...EVENTO_COMPLETO, llevaPaella: true }), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-section");
+    await abrirConfig(page);
     await page.waitForSelector('.logistica-block[data-bloque="compras"]');
     const m = await page.evaluate(() => {
       const raya = (b) => getComputedStyle(document.querySelector(`.logistica-block[data-bloque="${b}"]`)).borderLeftColor;
@@ -757,6 +815,8 @@ async function main() {
     for (const h of HOSTS_NUBE) await ctx.route(h, r => r.abort());
     const page = await nuevaPagina(ctx);
     await page.goto(url(EVENTO_COMPLETO), { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".category-section");
+    await abrirConfig(page);
     await page.waitForSelector(".segmented-control");
     await page.waitForTimeout(400);
     const m = await page.evaluate(() => {
@@ -858,7 +918,10 @@ async function main() {
       `${w}px: las 3 cifras en una fila y del mismo ancho ${JSON.stringify(filas)}`);
     // Repaso "premium": el detalle de cada cifra va en su línea sin un "·" colgando
     // delante, el botón del tema es solo el icono (el texto le robaba ancho al título)
-    // y las cajas de texto miden lo mismo que los desplegables de al lado.
+    // y las cajas de texto miden lo mismo que los desplegables de al lado (la
+    // configuración, en el móvil, solo se ve abierta con su atajo).
+    await page.locator(".atajos-una-columna button", { hasText: "Configurar el evento" }).click();
+    await page.waitForTimeout(300);
     const pulido = await page.evaluate(() => {
       const alto = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().height) : 0; };
       return {
@@ -1363,6 +1426,7 @@ async function main() {
         const p = await nuevaPagina(c);
         await p.goto(url(estado), { waitUntil: "domcontentloaded" });
         await p.waitForTimeout(1500);
+        await abrirConfig(p);
         const fuera = await p.evaluate(() => {
           const w = document.documentElement.clientWidth;
           return [...document.querySelectorAll("button, input, select")]
@@ -1515,6 +1579,7 @@ async function main() {
       const p = await nuevaPagina(c);
       await p.goto(url(CONFIG), { waitUntil: "domcontentloaded" });
       await p.waitForTimeout(1800);
+      await abrirConfig(p);
       const m = await p.evaluate(() => {
         // Un Range sobre el texto devuelve un rectángulo por cada línea que ocupa:
         // más de uno significa que la palabra se ha partido. Medir el alto no vale,
@@ -1659,6 +1724,47 @@ async function main() {
     ok(anchoNombre >= 100,
       `a 320px el nombre tiene al menos 100px (no los ~74px que dejaba la pastilla) → ${Math.round(anchoNombre)}px`);
     await c.close();
+  }
+
+  // ── Modo carga: todas las filas con la misma forma ──────────────────────────
+  // "Mira cómo se ven algunas distribuciones, unos a un lado y otros a otro: arregla
+  // eso, que se ve feo" (el dueño, con la Vuelta en el móvil): en flex, según lo larga
+  // que fuera la palabra más larga del nombre, la pastilla "todo" se quedaba a la
+  // derecha o bajaba sola a la izquierda (a 411px, 84 filas de una forma y 33 de otra),
+  // y en Salida la cantidad igual (a 320px, 97 y 18). Ahora las tres pestañas van en
+  // rejilla: a cada ancho, una sola forma para todas las filas.
+  console.log("\n── Modo carga: a cada ancho, todas las filas con la misma forma ──");
+  {
+    const estadoFormas = { evento: "boda", pax: 100, nombreEvento: "Boda formas",
+      itemsManuales: [{ categoria: "Menaje y cocina", label: "VASO CHUPITO CRISTAL GRANDE", cantidad: "30" }] };
+    for (const [ancho, letra] of [[320, 1], [360, 1], [390, 1], [411, 1], [411, 1.15]]) {
+      const c = await navegador.newContext({ viewport: { width: ancho, height: 900 }, isMobile: true, hasTouch: true });
+      for (const h of HOSTS_NUBE) await c.route(h, r => r.abort());
+      const p = await nuevaPagina(c);
+      await p.goto(url(estadoFormas), { waitUntil: "domcontentloaded" });
+      await p.waitForTimeout(1500);
+      if (letra !== 1) await p.addStyleTag({ content: `html { font-size: ${letra * 100}% !important; }` });
+      await p.locator("button", { hasText: "Modo carga" }).first().click();
+      await p.waitForTimeout(1000);
+      for (const pestana of ["Prep.", "Salida", "Vuelta"]) {
+        await p.locator(".carga-modo-toggle .segment-btn").filter({ hasText: pestana }).first().click();
+        await p.waitForTimeout(600);
+        const m = await p.evaluate(() => {
+          const formas = new Set(); let nombreMin = 999;
+          for (const r of document.querySelectorAll(".carga-row-principal")) {
+            const n = r.querySelector(".carga-nombre").getBoundingClientRect();
+            const q = r.querySelector(".carga-cantidad").getBoundingClientRect();
+            const t = r.querySelector(".carga-vino-todo")?.getBoundingClientRect();
+            formas.add(`${q.top < n.bottom - 4 ? "cantidad-al-lado" : "cantidad-debajo"}${t ? (t.top < n.bottom - 4 ? "/todo-al-lado" : "/todo-debajo") : ""}`);
+            nombreMin = Math.min(nombreMin, n.width);
+          }
+          return { formas: [...formas], nombreMin: Math.round(nombreMin), desborda: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+        });
+        ok(m.formas.length === 1 && !m.desborda && m.nombreMin >= 80,
+          `${pestana} a ${ancho}px${letra !== 1 ? " con la letra grande" : ""}: una sola forma (${m.formas.join(", ")}), el nombre con al menos ${m.nombreMin}px y sin salirse`);
+      }
+      await c.close();
+    }
   }
 
   // ── Modo carga también avisa de los items de alquiler ───────────────────────
@@ -2065,7 +2171,9 @@ async function main() {
       compras: [{ concepto: "Aguas", cantidad: "5 cajas", fecha: "2027-07-28" }],
     }), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
-    const malos = await p.evaluate(() => window.__contraste());
+    const malosLista = await p.evaluate(() => window.__contraste());
+    await abrirConfig(p);
+    const malos = [...malosLista, ...await p.evaluate(() => window.__contraste())];
     await p.locator("button", { hasText: "Modo carga" }).first().click();
     await p.waitForTimeout(1100);
     const malosCarga = await p.evaluate(() => window.__contraste());
@@ -2412,6 +2520,7 @@ async function main() {
     const p = await nuevaPagina(c);
     await p.goto(url(CON_FECHAS), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(2200);
+    await abrirConfig(p);
     const cortados = await p.evaluate(() => {
       const ctx2d = document.createElement("canvas").getContext("2d");
       const malos = [];
@@ -2947,7 +3056,7 @@ async function main() {
     // onChange como hace un dedo de verdad) volvía a poner un 1 solo, tecla a tecla,
     // sin dejar terminar de escribir el número bueno.
     await numero.click();
-    await p.keyboard.press("Control+a");
+    await p.keyboard.press(TECLA_SELECT_ALL);
     await p.keyboard.press("Delete");
     await p.waitForTimeout(150);
     ok((await numero.inputValue()) === "", "borrar el número entero lo deja vacío, no en 1");
@@ -2958,7 +3067,7 @@ async function main() {
     // Vacío y sin tocar nada más: al salir del campo recupera algo válido, no se
     // queda en blanco para siempre.
     await numero.click();
-    await p.keyboard.press("Control+a");
+    await p.keyboard.press(TECLA_SELECT_ALL);
     await p.keyboard.press("Delete");
     await p.waitForTimeout(150);
     await p.locator(".form-titulo").click();
@@ -4293,7 +4402,7 @@ async function main() {
     ok(await unidadDe("Nestea") === "pack", `a mano manda la de la persona, y con 1 en singular (${await unidadDe("Nestea")})`);
     // Vaciarla la devuelve a la automática
     await filaExacta("Nestea").locator(".item-unidad-btn").click();
-    await p.keyboard.press("Control+A");
+    await p.keyboard.press(TECLA_SELECT_ALL_MAYUS);
     await p.keyboard.press("Delete");
     await p.keyboard.press("Enter");
     await p.waitForTimeout(300);
