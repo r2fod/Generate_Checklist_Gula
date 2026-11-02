@@ -6,6 +6,13 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Horno pequeño: sus bandejas y las hondas** ("cuando se seleccione horno pequeño hay que
+  agregar sus bandejas de horno más bandejas hondas para calentar comida", el dueño). Con
+  "pequeño" o "ambos", en los cinco tipos de evento, la cocina suma "Bandejas de horno" (2,
+  las que caben dentro) y "Bandejas hondas (calentar comida)" (una cada 50 pax, mínimo 2;
+  `bandejasHornoPequeno` en checklist-generadores.js). Con el grande o sin horno, nada.
+  Los números son un primer reparto: se corrigen en `BANDEJAS_DE_HORNO` y
+  `PAX_POR_BANDEJA_HONDA`.
 - **Auditoría de los prompts del asistente** (`/claude-api prompt-audit`, el dueño: "dale
   caña"). Lo que había que arreglar:
   - La ruta Claude del Worker (`claude-opus-5`) mandaba `max_tokens: 2048` sin `thinking`:
