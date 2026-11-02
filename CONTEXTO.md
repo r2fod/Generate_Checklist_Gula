@@ -360,6 +360,10 @@ operativo).
   el personal)" con sus cápsulas ("si se agrega la grande industrial, que se agregue una
   Nespresso para el personal", el dueño): ya salía, ahora con su prueba y dicho en la
   nota. En un rodaje no: el equipo tiene la cafetera de mantenimiento.
+  La de bar no tiene toma de agua ni desagüe: con ella van un "Bidón beige 20L (lleno,
+  agua para la máquina)" y un "Bidón 20L (vacío, para el agua sucia)" ("uno para darle
+  agua a la máquina y otro para el agua sucia", el dueño), en todos los tipos y solo si
+  hay café para invitados. Icono propio (gota) para "bidón".
 - **Modo carga: a cada ancho, todas las filas con la misma forma** ("mira cómo se ven
   algunas distribuciones, unos a un lado y otros a otro: arregla eso, que se ve feo", el
   dueño, con la Vuelta en el móvil). En flex, según la palabra más larga del nombre, la

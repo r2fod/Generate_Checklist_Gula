@@ -814,6 +814,21 @@ console.log("\n══ Las Nespresso, según la gente ══");
     "con la grande va también la Nespresso del personal, con sus cápsulas, en todos los tipos con personal");
 }
 
+// ─── Cafetera de bar: dos bidones de 20L ──────────────────────────────────────
+// "Cuando se seleccione cafetera de bar, agrega un bidón beige de 20L lleno y otro de
+// 20L vacío: uno para darle agua a la máquina y otro para el agua sucia" (el dueño).
+console.log("\n══ Cafetera de bar: bidón lleno y bidón vacío ══");
+{
+  const cafe = (tipo, opts) => buildChecklist(tipo, 100, 2, 4, 0, opts).find(c => c.nombre === "Café").items.map(x => x[0]);
+  const BIDONES = ["Bidón beige 20L (lleno, agua para la máquina)", "Bidón 20L (vacío, para el agua sucia)"];
+  ok(["boda", "comunion", "corporativo", "cumpleanos", "produccion"].every(t => BIDONES.every(b => cafe(t, { tipoCafetera: "Bar" }).includes(b))),
+    "con la cafetera de bar, en todos los tipos, va el bidón lleno y el vacío");
+  ok(["Nespresso", "Grande", undefined].every(tipo => cafe("boda", { tipoCafetera: tipo }).every(l => !/^Bidón/.test(l))),
+    "con la Nespresso o la grande no van bidones");
+  ok(!cafe("boda", { tipoCafetera: "Bar", cafeParaInvitados: false }).some(l => /^Bidón/.test(l)),
+    "y sin café para invitados tampoco: la de bar no sale");
+}
+
 console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
 {
   // Antes las carpas solo existían en producción (siempre al aire libre). En el resto

@@ -237,7 +237,10 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(paxConsumo / 100)), "carga(s)")]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
+    // No tiene toma de agua ni desagüe: un bidón beige lleno la alimenta y otro vacío recoge
+    // el agua sucia que tira (el dueño: "uno para darle agua a la máquina y otro para el
+    // agua sucia").
+    items.push(["Cafetera de bar", "1"], ["Bidón beige 20L (lleno, agua para la máquina)", "1"], ["Bidón 20L (vacío, para el agua sucia)", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   } else {
     items.push(["Cafetera Nespresso", lineaNespresso(totalPax, numPersonal > 0)], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   }
