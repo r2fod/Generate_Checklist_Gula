@@ -23,7 +23,9 @@ siguen aquí.**
    ya; la de ingredientes necesita Cocina.
 3. **Auditoría de funcionalidad**: 16 fallos (uno crítico en el formulario y varios
    altos en calendario y checklist) más mejoras de uso. El plan está en el PR #231
-   (sección E de `PLAN_MEJORAS.md`), aún sin fusionar.
+   (sección E de `PLAN_MEJORAS.md`), aún sin fusionar. Revisados contra el código del
+   26/10: los del formulario (E3) están hechos (#283, #284) y los de la checklist (E2)
+   también (#285, ver `HISTORIAL.md`). Quedan los del calendario (E1).
 4. **Sin fecha**: marketing con Meta (A4 v2 y v3), gasto global (D2) y memoria
    semántica (D3).
 
