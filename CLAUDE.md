@@ -5,7 +5,7 @@
 - Lang: Spanish ONLY (code, comments, UI, commits).
 - Output: Direct code. No intro/outro text.
 - Privacy: Public repo. Fake test data only (no names/phones/€/buy prices).
-- Sync: Update `CONTEXTO.md` same commit. Chat rules -> append here.
+- Sync: Update `CONTEXTO.md` same commit (only what is current; each change gets a short entry at the top of `HISTORIAL.md`, never read whole). Chat rules -> append here.
 
 ## DATA SCHEMA
 - Item ID: `${categoría}::${labelOriginal}` (Renames require migration).

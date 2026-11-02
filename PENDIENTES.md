@@ -47,7 +47,7 @@ siguen aquí.**
   tiempo abiertos: habrá que traerles `main` y volver a pasar la batería antes.
 - **Modo carga a 320px**: la cabecera (escaleta, cronómetros y, desde #245, el
   recuadro "Falta por preparar") tapa el primer ítem. Hay que decidir qué se pliega
-  por defecto; #222 propone una parte. Detalle en `CONTEXTO.md`, "Auditoría visual
+  por defecto; #222 propone una parte. Detalle en `HISTORIAL.md`, "Auditoría visual
   móvil…", punto 3.
 - **Limpieza de datos del calendario** (en la app, no en el código): revisado contra
   la hoja el 6/10. Quedan 19 apuntes en el mes equivocado (11 próximos: 28–31/10,

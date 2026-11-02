@@ -100,6 +100,7 @@ const ICONOS_ITEM = [
   { f: ["ladrillo"], I: BrickWallFire, c: "#ea580c" },
   { f: ["leña"], I: FlameKindling, c: "#ea580c" },
   { f: ["café molido"], I: Bean, c: "#78350f" },
+  { f: ["bidón", "bidon"], I: Droplet, c: "#2563eb" },
   { f: ["rollo de mantel"], I: Scroll, c: "#a21caf" },
   { f: ["menú sin", "menu sin", "menú vegano", "menu vegano", "menú vegetariano", "menu vegetariano", "menú especial", "menu especial"], I: ChefHat, c: "#991b1b" },
   { f: ["vino", "tinto de verano", "vermut", "mistela", "cava", "champ", "sangr"], I: Wine, c: "#9d174d" },

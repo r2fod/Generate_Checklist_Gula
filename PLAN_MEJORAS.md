@@ -88,7 +88,7 @@ se calibra solo, como la bebida".
 Las tres capas de abajo, construidas: `revision.js` con el tono `oportunidad` (4
 reglas deterministas), `ver_auditoria` de solo lectura, y `aplicar_calibracion`
 para aplicar lo que propone (con la misma validación que las demás herramientas
-de ajuste). Sección "Oportunidades" en Cerebro. Ver CONTEXTO.md, "Hecho".
+de ajuste). Sección "Oportunidades" en Cerebro. Ver HISTORIAL.md, "Lo hecho".
 
 **Por qué (contexto original):** se pidió que el asistente haga auditorías y proponga mejoras. El
 asistente ya tiene la mitad del cuerpo de un auditor (reglas puras probadas,
@@ -144,7 +144,7 @@ nada ya (A1, del que dependían varias reglas, está hecho).
 tras la fusión, ver "Doce trampas" nº10 y 11), redes sociales por captura con
 visión de Gemini (v2a), estrategia de captación guardada en `indice/marketing`
 (v2b), modo maestro y textos listos para copiar. Solo queda **v3** (publicar de
-verdad por OAuth), sin fecha prometida — ver más abajo. Ver CONTEXTO.md, "Hecho".
+verdad por OAuth), sin fecha prometida — ver más abajo. Ver HISTORIAL.md, "Lo hecho".
 
 **Por qué (contexto original):** se pidió una vista donde el asistente analice una web o una red
 social, dé pautas para que los vídeos funcionen, diseñe el embudo para
@@ -268,7 +268,7 @@ el valor real de la API externa, no uno cómodo — ese barrido no habría cazad
 eso, son cosas distintas), y B8 (línea base de pintado de React,
 `npm run medir` en el job `navegador` de `test.yml`) — se daba por bloqueado en
 permiso de workflows, pero la app SÍ lo tiene concedido; solo hacía falta
-probarlo. Ver CONTEXTO.md, "Hecho".
+probarlo. Ver HISTORIAL.md, "Lo hecho".
 
 ## C. Negocio — lo que sale en el camión
 
@@ -363,7 +363,7 @@ igual el recordatorio de hoy.
 3. **Decisión del dueño, no de código:**
    - Unificar o no `aplicar_factor_bebida` (#154) y `aplicar_calibracion` con
      `area: "bebida"` (esta rama) en una sola herramienta — documentado en
-     CONTEXTO.md, "Hecho", ambas funcionan hoy sin pisarse.
+     HISTORIAL.md, "Lo hecho", ambas funcionan hoy sin pisarse.
    - A4 v2 (API de Meta) y v3 (OAuth, publicar de verdad) — grandes, sin fecha.
    - D2, D3 — solo si hace falta.
 4. **Pendiente de cablear, sin decisión tomada todavía:** el subconsciente

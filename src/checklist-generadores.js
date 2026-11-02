@@ -237,7 +237,10 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
   if (tipoCafetera === "Grande") {
     items.push(["Cafetera grande (industrial)", "1"], ["Café molido (industrial)", conSufijo(Math.max(1, Math.ceil(paxConsumo / 100)), "carga(s)")]);
   } else if (tipoCafetera === "Bar") {
-    items.push(["Cafetera de bar", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
+    // No tiene toma de agua ni desagüe: un bidón beige lleno la alimenta y otro vacío recoge
+    // el agua sucia que tira (el dueño: "uno para darle agua a la máquina y otro para el
+    // agua sucia").
+    items.push(["Cafetera de bar", "1"], ["Bidón beige 20L (lleno, agua para la máquina)", "1"], ["Bidón 20L (vacío, para el agua sucia)", "1"], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   } else {
     items.push(["Cafetera Nespresso", lineaNespresso(totalPax, numPersonal > 0)], ["Cápsulas café (estándar/descafeinado)", conSufijo(capsulas, `para ${paxConsumo} pax`)], ["Cuencos para calentar leche", "2"]);
   }
@@ -269,6 +272,20 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
     );
   }
   return { nombre: "Café", items };
+}
+
+// El horno pequeño no calienta nada sin sus bandejas: las suyas (las que caben dentro,
+// dos) y unas hondas para calentar la comida que llega hecha (el dueño: "cuando se
+// seleccione horno pequeño hay que agregar sus bandejas de horno más bandejas hondas
+// para calentar comida"). Las hondas van por tandas: una cada ~50 pax, mínimo dos.
+export const BANDEJAS_DE_HORNO = 2;
+export const PAX_POR_BANDEJA_HONDA = 50;
+const conHornoPequeno = (tipoHorno) => tipoHorno === "pequeño" || tipoHorno === "ambos";
+function bandejasHornoPequeno(pax) {
+  return [
+    ["Bandejas de horno", String(BANDEJAS_DE_HORNO)],
+    ["Bandejas hondas (calentar comida)", String(Math.max(2, Math.ceil(pax / PAX_POR_BANDEJA_HONDA)))],
+  ];
 }
 
 // ─── BUILD CHECKLIST ──────────────────────────────────────────────────────────
@@ -533,7 +550,7 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
 
   const cocinaItems = [];
   cocinaItems.push(["Cazuelas de barro", "—"], ["Cazuelas rojas", "—"], ["Gastros", String(numGastros > 0 ? numGastros : GASTROS_MINIMO)], ["Plancha (cocina)", "—"]);
-  if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
+  if (conHornoPequeno(tipoHorno)) cocinaItems.push(["Horno pequeño", "1"], ...bandejasHornoPequeno(pax));
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"]);
   if (hayDesayuno) cocinaItems.push(["Sandwichera", "1"]);
@@ -787,7 +804,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
   const cocinaItems = [];
-  if (tipoHorno === "pequeño" || tipoHorno === "ambos") cocinaItems.push(["Horno pequeño", "1"]);
+  if (conHornoPequeno(tipoHorno)) cocinaItems.push(["Horno pequeño", "1"], ...bandejasHornoPequeno(pax));
   if (tipoHorno === "grande"  || tipoHorno === "ambos") cocinaItems.push(["Horno grande", "1"]);
   cocinaItems.push(["Microondas", "1"], ["Batidora de vaso", "1"], ["Vitro", "1"], ["Aceiteras de cristal", "—"], ["Saleros", "6"], ["Pimenteros", "6"]);
   if (llevaArmarioCaliente) cocinaItems.push(["Armario caliente (alquiler Dealde)", "1", true]);
@@ -1069,7 +1086,8 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // El horno lo elige el selector de Equipamiento, igual que en el resto de
     // eventos: aquí estaba fijo en "Horno pequeño" y cambiar a Grande o Ambos no
     // hacía nada.
-    opt(tipoHorno === "pequeño" || tipoHorno === "ambos", ["Horno pequeño", "1"]),
+    opt(conHornoPequeno(tipoHorno), ["Horno pequeño", "1"]),
+    ...(conHornoPequeno(tipoHorno) ? bandejasHornoPequeno(pax) : []),
     opt(tipoHorno === "grande" || tipoHorno === "ambos", ["Horno grande", "1"]),
     ["Microondas", "1"], ["Batidora de vaso", "1"], ["Mesas calientes", String(calcMesasCalientes(pax))],
     // Termos de café/agua caliente: uno por cada ~25 pax (aguantan 8-10 tazas)

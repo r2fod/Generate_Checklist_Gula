@@ -1,0 +1,1790 @@
+# Historial — lo hecho, con su porqué
+
+Archivo de consulta, **no de lectura**: busca con `grep -n "palabra" HISTORIAL.md` y lee solo la
+entrada que toque. Lo vigente (reglas, trampas, estado de HOY) está en `CONTEXTO.md`.
+Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
+
+## Lo hecho
+
+- **App: la auditoría E2 de PLAN_MEJORAS (26/10)**, los cinco seguían vivos:
+  - **"Guardar evento" con el nombre de OTRO evento** pregunta antes ("Sustituir"); antes
+    lo pisaba sin avisar (el autoguardado sí lo miraba, `ocupadoPorOtro`). **"Duplicar"**
+    con un nombre que ya existe vuelve a pedir el nombre. Los dos, y el borrado, leen el
+    archivo de `eventosGuardadosRef` (el de ahora), no el de cuando se abrió el diálogo.
+  - **Borrar el evento abierto** lo suelta entero (activo, nombre y `eventoNubeId`) y la
+    pantalla queda como borrador: antes el autoguardado lo volvía a escribir y a subir.
+  - **Guardados del evento abierto en fila** (`enFila`, nube.js): dos seguidos salían
+    con el mismo baseline y, con la red lenta, el viejo llegaba tarde y dejaba su valor
+    en la nube. Ahora cada uno sale al acabar el anterior y lee el baseline al salir.
+  - **Carpas al salir de producción**: se apagan solo si las encendió el paso a
+    producción (`carpasDeProduccionRef`); las puestas a mano se quedan.
+  - **`CampoNumero`** (barriles, cucharas de porcelana, sartenes, planchas de gas, chill
+    out): se puede borrar y reescribir; antes vaciar saltaba a "1" y escribir "2" daba "12".
+- **Horno pequeño: sus bandejas y las hondas** ("cuando se seleccione horno pequeño hay que
+  agregar sus bandejas de horno más bandejas hondas para calentar comida", el dueño). Con
+  "pequeño" o "ambos", en los cinco tipos de evento, la cocina suma "Bandejas de horno" (2,
+  las que caben dentro) y "Bandejas hondas (calentar comida)" (una cada 50 pax, mínimo 2;
+  `bandejasHornoPequeno` en checklist-generadores.js). Con el grande o sin horno, nada.
+  Los números son un primer reparto: se corrigen en `BANDEJAS_DE_HORNO` y
+  `PAX_POR_BANDEJA_HONDA`.
+- **Auditoría de los prompts del asistente** (`/claude-api prompt-audit`, el dueño: "dale
+  caña"). Lo que había que arreglar:
+  - La ruta Claude del Worker (`claude-opus-5`) mandaba `max_tokens: 2048` sin `thinking`:
+    Claude Opus 5 piensa por defecto y eso cuenta dentro de `max_tokens`, así que la
+    respuesta se podía cortar a medias. Sube a 16000. Y ahora se mira `stop_reason`
+    (`respuestaDeClaude` en worker/index.js): un rechazo es un error que se ve, con su
+    motivo; lo cortado por largo lo dice y no ejecuta herramientas a medias.
+  - El sistema (`SISTEMA`, cliente.js) mandaba usar `aplicar_calibracion` y `apuntar_tarea`,
+    que en el nivel por defecto ("Solo consultar") no se ofrecen. Las mismas reglas,
+    sin nombrar herramientas: cuándo usar cada una ya lo dice su descripción.
+  - `simular_checklist` montaba con `{}` y cargaba siempre una barbacoa (con reja, carbón
+    y leña): ahora con lo que trae un evento nuevo en la app (sin barbacoa, horno
+    pequeño).
+  - Descripciones que faltaban: `calcular_hielo` (verano, congelador), `calcular_personal`
+    (qué devuelve), `simular_checklist` (adultos, niños, horas), `marcar_tarea` (cómo
+    busca) y `ver_escaleta` (sin hora no hay escaleta; `aOjo`, `avisoLogistica`).
+  - GEMINI.md decía que CLAUDE.md tenía líneas de firma de commit (nunca las tuvo: son
+    las del historial). CLAUDE.md: la revisión humana antes de fusionar es para las
+    ramas de seguridad, como ya decía la regla de "Merge"; y el "File Lock" lleva su
+    porqué.
+  Queda apuntado, sin hacer: los bloques de pensamiento de Claude no vuelven al modelo
+  entre herramientas (importa si se pasa a `claude-opus-5-5`), y la ruta Claude no usa
+  caché de prompt.
+- Calendario en colección propia, **dos enlaces**: el de mirar es otro documento, no se
+  lee de vuelta → no puede tocar el real.
+- **Checklists creadas solas** a 14 días al abrir la app, `sinConfigurar`.
+- Enlaces rotos que se curan: borrar una checklist devuelve su apunte a pendiente.
+- Precios y ratios en Firestore.
+- **El asistente entero** (ver abajo): cerebro con memoria/árbol, subconsciente,
+  objetivos, tareas, conversaciones, enrutado entre proveedores, tope de gasto, permisos
+  por nivel, ocho compañeros animados + Jarvis, voz, conectores, diario de gasto.
+- **Repaso de la noche**: el Worker mira eventos aunque nadie abra la app.
+- **Rediseño, fase 1 — marca y color por tipo** (plan entero en PLAN_MEJORAS.md, E):
+  el acento (`--accent`, 122 usos) pasa del añil al verde azulado del logo (#0f766e;
+  en oscuro #1aa391, mismo contraste que tenía el añil) y la "tinta" de los botones
+  sólidos a un verde muy oscuro. Los colores por tipo de evento viven una sola vez en
+  `:root` (`--color-boda`…) y los leen el calendario (`.tipo-*`) y `.con-tipo`
+  (`data-tipo`): la cabecera de la checklist y la del modo carga llevan el icono lleno,
+  la raya de arriba y el tinte del suyo. Sin tipo, la marca. Los añiles escritos a mano
+  pasaron a `color-mix` con `--accent`.
+- **Rediseño, fase 2 — cada categoría con su color**: el pastel de cada categoría se
+  copiaba en línea en cinco sitios (lista, hoja, modo carga, resumen y su barra) y en
+  oscuro se apagaba con un `filter` sobre el bloque entero, texto incluido. Ahora
+  `estiloCategoria` (Iconos.jsx) pone `--cat`/`--cat-suave` UNA vez en el contenedor
+  `.con-cat` y el CSS deriva `--cat-fondo/-tinta/-raya/-tinte`, invertidos en oscuro.
+  La hoja y el modo carga comparten `CabeceraCategoria`; en el modo carga lleva "3/8" y
+  su barra, contados con `estaHecho`, la MISMA regla que el recuento de arriba.
+- **Rediseño, contraste en la configuración**: la tarjeta "Evento" es un formulario de
+  dos metros donde Compras y Recogidas eran dos cajas grises iguales y los 25 extras
+  (paella, frituras/parisiene, tarta…) la misma fila repetida. Ahora `data-bloque` da a
+  cada bloque su color (`--bloque`, del que salen tinta, chip, fondo y borde, invertidos
+  en oscuro) y su icono (`IconoBloque`/`TituloBloque` en Iconos.jsx); logística,
+  alquileres, recogidas y compras van en su panel con la raya de su color. Cada extra
+  lleva su icono (`IconoExtra`, buscado por su texto) en el color del bloque, que se
+  llena del de la marca al marcarlo. La explicación de cada bloque va debajo del título
+  en pequeño (`TituloBloque detalle=`), no entre paréntesis; las pruebas buscan el
+  bloque por `data-bloque`, no por su texto.
+- **Rediseño, fase 3 — iconos con vida**: al marcar una línea del modo carga la
+  casilla (o la pastilla "todo" de la vuelta) rebota, el icono reacciona y la fila se
+  ilumina; al marcar lo último de una categoría, la cuenta salta con un aro, lleva ✓ y
+  un brillo cruza la cabecera. La llama, el copo y el camión (`anim-llama/-hielo/-camion`,
+  los pone Iconos.jsx según el DIBUJO) se mueven a su manera con el ratón encima, solo
+  donde hay ratón (`@media (hover: hover)`). Todo en "Iconos con vida" (index.css) y
+  apagado con `prefers-reduced-motion`.
+  - **Solo al marcar, nunca al abrir**: una animación CSS puesta con una clase arranca
+    también al montarse, y abrir el modo carga con cincuenta líneas hechas sería una
+    traca. `useAcabaDe(valor, grupo)` da `true` solo cuando el valor pasa de no a sí
+    con el componente ya montado; `grupo` es la pestaña (Prep. y Salida son la misma
+    fila con otra marca: cambiar de pestaña no es marcar). La clase se quita en
+    `animationend` del propio contenedor, si no, plegar y abrir lo repetiría.
+  - De paso: la fila "vino todo" de la vuelta era `#f4fcf6` fijo también en oscuro, con
+    el texto claro encima. Ahora `--ok-bg`; la prueba de contraste mira la vuelta.
+- **Rediseño, fase 4 — orden en el móvil**: en una columna (≤1180px) la checklist va
+  PRIMERO (`order` en `.main-layout`): la primera categoría salía a ~6.800px, tras
+  Plantillas, Eventos guardados y la configuración entera; ahora en la primera pantalla.
+  La configuración sigue debajo; los atajos `.atajos-una-columna` ("Configurar el
+  evento", "Eventos guardados") la abren ahí (ver abajo) y "Volver a la checklist"
+  (`.atajo-volver`) lleva con `irA(id)` a `#checklist-lista`, con
+  `scroll-margin-top` para no quedar debajo de la cabecera fija (tableta) o de
+  `.barra-fija` (móvil, 58px). En dos columnas no se ven. En el móvil "Añadir item" va
+  plegado (`anadirAbierto`, `.add-item-abrir`): abierto era media pantalla.
+  - **Los atajos abren su tarjeta ahí, no llevan abajo** ("que te lleve abajo no me
+    gusta; que se despliegue y si haces scroll hasta la checklist se esconda", el
+    dueño). `panelArriba` ("evento" | "guardados") pone `data-panel` en
+    `.main-layout`: la columna de configuración sube encima de la lista (`order: 1`)
+    con solo esa tarjeta, con `panel-despliega`. Al bajar hasta la checklist (su borde
+    llega a la tira fija) vuelve a su sitio, entera, y se corrige el scroll con lo que
+    medía para que la lista no salte (`overflow-anchor: none` en ese momento, para no
+    corregir dos veces). Abierto, el icono del botón pasa a ▲ (una flecha aparte partía
+    el botón en dos líneas hasta 412px). No se usó `display: contents` para subir cada
+    tarjeta sola: Chrome no la recolocaba a tiempo y la lista saltaba igual.
+    "Volver a la checklist" sigue para cuando se baja hasta la configuración.
+  - **Calendario**: los ajustes (traer, limpiar, compartir, asistente, equipo, ratios)
+    van en `Ajustes.jsx`, que en el móvil los esconde tras un botón con "N por revisar"
+    si el limpiador tiene algo. Lo usan la app suelta, la vista de la checklist y el
+    banco. **El banco los abre al entrar** (`abiertosAlEntrar`): sus pruebas son de lo
+    de DENTRO de cada panel a nueve anchos; el botón se prueba con `?cerrados=1`.
+- **Rediseño, fase 5 — remate**: una cabecera `sticky` se queda a la distancia del
+  PADDING de quien hace scroll, no en su borde. En la hoja el que hace scroll es el
+  fondo oscuro (`.preview-overlay`, 32px arriba en escritorio, 24 en tableta), así que
+  la cabecera se pegaba a 32px y por encima asomaba la lista. Ahora ese hueco va en
+  `--hueco-arriba` (cada cambio de padding del fondo la cambia también) y la cabecera
+  y la barra de pestañas del modo carga van con `top: calc(-1 * var(--hueco-arriba))`.
+  El nombre del evento va con la talla de título de pantalla (`--fs-2xl`; `--fs-xl` en
+  el móvil, antes `--fs-xl`/`--fs-lg`, casi como un título de bloque), `letter-spacing`
+  negativo y `text-wrap: balance`; las cantidades (lista, modo carga, hoja) con
+  `tabular-nums`.
+- **El formulario con los colores de cada tipo** ("que sea igual para que sea todo
+  más parejo en colores", el dueño): cada evento de "¿De qué evento son los datos?"
+  lleva `data-tipo` y sale con su icono en el color del tipo, sobre su fondo suave, y
+  una raya de ese color a la izquierda; las opciones de "¿Qué tipo de evento es?",
+  igual. Los colores son los mismos `--color-*` de la checklist (index.css, `:is(...)
+  [data-tipo]`).
+- **El tipo de evento se pregunta siempre**, también al elegir un evento que ya existe:
+  sale marcado el que tiene y basta con "Siguiente", pero se puede cambiar. Antes se
+  saltaba y una checklist creada por el calendario con el tipo equivocado no se podía
+  corregir desde el formulario. Al aplicar el envío, `evento` cambia con él.
+- **La cafetera, y no preguntar lo que no hace falta** ("cuando pregunta café para
+  invitados, que puedas elegir qué cafetera; analiza bien las preguntas para que sea lo
+  más inteligente y profesional", el dueño). Repaso de la configuración contra el
+  formulario: de lo que la oficina puede saber, solo faltaba la cafetera (lo demás que no
+  pregunta es logística o de la propia checklist: camareros, bandejas extra, recogidas,
+  marcas). Cambios:
+  - `cafetera` detrás de "café para los invitados" (en todos los tipos): Nespresso, de
+    bar o la grande; la nota dice cuántos cafés salen con la gente (pax ×
+    2,2, la misma cuenta que las cápsulas) → `tipoCafetera`. Con café solo del personal
+    no se pregunta ni se toca.
+  - El estilo del plato (`estiloPlato`) ya no se pregunta comiendo de pie en bandeja ni
+    con "no llevamos platos" (`hayPlatos`); el de postre, tampoco con "no llevamos
+    platos de postre".
+  - Fallo de los platos de buffet (#269): iban sumados a "Platos postre", que no sale
+    en bandeja ni sin platos de postre, y se perdían. Ahí salen en su propia línea,
+    "Platos pequeños (buffets)" (boda/comunión/empresa y cumpleaños).
+- **Las cafeteras, con lo que hay en el almacén** ("cafeteras tenemos 1 de bar, 1
+  industrial que va con café molido y 4 Nespresso: ponlo de forma inteligente", el
+  dueño). Antes iba siempre UNA Nespresso, fueran 30 o 300. Ahora (`lineaNespresso`,
+  `NESPRESSO_EN_ALMACEN = 4`, `INVITADOS_POR_NESPRESSO = 50` en checklist-generadores.js)
+  va una cada 50 invitados (supuesto: lo que saca una en la sobremesa), de las libres:
+  3 en boda/comunión/empresa y cumpleaños, porque la cuarta es la del personal; 4 en un
+  rodaje. Con 50 o menos, la línea sigue siendo "1" sin más. Con más de las que hay
+  carga las libres y avisa "para N pax harían falta M: mejor la grande"; subida a mano
+  por encima, "hay 3 libres (otra va al personal) · falta 1". La de bar y la grande
+  son una de cada, sin cambios. En el formulario, la nota de `cafetera` recomienda con
+  la gente: "basta una Nespresso", "irían N Nespresso" o "mejor la grande (N cargas)".
+  Con la grande (o la de bar) el personal sigue llevando su "Cafetera Nespresso (para
+  el personal)" con sus cápsulas ("si se agrega la grande industrial, que se agregue una
+  Nespresso para el personal", el dueño): ya salía, ahora con su prueba y dicho en la
+  nota. En un rodaje no: el equipo tiene la cafetera de mantenimiento.
+  La de bar no tiene toma de agua ni desagüe: con ella van un "Bidón beige 20L (lleno,
+  agua para la máquina)" y un "Bidón 20L (vacío, para el agua sucia)" ("uno para darle
+  agua a la máquina y otro para el agua sucia", el dueño), en todos los tipos y solo si
+  hay café para invitados. Icono propio (gota) para "bidón".
+- **Modo carga: a cada ancho, todas las filas con la misma forma** ("mira cómo se ven
+  algunas distribuciones, unos a un lado y otros a otro: arregla eso, que se ve feo", el
+  dueño, con la Vuelta en el móvil). En flex, según la palabra más larga del nombre, la
+  pastilla "todo" de Vuelta se quedaba a la derecha o bajaba sola a la izquierda (a
+  411px, 84 filas de una forma y 33 de otra) y en Salida la cantidad igual (a 320px, 97 y
+  18). Ahora Vuelta va en rejilla como Prep. (`.carga-row-vuelta`: nombre, cantidad y
+  pastilla en su columna; con la fila por debajo de 20em, todas con la pastilla debajo
+  del nombre) y Salida usa la misma rejilla que Prep. (`.carga-row-rejilla`, antes
+  `.carga-row-prep`). El nombre nunca baja de 6em (7em en Vuelta estrecha): una cantidad
+  larga ("de 225 (9 bateas de 25)") se parte en líneas antes que aplastarlo. Prueba en
+  app.test.mjs ("a cada ancho, todas las filas con la misma forma"): las tres pestañas a
+  320, 360, 390 y 411 (y con la letra al 115%), una sola forma por ancho.
+- **Lo nuevo, con su icono y revisado en todos los anchos** ("mira bien cómo se adapta
+  todo a las pantallas y revisa los iconos de lo nuevo", el dueño). Repaso a 320, 360,
+  414, 768, 1024, 1440 y 1920 del formulario (gente con tronas, cóctel, cafetera,
+  barbacoa y cuántas, buffets y sus platos) y de la app (checklist con todo lo nuevo y
+  el panel): nada se sale de lado. Cambios:
+  - Checklist (`ICONOS_ITEM`, delante de los grupos que los cogían por una palabra
+    suelta): Aperol un cóctel (era una caja), tronas un bebé (era un sillón), barbacoa
+    de ladrillo `BrickWallFire`, leña `FlameKindling`, café molido un grano y el rollo de
+    mantel de papel un rollo (era una camiseta).
+  - Formulario: cada cafetera lo suyo (Nespresso la taza, la de bar un bar, la grande
+    un grano de café); "¿Cuántas barbacoas?" con la de ladrillo; fondo propio para
+    barbacoa, cafetera y platos de buffet.
+  - El título de cada pregunta lleva el foco (lector de pantalla) pero ya sin el
+    recuadro que lo rodeaba al abrir el enlace.
+  - Panel: "Hay 2 en almacén: falta 1" en singular (decía "faltan 1"), en barbacoas y
+    tronas; los platos de buffet "se suman a los platos de postre (o van aparte si no
+    los hay)", como hace la checklist desde la cafetera.
+  - Repaso de errores ("comprueba que no haya bugs"): 28.800 checklists con todas las
+    combinaciones de tipo, gente (0 a 500), cafetera, café, barbacoa y cuántas, tronas,
+    corners y platos de buffet, sin una cantidad rara ni una línea repetida; y el
+    formulario entero (notas, avisos, envío → app) con respuestas vacías, viejas y
+    llenas. Lo único: el repaso y la bandeja decían "1 tronas", "1 pequeñas redondas".
+    Ahora los campos de `numeros` pueden llevar `uno` (y `varios`) y con 1 sale en
+    singular ("1 adulto · 1 niño · 1 trona").
+- **La barbacoa, con su pregunta y cuántas de cada** ("debería preguntar si lleva
+  barbacoa, y si lleva agregar carbón y leña, y decir cuántas grandes o pequeñas: tenemos
+  3 grandes de ladrillo, 3 pequeñas metálicas redondas y una pequeña rectangular", el
+  dueño; corregido: "grandes de ladrillo tenemos 2, redondas pequeñas metálicas 3 y 1
+  rectangular metálica"). Era una casilla de "extras" que cargaba una grande. Ahora `barbacoa` (sí/no,
+  detrás del horno, boda/comunión/empresa) y, si la lleva, `barbacoasCuantas` (numeros,
+  con aviso si se piden más de las del almacén) → `barbacoasLadrillo`,
+  `barbacoasRedondas`, `barbacoasRectangular` (null = sin decir). En la checklist
+  (`BARBACOAS` en checklist-generadores.js): una línea por tipo con "de N en almacén ·
+  faltan M", una "Reja BBQ grande" por cada grande, carbón por la gente con un saco
+  mínimo por barbacoa y un saco de leña por barbacoa. **Sin números, lo de siempre**
+  ("Barbacoa grande/pequeña" cada 60 pax, mismo nombre e identidad, mismo carbón y
+  leña). En la app, bajo "Barbacoa", tres campos con lo que hay en almacén. Envíos de
+  antes: `respuestasAlDia` pasa la casilla de "extras" a la pregunta.
+- **Iconos del formulario con sentido, y con su gesto** ("mejora los iconos del
+  formulario para que tengan sentido con la frase y anímalos", el dueño). Salían del
+  juego del fondo por posición (el "Corner de vermut" con una olla). Ahora en
+  `FondoIconos.jsx`: `ICONO_TITULO` (de qué va la pregunta) e `ICONO_OPCION` (lo que dice
+  cada respuesta); lo que no está ahí sale de reglas: un "no" se tacha (Ban), "otro
+  número" es una almohadilla, "otro (escribirlo)" un lápiz, "según la gente" unas
+  personas, y un "sí" lleva el icono de su pregunta. `gestoDeIcono` da a cada icono su
+  gesto (CSS `form-gesto-*`: la llama parpadea, el copo gira, las copas brindan, el
+  camión arranca, el corazón late, el "no" niega, el resto un brinco): el título lo hace
+  al llegar y la opción al elegirla (y con el ratón encima). Va en un envoltorio
+  (`.form-titulo-gesto`, `.form-opcion-gesto`) para no repetir la entrada del icono. Al
+  elegir una opción se pasa de pantalla a los 240 ms (antes 120) para que se vea.
+  Quietos con "reducir movimiento". El fondo flotante no cambia.
+- **Buffets con platos, tronas, corners y manteles** (el dueño, por partes: "que te
+  pregunte si para el buffet hacen falta platos", "mira si pregunta lo de la trona",
+  "corner de vermut, que ponga extra de vermut", "corner de Aperol: cava, agua con gas
+  0,75 y Aperol", "los manteles teniendo en cuenta las mesas de buffet y de barras" y
+  "que no falte el rollo de mantel de papel, para las mesas de cocina"):
+  - Tras "buffets", `buffetPlatos` (si hay alguno, no en rodaje): platos pequeños por
+    persona → `platosBuffet`, que se suma a "Platos postre" como el jamonero o la tarta.
+  - "¿Cuánta gente?" pregunta las **tronas** (`numTronas`). **Solo van las que se dicen**
+    ("si se deja en blanco no debería poner ninguna", el dueño): sin número no sale la
+    línea, haya niños o no (antes, una por niño). En el almacén hay 3
+    (`TRONAS_EN_ALMACEN`, repetido en preguntas.js): con más, el formulario avisa al
+    escribirlo, la app lo dice bajo el campo y la línea lleva "de 3 en almacén · faltan N".
+  - **Corner de vermut** y **corner de Aperol** son buffets (cuentan sus mesas) y llegan
+    como `llevaCornerVermut` / `llevaCornerAperol`, también casillas en la app. Vermut:
+    el del aperitivo otra vez (en cumpleaños, que no lleva, solo el del corner). Aperol:
+    un spritz por adulto (90 ml de cava, 60 de Aperol, 30 de soda) → cava sumado a su
+    línea, "Aperol (1L)" y "Agua con gas 0,75L (Aperol)". Nada si el cliente trae la bebida.
+  - **Manteles**: lo de antes (todas las mesas de 1,8 con las de cocina, las altas y
+    las de repuesto) más una por mesa de buffet y una por barra (`numBarras`, lo que se
+    contesta; sin contestar, una si hay barra). No se fijan mesas por barra a mano.
+  - **"Rollo de mantel de papel (mesas de cocina)"**, 1, en las tres checklists.
+- **El formulario, con su sección del cóctel y por temas** ("lo de chupito de cristal
+  debería ir en una sección de cóctel... hay chupito de cristal, cuchara de porcelana,
+  añadir más y el campo de algo más que aclarar", el dueño). Detrás de "¿Hay cóctel?"
+  (si no es 0) va `coctelLleva`: chupitos en vaso de cristal (el `llevaEntrante` de
+  siempre), canapés en cuchara de porcelana con cuántos distintos (`llevaCucharasPorcelana`
+  + `numCucharasPorcelana`, nuevos; en la app casilla "Cucharas de porcelana" y su
+  número, y en la checklist "Cucharas de porcelana (canapés)" = gente × canapés + 10%,
+  en Vajilla / "Vajilla, Cubertería y Cristalería" en cumpleaños) y "Añadir más", una
+  lista de qué y cuántos por persona que al aplicar el envío se suma a `itemsManuales`
+  en esa categoría sin duplicar (`itemsDelEnvio`). El "¿algo más que aclarar?" es el de
+  cada pregunta. Sin cóctel, chupitos y cucharas se apagan.
+  - **Brindis, barriles y aguas pequeñas, con la barra** (`barraLleva`), no en lo
+    presupuestado entre la barbacoa y el jamonero. La paella se pregunta justo detrás
+    del menú y el café cierra lo que se come. Menú infantil, fuera de los rodajes.
+  - **Envíos y borradores de antes**: `respuestasAlDia()` pasa el chupito de
+    `entrante` a `coctelLleva` y lo de la barra de `extras` a `barraLleva`; lo usan
+    `aRespuestasDeLaApp`, `resumirEnvio`, `cambiosEntreRespuestas` y el formulario al
+    cargar unas respuestas. Un envío viejo carga lo mismo que cargaba.
+  - **En la app, "Entrante de chupito" pasa a "Chupitos de cristal"** ("quitar del
+    entrante lo de chupito para que no esté duplicado", el dueño): solo el texto de la
+    casilla, el campo sigue siendo `llevaEntrante`. El item de la checklist conserva su
+    nombre ("Vasos chupito cristal (entrante)"): es su identidad, y cambiarlo pide migrar
+    las marcas y cantidades de los eventos guardados.
+  - `conLista` admite su propio número (`listaClave`, `listaNumero`, `listaEjemplo`,
+    `listaSufijo`); los buffets siguen con `mesas`.
+- **Asistente, "Probar los proveedores" pone al día la lista de Ajustes** ("sigo sin
+  ver los proveedores de IA que agregué", el dueño). La lista de proveedores a elegir
+  sale de `disponibles`, lo que el Worker dice que tiene clave, y la app solo se
+  enteraba al recibir una respuesta. Ahora, al probar, pasa a ser la de los que
+  responden (`disponiblesDeLaPrueba`). Si siguen sin salir, es el Worker: o no está
+  pegado el código nuevo (`worker/pegar.js`) o la clave tiene otro nombre (los que
+  lee: `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `ZAI_API_KEY`, `MISTRAL_API_KEY`,
+  `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+  `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`, `COMPATIBLE_API_KEY` +
+  `COMPATIBLE_URL`). `…workers.dev/__estado` lo dice abierto en el navegador.
+- **El Resumen del modo carga, en el móvil una lista** ("Resumen sigue estando feo,
+  hazlo más premium", el dueño): por debajo de 640px la tabla de siete columnas
+  (`.resumen-tabla-wrap`) se esconde y sale `.resumen-lista`: una tarjeta por categoría
+  con su color y su subtotal, y una fila por producto con el nombre entero y, debajo,
+  los MISMOS seis datos que la tabla con su nombre (carga, vuelta, consumo, roturas,
+  coste ud., total), en tres columnas. En pantalla grande, la tabla.
+  - **Corregido después** ("has quitado lo de roturas y lo que había antes, fíjate
+    bien por qué lo quitas", el dueño): la primera versión enseñaba solo los datos que
+    había (las roturas, solo si las había), quitó el "Coste estimado" de la barra y
+    movió los paneles de calibrar al final. Vuelto todo a como estaba: la lista cambia
+    la forma, no lo que se ve. Prueba: los seis datos en cada producto, una rotura
+    apuntada a mano se ve, el coste estimado arriba y los paneles antes de las cifras.
+  - Fallo propio cazado con capturas: la barra de pestañas del modo carga se quedaba
+    cortada en el escritorio si se le restaba `--hueco-arriba` como a la hoja. Ahí el
+    que hace scroll es el panel (`.carga-modal`), no el fondo: va con `top: 0`.
+- **Cabeceras de categoría, todas del mismo alto** ("¿por qué una es más grande que
+  otra?", el dueño, con COCINA y MENAJE Y UTENSILIOS en el móvil): con ↑ ↓ ✎ en la
+  píldora, a un nombre largo no le cabía al lado y la píldora bajaba a su línea (71px
+  unas, 107 otras; 14 de 20 nombres a 390px). Por debajo de 560px ↑ ↓ ✎ van al pie de
+  la categoría (`.cat-pie-edicion`, con los mismos `aria-label`), la cuenta pasa a
+  insignia sobre el icono (sin flecha: a la derecha se comía 63px y a 360px "MOBILIARIO,
+  SALA Y DECORACIÓN" ya no cabía en una línea), y el nombre tiene sitio para dos líneas
+  siempre (`min-height: 2lh`).
+  En el modo carga y la hoja, lo mismo (`.cat-cabecera-nombre`). Por encima de 560px
+  caben al lado de cualquier nombre. Prueba: un solo alto por anchura, en la checklist
+  y en el modo carga, a 320/390/768/1280; y en el móvil, la insignia sobre el icono sin
+  pisar el nombre.
+- **Distribución: nada partido ni cortado** ("que no se corte nada o se ponga en 2
+  líneas", y la captura de "Mesas de los comensales" con "Redonda 2m" sola abajo).
+  Revisadas las tres apps a 320–1280 con un script que mide texto recortado, controles
+  en varias líneas y selectores con opciones sueltas. Arreglado: `SegmentedControl` mide
+  con un `ResizeObserver` si sus opciones caben en una fila y, si no, pone
+  `data-rejilla` → de dos en dos (impar: la última ocupa la fila); el nombre de categoría
+  no encoge (`flex: 1 0 auto`) y es la píldora ↑ ↓ ✎ la que baja; títulos de bloque con
+  la explicación debajo; el resumen de los plegables (`.cal-ratios-titulo em`) en su
+  línea en el móvil, con el " · " por CSS; la escaleta en trozos que no se parten; el
+  título del modo carga es el evento ("Modo carga" pasa al recuento); campos de una fila
+  alineados abajo (`.form-row { align-items: end }`); cabeceras de la tabla del resumen
+  sin partir; nombres de eventos guardados enteros, sin "…". Los paneles de color, en el
+  móvil, se meten en el margen de la tarjeta lo mismo que ocupan raya y relleno (a 320px
+  le quitaban a la fila de horas de logística el sitio de "08:00 – 20:00"), y llevan los
+  grises de apoyo un punto más fuertes (el tinte los dejaba en 4,3–4,4 sobre 4,5). La
+  sonda de contraste de app.test.mjs leía `color(srgb …)` (lo que da `color-mix`) como
+  rgb de 0 a 255 y daba contrastes falsos de 1,00: arreglada. Queda a 320px un nombre
+  de categoría en dos líneas ("MOBILIARIO, SALA Y DECORACIÓN"; publicado tenía tres).
+
+## Lo desduplicado (y lo que NO se unificó)
+
+- **`fecha.js`** — "hoy" estaba escrito de siete maneras. Ahora hay UNA, `hoyISO()`, del
+  calendario del dispositivo. **Unificarla destapó un fallo en producción todos los días
+  del año**: los avisos hacían `hoy.setHours(0,0,0,0)` y `toISOString()` — poner el reloj
+  a medianoche LOCAL y pasarlo a UTC da el día ANTERIOR en cualquier huso por delante de
+  Greenwich (España incluida). Arreglado, con prueba, y la batería se lanza también con
+  `TZ=Pacific/Auckland` para cazar esto de nuevo si vuelve.
+- **`texto.js`** — `sinTildes`/`limpiaTexto`/`claveDeTexto`. **No** se tocaron
+  `idDeApunte` ni `idDeNombreEvento`: ahí un carácter distinto es otro id y deja
+  huérfano lo guardado. La ñ se sigue perdiendo en las claves, por lo mismo.
+- **`almacen.js`** — los `try/catch` de `localStorage` en un sitio. Excepciones:
+  `formulario/codigo.js` e `instalar.js` reciben el almacén COMO PARÁMETRO.
+- **CSS, repaso "premium"** (2026-10-04): `.form-input` estaba definido dos veces (el del
+  formulario, más alto y de otro fondo, pisaba al de la checklist y las cajas de texto
+  no medían lo mismo que los desplegables de al lado): ahora UNA regla para
+  `.form-input, .form-select`. Fuera también un `.btn:active` repetido. Con la letra
+  a 16px, los mínimos de la fila de "Añadir item" van en rem: si no, la categoría
+  ("Otros (añadidos manualmente)") salía cortada — lo cazó la prueba "Nada se corta".
+  Dos pruebas lo vigilan (`calculos.test.mjs`): ningún selector vuelve a poner una
+  propiedad que ya puso otro bloque suyo en el mismo `@media`, y ningún `font-size` en
+  rem fuera de la escala (salvo los diminutos, por debajo de `--fs-3xs`). Las reglas
+  partidas que quedan (las animaciones de `.btn`, `.header-icon`, el asistente) son a
+  propósito: juntarlas cambia el orden de la cascada.
+- **Iconos del fondo del formulario** (`FondoIconos.jsx`, `SITIOS`): fuera de la franja
+  del 21–79% del ancho, que es donde está la columna en un ordenador; los marcados
+  `conMargen` se esconden hasta 900px porque en el móvil caían detrás del título y de
+  la barra. Una prueba mide que ninguno pise título, barra ni columna.
+- **Limpiar el calendario** (`calendario/limpieza.js` la cuenta, `Limpiar.jsx` la
+  pantalla, montado en los dos calendarios): repetidos el mismo día (mismo título sin
+  la gente: "Produ X" / "Produ X 73 PAX", o uno dentro del otro: "BODA X EN LA FINCA?"
+  / "Boda X" — `mismoTitulo` de repetidos.js, el mismo criterio que el archivo), "Posible
+  X" ya confirmado como "X", el mismo evento con un mes justo de diferencia y el mismo
+  evento en días seguidos (sin marcar ninguno; ni producciones, ni lo que tiene "hasta",
+  ni rachas de 3+ días —un evento largo apuntado día a día—, ni dos con checklist o
+  personal: los montó alguien a propósito). En este último sobra el del mes de antes si es
+  principio de mes y el de después si es final (así se equivocó la importación); a
+  mitad de mes no marca ninguno. Solo eventos (dos camiones el mismo día son dos), y
+  nunca marca uno con checklist o personal. Borrar es escribir la lista sin ellos, como
+  el "Borrar" del editor: no pide permisos nuevos. El banco lo prueba con `?sucio=1`.
+  Lo que no ve (tareas, recogidas, días cerrados en el día malo) se marca pegando una
+  lista JSON de ids o de `{fecha, titulo}` ("Pegar una lista de lo que sobra",
+  `grupoDeLista`): sale como un grupo más, arriba, todo marcado salvo lo que tiene
+  checklist o personal, y dice cuántos de la lista ya no estaban.
+- **Borrar un apunte no borra su checklist, pero la quita del formulario**: el formulario
+  lista el ARCHIVO de checklists (`publico/{código}`, lo publica la app), no el
+  calendario, y cada repetido había dejado su checklist en blanco (`sinConfigurar`).
+  `sinApunteEnElCalendario` (envios.js): una en blanco que ningún apunte nombra (ni
+  `evento` ni título) deja de publicarse; en "Eventos guardados" sale en gris "sin
+  apunte en el calendario" para borrarla a mano si sobra. Las que tienen datos no se
+  tocan. La app escucha el calendario en vivo (`suscribirCalendarioNube`) y republica;
+  sin calendario leído no se quita nada. Ojo: el formulario solo se actualiza cuando la
+  app de la checklist está abierta en algún sitio (es quien publica).
+- **Eventos repetidos en el archivo** (`repetidos.js`): salían así — el calendario crea
+  la checklist en blanco con el título de la hoja, la oficina no la reconoce, manda "Es
+  un evento nuevo" con el nombre a su manera y al aplicarlo se creaba otro. Mismo
+  evento = mismo tipo, ±1 día y mismo título (`nucleoDeTitulo`, en `texto.js`, el mismo
+  criterio que el limpiador del calendario; uno dentro del otro vale si el corto tiene
+  2+ palabras). Tres usos: al aplicar un envío nuevo se ofrece el parecido ("Aplicar a
+  ese" / "Crear uno nuevo", `alternativa` en `Dialogo.jsx`); la checklist en blanco con
+  gemela con datos EL MISMO DÍA no se publica al formulario (a ±1 día sí: no se sabe la
+  fecha buena); y en "Eventos guardados" sale "¿repetido?" para borrar a mano. Nada se
+  borra solo.
+- **El icono instalado del formulario lleva el código** ("Falta el enlace" cada vez en
+  Android): el icono abre el `start_url` del manifiesto, que iba sin código, y la app
+  dependía del almacén del navegador — que no es el suyo si el enlace se abre desde
+  WhatsApp en otro navegador o el móvil limpia datos. Ahora `formulario/main.jsx` pide
+  `manifest.webmanifest?enviar=<código>` y `public/sw.js` (`manifiestoConCodigo`) sirve
+  el de siempre con el código en `start_url` y el mismo `id` (el que tenía por defecto,
+  su `start_url` sin código, **escrito entero**: con otro, el móvil no actualizaría la
+  app instalada). La primera visita aún no la controla el service worker: ahí se queda
+  como antes. Una app ya instalada se corrige sola la próxima vez que se abra con el
+  código (Chrome revisa el manifiesto al abrirla). Prueba: lo que el navegador entiende
+  como manifiesto (CDP `Page.getAppManifest`) y su identidad ya resuelta
+  (`Page.getAppId`).
+  - **Fallo que costó un día (6/10):** el `id` iba como `"./index.html"`. Un `id`
+    relativo se resuelve contra la RAÍZ del dominio, no contra la carpeta del
+    manifiesto, así que daba `/index.html`: el mismo que la checklist (`../index.html`
+    en `checklist/`, `./index.html` en la raíz, a propósito). El ordenador con la
+    checklist instalada vio "su" manifiesto con otro nombre y otro icono y ofreció
+    "Actualización de aplicación disponible": la checklist acabó llamándose "Formulario
+    Gula" y con su icono. Para comparar ids, `Page.getAppId`; nunca el texto del `id`.
+  - **Repasado en producción el 11/10** (el dueño volvió a verlo: dos "Formulario
+    Gula.app" en su Mac). Con `Page.getAppId` sobre la app publicada: checklist =
+    `r2fod.github.io/index.html`; calendario y formulario (con y sin código), cada uno
+    la suya en su carpeta. La otra app del dueño en el mismo dominio (`gula-logistics`)
+    no pide esa identidad. El código está bien desde #260: lo que queda es la app ya
+    instalada que se renombró aquel día, y se arregla desde ella — abrir la checklist,
+    aceptar "Actualización de aplicación disponible" (ahora vuelve a "Checklist Gula")
+    o desinstalarla y reinstalarla. La identidad de la checklist es la raíz del dominio
+    a propósito de no cambiar la ya instalada: no moverla sin avisar, dejaría huérfanas
+    las instaladas.
+- **Formulario: otro evento no arrastra el borrador del anterior** (26/10, "ya no hace
+  las preguntas correctas según el tipo de evento", el dueño). Las preguntas por tipo
+  (`soloEn`) y la lista que publica la app (`tipo: e.evento`) estaban bien —comprobado
+  recorriendo el formulario entero con cada tipo y con eventos de la lista simulados—.
+  Lo que fallaba era el borrador: "Es un evento nuevo" no limpiaba las respuestas y salía
+  con el tipo del evento anterior ya marcado (una boda), y elegir otro evento de la lista
+  mezclaba sus datos con los del borrador (una producción con el cóctel, las sillas y la
+  gente de la boda de antes, que además se mandaban con ella). Ahora `respuestasAlElegir`
+  (preguntas.js) solo conserva el borrador si es el MISMO evento, "Es un evento nuevo"
+  empieza de cero, y los dos limpian `envioId` (no se puede "corregir" un envío de otro
+  evento). Sigue igual que al abrir el formulario se retome el borrador donde se dejó.
+  Producción: las 28 preguntas que le salen están puestas a propósito para rodaje
+  (flores "todos los eventos" en #82, las sillas del rodaje en #97, carpas para todos el
+  5/9, y buffets, café y manteles mueven la checklist de producción). Solo se quita una
+  si el dueño dice cuál.
+- **Simetría: lo que va en la misma fila, del mismo alto** (14/10, captura del dueño:
+  "CÓCTEL / APERITIVO" partía en dos líneas y su tarjeta quedaba más alta y escalonada
+  junto a "COPAS"). Lo causó el `align-items: end` de `.form-row` (#258, para alinear
+  campos cuando una etiqueta parte): con tarjetas en la fila hace lo contrario. Ahora
+  `.form-row:has(> .range-group)` estira y el deslizador va abajo en las dos. En el
+  calendario, "Mes / Año / Equipo" y "+ Apunte" pasan a 44px los dos. Revisadas las
+  tres apps (checklist, modo carga con sus cuatro pestañas, calendario y las 25
+  preguntas del formulario) a 360–1920 con un script que mide, en cada fila de cajas
+  de un flex/grid, si alguna es más alta que sus vecinas: quedan cero.
+- **Formulario: la auditoría E3 de PLAN_MEJORAS (26/10)**, los seis que seguían vivos
+  (el E3.1 era el borrador de arriba):
+  - **Adjunto a medio preparar**: `CampoArchivo` avisa con `onCargando` y "Enviar" se
+    queda en "Preparando el archivo..." mientras haya alguno. Antes se podía mandar en
+    ese rato y el envío salía sin la foto.
+  - **Corregir un envío** solo manda uno nuevo si de verdad ya no se puede corregir
+    (`noSePuedeCorregir`: `permission-denied` = revisado, `not-found` = borrado). Un corte
+    de red salía igual: envío duplicado y un "logística ya lo revisó" falso. Ahora es
+    error y se reintenta el mismo.
+  - **El nombre de un evento que ya existe no se edita** (con su nota: "díselo a
+    logística"). La app lo busca por ese nombre y lo tecleado se descartaba en silencio,
+    mientras el sitio, en la misma pantalla, sí se aplicaba.
+  - **`buscarEnvioPorNombre` mira también la fecha**: la "Comida de empresa" de cada año
+    salía como ya mandada por el envío del año anterior. Sin fecha por algún lado, solo
+    el nombre, como antes.
+  - **El código en mayúsculas** (`codigoDeTexto`, `leerGuardado`, `?enviar=`): se hacen
+    siempre en mayúsculas y la nube distingue; tecleado a mano en minúsculas salía "este
+    enlace ya no vale".
+  - **"Deshacer" del "No lo sé"** sale de verdad, en la pantalla siguiente y diciendo de
+    qué pregunta: el efecto que cambia de pantalla lo borraba al llegar a ella.
+- **Pruebas del calendario: esperar a `.cal-mes`, no a `.cal-celda`.** En el mes de hoy
+  las semanas pasadas van plegadas; cuando la primera ya ha pasado (5/10/2026, el mes
+  empieza en jueves) su primera casilla no se ve y `waitForSelector(".cal-celda")` no
+  acababa nunca: la batería se caía según el día.
+- **"¿De qué evento son los datos?" cabe sin scroll** (lo pidió el dueño): la pantalla
+  (`.form-pantalla.es-elegir`) mide `100dvh` y solo encoge la lista
+  (`.form-lista-eventos`, con su propio scroll); logo, título, buscador y "Es un evento
+  nuevo" se quedan a la vista. Lo que sigue por debajo/encima se difumina con
+  `mask-image` (`hay-mas-abajo`/`hay-mas-arriba`, los pone `ListaQueDesliza` en
+  `Formulario.jsx`): una sombra pintada con el color del fondo se veía como una franja,
+  porque el fondo del formulario lleva degradados. Prueba: tarjetas de mentira metidas en
+  la lista (la batería no tiene nube), la página no se desliza y el botón se ve.
+- **Las ✕ de cerrar no se van con el scroll** (lo pidió el dueño): la Vista previa usa
+  `overflow: clip` en `.preview-modal` (con `hidden` la cabecera sticky no se pegaba);
+  en Modo carga la cabecera se va a propósito (es alta) y, al salir de la vista
+  (IntersectionObserver), sale otra ✕ en la tira fija — por eso en el móvil
+  Prep./Salida/Vuelta/Resumen van sin icono. En el calendario, el título del día con su
+  ✕ y Cancelar/Guardar del editor son sticky. Prueba: con todo al final, alguna ✕ a la
+  vista y tocable. Los espacios
+  entre bloques los pone el `gap` del contenedor (`.config-card`, `.cal-ajustes`), no
+  un `margin` en cada hijo: los dos sumados daban huecos dobles.
+- Fallo que costó una tarde: `export { aISO } from "…"` reexporta pero **no define** el
+  nombre en el módulo — las funciones que lo usaban reventaban al ejecutarse. El build no
+  lo caza. Tiene prueba.
+
+
+## Registro de entradas — HECHO (anteriores a la tanda de Estado de HOY)
+
+**Móvil/tableta: la configuración ya no sale repetida debajo de la checklist — HECHO**:
+- **Motivo**: en una columna (≤1180px) la columna de configuración vivía debajo de la
+  checklist y los atajos de arriba la subían al abrirlos. Al bajar hasta la lista se
+  cerraba y volvía abajo, así que al acabar la checklist se veía otra vez entera: parecía
+  repetida ("quiero quitar el de abajo y que solo se vea si le das a configurar evento o
+  eventos guardados sin duplicar código", el dueño).
+- **Solución** (solo CSS + quitar lo que sobraba, sin duplicar marcado):
+  - `index.css`: sin atajo abierto, `.config-sidebar` va `display: none` en una columna.
+    "Configurar el evento" trae `#cfg-evento` y encima "Añadir varios items pegando
+    texto"; "Eventos guardados" trae `#cfg-guardados` y debajo las Plantillas
+    (`#cfg-plantillas`, id nuevo). Plantillas y "Añadir varios items" no tenían atajo y se
+    habrían quedado sin sitio: el dueño eligió dónde van.
+  - `App.jsx`: fuera el botón "Volver a la checklist" (y `irA`, `ArrowUp`), que solo
+    servía para volver desde abajo. El cierre al bajar hasta la lista, sin salto, sigue igual.
+  - En dos columnas (>1180px) no cambia nada.
+  - Pruebas ("Orden en el móvil"): sin atajo no se ve nada de la configuración, cada atajo
+    trae lo suyo y su compañera en ese orden, y al final de la página no reaparece. "Resumen
+    del evento" abre el atajo antes de medir las cajas de texto.
+
+**Ratios de bebida: suelo automático del sector y aviso de cambio brusco — HECHO**:
+- **Motivo**: Al no registrarse de forma recurrente las vueltas de bebida en los eventos terminados, los pocos eventos con devolución computada skewan el ratio de consumo hacia abajo. Como la calibración automática necesita solo 3 eventos para proponer un factor (ej. 0.4 o 0.5), aplicar ese factor arriesga cargar significativamente menos bebida de la necesaria y obligaba a revisar o cambiar los ratios a mano.
+- **Solución implementada**:
+  - `src/asistente/sector.js`:
+    - Centralizada `comprobarBebidaSector(bebida, factor, { esVerano })` con bandas de referencia del sector (vino, cerveza, cava y refresco).
+    - Definidos los suelos de seguridad del sector (`SUELO_SECTOR_BEBIDA` y `factorMinimoSector`): vino 0.46 (0.33 bot/pax), cerveza 0.50 (1.5 tercios/pax), cava 0.63 (0.125 bot/pax), refresco 0.45 (2.0 uds/pax).
+    - Función `comprobarCambioBrusco(actual, nuevo, umbralPct = 15)` que detecta saltos o bajadas abruptas en los ratios.
+  - `src/calibracion.js`: `calibracionBebida` aplica automáticamente el suelo mínimo del sector (`Math.max(suelo, factorCalculado)`). Una calibración nunca bajará del umbral de seguridad del mercado por muy bajas que sean las vueltas, marcando `ajustadoPorSuelo: true`.
+  - `src/components/PanelBebida.jsx`:
+    - Insignia de `🛡️ suelo sector` cuando el factor medido está acotado por el mínimo de seguridad.
+    - Alerta de `⚡ X% salto` cuando la propuesta o medición supone una variación brusca (>= 15%) respecto al factor configurado.
+    - Resaltado de campos activos bajo el sector (`< sector`).
+    - Tooltip preventivo en los botones de aplicar factor medido.
+  - `src/asistente/revision.js`: `oportunidadesNegocio` detecta mediciones bajo el mínimo del sector y advierte de vueltas incompletas o variaciones bruscas. `revisarEvento` genera aviso de rareza ("raro") en eventos configurados con ratios bajo el sector.
+  - Pruebas unitarias añadidas y verdes en `calculos.test.mjs` y `asistente.test.mjs`.
+
+**Formulario: buffets configuran mesas de verdad, y reorden por bloques — HECHO
+(PR #184, tras #182/#183 ya fusionados)**:
+
+- **Buffets**: era texto libre a notas, sin mover ni un número de la checklist.
+  Ahora es marcado múltiple (quesos, dulce/candy bar, ibéricos, croquetas, fruta,
+  otro) con su nº de mesas cada uno; el total (`numMesasBuffet`) llega a la
+  checklist como línea nueva "Mesas de buffet" en boda/cumpleaños (que antes no
+  existía en absoluto) y en producción sube el mínimo de siempre por pax sin
+  bajarlo nunca. La línea de notas se sigue viendo igual que antes
+  (`resumirRespuesta()` la reconstruye).
+- **Reorden del formulario**: las ~44 preguntas de `PREGUNTAS`
+  (`src/formulario/preguntas.js`) se agruparon en 11 bloques temáticos
+  contiguos — antes cocina/equipamiento y mobiliario de exterior estaban partidos
+  en dos sitios distintos de la lista. Confirmado antes de tocar nada que el orden
+  es 100% independiente de cómo llega el dato a la checklist
+  (`aRespuestasDeLaApp()` lee por `id`, `Formulario.jsx` navega el array sin
+  ningún índice fijo) — solo hace falta respetar las dependencias `si:`
+  (tamanoPaella/cuantasPaellas tras menu, entrantePersonas tras entrante,
+  estiloPlatoPostre tras estiloPlato), que se mantienen.
+- Auditoría completa de integración formulario↔checklist a petición del dueño
+  ("que se auto-configure"): comparados los 92 campos que la app puede configurar
+  contra lo que ya rellena el formulario. Todo lo que falta está excluido a
+  propósito (personal, tarifas, logística — decisiones que la oficina no puede
+  saber) o ya se auto-deriva de un dato ya recogido (la temporada verano/invierno
+  sale sola de la fecha). El dueño confirmó que no hace falta subir de nivel nada
+  más por ahora.
+- **Iconos animados del formulario — HECHO**: `FondoIconos.jsx`
+  (`ICONOS_POR_PREGUNTA`) rellenado para las ~26 preguntas que caían en el icono
+  genérico por defecto (carpas, parabanes, buffets, alergias...), y quitadas las
+  dos entradas muertas (`sombra`, `carpasAlquiler`, preguntas que ya no existen).
+  La animación en sí (iconos flotando de fondo, cambian con la pregunta) ya
+  existía y ya es CSS puro y respeta `prefers-reduced-motion` — no hizo falta
+  construir nada nuevo, solo completar el mapa. Verificado con capturas en
+  `npm run dev`.
+- **Iconos en primer plano (título y opciones) — HECHO**: el mismo juego de
+  iconos por pregunta de `FondoIconos.jsx` se reutiliza ahora también delante:
+  `iconoDePregunta()` pone uno fijo junto al `<h1>` de cada pregunta, y
+  `iconoDeOpcion()` uno por cada botón de opción/casilla (rotando el juego si
+  hay más opciones que iconos) — nada nuevo que mantener, un solo mapa de datos
+  para fondo y primer plano. De paso se corrigió un desajuste: en `tipo` el
+  orden de iconos no coincidía con `TIPOS_EVENTO` (Cake y Briefcase estaban
+  cambiados), invisible mientras solo era fondo pero que se notaría de golpe en
+  un botón. Verificado con capturas en claro y oscuro.
+- **"El entrante para compartir, ¿cada cuántas?" ya no se queda solo en 3 o 4 —
+  HECHO**: tercera opción "Otro número" con su propio `conNumero`, mismo patrón
+  que "¿Cuántas paellas?". El número va a `entrantePersonasOtras` y
+  `aRespuestasDeLaApp()` lo usa en vez del valor fijo cuando se elige "otras".
+
+**Dos bugs reales encontrados por captura de pantalla del dueño — HECHO**:
+- **Calendario, campo "Nombre" de quien trabaja invisible en desktop**:
+  `.cal-asignado` (grid, `calendario.css`) daba a "horario" una columna `auto`
+  sin tope, que se comía todo su ancho de contenido ANTES de que "nombre" (1fr)
+  viera un solo píxel — con el modal a su ancho normal (~490px de fila),
+  rol+horario+quitar ya sumaban más que la fila entera, y el campo del nombre
+  se quedaba en 0px. Arreglado dándole a "horario" `minmax(0, min-content)`
+  (se ofrece encogido, envolviendo sus campos en dos líneas, que es lo que ya
+  sabía hacer) y a "nombre" un suelo de verdad (`minmax(140px, 1fr)`).
+- **Asistente, el selector de proveedores se reseteaba a solo Gemini**:
+  `disponibles` (lo que el Worker dice que tiene configurado) solo vivía en
+  estado de React, sin guardarse — a diferencia de la URL o el proveedor
+  elegido, que sí se guardan. Cada apertura del Asistente lo perdía hasta la
+  siguiente pregunta. Arreglado guardándolo con `leerJSON`/`guardarJSON`
+  (`gula_asistente_disponibles`), igual que el resto de ajustes.
+
+**Calendario, dos apuntes iguales el mismo día ahora se distinguen — HECHO**:
+pedido por el dueño ("dos camiones Covey" que se veían idénticos). Nueva
+`numeraRepetidos(lista)` en `apuntes.js`: numera SOLO los apuntes de un día que
+comparten título tal cual ("Camión Covey 1" / "Camión Covey 2"); un día sin
+repetidos no se toca. Se usa tanto en el chip del mes como en el panel del día.
+
+**Formulario, icono también en la pantalla de "qué evento es" — HECHO**: la
+pantalla de elegir evento (`paso === -1`) tenía su propio `<h1>`/botones, fuera
+del recorrido normal de preguntas, así que se había quedado sin el icono de
+título/opción de la ronda anterior. Título con `iconoDePregunta("elegir")`, y
+cada evento de la lista con el icono de su tipo (`iconoDeOpcion("tipo", ...)`,
+buscando el índice en `TIPOS_EVENTO`) — mismo Heart/Church/Briefcase/Cake/
+Clapperboard que ya se usa en la pregunta "tipo".
+
+**Buffets, "Otro" admite varios distintos con su propio nombre — HECHO**: antes
+"Otro" en la pregunta de buffets era una casilla más con un número, sin decir
+QUÉ era (había que aclararlo en el comentario libre). Ahora abre una lista
+(`conLista`/`campoLista`, nuevo en `preguntas.js` y `Formulario.jsx`): cada fila
+tiene su nombre ("gildas", "rincón de gin-tonics"...) y sus propias mesas,
+sumadas al total de `numMesasBuffet` igual que el resto. La nota del evento sale
+como "gildas (1), rincón de gin-tonics (2)" en vez de un número suelto.
+
+**Plato de postre: azul y naranja — HECHO**: pedido explícito, colores reales
+que antes solo se podían meter a mano en "Otro". Dos opciones más en
+`estiloPlatoPostre`, mismo mecanismo que las demás.
+
+**Iconos del formulario, también animados en primer plano — HECHO**: el icono
+del título y el de cada opción entran con un "pop" (escala + giro leve,
+`form-icono-entra`, 0.4s), con un pelín de escalonado entre opciones para que
+no salten todas a la vez. Respeta `prefers-reduced-motion`. El fondo flotante
+ya estaba animado; esto era lo que faltaba en primer plano.
+
+**Service worker: gula-v7 → gula-v8, sin cambiar iconos**: un dueño con la app
+instalada desde antes del arreglo de distancia (#173/v7) seguía viendo el
+icono viejo tras desinstalar y reinstalar el acceso directo. Medido píxel a
+píxel: los tres iconos (192, 512, maskable) ya tenían el mismo hueco — el
+problema era la caché del origen, que un acceso directo no toca. Subir la
+versión fuerza un purgado más para quien se haya quedado atascado.
+
+**Cajas de madera para alturas del buffet: de "—" fijo a un número real —
+HECHO**: iba siempre a ojo, hubiera buffet o no. Ahora con buffet calcula de
+verdad (`alturasBuffet()` en `calculos.js`): mínimo 2, y nunca más de 6 —
+en el almacén hay 4 de madera y 2 de plástico, así que no puede pedir más de
+lo que hay. Sin buffet se queda en "—" como siempre. En boda/comunión/
+corporativo y en producción (cumpleaños no tenía esta línea).
+
+**Hielo: se puede decir que no hace falta — HECHO**: antes se cargaba siempre,
+sin preguntar (kilos, bolsas y taxis enteros de más en un sitio que ya lo da,
+o en un evento que no lo necesita). Nueva pregunta "¿Llevamos hielo?" tras
+congelador; con "No hace falta" (`llevaHielo: false`), `calcBebidas()` no
+calcula nada y la línea "Hielo" se apaga en checklist (boda/comunión/
+corporativo, cumpleaños y producción, cada uno con su propia fórmula).
+
+**Elegir evento: distinguir los que ya se mandaron — HECHO**: en la pantalla de
+elegir evento, los que ya se enviaron desde este móvil se marcan con borde/fondo
+verde y un ✓ (mismo criterio que ya usaba el aviso "Ya mandaste datos de..." del
+repaso). Antes cada pantalla comparaba el nombre a su manera con el mismo código
+repetido dos veces; ahora ambas llaman a `buscarEnvioPorNombre()` (`mios.js`).
+De paso, aclarado: la lista de "Ver lo que he mandado" vive en el propio
+navegador (localStorage) — si se borran los datos del sitio (recomendado antes
+para forzar el icono nuevo) se pierde esa lista cómoda, aunque lo mandado sigue
+a salvo en la nube. Y confirmado que reenviar el mismo evento NO duplica: cada
+envío es un documento nuevo en `envios/`, y el aviso de "ya mandaste esto" es
+un recordatorio, no un bloqueo — mandar una corrección aposta es un caso válido.
+
+**Excepciones de mesa: de texto libre a casillas con su número de mesas —
+HECHO**: "cubiertos de pescado en la mesa 4, cristalería aparte en la 7..." se
+escribía a mano y se leía distinto cada vez. Ahora es una pregunta `marcar`
+(mismo patrón que buffets: doble tenedor, doble cuchillo, cristalería aparte,
+menú infantil, otro — cada una con "Cantidad en mesa"), y la línea de notas
+del evento se reconstruye con `resumirRespuesta()` igual que ya hace buffets,
+así que se lee siempre igual: "Doble tenedor (3), Cristalería aparte (2)". No
+toca el cálculo agregado por pax que ya existe (cubiertos/copas totales), lo
+complementa — sigue siendo una excepción sobre el aviso, no un editor mesa a
+mesa.
+
+**Menú: jamonero movido a "extras", "dos platos principales" aclarado —
+HECHO**: dos hallazgos revisando el formulario a fondo, a petición del dueño.
+(1) "Jamonero" vivía en "¿Qué lleva el menú?", junto a la paella, pero no es
+comida del menú — es un servicio que se presupuesta, como el desayuno, con
+quien además comparte fórmula (`platosPostreExtra` suma jamonero + tarta +
+desayuno en `checklist-generadores.js`). Movido a "¿Está presupuestado algo
+de esto?", junto al desayuno. De paso corregido un efecto secundario real:
+como la lectura de jamonero antes vivía FUERA del reparto boda/rodaje, un
+envío de producción sobreescribía `llevaJamonero` a `false` siempre —
+aunque se hubiera puesto a mano en la app — porque la opción no se ofrecía
+ahí (`soloEn` la excluye) y `marcado()` daba `false` igualmente. Ahora, al
+vivir dentro del bloque de "extras" (que ya no se procesa para producción),
+un envío de rodaje simplemente no lo toca, como el resto del formulario.
+(2) "Dos platos principales" dobla cubiertos, copas Y platos en toda la
+checklist (es el mismo interruptor "Doble servicio" de la app: "dobla
+cubierto, copa y plato") — para cuando se sirven los DOS platos a cada
+invitado, uno detrás de otro. El texto no lo dejaba claro y podía
+confundirse con un menú que simplemente deja elegir uno de los dos (que no
+dobla nada). Aclarado con nota en la pregunta y texto de la opción más
+explícito ("se sirven los dos"); el valor guardado (`dosPlatos`) no cambió.
+
+**Plato de postre: añadida "Relieve blanco" — HECHO**: ya existía en el plato
+principal (`estiloPlato`) pero faltaba en el de postre, para cuando el postre
+se sirve en el mismo plato grande en vez de uno pequeño aparte. "Verde" ya
+estaba en los dos desde antes. Sin tocar ningún valor existente (serían el
+label literal de la línea de checklist — un rename sin migración según
+CLAUDE.md), solo se añadió la opción nueva.
+
+**"¿Llevamos hielo?" solo si NO se lleva congelador — HECHO**: no tiene
+sentido llevar congelador y no querer hielo, así que la pregunta (justo
+después de "¿Y congelador?") ahora solo aparece cuando se contesta "No
+lleva" ahí. Con congelador (mediano o grande) se salta directo a la
+siguiente pregunta y se asume que sí hace falta hielo, como siempre.
+
+**Formulario reordenado en 11 bloques temáticos — HECHO**: repaso a fondo
+pedido por el dueño tras varias rondas añadiendo preguntas cerca de lo que
+había en cada momento, no según un mapa pensado de principio a fin. Solo
+cambia el ORDEN del array `PREGUNTAS` — ningún id/valor/campoNumero/soloEn/
+si/conNumero/conCampos/conArchivo se toca, así que es seguro por diseño
+(`aRespuestasDeLaApp()` lee por id, `Formulario.jsx` navega el array
+dinámicamente, ninguno de los dos depende de la posición). La mayoría del
+orden ya coincidía con el mapa de 11 bloques (sitio y mobiliario exterior,
+barra, menú, cocina, alquileres, excepciones, mantelería, recogidas,
+impresión de producción, cierre) de rondas anteriores; solo hacía falta
+mover "¿Hay que imprimir el menú?"/"¿etiquetas?" (solo producción) del
+hueco justo después de "¿Algo distinto de lo normal?" al final, junto a
+"comprar"/"alergias", que es donde de verdad encaja (justo antes del
+cierre, no en medio del bloque de mobiliario/cocina). Verificado con
+`npm run test:rapido` en verde SIN tocar `sincronizacion.test.mjs` (la
+prueba de que el orden no afecta al dato) y recorrido visual completo de
+los tres tipos de evento con Playwright.
+
+**Elegir evento: distinguir configurados de sin configurar — HECHO**: el
+evento ya llevaba la señal exacta que hacía falta —`sinConfigurar`
+(App.jsx): la pone el calendario al crear un evento en blanco (solo tipo/
+día/sitio/pax) y se quita sola al aplicar un formulario, o a mano con
+"Ya está configurado". `resumirParaOficina()` (envios.js) ahora también
+publica `configurado: !sinConfigurar` en la lista corta que ve el
+formulario. En "¿De qué evento son los datos?": los sin configurar salen
+primero (son los que de verdad hace falta rellenar) y los ya configurados
+al final, con un badge neutro "Ya configurado" — distinto del check verde
+de "ya te mandé algo" (PR #195), que es otra señal aparte y puede darse a
+la vez. Al vivir en el documento del evento en Firestore (no en
+localStorage de un móvil), sale igual para cualquiera que abra el enlace
+del formulario, sin depender de qué móvil lo mire.
+
+**Entrante: opción "Individual" — HECHO**: la pregunta "El entrante para
+compartir, ¿cada cuántas personas?" solo tenía 3, 4 u "otro número" —
+para un entrante que en realidad es individual (un plato por persona,
+no compartido) había que marcar "compartir" y escribir "1" a mano en
+"otro número", que no tiene sentido llamarlo "compartir". Añadida
+"Individual (un plato por persona)" como opción de serie (`valor: 1`),
+delante de las de 3/4 — usa el mismo cálculo que ya existía
+(`personasPorPlatoEntrante = 1` da exactamente un plato extra por
+persona), sin tocar la fórmula.
+
+**Cristalería: pregunta independiente de la barra libre — HECHO**: "Cristalería
+aparte" (en excepciones de mesa) confundía al dueño con otra cosa; lo que hacía falta
+era una pregunta nueva, "¿Llevamos cristalería?" (`preguntas.js`, tras "copas"),
+que a propósito NO depende de cóctel/copas (`si:` ninguno) — puede que no haya barra
+libre y aun así se sirva vino/agua/cava con la comida. `calcCristaleria()`
+(`calculos.js`) admite ahora `llevaCristaleria` (por defecto `true`, para no
+tocar ningún evento ya guardado); a `false` devuelve todo a cero y las líneas de
+"Vasos de agua", "Copas de vino" y "Copas de cava" desaparecen de la checklist
+(`opt(...)`, boda y cumpleaños — producción no lleva cristalería). Cableado igual
+que "Jarras de cristal": estado propio en `App.jsx` (con su casilla manual en
+Vajilla/Cristalería, por si hay que corregirlo a mano) y `getEstadoActual()`,
+para que lo que conteste el formulario se vea también en la checklist real, no
+solo en la calibración del asistente.
+
+**Buffets: desmarcar todos ahora baja las mesas a 0 — HECHO**: bug real, encontrado
+al auditar la checklist a fondo. `aRespuestasDeLaApp()` solo escribía
+`numMesasBuffet` cuando `r.buffets.length > 0` — si un evento ya tenía mesas de un
+envío anterior y llegaba una CORRECCIÓN desmarcando todos los buffets, `r.buffets`
+llegaba como `[]` (Formulario.jsx inicializa así una pantalla de "marcar" que se
+pasó sin marcar nada) pero el `if` no entraba, y `numMesasBuffet` se quedaba con el
+número viejo — la checklist seguía enseñando mesas de buffet que ya no había.
+Arreglado distinguiendo "nunca se contestó" (`r.buffets === undefined`, no se toca,
+igual que siempre) de "se contestó y no se marcó ninguno" (`Array.isArray(r.buffets)`
+aunque esté vacío → `numMesasBuffet = 0` explícito). Un test afirmaba a propósito el
+comportamiento viejo ("no se toca" con `buffets: []`); corregido para esperar `0`.
+
+**Mesa alta: por nº de barras, no una fórmula fija por pax — HECHO**: segundo punto
+de la misma tarea de buffets. Antes `mesasAltas = hayBarra ? Math.max(2, pax/15) :
+0` (solo en boda/comunión/corporativo, ni cumpleaños ni producción llevan "Mesa
+alta"). Ahora hay una pregunta "¿Cuántas barras se van a montar?" (tras
+"cristalería", solo si cóctel o copas tienen horas contestadas — sin barra no tiene
+sentido preguntarlo) y `calcMesasAltas(pax, numBarras)` en `calculos.js`: 2 mesas por
+barra, 4 si son 100 pax o más; sin contestar (`numBarras` a 0/undefined) cae sola al
+cálculo viejo por pax, así que un evento guardado antes de esto sigue dando el mismo
+número de siempre. Cableado en `App.jsx` igual que "Nº de mesas de buffet": estado
+propio con su casilla manual (solo boda/comunión/corporativo, gastado el mismo
+criterio que "Jarras de cristal"), y "pudiendo modificarlas" ya lo cubre el mecanismo
+genérico de `overridesManuales` que tiene toda la checklist — no hacía falta nada
+nuevo para eso.
+
+**Elegir evento: separar visualmente los configurados de los que no — HECHO**: el
+badge "Ya configurado" (PR #201) no era suficiente para el dueño — pidió primero
+colorear la tarjeta, y viendo la lista real, separar los dos grupos del todo. Ahora
+la tarjeta entera de un evento configurado lleva un fondo gris neutro (`.es-configurado`
+en `index.css`, a juego con el badge), y si además ya se le mandó algo desde este
+móvil manda el verde de `.es-enviado` (regla combinada, es la señal más útil ahora
+mismo). Y como `lista` ya venía ordenada (sin configurar primero — PR #201), se
+localiza dónde empieza el bloque de configurados (`primerConfiguradoIdx`) y se mete
+un separador con su rótulo justo ahí (`Formulario.jsx`, envolviendo cada fila en un
+`Fragment` con key para poder intercalarlo); si no hay mezcla de los dos grupos, no
+sale separador. Verificado con una maqueta estática cargando el CSS real compilado
+(la lista poblada de "próximos eventos" no se puede simular en este entorno — mismo
+límite ya documentado en PR #195/#201, Firestore no es alcanzable offline).
+
+**Elegir evento: el gris de "ya configurado" se veía casi invisible — HECHO**: el
+dueño mandó una captura real de producción — el 6% de opacidad de `.es-configurado`
+no se distinguía del resto en el tema oscuro, solo se notaba por la etiqueta y el
+separador, no por color. Subido a 16% de opacidad y borde `--border-color-strong`
+(mismo gris neutro, más fuerte); sigue sin competir con el verde de `.es-enviado`,
+que manda cuando se dan las dos cosas a la vez. Verificado con la misma maqueta
+estática, en claro y oscuro.
+
+**Plato de postre: "Mismo que el principal" — HECHO**: el dueño explicó que muchas
+veces el postre se sirve en el MISMO plato (grande) que el principal, no en uno
+pequeño aparte — obligar a repetir a mano el mismo color en la pregunta de postre no
+tenía sentido. Nueva opción, primera de la lista en `estiloPlatoPostre`: "El mismo
+que el principal (no uno pequeño de postre)". Al marcarla, `aRespuestasDeLaApp()`
+copia el valor ya resuelto de `estiloPlatoPrincipal` (la pregunta de arriba se
+procesa antes, así que ya está puesto — funciona igual si el principal se escribió
+a mano en "Otro"). Solo cambia la ETIQUETA del plato de postre en la checklist; la
+cantidad (`platosDoble + platosPostreExtra`) no se toca, sigue siendo un curso
+aparte que necesita sus propias unidades físicas.
+
+**"Primero + segundo": cubiertos y cristalería doblan por separado, no todo a la vez
+— HECHO**: había DOS mecanismos distintos sobre "doblar" que se pisaban: el menú
+("Dos platos principales") doblaba TODO (cubiertos+cristalería+plato) de golpe vía
+`dobleServicio`, y `excepcionesMesa` tenía "Doble tenedor"/"Doble cuchillo"/
+"Cristalería aparte" para UNA mesa concreta — el dueño pidió unificarlo:
+- La opción se renombra a "Primero + segundo (se sirven los dos)". Sigue doblando
+  el PLATO siempre (`dobleServicio`, sin tocar).
+- Nueva pregunta de seguimiento, "¿Qué se dobla?" (`queDobla`, tras el menú, solo si
+  se marcó "primero + segundo"): cubiertos (tenedor/cuchillo/cuchara) y cristalería
+  (vino/agua/cava), cada uno su propia casilla. Por defecto vienen marcados los
+  cubiertos (lo normal) y SIN marcar la cristalería — la misma copa se rellena
+  durante toda la comida, no suele doblar, pero se puede marcar si hace falta.
+  Nuevo mecanismo genérico en `Formulario.jsx`: `porDefecto` en una pregunta `marcar`
+  la muestra premarcada con esa lista en vez de partir siempre de `[]`.
+- `calcCristaleria()` (`calculos.js`): su parámetro `dobleCopa` ahora acepta también
+  un objeto `{vino, agua, cava}` con un flag por tipo (antes solo booleano, que dobla
+  vino+agua igual y nunca cava — ese comportamiento se conserva tal cual si se sigue
+  pasando un booleano, retrocompatible). `checklist-generadores.js`: `cubiertosDoble`
+  (una cuenta compartida) pasa a tres — `tenedorDoble`/`cuchilloDoble`/`cucharaDoble`
+  — cada una con su propio flag (`dobleTenedor`/`dobleCuchillo`/`dobleCuchara`, con
+  fallback a `dobleServicio` si no se contestó el seguimiento — eventos de antes de
+  esta tarea siguen calculando exactamente igual que siempre).
+- `excepcionesMesa` pierde "Doble tenedor"/"Doble cuchillo"/"Cristalería aparte" —
+  ya las cubre la pregunta de seguimiento (que es del evento entero, que es lo que
+  el dueño quería de verdad). Quedan solo "Menú infantil" y "Otro", genuinamente por
+  mesa; el caso raro de una mesa suelta con doble cubierto se resuelve editando la
+  línea a mano en la app (`overridesManuales`, ya existente).
+- Cableado en App.jsx: seis casillas nuevas junto a "Doble servicio" (que ahora dice
+  "dobla el plato", ya no "cubierto, copa y plato"), con el mismo fallback a
+  `dobleServicio` al cargar un evento antiguo.
+
+**"Bebida aparte": el cliente/la finca trae su propia bebida — HECHO**: con barra
+libre (cóctel o copas) la respuesta de quién pone la bebida y la cristalería es
+obvia — las pone Gula, siempre — así que las dos preguntas ("¿La bebida la trae el
+cliente/la finca, o la sirve Gula?", nueva, y "¿Llevamos cristalería?", de PR #203)
+ahora solo se hacen cuando NO hay barra libre (`si: (r) => !(coctel>0) &&
+!(copas>0)`, `preguntas.js`), que es el único caso realmente ambiguo. Con barra, se
+saltan y se calcula todo como siempre.
+- `calcBebidas()` (`calculos.js`) gana `llevaBebida = true`: a `false` pone a cero
+  TODO el alcohol y los refrescos (cerveza, vinos, cava, refrescos, tónica,
+  redbull...) — el hielo, que tiene su propio interruptor (`llevaHielo`) y es
+  aparte de la bebida, se sigue calculando igual (movido al principio de la
+  función, antes del corte, para que no dependa de `llevaBebida`). El agua para el
+  personal ya vivía en `calcPersonal()`, una función totalmente aparte — no hace
+  falta tocar nada ahí, ya estaba desacoplada.
+  Las líneas de bebida en la checklist quedan a "0" (no null): ahí siempre se ha
+  visto el número, nunca una línea que desaparece — a diferencia de cristalería o
+  hielo, que si se apagan sí quitan la línea entera.
+- Los vasos de cubata (ligados a horas de copas, no a esto) no se tocan.
+- `aRespuestasDeLaApp()`: `estado.llevaBebida = r.bebidaAparte === "no"` ("no" =
+  "la sirve Gula" = sí se calcula).
+
+**El aviso de "hay una versión nueva" llevaba dos semanas mostrando lo mismo —
+HECHO**: `cambios.js` se mantiene a mano (mismo estilo que `precios.js`/`sector.js`) y
+nadie la había tocado desde el 2026-08-25, así que el banner de la checklist llevaba
+~30 PRs de fondo sin decir nada de lo que de verdad había cambiado — el dueño lo cazó
+al ver siempre la misma nota. Añadida una entrada nueva con las mejoras reales más
+recientes, en el idioma de quien carga el camión, no del código. **A partir de
+ahora, tocar `cambios.js` en el mismo commit de cualquier cambio con impacto de
+usuario, igual que `CONTEXTO.md`** — si no, vuelve a quedarse atrás.
+
+**Calendario: la fila de "Asignados" se veía rota en pantallas anchas — HECHO**: el
+dueño mandó una captura real de producción — en "Editar apunte" el nombre de una
+persona parecía flotar entre la hora de entrada de ARRIBA y el importe/horas de
+ABAJO, como si fueran de otra persona. Causa real: a partir de 560px `.cal-asignado`
+pasa a una sola fila con `horario` encogido a `min-content` (`calendario.css`); si su
+contenido no cabe entero, envuelve en varias líneas dentro de esa columna, y con
+`align-items: center` las celdas nombre/rol/quitar (de una sola línea) quedaban
+centradas verticalmente contra ese bloque alto — el nombre acababa a media altura del
+horario de al lado. Con el modal a su ancho fijo (520px), esto pasa en CASI cualquier
+pantalla que no sea un móvil estrecho, no es un caso raro. Arreglado con
+`align-items: start` en ese breakpoint (todo se lee de arriba abajo, junto a la
+primera línea de horario) y un borde separador entre cada persona (`border-bottom` en
+`.cal-asignado`, quitado en la última) para que nunca se confundan dos filas
+distintas aunque una envuelva. Verificado en vivo con el banco de pruebas
+(`pruebas/calendario.html`), añadiendo gente de mentira a un evento y probando 320,
+390, 700 y 900px en claro y oscuro.
+
+**"Mesa alta" se quedaba en "—" sin barra libre aunque SÍ se llevaran — HECHO**: caso
+real del dueño ("Antoine y María" — bebida aparte, sin barra libre ni de cóctel ni de
+copas, pero sí lleva mesas altas y cristalería). La checklist tenía `mesasAltas =
+hayBarra ? calcMesasAltas(pax, numBarras) : 0` (`checklist-generadores.js`): sin
+barra, el "Nº de barras" contestado a mano en la app se ignoraba del todo — el único
+interruptor para pedir mesas altas sin barra no servía de nada. Arreglado a
+`(hayBarra || numBarras) ? calcMesasAltas(...) : 0`: con barra, igual que siempre (cae
+al cálculo por pax si no se contesta); sin barra, se queda en "—" salvo que se
+conteste "Nº de barras" a mano, que entonces manda igual que con barra. Nada nuevo que
+rellenar: ese campo ya estaba siempre visible en boda/comunión/corporativo, solo que
+no hacía nada sin barra. Verificado en vivo con un evento de mentira igual al real
+(sin cóctel ni copas, "Nº de barras": 1 → "Mesa alta: 2").
+
+**Y el formulario tampoco lo preguntaba sin barra libre — mismo commit, mismo hallazgo
+del dueño, HECHO**: el arreglo de arriba deja el campo funcionando en la app, pero la
+pregunta "numBarras" del formulario (`preguntas.js`) tenía `si: (r) => coctel>0 ||
+copas>0` — sin barra, la oficina no podía contestarlo desde el envío y alguien tenía
+que acordarse de rellenarlo a mano en la app después. Quitado el `si:`: ahora se
+pregunta siempre en los tipos con barra (`CON_BARRA`), texto reescrito para que tenga
+sentido sin barra libre ("¿Cuántas barras hacen falta para las mesas altas?", con nota
+aclarando que se pregunta aunque no haya barra libre). Sin contestar, sigue sin
+tocarse (mismo patrón de siempre) — un evento con barra de verdad se comporta
+exactamente igual que antes. Verificado en vivo: la pregunta sale con cóctel y copas a
+0 horas.
+
+**Auditoría a fondo pedida por el dueño (funcionalidad, duplicidad, escalabilidad,
+responsive) — HECHO, un fallo real encontrado y arreglado**:
+
+- **`llevaHielo` y `llevaBebida` nunca llegaban a la checklist real — el hallazgo
+  gordo**. `aRespuestasDeLaApp()` (`preguntas.js`) calculaba bien las dos, y
+  `calcBebidas()`/los tres generadores las aceptaban y usaban bien — pero `App.jsx`
+  no las tenía en NINGÚN sitio: ni `useState`, ni `SETTERS_SYNC` (el mapa que aplica
+  un envío del formulario), ni el objeto `opts` que de verdad llega a `buildChecklist`,
+  ni una casilla para tocarlo a mano. Resultado: contestar "no hace falta hielo" o
+  "la bebida la trae el cliente" en el formulario se guardaba, pero la checklist
+  seguía pidiendo hielo y bebida completos como si nadie hubiera contestado nada —
+  exactamente el mismo patrón de fallo silencioso que ya cazó antes "`buildChecklist()`
+  no leía `leerRatios()`". Arreglado replicando el cableado completo que ya tenía
+  `llevaCristaleria` (mismo patrón, en los mismos 6-7 sitios): `useState`, entrada en
+  `SETTERS_SYNC`, en `opts` y su array de dependencias, en `ETIQUETAS_CAMPO`, y una
+  casilla manual junto a "Llevamos cristalería" (`llevaBebida` no sale en producción,
+  que no usa `calcBebidas`; `llevaHielo` sí, en los cinco tipos). Nuevo test en
+  `app.test.mjs` que desmarca las dos casillas en la app REAL (no en `buildChecklist`
+  directo, que es justo lo que no habría cazado este fallo) y comprueba que la
+  checklist cambia de verdad — para que esta clase de fallo no vuelva a colarse en
+  silencio.
+- **Limpieza menor, de paso**: `calcCristaleria()` le faltaba la línea `@param` de
+  `llevaCristaleria` en el JSDoc (añadida). Y la fórmula de logística
+  (`numLogisticaEquipo > 0 ? ... : Math.max(1, Math.ceil(pax/60))`) estaba escrita
+  tres veces, una por generador — extraída a `calcLogistica()` en `calculos.js`,
+  mismo patrón que `calcMesasCalientes`/`calcMesasAltas`.
+- **Responsive**: barrido visual manual (no solo la batería automática, que ya cubre
+  9 anchos × 2 temas) por las pantallas más densas en campos de las tres apps — el
+  panel de configuración del evento con casi todo marcado, una lista de bebidas con
+  números de tres cifras, preguntas del formulario con muchas opciones, el equipo del
+  calendario — en 320/390/768/1280px, claro y oscuro. Sin desbordamiento ni solapes
+  en ninguna.
+- **Sin más hallazgos que mereciera la pena forzar**: código muerto (revisados los 28
+  exports de `calculos.js`/`checklist-generadores.js`, todos con uso real), render
+  sin memorizar, y duplicidad real entre `calculos.js` y los generadores — la
+  disciplina de extraer en cuanto algo se repite (bandejas, mesas calientes, mesas
+  altas, cristalería, alturas de buffet) se mantiene bien en el resto del código.
+
+**Café del personal: se pisaba con el de invitados, en vez de sumarse — HECHO**:
+encontrado por el dueño justo revisando la auditoría de arriba. `calcCafe()`
+(`checklist-generadores.js`) trataba "café para invitados" y "café del personal"
+como mutuamente excluyentes (`if (paraInvitados) {...} else if (numPersonal > 0)
+{...}`): con invitados marcado (el caso normal), el personal se quedaba sin su
+propia cafetera, dando por hecho que "tomaba prestado" de la de invitados. Pero el
+personal curra las mismas horas haya o no café de invitados — su parte tiene que
+calcularse SIEMPRE que haya plantilla, no solo cuando los invitados no lo piden.
+Arreglado quitando el `else`: los dos bloques son independientes ahora, y con
+invitados + personal a la vez salen las dos cafeteras y sus cápsulas por separado.
+Sin cambios en el caso "solo personal" (ya funcionaba bien) ni en producción (no usa
+`calcCafe` para el personal, tiene su propia cafetera de mantenimiento aparte).
+
+**Entrante "Individual" como su propia casilla, no un rodeo por "compartir" — HECHO**:
+el dueño señaló que en "¿Lleva entrante?" (`preguntas.js`) la única forma de decir "un
+plato por persona" era marcar "Para compartir" y, en la SIGUIENTE pantalla
+(`entrantePersonas`), elegir "Individual (un plato por persona)" — al revés de lo que
+dice la palabra "compartir". Añadida "Individual" como tercera casilla junto a
+"chupito"/"compartir" en la misma pregunta, con su propio número inline
+(`individualNumero`, mismo patrón que las demás casillas de `marcar`+`conNumero`).
+Al marcarla, `entranteCompartido` sale `true` con `personasPorPlatoEntrante` fijo a 1
+SIN preguntar nada más — la pantalla `entrantePersonas` sigue atada solo a "compartir"
+(su `si:` no cambia), así que elegir solo "individual" ya no mete una pantalla de más
+en medio. Si se marcan "individual" y "compartir" a la vez (raro, pero el marcar
+siempre ha permitido varias casillas), sus números se suman en una sola línea de
+"Platos extra entrante" con el ratio de "compartir" — la checklist solo tiene sitio
+para un ratio, no dos, limitación que ya existía antes de este cambio. Verificado en
+vivo con Playwright: marcar solo "individual" y pulsar "Siguiente" salta directo a la
+pregunta del café, sin pasar por "cada cuántas personas".
+
+De paso, revisado el aviso de que "seleccionar paella corta el hilo" (pregunta menú →
+tamaño → cuántas, cada una en su propia pantalla): `cuantasPaellas` tiene un porqué
+para seguir aparte y no meterse como número en la propia casilla "Paella" del menú —
+`calibracion.js` usa explícitamente que `numPaellas > 0` signifique "el número lo puso
+alguien a mano", para NO aprender de esos eventos y no torcer el ratio automático por
+pax. Si el número se autorrellenara nada más marcar "Paella" (como si fuera
+`conNumero` normal), CADA evento con paella pasaría a contar como "puesto a mano" y la
+calibración dejaría de tener datos limpios de qué sale de verdad con el pax solo. Por
+eso NO se fusiona con la casilla del menú — pero el dueño siguió insistiendo en que
+"hay cosas donde no debería estar", y repasando el orden entero contra los 11 bloques
+del reorden de #184 apareció el problema real, que no era el número de pantallas sino
+DÓNDE estaban: **"¿Tamaño de paella?" y "¿Cuántas paellas?" — movidas primero a
+"Cocina y equipamiento" (justo después de horno), y CORREGIDO otra vez tras verlo el
+dueño en vivo**: quedaba demasiado lejos de haber dicho "llevamos paella" en el menú
+— entre medias había cinco preguntas de equipamiento genérico (queDobla, entrante,
+entrantePersonas, café, nevera, congelador, hielo, horno) sin nada que ver con la
+paella, así que llegar a "¿tamaño?" se sentía como una pregunta reaparecida de la
+nada, no como continuar algo. Movidas de nuevo, esta vez a justo después de "café"
+— cierran "qué se come" (siguen sin cortar entrante/café, la razón de no pegarlas a
+"menu") sin quedar enterradas entre preguntas de equipo que no tienen nada que ver
+con haber dicho paella. Mismo `id`, misma `si:` (`menu.includes("paella")`) — cero
+cambios de lógica ni de `calibracion.js`.
+Verificado en vivo: con "Paella" marcada, el recorrido para una boda ahora es
+menú → entrante → café → **tamaño → cuántas** → nevera → congelador → horno →
+armario caliente.
+`npm run test` completo en verde (2375 comprobaciones): ningún test de
+`aRespuestasDeLaApp()`/`resumirEnvio()` depende del orden del array, que es
+justo la prueba de que reordenar es seguro.
+
+**Modo carga nunca avisaba de los items de alquiler — HECHO**: el dueño lo encontró
+en un evento real (sillas de Dealde) — la lista normal (`FilaItem.jsx`) pinta de
+amarillo y pone el cartelito "ALQUILER" en los items de un proveedor externo (por
+nombre, o marcados a mano con el ✎), pero `ModalModoCarga.jsx` descartaba ese dato al
+desestructurar la tupla del item (`[label, qty, , labelOriginal, , sufijo]` — la
+coma vacía era justo la marca de alquiler) y por eso ningún evento la mostraba ahí,
+nunca. Arreglado:
+- Extraída `esItemDeAlquiler(label, esAlquilerManual)` a `checklist-format.js` — el
+  criterio (tag manual, o el nombre lleva Dealde/Carvillo/Novelda/alquiler) estaba
+  copiado a mano en `FilaItem.jsx` y en el exportador de Word; ahora los tres (los dos
+  de antes + Modo carga) llaman a la misma función.
+- `FilaCargaPrep`/`FilaCargaVuelta` reciben `esAlquiler` y pintan `.carga-row.is-alquiler`
+  (mismo `--alquiler-bg` que la lista normal) más el cartelito.
+- **Dos fallos de layout cazados por la propia batería, no a ojo**: (1) el cartelito
+  puesto como hermano directo del nombre le robaba ancho hasta partir palabras letra a
+  letra a 320px — arreglado agrupando icono+nombre en `.carga-nombre-lead` con
+  `flex-basis:100%`, que fuerza al cartelito a su propia línea sin tocar el nombre. (2)
+  el gris apagado de `.carga-cantidad` sobre el fondo amarillo bajaba a 4,48 de
+  contraste (el mínimo AA es 4,5) — la prueba de contraste automática lo cazó con la
+  cantidad "1" de un item real; arreglado con `var(--alquiler-text)` (el mismo ámbar
+  del cartelito) en vez del gris, que si sube a 4,65.
+- Un test ya existente ("los alquileres están en Modo carga para marcarlos") leía el
+  nombre completo de `.carga-nombre` esperando texto exacto — al añadir el cartelito
+  ahí al lado dejó de coincidir. No era un fallo del test: es que el cartelito ahora
+  vive en el mismo contenedor. Se corrigió apuntando a `.carga-nombre-texto` (el
+  nombre puro, sin el cartelito), que es lo que ese test siempre quiso comprobar.
+- Verificado con capturas en claro/oscuro a 320/390px, y `npm run test` completo:
+  761 comprobaciones, 0 fallidas.
+
+**Auditoría visual móvil pedida por el dueño ("hay cosas mal") — 2 de 3 HECHO,
+1 pendiente de una decisión suya**: sesión aparte con Playwright en 320/375/390/412px,
+dos temas, las tres apps. Formulario y calendario salieron limpios; en la checklist,
+tres hallazgos reales, los dos primeros con la misma causa de fondo:
+
+1. **HECHO — El contador de items y la flecha ▼/▲ de cada categoría desaparecían a
+   320px, en 9 de cada 10 categorías, sin dejar rastro (ni scroll ni aviso)**.
+   `.category-header` es un flex `space-between` con `.cat-name` (nombre) y
+   `.cat-count` (los 3 botones ✎/⌃/⌄ + el número + la flecha, con
+   `flex-shrink:0`). Sin `min-width:0`, un flex item no encoge por debajo de su
+   contenido — así que a 320px, con `.cat-count` fijo, algo tenía que desbordar, y
+   la tarjeta redondeada con `overflow:hidden` se lo tragaba en silencio. Arreglado
+   dándole a `.cat-name` `min-width:0` y envolviendo el texto en
+   `.cat-name-texto` con `text-overflow:ellipsis` — ahora el que cede es el
+   NOMBRE (se recorta con "…"), nunca la píldora del contador, que es la única
+   pista de cuántos items tiene la categoría y si está abierta.
+2. **HECHO — La cabecera perdía la hora y el sitio del evento a 320px**. Ya se
+   había arreglado una vez (ocultar cóctel/nº de conceptos en móvil, limitar a 2
+   líneas) y a 375px cabe entero, pero a 320px el texto seguía necesitando algo
+   más de 2 líneas y se cortaba justo antes de la hora y el sitio. Arreglado con
+   `-webkit-line-clamp:3` solo por debajo de 340px (a partir de 375px sigue en 2).
+3. **PENDIENTE, necesita decisión del dueño — Modo carga tapa el primer ítem con
+   su propia cabecera a 320px (78% de una pantalla de móvil real, 844px, antes de
+   ver el primer checkbox)**. Ya se había medido y arreglado esto una vez
+   (compactar los cronómetros a una línea, documentado en `.carga-modal` en
+   `index.css`), pero la tarjeta "Escaleta del día" (añadida después de aquella
+   medición) se suma al título + contador + barra de progreso + tiempos estimados
+   + los cronómetros de Salida, y entre todos vuelven a tapar la lista — peor que
+   antes de aquel arreglo. La escaleta YA está plegada por defecto
+   (`Escaleta.jsx`, `useState(false)`), así que no es "una cosa más sin plegar":
+   es que hay demasiadas cosas plegadas-pero-visibles apiladas antes de la lista.
+   Arreglarlo bien significa decidir QUÉ información deja de verse por defecto en
+   la pantalla que usa quien está cargando el camión en vivo — una decisión de
+   producto, no un bug de CSS suelto. Se deja sin tocar hasta hablarlo con el
+   dueño.
+- Test nuevo en `app.test.mjs` para los dos hechos: contador/flecha de TODAS las
+  categorías visible a 320px, y el subtítulo con hora+sitio incluidos.
+- Los tres scripts temporales de la auditoría (`_pw_audit_*.cjs`) se borraron al
+  terminar, sin tocar código.
+
+**"Ya configurado" mentía en el formulario: decía que el evento estaba listo pero al
+entrar preguntaba todo de cero — HECHO, revierte a propósito una garantía de privacidad
+anterior, requiere revisión del dueño antes de fusionar (regla de `CLAUDE.md`: "AI
+Branches: Human security review required before main merge")**:
+
+- **El conflicto que vio el dueño**: en "¿De qué evento son los datos?"
+  (`Formulario.jsx`), un evento marcado "Ya configurado" (`sinConfigurar: false` en la
+  checklist) sonaba a "esto ya está resuelto, no hace falta tocarlo" — pero al entrar,
+  el formulario preguntaba las ~40 preguntas igual que a un evento nuevo. La etiqueta
+  hablaba de la CHECKLIST (`e.sinConfigurar`); el formulario nunca ha leído esos datos:
+  cada envío empezaba de cero por diseño — el enlace público (`publico/{codigo}`) solo
+  exponía `nombre/fecha/sitio/tipo/configurado`, nada de respuestas reales, A PROPÓSITO
+  (`resumirParaOficina()` llevaba un test explícito, `!('pax' in ...)`, verificando que
+  NADA de dentro del evento saliera por ese canal).
+- **Decisión del dueño, tras verle tres formas de arreglarlo** (solo aclarar el aviso /
+  recordar en este móvil con `mios.js` / traer lo real de la checklist): la tercera —
+  la que de verdad cumple lo pedido, a costa de mover esa frontera de privacidad.
+- **Qué viaja y qué NO**: cuando la oficina aplica un envío (`handleAplicarEnvio`),
+  `App.jsx` guarda ahora `formularioRespuestas` en el evento — las respuestas de esa
+  vez, tal cual, sin entrar en ningún cálculo (mismo patrón de metadato que
+  `eventoNubeId`: `useState` + `getEstadoActual()` + `SETTERS_SYNC`, fuera de
+  `ETIQUETAS_CAMPO`/`opts`). `resumirParaOficina()` (`envios.js`) las re-expone
+  filtradas por la nueva `respuestasParaOficina()`:
+  - Fuera `tipo`/`nombreYsitio`/`cuando` (ya viajan sueltos, no se duplican).
+  - Fuera `comprar`/`alergias`/`notas` (texto libre sin fondo — alergias es dato de
+    salud de un invitado — y cualquier `*_comentario` por pregunta): se quedan fuera
+    aunque cueste un poco más de tecleo volver a escribirlas.
+  - Fuera cualquier `*Archivo` (menú/hojas de alquiler subidas como foto o PDF): no
+    sirven para rellenar nada y pueden pesar.
+  - Tope duro de 20 KB tras filtrar: si algún día se cuela un campo pesado que no está
+    en la lista de arriba, se manda `null` en vez de arriesgarse a reventar el límite
+    de 1 MiB de `publico/{codigo}` (que lleva hasta 8 eventos en un solo documento) y
+    dejar a la oficina sin lista de próximos eventos — un fallo mucho peor que el que
+    se está arreglando.
+  - Solo se re-expone lo que YA viajó una vez por ese mismo canal público (una
+    respuesta de formulario que alguien mandó con ese código) — no se lee nunca nada
+    de lo que la checklist calcula o de lo que se edita a mano en la app.
+- **Lo que NO se arregla**: un evento configurado a mano en la app (sin pasar nunca por
+  el formulario, como parecían ser los ejemplos reales que vio el dueño) no tiene
+  `formularioRespuestas` que traer — sigue preguntando todo. Para no repetir el mismo
+  conflicto, la etiqueta ahora distingue los dos casos: "Ya configurado · se rellena
+  solo" (con respuestas de antes) frente a "Ya configurado" a secas (con un tooltip que
+  ya no promete que vengan puestas).
+- **Test que antes garantizaba lo contrario, ahora conviven los dos casos**: el test
+  original (`!('pax' in publicado.eventos[0])`, con un evento SIN `formularioRespuestas`)
+  se deja intacto sin tocar una línea — sigue demostrando que un evento configurado a
+  mano no filtra nada. Al lado, un test nuevo demuestra el caso contrario a propósito:
+  un evento CON `formularioRespuestas` sí lleva `respuestasPrevias`, filtradas.
+- **Verificación**: `npm run test:rapido` en verde (filtro puro + integración con
+  `resumirParaOficina`); `npm run test` completo antes de fusionar. Dado que esto mueve
+  una frontera de privacidad documentada a propósito, se deja SIN FUSIONAR hasta que el
+  dueño lo revise él mismo (no se auto-fusiona como el resto de PRs de esta sesión).
+
+**Notas duplicadas en eventos YA creados (antes del fix de #169): hecho para el único
+caso real que había.** Con una cuenta de servicio que dio el dueño se auditaron los 16
+eventos del archivo (solo lectura primero) — solo "Evento Aryan Campana" tenía líneas
+repetidas (9). Limpiado con backup previo del documento completo y verificación de que
+ningún otro campo cambió. El resto de eventos ya tenía las notas limpias.
+
+**Pendiente del dueño, no de código** — del contenido de #171 (motores gratis nuevos):
+pegar `worker/pegar.js` regenerado en el panel de Cloudflare y añadir como *Secret* la
+clave de cada proveedor que quiera usar — tabla completa en `worker/README.md`.
+
+**Dos piezas grandes, planificadas, sin código todavía** (el dueño pidió explícitamente
+"plan bien estructurado" para las dos — nada se arranca sin mostrarle antes una preview,
+mismo criterio que ya pedía para el formulario):
+
+1. **Cocina: escandallo → lista de la compra ("mise en place") + Presupuesto y margen
+   por evento.** Plan aprobado (ver el propio plan de la sesión). Orden decidido:
+   presupuesto/margen primero (reutiliza el motor de coste que YA existe en Resumen de
+   Modo Carga para comida/bebida, y `totalLogistica()` para logística — solo faltan
+   tarifas de sala/cocina y el presupuesto en sí), Cocina/escandallo después (parte de
+   cero: recetario, menú del evento, nada reutilizable todavía). Fase 3, el asistente,
+   al final. Piloto: el evento real "Aryan Campana" (ya limpio de notas duplicadas),
+   para probar con datos de verdad antes de generalizar. **2026-09-30: presupuesto y
+   margen, descartados aquí** (los lleva otra app del dueño, ver al principio de este
+   archivo); cocina sigue, en `PLAN_COCINA.md`.
+2. **Mejoras del formulario — HECHO, las seis.** Bug de las tronas: investigado a fondo
+   (reproducción real con Playwright por los dos caminos posibles) y no se reprodujo —
+   `Tronas` sale directo de `ninos` en los tres builders y ya estaba en las dependencias
+   del `useMemo`; se deja una prueba de guarda por si reaparece por otra vía (**después:
+   ya no salen de los niños, solo las que se dicen — ver "Buffets con platos, tronas"**). El resto,
+   implementado y con test: botón "ir al resumen" en cualquier pregunta; comentario libre
+   y colapsable por pregunta (a `notasEvento`, sin duplicar al reenviar); pregunta de
+   café (invitados/solo personal — `calcCafe` en `checklist-generadores.js`, con reserva
+   modesta para el personal cuando los invitados no toman); carpas ampliadas a los cinco
+   tipos de evento (cálculo compartido `calcCarpas()` en `carpas.js`, antes solo vivía en
+   producción); parabanes (mobiliario nuevo, sin fórmula por pax); excepciones de mesa y
+   buffets (texto libre a las notas, sin tocar el cálculo agregado todavía). Las
+   producciones se verificaron aparte en cada paso: mismo resultado antes/después de
+   compartir la lógica con el resto de tipos.
+
+**Revisión visual a fondo**: primera pasada hecha (checklist, calendario, la bienvenida
+del formulario) con los dos fallos de arriba. Queda el formulario paso a paso, las
+pestañas Año/Equipo del calendario, y los anchos intermedios de la batería que no se
+capturaron a mano.
+
+**PR #180, FUSIONADO Y DESPLEGADO** — el dueño pidió depurar el formulario en una
+ronda de revisión antes de volver a producción, en vez de fusionar commit a commit
+como el resto. Lo probó en el móvil recién publicado y salieron tres cosas; tras
+confirmar que la batería completa pasaba también contra el commit exacto ya en
+producción (para descartar que algo se hubiera roto entretanto), dio el visto bueno,
+se fusionó (`abb87eb`) y el despliegue (run #69 de "Publicar") terminó en verde:
+
+- **El campo numérico no dejaba borrar para escribir otro número** (`onChange` hacía
+  `Math.max(1, parseInt(v,10) || 1)`: vaciar el campo da `NaN`, y `NaN || 1` fuerza el 1
+  en cada pulsación de borrado). Arreglado en las dos rutas donde se repetía (opción
+  única y `marcar`): vacío pasa tal cual mientras se escribe, el mínimo se aplica solo
+  al salir del campo si se queda vacío. Con prueba que usa `Control+A`+`Delete`, no
+  `.fill()` (que sustituye el valor de golpe y no pasa por `onChange` como un dedo real).
+- **El comentario libre por pregunta salía hasta donde no aporta nada**: tipo de evento
+  (primera pregunta, pura clasificación), nombre/sitio (ya son texto libre, un
+  comentario ahí es una tercera caja redundante) y fecha/hora (un día es un día). Ahora
+  se oculta en esas tres con `SIN_COMENTARIO` (por `tipo` de pregunta) + un id suelto
+  para "tipo".
+- **"Mobiliario extra de alquiler" era un sí/no suelto sin decir qué es ni a quién se le
+  alquila** (proveedor fijo a Event Style en `alquileres.js`). Ahora es su propia
+  pregunta (como flores/minutas): qué mobiliario, a qué proveedor (vacío = Event Style,
+  que sigue mandando por defecto) y la hoja del alquiler adjunta. Se añadió también
+  "¿Algo más presupuestado como alquiler?" como cajón de sastre (vajilla especial,
+  decoración, sonido...) con el mismo qué+proveedor+adjunto, que solo va a
+  `notasEvento` — no crea una recogida automática, es la excepción que no tiene su
+  propia pregunta. Los adjuntos de las dos (`archivosAlquiler`) se acumulan en el
+  evento sin sustituirse al reenviar el formulario (tope de 8, por el límite de 1 MiB
+  por documento de Firestore); se listan en la bandeja (`archivosDelEnvio`) y en la
+  pantalla de Alquileres, con botón de quitar.
+- **Gap encontrado al mirarlo**: `tipo: "marcar"` (casillas múltiples) no soporta
+  `conCampos`/`conArchivo`, solo `conNumero` — por eso mobiliario/otro-alquiler son
+  preguntas `opciones` propias en vez de una casilla más dentro de "extras", mismo
+  patrón que ya usaban flores/minutas.
+
+`npm run test` en verde (735 comprobaciones navegador + el resto de baterías, sin
+errores de JS) antes de cada commit.
+
+**Bug real, cazado por el dueño en producción — HECHO, fusionado en el PR #180**: en
+Modo carga → Vuelta, apuntar "0" en lo que ha vuelto de Hielo (fundido/gastado entero,
+lo normal) sugería marcarlo como rotura ("faltan 70"). La sugerencia de "faltan N →
+apuntar como rotura" (`FilaCargaVuelta`, `ModalModoCarga.jsx`) salía para CUALQUIER
+material que no volviera, sin distinguir lo que se gasta (bebida, hielo, comida,
+combustible, desechables) de lo que de verdad puede romperse o perderse (cristalería,
+vajilla, mobiliario, herramientas). Se repasó el catálogo entero de los tres
+generadores y se creó `src/consumibles.js` (`esConsumible(categoria, label)`, por
+categoría entera — Bebidas/Alcoholes/Desechables— más una lista corta de sueltos
+dentro de categorías reutilizables — cápsulas de café, carbón, jabón, servilletas de
+papel, bridas...— y sus excepciones inversas — el tirador de cerveza, el calentador de
+agua, la cafetera, no se gastan aunque vivan en esa categoría). Por defecto (nada en
+la lista) sigue sin ser consumible, que es el comportamiento de siempre: la sugerencia
+de rotura no desaparece por error en lo que sí puede romperse. De paso, "Menús
+especiales" (recuento de alergias) salió también de Modo carga: es informativo, no
+material que se cargue o vuelva, igual que ya pasaba con "Personal".
+
+**Segunda vuelta sobre lo mismo, pedida explícitamente ("revisa a fondo")** — dos
+afinamientos más, sin PR todavía:
+
+- **El envase no es el contenido**: "Bombonas llenas" y "Garrafa gasolina" estaban en
+  `consumibles.js` como fungibles, pero eso mezclaba dos cosas — se gasta el GAS de
+  dentro, no la bombona; la bombona (vacía) es justo lo que se espera que vuelva con
+  el equipo, y si no vuelve sigue siendo una pérdida de verdad (a diferencia de
+  carbón/leña/pastillas de encender, que no tienen envase que devolver: se queman
+  enteros). Sacadas de la lista. De paso, "Vasos de chupito de plástico (barra
+  libre)" —de usar y tirar, a diferencia del resto de barware— entra como fungible.
+- **"Marcar todo como vuelto" ponía la cantidad COMPLETA en todo**, hielo y bebidas
+  incluidos — justo lo contrario de lo normal para eso, obligando a corregir a mano
+  casi todas las líneas de golpe. Ahora lo fungible se marca por defecto como "no ha
+  vuelto nada" (que es su caso normal) y lo reutilizable sigue marcándose como
+  "volvió completo".
+- **Sin el chip "faltan N", lo fungible se quedaba sin ninguna confirmación visual**
+  de que la app se había enterado del consumo (apuntar la vuelta de una bebida y no
+  ver nada más no dejaba claro que hubiera pasado algo). Ahora sale un texto neutro
+  ("N gastados", `.carga-consumido`) que confirma el consumo sin invitar a marcarlo
+  como rotura, que ahí no pinta nada.
+
+**Calendario: personal de un evento pasado — HECHO**. La pantalla "Equipo"
+(`VistaEquipo`, `Calendario.jsx`) era la ÚNICA de toda la app que enseñaba/editaba
+`apunte.personal` ("HORARIO PERSONAL EN EVENTO": nombre, rol, horario, importe) — y
+solo mira los próximos `DIAS_ANTICIPACION` (14) días; el editor genérico de un apunte
+(`EditorApunte`, alcanzable también para eventos pasados desde la vista Año) no tenía
+ese apartado en absoluto. El personal de un evento ya cerrado (como "Aryan Campana",
+el piloto del plan de Presupuesto/margen) era invisible en toda la app. Arreglado
+reutilizando el mismo componente `Asignados` dentro de `EditorApunte` —funciona para
+cualquier fecha, pasado incluido—, guardado junto al resto del apunte (no aparte,
+para que "Cancelar" siga descartando todo el borrador de una vez). De paso, una
+barrita de progreso visible sin desplegar (cuánto de la plantilla necesaria está
+cubierta, `.cal-asignados-barra`) — pedido explícitamente ("que sea más visual").
+Con test de extremo a extremo: crear con fecha de hace 40 días → añadir gente →
+guardar → reabrir desde Año → sigue ahí.
+
+**Encontrado de paso, revisando Modo Carga y el formulario a fondo — LOS TRES, HECHOS**:
+
+- El interruptor de Ajustes del asistente que solo ofrece los proveedores que el Worker
+  dice tener configurados (`proveedoresUI.js`, de una sesión anterior) no es un fallo:
+  antes de la primera pregunta de la sesión no se sabe qué hay configurado, así que se
+  asume solo Gemini. Groq/Claude/Cerebras/etc. ya están implementados en el Worker —
+  para verse en Ajustes hace falta además tener su clave puesta como *Secret* en
+  Cloudflare (`worker/README.md`), que es infraestructura del dueño, no código.
+- **Sufijo con número derivado que no se recalculaba al editar a mano — HECHO**: Hielo
+  y Carpas calculaban su sufijo UNA VEZ al generar la checklist; editar la cantidad a
+  mano solo cambiaba el número de delante, el sufijo se quedaba con el texto viejo.
+  `conSufijo` (`checklist-format.js`) ahora también acepta una función en vez de un
+  texto fijo; se resuelve en un solo sitio (el `useMemo` de `checklist` en `App.jsx`,
+  justo donde la cantidad ya lleva aplicado el override manual), que es lo que
+  alimenta tanto Modo Carga como la exportación a Word. Encontrado de paso: el camino
+  del asistente (`catsDeEventoGuardado()` en `calibracion.js`) lee la checklist RAW sin
+  pasar por ese `useMemo` — sin el mismo arreglo ahí, `listar_checklist` habría
+  enseñado una función de JavaScript en vez del texto para cualquier evento con hielo o
+  carpas por alquilar. Arreglado aparte, resolviendo con el propio número del item.
+- **"Mesas calientes" — HECHO**: antes solo existía en producción (automático por
+  pax); ahora hay pregunta sí/no en el formulario para el resto de tipos, reusando la
+  misma fórmula ya existente (`calcMesasCalientes()`, extraída a `calculos.js` para
+  que los tres builders compartan la cuenta).
+- **"Gastros" — HECHO**: en boda/comunión/corporativo salía "—" (se apuntaba a mano).
+  Ahora sale con un mínimo de serie (`GASTROS_MINIMO`, 4) y una pregunta para subirlo
+  si el menú lleva más. Cumpleaños no lo usa (todo en bandejas) y producción sigue con
+  su propia cuenta (2 por chafer) — ninguno de los dos se tocó.
+
+**Regresión real, cazada por la propia batería antes de fusionar**: `preguntas.js`
+(la app del FORMULARIO) importaba `GASTROS_MINIMO` desde `checklist-generadores.js`
+(el motor de cálculo ENTERO de la checklist, con todas sus dependencias) solo para no
+repetir un número. Vite convirtió ese fichero en un chunk compartido entre las dos
+apps — cambia el mapa de bundles y rompió el test de versión-nueva del service worker
+y el recorrido del formulario (timing). Arreglado duplicando la constante como un
+número local en `preguntas.js` (con comentario explicando el porqué): las tres apps
+son builds separados a propósito (`vite.config.js`), y una constante suelta nunca
+justifica cruzar esa frontera. De paso, el tope del bucle de "recorrer el formulario
+contestando No lo sé" en `app.test.mjs` vivía pegado al número exacto de preguntas de
+una boda (32) — con dos preguntas más pasó a 34 y lo superó. Subido a 45, con margen
+de verdad en vez de ir pegado a la cifra exacta.
+
+**Formulario: "Ya configurado" se rellena solo, y en verde para todos — HECHO,
+con revisión de seguridad del dueño**: en "¿De qué evento son los datos?", un evento
+"Ya configurado" preguntaba las ~40 preguntas igual que uno nuevo — la etiqueta hablaba
+de la CHECKLIST, el formulario nunca había leído esos datos. Ahora `App.jsx` guarda las
+respuestas de cada envío aplicado en el propio evento (`formularioRespuestas`, metadato
+fuera de cualquier cálculo) y `resumirParaOficina()` las re-expone **filtradas**
+(`respuestasParaOficina()`): fuera tipo/nombreYsitio/cuando (ya viajan sueltos),
+comprar/alergias/notas/comentarios libres (texto sin fondo, alergias es dato de salud)
+y cualquier archivo adjunto; tope duro de 20 KB. Solo se re-expone lo que YA viajó una
+vez por ese mismo canal público — nunca lo que la checklist calcula. Esto mueve a
+propósito una frontera de privacidad que el código llevaba probada ("nada de dentro de
+un evento sale por el enlace público"), así que se dejó sin fusionar hasta que el dueño
+lo revisara y diera el visto bueno explícito (regla de este archivo: "AI Branches").
+De paso, el "Ya configurado" pasó de gris (visible solo desde el móvil que lo mandó,
+`es-enviado`/`mios.js`) a verde con su ✓ para CUALQUIER evento configurado, lo haya
+mandado ese teléfono o no — con varias personas usando el formulario, el gris no le
+decía nada al resto.
+
+**Auditoría a fondo del formulario, pedida por el dueño ("que configure bien la
+checklist")** — con cita exacta fichero:línea:
+- **Orden — HECHO**: `buffets` mueve un número real (`numMesasBuffet`) pero vivía en
+  "Cierre" en vez de junto a `extras`, su pariente de patrón — movida ahí. `tarta`
+  vivía en el bloque de "lo que genera una recogida" (flores/minutas) pero no genera
+  ninguna — movida a cerrar mantelería y vajilla (monta o no una mesa, no es un
+  encargo que ir a buscar).
+- **Duplicación real — HECHO**: `barril30`/`barril50` (dentro de `extras`, de
+  marcar-varios) compartían el mismo `campoNumero` — marcar los dos descartaba en
+  silencio cuál de los dos tamaños era el real (la checklist solo soporta uno).
+  Añadido un `excluye` genérico en el toggle de `marcar` (`Formulario.jsx`): marcar
+  uno desmarca el otro, ya no se puede llegar a ese estado ambiguo.
+- **Huérfana — HECHO**: `numBarras` se preguntaba en cumpleaños pero solo
+  `buildChecklistBoda` (boda/comunión/corporativo comparten ese generador) calcula
+  "Mesa alta" — restringida a esos tres tipos.
+- **Dependencias `si:`**: sin hallazgos, las 8 condicionales del fichero están todas
+  bien ordenadas.
+- **PENDIENTE, decisión del dueño**: `entrante`, `armarioCaliente` y todo el bloque
+  `extras` (desayuno/jamonero/palomitera/chillout) nunca se preguntan en producción,
+  pero `buildChecklistProduccion` SÍ usa esos datos — un rodaje no puede configurar
+  bien su propia checklist en estas tres cosas desde el formulario. Es una laguna
+  real pero más grande (añadir preguntas nuevas a producción), a decidir con el dueño
+  antes de tocarla.
+- Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
+
+**Dos hallazgos más, vistos por el dueño en la app real — HECHO**:
+- **"tipoMesa" con icono de sofá**: `ICONOS_POR_PREGUNTA.tipoMesa` solo tenía 2
+  iconos (`Table2, Armchair`) para 4 opciones — al repetir el juego (`indice %
+  juego.length`), la primera mesa redonda de alquiler salía con un icono de sofá
+  (`Armchair`, que sí es correcto en `sillas`/`gente`/`mobiliarioAlquiler`, pero no
+  aquí). Puestos los 4 explícitos, todos mesa.
+- **Esa misma pregunta preguntaba mal**: "¿De qué son las mesas donde come la
+  gente?" pide MATERIAL, pero las 4 opciones son forma+tamaño (rectangular 1,8m /
+  redondas 1,5m, 1,8m, 2m). Cambiado a "¿Cómo son las mesas donde come la gente?".
+- Verificación: `npm run test` completo, 2375 comprobaciones, 0 fallidas.
+
+**Auditoría completa del formulario (49 preguntas, contraste con los tres generadores)
+— HECHO**: pedida por el dueño ("formulario inteligente": cada tipo de evento solo ve
+sus preguntas, no todas). Recorridas las 49 preguntas contra `aRespuestasDeLaApp()` y
+los tres `buildChecklist*`, confirmando que `soloEn`/`si:` ya scopea correctamente cada
+una a su tipo de evento. Dos hallazgos reales, arreglados en la misma pasada:
+- **Bloque `extras` duplicado en `aRespuestasDeLaApp()`**: se procesaba en DOS `if
+  (Array.isArray(r.extras))` distintos — uno dentro de la rama no-producción
+  (brindis/barbacoa/desayuno/barril/jarras/jamonero) y otro suelto al final del todo
+  (chillout/palomitera). No rompía nada hoy porque TODAS las opciones de `extras`
+  excluyen producción (`soloEn`), pero si algún día se añadiera una opción válida para
+  producción, la mitad de los campos se aplicarían y la otra mitad no, sin que se
+  notara. Unificado en un solo bloque.
+- **Aguas pequeñas en banquete, sin pregunta**: el interruptor real de la checklist
+  (`llevaAguasPequenas`, ya usado por `buildChecklistBoda`/`Cumpleanos` para enseñar
+  "Aguas pequeñas (33cl)") no lo preguntaba nadie fuera de producción — se quedaba
+  siempre apagado salvo tocarlo a mano en la app. Añadida como opción más de `extras`
+  (`aguasPequenas`, `soloEn: CON_BARRA`), mismo patrón que Chill out/Brindis — en
+  producción no hace falta, ahí ya van siempre (pregunta aparte, solo el envase).
+- **"¿Cómo se come?" nunca se preguntaba en producción**: `buildChecklistProduccion` ya
+  sabe ocultar platos trinchero/hondos/metálicos con `soloBandeja`, pero la pregunta
+  `servicio` tenía `soloEn: CON_BARRA` (sin producción) — un rodaje se quedaba siempre
+  con lo que ya tuviera la app. Extendido `soloEn` a `[...CON_BARRA, "produccion"]`.
+  Importante: el ratio de camareros que esa misma pregunta ajusta en banquetes (25/12)
+  NO se toca en producción — un rodaje ya tiene el suyo propio
+  (`leerRatios().produccion`, 1 cada 20), así que `aRespuestasDeLaApp()` solo pone
+  `soloBandeja` en la rama de producción, `paxPorCamarero` se queda fuera.
+- Sigue **PENDIENTE, decisión del dueño** (sin tocar en esta pasada, ver entrada
+  anterior): `entrante`/`armarioCaliente`/el resto de `extras`
+  (desayuno/jamonero/palomitera/chillout) sin preguntar en producción aunque
+  `buildChecklistProduccion` sí usa esos campos — laguna más grande, requiere decidir
+  qué preguntas nuevas añadir.
+- Tests nuevos en `sincronizacion.test.mjs`: el bloque "Jarras, aguas y barriles"
+  (antes afirmaba justo lo contrario: que las aguas pequeñas NO se ofrecían en un
+  banquete) y un bloque nuevo junto a las pruebas de carpas/parabanes que cubre
+  `servicio` en producción (`soloBandeja` sí, `paxPorCamarero` no).
+- Verificación: `npm run test` completo, 764 comprobaciones, 0 fallidas. Fusionado
+  (PR #225).
+
+**Calendario: "Traer" apuntes de golpe también con datos ya puestos — HECHO**: la
+pantalla de pegar una lista JSON (`Traer.jsx`) solo salía con el calendario vacío
+("un empujón de una vez, no un ajuste") — con apuntes ya cargados no había forma de
+añadir una tanda nueva (la hoja de pared, otro calendario) sin borrar antes lo que
+ya había. Pedido por el dueño tras encontrar que unos cambios recientes de la hoja de
+Google nunca habían llegado al calendario de la app.
+- Con el calendario vacío, se comporta exactamente igual que antes (abierto de
+  siempre). Con datos ya puestos, sale plegado detrás de un botón ("Añadir varios
+  apuntes de golpe", mismo patrón que "Compartir") y solo AÑADE: nueva función pura
+  `mezclaApuntes(existentes, nuevos)` en `apuntes.js` descarta de los nuevos
+  cualquier id (fecha+título, `idDeApunte`) que ya existiera — pegar de más nunca
+  puede pisar un apunte que alguien ya haya editado a mano (personal, notas, hora...).
+- Tests nuevos en `calculos.test.mjs`: pegar una hoja que se solapa con lo que ya
+  había solo añade lo de verdad nuevo, sin tocar lo existente; repetir el mismo
+  pegado dos veces no duplica nada.
+- Verificación: `npm run test` completo, 764 comprobaciones, 0 fallidas.
+- Aparte, sin tocar código: se extrajeron del "CALENDARIO GULA" de Google Sheets del
+  dueño (hoja "2026. EVENTOS" + lista "BODASGULA 2026") 359 apuntes de 2026 listos
+  para pegar aquí una vez esto esté desplegado — 32 bodas, 3 comuniones, 29
+  vacaciones, 9 días cerrados y 286 tareas/visitas. Los datos reales NO van en el
+  repo (viven en Firestore, no en el código): el JSON se le pasó al dueño aparte.
+  Excluidos de esta pasada por datos poco fiables en la hoja de origen: junio, julio
+  y diciembre (semanas mal cuadradas o contenido duplicado/vacío) — quedan
+  pendientes de repasar a mano. **Repasado el 2026-09-30**: esa importación leyó con
+  el mes del bloque los días de otro mes que la hoja pinta en la primera o la última
+  fila de cada mes. Lo que falta, lo que sobra y cómo leer la hoja bien están en
+  "Estado de HOY", al final.
+
+**Modo carga → Resumen: la tabla se ajustaba al pixel justo y podía obligar a
+arrastrar — HECHO**: el dueño lo vio en la app real (captura). `.resumen-tabla-producto`
+estaba tuneada a mano para medir exactamente los 810px disponibles dentro del modal
+(comentario en el código: "con 220 la tabla medía 813px... con 190 sobran ~33px");
+con `width: 100%` en la tabla, cualquier margen que se liberara (menos padding, menos
+max-width) el navegador se lo repartía entre las demás columnas hasta rellenar el
+ancho entero — no quedaba NUNCA margen real, así que una fuente de sistema un pelín
+más ancha que la de las pruebas volvía a desbordar.
+- Cambiado `.resumen-tabla` a `width: auto` (con `max-width: 100%` de tope): ahora la
+  tabla mide lo que de verdad necesita su contenido, no lo que quepa en el hueco —
+  733px de 810 disponibles, ~76px de margen real. Si algún día hiciera falta más
+  (nombres/sufijos más largos), cae en el scroll de `.resumen-tabla-wrap` como red,
+  no se rompe.
+  También menos padding por celda (12px → 8px) y `.resumen-tabla-producto` de 190px
+  a 165px, para no depender de un solo número exacto.
+- Test nuevo en `app.test.mjs`: el margen de la tabla del Resumen (boda) tiene que
+  ser de al menos 40px, no solo "no desborda" — así una vuelta a apretarla al pixel
+  justo se pilla en la próxima batería, no en una captura del dueño.
+- Verificación: medido con Playwright a 1280/1440/1920px (0 desbordamiento, ~76px de
+  margen en los tres) y a 320px (la página entera sigue sin desbordar).
+
+**Calendario: casillas del mes desbocadas en desktop con un día muy cargado — HECHO**:
+el dueño lo vio con los 359 apuntes reales ya pegados (captura de septiembre 2026):
+días con seis apuntes estiraban su casilla —y su fila entera de la rejilla— mucho más
+que las de al lado, mientras días vacíos se quedaban en el mínimo. Causa: en
+`Mes()` (`Calendario.jsx`), a partir de 560px (`.cal-chip{display:flex}`) se pintaba
+UN chip por apunte sin límite; `min-height` en `.cal-celda` es un suelo, no un techo,
+y `overflow:hidden` no recorta nada porque el alto natural de la columna flex ya
+cuenta con cada chip.
+- **Deshecho por el dueño en #234** ("mostrar todos los eventos sin truncar"): la
+  casilla vuelve a enseñar todos los chips (`overflow-y: auto`) y el día cargado estira
+  su fila; prefiere verlos todos. `CHIPS_VISIBLES` y `.cal-chip-mas` quedan sin uso.
+  #234 no tocó las dos pruebas de este tope y la batería completa se quedó en rojo
+  desde el 24-09 —y con ella todos los despliegues, que no publican en rojo—; ahora
+  comprueban lo contrario: el día con cinco apuntes enseña los cinco y no hay "+N más".
+- Tope de `CHIPS_VISIBLES = 3` por casilla (constante junto a `ICONOS`); a partir del
+  cuarto apunte sale un `+N más` (`.cal-chip-mas`, mismo trato visual que `.cal-mas`
+  en móvil). Como `del` ya viene con los eventos primero (`porDia()`), lo que se
+  recorta es siempre lo menos importante del día. Nada se pierde: la casilla entera
+  ya era (y sigue siendo) un botón que abre `PanelDia` con la lista completa.
+- Solo desktop (≥560px): en móvil el problema no existía — ahí siempre se enseñó el
+  resumen compacto de iconos (`.cal-puntos`, ya capado a 1 icono+"×N" bajo 420px) y
+  la casilla es cuadrada (`aspect-ratio: 1/1`), así que su alto no depende del
+  contenido.
+- Verificado con el banco de pruebas (`pruebas/calendario.html`, datos inventados:
+  tres eventos + dos vacaciones el mismo día, el mismo caso que el del dueño) a
+  360/1280/1920px: la casilla cargada ya no desborda su fila, se ve "+2 más" y el
+  resto de casillas de la semana quedan a la misma altura.
+
+**Calendario: todos los apuntes a la vista, también en el móvil — HECHO**: el dueño,
+tras #234: "que se vean todos los eventos y no ponga lo de 2 más o 3 más, que si no no
+es nada visual; y en el móvil también". En el móvil la casilla enseñaba solo iconos y
+un "×3" (`.cal-puntos`/`.cal-mas`), y en escritorio los chips hacían scroll dentro de la
+casilla (`overflow-y: auto` de #234).
+- **Una barrita por apunte, todas, a cualquier ancho** (`Mes()`): desaparecen
+  `.cal-puntos`, `.cal-mas`, `.cal-chip-mas` y `CHIPS_VISIBLES`. La casilla deja de
+  ser cuadrada (`min-height` 52px móvil / 92px ≥560px) y crece con lo que lleve, la
+  fila con ella; sin scroll dentro. **Ningún nombre cortado** (el dueño, tras ver la
+  primera versión: "pero se corta, que no se corte en el calendario"): ≥560px lleva
+  icono, nombre entero en las líneas que haga falta (parte por palabras: si no cabe
+  con el pax, baja el pax; entre 560 y 899px sin icono, que se quedaba solo en su
+  línea) y pax. En el móvil (casillas de 40-55px, no cabe entero ni "Comunión") la
+  casilla lleva un punto de su color por apunte y los nombres van debajo de la semana
+  (ver abajo). "Lo que viene" tampoco corta con "…".
+- **La gente del día junto al número** (`.cal-celda-cab`), no en la esquina de abajo,
+  donde tapaba la última barrita.
+- **El móvil, por semanas** (`SemanaEnLista`, solo <560px). Primero fueron barritas
+  sin texto y una lista "día a día" al final del mes: el dueño lo vio con sus datos
+  de verdad (muchas vacaciones y tareas) y "no se ve nada, cámbialo". Ahora cada fila
+  de siete días marca con un punto de su color cada evento, tarea o recogida (flojos
+  los que no son evento), y JUSTO DEBAJO de esa fila va lo de esa semana: un día por
+  fila, fecha grande a la izquierda y cada apunte con su nombre entero, tipo, hora,
+  sitio y pax. Lo que dura varios días sale una vez (el primer día de la semana en
+  que cae) con "hasta el N". Las vacaciones y los días cerrados (`AUSENCIAS`) no salen
+  en la casilla: van en una línea al final de su semana ("Raúl 1–2 · Ana 7–13"). Hoy
+  resaltado, lo pasado apagado, los días con choque con el borde rojo. Tocar un día de
+  la lista abre `PanelDia`, igual que la casilla.
+- **La semana en curso, lo primero** (el dueño: "estaría bien que esté al principio la
+  semana activa"). En el mes de hoy, en el móvil, las semanas que ya pasaron se
+  pliegan tras un botón ("Ver las N semanas pasadas", `.cal-ver-pasadas`; clase
+  `es-pasada` en la fila y en su lista) y la primera fila que se ve es la de hoy. En
+  otros meses y en ancho (≥560px) se ve el mes entero, como siempre.
+- El total de gente del día suma con `Number(a.pax)`: en la captura del dueño un día
+  salía "10015"; los apuntes pasan por `saneaApunte`, que solo guarda pax numéricos,
+  así que lo más probable es un apunte con el pax mal tecleado — el `Number` es por si
+  entra uno como texto por otro camino.
+- Pruebas en `app.test.mjs` (bloque del calendario, 320/390/768/1280): todas las
+  casillas enseñan todas sus barritas visibles y sin scroll, ni "×N" ni "+N", ningún
+  nombre cortado ni palabra partida en el calendario (tampoco en "Lo que viene"); la gente
+  en la línea del número; en el móvil, una lista justo debajo de cada semana con los
+  nombres enteros, hora y pax, las vacaciones en su línea una vez por semana, y tocar
+  un día lo abre; en el mes de hoy la primera semana que se ve es la de hoy y el botón
+  despliega las pasadas; por encima de 560px la lista no sale y el mes sale entero.
+
+**Todas las filas con su unidad, y editable a mano — HECHO**: el dueño: "hay cosas que
+no tienen unidades o cajas; analiza bien y ponle a todos, permite poder editarlo si se
+quiere, pero que los que se actualizan solos como las cajas o packs sigan funcionando".
+Medido con todos los generadores: de ~400 items, 304 salían con el número solo.
+- **Unidad por defecto** (`unidadPorDefecto(label, categoria)`, `checklist-format.js`):
+  solo para los que no traen unidad del generador ni cuentan cajas/bateas solos, y
+  solo con número (debajo de un "—" no dice nada). Licores en "botellas", personal en
+  "personas", carbón y leña en "sacos", Red Bull en "latas", leches en "bricks",
+  vermut y cerveza sin gluten en "botellas"; el resto, "uds". Concuerda con el número
+  como las demás (`UNIDADES_ENVASE` suma ud, persona, saco, brick): "1 ud", "23 uds".
+- **Agua con gas y cerveza 0,0** entran en `CAJA_POR_LABEL` (24): `calcBebidas` ya las
+  sacaba en cajas de 24 y no lo decían.
+- **Editable a mano** (`unidadesManuales`, mapa `"categoria::labelOriginal" → texto`):
+  la unidad de debajo del número es un botón que se lee como el texto de siempre; al
+  tocarlo pasa a campo (16px, sin zoom de iOS). Enter guarda, Escape no; tocar y
+  salir sin cambiar no la fija. Vacío = vuelve a la de la app, así las cajas, bateas y
+  packs automáticos siguen solos mientras nadie los toque. La puesta a mano manda sobre
+  todo (cajas incluidas), concuerda con el número si es un envase conocido y sale en
+  acento y cursiva. Con el link de solo marcar se lee pero no se toca.
+- El botón de la unidad mide 16px de alto (12 de ancho en "ud"): gana zona de toque
+  con un `::after` invisible de al menos 44×32, pegado a su borde derecho y crecido
+  hacia abajo (no hacia la caja de la cantidad). En las filas de alquiler, en claro,
+  la unidad va en `--text-label`: el gris de siempre daba 4,48 sobre el amarillo. No
+  con `color-mix()`: su color calculado sale como `color(srgb 0.68 …)` y la prueba de
+  contraste lo leía como casi negro.
+- El estado nuevo va como los demás ajustes a mano: en `getEstadoActual`,
+  `SETTERS_SYNC` (nube), `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, "Deshacer", y
+  se migra al renombrar un item manual o una categoría. La tupla de cada item lleva un
+  séptimo dato (`unidadManual`) y `fmtCantidadCompleta(label, qty, sufijo,
+  unidadManual)` lo respeta en Modo carga, Vista previa, Word y copiar texto.
+- Pruebas: puras en `calculos.test.mjs` (unidad por defecto, singulares nuevos, cajas
+  de agua con gas/0,0, manual sobre automática, `sanearEstado`); en `app.test.mjs`
+  ("Todas las filas con su unidad, y editable a mano"): boda y producción sin ninguna
+  fila con número sin unidad, cambiar a mano, Escape, cajas automáticas que siguen,
+  manual sobre cajas y en singular, vaciar devuelve la automática, Modo carga y solo
+  marcar. Las pruebas que leían `.item-batea-info` como texto usan `textoUnidad()`.
+
+**Modo carga: lo que falta por preparar (a medias) — HECHO**: el dueño: "quiero poder
+poner la cantidad que queda pendiente, porque a veces no tengo todo porque tiene que
+venir el proveedor, y si no luego es un lío con lo que falta; estudia la mejor forma
+para no olvidarnos". En Prep. un item era preparado o no, y lo que faltaba vivía en la
+cabeza de alguien.
+- **Estado nuevo `pendientes`** (App.jsx): mapa `"categoria::labelOriginal" → { faltan,
+  nota? }`. Va como los demás de Modo carga: `getEstadoActual`, `SETTERS_SYNC` (la nube
+  fusiona clave a clave, así que dos personas apuntando cosas distintas no se pisan),
+  `ETIQUETAS_CAMPO`, `MAPAS` de `sanearEstado`, se vacía al duplicar el evento y se
+  migra al renombrar un item manual o una categoría.
+- **Apuntarlo** (Modo carga · Prep., `FilaCargaPrep`): un reloj de arena en cada fila
+  abre "¿Cuántos faltan? (de N)" y "Quién lo trae o cuándo (opcional)". Guardar con
+  algo pendiente le quita la marca de preparado (no está todo); vacío o 0 lo borra. El
+  botón va dentro de la etiqueta de la fila pero no marca la casilla.
+- **Que no se olvide**: la fila, en ámbar, dice "Faltan 3 de 8 botellas · proveedor
+  martes" (en Prep. y en Salida); arriba de Modo carga, un recuadro "Falta por preparar
+  (N)" con todo lo pendiente, y tocar cada línea lleva a su fila; la cuenta de arriba
+  añade "· N a medias"; y en la lista normal la fila lleva la etiqueta "FALTAN N".
+- **Cuando llega**: "Ya ha llegado todo" en el mismo recuadro, o marcar la casilla de
+  preparado, lo da por completo y quita lo pendiente (`handleTogglePreparado`). En
+  Salida marcar como cargado NO lo quita: puede salir incompleto y lo que falta sigue
+  a la vista.
+- Pruebas: `calculos.test.mjs` (`sanearEstado` con `pendientes`) y `app.test.mjs` ("Lo
+  que falta por preparar": apuntar sin tocar la casilla, la fila, el recuadro, la
+  cuenta, Salida, "Ya ha llegado todo", la lista normal, guardado con el evento y
+  marcar la casilla).
+
+**Modo carga con muchas cosas a medias: recuadro con scroll y filas de Prep. en su sitio
+— HECHO**: captura del dueño con 36 cosas a medias: "pon un scroll para que no sea tan
+largo llegar a la checklist, y mira la distribución, que ahora se corta o se bajan".
+- **El recuadro "Falta por preparar"** medía 1.700px: la lista empezaba dos pantallas
+  más abajo. Ahora la lista va dentro de `.carga-pendientes-lista`, con tope de
+  `min(42vh, 17rem)` y scroll propio (se ven unas cinco). Las sombras arriba y abajo
+  (fondos `local` + `scroll`, CSS puro) avisan de que hay más.
+- **Cada línea del recuadro con la misma forma** (rejilla): el nombre, cuánto falta a
+  la derecha (`.carga-pendientes-cant`) y la nota debajo (`.carga-pendientes-nota`).
+  Antes era texto seguido, y según lo largo del nombre el resto cabía o bajaba.
+- **Las filas de Prep. en rejilla** (`.carga-row-prep`, solo con el reloj de arena):
+  casilla | nombre | marcas | cantidad | reloj. En flex, según el nombre, bajaba la
+  cantidad, el reloj o los dos: a 393px con la letra al 115%, 22 de 136 filas, en
+  cuatro formas distintas; a 320px, casi todas.
+  - El nombre nunca baja de su palabra más larga (`minmax(min-content, 1fr)`). La
+    cantidad larga ("1100 (44 bateas de 25)") se parte en dos líneas, alineada a la
+    derecha.
+  - Lo que falta va debajo, de la columna del nombre al borde: ahora es hijo directo
+    de la fila, no del nombre, donde se estrujaba ("Faltan 1 / de 1 bolsa").
+  - Si ni así cabe (`@container cargafila (max-width: 17.5em)`, en em de la propia
+    fila, así que con la letra grande cambia antes), TODAS las filas pasan a la misma
+    forma de dos pisos: el nombre arriba con todo el ancho, y cantidad y reloj debajo
+    a la derecha.
+  - Medido: a 340, 360 y 375px (letra ×1) y a 393 y 412px (×1.15), una línea. A
+    320px, y a 360–375px con letra ×1.15, dos pisos. En todos, 0 desbordes y 0
+    palabras partidas, también en producción, cumpleaños y comunión.
+  - Salida (sin reloj) sigue en flex como antes; lo que falta, en su línea, alineado
+    con el nombre.
+  - Las marcas "cargado"/"prep."/"revisar" van juntas en `.carga-marcas`, para que
+    ocupen una sola columna.
+- Prueba en `app.test.mjs` ("Muchas cosas a medias", 393 ×1 y ×1.15, y 320): con 24
+  a medias, el recuadro desliza y no pasa de media pantalla, y la lista empieza en la
+  primera pantalla. Cada línea del recuadro tiene su forma. En Prep., una sola
+  columna de relojes, una de cantidades y una sola forma; sin desbordes ni palabras
+  partidas. Contra `main` sin el arreglo da 12 fallos; con él, 0.
+
+**Modo carga: marcar varios a la vez se desmarcaba entre sí — HECHO**: bug reportado
+por el dueño ("cuando hay varios checkeando cosas en modo carga se les desmarca a
+otros"). Causa, en `guardarEventoNube()` (`nube.js`): la transacción ya fusionaba
+CAMPO a campo contra el `baseline` (PR previo, ver más abajo), pero `checkeados` /
+`preparados` / `vueltos` / `roturas` / `marcasRevisar` / `notasCheck` son cada uno
+UN SOLO campo con las marcas de TODOS los items (`{"categoría::item": true, ...}`).
+Con dos personas marcando ítems DISTINTOS del mismo camión casi a la vez, las dos
+tocan ese mismo campo — así que se subía la copia entera del mapa de quien guardara,
+que todavía no sabía nada de la marca de la otra persona, y se la comía.
+- La fusión ahora entra una clave más adentro para cualquier campo que sea un objeto
+  plano (no un array: mezclar por índice no tiene sentido ahí): solo se sube encima
+  la clave-item que ESTE aparato cambió de verdad (comparada contra su propio
+  `baseline`); el resto de items —los que pueda haber marcado otra persona mientras
+  tanto— se quedan tal cual están en el servidor. Dos personas marcando el MISMO
+  item a la vez siguen resolviéndose "gana el último" (no hay forma de saber cuál es
+  la verdad), pero ya no se lleva por delante los items de los demás.
+- Nueva función `fusionaCampo()` en `nube.js`, usada automáticamente para cualquier
+  campo con esa forma — no hace falta listar `checkeados`/`preparados`/etc. a mano,
+  así que un campo nuevo del mismo tipo queda protegido sin tocar este fichero otra
+  vez.
+- Test nuevo en `sincronizacion.test.mjs` ("Modo carga: varios marcando items
+  DISTINTOS del mismo camión"): dos marcas distintas no se pisan, desmarcar tampoco
+  arrastra a los demás, y el mismo item a la vez sigue resolviéndose por orden de
+  llegada sin tocar el resto.
+
+**Auditoría a fondo de cálculos automáticos: 7 bugs reales cazados — HECHO**: pedida
+por el dueño ("algunas cosas no las está calculando bien"), sin tocar nada hasta
+confirmar cada hallazgo con un caso numérico concreto. Dos pasadas de solo lectura
+(generadores de checklist + `calculos.js`; formulario + tiempos/personal/precios) y
+tres preguntas de negocio resueltas con el dueño antes de arreglar nada.
+- **Montaje se dividía por la gente de logística** (`tiempos-carga.js`), en contra de
+  su propio comentario ("tiempo de todo el equipo, no se divide"): pasaba por la
+  misma `reparte()` que carga/descarga. Con poca gente de logística salía disparado
+  (3h31 con 1 persona, 1h47 con 3, para el mismo evento). Ahora se calcula aparte,
+  sin dividir.
+- **Corporativo con tarta no cargaba la mesa** (`checklist-generadores.js`): boda,
+  comunión y cumpleaños sí generaban su línea de mesa; corporativo cargaba pala y
+  cuchillo (sin condición de tipo) pero nunca la mesa donde ponerla, aunque el
+  formulario pregunta por la tarta en los cuatro tipos desde siempre.
+- **Cumpleaños: "Descansadores de paella" fijo en 2**, sin mirar cuántas paelleras
+  había de verdad (boda sí escalaba). Con muchas paelleras a la vez faltaban
+  soportes.
+- **Producción: "Trípode" fijo en 1** (+ frituras), cuando debía escalar con el nº de
+  paelleras igual que "Paravientos", calculado justo al lado con la misma cuenta.
+- **`personasPorPlatoEntrante` sin valor por defecto** en los tres generadores puros:
+  llamado sin pasar por el `useState` de App.jsx (p.ej. al recalibrar un evento
+  guardado sin ese campo) daba "cada undefined pax" en vez de caer al mismo 4 de la
+  UI. Añadido `= 4` en el destructuring de `opts`, igual que ya hacía la interfaz.
+- **Producción de varios días: los vasos del personal no se multiplicaban por
+  `nDias`**, mientras que el agua de la misma gente sí. Un rodaje de 3 días se
+  quedaba con los vasos desechables de uno solo.
+- **"Agua con gas" y "Cerveza 0,0" no se pedían en cajas de 24** pese a que su propio
+  comentario lo decía ("cajas de 24, 1 caja mínimo real") — salían como botellas
+  sueltas sin redondear ni tener suelo. La Cerveza 0,0 además ignoraba las horas de
+  barra libre, a diferencia de la cerveza con alcohol de al lado (media hora de
+  cóctel pedía lo mismo que una barra libre entera). Las dos ahora redondean a caja
+  de 24 con mínimo de una, y la 0,0 ya responde a las horas de barra como su hermana
+  con alcohol (la temporada se deja fuera a propósito: no hay dato real que diga que
+  el 0,0 se beba distinto en verano).
+- Confirmado con el dueño y dejado tal cual, tras revisar el porqué: el ratio de
+  logística SÍ debe escalar con pax (2 en 100, 3 en 150, 4 en 300) — solo se corrigió
+  el comentario de cabecera, que se había quedado con la versión vieja ("2 siempre").
+- Revisado y descartado como bug (documentado a propósito, con test que lo prueba):
+  el redondeo simétrico de la cerveza normal a cajas de 24 (`Math.round`, no
+  `Math.ceil` — ±12 tercios de margen aceptado); los ratios de personal de los tres
+  generadores; `conMargen()`; las fórmulas de champaneras/alturas de buffet/mesas
+  altas/calientes.
+- Test nuevo en `calculos.test.mjs` ("Auditoría de cálculos: 6 bugs reales cazados
+  sin llegar a un evento"): uno por hallazgo, cada uno con el caso numérico que lo
+  demuestra.
+- Verificación: `npm run test` completo antes de fusionar.
+
+**Palabras partidas y nombres cortados en el móvil — HECHO**: captura del dueño a
+393px con la letra de Android algo grande: "Cápsul/as café (para/el/person/al)" en
+seis líneas, "Cervez/a Alham/bra", "BEBIDAS F…" y la lista leyéndose a través de la
+barra fija. Reproducido tal cual subiendo la fuente raíz al 115% (la app va en rem,
+que es lo que agranda el ajuste de accesibilidad del móvil). Nada se salía ni se
+recortaba —el barrido responsive pasaba—, solo se leía mal.
+- **Fila del item, en columnas fijas** (segunda pasada: el dueño vio la primera "sin
+  simetría" —con `flex-wrap` unas filas iban en una línea y otras en dos, y cada caja
+  de cantidad caía en un sitio: 21 posiciones distintas en una boda—). Ahora es una
+  rejilla: nombre | cantidad | ✎✕, y el envase DEBAJO del número, en pequeño, sin
+  "=" y alineado a su borde derecho (tercera pasada, lo pidió el dueño: debajo ya se
+  lee como la misma cantidad dicha en envases). La columna de cantidad
+  mide lo que 4 cifras (4,75em escritorio / 4,5em móvil, medido): las 115 cajas
+  numéricas de una boda salen en UNA posición y del mismo ancho, y ✎✕ en otra. El
+  grupo `.item-controles` va con `display: contents` para que sus hijos entren en la
+  rejilla. ✎✕ a 34px de ancho en el móvil (toque 34×40). Si la LISTA es más estrecha
+  que 17em (container query, se mide con la letra de verdad: 320px con la letra al
+  115-130%), el nombre sube a toda la fila y lo demás baja, en las mismas columnas.
+  `overflow-wrap: anywhere` → `break-word`, y `conCortes()` (`components/cortes.jsx`,
+  compartido con Modo carga) mete `<wbr>` tras cada "/" también en la checklist.
+  Alto de la lista a 393px con letra al 115%: 9.031px (antes del arreglo, 9.493).
+- **El envase concuerda con el número, y en vivo**: "1 caja de 24" / "3 cajas de 24",
+  "1 batea", y también los sufijos fijos que eran la etiqueta de lo que se cuenta
+  ("botellas", "packs (6 uds)", "caja(s)"): `envaseSegunCantidad()`
+  (`checklist-format.js`) pasa a singular o plural solo la primera palabra si es un
+  envase (batea, bolsa, bote, botella, caja, carga, lata, pack, paquete, rollo, taxi);
+  "kg" y lo demás no se toca. Se aplica al resolver la checklist (App.jsx, así Modo
+  carga y el Word ya lo llevan) y en la fila mientras se teclea. Hielo "1 taxi" y
+  carpas "falta 1, hay que alquilarla" en singular. Sin número ("—") no se cuentan
+  cajas: antes salía "0 cajas de 24".
+- **Cabecera de categoría**: el nombre parte en líneas por palabras en vez de "…";
+  nunca encoge por debajo de su palabra más larga (`min-width: min-content`) y, si ni
+  esa cabe, la que baja de línea es la píldora (la cabecera hace `flex-wrap`). En
+  ≤560px los ↑ ↓ ✎ pasan de 40 a 34px de ancho (alto 40, toque ≥32 como pide la
+  prueba de zonas táctiles). A 320px la píldora baja en 8 de 12: no cabe de otra forma
+  sin esconder botones.
+- **Barra fija del móvil**: opaca (`--card-bg`) en vez de cristal: donde el desenfoque
+  no se pinta (ahorro de batería, algunos Android) la lista se leía a través. El
+  nombre del evento, en dos líneas antes que "Boda Rita y Ll…".
+- **Modo carga**: mismo problema en las filas ("(estándar/de-scafeinado)",
+  "(Seagrams/Ta-nqueray)"): `.carga-nombre` con `min-width: min-content` y la fila con
+  `flex-wrap`, así baja la cantidad antes que partir el nombre. En el Resumen, 46 de
+  130 productos salían con "…": ahora parten en líneas, con icono y nombre en bloque y
+  el ancho de columna fijo (sin `width` la tabla la estrechaba a la palabra más larga).
+  `conCortes()` mete `<wbr>` tras cada "/": el navegador no parte ahí y
+  "estándar/descafeinado" era una sola palabra de 170px en 132.
+- Test nuevo en `app.test.mjs` ("Ninguna palabra partida, ni con la letra grande"),
+  con `palabrasPartidas()`: mide cada tira de letras con `getClientRects()` y falla si
+  sus trozos caen en líneas distintas. 320 y 393px × letra al 100 y 115%: checklist,
+  cabeceras, barra fija y Modo carga (Salida, Vuelta, Resumen). Contra `main` sin el
+  arreglo da 20 fallos; con él, 0. Y la simetría: todas las cajas de cantidad y los
+  ✎✕ en una sola posición (contra la primera pasada, en flex, falla en los 4 casos). Barrido a mano además en formulario (12 preguntas)
+  y calendario, y a 360/412 y letra al 130%: 0 palabras partidas, 0 recortes.
+  "Lo que pone debajo de la cantidad" (sin "=", debajo y a la derecha de la caja,
+  singular/plural al teclear) y el de hielo/carpas en singular; puras de
+  `envaseSegunCantidad()` en `calculos.test.mjs`.
+
+**Protección contra sobreescritura concurrente al abrir la app — HECHO**:
+- **Bug cazado**: al abrir la app con un evento activo en `localStorage`, el `useEffect` de auto-guardado de archivo (`estadoActualJSON`) saltaba a los 1,2s en el montaje inicial sin que el usuario tocara nada, subiendo a Firestore la foto vieja local y pisando las cantidades que un compañero estuviera editando en ese instante.
+- **Solución en `App.jsx`**:
+  - `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` inicializados con `estadoActualJSON`: los efectos de guardado comprueban si el estado actual es idéntico al último guardado/cargado (`estadoActualJSON === ref.current`) y abortan de inmediato en el arranque sin programar timers de guardado.
+  - En la sincronización inicial de la nube (`sincronizar`), si el evento abierto en pantalla existe en el archivo remoto, se hidrata la pantalla con la versión fresca de la nube mediante `settersSyncRef` y se actualiza la referencia, evitando que la copia obsoleta de `localStorage` persista en pantalla o se re-suba.
+  - Las suscripciones en tiempo real (`suscribirArchivoNube` y `suscribirEventoNube`) actualizan `ultimoArchivoGuardadoJSONRef` y `ultimoGuardadoNubeRef` al aplicar cambios remotos, evitando ecos y bucles de re-guardado.
+- Test nuevo en `sincronizacion.test.mjs`: "Arranque con evento abierto no pisa cambios de otra persona".
+- **Comprobación de cálculo de mesas de cocina**:
+  - Mesas rectangulares de 1,8m (almacén propio Gula): las 4 a 6 mesas de apoyo de cocina se suman directamente con las mesas de comer en la misma línea `"Mesas de 1,8m"`.
+  - Mesas redondas (alquiler externo): se desglosan por separado: `"Mesas de 1,8m"` para cocina y `"Mesas redondas ... (alquiler)"` para comensales.
+
+**Dos planes grandes, sin código todavía**: `PLAN_COCINA.md` y `PLAN_INVENTARIO.md`.
+Presupuesto no: lo lleva otra app del dueño (ver al principio de este archivo).
+
+**Y lo de siempre**: lo nuevo está probado contra datos inventados, no contra un
+septiembre con tres bodas el mismo día — no parar de añadir sin haberlo usado antes.
