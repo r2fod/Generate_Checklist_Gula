@@ -7,7 +7,7 @@
 // Todo pasa por saneaLista antes de guardarse, que es la misma puerta por la que entra
 // lo que se escribe a mano. Un apunte del asistente no puede colarse por un camino con
 // menos comprobaciones que el de una persona.
-import { saneaLista, idDeApunte } from "../calendario/apuntes.js";
+import { saneaLista, idLibre } from "../calendario/apuntes.js";
 
 export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
   return function aplicar(propuesta) {
@@ -17,7 +17,8 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       // El id NO es aleatorio: la identidad de un apunte es idDeApunte(fecha, título),
       // que es lo que hace que el mismo apunte traído dos veces sea uno. Poner un id al
       // azar lo rompería y el calendario acabaría con duplicados que parecen distintos.
-      const [limpio] = saneaLista([{ ...datos, id: idDeApunte(datos.fecha, datos.titulo) }]);
+      // idLibre: el de siempre, salvo que otro apunte con otro título ya lo tenga
+      const [limpio] = saneaLista([{ ...datos, id: idLibre(datos.fecha, datos.titulo, apuntes) }]);
       if (!limpio) return { error: "Ese apunte no ha pasado las comprobaciones: revisa la fecha y el tipo." };
       guardar(limpio);
       return { creado: limpio.titulo, fecha: limpio.fecha };
@@ -29,11 +30,12 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       // Si cambia la fecha o el título, cambia la identidad. Se recalcula y se borra el
       // viejo: si no, quedarían los dos y el calendario enseñaría el evento dos veces.
       const fusionado = { ...antes, ...datos.cambios };
-      const idNuevo = idDeApunte(fusionado.fecha, fusionado.titulo);
+      const idNuevo = idLibre(fusionado.fecha, fusionado.titulo, apuntes.filter(a => a.id !== antes.id));
       const [limpio] = saneaLista([{ ...fusionado, id: idNuevo }]);
       if (!limpio) return { error: "El cambio deja el apunte inválido." };
-      if (idNuevo !== antes.id) borrar(antes.id);
-      guardar(limpio);
+      // El viejo se quita en el MISMO guardado: borrar y guardar por separado partían
+      // de la misma foto y el guardado lo volvía a meter (salían los dos)
+      guardar(limpio, idNuevo !== antes.id ? antes.id : undefined);
       return { editado: limpio.titulo };
     }
 

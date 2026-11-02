@@ -22,7 +22,7 @@ import {
 import { sanearEstado, CAMPOS_VIGILADOS, cambiosDeCantidad } from "../estado.js";
 import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formulario/instalar.js";
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
-import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos } from "../calendario/apuntes.js";
+import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos, aVistaProxima, idDeApunte, idLibre } from "../calendario/apuntes.js";
 import { sugerenciasDeLimpieza, grupoDeLista } from "../calendario/limpieza.js";
 import { nucleoDeTitulo } from "../texto.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
@@ -1573,6 +1573,47 @@ console.log("\n══ Qué checklists se crean solas, y cuáles NO ══");
     [{ fecha: "2026-09-04", titulo: "Boda sin id", tipo: "boda", pax: 100 }], {}, { hoy });
   ok(sinId.enlaces.length === 0 && Object.keys(sinId.nuevas).length === 0,
     "un apunte sin id no genera enlace: sin él no se puede marcar y marcaría a los demás");
+}
+
+// ── La auditoría E1 del calendario (PLAN_MEJORAS) ─────────────────────────────
+console.log("\n══ Calendario: varios días, ids que chocan y el cliente de cada año ══");
+{
+  const hoy = new Date("2026-09-12T09:00:00");
+  // Un rodaje del 10 al 13 mirado el día 12: antes "Lo que viene" daba [] (solo miraba
+  // el primer día). Sigue, en curso, pero no se le crea checklist (ya ha empezado).
+  const rodaje = saneaLista([
+    { fecha: "2026-09-10", hasta: "2026-09-13", titulo: "Rodaje X", tipo: "produccion", pax: 40 },
+    { fecha: "2026-09-01", hasta: "2026-09-05", titulo: "Rodaje acabado", tipo: "produccion", pax: 40 },
+    { fecha: "2026-09-15", titulo: "Boda Y", tipo: "boda", pax: 90 },
+  ]);
+  const viene = aVistaProxima(rodaje, { hoy });
+  ok(viene.length === 2 && viene[0].titulo === "Rodaje X" && viene[0].enCurso && viene[0].faltan === 0
+    && viene[1].titulo === "Boda Y" && viene[1].faltan === 3 && !("enCurso" in viene[1]),
+    `un evento de varios días sigue en "Lo que viene" mientras dura, el acabado no (${JSON.stringify(viene.map(a => [a.titulo, a.faltan, !!a.enCurso]))})`);
+  ok(!apuntesPorPromover(rodaje, { hoy }).some(a => a.titulo === "Rodaje X")
+    && !Object.values(checklistsPorCrear(rodaje, {}, { hoy }).nuevas).some(e => e.nombreEvento === "Rodaje X"),
+    "pero lo que ya ha empezado no se promueve ni se le crea checklist, como antes");
+
+  // Dos títulos que solo se diferencian pasado el carácter 40 daban el mismo id el
+  // mismo día, y el nuevo sustituía al otro. idLibre le pone -2; el mismo título
+  // (aunque cambien tildes o mayúsculas) sigue siendo el mismo apunte.
+  const t1 = "Cena de Navidad Empresa Construcciones Ejemplo Planta 1";
+  const ya = saneaLista([{ fecha: "2026-12-12", titulo: t1, tipo: "corporativo" }]);
+  const base = idDeApunte("2026-12-12", t1);
+  ok(ya[0].id === base && idLibre("2026-12-12", t1.replace("1", "2"), ya) === `${base}-2`,
+    `dos títulos largos que chocan: el nuevo va con -2 (${idLibre("2026-12-12", t1.replace("1", "2"), ya)})`);
+  ok(idLibre("2026-12-12", t1.toUpperCase(), ya) === base && idLibre("2026-12-13", t1, ya) === idDeApunte("2026-12-13", t1),
+    "el mismo título sigue dando el mismo id, y otro día no choca con nada");
+
+  // El cliente de todos los años: la checklist del año pasado tiene el mismo nombre.
+  // Enlazar con ella abría su checklist con sus checks; va aparte, con el año.
+  const navidad = saneaLista([{ fecha: "2026-09-20", titulo: "Comida Empresa X", tipo: "corporativo", pax: 60 }]);
+  const conPasado = checklistsPorCrear(navidad, { "Comida Empresa X": { evento: "corporativo", fechaEvento: "2025-09-19" } }, { hoy });
+  ok(conPasado.nuevas["Comida Empresa X 2026"] && conPasado.enlaces[0].nombre === "Comida Empresa X 2026" && conPasado.enlaces[0].nueva,
+    `con la del año pasado en el archivo, la de este año va aparte (${JSON.stringify(conPasado.enlaces)})`);
+  const mismoEvento = checklistsPorCrear(navidad, { "Comida Empresa X": { evento: "corporativo", fechaEvento: "2026-09-19" } }, { hoy });
+  ok(Object.keys(mismoEvento.nuevas).length === 0 && mismoEvento.enlaces[0].nombre === "Comida Empresa X" && !mismoEvento.enlaces[0].nueva,
+    "pero con unos días de diferencia es el mismo evento y se enlaza con el que hay");
 }
 
 {
