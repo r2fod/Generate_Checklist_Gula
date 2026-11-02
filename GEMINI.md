@@ -9,6 +9,7 @@
 1. `CONTEXTO.md`: "Orden de lectura" al principio y, sobre todo, "Estado de HOY"
    dentro de "Qué queda pendiente ahora mismo": qué está en producción, qué PR no se
    tocan, qué queda por hacer y qué datos del calendario hay que limpiar.
+   `HISTORIAL.md` (lo ya hecho) pesa más de 130 KB: no lo leas entero, busca con `grep`.
 2. `PENDIENTES.md`: la lista corta de lo que falta y de quién depende. El orden lo
    decide el dueño: pregúntale.
 3. `PLAN_MEJORAS.md`, `PLAN_COCINA.md` y `PLAN_INVENTARIO.md` solo si el dueño pide algo
