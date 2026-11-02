@@ -829,6 +829,24 @@ console.log("\n══ Cafetera de bar: bidón lleno y bidón vacío ══");
     "y sin café para invitados tampoco: la de bar no sale");
 }
 
+// ─── Horno pequeño: sus bandejas y las hondas ─────────────────────────────────
+// "Cuando se seleccione horno pequeño hay que agregar sus bandejas de horno más bandejas
+// hondas para calentar comida" (el dueño).
+console.log("\n══ Horno pequeño: bandejas de horno y bandejas hondas ══");
+{
+  const items = (tipo, pax, tipoHorno) => buildChecklist(tipo, pax, 2, 4, 0, { tipoHorno }).flatMap(c => c.items).filter(Boolean);
+  const valor = (tipo, pax, tipoHorno, label) => items(tipo, pax, tipoHorno).find(x => x[0] === label)?.[1];
+  const TIPOS = ["boda", "comunion", "corporativo", "cumpleanos", "produccion"];
+  ok(TIPOS.every(t => valor(t, 100, "pequeño", "Bandejas de horno") === "2" && valor(t, 100, "pequeño", "Bandejas hondas (calentar comida)") === "2"),
+    "con el horno pequeño, en todos los tipos, van sus 2 bandejas de horno y 2 hondas");
+  ok(TIPOS.every(t => valor(t, 100, "ambos", "Bandejas de horno") === "2"),
+    "con los dos hornos también (el pequeño está)");
+  ok(TIPOS.every(t => ["grande", ""].every(h => valor(t, 100, h, "Bandejas de horno") === undefined && valor(t, 100, h, "Bandejas hondas (calentar comida)") === undefined)),
+    "con el horno grande o sin horno no van");
+  ok(valor("boda", 40, "pequeño", "Bandejas hondas (calentar comida)") === "2" && valor("boda", 400, "pequeño", "Bandejas hondas (calentar comida)") === "8",
+    "las hondas crecen con la gente (una cada 50 pax, mínimo dos)");
+}
+
 console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
 {
   // Antes las carpas solo existían en producción (siempre al aire libre). En el resto
