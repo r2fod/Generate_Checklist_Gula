@@ -29,7 +29,7 @@ const HERRAMIENTAS_EN_CATEGORIA_CONSUMIBLE = [
 // bombona (vacía) es justo lo que se espera que vuelva con el equipo. Por eso NO están
 // aquí — si un día falta una bombona entera, eso sigue siendo una pérdida de verdad.
 const ITEMS_CONSUMIBLES = [
-  /^Cápsulas café/, /^Café molido/, /^Infusiones/, /^Azucarillos/, /^Leches variadas/,
+  /^Cápsulas café/, /^Café molido/, /^Infusiones/, /^Azucarillos/, /^Leches variadas/, /^Leche (entera|de avena|sin lactosa)/,
   /^Carbón$/, /^Leña$/, /^Pastillas de encender/,
   /^Cinta aislante/, /^Bridas/, /^Imperdibles/,
   /^Fairy/, /^Estropajo/, /^Papel plata/, /^Film/, /^Papel Chemine/, /^Bolsas de basura/,

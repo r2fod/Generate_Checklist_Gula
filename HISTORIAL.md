@@ -6,6 +6,14 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Café solo para el personal: 2 de leche entera, 2 de avena y 2 sin lactosa** ("cuando se
+  ponga solo cafe para personal que tambien agregue leches 2 de leche entera, 2 de avena,
+  2 sin lactosa", el dueño). Al apagar el café de invitados (`cafeParaInvitados: false`),
+  desaparecía la línea de `Leches variadas` y el personal se quedaba con cafetera y cápsulas
+  pero sin leche. Ahora `calcCafe` (`src/checklist-generadores.js`) añade
+  `Leche entera (para el personal)`, `Leche de avena (para el personal)` y
+  `Leche sin lactosa (para el personal)` (`2` de cada una), registradas también en
+  `src/consumibles.js` para que al gastarse no cuenten como rotura en la vuelta.
 - **Bebidas frías e hielo responden a las horas de cóctel y de copas (`src/calculos.js`)**
   ("veo que al cambiar las horas de barra libre o coctail no modifica las cantidades y
   deberia cambiar el ratio", el dueño). Antes la cerveza tenía tope duro en 4h totales

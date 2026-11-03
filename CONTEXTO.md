@@ -495,6 +495,10 @@ está en el historial de git y en las pruebas que los cubren):
   enrutado automático por niveles de coste (N1 `flash_lite`/`Argon Low`/`haiku`, N2
   `flash`/`Argon Medium`/`sonnet`, N3 `pro`/`Argon High`/`opus`), indicador visible de
   modelo/tarea e índices por líneas en `CONTEXTO.md` y `PLAN_MEJORAS.md`.
+- **Café solo para el personal (`src/checklist-generadores.js`) — HECHO**: cuando no hay
+  café para invitados (`!paraInvitados`) pero sí plantilla (`numPersonal > 0`), además de la
+  Nespresso y las cápsulas del personal se suman `2` de leche entera, `2` de avena y `2` sin
+  lactosa (marcadas como consumibles en `src/consumibles.js`).
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni

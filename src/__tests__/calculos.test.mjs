@@ -783,6 +783,12 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "sin invitados no se piden tazas, platos, infusiones ni jarras — eso es de invitados");
   ok(catCafe(soloPersonal).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
     "pero si el personal sí toma café, se lleva su propia cafetera");
+  ok(catCafe(soloPersonal).items.some(x => x[0] === "Leche entera (para el personal)" && x[1] === "2")
+    && catCafe(soloPersonal).items.some(x => x[0] === "Leche de avena (para el personal)" && x[1] === "2")
+    && catCafe(soloPersonal).items.some(x => x[0] === "Leche sin lactosa (para el personal)" && x[1] === "2"),
+    "y cuando es solo café para el personal, se llevan 2 de leche entera, 2 de avena y 2 sin lactosa");
+  ok(!catCafe(conInvitados).items.some(x => /^Leche (entera|de avena|sin lactosa) \(para el personal\)$/.test(x[0])),
+    "mientras que con café de invitados ya va la línea de Leches variadas");
   ok(JSON.stringify(vasosPersonal(conInvitados)) === JSON.stringify(vasosPersonal(soloPersonal)),
     "y los vasos de cartón del personal no cambian: son aparte, no dependen de esto");
   ok(JSON.stringify(catCafe(conInvitados).items.find(x => x[0] === "Cápsulas café (para el personal)"))
@@ -3099,6 +3105,10 @@ console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
   // Sueltos consumibles dentro de categorías por lo demás reutilizables
   ok(esConsumible("Café", "Cápsulas café (estándar/descafeinado)") === true,
     "las cápsulas se gastan aunque la cafetera (misma categoría) no");
+  ok(esConsumible("Café", "Leche entera (para el personal)") === true
+    && esConsumible("Café", "Leche de avena (para el personal)") === true
+    && esConsumible("Café", "Leche sin lactosa (para el personal)") === true,
+    "las leches del personal también son consumibles: si se gastan no son roturas");
   ok(esConsumible("Café", "Cafetera Nespresso") === false,
     "la cafetera en sí sí es reutilizable: si falta, es una pérdida de verdad");
   ok(esConsumible("Paella y fuego", "Carbón") === true, "el carbón se quema");
