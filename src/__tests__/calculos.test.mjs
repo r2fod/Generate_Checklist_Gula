@@ -105,9 +105,26 @@ console.log("\n══ Cerveza: las horas no pueden restar ══");
     `media hora de barra no pide menos que no tener barra (${cerveza(0)} → ${cerveza(0.5)})`);
   ok(cerveza(0) === cerveza(2),
     `sin barra se calcula como 2 horas, que es el suelo (${cerveza(0)})`);
-  ok(cerveza(4) === cerveza(8) && cerveza(8) === cerveza(12),
-    `y de 4h en adelante ya no sube: nadie bebe el doble porque la barra dure el doble (${cerveza(4)})`);
+  ok(cerveza(8) > cerveza(4) && cerveza(8) === cerveza(12),
+    `sube con barras más largas (4h:${cerveza(4)} → 8h:${cerveza(8)}) y de 8h en adelante se estabiliza (${cerveza(12)})`);
   ok(cerveza(4) % 24 === 0, `siempre en cajas de 24 (${cerveza(4)})`);
+
+  // Mover las horas de cóctel y de copas mueve las bebidas frías y el hielo
+  const bCoctelCorto = calcBebidas(100, 5, true, false, false, 4); // 1h cóctel + 4h copas
+  const bCoctelLargo = calcBebidas(100, 7, true, false, false, 4); // 3h cóctel + 4h copas
+  ok(bCoctelLargo.vinoBlanco + bCoctelLargo.vinoTinto > bCoctelCorto.vinoBlanco + bCoctelCorto.vinoTinto
+    && bCoctelLargo.tintoVerano > bCoctelCorto.tintoVerano
+    && bCoctelLargo.vermutRojo > bCoctelCorto.vermutRojo
+    && bCoctelLargo.cocaNormal > bCoctelCorto.cocaNormal
+    && bCoctelLargo.hieloKg > bCoctelCorto.hieloKg,
+    "subir las horas de cóctel sube vino, tinto de verano, vermut, refrescos y hielo");
+  const bCopasLargas = calcBebidas(100, 8, true, false, false, 6); // 2h cóctel + 6h copas
+  const bCopasCortas = calcBebidas(100, 4, true, false, false, 2); // 2h cóctel + 2h copas
+  ok(bCopasLargas.cerveza > bCopasCortas.cerveza
+    && bCopasLargas.cocaNormal > bCopasCortas.cocaNormal
+    && bCopasLargas.tonica > bCopasCortas.tonica
+    && bCopasLargas.hieloKg > bCopasCortas.hieloKg,
+    "subir las horas de copas sube cerveza, refrescos, tónica y hielo");
 
   // En verano se bebe más cerveza que en invierno, a igualdad de todo lo demás
   ok(calcBebidas(100, 4, true, false).cerveza > calcBebidas(100, 4, false, false).cerveza,
