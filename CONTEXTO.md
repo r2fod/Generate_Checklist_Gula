@@ -504,6 +504,10 @@ está en el historial de git y en las pruebas que los cubren):
   de cocina a partir de 100 pax (`4` bajo 100), `2` de gueridón, `4` mesas por barra a
   partir de 100 pax (`2` bajo 100), más las de buffet (`numMesasBuffet`) y cada corner
   activo (`llevaCornerVermut`, `llevaCornerAperol`).
+- **Botón "Recalcular cantidades" en eventos auto-guardados y ediciones manuales (`src/App.jsx`) — HECHO**:
+  inicializa `valoresCalculados` también en el primer auto-guardado y evita que editar a
+  mano o pulsar "Guardar evento" marque las cantidades con `*` como ya revisadas sin pasar
+  por el modal de recalcular.
 - **Cocina y Logística en `Personal` unificadas con `personal.js` (`src/checklist-generadores.js`, `src/calculos.js`) — HECHO**:
   la checklist usaba todavía `Math.ceil(pax * 3 / 50)` para Cocina (dando 11 personas en 180 pax)
   y `Math.ceil(pax / 60)` sin tope en Logística; ahora usa las curvas medidas de `personalNecesario()`

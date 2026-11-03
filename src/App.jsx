@@ -1782,6 +1782,17 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { cancelado = true; unsub(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const construirFotoCalculados = (baseActual = valoresBaseActuales, manuales = overridesManuales, previos = valoresCalculados) => {
+    const foto = {};
+    Object.entries(baseActual).forEach(([k, v]) => {
+      if (manuales[k] !== undefined && String(manuales[k]) !== String(v)) {
+        if (previos[k] !== undefined) foto[k] = previos[k];
+      } else {
+        foto[k] = v;
+      }
+    });
+    return foto;
+  };
   const handleGuardarEvento = () => setDialogo({
     tipo: "prompt",
     titulo: "💾 Guardar como EVENTO",
@@ -1790,14 +1801,15 @@ export default function App({ onCerrarSesion } = {}) {
     valorInicial: nombreEvento || "",
     textoConfirmar: "Guardar evento",
     onConfirm: (nombre) => {
-      // Se actualiza la foto de cantidades automáticas al guardar: a partir de ahora
-      // "Recalcular" comparará contra los valores de ESTE guardado, no de uno anterior
-      setValoresCalculados(valoresBaseActuales);
+      // Se actualiza la foto de cantidades automáticas al guardar (sin dar por revisadas
+      // las cantidades puestas a mano que todavía no hayan pasado por "Recalcular"):
+      const foto = construirFotoCalculados();
+      setValoresCalculados(foto);
       // El campo "Nombre del evento" se sincroniza con el nombre elegido al guardar:
       // así el siguiente "Guardar evento" ya viene precargado sin volver a escribirlo
       setNombreEvento(nombre);
       marcarEventoActivo(nombre); // a partir de ahora este evento se auto-guarda solo
-      const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: valoresBaseActuales };
+      const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre, valoresCalculados: foto };
       ultimoArchivoGuardadoJSONRef.current = JSON.stringify(nuevoEstado);
       guardarEventos({ ...eventosGuardados, [nombre]: nuevoEstado });
       setGuardadoEventoMsg(`✓ Guardado como EVENTO: "${nombre}"`);
@@ -1839,7 +1851,11 @@ export default function App({ onCerrarSesion } = {}) {
         const actualizado = { ...prev };
         // Renombrar el evento activo lo mueve, no lo duplica
         if (activoAhora && activoAhora !== nombre && actualizado[activoAhora]) delete actualizado[activoAhora];
-        const nuevoEstado = { ...getEstadoActual(), nombreEvento: nombre };
+        const estadoActual = getEstadoActual();
+        const tieneFoto = estadoActual.valoresCalculados && Object.keys(estadoActual.valoresCalculados).length > 0;
+        const fotoAuto = tieneFoto ? estadoActual.valoresCalculados : construirFotoCalculados();
+        if (!tieneFoto) setValoresCalculados(fotoAuto);
+        const nuevoEstado = { ...estadoActual, nombreEvento: nombre, valoresCalculados: fotoAuto };
         actualizado[nombre] = nuevoEstado;
         marcarEventoActivo(nombre);
         ultimoArchivoGuardadoJSONRef.current = JSON.stringify(nuevoEstado);
@@ -2958,6 +2974,14 @@ export default function App({ onCerrarSesion } = {}) {
       const next = { ...prev };
       if (valor.trim() === "") delete next[key];
       else next[key] = valor;
+      return next;
+    });
+    // Al tocar una cantidad a mano, deja de darse por revisada en "Recalcular cantidades"
+    // hasta que el usuario decida explícitamente "Mantener" o "Usar" en el modal:
+    setValoresCalculados(prev => {
+      if (prev[key] === undefined) return prev;
+      const next = { ...prev };
+      delete next[key];
       return next;
     });
     // Si la cantidad cambia, lo ya marcado en "Modo carga" deja de ser fiable: lo que
