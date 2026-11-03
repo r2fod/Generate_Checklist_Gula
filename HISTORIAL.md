@@ -6,6 +6,14 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Botón "Recalcular cantidades": foto inicial en auto-guardado y cantidades a mano (`*`)**
+  ("y el boton de recalcular cantidades es funcional compruebalo", el dueño). Antes solo se
+  guardaba `valoresCalculados` al pulsar manualmente "Guardar evento" (los eventos
+  auto-guardados tenían `{}` y no detectaban cambios de fórmula), y al editar una cantidad
+  a mano o pulsar "Guardar evento" se pisaba `valoresCalculados[key] = nuevo`, haciendo que
+  `handleRecalcular` creyera que esa edición manual ya se había revisado en el modal. Ahora
+  se inicializa la foto en el primer auto-guardado y las cantidades con `*` se ofrecen
+  siempre en `Recalcular cantidades` hasta que se elija "Mantener" o "Usar".
 - **Mesas de 1,8m: 2 de gueridón, 8 de cocina y 4 por barra a partir de 100 pax** ("seria
   2 de gueridon, 8 mesas cocina, 4 mesas por barra apartir de 100 pax", el dueño). Ahora
   `calcMesasCocina(pax)` da `8` mesas de 1,8m con `≥100` pax (`4` con `<100`), se suman
