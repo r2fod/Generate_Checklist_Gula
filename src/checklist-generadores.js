@@ -122,6 +122,14 @@ function mesasDeBarra(numBarras, hayBarra) {
   return numBarras > 0 ? numBarras : hayBarra ? 1 : 0;
 }
 
+// Mesas de 1,8m adicionales por barras extra (la 1ª barra ya va en calcMesasCocina) y
+// por cada corner activo (Vermut / Aperol), que monta su propia mesa de 1,8m.
+function mesasExtraBarrasYCorners(numBarras, llevaCornerVermut, llevaCornerAperol) {
+  const barrasExtra = Math.max(0, (Number(numBarras) || 0) - 1);
+  const corners = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
+  return barrasExtra + corners;
+}
+
 // Platos de los buffets: por persona, con los de postre (plato pequeño)
 function platosDeBuffet(totalPax, porPersona) {
   return porPersona > 0 ? Math.ceil(totalPax * porPersona) : 0;
@@ -473,10 +481,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // normal del evento en vez de paxDelDiaGrande.
   const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } =
     llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
+  const mesasCorners = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
+  const mesasExtra18 = numMesasBuffet + mesasExtraBarrasYCorners(numBarras, llevaCornerVermut, llevaCornerAperol);
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
-    // Las mesas de buffet son también rectangulares de 1,8m: se unifican en "Mesas de 1,8m"
-    // junto con las de cocina y comensales (igual que ya hacía producción).
-    ...lineasDeMesas(calcMesasCocina(pax) + numMesasBuffet, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    // Las mesas de buffet, barras extra y corners (Vermut / Aperol) son también
+    // rectangulares de 1,8m: se unifican en "Mesas de 1,8m" junto con cocina y comensales.
+    ...lineasDeMesas(calcMesasCocina(pax) + mesasExtra18, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
       ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
       : String(numCarpas)]),
@@ -589,8 +599,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    // Las mesas de buffet y las de las barras también se visten: no estaban en la cuenta
-    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 2 + mesasAltas + numMesasBuffet + mesasDeBarra(numBarras, hayBarra), colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
+    // Las mesas de buffet, las de las barras y las de los corners también se visten
+    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 2 + mesasAltas + numMesasBuffet + mesasDeBarra(numBarras, hayBarra) + mesasCorners, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
     [...ROLLO_PAPEL],
     ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
     ["Plancha de vapor (manteles)", "1"],
@@ -767,9 +777,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const { numCarpas: numCarpasCumple, faltanCarpas: faltanCarpasCumple,
     paredes: paredesCarpasCumple, pesas: pesasCarpasCumple } = llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
+  const mesasCornersCumple = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
+  const mesasExtraCumple18 = numMesasBuffet + mesasExtraBarrasYCorners(opts.numBarras, llevaCornerVermut, llevaCornerAperol);
   cats.push({ nombre: "Mobiliario", items: [
-    // Igual que un banquete: las de cocina + buffet + las de la gente que se sienta
-    ...lineasDeMesas(calcMesasCocina(pax) + numMesasBuffet, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    // Igual que un banquete: las de cocina + buffet + barras extra + corners + comensales
+    ...lineasDeMesas(calcMesasCocina(pax) + mesasExtraCumple18, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpasCumple > 0
       ? conSufijo(numCarpasCumple, sufijoCarpas(faltanCarpasCumple))
       : String(numCarpasCumple)]),
@@ -829,7 +841,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 1 + numMesasBuffet + mesasDeBarra(0, hayBarra), colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
+    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 1 + numMesasBuffet + mesasDeBarra(opts.numBarras || 0, hayBarra) + mesasCornersCumple, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
     [...ROLLO_PAPEL],
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
