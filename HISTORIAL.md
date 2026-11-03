@@ -6,6 +6,12 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Mesas de buffet unificadas en `Mesas de 1,8m`** ("estaria bien que unifique las mesas
+  de buffet en las mesas de 1.8 para mas comodidad", el dueño). En banquete y cumpleaños
+  salía una fila aparte de `Mesas de buffet` además de `Mesas de 1,8m`; ahora
+  `numMesasBuffet` se suma directamente a `lineasDeMesas(calcMesasCocina(pax) + numMesasBuffet, ...)`
+  bajo `Mesas de 1,8m` (igual que ya hacía producción), manteniendo intactos los manteles
+  y las cajas de madera para alturas.
 - **Café solo para el personal: 2 de leche entera, 2 de avena y 2 sin lactosa** ("cuando se
   ponga solo cafe para personal que tambien agregue leches 2 de leche entera, 2 de avena,
   2 sin lactosa", el dueño). Al apagar el café de invitados (`cafeParaInvitados: false`),

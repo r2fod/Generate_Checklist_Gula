@@ -995,15 +995,18 @@ console.log("\n══ Mesas de buffet: de texto libre a un número real en la ch
   };
 
   const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
-  ok(item(sinContestar, "Mobiliario, sala y decoración", "Mesas de buffet") === null,
-    "sin contestar, la fila de mesas de buffet se queda apagada (cantidad null), como el resto de mobiliario condicional");
-
   const conBuffet = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 3 });
-  ok(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de buffet") === "3",
-    "con el total del formulario, sale la línea con ese número");
+  ok(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de buffet") === undefined,
+    "las mesas de buffet se unifican en Mesas de 1,8m, sin línea separada de Mesas de buffet");
+  ok(Number(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de 1,8m"))
+    === Number(item(sinContestar, "Mobiliario, sala y decoración", "Mesas de 1,8m")) + 3,
+    "con 3 mesas de buffet, la línea de Mesas de 1,8m sube en 3");
 
+  const cumpleBase = buildChecklist("cumpleanos", 60, 0, 0, 8, {});
   const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { numMesasBuffet: 2 });
-  ok(item(cumple, "Mobiliario", "Mesas de buffet") === "2", "y en cumpleaños igual, en su categoría");
+  ok(item(cumple, "Mobiliario", "Mesas de buffet") === undefined
+    && Number(item(cumple, "Mobiliario", "Mesas de 1,8m")) === Number(item(cumpleBase, "Mobiliario", "Mesas de 1,8m")) + 2,
+    "y en cumpleaños igual: se suman directamente a Mesas de 1,8m");
 
   // Producción: el mínimo de siempre por pax se mantiene si el formulario dice
   // menos (o no dice nada); una respuesta detallada solo puede subirlo.
