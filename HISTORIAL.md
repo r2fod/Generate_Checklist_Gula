@@ -6,6 +6,16 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Bebidas frías e hielo responden a las horas de cóctel y de copas (`src/calculos.js`)**
+  ("veo que al cambiar las horas de barra libre o coctail no modifica las cantidades y
+  deberia cambiar el ratio", el dueño). Antes la cerveza tenía tope duro en 4h totales
+  (`Math.min(1, barFactor)`), el hielo era binario (`horasBarra > 0 ? 1 : 0.6`) y el vino,
+  el tinto de verano, el vermut y los refrescos ignoraban los deslizadores de horas. Ahora,
+  respetando los puntos calibrados de referencia (`2h` cóctel y `4h–5h` barra total),
+  escalan progresivamente el hielo (`calcHielo`), la cerveza (`factorHorasCerveza`, tope
+  `1.25` en `8h`), el vino y tinto de verano (`factorHorasCoctel`), el vermut
+  (`factorHorasVermut`), los refrescos (`factorHorasRefresco`) y la tónica/Red Bull
+  (`barFactorTope = 2.2`), más el protocolo de orquestación en `PLAYBOOK_AGENTES.md`.
 - **Horno pequeño: sus bandejas y las hondas** ("cuando se seleccione horno pequeño hay que
   agregar sus bandejas de horno más bandejas hondas para calentar comida", el dueño). Con
   "pequeño" o "ambos", en los cinco tipos de evento, la cocina suma "Bandejas de horno" (2,

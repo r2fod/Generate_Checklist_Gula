@@ -1,5 +1,5 @@
 # Gula Catering — CLAUDE.md
-> Live production app. Read `CONTEXTO.md` first.
+> Live production app. Fast start: read `PENDIENTES.md` + `CONTEXTO.md` (`L1-L155` & `L465-L585` only; do NOT read `HISTORIAL.md` whole).
 
 ## CORE
 - Lang: Spanish ONLY (code, comments, UI, commits).
@@ -38,4 +38,5 @@
 - Calendar data from the Drive sheet: JSON to the owner, NEVER committed. Compare with the current calendar first (exact normalized title per date); "Traer" only adds. Method: `CONTEXTO.md` → "Estado de HOY". When the sheet confirms a "Posible X", the "Posible X" goes ("deberías quitar los posibles"): the owner authorized removing those directly from the calendar, with a backup first and only if nobody changed it meanwhile; any other deletion is still the owner's.
 - Redesigns change the form, never what is shown: don't drop data, lines or panels (or move them out of sight) without asking ("has quitado lo de roturas y lo que había antes").
 - Gemini via MCP (`google-gemini`) is connected in Claude Desktop: lean on it — second opinion on analysis/design, screenshot and image review, research. Each in its strength: Claude decides, writes the code and verifies; Gemini's answer is input to check, not truth.
+- Coordinator & Model Routing: follow `PLAYBOOK_AGENTES.md` to delegate easy/search tasks to cheap models (`flash_lite`/`haiku`), standard changes to medium models (`flash`/`sonnet`), and complex/critical tasks (`nube.js`, security, architecture) to top models (`pro`/`opus`).
 - Same rules for any AI (`GEMINI.md` imports this file).

@@ -1,12 +1,10 @@
-# Plan de mejoras
+# Plan de mejoras (`PLAN_MEJORAS.md`)
 
-> Cómo leerlo: cada ítem lleva el porqué, el tamaño y de qué depende.
-> La sección A es lo pedido en conversación, estructurado; las demás salen
-> del análisis profundo (`ANALISIS.md`, medido el 2026-08-25 en `e5ca4d5`).
-> Proceso de la casa para cada PR: español, JS puro con JSDoc donde toca,
-> una prueba por comportamiento (con el porqué en su texto), `CONTEXTO.md`
-> en el MISMO commit, `test:rapido` verde antes de commit, captura para
-> cualquier cambio visual, y no se publica en rojo.
+> **Índice rápido para IA (no leer entero si solo buscas qué falta)**:
+> - **Qué queda de verdad por hacer** → ir directo a **`L338–L374`** (o leer `PENDIENTES.md`).
+> - **Qué NO hacer (ratificado)** → ir directo a **`L375–L397`**.
+> - **Histórico de bloques ya hechos**: `A1` Ratios/Sector (`L13`), `A2` Auditoría (`L86`), `A4` Marketing (`L141`), `B` Correctitud (`L257`), `C` Negocio/Hielo/Comida (`L273`), `E` Rediseño (`L285`), `D` Futuro (`L322`).
+> - Proceso por PR: español, JS puro + JSDoc, test en mismo commit, actualizar `CONTEXTO.md` y `PENDIENTES.md`, `test:rapido` verde y captura si es visual.
 
 ## A. Lo pedido en conversación (estructurado)
 
