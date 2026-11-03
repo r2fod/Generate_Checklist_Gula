@@ -270,6 +270,13 @@ function calcCafe(totalPax, tipoCafetera, hayDesayuno, paxConsumo = totalPax, si
       ["Cafetera Nespresso (para el personal)", "1"],
       ["Cápsulas café (para el personal)", conSufijo(Math.max(2, Math.ceil(numPersonal * 2)), `para ${numPersonal} personas`)],
     );
+    if (!paraInvitados) {
+      items.push(
+        ["Leche entera (para el personal)", "2"],
+        ["Leche de avena (para el personal)", "2"],
+        ["Leche sin lactosa (para el personal)", "2"],
+      );
+    }
   }
   return { nombre: "Café", items };
 }
