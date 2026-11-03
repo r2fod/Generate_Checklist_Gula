@@ -502,6 +502,10 @@ está en el historial de git y en las pruebas que los cubren):
 - **Mesas de buffet unificadas en `Mesas de 1,8m` (`src/checklist-generadores.js`) — HECHO**:
   en banquete y cumpleaños `numMesasBuffet` se suma directamente a la línea `Mesas de 1,8m`
   (igual que en producción) en lugar de sacar una fila separada de `Mesas de buffet`.
+- **Cocina y Logística en `Personal` unificadas con `personal.js` (`src/checklist-generadores.js`, `src/calculos.js`) — HECHO**:
+  la checklist usaba todavía `Math.ceil(pax * 3 / 50)` para Cocina (dando 11 personas en 180 pax)
+  y `Math.ceil(pax / 60)` sin tope en Logística; ahora usa las curvas medidas de `personalNecesario()`
+  (`2` ≤40, `3` ≤60, `4` ≤120, `5` hasta 275 en Cocina; `1` ≤30, `2` ≤100, `3` ≤200 y tope `4` en Logística).
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni

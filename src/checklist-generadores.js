@@ -14,7 +14,7 @@ import { calcCarpas, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { repartoManteles, colorPorDefecto } from "./manteles.js";
 import { lineasDeMesas, mesasParaVestir, TIPO_MESA_POR_DEFECTO } from "./mesas.js";
 import { calcPaella } from "./paella.js";
-import { leerRatios } from "./personal.js";
+import { leerRatios, personalNecesario } from "./personal.js";
 
 // Antes "Gastros" se dejaba en blanco ("—") para que cocina apuntara la cantidad a
 // mano; con un mínimo de serie ya sale algo cargado desde el principio, y la pregunta
@@ -445,12 +445,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     ["Carros de servicio/transporte", "2"], ["Walkies", "2"],
   ]});
 
-  // Personal (banquete emplatado): camareros según el ratio configurado, logística
-  // 1 cada 60 pax (carga/transporte/montaje), cocina ~3 cada 50 pax.
+  // Personal (banquete emplatado): camareros según el ratio configurado, logística y
+  // cocina unificados con las curvas medidas de personal.js (2 ≤40, 3 ≤60, 4 ≤120, 5+).
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, numCamareros, divisorCam))],
     ["Logística", String(numLogistica)],
-    ["Cocina", String(Math.max(2, Math.ceil(pax * 3 / 50)))],
+    ["Cocina", String(personalNecesario(evtKey, Math.max(1, pax)).cocina)],
   ]});
 
   // Bandejas para pasar comida (canapés, aperitivos, lo que sea): van SIEMPRE y se
@@ -762,7 +762,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   cats.push({ nombre: "Personal", items: [
     ["Camareros", String(personalSala(pax, opts.numCamareros, divisorCam))],
     ["Logística", String(calcLogistica(pax, opts.numLogisticaEquipo))],
-    ["Cocina", String(Math.max(1, Math.ceil(pax * 2 / 50)))],
+    ["Cocina", String(personalNecesario("cumpleanos", Math.max(1, pax)).cocina)],
   ]});
 
   const { numCarpas: numCarpasCumple, faltanCarpas: faltanCarpasCumple,
