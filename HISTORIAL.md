@@ -6,6 +6,12 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Cocina y Logística de la checklist unificadas con `personal.js`** ("revisa estos valores
+  porque lo veo muy altos", el dueño al ver 11 de Cocina para ~180 pax). En `src/personal.js`
+  la curva medida con los 19 eventos reales ya daba `2` (≤40 pax), `3` (≤60), `4` (≤120) y
+  `5` (121–275 pax), pero `src/checklist-generadores.js` seguía con la fórmula antigua
+  `Math.ceil(pax * 3 / 50)` (11 cocineros para 180 pax) y `calcLogistica` con `pax / 60` sin
+  tope. Ahora ambos leen la misma curva medida que `personalNecesario()`.
 - **Mesas de buffet unificadas en `Mesas de 1,8m`** ("estaria bien que unifique las mesas
   de buffet en las mesas de 1.8 para mas comodidad", el dueño). En banquete y cumpleaños
   salía una fila aparte de `Mesas de buffet` además de `Mesas de 1,8m`; ahora

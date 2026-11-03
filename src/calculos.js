@@ -161,12 +161,14 @@ export function taxisDeHielo(kg) { return Math.max(1, Math.ceil(kg / KG_POR_TAXI
 export function calcMesasCalientes(pax) { return Math.max(1, Math.ceil((pax || 0) / 40)); }
 
 // Logística para la lista de Personal: la gente real puesta en el "Equipo de
-// logística"; si no hay nadie, el recomendado (1 cada 60 pax). Estaba escrita tres
-// veces, una por generador (una de ellas incluso extraída a variable y las otras dos
-// no) — dos copias de la misma fórmula son una que se queda atrás.
+// logística"; si no hay nadie, la misma curva medida que logisticaNecesaria(pax) en
+// personal.js (1 hasta 30 pax, 2 hasta 100, 3 hasta 200 y tope en 4).
 /** @param {number} pax @param {number} [numLogisticaEquipo] @returns {number} */
 export function calcLogistica(pax, numLogisticaEquipo = 0) {
-  return numLogisticaEquipo > 0 ? numLogisticaEquipo : Math.max(1, Math.ceil(pax / 60));
+  if (numLogisticaEquipo > 0) return numLogisticaEquipo;
+  const n = Math.max(0, Number(pax) || 0);
+  if (n <= 30) return 1;
+  return Math.min(4, 1 + Math.ceil(n / 100));
 }
 
 // Mesas altas: antes una fórmula fija por pax (pax/15); ahora depende de cuántas

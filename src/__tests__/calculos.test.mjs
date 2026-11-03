@@ -1911,6 +1911,17 @@ console.log("\n══ Cocina y logística dejan de aplanarse ══");
     "y la logística pequeña también");
   // Ni se dispara: por encima de 4 de logística no se ha visto nunca
   ok(n(1000).logistica === 4, "la logística tiene tope en 4, no crece sin freno");
+  // Y la checklist (Cocina y Logística) usa la misma curva medida que personalNecesario()
+  // en vez de la fórmula vieja pax*3/50 que disparaba 11 de cocina para 180 pax.
+  const personalDeChecklist = (tipo, pax, label) => Number(
+    buildChecklist(tipo, pax, 2, 4, 0, {}).find(c => c.nombre === "Personal").items.find(x => x[0] === label)[1]
+  );
+  ok(personalDeChecklist("boda", 180, "Cocina") === personalNecesario("boda", 180).cocina
+    && personalDeChecklist("boda", 180, "Cocina") === 5,
+    "en la checklist, una boda de 180 pax pide 5 de cocina (igual que personal.js), no 11");
+  ok(personalDeChecklist("boda", 100, "Logística") === personalNecesario("boda", 100).logistica
+    && personalDeChecklist("boda", 300, "Logística") === 4,
+    "y la logística de la checklist cuadra también con personal.js y su tope de 4");
 }
 
 console.log("\n══ El hielo: kilos, bolsas y taxis ══");
