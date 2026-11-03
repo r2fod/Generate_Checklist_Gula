@@ -474,7 +474,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } =
     llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
-    ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    // Las mesas de buffet son también rectangulares de 1,8m: se unifican en "Mesas de 1,8m"
+    // junto con las de cocina y comensales (igual que ya hacía producción).
+    ...lineasDeMesas(calcMesasCocina(pax) + numMesasBuffet, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
       ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
       : String(numCarpas)]),
@@ -482,9 +484,6 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpas)]),
     // Sin fórmula propia: el número lo pone quien ha visto el sitio.
     opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
-    // Suma de las mesas de cada buffet marcado en el formulario (quesos, dulce...),
-    // no una constante — antes esta línea no existía en absoluto para boda/cumpleaños.
-    opt(numMesasBuffet > 0, ["Mesas de buffet", String(numMesasBuffet)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     opt(evtKey === "boda" && llevaTarta, ["Mesa redonda especial para Tarta", "1"]),
@@ -769,15 +768,14 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const { numCarpas: numCarpasCumple, faltanCarpas: faltanCarpasCumple,
     paredes: paredesCarpasCumple, pesas: pesasCarpasCumple } = llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   cats.push({ nombre: "Mobiliario", items: [
-    // Igual que un banquete: las de cocina más las de la gente que se sienta
-    ...lineasDeMesas(calcMesasCocina(pax), totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    // Igual que un banquete: las de cocina + buffet + las de la gente que se sienta
+    ...lineasDeMesas(calcMesasCocina(pax) + numMesasBuffet, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpasCumple > 0
       ? conSufijo(numCarpasCumple, sufijoCarpas(faltanCarpasCumple))
       : String(numCarpasCumple)]),
     opt(llevaCarpas, ["Paredes de carpas", String(paredesCarpasCumple)]),
     opt(llevaCarpas, ["Pesas (15kg)", String(pesasCarpasCumple)]),
     opt(llevaParabanes, ["Parabanes", numParabanes > 0 ? String(numParabanes) : "—"]),
-    opt(numMesasBuffet > 0, ["Mesas de buffet", String(numMesasBuffet)]),
     opt(origenSillas !== "No llevan", [labelSillas, String(totalPax), esAlquilerSillas]),
     opt(llevaMobiliarioAlquiler, ["Mobiliario (alquiler Event Style)", "1", true]),
     ["Cubo basura reciclaje", "1"], ["Cubo basura cocina", "1"],
