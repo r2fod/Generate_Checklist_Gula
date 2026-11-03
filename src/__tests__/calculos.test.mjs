@@ -125,6 +125,12 @@ console.log("\n══ Cerveza: las horas no pueden restar ══");
     && bCopasLargas.tonica > bCopasCortas.tonica
     && bCopasLargas.hieloKg > bCopasCortas.hieloKg,
     "subir las horas de copas sube cerveza, refrescos, tónica y hielo");
+  // Las horas de copas pesan más en el hielo que las de cóctel, y barras extra / corners suman su cama de hielo
+  ok(calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4 }).kg > calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 1 }).kg,
+    "a igual duración total (6h), más horas de copas piden más hielo que más horas de cóctel");
+  ok(calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numBarras: 3 }).kg > calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numBarras: 1 }).kg
+    && calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numCorners: 2 }).kg > calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numCorners: 0 }).kg,
+    "cada barra extra y cada corner frío suman hielo para sus cubetas y champaneras");
 
   // En verano se bebe más cerveza que en invierno, a igualdad de todo lo demás
   ok(calcBebidas(100, 4, true, false).cerveza > calcBebidas(100, 4, false, false).cerveza,
