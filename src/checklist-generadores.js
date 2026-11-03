@@ -66,17 +66,10 @@ function sufijoCarpas(faltanCarpas) {
 
 // ─── HELPERS DE CÁLCULO ───────────────────────────────────────────────────────
 
-// Las mesas de trabajo: las de cocina. Dicho por quien las monta, son de 4 a 6 según el
-// tamaño del evento, no más. En producción el buffet y la del camión se cuentan aparte,
-// en su propio bloque, porque allí esa línea no es solo cocina.
-//
-// Antes salían de una tabla 7/11/13 que además se plantaba en 13 a partir de 100 pax:
-// una boda de 120 y una de 300 cargaban las mismas. Para 100 personas pedía 11 mesas de
-// cocina donde se montan 4 — siete de más en el camión, con sus manteles.
+// Las mesas de trabajo de cocina: 8 mesas a partir de 100 pax (4 en eventos menores).
+const MESAS_GUERIDON = 2;
 function calcMesasCocina(pax) {
-  if (pax <= 100) return 4;
-  if (pax <= 200) return 5;
-  return 6;
+  return pax >= 100 ? 8 : 4;
 }
 
 // Tronas: SOLO las que se dicen ("si se deja en blanco no debería poner ninguna", el
@@ -116,18 +109,11 @@ function lineaDeAlmacen(n, hay) {
   });
 }
 
-// Las mesas de las barras de bebida, para los manteles: las que se han dicho ("¿Cuántas
-// barras?"); sin decirlo, una si hay barra.
-function mesasDeBarra(numBarras, hayBarra) {
-  return numBarras > 0 ? numBarras : hayBarra ? 1 : 0;
-}
-
-// Mesas de 1,8m adicionales por barras extra (la 1ª barra ya va en calcMesasCocina) y
-// por cada corner activo (Vermut / Aperol), que monta su propia mesa de 1,8m.
-function mesasExtraBarrasYCorners(numBarras, llevaCornerVermut, llevaCornerAperol) {
-  const barrasExtra = Math.max(0, (Number(numBarras) || 0) - 1);
-  const corners = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
-  return barrasExtra + corners;
+// Las mesas de 1,8m de las barras de bebida (y sus manteles): 4 mesas por barra a partir
+// de 100 pax (2 bajo 100 pax). Si no se dice nº de barras pero hay barra, cuenta 1 barra.
+function mesasDeBarra(numBarras, hayBarra, pax = 100) {
+  const barras = numBarras > 0 ? Number(numBarras) : (hayBarra ? 1 : 0);
+  return barras * (pax >= 100 ? 4 : 2);
 }
 
 // Platos de los buffets: por persona, con los de postre (plato pequeño)
@@ -482,11 +468,11 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   const { numCarpas, faltanCarpas, paredes: paredesCarpas, pesas: pesasCarpas } =
     llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   const mesasCorners = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
-  const mesasExtra18 = numMesasBuffet + mesasExtraBarrasYCorners(numBarras, llevaCornerVermut, llevaCornerAperol);
+  const mesasApoyo18 = calcMesasCocina(pax) + MESAS_GUERIDON + mesasDeBarra(numBarras, hayBarra, pax) + numMesasBuffet + mesasCorners;
   cats.push({ nombre: "Mobiliario, sala y decoración", items: [
-    // Las mesas de buffet, barras extra y corners (Vermut / Aperol) son también
-    // rectangulares de 1,8m: se unifican en "Mesas de 1,8m" junto con cocina y comensales.
-    ...lineasDeMesas(calcMesasCocina(pax) + mesasExtra18, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    // Mesas de 1,8m: cocina (8 con ≥100 pax, 4 con <100) + 2 de gueridón + barras (4 por
+    // barra con ≥100 pax, 2 con <100) + buffets + corners + comensales (si van en 1,8m).
+    ...lineasDeMesas(mesasApoyo18, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpas > 0
       ? conSufijo(numCarpas, sufijoCarpas(faltanCarpas))
       : String(numCarpas)]),
@@ -599,8 +585,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   cats.push({ nombre: "Mantelería y textiles", items: [
-    // Las mesas de buffet, las de las barras y las de los corners también se visten
-    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 2 + mesasAltas + numMesasBuffet + mesasDeBarra(numBarras, hayBarra) + mesasCorners, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
+    // Se visten todas las mesas (comensales + cocina + 2 gueridón + barras + buffets + corners + mesas altas)
+    ...repartoManteles(mesasParaVestir(mesasApoyo18, totalPax, tipoMesa) + mesasAltas, colorManteles || colorPorDefecto(evtKey), porcentajeBeige),
     [...ROLLO_PAPEL],
     ["Delantales", String(personalSala(pax, numCamareros, divisorCam) + 2)],
     ["Plancha de vapor (manteles)", "1"],
@@ -778,10 +764,10 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const { numCarpas: numCarpasCumple, faltanCarpas: faltanCarpasCumple,
     paredes: paredesCarpasCumple, pesas: pesasCarpasCumple } = llevaCarpas ? calcCarpas(pax, opts.numCarpas) : {};
   const mesasCornersCumple = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
-  const mesasExtraCumple18 = numMesasBuffet + mesasExtraBarrasYCorners(opts.numBarras, llevaCornerVermut, llevaCornerAperol);
+  const mesasApoyoCumple18 = calcMesasCocina(pax) + MESAS_GUERIDON + mesasDeBarra(opts.numBarras, hayBarra, pax) + numMesasBuffet + mesasCornersCumple;
   cats.push({ nombre: "Mobiliario", items: [
-    // Igual que un banquete: las de cocina + buffet + barras extra + corners + comensales
-    ...lineasDeMesas(calcMesasCocina(pax) + mesasExtraCumple18, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
+    // Igual que un banquete: cocina + 2 gueridón + barras + buffet + corners + comensales
+    ...lineasDeMesas(mesasApoyoCumple18, totalPax, tipoMesa).map(([n, c, alq]) => (alq ? [n, c, true] : [n, c])),
     opt(llevaCarpas, ["Carpas", faltanCarpasCumple > 0
       ? conSufijo(numCarpasCumple, sufijoCarpas(faltanCarpasCumple))
       : String(numCarpasCumple)]),
@@ -841,7 +827,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
 
   const usaTela = fuerzaTextilTela;
   cats.push({ nombre: "Mantelería y Textiles", items: [
-    ...repartoManteles(mesasParaVestir(calcMesasCocina(pax), totalPax, tipoMesa) + 1 + numMesasBuffet + mesasDeBarra(opts.numBarras || 0, hayBarra) + mesasCornersCumple, colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
+    ...repartoManteles(mesasParaVestir(mesasApoyoCumple18, totalPax, tipoMesa), colorManteles || colorPorDefecto("cumpleanos"), porcentajeBeige),
     [...ROLLO_PAPEL],
     ["Plancha de vapor (manteles)", "1"],
     ["Delantales", String(personalSala(pax, opts.numCamareros, divisorCam) + 2)], ["Bayetas", "4"], ["Trapos de horno", "4"],
