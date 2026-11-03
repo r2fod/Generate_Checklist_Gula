@@ -282,8 +282,8 @@ export const PREGUNTAS = [
     // mesas altas y cristalería (checklist-generadores.js ya lo respeta: sin barra,
     // esto manda igual si se contesta). Por eso ya no lleva `si:`: se pregunta siempre
     // en los tipos con barra, la haya montado o no.
-    id: "numBarras", tipo: "opciones", texto: "¿Cuántas barras hacen falta para las mesas altas?",
-    nota: "2 mesas altas por barra, o 4 si son 100 pax o más. Se pregunta aunque no haya barra libre: puede que igual llevéis mesas altas.",
+    id: "numBarras", tipo: "opciones", texto: "¿Cuántas barras hacen falta?",
+    nota: "2 mesas de 1,8m por barra (<100 pax) o 4 si son 100 pax o más. Se pregunta aunque no haya barra libre: puede que igual llevéis barra y mesas altas.",
     opciones: [
       { valor: 1, texto: "1 barra" },
       { valor: 2, texto: "2 barras" },
@@ -1450,14 +1450,6 @@ export function aRespuestasDeLaApp(respuestas = {}) {
   }
 
   return estado;
-}
-
-// Qué campos ha decidido la app por su cuenta (no los ha contestado nadie). Sirve
-// para enseñarlos en otro color en la bandeja: de un vistazo se ve qué revisar.
-function camposSinContestar(r = {}, tipo = "boda") {
-  return preguntasDe(tipo, r)
-    .filter(p => r[p.id] === undefined || r[p.id] === null)
-    .map(p => p.id);
 }
 
 // ─── LO QUE HAY QUE IR A BUSCAR ────────────────────────────────────────────────

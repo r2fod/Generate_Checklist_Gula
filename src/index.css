@@ -1327,6 +1327,19 @@ body {
   padding: 1px 7px;
 }
 
+.recalcular-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.recalcular-tag-bajada {
+  color: var(--aviso-texto);
+  background: var(--aviso-bg);
+  border: 1px solid var(--aviso-borde);
+}
+
 .recalcular-opciones {
   display: flex;
   gap: 8px;
@@ -1337,12 +1350,16 @@ body {
   text-align: center;
   font-size: var(--fs-sm);
   padding: 8px 10px;
+  color: var(--text-main);
+  border-color: var(--border-color-strong);
 }
 
 .recalcular-opcion.active {
-  background: var(--primary-navy);
-  border-color: var(--primary-navy);
-  color: white;
+  background: var(--green-btn);
+  border-color: var(--green-btn);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--green-btn);
 }
 
 @media (max-width: 480px) {
@@ -1359,8 +1376,9 @@ body {
 }
 
 .btn-navy-outline:hover {
-  background: var(--primary-navy);
-  color: white;
+  background: var(--solido-bg);
+  border-color: var(--solido-bg);
+  color: var(--solido-texto);
   transform: translateY(-1px);
 }
 
@@ -2241,6 +2259,23 @@ body {
   padding: 7px 12px;
   font-size: var(--fs-sm);
   white-space: nowrap;
+}
+
+.recalcular-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* Sin margen propio: la tarjeta (.config-card) ya separa a sus hijos con su gap, y

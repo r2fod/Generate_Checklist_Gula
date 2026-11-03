@@ -277,20 +277,23 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
   // a mano casi todas las líneas de la lista, justo lo contrario de lo que este botón
   // quiere ahorrar. La cristalería/vajilla/mobiliario sigue dando por vuelto el total,
   // que es su caso normal.
-  const itemsMarcables = checklist.flatMap(c => c.items
+  const itemsMarcables = useMemo(() => checklist.flatMap(c => c.items
     .map(([, q, , lo]) => {
       const n = parseFloat(String(q && q.u ? q.u : q).replace(",", "."));
       const valorVuelto = isNaN(n) ? true : String(n);
       return { key: `${c.nombre}::${lo}`, valor: esConsumible(c.nombre, lo) ? "0" : valorVuelto };
-    }));
-  const todoVuelto = itemsMarcables.length > 0 && itemsMarcables.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; });
+    })), [checklist]);
+  const todoVuelto = useMemo(
+    () => itemsMarcables.length > 0 && itemsMarcables.every(it => { const v = vueltos[it.key]; return v !== undefined && v !== ""; }),
+    [itemsMarcables, vueltos]
+  );
   const contarSi = (cumple) => checklist.reduce((acc, c) => acc + c.items.filter(([, , , lo]) => cumple(`${c.nombre}::${lo}`)).length, 0);
-  const totalPreparados = contarSi(k => preparados[k]);
+  const totalPreparados = useMemo(() => contarSi(k => preparados[k]), [checklist, preparados]);
   // Lo que está a medias, con su nombre y su cantidad, para decirlo ARRIBA: en una
   // lista de 130 items, un aviso que solo vive en su fila es un aviso que se olvida.
-  const aMedias = checklist.flatMap(c => c.items
+  const aMedias = useMemo(() => checklist.flatMap(c => c.items
     .filter(([, , , lo]) => pendientes[`${c.nombre}::${lo}`])
-    .map(([label, q, , lo, , sufijo]) => ({ key: `${c.nombre}::${lo}`, label, total: q && q.u ? q.u : q, sufijo, ...pendientes[`${c.nombre}::${lo}`] })));
+    .map(([label, q, , lo, , sufijo]) => ({ key: `${c.nombre}::${lo}`, label, total: q && q.u ? q.u : q, sufijo, ...pendientes[`${c.nombre}::${lo}`] }))), [checklist, pendientes]);
   const irAPendiente = (key) => {
     const fila = document.querySelector(`[data-pendiente="${CSS.escape(key)}"]`);
     if (fila) fila.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -299,29 +302,29 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
   // luego se sube al camión— así que subirlo de golpe ahorra repasar la lista entera
   // item a item. También es la vía para recuperar una carga que se haya perdido,
   // porque lo preparado y lo cargado suelen ser lo mismo.
-  const preparadosSinCargar = checklist.flatMap(c => c.items
+  const preparadosSinCargar = useMemo(() => checklist.flatMap(c => c.items
     .map(([, , , lo]) => `${c.nombre}::${lo}`)
-    .filter(k => preparados[k] && !checkeados[k]));
+    .filter(k => preparados[k] && !checkeados[k])), [checklist, preparados, checkeados]);
   // Qué cuenta como hecho en la pestaña abierta: lo usan el recuento de arriba y el de
   // cada categoría, que no pueden discrepar.
   const estaHecho = (k) => modo === "preparacion" ? !!preparados[k]
     : modo === "salida" ? !!checkeados[k]
     : vueltos[k] !== undefined && vueltos[k] !== "";
-  const totalMarcados = contarSi(estaHecho);
+  const totalMarcados = useMemo(() => contarSi(estaHecho), [checklist, modo, preparados, checkeados, vueltos]);
   const palabraModo = modo === "preparacion" ? "preparados" : modo === "salida" ? "cargados" : "vueltos";
   // Items marcados a los que alguien les ha cambiado la cantidad DESPUÉS: siguen
   // marcados (es trabajo hecho, no se borra) pero hay que volver a contarlos. El aviso
   // de "revisar" vive en su fila, y en una lista de 130 ítems eso es no verlo nunca:
   // quien carga no va a recorrer la lista entera por si acaso. Aquí se cuentan para
   // poder decirlo arriba, donde sí se mira, y llevar de un toque al primero.
-  const porRevisar = checklist.flatMap(c => c.items
+  const porRevisar = useMemo(() => checklist.flatMap(c => c.items
     .map(([, , , lo]) => `${c.nombre}::${lo}`)
-    .filter(k => marcasRevisar[k] && (modo === "preparacion" ? preparados[k] : modo === "salida" ? checkeados[k] : vueltos[k] !== undefined && vueltos[k] !== "")));
+    .filter(k => marcasRevisar[k] && (modo === "preparacion" ? preparados[k] : modo === "salida" ? checkeados[k] : vueltos[k] !== undefined && vueltos[k] !== ""))), [checklist, marcasRevisar, modo, preparados, checkeados, vueltos]);
   const irAlPrimeroPorRevisar = () => {
     const fila = document.querySelector(`[data-revisar="${CSS.escape(porRevisar[0] || "")}"]`);
     if (fila) fila.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const totalRoturas = Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0);
+  const totalRoturas = useMemo(() => Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0), [roturas]);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
   // Tiempos estimados (Preparación / Carga / Descarga). El criterio vive en
   // estimarTiemposCarga() para compartirlo con el formulario. El nº de logística marca
@@ -458,7 +461,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
   // marca (ver la nota de arriba, en FilaCargaPrep).
   const filasPorCategoria = useMemo(() => checklist.map(cat => {
     const filas = cat.items.map(([label, qty, , labelOriginal, , sufijo]) => {
-      const key = `${cat.nombre}::${labelOriginal}`;
+      const key = `${cat.nombre}::${labelOriginal ?? label}`;
       const valor = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
       const cargaInicial = isNaN(valor) ? null : valor;
       const raw = vueltos[key];
@@ -959,7 +962,8 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
               />
               <div className="carga-lista">
                 {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual]) => {
-                  const dataKey = `${cat.nombre}::${labelOriginal}`;
+                  const nombreBase = labelOriginal ?? label;
+                  const dataKey = `${cat.nombre}::${nombreBase}`;
                   // Mismo criterio que la lista normal (FilaItem.jsx): el tag manual, o
                   // si el propio nombre ya lo delata (Dealde/Carvillo/Novelda/alquiler).
                   // Sin esto, un item de alquiler salía en Modo carga como uno más, sin
@@ -1001,7 +1005,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                       unidadManual={unidadManual}
                       valorVuelta={vueltos[dataKey]}
                       roturaValor={roturas[dataKey]}
-                      consumible={esConsumible(cat.nombre, labelOriginal)}
+                      consumible={esConsumible(cat.nombre, nombreBase)}
                       esAlquiler={esAlquiler}
                       onVuelve={onVuelve}
                       onRoturas={onRoturas}

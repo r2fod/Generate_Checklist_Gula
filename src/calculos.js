@@ -127,19 +127,32 @@ export function conFactorHielo(factores, tipo, valor) {
 // para contarlo al cargar y los taxis para saber cuánto sitio ocupa en el camión.
 /**
  * @param {number} pax
- * @param {{ mesVerano?: boolean, horasBarra?: number, tieneCongelador?: boolean, tipo?: string }} [opciones]
+ * @param {{ mesVerano?: boolean, horasBarra?: number, horasCopas?: number, tieneCongelador?: boolean, tipo?: string, numBarras?: number, numCorners?: number }} [opciones]
  * @returns {{ kg: number, bolsas: number, taxis: number }}
  */
-export function calcHielo(pax, { mesVerano = false, horasBarra = 0, tieneCongelador = false, tipo = "" } = {}) {
+export function calcHielo(pax, { mesVerano = false, horasBarra = 0, horasCopas, tieneCongelador = false, tipo = "", numBarras = 0, numCorners = 0 } = {}) {
   const n = Math.max(0, Math.round(pax) || 0);
   if (!n) return { kg: 0, bolsas: 0, taxis: 0 };
   const temporada = mesVerano ? "verano" : "invierno";
   const merma = tieneCongelador ? 1 : MERMA_SIN_CONGELADOR[temporada];
   // Sin barra (0h) hace falta el 60% para enfriar agua y refrescos de la comida; con
-  // barra crece de forma continua con las horas totales (vale 1 en las 5h de referencia
-  // y sube hasta 1,5 en barras largas, en vez de dar los mismos kilos para 1h que para 8h).
-  const factorHoras = horasBarra <= 0 ? FACTOR_SIN_BARRA : Math.min(1.5, FACTOR_SIN_BARRA + horasBarra * 0.08);
-  const kg = Math.ceil(n * KG_HIELO_POR_PAX[temporada] * factorHoras * merma * factorHieloDe(tipo));
+  // barra crece con las horas, pesando más las horas de copas (+9%/h, porque llevan
+  // hielo en cada vaso además de las bañeras) que las de cóctel (+6,5%/h).
+  let factorHoras;
+  if (horasBarra <= 0) {
+    factorHoras = FACTOR_SIN_BARRA;
+  } else if (horasCopas !== undefined) {
+    const copas = Math.max(0, Math.min(horasBarra, Number(horasCopas) || 0));
+    const coctel = Math.max(0, horasBarra - copas);
+    factorHoras = Math.min(1.6, FACTOR_SIN_BARRA + coctel * 0.065 + copas * 0.09);
+  } else {
+    factorHoras = Math.min(1.5, FACTOR_SIN_BARRA + horasBarra * 0.08);
+  }
+  // Cada barra adicional a partir de la 2.ª suma 1 taxi (24 kg) y cada corner frío
+  // (cerveza, vermut, aperol, sidra) suma medio taxi (12 kg) para llenar sus bañeras.
+  const extraBarrasKg = horasBarra > 0 || numBarras > 0 ? Math.max(0, (Number(numBarras) || 1) - 1) * KG_POR_TAXI : 0;
+  const extraCornersKg = Math.max(0, Number(numCorners) || 0) * (KG_POR_TAXI / 2);
+  const kg = Math.ceil((n * KG_HIELO_POR_PAX[temporada] * factorHoras + extraBarrasKg + extraCornersKg) * merma * factorHieloDe(tipo));
   return {
     kg,
     bolsas: Math.ceil(kg / KG_POR_BOLSA),
@@ -171,14 +184,12 @@ export function calcLogistica(pax, numLogisticaEquipo = 0) {
   return Math.min(4, 1 + Math.ceil(n / 100));
 }
 
-// Mesas altas: antes una fórmula fija por pax (pax/15); ahora depende de cuántas
-// barras se van a montar de verdad (2 mesas por barra, 4 si son 100 pax o más).
-// Sin numBarras (eventos guardados antes de esta pregunta, o sin contestar) cae al
-// cálculo viejo por pax, para no dejar de dar un número razonable.
-/** @param {number} pax @param {number} [numBarras] @returns {number} */
-export function calcMesasAltas(pax, numBarras) {
-  if (!numBarras) return Math.max(2, Math.ceil((pax || 0) / 15));
-  return numBarras * (pax >= 100 ? 4 : 2);
+export const MESAS_ALTAS_EN_ALMACEN = 15;
+
+// Mesas altas (cóctel): 1 cada 10 personas, con tope en 15 (las que tenemos en almacén).
+/** @param {number} pax @param {number} [_numBarras] @returns {number} */
+export function calcMesasAltas(pax, _numBarras) {
+  return Math.min(MESAS_ALTAS_EN_ALMACEN, Math.max(2, Math.ceil((pax || 0) / 10)));
 }
 
 // Cuántas copas/vasos caben en cada batea, por tipo
@@ -229,10 +240,10 @@ export function terciosConBarril(terciosNecesarios, litrosBarril, numBarriles) {
  * @param {boolean} tieneCongelador
  * @param {boolean} [tieneBrindisCava]
  * @param {number} [horasCopas]
- * @param {{ alcoholPax?: number, tipo?: string, llevaHielo?: boolean, llevaBebida?: boolean }} [opciones] alcoholPax = solo adultos
+ * @param {{ alcoholPax?: number, tipo?: string, llevaHielo?: boolean, llevaBebida?: boolean, numBarras?: number, numCorners?: number }} [opciones] alcoholPax = solo adultos
  * @returns {Record<string, any>}
  */
-export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = undefined, { alcoholPax = pax, tipo = "", llevaHielo = true, llevaBebida = true } = {}) {
+export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava = false, horasCopas = undefined, { alcoholPax = pax, tipo = "", llevaHielo = true, llevaBebida = true, numBarras = 0, numCorners = 0 } = {}) {
   const factor = factoresDeTipo(tipo);
   // Cuando se pasa horasCopas aparte (app y asistente), las horas de cóctel son h - horasCopas
   // (con 2h como referencia neutra). Si se llama solo con h (tests de una sola variable),
@@ -243,7 +254,9 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
   // El hielo tiene su propio interruptor (llevaHielo, ya existía) y va aparte de la
   // bebida: si el cliente trae su bebida, puede que igualmente necesite el hielo de
   // Gula, así que se calcula siempre igual antes de mirar llevaBebida.
-  const hielo = llevaHielo ? calcHielo(pax, { mesVerano, horasBarra: h, tieneCongelador, tipo }) : { kg: 0, bolsas: 0, taxis: 0 };
+  const hielo = llevaHielo
+    ? calcHielo(pax, { mesVerano, horasBarra: h, horasCopas: tieneHorasCopas ? copas : undefined, tieneCongelador, tipo, numBarras, numCorners })
+    : { kg: 0, bolsas: 0, taxis: 0 };
   const taxisHielo = hielo.taxis;
   // "Bebida aparte": el cliente/la finca trae su propia bebida, Gula no aporta nada
   // de esto. Se apaga TODO lo de beber (cero, no null: aquí siempre se ha mostrado
@@ -353,11 +366,11 @@ export function calcBebidas(pax, h, mesVerano, tieneCongelador, tieneBrindisCava
     cocaNormal: Math.round(refrescoTotal * 0.25),
     cocaZero:   Math.round(refrescoTotal * 0.15),
     // Cada refresco por separado, sin unificar (datos reales: Fanta naranja y limón
-    // se piden como productos distintos, no combinados en una sola línea)
-    fantaNaranja: Math.round(refrescoTotal * 0.04),
-    fantaLimon:   Math.round(refrescoTotal * 0.035),
-    aquarius:     Math.round(refrescoTotal * 0.05),
-    sprite:     Math.round(refrescoTotal * 0.05),
+    // se piden como productos distintos, y de normal se toma más de limón que de naranja)
+    fantaNaranja: Math.round(refrescoTotal * 0.07),
+    fantaLimon:   Math.round(refrescoTotal * 0.08),
+    aquarius:     Math.round(refrescoTotal * 0.1),
+    sprite:     Math.round(refrescoTotal * 0.1),
     nestea:     Math.round(refrescoTotal * 0.025),
     // Agua con gas y cerveza sin alcohol se piden en cajas de 24 (1 caja mínimo real):
     // el comentario ya lo decía, pero el número que salía era de botellas sueltas, sin

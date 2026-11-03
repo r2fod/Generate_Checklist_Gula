@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Dialogo({ config, onCerrar }) {
   const [valor, setValor] = useState(config.valorInicial || "");
   const esPrompt = config.tipo === "prompt";
+  useEffect(() => {
+    const alPulsar = (e) => { if (e.key === "Escape") onCerrar(); };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [onCerrar]);
   const confirmar = () => {
     if (esPrompt && !valor.trim()) return;
     onCerrar();

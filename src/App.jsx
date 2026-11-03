@@ -169,10 +169,6 @@ function esVerano(estacion, fechaISO) {
   return esFechaDeVerano(fechaISO);
 }
 
-// El día de hoy vive en src/fecha.js, uno solo para todo el repositorio. Se reexporta
-// porque media App lo llama desde aquí.
-export { hoyISO };
-
 // Qué temporada le toca a un evento guardado ANTES de que existiera este dato. Los que
 // ya han pasado se quedan clavados en lo que tuvieran: su lista es historia y no tiene
 // sentido que las cifras cambien al abrirla. Los que están por venir pasan a automático,
@@ -1284,9 +1280,16 @@ export default function App({ onCerrarSesion } = {}) {
         return prev; // ya hay una escrita a mano para esto: manda la suya
       }
       if (activo) {
-        // Ya existe: solo se refresca el nombre (p. ej. al cambiar de proveedor), nunca
-        // las fechas, que a estas alturas pueden estar puestas a mano
-        if (i !== -1) return prev.map((r, idx) => idx === i ? { ...r, concepto } : r);
+        // Ya existe: se refresca el nombre (p. ej. al cambiar de proveedor) y, si las
+        // fechas seguían en automático, se mueven con la nueva fecha del evento.
+        if (i !== -1) return prev.map((r, idx) => idx === i ? {
+          ...r,
+          concepto,
+          ...(r.fechasAuto ? {
+            fecha: sumaDias(fechaEvento, -DIAS_ANTES_RECOGIDA),
+            fechaDevolucion: sumaDias(fechaEvento, DIAS_DESPUES_DEVOLUCION),
+          } : {}),
+        } : r);
         return [...prev, {
           concepto, hora: "",
           fecha: sumaDias(fechaEvento, -DIAS_ANTES_RECOGIDA),
@@ -1894,13 +1897,26 @@ export default function App({ onCerrarSesion } = {}) {
     return () => { cancelado = true; clearInterval(cadaRato); document.removeEventListener("visibilitychange", alVolver); };
   }, []);
 
-  const handleRecalcular = () => {
+  const calcularDiferenciasRecalculo = (
+    baseActual = valoresBaseActuales,
+    manuales = overridesManuales,
+    previos = valoresCalculados,
+    originales = valoresOriginalesActuales
+  ) => {
     const cambios = [];
-    Object.keys(valoresBaseActuales).forEach(key => {
-      const nuevo = valoresBaseActuales[key];
+    const calcBajadaPct = (ant, nue) => {
+      const a = Number(ant);
+      const n = Number(nue);
+      if (!Number.isFinite(a) || !Number.isFinite(n) || a <= 0 || n >= a) return 0;
+      return Math.round((1 - n / a) * 100);
+    };
+    Object.keys(baseActual).forEach(key => {
+      const nuevo = baseActual[key];
+      const original = (originales && originales[key]) || nuevo;
+      const bajaPorRatio = Number(original) > 0 && Number(nuevo) <= Number(original) * 0.85;
       const [categoria, ...resto] = key.split("::");
       const label = resto.join("::");
-      const aMano = overridesManuales[key];
+      const aMano = manuales[key];
       // Cantidad puesta a mano: es justo la que NO se actualiza sola, así que si el
       // cálculo automático ya no coincide (por ejemplo porque ha cambiado el pax) es
       // la primera que hay que ofrecer. Antes se saltaba sin decir nada y el botón
@@ -1909,14 +1925,42 @@ export default function App({ onCerrarSesion } = {}) {
         if (String(aMano) === String(nuevo)) return;
         // Si ya se revisó contra este mismo cálculo (y se decidió mantener el valor a
         // mano), no se vuelve a preguntar: solo si el automático se mueve otra vez.
-        if (valoresCalculados[key] === nuevo) return;
-        cambios.push({ key, categoria, label, anterior: String(aMano), nuevo, aMano: true });
+        if (previos[key] === nuevo) return;
+        const bajadaPct = calcBajadaPct(aMano, nuevo);
+        cambios.push({
+          key, categoria, label,
+          anterior: String(aMano), nuevo, original,
+          aMano: true, bajaPorRatio, bajadaPct,
+        });
         return;
       }
-      const anterior = valoresCalculados[key];
-      if (anterior === undefined || anterior === nuevo) return; // nunca guardado, o sin cambios
-      cambios.push({ key, categoria, label, anterior, nuevo, aMano: false });
+      const anterior = previos[key];
+      if (anterior !== undefined && anterior !== nuevo) {
+        const bajadaPct = calcBajadaPct(anterior, nuevo);
+        cambios.push({
+          key, categoria, label,
+          anterior, nuevo, original,
+          aMano: false, bajaPorRatio, bajadaPct,
+        });
+        return;
+      }
+      // Si el autoratio baja mucho el cálculo (≥15%) respecto al original (×1) y aún no
+      // se ha decidido qué hacer con esa bajada, avisa y deja elegir si bajar o seguir
+      // con el original.
+      if (bajaPorRatio && previos[`__ratio::${key}`] !== `${nuevo}::${original}`) {
+        const bajadaPct = calcBajadaPct(original, nuevo);
+        cambios.push({
+          key, categoria, label,
+          anterior: original, nuevo, original,
+          aMano: false, bajaPorRatio: true, bajadaPct,
+        });
+      }
     });
+    return cambios;
+  };
+
+  const handleRecalcular = () => {
+    const cambios = calcularDiferenciasRecalculo();
     if (cambios.length === 0) {
       setRecalcularMsg("✓ Nada ha cambiado desde el último guardado");
       setTimeout(() => setRecalcularMsg(""), 3500);
@@ -1928,7 +1972,10 @@ export default function App({ onCerrarSesion } = {}) {
     const nuevosOverrides = { ...overridesManuales };
     const nuevoSnapshot = { ...valoresCalculados };
     modalRecalcular.forEach(c => {
-      if (decisiones[c.key] === "mantener") {
+      if (decisiones[c.key] === "original" && c.original) {
+        nuevosOverrides[c.key] = c.original;
+        nuevoSnapshot[c.key] = c.nuevo;
+      } else if (decisiones[c.key] === "mantener") {
         nuevosOverrides[c.key] = c.anterior;
         // En la foto se apunta el cálculo automático que se ha revisado, no el valor
         // que se mantiene: así no se vuelve a preguntar por lo ya decidido, pero sí
@@ -1939,6 +1986,9 @@ export default function App({ onCerrarSesion } = {}) {
         // cantidad se queda clavada en la de antes y el recalculo no se nota.
         if (c.aMano) delete nuevosOverrides[c.key];
         nuevoSnapshot[c.key] = c.nuevo;
+      }
+      if (c.bajaPorRatio) {
+        nuevoSnapshot[`__ratio::${c.key}`] = `${c.nuevo}::${c.original}`;
       }
     });
     setOverridesManuales(nuevosOverrides);
@@ -2808,6 +2858,42 @@ export default function App({ onCerrarSesion } = {}) {
     });
     return mapa;
   }, [baseChecklist, categoriasRenombradas]);
+  const valoresOriginalesActuales = useMemo(() => {
+    const hayBajadaRatio =
+      Object.values((factoresBebida && factoresBebida[evento]) || {}).some(f => Number(f) < 1) ||
+      Number((factoresHielo || {})[evento]) < 1 ||
+      Object.values((factoresComida && factoresComida[evento]) || {}).some(f => Number(f) < 1) ||
+      (Number(paxPorCamarero) > 0 && Number((ratiosPersonal || {})[evento]) > 0);
+    if (!hayBajadaRatio) return valoresBaseActuales;
+    const prevB = leerFactores();
+    const prevH = leerFactoresHielo();
+    const prevC = leerFactoresComida();
+    try {
+      ponFactores({});
+      ponFactoresHielo({});
+      ponFactoresComida({});
+      const sinRatio = buildChecklist(evento, pax, barraCoctel ? horasCoctel : 0, barraCopas ? horasCopas : 0, ninos, { ...opts, paxPorCamarero: 0 });
+      const mapa = {};
+      sinRatio.forEach(cat => {
+        const nombreCat = categoriasRenombradas[cat.nombre] ?? cat.nombre;
+        cat.items.forEach(([label, qty]) => {
+          if (qty === null) return;
+          const esObjetoConSufijo = qty && typeof qty === "object";
+          mapa[`${nombreCat}::${label}`] = String(esObjetoConSufijo ? qty.u : qty);
+        });
+      });
+      return mapa;
+    } finally {
+      ponFactores(prevB);
+      ponFactoresHielo(prevH);
+      ponFactoresComida(prevC);
+    }
+  }, [valoresBaseActuales, factoresBebida, factoresHielo, factoresComida, ratiosPersonal, paxPorCamarero, evento, pax, barraCoctel, horasCoctel, barraCopas, horasCopas, ninos, opts, categoriasRenombradas]);
+  const cambiosRecalcular = useMemo(
+    () => calcularDiferenciasRecalculo(valoresBaseActuales, overridesManuales, valoresCalculados, valoresOriginalesActuales),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [valoresBaseActuales, overridesManuales, valoresCalculados, valoresOriginalesActuales]
+  );
   const categoriasDisponibles = useMemo(() => {
     const base = baseChecklist.map(c => categoriasRenombradas[c.nombre] ?? c.nombre);
     // Las categorías creadas por el usuario (vía items añadidos) también están disponibles
@@ -3223,8 +3309,16 @@ export default function App({ onCerrarSesion } = {}) {
     setNombresManuales(migraClaves);
     setUnidadesManuales(migraClaves);
     setItemsAlquilerManual(migraClaves);
-    // Lo que falta por llegar no se puede perder por renombrar la categoría
+    // Lo que falta por llegar, lo preparado/cargado/vuelto y la foto de cálculo no se
+    // pueden perder por renombrar la categoría.
     setPendientes(migraClaves);
+    setPreparados(migraClaves);
+    setCheckeados(migraClaves);
+    setVueltos(migraClaves);
+    setRoturas(migraClaves);
+    setMarcasRevisar(migraClaves);
+    setNotasCheck(migraClaves);
+    setValoresCalculados(migraClaves);
   };
 
   const handleLabelItemManual = (value) => {
@@ -3326,28 +3420,39 @@ export default function App({ onCerrarSesion } = {}) {
   // existen, para que cargar una copia vieja no pise trabajo más nuevo.
   const handleImportarCopia = (fichero) => {
     if (!fichero) return;
+    if (fichero.size > 10 * 1024 * 1024) {
+      setGuardadoEventoMsg("✕ El fichero es demasiado grande");
+      setTimeout(() => setGuardadoEventoMsg(""), 4000);
+      return;
+    }
+    const esClaveSegura = (k) => k !== "__proto__" && k !== "constructor" && k !== "prototype";
     const lector = new FileReader();
+    lector.onerror = () => {
+      setGuardadoEventoMsg("✕ No se ha podido leer el fichero");
+      setTimeout(() => setGuardadoEventoMsg(""), 4000);
+    };
     lector.onload = () => {
       let datos;
       try { datos = JSON.parse(String(lector.result)); }
       catch (e) { setGuardadoEventoMsg("✕ Ese fichero no es una copia válida"); setTimeout(() => setGuardadoEventoMsg(""), 4000); return; }
-      if (!datos || datos.formato !== "gula-checklist-copia" || !datos.eventos) {
+      if (!datos || datos.formato !== "gula-checklist-copia" || !datos.eventos || typeof datos.eventos !== "object") {
         setGuardadoEventoMsg("✕ Ese fichero no es una copia de Gula");
         setTimeout(() => setGuardadoEventoMsg(""), 4000);
         return;
       }
-      const nuevos = Object.keys(datos.eventos).filter(n => eventosGuardados[n] === undefined);
-      const repetidos = Object.keys(datos.eventos).filter(n => eventosGuardados[n] !== undefined);
+      const clavesValidas = Object.keys(datos.eventos).filter(esClaveSegura);
+      const nuevos = clavesValidas.filter(n => eventosGuardados[n] === undefined);
+      const repetidos = clavesValidas.filter(n => eventosGuardados[n] !== undefined);
       setDialogo({
         tipo: "confirm",
         titulo: "Restaurar copia de seguridad",
-        mensaje: `La copia tiene ${Object.keys(datos.eventos).length} eventos: ${nuevos.length} que no están aquí y ${repetidos.length} que ya existen. Se añaden los que faltan y NO se toca ninguno de los que ya tienes.`,
+        mensaje: `La copia tiene ${clavesValidas.length} eventos: ${nuevos.length} que no están aquí y ${repetidos.length} que ya existen. Se añaden los que falten y NO se toca ninguno de los que ya tienes.`,
         textoConfirmar: `Añadir ${nuevos.length} eventos`,
         onConfirm: () => {
           const combinado = { ...eventosGuardados };
-          nuevos.forEach(n => { combinado[n] = datos.eventos[n]; });
+          nuevos.forEach(n => { combinado[n] = sanearEstado(datos.eventos[n]); });
           guardarEventos(combinado);
-          if (datos.plantillas) guardarPlantillas({ ...datos.plantillas, ...plantillas });
+          if (datos.plantillas && typeof datos.plantillas === "object") guardarPlantillas({ ...datos.plantillas, ...plantillas });
           setGuardadoEventoMsg(`✓ Restaurados ${nuevos.length} eventos de la copia`);
           setTimeout(() => setGuardadoEventoMsg(""), 5000);
         },
@@ -4081,7 +4186,14 @@ export default function App({ onCerrarSesion } = {}) {
               <button className="btn btn-navy-outline btn-plantilla" onClick={handleGuardarEvento} title="Guarda esta checklist COMPLETA (nombre, fecha, ubicación, logística...) para reabrirla o compartir su link"><Save size={14} /> Guardar evento</button>
             </div>
           </div>
-          <button className="btn btn-outline btn-secundario-ancho" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar"><RefreshCw size={14} /> Recalcular cantidades</button>
+          <button className="btn btn-outline btn-secundario-ancho" onClick={handleRecalcular} title="Comprueba si alguna cantidad automática ha cambiado desde el último guardado (por un ajuste de fórmula) y deja elegir cuál usar">
+            <RefreshCw size={14} /> Recalcular cantidades
+            {cambiosRecalcular.length > 0 && (
+              <span className="recalcular-badge" title={`${cambiosRecalcular.length} ${cambiosRecalcular.length === 1 ? "cantidad pendiente de revisar" : "cantidades pendientes de revisar"}`}>
+                {cambiosRecalcular.length}
+              </span>
+            )}
+          </button>
           {recalcularMsg && <p className="guardado-confirm">{recalcularMsg}</p>}
           {guardadoEventoMsg && <p className="guardado-confirm">{guardadoEventoMsg}</p>}
           {Object.keys(eventosGuardados).length === 0 ? (
@@ -5198,6 +5310,12 @@ export default function App({ onCerrarSesion } = {}) {
         )}
 
         {/* CATEGORÍAS */}
+        {filtered.length === 0 && filtro.trim() && (
+          <div className="config-card plantillas-vacio" style={{ textAlign: "center", padding: "24px 16px" }}>
+            <p style={{ margin: "0 0 10px" }}>No se encontraron materiales para «<strong>{filtro}</strong>»</p>
+            <button type="button" className="btn btn-outline" onClick={() => setFiltro("")}>Limpiar búsqueda</button>
+          </div>
+        )}
         {filtered.map((cat, idx) => {
           const isOpen = openCategories[cat.nombre] !== false;
           return (
@@ -5218,7 +5336,7 @@ export default function App({ onCerrarSesion } = {}) {
                     const editando = editandoNombre === keyId;
                     return (
                       <FilaItem
-                        key={i}
+                        key={manualIdx !== null && manualIdx !== undefined ? `${keyId}::m${manualIdx}` : `${keyId}::${i}`}
                         categoria={cat.nombre}
                         label={label}
                         labelOriginal={labelOriginal}
