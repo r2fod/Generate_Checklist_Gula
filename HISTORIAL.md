@@ -6,6 +6,12 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Mesas de 1,8m: 2 de gueridón, 8 de cocina y 4 por barra a partir de 100 pax** ("seria
+  2 de gueridon, 8 mesas cocina, 4 mesas por barra apartir de 100 pax", el dueño). Ahora
+  `calcMesasCocina(pax)` da `8` mesas de 1,8m con `≥100` pax (`4` con `<100`), se suman
+  siempre `2` mesas de gueridón (`MESAS_GUERIDON = 2`) y `mesasDeBarra` aporta `4` mesas de
+  1,8m por barra a partir de 100 pax (`2` bajo 100 pax), todo unificado en `Mesas de 1,8m`
+  y con su mantel en `repartoManteles`.
 - **Mesas de 1,8m suman también barras extra y corners (Vermut / Aperol)** ("y en las mesas
   ya suba las mesas de la barra libre? como los corners?", el dueño). Las barras extra por
   encima de la primera (`numBarras > 1`) solo sumaban manteles y mesas altas pero no mesas

@@ -4057,14 +4057,14 @@ async function main() {
       const f = (await listaItems(p)).find(i => i.startsWith("Mesas de 1,8m")) || "";
       return Number((f.match(/=(\d+)/) || [])[1] || 0);
     };
-    // Comensales (pax/6, rectangular de 1,80) + las de cocina y barras (4/5/6).
+    // Comensales (pax/6, rectangular de 1,80) + 8 de cocina + 2 de gueridón + 4 de barra (14 de apoyo).
     // Seis por mesa y no siete: aquí se juntan varias para hacer mesas largas y al
     // juntarlas se pierden las cabeceras, que es de donde salen los comensales de más
     // que dan las tablas del sector.
     const cien = await mesas(100), dosc = await mesas(200), tresc = await mesas(300);
-    ok(cien === 21, `100 pax: 17 de comensales + 4 de cocina = ${cien}`);
-    ok(dosc === 39, `200 pax: 34 + 5 = ${dosc}`);
-    ok(tresc === 56, `300 pax: 50 + 6 = ${tresc}`);
+    ok(cien === 31, `100 pax: 17 de comensales + 8 cocina + 2 gueridón + 4 barra = ${cien}`);
+    ok(dosc === 48, `200 pax: 34 + 14 = ${dosc}`);
+    ok(tresc === 64, `300 pax: 50 + 14 = ${tresc}`);
     // Lo que fallaba antes: dejar de crecer a partir de 100 pax
     ok(tresc > dosc && dosc > cien,
       "y una boda más grande lleva más mesas, que antes se plantaban a partir de 100 pax");

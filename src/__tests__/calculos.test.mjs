@@ -3330,9 +3330,9 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
   const manteles = (evt, opts) => num(linea(evt, opts, /^Manteles/));
   ok(manteles("boda", { numMesasBuffet: 2, numBarras: 2 }) === manteles("boda", { numBarras: 2 }) + 2,
     "cada mesa de buffet suma su mantel");
-  // De 1 a 3 barras con 100 pax: 2 manteles de barra más, y 8 mesas altas más (4 por barra)
-  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 2 + 8,
-    "cada barra suma el suyo (y sus mesas altas, como siempre)");
+  // De 1 a 3 barras con 100 pax: 2 barras más × 4 mesas de 1,8m por barra (= 8 manteles de barra) + 8 mesas altas (4 por barra)
+  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 8 + 8,
+    "cada barra suma sus 4 manteles de mesa de 1,8m (y sus 4 mesas altas)");
   ok(manteles("cumpleanos", { numMesasBuffet: 1 }) === manteles("cumpleanos", {}) + 1,
     "en un cumpleaños, igual con los buffets");
   ok(["boda", "cumpleanos", "produccion"].every(evt => num(linea(evt, { diasProduccion: ["20"] }, /^Rollo de mantel de papel/)) === 1),
@@ -3359,8 +3359,11 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
     "y si no van platos de postre (o todo es en bandeja), los de buffet salen en su propia línea");
 
   const mesas18 = (evt, opts) => num(linea(evt, opts, /^Mesas de 1,8m$/));
-  ok(mesas18("boda", { numBarras: 3 }) === mesas18("boda", { numBarras: 1 }) + 2,
-    "cada barra extra por encima de la primera suma también su mesa de 1,8m");
+  ok(mesas18("boda", { numBarras: 3 }) === mesas18("boda", { numBarras: 1 }) + 8,
+    "a partir de 100 pax, cada barra lleva 4 mesas de 1,8m (de 1 a 3 barras sube en 8)");
+  // Con 100 adultos (0 niños) y 1 barra: 17 comensales + 8 cocina + 2 gueridón + 4 barra = 31 mesas de 1,8m
+  ok(num(linea("boda", {}, /^Mesas de 1,8m$/, 100, 0)) === 31,
+    "en boda de 100 pax: 17 de comensales + 8 cocina + 2 gueridón + 4 de barra = 31 mesas de 1,8m");
   ok(mesas18("boda", { llevaCornerVermut: true }) === mesas18("boda", {}) + 1
     && mesas18("boda", { llevaCornerAperol: true }) === mesas18("boda", {}) + 1
     && mesas18("boda", { llevaCornerVermut: true, llevaCornerAperol: true }) === mesas18("boda", {}) + 2,
