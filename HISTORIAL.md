@@ -6,6 +6,12 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Mesas de 1,8m suman también barras extra y corners (Vermut / Aperol)** ("y en las mesas
+  ya suba las mesas de la barra libre? como los corners?", el dueño). Las barras extra por
+  encima de la primera (`numBarras > 1`) solo sumaban manteles y mesas altas pero no mesas
+  de 1,8m, y los corners (`llevaCornerVermut`, `llevaCornerAperol`) no sumaban ni mesa de
+  1,8m ni mantel. Ahora `mesasExtraBarrasYCorners` los añade tanto a `Mesas de 1,8m` como a
+  `repartoManteles`.
 - **Cocina y Logística de la checklist unificadas con `personal.js`** ("revisa estos valores
   porque lo veo muy altos", el dueño al ver 11 de Cocina para ~180 pax). En `src/personal.js`
   la curva medida con los 19 eventos reales ya daba `2` (≤40 pax), `3` (≤60), `4` (≤120) y

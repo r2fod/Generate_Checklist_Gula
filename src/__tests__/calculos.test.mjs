@@ -3358,6 +3358,15 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
     && linea("boda", { platosBuffet: 1 }, /^Platos pequeños \(buffets\)/, 100, 0)[2] === null,
     "y si no van platos de postre (o todo es en bandeja), los de buffet salen en su propia línea");
 
+  const mesas18 = (evt, opts) => num(linea(evt, opts, /^Mesas de 1,8m$/));
+  ok(mesas18("boda", { numBarras: 3 }) === mesas18("boda", { numBarras: 1 }) + 2,
+    "cada barra extra por encima de la primera suma también su mesa de 1,8m");
+  ok(mesas18("boda", { llevaCornerVermut: true }) === mesas18("boda", {}) + 1
+    && mesas18("boda", { llevaCornerAperol: true }) === mesas18("boda", {}) + 1
+    && mesas18("boda", { llevaCornerVermut: true, llevaCornerAperol: true }) === mesas18("boda", {}) + 2,
+    "cada corner (Vermut y Aperol) suma 1 mesa de 1,8m");
+  ok(manteles("boda", { llevaCornerVermut: true, llevaCornerAperol: true }) === manteles("boda", {}) + 2,
+    "y cada corner suma también su mantel");
   ok(num(linea("boda", { llevaCornerVermut: true }, /^Vermut rojo/)) === 2 * num(linea("boda", {}, /^Vermut rojo/))
     && num(linea("boda", { llevaCornerVermut: true }, /^Vermut blanco/)) === 2 * num(linea("boda", {}, /^Vermut blanco/)),
     "el corner de vermut suma su propio vermut al del aperitivo");
