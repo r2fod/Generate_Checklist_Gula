@@ -423,7 +423,12 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // El agua, los refrescos y el hielo van sobre TODOS (los niños beben); el alcohol solo
   // sobre los adultos. Antes todo iba sobre los adultos y en una comunión de 60+25
   // faltaba agua y refresco para veinticinco personas.
-  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, { alcoholPax: pax, tipo: evtKey, llevaHielo, llevaBebida });
+  const numCornersFrios = (llevaCornerVermut ? 1 : 0) + (llevaCornerAperol ? 1 : 0);
+  const bebidas    = calcBebidas(totalPax, horasBarraTotal, mesVerano, hayCongelador, tieneBrindisCava, horasCopas, {
+    alcoholPax: pax, tipo: evtKey, llevaHielo, llevaBebida,
+    numBarras: Number(numBarras) || 0,
+    numCorners: numCornersFrios,
+  });
   const aperol     = cornerAperol(llevaCornerAperol && llevaBebida ? pax : 0);
   const destilados = horasCopas > 0 ? calcDestilados(pax, horasCopas) : null;
   // Los vasos de cubata solo dependen de la barra libre de copas (0 si no está activada):
@@ -512,7 +517,8 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
     opt(bandejasPl > 0, ["Bandejas de plata", String(bandejasPl)]),
   ]});
 
-  const numPaella  = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, evtKey).n : 0;
+  const pBoda      = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, evtKey) : null;
+  const numPaella  = pBoda ? pBoda.n : 0;
   const numFritura = tieneFrituras ? Math.max(1, numFrituras) : 0;
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
   const nPlanchas  = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
@@ -520,10 +526,9 @@ function buildChecklistBoda(evtKey, pax, horasCoctel, horasCopas, ninos, opts) {
   // Paella y fuego: todo el equipo de fuego/paella junto (paella, difusores, trípode,
   // paravientos, bombonas, parisiene, barbacoa…), para distinguirlo y cargarlo cómodo.
   const paellaItems = [];
-  if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas, evtKey);
+  if (pBoda) {
     // Difusor y trípode se comparten con las frituras (misma herramienta), se suman en vez de listar aparte
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Difusor", String(p.n + numFritura)], ["Trípode", String(p.n + numFritura)], ["Paravientos", String(p.n)]);
+    paellaItems.push([`Paella ${pBoda.talla}`, String(pBoda.n)], ["Paletas de paella", String(pBoda.n)], ["Difusor", String(pBoda.n + numFritura)], ["Trípode", String(pBoda.n + numFritura)], ["Paravientos", String(pBoda.n)]);
   }
   if (tieneFrituras) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Espumadera grande", String(Math.max(2, numFritura))]);
@@ -789,11 +794,11 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   ]});
 
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo)
+  const pCumple = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "cumpleanos") : null;
   const paellaItems = [];
-  if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas, "cumpleanos");
+  if (pCumple) {
     // El trípode se comparte con las frituras (misma herramienta), se suma en vez de listar aparte
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)], ["Descansadores de paella", String(p.n)], ["Trípode", String(p.n + numFritura)]);
+    paellaItems.push([`Paella ${pCumple.talla}`, String(pCumple.n)], ["Paletas de paella", String(pCumple.n)], ["Descansadores de paella", String(pCumple.n)], ["Trípode", String(pCumple.n + numFritura)]);
   }
   if (tieneFrituras) {
     paellaItems.push(["Sartén Parisiene (frituras)", String(numFritura)], ["Difusor", String(numFritura)], ["Paravientos", "1"]);
@@ -802,7 +807,7 @@ function buildChecklistCumpleanos(pax, horasCoctel, horasCopas, ninos, opts) {
   const nPlanchasCumple = llevaPlanchaGas ? Math.max(1, numPlanchasGas) : 0;
   if (llevaPlanchaGas) paellaItems.push(["Plancha de gas", String(nPlanchasCumple)]);
   // 1 bombona por paella + 1 por cada sartén de fritura + 1 si hay plancha de gas
-  const bombonasCumple = (llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "cumpleanos").n : 0) + numFritura + nPlanchasCumple;
+  const bombonasCumple = (pCumple ? pCumple.n : 0) + numFritura + nPlanchasCumple;
   if (bombonasCumple > 0) paellaItems.push(["Bombonas llenas", String(bombonasCumple)]);
   cats.push({ nombre: "Paella y fuego", items: paellaItems });
 
@@ -1065,12 +1070,12 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
 
   // Paella y fuego: todo el equipo de fuego/paella junto (para distinguirlo y cargarlo cómodo).
   // Paravientos solo tienen sentido con fuego fuera (paellas/frituras): uno por foco.
-  const numPaellaProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "produccion").n : 0;
+  const pProd = llevaPaella ? calcPaella(pax, tipoPaella, numPaellas, "produccion") : null;
+  const numPaellaProd = pProd ? pProd.n : 0;
   const numParavientos = numPaellaProd + numFritura;
   const paellaItems = [];
-  if (llevaPaella) {
-    const p = calcPaella(pax, tipoPaella, numPaellas, "produccion");
-    paellaItems.push([`Paella ${p.talla}`, String(p.n)], ["Paletas de paella", String(p.n)]);
+  if (pProd) {
+    paellaItems.push([`Paella ${pProd.talla}`, String(pProd.n)], ["Paletas de paella", String(pProd.n)]);
   }
   paellaItems.push(["Trípode", String(numPaellaProd + numFritura)]);
   if (numParavientos > 0) paellaItems.push(["Paravientos", String(numParavientos)]);
@@ -1187,7 +1192,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     // refresco se aplica aquí a mano: si no, el panel enseñaría una casilla de producción
     // que no movería nada.
     ["Coca-Cola normal", String(Math.round(paxConsumo * 0.94 * factorRefresco))], ["Coca-Cola Zero", String(Math.round(paxConsumo * 0.56 * factorRefresco))],
-    ["Fanta naranja", String(Math.round(paxConsumo * 0.24 * factorRefresco))], ["Fanta limón", String(Math.round(paxConsumo * 0.2 * factorRefresco))],
+    ["Fanta naranja", String(Math.round(paxConsumo * 0.2 * factorRefresco))], ["Fanta limón", String(Math.round(paxConsumo * 0.24 * factorRefresco))],
     ["Aquarius", String(Math.round(paxConsumo * 0.24 * factorRefresco))],
     // En producción el agua de beber son las CAJAS de 33cl (35 uds). El ratio va por
     // temporada: en un rodaje de doce horas al sol se bebe el doble que en enero, y

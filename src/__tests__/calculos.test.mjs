@@ -1039,7 +1039,7 @@ console.log("\n══ Mesas de buffet: de texto libre a un número real en la ch
     "y en producción, misma cuenta");
 }
 
-console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax ══");
+console.log("\n══ Mesa alta: 1 cada 10 personas, con tope en 15 (almacén) ══");
 {
   const item = (cats, cat, label) => {
     const c = cats.find(x => x.nombre === cat);
@@ -1052,30 +1052,28 @@ console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax
   ok(item(sinBarra, "Mobiliario, sala y decoración", "Mesa alta") === "—",
     "sin cóctel ni copas, no hay mesas altas que montar");
 
-  // Con barra pero sin contestar numBarras, cae al cálculo viejo por pax
+  // Con barra: 1 cada 10 personas (90 pax → 9 mesas altas)
   const sinNumBarras = buildChecklist("boda", 90, 2, 4, 0, {});
-  ok(item(sinNumBarras, "Mobiliario, sala y decoración", "Mesa alta") === String(calcMesasAltas(90)),
-    `con barra pero sin contestar barras, cae al cálculo viejo por pax (90 → ${calcMesasAltas(90)})`);
+  ok(item(sinNumBarras, "Mobiliario, sala y decoración", "Mesa alta") === "9",
+    `con barra: 1 cada 10 personas (90 → ${calcMesasAltas(90)})`);
 
-  // Con numBarras contestado, manda esa cuenta (2 por barra bajo 100 pax)
-  const conUnaBarra = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 1 });
-  ok(item(conUnaBarra, "Mobiliario, sala y decoración", "Mesa alta") === "2",
-    "1 barra bajo 100 pax → 2 mesas altas");
-  const conDosBarras = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 2 });
-  ok(item(conDosBarras, "Mobiliario, sala y decoración", "Mesa alta") === "4",
-    "2 barras bajo 100 pax → 4 mesas altas");
-
-  // Con 100 pax o más, 4 por barra
+  // Con 100 pax → 10 mesas altas; con 120 pax → 12 mesas altas
+  const conUnaBarra = buildChecklist("boda", 100, 2, 4, 0, { numBarras: 1 });
+  ok(item(conUnaBarra, "Mobiliario, sala y decoración", "Mesa alta") === "10",
+    "100 pax → 10 mesas altas (1 cada 10 personas)");
   const conBarraPaxAlto = buildChecklist("boda", 120, 2, 4, 0, { numBarras: 1 });
-  ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "4",
-    "1 barra con 120 pax → 4 mesas altas");
+  ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "12",
+    "120 pax → 12 mesas altas");
 
-  // Sin barra libre (el cliente trae su bebida) pero SÍ se llevan mesas altas: antes se
-  // ignoraba "Nº de barras" del todo si no había barra — un evento real así se quedaba
-  // en "—" aunque en la app se hubiera contestado. Contestar a mano manda igual.
+  // Tope en 15 mesas altas (las que tenemos en almacén)
+  const conTopeAlmacen = buildChecklist("boda", 180, 2, 4, 0, { numBarras: 2 });
+  ok(item(conTopeAlmacen, "Mobiliario, sala y decoración", "Mesa alta") === "15",
+    "180 pax → tope en 15 mesas altas (almacén)");
+
+  // Sin barra libre (el cliente trae su bebida) pero SÍ se contesta "Nº de barras"
   const sinBarraConMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 1 });
-  ok(item(sinBarraConMesas, "Mobiliario, sala y decoración", "Mesa alta") === "2",
-    "sin barra pero con 'Nº de barras' contestado a mano, sí se calculan mesas altas");
+  ok(item(sinBarraConMesas, "Mobiliario, sala y decoración", "Mesa alta") === "9",
+    "sin barra pero con 'Nº de barras' contestado a mano, sí se calculan mesas altas (90 pax → 9)");
   const sinBarraSinMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 0 });
   ok(item(sinBarraSinMesas, "Mobiliario, sala y decoración", "Mesa alta") === "—",
     "y sin barra Y sin contestar, se queda en '—' como siempre (no cambia el caso normal)");
@@ -1885,15 +1883,9 @@ console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
   ok(b.cocaNormal === 120 && b.cocaZero === 72 && b.nestea === 12,
     `los tres calibrados siguen clavados en su fuente → ${b.cocaNormal}/${b.cocaZero}/${b.nestea}`);
 
-  // Los otros cuatro se añadieron después sin ningún dato: sumaban 2,6 uds/pax ellos
-  // solos y hacían que el total sobrepasara en un 84% su propia calibración.
-  const total = b.cocaNormal + b.cocaZero + b.nestea + b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite;
-  const porPax = total / 65;
-  ok(porPax > 4 && porPax < 5,
-    `el total baja a ${porPax.toFixed(1)} uds/pax (antes 5,7, calibración 3,1)`);
-  const sinCalibrar = (b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite) / 65;
-  ok(sinCalibrar < 1.5,
-    `y los cuatro sin calibrar pesan ahora ${sinCalibrar.toFixed(1)} uds/pax, no 2,6`);
+  // Fanta limón (0,08) lleva más ratio que Fanta naranja (0,07), y Aquarius/Sprite (0,10).
+  ok(b.fantaNaranja === 34 && b.fantaLimon === 38 && b.aquarius === 48 && b.sprite === 48,
+    `Fanta limón (38) > Fanta naranja (34), Aquarius y Sprite restaurados → ${b.fantaNaranja}/${b.fantaLimon}/${b.aquarius}/${b.sprite}`);
 }
 
 console.log("\n══ Cocina y logística dejan de aplanarse ══");
@@ -3164,17 +3156,12 @@ console.log("\n══ Mesas calientes y taxis de hielo, como funciones sueltas �
     `1 mesa caliente por cada ~40 pax: 40 → 1, 41 → 2 (${calcMesasCalientes(40)}, ${calcMesasCalientes(41)})`);
   ok(calcMesasCalientes(0) === 1, "sin pax puesto, el mínimo es 1, no 0");
 
-  // Mesas altas: antes pax/15 fijo; ahora depende de cuántas barras se van a montar
-  // (2 por barra, 4 con 100 pax o más), y sin contestar cae sola al cálculo viejo.
-  ok(calcMesasAltas(99, 1) === 2 && calcMesasAltas(99, 2) === 4,
-    `2 mesas por barra bajo 100 pax: 1 barra → 2, 2 barras → 4 (${calcMesasAltas(99, 1)}, ${calcMesasAltas(99, 2)})`);
-  ok(calcMesasAltas(120, 1) === 4 && calcMesasAltas(120, 2) === 8,
-    `4 mesas por barra con 100 pax o más: 1 barra → 4, 2 barras → 8 (${calcMesasAltas(120, 1)}, ${calcMesasAltas(120, 2)})`);
-  ok(calcMesasAltas(99, 3) === 6, "el salto de 2 a 4 es por pax, no por nº de barras (99 pax, 3 barras → 6)");
-  ok(calcMesasAltas(100, 0) === Math.max(2, Math.ceil(100 / 15)),
-    "sin barras contestadas (0), cae al cálculo viejo por pax");
-  ok(calcMesasAltas(100, undefined) === Math.max(2, Math.ceil(100 / 15)),
-    "y sin el campo siquiera (undefined), igual — eventos guardados antes de esta pregunta");
+  // Mesas altas: 1 cada 10 personas, con tope en 15 (las que hay en almacén).
+  ok(calcMesasAltas(80) === 8 && calcMesasAltas(100) === 10,
+    `1 mesa alta cada 10 pax: 80 → ${calcMesasAltas(80)}, 100 → ${calcMesasAltas(100)}`);
+  ok(calcMesasAltas(150) === 15 && calcMesasAltas(200) === 15,
+    `tope en 15 mesas altas en almacén: 150 → ${calcMesasAltas(150)}, 200 → ${calcMesasAltas(200)}`);
+  ok(calcMesasAltas(10) === 2, "suelo de 2 mesas altas en eventos muy pequeños");
 
   ok(taxisDeHielo(24) === 1 && taxisDeHielo(25) === 2,
     `24kg entran en 1 taxi, 25kg ya piden 2 (${taxisDeHielo(24)}, ${taxisDeHielo(25)})`);
@@ -3330,9 +3317,9 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
   const manteles = (evt, opts) => num(linea(evt, opts, /^Manteles/));
   ok(manteles("boda", { numMesasBuffet: 2, numBarras: 2 }) === manteles("boda", { numBarras: 2 }) + 2,
     "cada mesa de buffet suma su mantel");
-  // De 1 a 3 barras con 100 pax: 2 barras más × 4 mesas de 1,8m por barra (= 8 manteles de barra) + 8 mesas altas (4 por barra)
-  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 8 + 8,
-    "cada barra suma sus 4 manteles de mesa de 1,8m (y sus 4 mesas altas)");
+  // De 1 a 3 barras con 100 pax: 2 barras más × 4 mesas de 1,8m por barra (= 8 manteles de barra)
+  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 8,
+    "cada barra suma sus 4 manteles de mesa de 1,8m");
   ok(manteles("cumpleanos", { numMesasBuffet: 1 }) === manteles("cumpleanos", {}) + 1,
     "en un cumpleaños, igual con los buffets");
   ok(["boda", "cumpleanos", "produccion"].every(evt => num(linea(evt, { diasProduccion: ["20"] }, /^Rollo de mantel de papel/)) === 1),

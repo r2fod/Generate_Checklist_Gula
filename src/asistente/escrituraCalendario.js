@@ -9,7 +9,8 @@
 // menos comprobaciones que el de una persona.
 import { saneaLista, idDeApunte } from "../calendario/apuntes.js";
 
-export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
+export function aplicarEnCalendario({ apuntes: apuntesIniciales = [], guardar, borrar, reemplazar }) {
+  let apuntes = apuntesIniciales;
   return function aplicar(propuesta) {
     const { que, datos } = propuesta || {};
 
@@ -19,6 +20,7 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       // azar lo rompería y el calendario acabaría con duplicados que parecen distintos.
       const [limpio] = saneaLista([{ ...datos, id: idDeApunte(datos.fecha, datos.titulo) }]);
       if (!limpio) return { error: "Ese apunte no ha pasado las comprobaciones: revisa la fecha y el tipo." };
+      apuntes = [...apuntes.filter(a => a.id !== limpio.id), limpio];
       guardar(limpio);
       return { creado: limpio.titulo, fecha: limpio.fecha };
     }
@@ -32,14 +34,20 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       const idNuevo = idDeApunte(fusionado.fecha, fusionado.titulo);
       const [limpio] = saneaLista([{ ...fusionado, id: idNuevo }]);
       if (!limpio) return { error: "El cambio deja el apunte inválido." };
-      if (idNuevo !== antes.id) borrar(antes.id);
-      guardar(limpio);
+      apuntes = [...apuntes.filter(a => a.id !== antes.id && a.id !== idNuevo), limpio];
+      if (idNuevo !== antes.id && reemplazar) {
+        reemplazar(antes.id, limpio);
+      } else {
+        if (idNuevo !== antes.id) borrar(antes.id);
+        guardar(limpio);
+      }
       return { editado: limpio.titulo };
     }
 
     if (que === "borrar_apunte") {
       const antes = apuntes.find(a => a.id === datos.id);
       if (!antes) return { error: "Ese apunte ya no está." };
+      apuntes = apuntes.filter(a => a.id !== datos.id);
       borrar(datos.id);
       return { borrado: antes.titulo };
     }

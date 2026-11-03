@@ -8,13 +8,15 @@
 // los que ya había.
 import { apuntarTarea, marcarTarea } from "./tareas.js";
 
-export function aplicarEnTareas({ tareas = [], guardar }) {
+export function aplicarEnTareas({ tareas: tareasIniciales = [], guardar }) {
+  let tareas = tareasIniciales;
   return function aplicar(propuesta) {
     const { que, datos } = propuesta || {};
 
     if (que === "apuntar_tarea") {
       const r = apuntarTarea(tareas, datos.texto, { evento: datos.evento, fecha: datos.fecha });
       if (r.error) return { error: r.error };
+      tareas = r.tareas;
       guardar(r.tareas);
       return r.yaEstaba
         ? { apuntado: r.tarea.texto, yaEstaba: true }
@@ -24,7 +26,8 @@ export function aplicarEnTareas({ tareas = [], guardar }) {
     if (que === "marcar_tarea") {
       const antes = tareas.find(t => t.id === datos.id);
       if (!antes) return { error: "Esa tarea ya no está." };
-      guardar(marcarTarea(tareas, datos.id, true));
+      tareas = marcarTarea(tareas, datos.id, true);
+      guardar(tareas);
       return { hecha: antes.texto };
     }
 

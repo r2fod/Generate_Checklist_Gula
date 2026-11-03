@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { repartirEnvios, limpiarAvisos } from "../formulario/envios.js";
 import {
-  resumirEnvio, archivosDelEnvio, nombreDelEnvio, textoAvisoEnvio,
+  resumirEnvio, archivosDelEnvio, textoAvisoEnvio,
 } from "../formulario/preguntas.js";
 
 function TarjetaEnvio({ e, fmtEnviado, revisado = false, avisos = [], children }) {
