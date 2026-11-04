@@ -105,9 +105,32 @@ console.log("\n══ Cerveza: las horas no pueden restar ══");
     `media hora de barra no pide menos que no tener barra (${cerveza(0)} → ${cerveza(0.5)})`);
   ok(cerveza(0) === cerveza(2),
     `sin barra se calcula como 2 horas, que es el suelo (${cerveza(0)})`);
-  ok(cerveza(4) === cerveza(8) && cerveza(8) === cerveza(12),
-    `y de 4h en adelante ya no sube: nadie bebe el doble porque la barra dure el doble (${cerveza(4)})`);
+  ok(cerveza(8) > cerveza(4) && cerveza(8) === cerveza(12),
+    `sube con barras más largas (4h:${cerveza(4)} → 8h:${cerveza(8)}) y de 8h en adelante se estabiliza (${cerveza(12)})`);
   ok(cerveza(4) % 24 === 0, `siempre en cajas de 24 (${cerveza(4)})`);
+
+  // Mover las horas de cóctel y de copas mueve las bebidas frías y el hielo
+  const bCoctelCorto = calcBebidas(100, 5, true, false, false, 4); // 1h cóctel + 4h copas
+  const bCoctelLargo = calcBebidas(100, 7, true, false, false, 4); // 3h cóctel + 4h copas
+  ok(bCoctelLargo.vinoBlanco + bCoctelLargo.vinoTinto > bCoctelCorto.vinoBlanco + bCoctelCorto.vinoTinto
+    && bCoctelLargo.tintoVerano > bCoctelCorto.tintoVerano
+    && bCoctelLargo.vermutRojo > bCoctelCorto.vermutRojo
+    && bCoctelLargo.cocaNormal > bCoctelCorto.cocaNormal
+    && bCoctelLargo.hieloKg > bCoctelCorto.hieloKg,
+    "subir las horas de cóctel sube vino, tinto de verano, vermut, refrescos y hielo");
+  const bCopasLargas = calcBebidas(100, 8, true, false, false, 6); // 2h cóctel + 6h copas
+  const bCopasCortas = calcBebidas(100, 4, true, false, false, 2); // 2h cóctel + 2h copas
+  ok(bCopasLargas.cerveza > bCopasCortas.cerveza
+    && bCopasLargas.cocaNormal > bCopasCortas.cocaNormal
+    && bCopasLargas.tonica > bCopasCortas.tonica
+    && bCopasLargas.hieloKg > bCopasCortas.hieloKg,
+    "subir las horas de copas sube cerveza, refrescos, tónica y hielo");
+  // Las horas de copas pesan más en el hielo que las de cóctel, y barras extra / corners suman su cama de hielo
+  ok(calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4 }).kg > calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 1 }).kg,
+    "a igual duración total (6h), más horas de copas piden más hielo que más horas de cóctel");
+  ok(calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numBarras: 3 }).kg > calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numBarras: 1 }).kg
+    && calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numCorners: 2 }).kg > calcHielo(100, { mesVerano: true, horasBarra: 6, horasCopas: 4, numCorners: 0 }).kg,
+    "cada barra extra y cada corner frío suman hielo para sus cubetas y champaneras");
 
   // En verano se bebe más cerveza que en invierno, a igualdad de todo lo demás
   ok(calcBebidas(100, 4, true, false).cerveza > calcBebidas(100, 4, false, false).cerveza,
@@ -766,6 +789,12 @@ console.log("\n══ El café, para invitados o solo para el personal ══");
     "sin invitados no se piden tazas, platos, infusiones ni jarras — eso es de invitados");
   ok(catCafe(soloPersonal).items.some(x => x[0] === "Cafetera Nespresso (para el personal)"),
     "pero si el personal sí toma café, se lleva su propia cafetera");
+  ok(catCafe(soloPersonal).items.some(x => x[0] === "Leche entera (para el personal)" && x[1] === "2")
+    && catCafe(soloPersonal).items.some(x => x[0] === "Leche de avena (para el personal)" && x[1] === "2")
+    && catCafe(soloPersonal).items.some(x => x[0] === "Leche sin lactosa (para el personal)" && x[1] === "2"),
+    "y cuando es solo café para el personal, se llevan 2 de leche entera, 2 de avena y 2 sin lactosa");
+  ok(!catCafe(conInvitados).items.some(x => /^Leche (entera|de avena|sin lactosa) \(para el personal\)$/.test(x[0])),
+    "mientras que con café de invitados ya va la línea de Leches variadas");
   ok(JSON.stringify(vasosPersonal(conInvitados)) === JSON.stringify(vasosPersonal(soloPersonal)),
     "y los vasos de cartón del personal no cambian: son aparte, no dependen de esto");
   ok(JSON.stringify(catCafe(conInvitados).items.find(x => x[0] === "Cápsulas café (para el personal)"))
@@ -812,6 +841,39 @@ console.log("\n══ Las Nespresso, según la gente ══");
   ok(["boda", "comunion", "corporativo", "cumpleanos"].every(t => conGrande(t).includes("Cafetera grande (industrial)")
     && conGrande(t).includes("Cafetera Nespresso (para el personal)") && conGrande(t).includes("Cápsulas café (para el personal)")),
     "con la grande va también la Nespresso del personal, con sus cápsulas, en todos los tipos con personal");
+}
+
+// ─── Cafetera de bar: dos bidones de 20L ──────────────────────────────────────
+// "Cuando se seleccione cafetera de bar, agrega un bidón beige de 20L lleno y otro de
+// 20L vacío: uno para darle agua a la máquina y otro para el agua sucia" (el dueño).
+console.log("\n══ Cafetera de bar: bidón lleno y bidón vacío ══");
+{
+  const cafe = (tipo, opts) => buildChecklist(tipo, 100, 2, 4, 0, opts).find(c => c.nombre === "Café").items.map(x => x[0]);
+  const BIDONES = ["Bidón beige 20L (lleno, agua para la máquina)", "Bidón 20L (vacío, para el agua sucia)"];
+  ok(["boda", "comunion", "corporativo", "cumpleanos", "produccion"].every(t => BIDONES.every(b => cafe(t, { tipoCafetera: "Bar" }).includes(b))),
+    "con la cafetera de bar, en todos los tipos, va el bidón lleno y el vacío");
+  ok(["Nespresso", "Grande", undefined].every(tipo => cafe("boda", { tipoCafetera: tipo }).every(l => !/^Bidón/.test(l))),
+    "con la Nespresso o la grande no van bidones");
+  ok(!cafe("boda", { tipoCafetera: "Bar", cafeParaInvitados: false }).some(l => /^Bidón/.test(l)),
+    "y sin café para invitados tampoco: la de bar no sale");
+}
+
+// ─── Horno pequeño: sus bandejas y las hondas ─────────────────────────────────
+// "Cuando se seleccione horno pequeño hay que agregar sus bandejas de horno más bandejas
+// hondas para calentar comida" (el dueño).
+console.log("\n══ Horno pequeño: bandejas de horno y bandejas hondas ══");
+{
+  const items = (tipo, pax, tipoHorno) => buildChecklist(tipo, pax, 2, 4, 0, { tipoHorno }).flatMap(c => c.items).filter(Boolean);
+  const valor = (tipo, pax, tipoHorno, label) => items(tipo, pax, tipoHorno).find(x => x[0] === label)?.[1];
+  const TIPOS = ["boda", "comunion", "corporativo", "cumpleanos", "produccion"];
+  ok(TIPOS.every(t => valor(t, 100, "pequeño", "Bandejas de horno") === "2" && valor(t, 100, "pequeño", "Bandejas hondas (calentar comida)") === "2"),
+    "con el horno pequeño, en todos los tipos, van sus 2 bandejas de horno y 2 hondas");
+  ok(TIPOS.every(t => valor(t, 100, "ambos", "Bandejas de horno") === "2"),
+    "con los dos hornos también (el pequeño está)");
+  ok(TIPOS.every(t => ["grande", ""].every(h => valor(t, 100, h, "Bandejas de horno") === undefined && valor(t, 100, h, "Bandejas hondas (calentar comida)") === undefined)),
+    "con el horno grande o sin horno no van");
+  ok(valor("boda", 40, "pequeño", "Bandejas hondas (calentar comida)") === "2" && valor("boda", 400, "pequeño", "Bandejas hondas (calentar comida)") === "8",
+    "las hondas crecen con la gente (una cada 50 pax, mínimo dos)");
 }
 
 console.log("\n══ Carpas para todos los tipos de evento (antes solo producción) ══");
@@ -939,15 +1001,18 @@ console.log("\n══ Mesas de buffet: de texto libre a un número real en la ch
   };
 
   const sinContestar = buildChecklist("boda", 90, 2, 4, 0, {});
-  ok(item(sinContestar, "Mobiliario, sala y decoración", "Mesas de buffet") === null,
-    "sin contestar, la fila de mesas de buffet se queda apagada (cantidad null), como el resto de mobiliario condicional");
-
   const conBuffet = buildChecklist("boda", 90, 2, 4, 0, { numMesasBuffet: 3 });
-  ok(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de buffet") === "3",
-    "con el total del formulario, sale la línea con ese número");
+  ok(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de buffet") === undefined,
+    "las mesas de buffet se unifican en Mesas de 1,8m, sin línea separada de Mesas de buffet");
+  ok(Number(item(conBuffet, "Mobiliario, sala y decoración", "Mesas de 1,8m"))
+    === Number(item(sinContestar, "Mobiliario, sala y decoración", "Mesas de 1,8m")) + 3,
+    "con 3 mesas de buffet, la línea de Mesas de 1,8m sube en 3");
 
+  const cumpleBase = buildChecklist("cumpleanos", 60, 0, 0, 8, {});
   const cumple = buildChecklist("cumpleanos", 60, 0, 0, 8, { numMesasBuffet: 2 });
-  ok(item(cumple, "Mobiliario", "Mesas de buffet") === "2", "y en cumpleaños igual, en su categoría");
+  ok(item(cumple, "Mobiliario", "Mesas de buffet") === undefined
+    && Number(item(cumple, "Mobiliario", "Mesas de 1,8m")) === Number(item(cumpleBase, "Mobiliario", "Mesas de 1,8m")) + 2,
+    "y en cumpleaños igual: se suman directamente a Mesas de 1,8m");
 
   // Producción: el mínimo de siempre por pax se mantiene si el formulario dice
   // menos (o no dice nada); una respuesta detallada solo puede subirlo.
@@ -980,7 +1045,7 @@ console.log("\n══ Mesas de buffet: de texto libre a un número real en la ch
     "y en producción, misma cuenta");
 }
 
-console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax ══");
+console.log("\n══ Mesa alta: 1 cada 10 personas, con tope en 15 (almacén) ══");
 {
   const item = (cats, cat, label) => {
     const c = cats.find(x => x.nombre === cat);
@@ -993,30 +1058,28 @@ console.log("\n══ Mesa alta: por nº de barras, no una fórmula fija por pax
   ok(item(sinBarra, "Mobiliario, sala y decoración", "Mesa alta") === "—",
     "sin cóctel ni copas, no hay mesas altas que montar");
 
-  // Con barra pero sin contestar numBarras, cae al cálculo viejo por pax
+  // Con barra: 1 cada 10 personas (90 pax → 9 mesas altas)
   const sinNumBarras = buildChecklist("boda", 90, 2, 4, 0, {});
-  ok(item(sinNumBarras, "Mobiliario, sala y decoración", "Mesa alta") === String(calcMesasAltas(90)),
-    `con barra pero sin contestar barras, cae al cálculo viejo por pax (90 → ${calcMesasAltas(90)})`);
+  ok(item(sinNumBarras, "Mobiliario, sala y decoración", "Mesa alta") === "9",
+    `con barra: 1 cada 10 personas (90 → ${calcMesasAltas(90)})`);
 
-  // Con numBarras contestado, manda esa cuenta (2 por barra bajo 100 pax)
-  const conUnaBarra = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 1 });
-  ok(item(conUnaBarra, "Mobiliario, sala y decoración", "Mesa alta") === "2",
-    "1 barra bajo 100 pax → 2 mesas altas");
-  const conDosBarras = buildChecklist("boda", 90, 2, 4, 0, { numBarras: 2 });
-  ok(item(conDosBarras, "Mobiliario, sala y decoración", "Mesa alta") === "4",
-    "2 barras bajo 100 pax → 4 mesas altas");
-
-  // Con 100 pax o más, 4 por barra
+  // Con 100 pax → 10 mesas altas; con 120 pax → 12 mesas altas
+  const conUnaBarra = buildChecklist("boda", 100, 2, 4, 0, { numBarras: 1 });
+  ok(item(conUnaBarra, "Mobiliario, sala y decoración", "Mesa alta") === "10",
+    "100 pax → 10 mesas altas (1 cada 10 personas)");
   const conBarraPaxAlto = buildChecklist("boda", 120, 2, 4, 0, { numBarras: 1 });
-  ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "4",
-    "1 barra con 120 pax → 4 mesas altas");
+  ok(item(conBarraPaxAlto, "Mobiliario, sala y decoración", "Mesa alta") === "12",
+    "120 pax → 12 mesas altas");
 
-  // Sin barra libre (el cliente trae su bebida) pero SÍ se llevan mesas altas: antes se
-  // ignoraba "Nº de barras" del todo si no había barra — un evento real así se quedaba
-  // en "—" aunque en la app se hubiera contestado. Contestar a mano manda igual.
+  // Tope en 15 mesas altas (las que tenemos en almacén)
+  const conTopeAlmacen = buildChecklist("boda", 180, 2, 4, 0, { numBarras: 2 });
+  ok(item(conTopeAlmacen, "Mobiliario, sala y decoración", "Mesa alta") === "15",
+    "180 pax → tope en 15 mesas altas (almacén)");
+
+  // Sin barra libre (el cliente trae su bebida) pero SÍ se contesta "Nº de barras"
   const sinBarraConMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 1 });
-  ok(item(sinBarraConMesas, "Mobiliario, sala y decoración", "Mesa alta") === "2",
-    "sin barra pero con 'Nº de barras' contestado a mano, sí se calculan mesas altas");
+  ok(item(sinBarraConMesas, "Mobiliario, sala y decoración", "Mesa alta") === "9",
+    "sin barra pero con 'Nº de barras' contestado a mano, sí se calculan mesas altas (90 pax → 9)");
   const sinBarraSinMesas = buildChecklist("boda", 90, 0, 0, 0, { numBarras: 0 });
   ok(item(sinBarraSinMesas, "Mobiliario, sala y decoración", "Mesa alta") === "—",
     "y sin barra Y sin contestar, se queda en '—' como siempre (no cambia el caso normal)");
@@ -1867,15 +1930,9 @@ console.log("\n══ Refrescos: los cuatro que nadie calibró ══");
   ok(b.cocaNormal === 120 && b.cocaZero === 72 && b.nestea === 12,
     `los tres calibrados siguen clavados en su fuente → ${b.cocaNormal}/${b.cocaZero}/${b.nestea}`);
 
-  // Los otros cuatro se añadieron después sin ningún dato: sumaban 2,6 uds/pax ellos
-  // solos y hacían que el total sobrepasara en un 84% su propia calibración.
-  const total = b.cocaNormal + b.cocaZero + b.nestea + b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite;
-  const porPax = total / 65;
-  ok(porPax > 4 && porPax < 5,
-    `el total baja a ${porPax.toFixed(1)} uds/pax (antes 5,7, calibración 3,1)`);
-  const sinCalibrar = (b.fantaNaranja + b.fantaLimon + b.aquarius + b.sprite) / 65;
-  ok(sinCalibrar < 1.5,
-    `y los cuatro sin calibrar pesan ahora ${sinCalibrar.toFixed(1)} uds/pax, no 2,6`);
+  // Fanta limón (0,08) lleva más ratio que Fanta naranja (0,07), y Aquarius/Sprite (0,10).
+  ok(b.fantaNaranja === 34 && b.fantaLimon === 38 && b.aquarius === 48 && b.sprite === 48,
+    `Fanta limón (38) > Fanta naranja (34), Aquarius y Sprite restaurados → ${b.fantaNaranja}/${b.fantaLimon}/${b.aquarius}/${b.sprite}`);
 }
 
 console.log("\n══ Cocina y logística dejan de aplanarse ══");
@@ -1893,6 +1950,17 @@ console.log("\n══ Cocina y logística dejan de aplanarse ══");
     "y la logística pequeña también");
   // Ni se dispara: por encima de 4 de logística no se ha visto nunca
   ok(n(1000).logistica === 4, "la logística tiene tope en 4, no crece sin freno");
+  // Y la checklist (Cocina y Logística) usa la misma curva medida que personalNecesario()
+  // en vez de la fórmula vieja pax*3/50 que disparaba 11 de cocina para 180 pax.
+  const personalDeChecklist = (tipo, pax, label) => Number(
+    buildChecklist(tipo, pax, 2, 4, 0, {}).find(c => c.nombre === "Personal").items.find(x => x[0] === label)[1]
+  );
+  ok(personalDeChecklist("boda", 180, "Cocina") === personalNecesario("boda", 180).cocina
+    && personalDeChecklist("boda", 180, "Cocina") === 5,
+    "en la checklist, una boda de 180 pax pide 5 de cocina (igual que personal.js), no 11");
+  ok(personalDeChecklist("boda", 100, "Logística") === personalNecesario("boda", 100).logistica
+    && personalDeChecklist("boda", 300, "Logística") === 4,
+    "y la logística de la checklist cuadra también con personal.js y su tope de 4");
 }
 
 console.log("\n══ El hielo: kilos, bolsas y taxis ══");
@@ -3090,6 +3158,10 @@ console.log("\n══ Qué se gasta y qué de verdad puede romperse ══");
   // Sueltos consumibles dentro de categorías por lo demás reutilizables
   ok(esConsumible("Café", "Cápsulas café (estándar/descafeinado)") === true,
     "las cápsulas se gastan aunque la cafetera (misma categoría) no");
+  ok(esConsumible("Café", "Leche entera (para el personal)") === true
+    && esConsumible("Café", "Leche de avena (para el personal)") === true
+    && esConsumible("Café", "Leche sin lactosa (para el personal)") === true,
+    "las leches del personal también son consumibles: si se gastan no son roturas");
   ok(esConsumible("Café", "Cafetera Nespresso") === false,
     "la cafetera en sí sí es reutilizable: si falta, es una pérdida de verdad");
   ok(esConsumible("Paella y fuego", "Carbón") === true, "el carbón se quema");
@@ -3131,17 +3203,12 @@ console.log("\n══ Mesas calientes y taxis de hielo, como funciones sueltas �
     `1 mesa caliente por cada ~40 pax: 40 → 1, 41 → 2 (${calcMesasCalientes(40)}, ${calcMesasCalientes(41)})`);
   ok(calcMesasCalientes(0) === 1, "sin pax puesto, el mínimo es 1, no 0");
 
-  // Mesas altas: antes pax/15 fijo; ahora depende de cuántas barras se van a montar
-  // (2 por barra, 4 con 100 pax o más), y sin contestar cae sola al cálculo viejo.
-  ok(calcMesasAltas(99, 1) === 2 && calcMesasAltas(99, 2) === 4,
-    `2 mesas por barra bajo 100 pax: 1 barra → 2, 2 barras → 4 (${calcMesasAltas(99, 1)}, ${calcMesasAltas(99, 2)})`);
-  ok(calcMesasAltas(120, 1) === 4 && calcMesasAltas(120, 2) === 8,
-    `4 mesas por barra con 100 pax o más: 1 barra → 4, 2 barras → 8 (${calcMesasAltas(120, 1)}, ${calcMesasAltas(120, 2)})`);
-  ok(calcMesasAltas(99, 3) === 6, "el salto de 2 a 4 es por pax, no por nº de barras (99 pax, 3 barras → 6)");
-  ok(calcMesasAltas(100, 0) === Math.max(2, Math.ceil(100 / 15)),
-    "sin barras contestadas (0), cae al cálculo viejo por pax");
-  ok(calcMesasAltas(100, undefined) === Math.max(2, Math.ceil(100 / 15)),
-    "y sin el campo siquiera (undefined), igual — eventos guardados antes de esta pregunta");
+  // Mesas altas: 1 cada 10 personas, con tope en 15 (las que hay en almacén).
+  ok(calcMesasAltas(80) === 8 && calcMesasAltas(100) === 10,
+    `1 mesa alta cada 10 pax: 80 → ${calcMesasAltas(80)}, 100 → ${calcMesasAltas(100)}`);
+  ok(calcMesasAltas(150) === 15 && calcMesasAltas(200) === 15,
+    `tope en 15 mesas altas en almacén: 150 → ${calcMesasAltas(150)}, 200 → ${calcMesasAltas(200)}`);
+  ok(calcMesasAltas(10) === 2, "suelo de 2 mesas altas en eventos muy pequeños");
 
   ok(taxisDeHielo(24) === 1 && taxisDeHielo(25) === 2,
     `24kg entran en 1 taxi, 25kg ya piden 2 (${taxisDeHielo(24)}, ${taxisDeHielo(25)})`);
@@ -3297,9 +3364,9 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
   const manteles = (evt, opts) => num(linea(evt, opts, /^Manteles/));
   ok(manteles("boda", { numMesasBuffet: 2, numBarras: 2 }) === manteles("boda", { numBarras: 2 }) + 2,
     "cada mesa de buffet suma su mantel");
-  // De 1 a 3 barras con 100 pax: 2 manteles de barra más, y 8 mesas altas más (4 por barra)
-  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 2 + 8,
-    "cada barra suma el suyo (y sus mesas altas, como siempre)");
+  // De 1 a 3 barras con 100 pax: 2 barras más × 4 mesas de 1,8m por barra (= 8 manteles de barra)
+  ok(manteles("boda", { numBarras: 3 }) === manteles("boda", { numBarras: 1 }) + 8,
+    "cada barra suma sus 4 manteles de mesa de 1,8m");
   ok(manteles("cumpleanos", { numMesasBuffet: 1 }) === manteles("cumpleanos", {}) + 1,
     "en un cumpleaños, igual con los buffets");
   ok(["boda", "cumpleanos", "produccion"].every(evt => num(linea(evt, { diasProduccion: ["20"] }, /^Rollo de mantel de papel/)) === 1),
@@ -3325,6 +3392,18 @@ console.log("\n── Manteles, rollo, tronas, platos de buffet y corners ──
     && linea("boda", { platosBuffet: 1 }, /^Platos pequeños \(buffets\)/, 100, 0)[2] === null,
     "y si no van platos de postre (o todo es en bandeja), los de buffet salen en su propia línea");
 
+  const mesas18 = (evt, opts) => num(linea(evt, opts, /^Mesas de 1,8m$/));
+  ok(mesas18("boda", { numBarras: 3 }) === mesas18("boda", { numBarras: 1 }) + 8,
+    "a partir de 100 pax, cada barra lleva 4 mesas de 1,8m (de 1 a 3 barras sube en 8)");
+  // Con 100 adultos (0 niños) y 1 barra: 17 comensales + 8 cocina + 2 gueridón + 4 barra = 31 mesas de 1,8m
+  ok(num(linea("boda", {}, /^Mesas de 1,8m$/, 100, 0)) === 31,
+    "en boda de 100 pax: 17 de comensales + 8 cocina + 2 gueridón + 4 de barra = 31 mesas de 1,8m");
+  ok(mesas18("boda", { llevaCornerVermut: true }) === mesas18("boda", {}) + 1
+    && mesas18("boda", { llevaCornerAperol: true }) === mesas18("boda", {}) + 1
+    && mesas18("boda", { llevaCornerVermut: true, llevaCornerAperol: true }) === mesas18("boda", {}) + 2,
+    "cada corner (Vermut y Aperol) suma 1 mesa de 1,8m");
+  ok(manteles("boda", { llevaCornerVermut: true, llevaCornerAperol: true }) === manteles("boda", {}) + 2,
+    "y cada corner suma también su mantel");
   ok(num(linea("boda", { llevaCornerVermut: true }, /^Vermut rojo/)) === 2 * num(linea("boda", {}, /^Vermut rojo/))
     && num(linea("boda", { llevaCornerVermut: true }, /^Vermut blanco/)) === 2 * num(linea("boda", {}, /^Vermut blanco/)),
     "el corner de vermut suma su propio vermut al del aperitivo");

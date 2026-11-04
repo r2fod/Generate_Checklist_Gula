@@ -2400,6 +2400,29 @@ console.log("\n── Claude: rechazos y respuestas cortadas ──");
   ok(/no ha querido contestar/.test(rechazo) && /cyber/.test(rechazo), "un rechazo también se dice, con su motivo");
 }
 
+// ── Llamadas encadenadas en un mismo turno (tareas y calendario) ──────────────
+console.log("\n── Llamadas encadenadas sin perder la primera ──");
+{
+  let listaTareas = [];
+  const apTareas = aplicarEnTareas({ tareas: listaTareas, guardar: (t) => { listaTareas = t; } });
+  apTareas({ que: "apuntar_tarea", datos: { texto: "Pedir hielo extra" } });
+  apTareas({ que: "apuntar_tarea", datos: { texto: "Confirmar furgoneta" } });
+  ok(listaTareas.length === 2,
+    "apuntar dos tareas seguidas en el mismo turno conserva las dos");
+
+  const guardados = [];
+  const apCal = aplicarEnCalendario({
+    apuntes: [],
+    guardar: (a) => guardados.push(a),
+    borrar: () => {},
+  });
+  const f = hoyISO();
+  apCal({ que: "crear_apunte", datos: { fecha: f, titulo: "Boda Uno", tipo: "boda" } });
+  const rEdit = apCal({ que: "editar_apunte", datos: { id: idDeApunte(f, "Boda Uno"), cambios: { notas: "Todo listo" } } });
+  ok(rEdit.editado === "Boda Uno" && guardados.length === 2 && guardados[1].notas === "Todo listo",
+    "crear un apunte y editarlo en el mismo turno encuentra el recién creado");
+}
+
 console.log("\n──────────────────────────────────────────────────────────");
 console.log(`  ${pasan} comprobaciones pasadas, ${fallos.length} fallidas`);
 if (fallos.length) { console.log("\n  Fallos:"); fallos.forEach(f => console.log(`   · ${f}`)); process.exit(1); }

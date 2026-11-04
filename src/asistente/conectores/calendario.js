@@ -15,7 +15,7 @@
 // Lo que NO hacen, en ningún nivel: tocar una checklist ya creada. Un apunte es una
 // línea de calendario; una checklist lleva dentro el trabajo de quien carga el camión.
 import { registrarConector } from "../conectores.js";
-import { TIPOS, esTipoEvento } from "../../calendario/apuntes.js";
+import { TIPOS } from "../../calendario/apuntes.js";
 import { sinTildes } from "../../texto.js";
 
 const TIPOS_VALIDOS = Object.keys(TIPOS);

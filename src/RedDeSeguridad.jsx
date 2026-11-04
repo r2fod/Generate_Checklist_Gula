@@ -9,14 +9,18 @@
 // pasó, deja DESCARGAR lo que hubiera guardado (que es el trabajo hecho) y ofrece
 // empezar de cero solo después de haber podido guardarlo.
 import { Component } from "react";
-import { leerTexto, borrar } from "./almacen.js";
+import { leerTexto, leerJSON, borrar } from "./almacen.js";
 import { apunta, leerDiario, comoTexto } from "./diario.js";
 import { hoyISO } from "./fecha.js";
 
 const CLAVES = ["gula_checklist_estado", "gula_eventos_guardados", "gula_plantillas"];
 
 function descargarTodo() {
-  const datos = {};
+  const datos = {
+    formato: "gula-checklist-copia",
+    fecha: hoyISO(),
+    eventos: leerJSON("gula_eventos_guardados", {}),
+  };
   for (const k of CLAVES) {
     datos[k] = leerTexto(k, null);
   }

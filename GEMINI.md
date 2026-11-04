@@ -1,22 +1,11 @@
 # Gula Catering — GEMINI.md
-> App en producción. Las reglas son las mismas que para Claude: están en `CLAUDE.md`,
-> importado aquí debajo. Si tu herramienta no procesa la línea `@./CLAUDE.md`, ábrelo
-> y léelo entero antes de nada.
+> App en producción. Mismas reglas que `CLAUDE.md` (importado abajo) + orquestación en `PLAYBOOK_AGENTES.md`.
 
 @./CLAUDE.md
 
-## Antes de tocar nada
-1. `CONTEXTO.md`: "Orden de lectura" al principio y, sobre todo, "Estado de HOY"
-   dentro de "Qué queda pendiente ahora mismo": qué está en producción, qué PR no se
-   tocan, qué queda por hacer y qué datos del calendario hay que limpiar.
-2. `PENDIENTES.md`: la lista corta de lo que falta y de quién depende. El orden lo
-   decide el dueño: pregúntale.
-3. `PLAN_MEJORAS.md`, `PLAN_COCINA.md` y `PLAN_INVENTARIO.md` solo si el dueño pide algo
-   de esos planes.
-
-## Lo que es de Claude y aquí no aplica
-- Las líneas de firma que verás en los commits del historial ("Co-Authored-By: Claude…",
-  "Claude-Session: …"): firma como te toque a ti, pero el mensaje, en español como siempre.
-- Nada más de `CLAUDE.md`: idioma, privacidad (repo público, cero datos reales), pruebas por cambio,
-  batería completa antes de fusionar, capturas para lo visual y actualizar
-  `CONTEXTO.md` en el mismo commit valen igual.
+## Lectura rápida al iniciar sesión (ahorro de tokens)
+1. `PENDIENTES.md`: lista corta de qué falta y de quién depende (preguntar orden al dueño).
+2. `CONTEXTO.md`: leer solo `L1-L155` (mapa/reglas) y "Estado de HOY" (`L465-L580`). `HISTORIAL.md` (>130 KB) NO se lee entero: buscar con subagente `research` (`Model: "flash_lite"`).
+3. `PLAYBOOK_AGENTES.md`: enrutado automático de subagentes (`flash_lite` / `Argon Low` → búsquedas; `flash` / `Argon Medium` → código/tests; `pro` / `Argon High` → `nube.js`/seguridad).
+4. `PLAN_MEJORAS.md`, `PLAN_COCINA.md`, `PLAN_INVENTARIO.md`: leer solo bajo pedido.
+5. Commits: mensaje siempre en español, sin firmas de otra IA.

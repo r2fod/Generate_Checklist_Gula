@@ -9,7 +9,8 @@
 // menos comprobaciones que el de una persona.
 import { saneaLista, idLibre } from "../calendario/apuntes.js";
 
-export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
+export function aplicarEnCalendario({ apuntes: apuntesIniciales = [], guardar, borrar }) {
+  let apuntes = apuntesIniciales;
   return function aplicar(propuesta) {
     const { que, datos } = propuesta || {};
 
@@ -20,6 +21,7 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       // idLibre: el de siempre, salvo que otro apunte con otro título ya lo tenga
       const [limpio] = saneaLista([{ ...datos, id: idLibre(datos.fecha, datos.titulo, apuntes) }]);
       if (!limpio) return { error: "Ese apunte no ha pasado las comprobaciones: revisa la fecha y el tipo." };
+      apuntes = [...apuntes.filter(a => a.id !== limpio.id), limpio];
       guardar(limpio);
       return { creado: limpio.titulo, fecha: limpio.fecha };
     }
@@ -33,6 +35,7 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
       const idNuevo = idLibre(fusionado.fecha, fusionado.titulo, apuntes.filter(a => a.id !== antes.id));
       const [limpio] = saneaLista([{ ...fusionado, id: idNuevo }]);
       if (!limpio) return { error: "El cambio deja el apunte inválido." };
+      apuntes = [...apuntes.filter(a => a.id !== antes.id && a.id !== idNuevo), limpio];
       // El viejo se quita en el MISMO guardado: borrar y guardar por separado partían
       // de la misma foto y el guardado lo volvía a meter (salían los dos)
       guardar(limpio, idNuevo !== antes.id ? antes.id : undefined);
@@ -42,6 +45,7 @@ export function aplicarEnCalendario({ apuntes = [], guardar, borrar }) {
     if (que === "borrar_apunte") {
       const antes = apuntes.find(a => a.id === datos.id);
       if (!antes) return { error: "Ese apunte ya no está." };
+      apuntes = apuntes.filter(a => a.id !== datos.id);
       borrar(datos.id);
       return { borrado: antes.titulo };
     }

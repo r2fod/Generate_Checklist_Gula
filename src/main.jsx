@@ -57,9 +57,10 @@ function avisarEventoNoEncontrado(id, sinConexion) {
     <p>${sinConexion
       ? 'No hay conexión para traerlo. Con cobertura, vuelve a abrir el link.'
       : 'Este link apunta a un evento que ya no está en la nube: puede que se borrara o que no llegara a subirse.'}</p>
-    <p class="link-roto-id">${id}</p>
+    <p class="link-roto-id"></p>
     <button type="button">Abrir la app igualmente</button>
     <p class="link-roto-nota">Se abrirá lo último que hubiera en este móvil, que NO es el evento del link.</p>`
+  caja.querySelector('.link-roto-id').textContent = id
   caja.querySelector('button').addEventListener('click', () => {
     window.location.href = window.location.origin + window.location.pathname
   })
@@ -89,10 +90,11 @@ function preguntarAntesDePisar(id, estadoNube, estadoLocal, seguir) {
     <h1>Aquí hay trabajo sin subir</h1>
     <p>En este dispositivo hay <strong>${suyas} marcas</strong> (preparado, cargado, vuelto o roturas)
        y el link solo trae <strong>${llegan}</strong>. Abrirlo tal cual borraría la diferencia.</p>
-    <p class="link-roto-id">${(estadoLocal && estadoLocal.nombreEvento) || id}</p>
+    <p class="link-roto-id"></p>
     <button type="button" data-quedarse>Seguir con lo de este dispositivo</button>
     <button type="button" data-pisar>Abrir el link igualmente</button>
     <p class="link-roto-nota">Si sigues con lo de aquí, lo tuyo se subirá a la nube en cuanto haya conexión.</p>`
+  caja.querySelector('.link-roto-id').textContent = (estadoLocal && estadoLocal.nombreEvento) || id
   caja.querySelector('[data-quedarse]').addEventListener('click', () => {
     // Se quita el ?evento= para que recargar no vuelva a preguntar
     window.location.href = window.location.origin + window.location.pathname
