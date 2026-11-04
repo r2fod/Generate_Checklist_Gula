@@ -125,7 +125,11 @@ function Banco() {
   const [apuntes, setApuntes] = useState(() => {
     if (arrancaVacio) return [];
     const sucio = new URLSearchParams(window.location.search).get("sucio");
-    return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : sucio ? [...DEMO, ...SUCIOS] : DEMO);
+    // Con "?varios=1", un rodaje de varios días que empezó ayer: el que antes desaparecía
+    // de "Lo que viene" y de la vista Equipo en cuanto pasaba su primer día
+    const varios = new URLSearchParams(window.location.search).get("varios");
+    const enCurso = [{ fecha: dia(-1), hasta: dia(2), titulo: "Rodaje de varios días", tipo: "produccion", pax: 30 }];
+    return saneaLista(cuantos > 0 ? muchosApuntes(cuantos) : sucio ? [...DEMO, ...SUCIOS] : varios ? [...DEMO, ...enCurso] : DEMO);
   });
   // Solo con el DEMO fijo tiene sentido fijar el mes: vacío no tiene nada que enseñar,
   // y "muchos" reparte sus apuntes a propósito por todo el año (medir.mjs), no en un

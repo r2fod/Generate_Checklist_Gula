@@ -6,6 +6,24 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
+  - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
+    (`aVistaProxima` → `enCurso`, "en curso"), y en la vista Equipo sale en CADA día que
+    le queda (por `porDia`): antes desaparecía de los dos en cuanto pasaba su primer día.
+    A lo ya empezado no se le crea checklist (`apuntesPorPromover`, `checklistsPorCrear`),
+    como antes.
+  - **Ids que chocan**: `idDeApunte` corta el título a 40 y dos títulos que solo
+    difieren después daban el mismo id el mismo día (el nuevo sustituía al otro, con su
+    personal y su checklist). `idLibre` (editor y asistente) añade `-2`; `idDeApunte` no
+    cambia, ni los ids guardados.
+  - **El cliente de cada año**: si la checklist del archivo con ese nombre es de otra
+    fecha a más de 30 días, la de este año se crea como "Nombre 2026" en vez de enlazar
+    con la del año pasado.
+  - **Renombrar con el asistente** dejaba los dos apuntes (borrar y guardar partían de la
+    misma foto): `guardar(nuevo, idViejo)` en una sola escritura, en el hook y en App. Main
+    había dejado preparado un `reemplazar` que nadie pasaba; se quita.
+  - **Quedan para el dueño**: E1.1 (dos móviles a la vez: la transacción perdería lo
+    editado sin red) y E1.5 (reglas de la copia "solo ver", seguridad).
 - **App: la auditoría E2 de PLAN_MEJORAS (26/10)**, los cinco seguían vivos:
   - **"Guardar evento" con el nombre de OTRO evento** pregunta antes ("Sustituir"); antes
     lo pisaba sin avisar (el autoguardado sí lo miraba, `ocupadoPorOtro`). **"Duplicar"**

@@ -185,7 +185,9 @@ declara cubrir, para que los dos no se separen en silencio.
 
 - Identidad de item = `${categoría}::${labelOriginal}`. Cambiar el label **destruye los
   checks del usuario**.
-- Identidad de apunte = `${fecha}_${slug}`.
+- Identidad de apunte = `${fecha}_${slug}` (`idDeApunte`, el slug cortado a 40: NO tocar,
+  cambiaría los ids guardados). Un apunte NUEVO lleva `idLibre`: si ese id ya lo tiene
+  otro apunte con otro título, añade `-2`, `-3`...; el mismo título da el mismo id.
 - Estado se lee con `estadoInicial.X ?? por-defecto`: **parcial es válido**.
 - Abrir evento = escribir `gula_checklist_estado` + recargar.
 
@@ -396,7 +398,8 @@ propia herramienta, con su propia validación.
 2. **Apunte sin `id` no genera enlace** — `undefined` casa con todos los que tampoco lo
    tengan.
 3. **Marcar apuntes en UNA sola escritura** — tres seguidas parten de la misma foto,
-   solo sobrevive la última.
+   solo sobrevive la última. Lo mismo al cambiar el id de un apunte: `guardar(nuevo,
+   idViejo)` en el hook y en App, no un borrar y un guardar por separado.
 
 ## Fallos reales cazados en producción (resumen — detalle en cada commit)
 
