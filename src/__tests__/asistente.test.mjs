@@ -1564,6 +1564,13 @@ console.log("\n── Crear checklists desde el calendario ──");
   ok(ejecutar("crear_checklists", {}, yaEsta).ids.length === 1,
     "y al pedir los próximos solo entra la que falta");
 
+  // Un rodaje de varios días que ya ha empezado sale en "Lo que viene" (en curso), pero
+  // la app no le crea checklist: si entrara aquí, el asistente diría "creadas" sin crear
+  const conRodaje = { ...base, nivel: "confianza", apuntes: [...base.apuntes,
+    { id: "a5", fecha: enDiasISO(-1), hasta: enDiasISO(2), titulo: "Rodaje en curso", tipo: "produccion" }] };
+  ok(!ejecutar("crear_checklists", {}, conRodaje).ids.includes("a5"),
+    "al pedir los próximos, el rodaje que ya ha empezado no entra");
+
   // Apagado donde la app no sabe crearlas (el calendario suelto no tiene archivo)
   ok(!catalogoParaModelo(false, {}, "confianza").map(h => h.name).includes("crear_checklists"),
     "sin puedeCrear la herramienta ni se ofrece");

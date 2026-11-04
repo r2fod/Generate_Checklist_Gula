@@ -246,7 +246,8 @@ export function aVistaProxima(apuntes, { dias = DIAS_ANTICIPACION, hoy = new Dat
     .filter(a => esTipoEvento(a.tipo))
     .map(a => {
       const empieza = diasHasta(a.fecha, hoy);
-      const acaba = (a.hasta ? diasHasta(a.hasta, hoy) : null) ?? empieza;
+      // Nunca antes de empezar: un `hasta` anterior a la fecha (sin sanear) lo escondería
+      const acaba = Math.max((a.hasta ? diasHasta(a.hasta, hoy) : null) ?? empieza, empieza ?? 0);
       if (empieza === null || acaba < 0 || empieza > dias) return null;
       return empieza < 0 ? { ...a, faltan: 0, enCurso: true } : { ...a, faltan: empieza };
     })

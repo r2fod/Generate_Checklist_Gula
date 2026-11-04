@@ -56,8 +56,10 @@ export default registrarConector({
           }
         } else {
           // Sin títulos, los que ya se acercan — la misma cuenta que usa la app al
-          // arrancar, para que el asistente no tenga su propia idea de "próximo".
-          elegidos = aVistaProxima(apuntes, dias > 0 ? { dias: Math.round(dias) } : undefined);
+          // arrancar, para que el asistente no tenga su propia idea de "próximo". Sin los
+          // que ya han empezado (un rodaje en curso): la app no les crea checklist, y el
+          // asistente diría "creadas" sin haber creado nada.
+          elegidos = aVistaProxima(apuntes, dias > 0 ? { dias: Math.round(dias) } : undefined).filter(a => !a.enCurso);
         }
 
         // Los que ya tienen checklist no cuentan: decir "he creado 5" cuando 3 ya

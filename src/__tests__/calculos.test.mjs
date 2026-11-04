@@ -1653,6 +1653,9 @@ console.log("\n══ Calendario: varios días, ids que chocan y el cliente de c
   ok(viene.length === 2 && viene[0].titulo === "Rodaje X" && viene[0].enCurso && viene[0].faltan === 0
     && viene[1].titulo === "Boda Y" && viene[1].faltan === 3 && !("enCurso" in viene[1]),
     `un evento de varios días sigue en "Lo que viene" mientras dura, el acabado no (${JSON.stringify(viene.map(a => [a.titulo, a.faltan, !!a.enCurso]))})`);
+  // Un `hasta` anterior a la fecha (un apunte sin sanear) no puede esconder el evento
+  const alReves = aVistaProxima([{ id: "x", fecha: "2026-09-15", hasta: "2026-09-10", titulo: "Boda Z", tipo: "boda" }], { hoy });
+  ok(alReves.length === 1 && alReves[0].faltan === 3, `un "hasta" al revés no esconde el evento (${JSON.stringify(alReves.map(a => a.faltan))})`);
   ok(!apuntesPorPromover(rodaje, { hoy }).some(a => a.titulo === "Rodaje X")
     && !Object.values(checklistsPorCrear(rodaje, {}, { hoy }).nuevas).some(e => e.nombreEvento === "Rodaje X"),
     "pero lo que ya ha empezado no se promueve ni se le crea checklist, como antes");
