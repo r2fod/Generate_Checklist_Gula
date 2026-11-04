@@ -157,6 +157,49 @@ console.log('\n══ El evento compartido: dos personas guardando casi a la vez
     'mismo campo, misma base: gana el último en escribir, pero solo ahí — lo demás no se toca');
 }
 
+// ── El MISMO aparato guardando dos veces seguidas con la red lenta ─────────────
+// (PLAN_MEJORAS E2.3) Los dos guardados salían a la vez desde el mismo baseline: si el
+// segundo (el nuevo) confirmaba antes, el primero llegaba después y dejaba en la nube
+// el valor viejo. En fila (enFila), cada uno sale cuando ha acabado el anterior y con
+// el baseline que este dejó.
+console.log('\n══ El mismo aparato, dos guardados seguidos con la red lenta ══');
+{
+  almacen.clear(); limpiarPrevios(); setSesion(true);
+  const espera = (ms) => new Promise(r => setTimeout(r, ms));
+  const id = 'evt_red_lenta';
+  const inicio = (await N.guardarEventoNube(id, { horasCoctel: 4, pax: 100 })).fusion;
+
+  // Sin fila: los dos con la misma base, y el primero tarda más en llegar
+  const lento = espera(40).then(() => N.guardarEventoNube(id, { ...inicio, horasCoctel: 5 }, inicio));
+  await N.guardarEventoNube(id, { ...inicio, horasCoctel: 6 }, inicio);
+  await lento;
+  const sinFila = JSON.parse(almacen.get(`eventos/${id}`).estado).horasCoctel;
+  ok(sinFila === 5, `sin fila, el guardado viejo que llega tarde deja el valor viejo (${sinFila}, no 6): el fallo`);
+
+  // En fila: el baseline se lee al salir, del guardado anterior
+  await N.guardarEventoNube(id, { horasCoctel: 4, pax: 100 });
+  let ultimo = { horasCoctel: 4, pax: 100 };
+  const fila = N.enFila();
+  const guardar = (local, retraso) => fila(async () => {
+    await espera(retraso);
+    const r = await N.guardarEventoNube(id, local, ultimo);
+    ultimo = r.fusion;
+    return r;
+  });
+  await Promise.all([guardar({ horasCoctel: 5, pax: 100 }, 40), guardar({ horasCoctel: 6, pax: 100 }, 0)]);
+  const enFila = JSON.parse(almacen.get(`eventos/${id}`).estado).horasCoctel;
+  ok(enFila === 6, `en fila, el último cambio es el que queda (${enFila})`);
+
+  // Y un guardado que falla no atasca la fila
+  const orden = [];
+  const f2 = N.enFila();
+  const fallido = f2(async () => { orden.push('a'); throw new Error('sin red'); }).catch(() => orden.push('a falló'));
+  await f2(async () => { orden.push('b'); });
+  await fallido;
+  ok(JSON.stringify(orden) === JSON.stringify(['a', 'a falló', 'b']) || JSON.stringify(orden) === JSON.stringify(['a', 'b', 'a falló']),
+    `si uno falla, el siguiente sale igual (${orden.join(' → ')})`);
+}
+
 // ── Modo carga: dos personas marcando casillas DISTINTAS del mismo camión ────────
 // El bug real (reportado por el dueño): con varios marcando en Modo carga a la vez,
 // a unos se les desmarcaba lo que acababan de marcar otros. `checkeados` (y

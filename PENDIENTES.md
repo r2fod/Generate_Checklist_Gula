@@ -8,7 +8,7 @@
 ## 0. Mejoras grandes
 1. **Cocina (`PLAN_COCINA.md`)**: recetario, escandallo (coste real/ración) y lista de compra. Va primero.
 2. **Inventario inteligente (`PLAN_INVENTARIO.md`)**: stock de almacén conectado a la checklist (alquilar/comprar diferencia y caducidades). Material puede empezar ya; ingredientes depende de Cocina.
-3. **Auditoría de funcionalidad (PR #231)**: 16 fallos (1 crítico en formulario + varios altos en calendario/checklist). Pendiente de revisión/fusión del dueño.
+3. **Auditoría de funcionalidad (PR #231)**: 16 fallos (1 crítico en formulario + varios altos en calendario/checklist). El plan sigue sin fusionar; revisados contra el código del 26/10, hechos los del formulario (E3: #283, #284) y los de la checklist (E2: #285, ver `HISTORIAL.md`). Quedan los del calendario (E1).
 4. **Sin fecha**: marketing Meta OAuth (A4 v2/v3), gasto global (D2), memoria semántica (D3).
 
 ## 1. Código listo para empezar (preguntar orden al dueño)

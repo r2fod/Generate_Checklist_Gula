@@ -6,6 +6,20 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **App: la auditoría E2 de PLAN_MEJORAS (26/10)**, los cinco seguían vivos:
+  - **"Guardar evento" con el nombre de OTRO evento** pregunta antes ("Sustituir"); antes
+    lo pisaba sin avisar (el autoguardado sí lo miraba, `ocupadoPorOtro`). **"Duplicar"**
+    con un nombre que ya existe vuelve a pedir el nombre. Los dos, y el borrado, leen el
+    archivo de `eventosGuardadosRef` (el de ahora), no el de cuando se abrió el diálogo.
+  - **Borrar el evento abierto** lo suelta entero (activo, nombre y `eventoNubeId`) y la
+    pantalla queda como borrador: antes el autoguardado lo volvía a escribir y a subir.
+  - **Guardados del evento abierto en fila** (`enFila`, nube.js): dos seguidos salían
+    con el mismo baseline y, con la red lenta, el viejo llegaba tarde y dejaba su valor
+    en la nube. Ahora cada uno sale al acabar el anterior y lee el baseline al salir.
+  - **Carpas al salir de producción**: se apagan solo si las encendió el paso a
+    producción (`carpasDeProduccionRef`); las puestas a mano se quedan.
+  - **`CampoNumero`** (barriles, cucharas de porcelana, sartenes, planchas de gas, chill
+    out): se puede borrar y reescribir; antes vaciar saltaba a "1" y escribir "2" daba "12".
 - **Botón "Recalcular cantidades": foto inicial en auto-guardado y cantidades a mano (`*`)**
   ("y el boton de recalcular cantidades es funcional compruebalo", el dueño). Antes solo se
   guardaba `valoresCalculados` al pulsar manualmente "Guardar evento" (los eventos
