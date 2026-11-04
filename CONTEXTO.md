@@ -20,18 +20,15 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
   (primero) y `PLAN_INVENTARIO.md`** (después: su parte de ingredientes necesita el
   escandallo de Cocina; la de material puede empezar antes).
 
-## Orden de lectura
+## Orden de lectura e Índice Rápido por Líneas (para IA — no leer el archivo entero)
 
-1. `CLAUDE.md` (ya lo has leído: se carga solo).
-2. "Conceptos que hay que respetar" — identidad de item/apunte. Tocarlos sin cuidado
-   borra el trabajo de quien está cargando un camión.
-3. "Proceso" — cómo lanzar pruebas y deploy sin romperlo tú mismo.
-4. `PLAN_MEJORAS.md` — qué falta de verdad, qué ya está cerrado.
-5. "Qué queda pendiente ahora mismo", al final de este archivo — el estado de HOY.
-   El resto de documentos (`HISTORIAL.md`, `AUDITORIA_PROYECTO.md`, `ANALISIS.md`, los
-   `PLAN_*.md`) se consultan con `grep` solo si la tarea lo pide.
-6. `PENDIENTES.md` — la lista corta de lo que falta y de quién depende (código,
-   decisión del dueño, acción suya fuera del código, datos reales).
+> **Regla de eficiencia**: lee solo el rango `StartLine`–`EndLine` que necesites o delega la búsqueda en un subagente N1 (`flash_lite` / `haiku`, ver `PLAYBOOK_AGENTES.md`). `HISTORIAL.md` (>130 KB) se consulta solo con `grep`.
+
+- **`L1–L155` · Arranque rápido**: Mapa del repo (`L35`), Revisión visual/Playwright (`L60`), Estilo de código y tokens CSS (`L75`), Comandos, CI y Proceso (`L98`).
+- **`L156–L265` · Arquitectura e Invariantes**: Firestore (`L160`), Identidad de ítem/apunte (`L188`), Cadena de datos (`L196`), Service Worker (`L207`).
+- **`L266–L465` · El Asistente y Guardias**: Piezas (`L279`), Proxy Worker (`L356`), **Tres guardias intocables** (`L397`), Fallos reales cazados (`L405`).
+- **`L466–L585` · ESTADO DE HOY (LECTURA OBLIGATORIA AL RETOMAR)**: Qué está en producción, qué PRs no se tocan (`#222`, `#231`, `#232`, `#233`, `#237`) y método de cruce del calendario Drive↔App.
+- **Lista corta de pendientes activos → `PENDIENTES.md`** (`50` líneas).
 
 ## Mapa del repositorio
 
@@ -490,6 +487,31 @@ está en el historial de git y en las pruebas que los cubren):
 - #277/#278 Bebida: suelo automático del sector en la calibración y aviso de cambio brusco.
 - Móvil/tableta: la configuración ya no se repite debajo de la checklist; solo se ve
   abierta con "Configurar el evento" o "Eventos guardados" (ver su entrada en `HISTORIAL.md`).
+- **Bebidas frías e hielo responden a las horas de cóctel y de copas (`src/calculos.js`) — HECHO**:
+  cerveza, refrescos, vino, tinto de verano, vermut, hielo, tónica y Red Bull escalan ahora
+  con `horasCoctel` y `horasCopas` manteniendo exactos los puntos calibrados de referencia
+  (`2h` cóctel y `4h–5h` barra; detalle en `HISTORIAL.md`).
+- **Orquestación de agentes y optimización de `.md` (`PLAYBOOK_AGENTES.md`) — HECHO**:
+  enrutado automático por niveles de coste (N1 `flash_lite`/`Argon Low`/`haiku`, N2
+  `flash`/`Argon Medium`/`sonnet`, N3 `pro`/`Argon High`/`opus`), indicador visible de
+  modelo/tarea e índices por líneas en `CONTEXTO.md` y `PLAN_MEJORAS.md`.
+- **Café solo para el personal (`src/checklist-generadores.js`) — HECHO**: cuando no hay
+  café para invitados (`!paraInvitados`) pero sí plantilla (`numPersonal > 0`), además de la
+  Nespresso y las cápsulas del personal se suman `2` de leche entera, `2` de avena y `2` sin
+  lactosa (marcadas como consumibles en `src/consumibles.js`).
+- **Mesas de 1,8m: 8 de cocina, 2 de gueridón, 4 por barra (≥100 pax), buffets y corners (`src/checklist-generadores.js`) — HECHO**:
+  en banquete y cumpleaños se suman dentro de `Mesas de 1,8m` (y en `Manteles`) `8` mesas
+  de cocina a partir de 100 pax (`4` bajo 100), `2` de gueridón, `4` mesas por barra a
+  partir de 100 pax (`2` bajo 100), más las de buffet (`numMesasBuffet`) y cada corner
+  activo (`llevaCornerVermut`, `llevaCornerAperol`).
+- **Botón "Recalcular cantidades" en eventos auto-guardados y ediciones manuales (`src/App.jsx`) — HECHO**:
+  inicializa `valoresCalculados` también en el primer auto-guardado y evita que editar a
+  mano o pulsar "Guardar evento" marque las cantidades con `*` como ya revisadas sin pasar
+  por el modal de recalcular.
+- **Cocina y Logística en `Personal` unificadas con `personal.js` (`src/checklist-generadores.js`, `src/calculos.js`) — HECHO**:
+  la checklist usaba todavía `Math.ceil(pax * 3 / 50)` para Cocina (dando 11 personas en 180 pax)
+  y `Math.ceil(pax / 60)` sin tope en Logística; ahora usa las curvas medidas de `personalNecesario()`
+  (`2` ≤40, `3` ≤60, `4` ≤120, `5` hasta 275 en Cocina; `1` ≤30, `2` ≤100, `3` ≤200 y tope `4` en Logística).
 
 **PR abiertos que NO son para fusionar sin el dueño**: #222, #231, #233, #237
 y #232 (#232 y #237 tocan seguridad: revisión humana obligatoria, ver `CLAUDE.md`). No tocarlos ni

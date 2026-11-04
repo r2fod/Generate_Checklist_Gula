@@ -20,6 +20,56 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
     producción (`carpasDeProduccionRef`); las puestas a mano se quedan.
   - **`CampoNumero`** (barriles, cucharas de porcelana, sartenes, planchas de gas, chill
     out): se puede borrar y reescribir; antes vaciar saltaba a "1" y escribir "2" daba "12".
+- **Botón "Recalcular cantidades": foto inicial en auto-guardado y cantidades a mano (`*`)**
+  ("y el boton de recalcular cantidades es funcional compruebalo", el dueño). Antes solo se
+  guardaba `valoresCalculados` al pulsar manualmente "Guardar evento" (los eventos
+  auto-guardados tenían `{}` y no detectaban cambios de fórmula), y al editar una cantidad
+  a mano o pulsar "Guardar evento" se pisaba `valoresCalculados[key] = nuevo`, haciendo que
+  `handleRecalcular` creyera que esa edición manual ya se había revisado en el modal. Ahora
+  se inicializa la foto en el primer auto-guardado y las cantidades con `*` se ofrecen
+  siempre en `Recalcular cantidades` hasta que se elija "Mantener" o "Usar".
+- **Mesas de 1,8m: 2 de gueridón, 8 de cocina y 4 por barra a partir de 100 pax** ("seria
+  2 de gueridon, 8 mesas cocina, 4 mesas por barra apartir de 100 pax", el dueño). Ahora
+  `calcMesasCocina(pax)` da `8` mesas de 1,8m con `≥100` pax (`4` con `<100`), se suman
+  siempre `2` mesas de gueridón (`MESAS_GUERIDON = 2`) y `mesasDeBarra` aporta `4` mesas de
+  1,8m por barra a partir de 100 pax (`2` bajo 100 pax), todo unificado en `Mesas de 1,8m`
+  y con su mantel en `repartoManteles`.
+- **Mesas de 1,8m suman también barras extra y corners (Vermut / Aperol)** ("y en las mesas
+  ya suba las mesas de la barra libre? como los corners?", el dueño). Las barras extra por
+  encima de la primera (`numBarras > 1`) solo sumaban manteles y mesas altas pero no mesas
+  de 1,8m, y los corners (`llevaCornerVermut`, `llevaCornerAperol`) no sumaban ni mesa de
+  1,8m ni mantel. Ahora `mesasExtraBarrasYCorners` los añade tanto a `Mesas de 1,8m` como a
+  `repartoManteles`.
+- **Cocina y Logística de la checklist unificadas con `personal.js`** ("revisa estos valores
+  porque lo veo muy altos", el dueño al ver 11 de Cocina para ~180 pax). En `src/personal.js`
+  la curva medida con los 19 eventos reales ya daba `2` (≤40 pax), `3` (≤60), `4` (≤120) y
+  `5` (121–275 pax), pero `src/checklist-generadores.js` seguía con la fórmula antigua
+  `Math.ceil(pax * 3 / 50)` (11 cocineros para 180 pax) y `calcLogistica` con `pax / 60` sin
+  tope. Ahora ambos leen la misma curva medida que `personalNecesario()`.
+- **Mesas de buffet unificadas en `Mesas de 1,8m`** ("estaria bien que unifique las mesas
+  de buffet en las mesas de 1.8 para mas comodidad", el dueño). En banquete y cumpleaños
+  salía una fila aparte de `Mesas de buffet` además de `Mesas de 1,8m`; ahora
+  `numMesasBuffet` se suma directamente a `lineasDeMesas(calcMesasCocina(pax) + numMesasBuffet, ...)`
+  bajo `Mesas de 1,8m` (igual que ya hacía producción), manteniendo intactos los manteles
+  y las cajas de madera para alturas.
+- **Café solo para el personal: 2 de leche entera, 2 de avena y 2 sin lactosa** ("cuando se
+  ponga solo cafe para personal que tambien agregue leches 2 de leche entera, 2 de avena,
+  2 sin lactosa", el dueño). Al apagar el café de invitados (`cafeParaInvitados: false`),
+  desaparecía la línea de `Leches variadas` y el personal se quedaba con cafetera y cápsulas
+  pero sin leche. Ahora `calcCafe` (`src/checklist-generadores.js`) añade
+  `Leche entera (para el personal)`, `Leche de avena (para el personal)` y
+  `Leche sin lactosa (para el personal)` (`2` de cada una), registradas también en
+  `src/consumibles.js` para que al gastarse no cuenten como rotura en la vuelta.
+- **Bebidas frías e hielo responden a las horas de cóctel y de copas (`src/calculos.js`)**
+  ("veo que al cambiar las horas de barra libre o coctail no modifica las cantidades y
+  deberia cambiar el ratio", el dueño). Antes la cerveza tenía tope duro en 4h totales
+  (`Math.min(1, barFactor)`), el hielo era binario (`horasBarra > 0 ? 1 : 0.6`) y el vino,
+  el tinto de verano, el vermut y los refrescos ignoraban los deslizadores de horas. Ahora,
+  respetando los puntos calibrados de referencia (`2h` cóctel y `4h–5h` barra total),
+  escalan progresivamente el hielo (`calcHielo`), la cerveza (`factorHorasCerveza`, tope
+  `1.25` en `8h`), el vino y tinto de verano (`factorHorasCoctel`), el vermut
+  (`factorHorasVermut`), los refrescos (`factorHorasRefresco`) y la tónica/Red Bull
+  (`barFactorTope = 2.2`), más el protocolo de orquestación en `PLAYBOOK_AGENTES.md`.
 - **Horno pequeño: sus bandejas y las hondas** ("cuando se seleccione horno pequeño hay que
   agregar sus bandejas de horno más bandejas hondas para calentar comida", el dueño). Con
   "pequeño" o "ambos", en los cinco tipos de evento, la cocina suma "Bandejas de horno" (2,

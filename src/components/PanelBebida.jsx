@@ -10,7 +10,7 @@
 // entre un ajuste a ojo y uno medido.
 import { useState } from "react";
 import { Wine, ChevronDown, RotateCcw, Check, AlertTriangle, ShieldCheck } from "lucide-react";
-import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, FACTOR_NEUTRO, factorDe, conFactor } from "../bebida.js";
+import { BEBIDAS, CLAVES_BEBIDA, TIPOS_BEBIDA, FACTOR_NEUTRO, factorDe, conFactor, cuantosAjustados } from "../bebida.js";
 import { enTexto, enNumero } from "../texto.js";
 import { comprobarBebidaSector, comprobarCambioBrusco } from "../asistente/sector.js";
 
@@ -28,8 +28,7 @@ export default function PanelBebida({ factores = {}, calibracion = {}, onCambiar
   // de "1,2" para escribir "0,9" devolvería el campo a 1 a mitad de camino.
   const [enCurso, setEnCurso] = useState({});
 
-  const ajustados = TIPOS_BEBIDA.reduce((acc, t) =>
-    acc + CLAVES_BEBIDA.filter(b => factorDe(factores, t, b) !== FACTOR_NEUTRO).length, 0);
+  const ajustados = cuantosAjustados(factores);
   const medidos = Object.values(calibracion).reduce((acc, fila) => acc + Object.keys(fila).length, 0);
 
   const poner = (tipo, valor) => onCambiar(conFactor(factores, tipo, bebida, valor));

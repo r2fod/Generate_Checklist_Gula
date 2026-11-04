@@ -195,7 +195,12 @@ export async function preguntar({
       // puede ser asíncrona (analizar_web mira fuera) sin que el bucle tenga que
       // saberlo. Un resultado que fuera una Promise sin esperar se stringify como
       // {} y el modelo creería que la herramienta no devolvió nada.
-      const crudo = await Promise.resolve(ejecutar(llamada.nombre, llamada.argumentos, contexto));
+      let crudo;
+      try {
+        crudo = await Promise.resolve(ejecutar(llamada.nombre, llamada.argumentos, contexto));
+      } catch (e) {
+        crudo = { error: `Ha fallado ${llamada.nombre}: ${e && e.message ? e.message : e}` };
+      }
       // Se comprime ANTES de meterlo en la conversación, no al mandarlo: el resultado se
       // queda ahí y viaja otra vez en cada pregunta siguiente. Comprimir a la salida
       // ahorraría una vez; comprimir aquí ahorra todas.

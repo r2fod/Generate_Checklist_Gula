@@ -1,9 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { RefreshCw } from "lucide-react";
 
 export default function ModalRecalcular({ cambios, onClose, onAplicar }) {
   const [decisiones, setDecisiones] = useState(() => Object.fromEntries(cambios.map(c => [c.key, "mantener"])));
   const elegir = (key, valor) => setDecisiones(prev => ({ ...prev, [key]: valor }));
+  useEffect(() => {
+    const alPulsar = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [onClose]);
   return (
     <div className="dialogo-overlay" onClick={onClose}>
       <div className="dialogo-modal recalcular-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
@@ -19,18 +24,37 @@ export default function ModalRecalcular({ cambios, onClose, onAplicar }) {
             <div className="recalcular-row" key={c.key}>
               <div className="recalcular-nombre">
                 {c.label}
-                {c.aMano && <span className="recalcular-tag">a mano</span>}
+                {(c.aMano || c.bajadaPct >= 15 || c.bajaPorRatio) && (
+                  <div className="recalcular-tags">
+                    {c.aMano && <span className="recalcular-tag">a mano</span>}
+                    {c.bajaPorRatio ? (
+                      <span className="recalcular-tag recalcular-tag-bajada">
+                        ⚠ Autoratio (−{c.bajadaPct}%) · Original: {c.original}
+                      </span>
+                    ) : c.bajadaPct >= 15 ? (
+                      <span className="recalcular-tag recalcular-tag-bajada">
+                        ⚠ Baja un {c.bajadaPct}%
+                      </span>
+                    ) : null}
+                  </div>
+                )}
                 <span className="recalcular-categoria">{c.categoria}</span>
               </div>
               <div className="recalcular-opciones">
                 <button
                   className={`btn btn-outline recalcular-opcion ${decisiones[c.key] === "mantener" ? "active" : ""}`}
                   onClick={() => elegir(c.key, "mantener")}
-                >Mantener {c.anterior}</button>
+                >{c.bajaPorRatio && !c.aMano && c.anterior === c.original ? `Seguir con original (${c.original})` : `Mantener ${c.anterior}`}</button>
                 <button
                   className={`btn btn-outline recalcular-opcion ${decisiones[c.key] === "nuevo" ? "active" : ""}`}
                   onClick={() => elegir(c.key, "nuevo")}
                 >Usar {c.nuevo}</button>
+                {c.original && c.original !== c.anterior && c.original !== c.nuevo && (
+                  <button
+                    className={`btn btn-outline recalcular-opcion ${decisiones[c.key] === "original" ? "active" : ""}`}
+                    onClick={() => elegir(c.key, "original")}
+                  >Original ({c.original})</button>
+                )}
               </div>
             </div>
           ))}

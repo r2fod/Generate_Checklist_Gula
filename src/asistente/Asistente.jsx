@@ -23,7 +23,7 @@ import { leerGasto, apuntar, resumen, eurosTotales, leerTope, ponerTope, borrarG
 import { NIVELES, CLAVES_NIVEL, NIVEL_POR_DEFECTO, nivelValido } from "./permisos.js";
 import { sinMarcas } from "./texto.js";
 import { queHacerConLaUrl } from "./proxy.js";
-import { PERSONALIDADES, CLAVES_PERSONALIDAD, PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
+import { PERSONALIDAD_POR_DEFECTO, personalidadValida } from "./personalidad.js";
 import { VOCES_GEMINI, vozGeminiValida } from "./vozGemini.js";
 import { avisosConfig, saludoPendientes } from "./avisosConfig.js";
 import { proveedoresElegibles, disponiblesDeLaPrueba } from "./proveedoresUI.js";

@@ -1,6 +1,6 @@
 import { X, Tag, Truck, Package, ShoppingCart } from "lucide-react";
 import {
-  EVENTOS, PALABRAS_ALQUILER, fmtCantidadCompleta, quitarItemsSinCantidad,
+  EVENTOS, esItemDeAlquiler, fmtCantidadCompleta, quitarItemsSinCantidad,
   fmtLogistica, totalLogistica, fmtRecogidas, fmtCompras,
 } from "../checklist-format.js";
 import { CabeceraCategoria, estiloCategoria } from "./Iconos.jsx";
@@ -21,8 +21,7 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
   // entera. Es lo primero que necesita quien lleva el servicio, porque de eso responde
   // cuando acaba el evento.
   const alquileres = checklist.flatMap(cat => cat.items
-    .filter(([label, , , , esAlquilerManual]) =>
-      esAlquilerManual || PALABRAS_ALQUILER.some(pl => String(label).toLowerCase().includes(pl)))
+    .filter(([label, , , , esAlquilerManual]) => esItemDeAlquiler(label, esAlquilerManual))
     .map(([label, qty, , , , sufijo, unidadManual]) => ({
       label,
       cantidad: fmtCantidadCompleta(label, qty && qty.u ? qty.u : qty, sufijo, unidadManual),
@@ -90,7 +89,7 @@ export default function ModalVistaPrevia({ checklist: checklistCompleta, evtKey,
                   </thead>
                   <tbody>
                     {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual], i) => {
-                      const alq = esAlquilerManual || PALABRAS_ALQUILER.some(p => label.toLowerCase().includes(p));
+                      const alq = esItemDeAlquiler(label, esAlquilerManual);
                       const key = `${cat.nombre}::${labelOriginal ?? label}`;
                       return (
                         <tr key={i} className={alq ? "is-rental" : ""}>
