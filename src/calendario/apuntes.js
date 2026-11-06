@@ -50,6 +50,9 @@ export const esTipoEvento = (tipo) => !!(TIPOS[tipo] && TIPOS[tipo].esEvento);
 // que hay que preparar". Dos semanas es lo que se tarda en cerrar proveedores, mirar
 // alquileres y cuadrar gente; a menos de eso ya se va con prisa.
 export const DIAS_ANTICIPACION = 14;
+// Hasta cuántos días de diferencia dos fechas con el mismo nombre son el mismo evento
+// (ver checklistsPorCrear): más allá, es el del año pasado.
+const DIAS_MISMO_EVENTO = 30;
 
 const SOLO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -115,10 +118,30 @@ export function saneaApunte(bruto) {
 // Así, si el mismo apunte se importa dos veces —de la hoja y a mano—, es EL MISMO y no
 // aparece duplicado en el calendario.
 export function idDeApunte(fecha, titulo) {
-  const limpio = String(titulo)
+  return `${fecha}_${tituloLimpio(titulo).slice(0, 40)}`;
+}
+
+// El título sin tildes, mayúsculas ni signos: "Peña" y "pena" son el mismo
+function tituloLimpio(titulo) {
+  return String(titulo)
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
-  return `${fecha}_${limpio}`;
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+// El id de un apunte NUEVO. Casi siempre es idDeApunte, pero ese corta el título a 40
+// letras, y dos títulos que solo se diferencian después ("... Planta 1" y "... Planta 2")
+// daban el mismo id el mismo día: el nuevo sustituía al otro con su personal y su
+// checklist. Si el id ya lo tiene un apunte con OTRO título, se le añade -2, -3... El
+// mismo título sigue dando el mismo id (es lo que hace que un apunte traído dos veces
+// sea uno), y los ids que ya existen no se tocan.
+export function idLibre(fecha, titulo, apuntes = []) {
+  const base = idDeApunte(fecha, titulo);
+  const mio = tituloLimpio(titulo);
+  const libre = (id) => { const a = apuntes.find(x => x.id === id); return !a || tituloLimpio(a.titulo) === mio; };
+  if (libre(base)) return base;
+  let n = 2;
+  while (!libre(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
 }
 
 // Une una lista traída de golpe (la hoja de pared, otro calendario) con la que ya
@@ -216,19 +239,28 @@ export function numeraRepetidos(lista) {
 // Lo que viene: los eventos de los próximos N días, ordenados por lo que queda. Solo
 // eventos — las vacaciones y los días cerrados no son cosas que haya que preparar, se
 // cruzan aparte para avisar de que falta gente.
+// Uno de varios días (`hasta`) sigue aquí mientras dura, con `enCurso` y `faltan` 0: antes
+// desaparecía en cuanto pasaba su primer día, con el rodaje todavía en marcha.
 export function aVistaProxima(apuntes, { dias = DIAS_ANTICIPACION, hoy = new Date() } = {}) {
   return apuntes
     .filter(a => esTipoEvento(a.tipo))
-    .map(a => ({ ...a, faltan: diasHasta(a.fecha, hoy) }))
-    .filter(a => a.faltan !== null && a.faltan >= 0 && a.faltan <= dias)
+    .map(a => {
+      const empieza = diasHasta(a.fecha, hoy);
+      // Nunca antes de empezar: un `hasta` anterior a la fecha (sin sanear) lo escondería
+      const acaba = Math.max((a.hasta ? diasHasta(a.hasta, hoy) : null) ?? empieza, empieza ?? 0);
+      if (empieza === null || acaba < 0 || empieza > dias) return null;
+      return empieza < 0 ? { ...a, faltan: 0, enCurso: true } : { ...a, faltan: empieza };
+    })
+    .filter(Boolean)
     .sort((x, y) => x.faltan - y.faltan || x.titulo.localeCompare(y.titulo));
 }
 
 // Qué apuntes toca convertir en evento de la app. Solo los que se acercan y no lo son
 // ya: sin la marca "evento" se volverían a crear en cada apertura del calendario y
-// acabarías con veinte copias de la misma boda.
+// acabarías con veinte copias de la misma boda. Lo que ya ha empezado tampoco: como
+// antes, solo lo que está por venir.
 export function apuntesPorPromover(apuntes, { dias = DIAS_ANTICIPACION, hoy = new Date() } = {}) {
-  return aVistaProxima(apuntes, { dias, hoy }).filter(a => !a.evento);
+  return aVistaProxima(apuntes, { dias, hoy }).filter(a => !a.evento && !a.enCurso);
 }
 
 // De un apunte a una checklist recién empezada. Es el puente entre las dos apps: aquí
@@ -266,7 +298,8 @@ export function checklistsPorCrear(apuntes, archivo = {}, opciones = {}) {
     //
     // Lo que ya pasó no se resucita: aVistaProxima solo deja lo que está por venir, así
     // que borrar la checklist de una boda de hace un mes para hacer limpieza no la trae
-    // de vuelta.
+    // de vuelta. Lo que ya ha empezado (un rodaje en curso), tampoco.
+    .filter(a => !a.enCurso)
     .filter(a => !a.evento || !hay(archivo, a.evento))
     .forEach(a => {
     const estado = estadoDesdeApunte(a);
@@ -277,6 +310,15 @@ export function checklistsPorCrear(apuntes, archivo = {}, opciones = {}) {
     // en la prueba de arranque: se marcó una boda de dentro de dos meses. Lo normal es
     // que venga puesto (saneaLista lo pone), pero de esto no se avisa: se rompe callado.
     if (!a.id) return;
+    // El cliente de todos los años ("Cena de Navidad Empresa X") se llama igual cada
+    // vez: si la del archivo es de otra fecha lejana, es la del año pasado, y enlazar con
+    // ella abría su checklist con sus checks. Esta va aparte, con el año en el nombre.
+    // Unos pocos días de diferencia siguen siendo el mismo evento (uno de dos días, o
+    // una fecha que se movió).
+    const delArchivo = hay(archivo, estado.nombreEvento) ? archivo[estado.nombreEvento] : null;
+    const otraFecha = delArchivo && aFecha(delArchivo.fechaEvento)
+      && Math.abs(diasHasta(a.fecha, aFecha(delArchivo.fechaEvento))) > DIAS_MISMO_EVENTO;
+    if (otraFecha) estado.nombreEvento = `${estado.nombreEvento} ${a.fecha.slice(0, 4)}`;
     const nombre = estado.nombreEvento;
     // Si ya hay un evento guardado con ese nombre NO se toca. Puede llevar media
     // checklist montada y sus checks hechos, y sobrescribirla con una recién nacida es

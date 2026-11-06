@@ -13,7 +13,7 @@ import React, { useMemo, useState } from "react";
 import { Heart, Church, Briefcase, Cake, Clapperboard, Palmtree, Truck, Ban, ClipboardList, ChevronDown, X } from "lucide-react";
 import {
   TIPOS, esTipoEvento, porDia, semanasDelMes, NOMBRE_MES, INICIAL_DIA,
-  aFecha, diasHasta, saneaApunte, idDeApunte, aVistaProxima, choques, ausentesEn, disponiblesEn,
+  aFecha, diasHasta, saneaApunte, idLibre, aVistaProxima, choques, ausentesEn, disponiblesEn,
   turnosDe, DIAS_ANTICIPACION, apuntesPorPromover, numeraRepetidos,
 } from "./apuntes.js";
 import { hoyISO } from "../fecha.js";
@@ -170,6 +170,7 @@ export default function Calendario({
       {editando && (
         <EditorApunte
           apunte={editando}
+          apuntes={apuntes}
           equipo={equipo}
           onCerrar={() => setEditando(null)}
           onGuardar={(a) => { onGuardar && onGuardar(a); setEditando(null); }}
@@ -473,10 +474,12 @@ function LoQueViene({ proximos, apuntes, equipo, onAbrirEvento }) {
         )}
       </div>
       {proximos.map((a, i) => {
-        const fuera = ausentesEn(apuntes, a.fecha);
+        // Uno de varios días que ya ha empezado se mira por hoy, no por el día que empezó
+        const dia = a.enCurso ? hoyISO() : a.fecha;
+        const fuera = ausentesEn(apuntes, dia);
         // Cuánta gente queda ese día. Sin equipo configurado no se puede decir, así que
         // no se enseña nada en vez de inventarse un número.
-        const quedan = equipo.length ? disponiblesEn(apuntes, a.fecha, equipo) : null;
+        const quedan = equipo.length ? disponiblesEn(apuntes, dia, equipo) : null;
         return (
           // El tipo va en la FILA, no solo en el punto: así --cal-color cae en cascada y
           // el carril de la izquierda se pinta del color de la boda sin repetirlo.
@@ -490,7 +493,7 @@ function LoQueViene({ proximos, apuntes, equipo, onAbrirEvento }) {
                 sin leer, y es el mismo icono que en el mes. */}
             <IconoTipo tipo={a.tipo} size={15} />
             <span className="cal-viene-nombre">{a.titulo}</span>
-            <span className="cal-viene-cuando">{cuandoTexto(a.faltan)}</span>
+            <span className="cal-viene-cuando">{a.enCurso ? "en curso" : cuandoTexto(a.faltan)}</span>
             {quedan
               ? <span className={`cal-viene-falta${quedan.length <= 1 ? " es-critico" : ""}`}
                       title={`Ese día están: ${quedan.join(", ") || "nadie"}${fuera.length ? `. Fuera: ${fuera.join(", ")}` : ""}`}>
@@ -538,7 +541,7 @@ function ChoquesAviso({ choques: lista, apuntes, equipo, onIr }) {
 // Lo mínimo: qué día, qué es y cómo se llama. El resto es opcional a propósito — la
 // gracia del calendario es poder apuntar "boda Marina" en cuanto te dan la fecha, sin
 // saber todavía ni el pax ni el sitio.
-function EditorApunte({ apunte, equipo, onCerrar, onGuardar, onBorrar }) {
+function EditorApunte({ apunte, apuntes = [], equipo, onCerrar, onGuardar, onBorrar }) {
   const [f, setF] = useState(apunte);
   const pon = (k) => (e) => setF(x => ({ ...x, [k]: e.target.value }));
   const listo = saneaApunte({ ...f, pax: Number(f.pax) || undefined });
@@ -624,7 +627,7 @@ function EditorApunte({ apunte, equipo, onCerrar, onGuardar, onBorrar }) {
           <button className="btn btn-outline" onClick={onCerrar}>Cancelar</button>
           <button className="btn btn-green" disabled={!listo}
                   title={listo ? "" : "Hace falta al menos el día y el nombre"}
-                  onClick={() => onGuardar({ ...listo, id: apunte.id || idDeApunte(listo.fecha, listo.titulo) })}>
+                  onClick={() => onGuardar({ ...listo, id: apunte.id || idLibre(listo.fecha, listo.titulo, apuntes) })}>
             Guardar
           </button>
         </div>
@@ -641,19 +644,17 @@ function EditorApunte({ apunte, equipo, onCerrar, onGuardar, onBorrar }) {
 // reparte por jornada. El 19 de septiembre no son "tres bodas de 180, 100 y 50": son
 // 400 comensales y 44 personas que hay que tener ese sábado.
 function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar, onGuardar }) {
-  const porDia = useMemo(() => {
-    const dias = new Map();
-    for (const a of apuntes) {
-      if (!esTipoEvento(a.tipo)) continue;
-      const faltan = diasHasta(a.fecha);
-      if (faltan === null || faltan < 0 || faltan > DIAS_ANTICIPACION) continue;
-      if (!dias.has(a.fecha)) dias.set(a.fecha, []);
-      dias.get(a.fecha).push(a);
-    }
-    return [...dias.entries()].sort((x, y) => x[0].localeCompare(y[0]));
+  // Uno de varios días (un rodaje) sale en CADA uno de sus días: la gente hace falta
+  // todos los días que dura. Antes salía solo el primero, y en cuanto ese pasaba
+  // desaparecía de aquí con el rodaje todavía en marcha.
+  const jornadas = useMemo(() => {
+    const mapa = porDia(apuntes.filter(a => esTipoEvento(a.tipo)));
+    return Object.entries(mapa)
+      .filter(([dia]) => { const faltan = diasHasta(dia); return faltan !== null && faltan >= 0 && faltan <= DIAS_ANTICIPACION; })
+      .sort((x, y) => x[0].localeCompare(y[0]));
   }, [apuntes]);
 
-  if (porDia.length === 0) {
+  if (jornadas.length === 0) {
     return (
       <div className="cal-viene cal-viene-vacio">
         No hay eventos en los próximos {DIAS_ANTICIPACION} días.
@@ -663,7 +664,7 @@ function VistaEquipo({ apuntes, equipo, onAbrirEvento, onEditar, onGuardar }) {
 
   return (
     <div className="cal-equipo-vista">
-      {porDia.map(([dia, delDia]) => {
+      {jornadas.map(([dia, delDia]) => {
         const f = aFecha(dia);
         const faltan = diasHasta(dia);
         // Lo que hace falta ese día es la SUMA de sus eventos. Sumar sala/cocina/

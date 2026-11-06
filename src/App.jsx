@@ -2385,9 +2385,10 @@ export default function App({ onCerrarSesion } = {}) {
     setApuntesCalendario(despues);
   }, [apuntesCalendario]);
 
-  const guardarApunte = React.useCallback((apunte) => {
-    // Por id: un apunte editado conserva el suyo, y uno nuevo no pisa a nadie.
-    escribirEnCalendario(lista => [...lista.filter(a => a.id !== apunte.id), apunte])
+  const guardarApunte = React.useCallback((apunte, quitar) => {
+    // Por id: un apunte editado conserva el suyo, y uno nuevo no pisa a nadie. `quitar`,
+    // el id viejo si cambia (ver guardar en useCalendarioNube): en la misma escritura.
+    escribirEnCalendario(lista => [...lista.filter(a => a.id !== apunte.id && a.id !== quitar), apunte])
       .catch(() => { /* sin conexión: se dice arriba, no se traga */ });
   }, [escribirEnCalendario]);
 

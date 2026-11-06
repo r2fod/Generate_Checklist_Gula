@@ -6706,6 +6706,29 @@ async function main() {
     await c.close();
   }
 
+  // Un rodaje de varios días que empezó ayer (PLAN_MEJORAS E1.2): antes desaparecía de
+  // "Lo que viene" y de la vista Equipo en cuanto pasaba su primer día, con el rodaje
+  // todavía en marcha. Ahora sigue, "en curso", y en Equipo sale en cada día que queda.
+  {
+    const BANCO = `http://localhost:${PUERTO}/pruebas/calendario.html?varios=1`;
+    for (const w of [390, 1280]) {
+      const c = await navegador.newContext({ viewport: { width: w, height: 900 } });
+      const p = await c.newPage();
+      p.on("pageerror", e => errores.push(`calendario varios días ${w}px: ${e}`));
+      await p.goto(BANCO, { waitUntil: "networkidle" });
+      await p.waitForSelector(".cal-viene-fila");
+      const fila = await p.locator(".cal-viene-fila", { hasText: "Rodaje de varios días" }).first().innerText().catch(() => "");
+      ok(/en curso/.test(fila), `${w}px · el rodaje que empezó ayer sigue en "Lo que viene", en curso ("${fila.replace(/\s+/g, " ").trim()}")`);
+      await p.locator(".cal-vistas .segment-btn", { hasText: "Equipo" }).first().click();
+      await p.waitForTimeout(400);
+      const jornadas = await p.locator(".cal-jornada", { hasText: "Rodaje de varios días" }).count();
+      ok(jornadas === 3, `${w}px · y en Equipo sale hoy, mañana y pasado, los días que le quedan (${jornadas})`);
+      ok(!await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1),
+        `${w}px · sin mover la página de lado`);
+      await c.close();
+    }
+  }
+
   await navegador.close();
   srv.kill();
 

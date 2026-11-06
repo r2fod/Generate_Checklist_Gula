@@ -800,17 +800,19 @@ console.log("\n── Escribir en el calendario ──");
   const apuntes = [{ id, fecha: "2026-09-12", titulo: "Boda X", tipo: "boda" }];
   let ops = [];
   const aplicar = aplicarEnCalendario({
-    apuntes, guardar: (a) => ops.push(["guardar", a.id]), borrar: (x) => ops.push(["borrar", x]),
+    apuntes, guardar: (a, quitar) => ops.push(["guardar", a.id, quitar]), borrar: (x) => ops.push(["borrar", x]),
   });
 
   ops = []; const creado = aplicar({ que: "crear_apunte", datos: { titulo: "Boda Y", fecha: "2026-10-01", tipo: "boda", pax: 90 } });
   ok(creado.creado === "Boda Y" && ops[0][1] === idDeApunte("2026-10-01", "Boda Y"),
     "al crear, el id sale de la fecha y el título — no es aleatorio");
 
-  // Cambiar la fecha cambia la IDENTIDAD. Si no se borra el viejo quedan los dos y el
-  // calendario enseña el mismo evento dos veces.
+  // Cambiar la fecha cambia la IDENTIDAD. Si no se quita el viejo quedan los dos y el
+  // calendario enseña el mismo evento dos veces. Y se quita en el MISMO guardado: con un
+  // borrar aparte, los dos partían de la misma foto y el guardado volvía a meter el viejo.
   ops = []; aplicar({ que: "editar_apunte", datos: { id, cambios: { fecha: "2026-09-13" } } });
-  ok(ops.some(o => o[0] === "borrar" && o[1] === id), "al cambiar la fecha se borra el id viejo");
+  ok(ops.length === 1 && ops[0][0] === "guardar" && ops[0][2] === id,
+    `al cambiar la fecha se quita el id viejo en el mismo guardado (${JSON.stringify(ops)})`);
   ok(ops.some(o => o[0] === "guardar" && o[1] === idDeApunte("2026-09-13", "Boda X")), "y se guarda con el nuevo");
 
   ops = []; aplicar({ que: "editar_apunte", datos: { id, cambios: { pax: 120 } } });
@@ -1561,6 +1563,13 @@ console.log("\n── Crear checklists desde el calendario ──");
     "una que ya existe no se vuelve a crear");
   ok(ejecutar("crear_checklists", {}, yaEsta).ids.length === 1,
     "y al pedir los próximos solo entra la que falta");
+
+  // Un rodaje de varios días que ya ha empezado sale en "Lo que viene" (en curso), pero
+  // la app no le crea checklist: si entrara aquí, el asistente diría "creadas" sin crear
+  const conRodaje = { ...base, nivel: "confianza", apuntes: [...base.apuntes,
+    { id: "a5", fecha: enDiasISO(-1), hasta: enDiasISO(2), titulo: "Rodaje en curso", tipo: "produccion" }] };
+  ok(!ejecutar("crear_checklists", {}, conRodaje).ids.includes("a5"),
+    "al pedir los próximos, el rodaje que ya ha empezado no entra");
 
   // Apagado donde la app no sabe crearlas (el calendario suelto no tiene archivo)
   ok(!catalogoParaModelo(false, {}, "confianza").map(h => h.name).includes("crear_checklists"),

@@ -115,7 +115,10 @@ export default function useCalendarioNube(enlace = null) {
     soloVer,
     codigos,
     traer: (lista) => escribir(lista, equipo),
-    guardar: (apunte) => escribir([...apuntes.filter(a => a.id !== apunte.id), apunte], equipo),
+    // `quitar`: el id viejo de un apunte que cambia de id (otra fecha u otro título). Va
+    // en la MISMA escritura: borrar y guardar por separado partían los dos de la misma
+    // foto, y el guardado volvía a meter el viejo — salían los dos.
+    guardar: (apunte, quitar) => escribir([...apuntes.filter(a => a.id !== apunte.id && a.id !== quitar), apunte], equipo),
     borrar: (id) => escribir(apuntes.filter(a => a.id !== id), equipo),
     cambiarEquipo: (siguiente) => escribir(apuntes, siguiente),
     ratios,
