@@ -2767,15 +2767,28 @@ async function main() {
     ok(await visible(), "al bajar aparece la barra fina");
     const caja = await p.locator(".barra-fija").boundingBox();
     ok(caja && caja.y >= 0 && caja.y < 20, `y se queda pegada arriba (y=${caja ? Math.round(caja.y) : "?"})`);
-    // El buscador de la barra fina filtra igual que el de la lista
-    await p.locator(".barra-fija-buscar").fill("mantel");
-    await p.waitForTimeout(700);
+    const categoriaMantel = p.locator(".category-section").filter({ has: p.locator(".item-name").filter({ hasText: /mantel/i }) }).first();
+    const cabeceraMantel = categoriaMantel.locator(".category-header");
+    const estadoOrden = () => cabeceraMantel.locator('.cat-edit-btn[aria-label^="Subir"], .cat-edit-btn[aria-label^="Bajar"]').evaluateAll(botones => botones.map(b => b.disabled));
+    const ordenAntes = await estadoOrden();
+    await cabeceraMantel.click();
+    ok(await cabeceraMantel.getAttribute("aria-expanded") === "false", "se puede plegar una categoría antes de buscar");
+    await p.evaluate(() => window.scrollTo(0, 900));
+    const filtroFijo = p.locator(".barra-fija-buscar");
+    await filtroFijo.fill("  MÁNTEL  ");
+    await p.waitForFunction(() => { const filas = [...document.querySelectorAll(".item-row .item-name")]; return filas.length > 0 && filas.every(e => /mantel/i.test(e.textContent)); });
     const nombres = await p.locator(".item-row .item-name").allInnerTexts();
-    ok(nombres.length > 0 && nombres.every(n => /mantel/i.test(n)), `y su buscador filtra la lista (${nombres.length} items)`);
-    await p.locator(".barra-fija-buscar").fill("");
-    await p.waitForTimeout(500);
+    ok(nombres.length > 0 && nombres.every(n => /mantel/i.test(n)), "la búsqueda móvil ignora tildes, mayúsculas y espacios");
+    ok(await cabeceraMantel.getAttribute("aria-expanded") === "true", "la categoría plegada enseña sus coincidencias");
+    ok(JSON.stringify(await estadoOrden()) === JSON.stringify(ordenAntes), "la categoría conserva su posición real al buscar");
+    await filtroFijo.fill("material-sin-coincidencias");
+    await p.getByText(/No se encontraron materiales/).waitFor();
+    ok(await filtroFijo.evaluate(e => document.activeElement === e && getComputedStyle(e).visibility === "visible"), "se puede seguir escribiendo tras una búsqueda sin resultados");
+    await filtroFijo.fill("");
+    await categoriaMantel.locator(".category-header[aria-expanded=false]").waitFor();
+    ok(await cabeceraMantel.getAttribute("aria-expanded") === "false", "limpiar la búsqueda restaura el plegado anterior");
 
-    // Dentro de Modo carga, el cambio Salida/Vuelta y el recuento no pueden irse
+    await p.evaluate(() => window.scrollTo(0, 900));
     await p.locator(".barra-fija-carga").click();
     await p.waitForTimeout(1400);
     await p.evaluate(() => { document.querySelector(".carga-modal").scrollTop = 1500; });
@@ -2783,7 +2796,21 @@ async function main() {
     const t = await p.locator(".carga-modo-toggle").boundingBox();
     ok(t && t.y < 120, `en Modo carga el toggle sigue arriba tras bajar (y=${t ? Math.round(t.y) : "?"})`);
     const cuenta = await p.locator(".carga-toggle-cuenta").innerText();
-    ok(/^\d+\/\d+$/.test(cuenta.trim()), `y con él el recuento a la vista (${cuenta.trim()})`);
+    const carga = p.locator(".carga-modal");
+    const filtroCarga = carga.getByRole("searchbox", { name: "Buscar material en modo carga" });
+    await filtroCarga.fill("  MÁNTEL ");
+    await p.waitForFunction(() => Array.from(document.querySelectorAll(".carga-lista")).every(e => /mantel/i.test(e.textContent)));
+    const coincidencias = carga.locator(".preview-category");
+    ok(await coincidencias.count() > 0, "Salida filtra materiales con el mismo criterio que la checklist");
+    ok(await p.locator(".carga-toggle-cuenta").innerText() === cuenta, "buscar conserva el total de materiales del modo carga");
+    for (const pestaña of ["Prep.", "Vuelta"]) {
+      await carga.getByRole("button", { name: pestaña, exact: true }).click();
+      ok(await filtroCarga.inputValue() === "  MÁNTEL " && await coincidencias.count() > 0, `el filtro se mantiene en ${pestaña}`);
+    }
+    await filtroCarga.fill("material-sin-coincidencias");
+    await carga.getByRole("button", { name: "Limpiar búsqueda" }).click();
+    await coincidencias.nth(1).waitFor();
+    ok(await coincidencias.count() > 1, "limpiar la búsqueda recupera la lista de carga");
     await c.close();
   }
 
@@ -5503,6 +5530,13 @@ async function main() {
     await p.waitForTimeout(1200);
     ok(await aLaVista(),
       "y al pulsar el aviso de arriba, la pantalla salta hasta ella");
+    const buscadorCarga = p.getByRole("searchbox", { name: "Buscar material en modo carga" });
+    await buscadorCarga.fill("material-sin-coincidencias");
+    await fila.waitFor({ state: "detached" });
+    await contador.click();
+    await fila.waitFor();
+    ok(await buscadorCarga.inputValue() === "", "el aviso recupera la fila que había ocultado la búsqueda");
+
 
     // Volver a tocarla es haberla revisado: el aviso desaparece
     await fila.locator('input[type="checkbox"]').click();

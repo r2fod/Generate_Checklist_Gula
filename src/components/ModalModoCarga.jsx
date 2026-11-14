@@ -10,6 +10,8 @@ import { fmtCantidadCompleta, quitarItemsSinCantidad, esItemDeAlquiler } from ".
 import { esConsumible } from "../consumibles.js";
 import { FASES_TIEMPO, estimarTiemposCarga } from "../tiempos-carga.js";
 import { leerPrecios, guardarPrecios, parsePreciosPegados } from "../precios.js";
+import BuscarMaterial, { SinMateriales } from "./BuscarMaterial.jsx";
+import { useBuscarMaterial } from "./useBuscarMaterial.js";
 import PanelBebida from "./PanelBebida.jsx";
 
 import PanelHielo from "./PanelHielo.jsx";
@@ -138,7 +140,7 @@ const FilaCargaPrep = memo(function FilaCargaPrep({
   );
 });
 
-const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, unidadManual, valorVuelta, roturaValor, consumible, esAlquiler, onVuelve, onRoturas }) {
+const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, sufijo, unidadManual, valorVuelta, roturaValor, consumible, esAlquiler, marcaRevisar, onVuelve, onRoturas }) {
   const cantidadCompletaNum = parseFloat(String(qty && qty.u ? qty.u : qty).replace(",", "."));
   const cantidadCompleta = isNaN(cantidadCompletaNum) ? null : cantidadCompletaNum;
   const marcado = valorVuelta !== undefined && valorVuelta !== "";
@@ -159,6 +161,7 @@ const FilaCargaVuelta = memo(function FilaCargaVuelta({ dataKey, label, qty, suf
   const [salta, terminar] = useAcabaDe(vinoTodo);
   return (
     <div className={`carga-row ${marcado ? "is-marcado" : ""} ${vinoTodo ? "is-vino-todo" : ""} ${esAlquiler ? "is-alquiler" : ""}${salta ? " acaba-de-marcarse" : ""}`}
+         data-revisar={marcaRevisar ? dataKey : undefined}
          onAnimationEnd={e => { if (e.target === e.currentTarget) terminar(); }}>
       {/* La pastilla "todo" va en la línea del nombre, que es donde está la casilla de
           marcar en Prep. y en Salida: es la misma acción y tiene que estar en el mismo
@@ -260,6 +263,8 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
     () => quitarItemsSinCantidad(checklistCompleta).filter(c => !/personal|menús especiales/i.test(c.nombre)),
     [checklistCompleta],
   );
+  const { filtro, setFiltro, buscando, visibles, sinResultados } = useBuscarMaterial(checklist);
+  const [destinoDeFila, setDestinoDeFila] = useState(null);
   const [modo, setModo] = useState("salida"); // preparacion | salida | vuelta
   const [verResumen, setVerResumen] = useState(false);
   const [precios, setPrecios] = useState(() => leerPrecios());
@@ -294,10 +299,16 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
   const aMedias = useMemo(() => checklist.flatMap(c => c.items
     .filter(([, , , lo]) => pendientes[`${c.nombre}::${lo}`])
     .map(([label, q, , lo, , sufijo]) => ({ key: `${c.nombre}::${lo}`, label, total: q && q.u ? q.u : q, sufijo, ...pendientes[`${c.nombre}::${lo}`] }))), [checklist, pendientes]);
-  const irAPendiente = (key) => {
-    const fila = document.querySelector(`[data-pendiente="${CSS.escape(key)}"]`);
-    if (fila) fila.scrollIntoView({ behavior: "smooth", block: "center" });
+  const irAFila = (atributo, key) => {
+    setFiltro("");
+    setDestinoDeFila({ atributo, key });
   };
+  useEffect(() => {
+    if (!destinoDeFila || buscando) return;
+    const fila = document.querySelector(`[${destinoDeFila.atributo}="${CSS.escape(destinoDeFila.key)}"]`);
+    fila?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setDestinoDeFila(null);
+  }, [buscando, destinoDeFila]);
   // Lo que está preparado pero todavía sin cargar. Es el camino normal —se prepara y
   // luego se sube al camión— así que subirlo de golpe ahorra repasar la lista entera
   // item a item. También es la vía para recuperar una carga que se haya perdido,
@@ -320,10 +331,6 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
   const porRevisar = useMemo(() => checklist.flatMap(c => c.items
     .map(([, , , lo]) => `${c.nombre}::${lo}`)
     .filter(k => marcasRevisar[k] && (modo === "preparacion" ? preparados[k] : modo === "salida" ? checkeados[k] : vueltos[k] !== undefined && vueltos[k] !== ""))), [checklist, marcasRevisar, modo, preparados, checkeados, vueltos]);
-  const irAlPrimeroPorRevisar = () => {
-    const fila = document.querySelector(`[data-revisar="${CSS.escape(porRevisar[0] || "")}"]`);
-    if (fila) fila.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
   const totalRoturas = useMemo(() => Object.values(roturas).reduce((acc, n) => acc + (parseInt(n, 10) || 0), 0), [roturas]);
   const pct = totalItems > 0 ? Math.round((totalMarcados / totalItems) * 100) : 0;
   // Tiempos estimados (Preparación / Carga / Descarga). El criterio vive en
@@ -576,7 +583,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                 arriba, junto al recuento, porque es lo único que se mira sin scroll —
                 y lleva de un toque a la fila, que buscarla entre 130 no es plan. */}
             {porRevisar.length > 0 && (
-              <button type="button" className="carga-por-revisar" onClick={irAlPrimeroPorRevisar}
+              <button type="button" className="carga-por-revisar" onClick={() => irAFila("data-revisar", porRevisar[0])}
                       title="Se les cambió la cantidad después de marcarlos: hay que volver a contarlos">
                 <AlertTriangle size={13} />
                 <span>
@@ -663,6 +670,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
           {!sinCerrar && cabeceraFuera && (
             <button className="preview-close-btn carga-toggle-cerrar" onClick={onClose} aria-label="Cerrar modo carga" title="Cerrar"><X size={14} /></button>
           )}
+          {!verResumen && <BuscarMaterial className="search-input-main carga-buscador" etiqueta="Buscar material en modo carga" filtro={filtro} setFiltro={setFiltro} />}
         </div>
         {mostrarRecordatorio && (
           <div className={`carga-nota-recordatorio ${notasCompletas ? "is-completo" : ""}`} role="note">
@@ -935,7 +943,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                   la misma forma: nombre, cuánto falta a la derecha y la nota debajo. */}
               <div className="carga-pendientes-lista">
                 {aMedias.map(p => (
-                  <button type="button" key={p.key} className="carga-pendientes-item" onClick={() => irAPendiente(p.key)}>
+                  <button type="button" key={p.key} className="carga-pendientes-item" onClick={() => irAFila("data-pendiente", p.key)}>
                     <strong>{p.label}</strong>
                     <span className="carga-pendientes-cant">faltan {p.faltan}{p.total !== undefined && p.total !== null && p.total !== "" ? ` de ${p.total}${p.sufijo ? ` ${p.sufijo}` : ""}` : ""}</span>
                     {p.nota && <span className="carga-pendientes-nota">{p.nota}</span>}
@@ -952,13 +960,14 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
               title={todoVuelto ? "Quita la marca de vuelto de todos los items" : "Da por hecha la vuelta: lo reutilizable (cristalería, vajilla, mobiliario...) como que volvió completo, lo que se gasta (bebida, hielo, comida...) como que no ha vuelto nada, que es lo normal en cada caso. Luego ajustas las excepciones y las roturas."}
             >{todoVuelto ? <><X size={15} /> Desmarcar todo</> : <><Check size={15} /> Marcar todo como vuelto</>}</button>
           )}
-          {checklist.map(cat => (
+          {sinResultados && <SinMateriales filtro={filtro} setFiltro={setFiltro} />}
+          {visibles.map(cat => (
             <div className="preview-category con-cat" key={cat.nombre} style={estiloCategoria(cat.nombre)}>
               <CabeceraCategoria
                 nombre={cat.nombre}
                 grupo={modo}
-                hechos={cat.items.filter(([, , , lo]) => estaHecho(`${cat.nombre}::${lo}`)).length}
-                total={cat.items.length}
+                hechos={(cat.itemsCompletos ?? cat.items).filter(([, , , lo]) => estaHecho(`${cat.nombre}::${lo}`)).length}
+                total={(cat.itemsCompletos ?? cat.items).length}
               />
               <div className="carga-lista">
                 {cat.items.map(([label, qty, , labelOriginal, esAlquilerManual, sufijo, unidadManual]) => {
@@ -1004,6 +1013,7 @@ export default function ModalModoCarga({ checklist: checklistCompleta, tipoEvent
                       sufijo={sufijo}
                       unidadManual={unidadManual}
                       valorVuelta={vueltos[dataKey]}
+                      marcaRevisar={estaHecho(dataKey) && !!marcasRevisar[dataKey]}
                       roturaValor={roturas[dataKey]}
                       consumible={esConsumible(cat.nombre, nombreBase)}
                       esAlquiler={esAlquiler}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useDeferredValue, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 
 import {
   Heart, Church, Cake, Briefcase, Clapperboard,
@@ -14,6 +14,8 @@ import { cambioDelEventoAbierto } from "./sincronizacion-eventos.js";
 import { hoyISO, aISO, enDiasISO } from "./fecha.js";
 import { apunta as apuntaEnDiario } from "./diario.js";
 import { sinTildes } from "./texto.js";
+import BuscarMaterial, { SinMateriales } from "./components/BuscarMaterial.jsx";
+import { useBuscarMaterial } from "./components/useBuscarMaterial.js";
 import { leerTexto, leerJSON, guardarTexto, guardarJSON, borrar as borrarDelAlmacen } from "./almacen.js";
 import { carpasRecomendadas, carpasPorAlquilar, CARPAS_EN_ALMACEN } from "./carpas.js";
 import { colorPorDefecto } from "./manteles.js";
@@ -661,7 +663,6 @@ export default function App({ onCerrarSesion } = {}) {
   const [cronos, setCronos] = useState(estadoInicial.cronos ?? {}); // { carga:{...}, descarga:{...} }
   // Categorías renombradas por el usuario: { "nombre original": "nombre nuevo" }
   const [categoriasRenombradas, setCategoriasRenombradas] = useState(estadoInicial.categoriasRenombradas ?? {});
-  const [filtro, setFiltro]           = useState("");
   const [openCategories, setOpenCategories] = useState({});
   // El link de solo ver (el del metre) abre DIRECTO en la hoja: es la vista buena para
   // quien tiene que saber qué hay y qué se devuelve, no la lista de carga con sus
@@ -3407,14 +3408,7 @@ export default function App({ onCerrarSesion } = {}) {
     setItemsManuales(prev => prev.filter((_, i) => i !== idx));
   };
 
-  // El campo de búsqueda responde al instante, pero recorrer y volver a pintar las
-  // ~140 filas se hace con prioridad baja: así escribir no se atasca en el móvil.
-  const filtroDiferido = useDeferredValue(filtro);
-  const filtered = useMemo(() => {
-    if (!filtroDiferido.trim()) return checklist;
-    const q = filtroDiferido.toLowerCase();
-    return checklist.map(c => ({ ...c, items: c.items.filter(i => i[0].toLowerCase().includes(q)) })).filter(c => c.items.length > 0);
-  }, [checklist, filtroDiferido]);
+  const { filtro, setFiltro, buscando, visibles: filtered, sinResultados } = useBuscarMaterial(checklist);
 
   const totalConceptos = checklist.reduce((acc, c) => acc + c.items.length, 0);
   // Datos del resumen de cabecera: lo cargado hasta ahora y lo que queda por recoger
@@ -3709,14 +3703,7 @@ export default function App({ onCerrarSesion } = {}) {
           <span className="barra-fija-nombre" title={nombreEvento || EVENTOS[evento]?.label}>
             {nombreEvento || EVENTOS[evento]?.label}
           </span>
-          <input
-            type="text"
-            className="barra-fija-buscar"
-            placeholder="Buscar..."
-            aria-label="Buscar un material"
-            value={filtro}
-            onChange={e => setFiltro(e.target.value)}
-          />
+          <BuscarMaterial className="barra-fija-buscar" placeholder="Buscar..." filtro={filtro} setFiltro={setFiltro} />
           {/* Con el link de solo ver no hay entrada a Modo carga: marcar es de logística */}
           {!soloVista && (
             <button className="barra-fija-carga" onClick={() => setModoCarga(true)} title="Modo carga">
@@ -5286,7 +5273,7 @@ export default function App({ onCerrarSesion } = {}) {
 
         {/* BUSCADOR + DESHACER */}
         <div className="animate-entrance search-row" style={{ animationDelay: "0.2s" }}>
-          <input type="text" className="search-input-main" placeholder="Buscar un material..." value={filtro} onChange={e => setFiltro(e.target.value)} />
+          <BuscarMaterial filtro={filtro} setFiltro={setFiltro} />
           {historial.length > 0 && (
             <button className="btn btn-outline btn-deshacer" onClick={handleDeshacer} title="Deshace el último cambio manual (cantidad editada o item quitado)"><Undo2 size={14} /> Deshacer</button>
           )}
@@ -5361,21 +5348,17 @@ export default function App({ onCerrarSesion } = {}) {
         )}
 
         {/* CATEGORÍAS */}
-        {filtered.length === 0 && filtro.trim() && (
-          <div className="config-card plantillas-vacio" style={{ textAlign: "center", padding: "24px 16px" }}>
-            <p style={{ margin: "0 0 10px" }}>No se encontraron materiales para «<strong>{filtro}</strong>»</p>
-            <button type="button" className="btn btn-outline" onClick={() => setFiltro("")}>Limpiar búsqueda</button>
-          </div>
-        )}
+        {sinResultados && <SinMateriales filtro={filtro} setFiltro={setFiltro} />}
         {filtered.map((cat, idx) => {
-          const isOpen = openCategories[cat.nombre] !== false;
+          const isOpen = buscando || openCategories[cat.nombre] !== false;
+          const posicion = checklist.findIndex(c => c.nombre === cat.nombre);
           return (
             <div key={cat.nombre} className={`category-section con-cat animate-entrance ${isOpen ? "is-open" : ""}`} style={{ animationDelay: `${0.25 + idx * 0.04}s`, ...estiloCategoria(cat.nombre) }}>
-              <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleCategory(cat.nombre)} onKeyDown={e => e.target === e.currentTarget && (e.key === "Enter" || e.key === " ") && toggleCategory(cat.nombre)}>
+              <div className="category-header" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => !buscando && toggleCategory(cat.nombre)} onKeyDown={e => { if (!buscando && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleCategory(cat.nombre); } }}>
                 <span className="cat-name"><span className="cat-icon"><IconoCategoria nombre={cat.nombre} /></span><span className="cat-name-texto">{cat.nombre}</span></span>
                 <span className="cat-count">
-                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, -1); }} disabled={idx === 0} title="Subir esta categoría" aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={13} /></button>
-                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, 1); }} disabled={idx === checklist.length - 1} title="Bajar esta categoría" aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={13} /></button>
+                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, -1); }} disabled={posicion === 0} title="Subir esta categoría" aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={13} /></button>
+                  <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleMoverCategoria(cat.nombre, 1); }} disabled={posicion === checklist.length - 1} title="Bajar esta categoría" aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={13} /></button>
                   <button className="cat-edit-btn" onClick={e => { e.stopPropagation(); handleRenombrarCategoria(cat.nombre); }} title="Renombrar categoría" aria-label={`Renombrar categoría ${cat.nombre}`}><Pencil size={13} /></button>
                   {cat.items.length}<span className="arrow">▼</span>
                 </span>
@@ -5426,8 +5409,8 @@ export default function App({ onCerrarSesion } = {}) {
                       grande que otra?", el dueño). En pantalla grande siguen arriba. */}
                   <div className="cat-pie-edicion">
                     <span className="cat-pie-texto">Categoría</span>
-                    <button type="button" className="cat-pie-btn" onClick={() => handleMoverCategoria(cat.nombre, -1)} disabled={idx === 0} aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={14} aria-hidden="true" /> Subir</button>
-                    <button type="button" className="cat-pie-btn" onClick={() => handleMoverCategoria(cat.nombre, 1)} disabled={idx === checklist.length - 1} aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={14} aria-hidden="true" /> Bajar</button>
+                    <button type="button" className="cat-pie-btn" onClick={() => handleMoverCategoria(cat.nombre, -1)} disabled={posicion === 0} aria-label={`Subir la categoría ${cat.nombre}`}><ChevronUp size={14} aria-hidden="true" /> Subir</button>
+                    <button type="button" className="cat-pie-btn" onClick={() => handleMoverCategoria(cat.nombre, 1)} disabled={posicion === checklist.length - 1} aria-label={`Bajar la categoría ${cat.nombre}`}><ChevronDown size={14} aria-hidden="true" /> Bajar</button>
                     <button type="button" className="cat-pie-btn" onClick={() => handleRenombrarCategoria(cat.nombre)} aria-label={`Renombrar categoría ${cat.nombre}`}><Pencil size={13} aria-hidden="true" /> Renombrar</button>
                   </div>
                 </div>
