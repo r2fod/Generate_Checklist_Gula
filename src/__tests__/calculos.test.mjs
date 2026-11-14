@@ -24,6 +24,8 @@ import { queAvisoToca, yaEsApp, estaSilenciado, DIAS_SILENCIO } from "../formula
 import { codigoDeTexto, direccionConCodigo, leerGuardado, guardar } from "../formulario/codigo.js";
 import { saneaEquipo, personaDeTexto, disponiblesEn, saneaLista, mezclaApuntes, choques, estadoDesdeApunte, apuntesPorPromover, checklistsPorCrear, numeraRepetidos, aVistaProxima, idDeApunte, idLibre } from "../calendario/apuntes.js";
 import { sugerenciasDeLimpieza, grupoDeLista } from "../calendario/limpieza.js";
+import { filtrarMaterial } from "../busqueda-material.js";
+import assert from "node:assert/strict";
 import { nucleoDeTitulo } from "../texto.js";
 import { personalNecesario, horasEntre, resumenAsignados, personalQueFalta, saneaAsignados,
   PAX_POR_CAMARERO, saneaRatios, ponRatios, leerRatios, ratiosCambiados } from "../personal.js";
@@ -62,6 +64,15 @@ const ok = (cond, msg) => {
   if (cond) { pasan++; console.log(`  ✅ ${msg}`); }
   else { fallos.push(msg); console.log(`  ❌ ${msg}`); }
 };
+
+// Los dos buscadores conservan la identidad original de cada fila.
+const cafeDePrueba = ["Café molido", 2, undefined, "Café"];
+const listaDeBusqueda = [{ nombre: "Bebidas", items: [cafeDePrueba, ["Agua", 1]] }];
+assert.equal(filtrarMaterial(listaDeBusqueda, "   MOLIDO   cafe  ")[0].items[0], cafeDePrueba);
+assert.equal(filtrarMaterial(listaDeBusqueda, "   "), listaDeBusqueda);
+assert.deepEqual(filtrarMaterial(listaDeBusqueda, "té verde"), []);
+assert.equal(listaDeBusqueda[0].items.length, 2);
+
 
 // Comprueba que una cantidad NUNCA baja al subir las horas. Los cálculos por tramos
 // con topes y suelos son justo donde se cuelan estos saltos, y mirando un caso suelto

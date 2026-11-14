@@ -1,5 +1,7 @@
 # Historial — lo hecho, con su porqué
 
+- **Buscador de materiales en checklist y Modo carga**: búsqueda compartida por nombre, con tildes y espacios normalizados. Al buscar se abren las categorías con coincidencias y, al limpiar, vuelve su plegado. Las flechas usan el orden completo y el buscador móvil se mantiene visible mientras tiene foco.
+
 Archivo de consulta, **no de lectura**: busca con `grep -n "palabra" HISTORIAL.md` y lee solo la
 entrada que toque. Lo vigente (reglas, trampas, estado de HOY) está en `CONTEXTO.md`.
 Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.

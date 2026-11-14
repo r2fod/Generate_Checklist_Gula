@@ -55,6 +55,8 @@ pruebas/calendario.html        banco de pruebas sin nube, para lo que hay tras e
 **Lo más denso: `src/nube.js`.** Todo Firestore pasa por ahí; los comentarios explican
 por qué cada colección vive donde vive (sobre todo el calendario, con dos documentos).
 
+- **Buscar material**: la checklist (incluida la barra fija móvil) y Prep., Salida y Vuelta en Modo carga usan el mismo filtro. Ignora tildes, mayúsculas y espacios repetidos, y muestra resultados aunque la categoría estuviera plegada. En Modo carga, los recuentos, marcas y acciones globales usan la lista completa.
+
 ## Cómo se revisa lo visual
 
 Las pruebas comprueban desbordamiento y texto cortado, **no si algo se ve bien**. Dos
