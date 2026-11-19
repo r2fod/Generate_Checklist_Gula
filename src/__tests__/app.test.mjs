@@ -5795,6 +5795,10 @@ async function main() {
         ok(faltan.length === 0, `${w}px · con el nombre entero de cada apunte${faltan.length ? ` → faltan ${faltan.join(", ")}` : ""}`);
         ok(/180 pax/.test(textoListas) && /21:00/.test(textoListas),
           `${w}px · y su hora y su gente`);
+        // Un apunte de varios días sale en CADA día que cubre, no solo el primero
+        // ("Producción On" de dos días no se veía el segundo sin abrir el día)
+        const diasRodaje = await listas.locator(".cal-agenda-dia", { hasText: "Rodaje de prueba" }).count();
+        ok(diasRodaje === 2, `${w}px · un apunte de dos días sale en los dos días de la lista (${diasRodaje})`);
         // Las vacaciones, en su línea de la semana y una vez por semana, no día a día
         const ausencias = await p.locator(".cal-semana-ausencias").allInnerTexts();
         ok(ausencias.join(" ").includes("Vacas Mengano") && ausencias.every(t => (t.match(/Vacas Mengano/g) || []).length <= 1),

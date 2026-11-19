@@ -8,6 +8,12 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Calendario móvil: un apunte de varios días sale en cada día que cubre**
+  (`SemanaEnLista`, `Calendario.jsx`): antes la lista bajo cada semana lo mostraba solo el
+  primer día y el segundo parecía vacío ("Producción On" de dos días). Los días siguientes
+  llevan "continúa". Las vacaciones siguen en su línea de la semana, una vez. Prueba en
+  `app.test.mjs` con "Rodaje de prueba" de dos días (`prueba.jsx`).
+
 - **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
   - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
     (`aVistaProxima` → `enCurso`, "en curso"), y en la vista Equipo sale en CADA día que
