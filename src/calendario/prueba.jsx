@@ -53,7 +53,7 @@ const DEMO = [
   { fecha: dia(9), titulo: "Comunión de prueba", tipo: "comunion", pax: 40, hora: "13:30" },
   // Tercer evento el mismo día: el caso que de verdad importa, como el 19 de septiembre
   { fecha: dia(9), titulo: "Boda de prueba tres", tipo: "boda", pax: 180, sitio: "Otro sitio", hora: "21:00" },
-  { fecha: dia(9), titulo: "Rodaje de prueba", tipo: "produccion", pax: 25 },
+  { fecha: dia(9), hasta: dia(10), titulo: "Rodaje de prueba", tipo: "produccion", pax: 25 },
   { fecha: dia(16), titulo: "Cumpleaños de prueba", tipo: "cumpleanos" },
   { fecha: dia(20), titulo: "Corporativo de prueba", tipo: "corporativo", pax: 80 },
   { fecha: dia(1), hasta: dia(6), titulo: "Fulanita", tipo: "vacaciones" },

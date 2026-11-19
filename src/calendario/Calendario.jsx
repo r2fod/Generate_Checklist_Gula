@@ -282,7 +282,8 @@ function Mes({ anio, mes, mapa, hoy, enChoque, onDia, abierto }) {
 // Las vacaciones y los días cerrados no son trabajo que preparar sino gente que falta:
 // con los datos de verdad eran la mitad de lo apuntado y tapaban las bodas. Van en una
 // línea al final de la semana ("Raúl 1–2 · Ana 7–13"), no repetidos día a día. Lo demás
-// que dura varios días sale una vez, el primero de la semana, con "hasta el N".
+// que dura varios días sale en CADA día que cubre, con "hasta el N" (antes solo el
+// primero y el resto de días parecían vacíos: "Producción On" de dos días no se veía el 2º).
 const AUSENCIAS = new Set(["vacaciones", "cerrado"]);
 
 function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia, pasada = false }) {
@@ -290,8 +291,7 @@ function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia, pasada = false }) {
   if (!dias.length) return null;
   const primero = dias[0], ultimo = dias[dias.length - 1];
   const filas = dias
-    .map(dia => ({ dia, lista: (mapa[dia] || []).filter(a => !AUSENCIAS.has(a.tipo)
-      && (a.fecha === dia || (dia === primero && a.fecha < dia))) }))
+    .map(dia => ({ dia, lista: (mapa[dia] || []).filter(a => !AUSENCIAS.has(a.tipo)) }))
     .filter(f => f.lista.length);
   // Cada ausencia una vez, con los días que caen en esta semana
   const ausencias = [];
@@ -332,6 +332,7 @@ function SemanaEnLista({ semana, mapa, hoy, enChoque, onDia, pasada = false }) {
                     <small>
                       {[
                         TIPOS[a.tipo].nombre,
+                        a.fecha < dia ? "continúa" : "",
                         a.hora,
                         a.sitio,
                         a.pax ? `${a.pax} pax` : "",
