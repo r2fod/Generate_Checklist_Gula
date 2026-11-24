@@ -67,6 +67,7 @@ Firestore.
    | `MISTRAL_API_KEY` | Secret | [Mistral](https://console.mistral.ai/api-keys) — capa gratis "Experiment". **Ojo: por defecto SÍ entrena con lo que recibe la capa gratis; se desactiva a mano en su panel, Ajustes → Privacidad** |
    | `OPENROUTER_API_KEY` | Secret | [OpenRouter](https://openrouter.ai/keys) — modelos gratis marcados `:free`. Algunos exigen activar "training y logging" en su panel para poder usarlos |
    | `NVIDIA_API_KEY` | Secret | [NVIDIA NIM](https://build.nvidia.com/) — su política de privacidad dice que graba y usa lo que entra/sale para mejorar sus modelos, aunque sus términos digan lo contrario |
+   | `GITHUB_MODELS_TOKEN` | Secret | [GitHub Models](https://github.com/settings/personal-access-tokens) — token fino con permiso `models:read`, de una cuenta del NEGOCIO (no la personal). Gratis con cupo bajo por cuenta (prototipado), respaldo. Según GitHub no entrena con lo que recibe. `GITHUB_MODELS_MODEL` para fijar otro modelo |
    | `GROQ_MODEL` / `CEREBRAS_MODEL` / `ZAI_MODEL` / `MISTRAL_MODEL` / `OPENROUTER_MODEL` / `NVIDIA_MODEL` | Text | Para fijar otro modelo si el catálogo gratis cambia (pasa cada pocos meses, mismo motivo que `GEMINI_MODEL`) |
 
    Los tres últimos (Mistral, OpenRouter, NVIDIA) pueden acabar entrenando con lo que

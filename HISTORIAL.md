@@ -8,6 +8,13 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Proveedor GitHub Models en la cascada** (`github`, tras Cloudflare): token `GITHUB_MODELS_TOKEN`
+  (PAT `models:read`, cuenta del negocio). Según GitHub no entrena → puede ver datos de clientes.
+  Cupo bajo por cuenta: es respaldo. Sin probar contra cuenta real (base y modelo por defecto
+  salen de su documentación). Descartados: Arena y Duck.ai (sin API oficial), Hugging Face
+  (sin garantía de privacidad), SambaNova (pendiente de leer sus Términos). **Aviso aparte:** la
+  capa gratis de Gemini sí usa lo recibido para mejorar productos de Google y `gemini` NO está
+  en `SIN_DATOS_DE_CLIENTES`; sin cambiar, decisión del dueño (depende de si hay facturación).
 - **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
   - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
     (`aVistaProxima` → `enCurso`, "en curso"), y en la vista Equipo sale en CADA día que

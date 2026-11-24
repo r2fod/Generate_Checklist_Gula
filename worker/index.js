@@ -449,6 +449,20 @@ const PROVEEDORES = {
       modelo: env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
     }),
   },
+  // GitHub Models: gratis con un token de GitHub (PAT con permiso "models:read"), pensado
+  // para prototipar y con cupo bajo POR CUENTA (no por token) — es respaldo, no motor
+  // principal. Según GitHub corre en su infraestructura y Azure y no entrena con lo que
+  // recibe, así que puede ver datos de clientes. Usar un token de una cuenta del NEGOCIO,
+  // no la personal. Sin verificar contra una cuenta real: base y modelo por defecto salen
+  // de su documentación; si cambian, se pisan con GITHUB_MODELS_MODEL.
+  github: {
+    clave: "GITHUB_MODELS_TOKEN",
+    habla: (env) => dialectoOpenAI({
+      base: "https://models.github.ai/inference",
+      clave: env.GITHUB_MODELS_TOKEN,
+      modelo: env.GITHUB_MODELS_MODEL || "openai/gpt-4.1-mini",
+    }),
+  },
   // Cloudflare tiene su propio motor (Workers AI) y este Worker YA vive en Cloudflare,
   // así que hay una forma de usarlo sin ninguna clave: un "binding" nativo (Settings →
   // Bindings → Add → Workers AI, con el nombre "AI") y `env.AI.run(...)` en vez de un
@@ -494,7 +508,7 @@ async function estado(env) {
     "GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "FIREBASE_API_KEY",
     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "COMPATIBLE_API_KEY",
     "GROQ_API_KEY", "CEREBRAS_API_KEY", "ZAI_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY", "NVIDIA_API_KEY",
-    "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "GITHUB_MODELS_TOKEN",
   ];
   const puestas = {};
   claves.forEach(k => {

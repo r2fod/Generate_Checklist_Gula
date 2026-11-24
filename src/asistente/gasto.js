@@ -33,6 +33,8 @@ export const PRECIOS = {
   // Gratis mientras no se salga del cupo diario compartido de Neuronas (10.000/día,
   // repartido entre TODOS los modelos que se usen en la cuenta, no uno por modelo).
   cloudflare: { entrada: 0,    salida: 0,    nombre: "Cloudflare" },
+  // Gratis con cupo bajo por cuenta de GitHub (prototipado).
+  github:     { entrada: 0,    salida: 0,    nombre: "GitHub" },
 };
 
 const CLAVE = "gula_asistente_gasto";

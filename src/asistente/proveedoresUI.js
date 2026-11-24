@@ -8,7 +8,7 @@ import { ORDEN, SIN_DATOS_DE_CLIENTES } from "./enrutado.js";
 // (OpenRouter, DeepSeek, Ollama... lo que se le ponga en su panel): no tiene nota fija
 // porque puede ser cualquier cosa.
 export const NOMBRE_PROVEEDOR = {
-  gemini: "Gemini", groq: "Groq", cerebras: "Cerebras", zai: "Z.AI", cloudflare: "Cloudflare",
+  gemini: "Gemini", groq: "Groq", cerebras: "Cerebras", zai: "Z.AI", cloudflare: "Cloudflare", github: "GitHub",
   claude: "Claude", openai: "OpenAI", mistral: "Mistral", openrouter: "OpenRouter",
   nvidia: "NVIDIA", compatible: "Compatible",
 };
