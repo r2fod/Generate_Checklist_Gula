@@ -74,7 +74,10 @@ RTK es un binario; aquí se replica la idea a mano. Principios: solo fallos, agr
 
 Reglas: si recortas con `head`/`tail`, di cuántas líneas quedaron fuera; si el resumen no basta, relee crudo. Nunca filtrar cuando se depura un fallo sin causa clara.
 
-## 4. Cómo se usa (IAs)
+## 4. Catálogo por sector
+Para elegir estilo, paleta, tipografía y patrón de un tipo de negocio: `diseno/INDICE.md` (copia por sectores de la base de UI UX Pro Max). Leer solo el sector y el tipo que toque, nunca la carpeta entera. Gula → `comida-eventos` y `gestion-herramientas`.
+
+## 5. Cómo se usa (IAs)
 - Rediseño de pantalla → PB-B de `PLAYBOOK_AGENTES.md` + §1 de esta guía. Cambios de código en general → §2. Salida de comandos → §3.
 - Cualquier IA (Claude, Gemini/Antigravity) la lee bajo pedido, como `PLAN_*.md`; no hace falta instalar plugins.
 - Gemini MCP puede dar segunda opinión visual sobre capturas (su respuesta es entrada a verificar).

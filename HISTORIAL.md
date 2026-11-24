@@ -9,6 +9,7 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 ## Lo hecho
 
 - **`GUIA_DISENO.md`**: destilado de UI UX Pro Max (reglas de diseño y checklist), Ponytail (escalera de "escribir poco") y RTK (salida de comandos compacta) adaptado a las reglas de Gula, para no instalar los tres plugins. Enlazada desde `PLAYBOOK_AGENTES.md` (PB-B) y `GEMINI.md`. Solo documentación, sin código.
+  - **`diseno/`**: copia de la base de datos de UI UX Pro Max (MIT, licencia incluida) reordenada por sector: 194 tipos de negocio en 9 sectores, 89 estilos, tipografías, landing, gráficos, movimiento y UX. Un `INDICE.md` dice qué sector leer para no cargar todo (Gula → `comida-eventos` + `gestion-herramientas`). Sin iconos ni Google Fonts (librerías) ni columna GSAP.
 
 - **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
   - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
