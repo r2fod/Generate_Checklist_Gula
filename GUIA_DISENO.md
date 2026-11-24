@@ -77,7 +77,13 @@ Reglas: si recortas con `head`/`tail`, di cuántas líneas quedaron fuera; si el
 ## 4. Catálogo por sector
 Para elegir estilo, paleta, tipografía y patrón de un tipo de negocio: `diseno/INDICE.md` (copia por sectores de la base de UI UX Pro Max). Leer solo el sector y el tipo que toque, nunca la carpeta entera. Gula → `comida-eventos` y `gestion-herramientas`.
 
-## 5. Cómo se usa (IAs)
+## 5. Laboratorio y Figma (sin conectores)
+**Laboratorio** (`diseno/lab/`, solo con `npm run dev`, fuera del build): una variante = un fragmento HTML en `diseno/lab/variantes/<nombre>.html` con CSS nativo y **solo tokens** de `src/index.css`; se añade su nombre a `variantes/indice.json`. `npm run lab:captura [nombre]` la captura a 320 y 1280 px, claro y oscuro, y avisa si hay scroll horizontal (salida en `diseno/lab/capturas/`, ignorada por git; si no encuentra chromium, `CHROMIUM_PATH=...`). Se revisa la captura a ojo; la elegida pasa a `src/`.
+**Figma** (`scripts/figma.mjs`, sin conector): `FIGMA_TOKEN=... node scripts/figma.mjs "<enlace del frame>" [--imagen] [--prof=6]`. Token personal de Figma con permiso de solo lectura de archivos, **solo en variable de entorno**. Imprime el frame comprimido (tamaños, gap, padding, radios, colores, tipografías) y marca cada valor `=--token` (exacto), `≈--token` (a ≤12 de distancia) o `sin token` (preguntar, no inventar hex). `--imagen` baja el PNG a `diseno/lab/capturas/` para compararlo con la captura del laboratorio. Pasar frames de móvil **y** de escritorio: Figma no da el responsive.
+Flujo: Figma → `figma.mjs` → variante en el laboratorio → `lab:captura` → comparar con la imagen de Figma → pasar a `src/`.
+Pendiente: probado solo con datos inventados con la forma documentada de la API; falta un frame real (sustituir el de `src/__tests__/figma.test.mjs`).
+
+## 6. Cómo se usa (IAs)
 - Rediseño de pantalla → PB-B de `PLAYBOOK_AGENTES.md` + §1 de esta guía. Cambios de código en general → §2. Salida de comandos → §3.
 - Cualquier IA (Claude, Gemini/Antigravity) la lee bajo pedido, como `PLAN_*.md`; no hace falta instalar plugins.
 - Gemini MCP puede dar segunda opinión visual sobre capturas (su respuesta es entrada a verificar).

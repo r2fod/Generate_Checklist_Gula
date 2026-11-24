@@ -11,8 +11,8 @@
     "worker:build": "rolldown worker/index.js -o worker/pegar.js -f esm --platform neutral",
     "predeploy": "npm run test",
     "deploy": "gh-pages -d dist",
-    "test": "node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs && node src/__tests__/app.test.mjs",
-    "test:rapido": "npm run tipos && node src/__tests__/calculos.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs",
+    "test": "node src/__tests__/calculos.test.mjs && node src/__tests__/figma.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs && node src/__tests__/app.test.mjs",
+    "test:rapido": "npm run tipos && node src/__tests__/calculos.test.mjs && node src/__tests__/figma.test.mjs && node src/__tests__/asistente.test.mjs && npm run build && node src/__tests__/sincronizacion.test.mjs",
     "tipos": "tsc -p jsconfig.json",
     "medir": "node pruebas/medir.mjs",
     "reglas:deploy": "firebase deploy --only firestore:rules",
@@ -20,7 +20,9 @@
     "reglas:emulador": "firebase emulators:exec --only firestore \"node pruebas/reglas.test.mjs\"",
     "test:calc": "node src/__tests__/calculos.test.mjs",
     "test:sync": "node src/__tests__/sincronizacion.test.mjs",
-    "test:app": "node src/__tests__/app.test.mjs"
+    "test:app": "node src/__tests__/app.test.mjs",
+    "lab:captura": "node scripts/lab-captura.mjs",
+    "test:figma": "node src/__tests__/figma.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.17.1",
