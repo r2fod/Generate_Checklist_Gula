@@ -366,7 +366,8 @@ Claves de API fuera del bundle (repo público) — viven como secretos del Worke
   **Ojo con el ToS**: crear cuentas SOLO para esquivar el límite de cuota va contra las
   condiciones de Gemini; con cuentas reales del negocio no hay problema.
 - **Motores gratis en la cascada** (`enrutado.js` → `ORDEN`): Gemini, Groq, Cerebras,
-  Z.AI, Cloudflare Workers AI, Claude, OpenAI, Mistral, OpenRouter, NVIDIA. Todos hablan
+  Z.AI, Cloudflare Workers AI, GitHub Models (token `GITHUB_MODELS_TOKEN` de cuenta del
+  negocio; cupo bajo por cuenta, respaldo), Claude, OpenAI, Mistral, OpenRouter, NVIDIA. Todos hablan
   el dialecto de OpenAI (`dialectoOpenAI`) salvo Gemini/Claude, que tienen el suyo.
   `SIN_DATOS_DE_CLIENTES` (OpenAI, Mistral, OpenRouter, NVIDIA) excluye a los
   proveedores que pueden entrenar con lo recibido en su capa gratis — investigado con

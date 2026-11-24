@@ -1109,6 +1109,14 @@ const PROVEEDORES = {
 			modelo: env.NVIDIA_MODEL || "meta/llama-3.3-70b-instruct"
 		})
 	},
+	github: {
+		clave: "GITHUB_MODELS_TOKEN",
+		habla: (env) => dialectoOpenAI({
+			base: "https://models.github.ai/inference",
+			clave: env.GITHUB_MODELS_TOKEN,
+			modelo: env.GITHUB_MODELS_MODEL || "openai/gpt-4.1-mini"
+		})
+	},
 	cloudflare: {
 		clave: "CLOUDFLARE_API_TOKEN",
 		ademas: "CLOUDFLARE_ACCOUNT_ID",
@@ -1135,7 +1143,8 @@ async function estado(env) {
 		"OPENROUTER_API_KEY",
 		"NVIDIA_API_KEY",
 		"CLOUDFLARE_API_TOKEN",
-		"CLOUDFLARE_ACCOUNT_ID"
+		"CLOUDFLARE_ACCOUNT_ID",
+		"GITHUB_MODELS_TOKEN"
 	];
 	const puestas = {};
 	claves.forEach((k) => {

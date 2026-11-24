@@ -646,6 +646,13 @@ console.log("\n── Quién contesta cada pregunta ──");
     candidatos("cuanto hielo para 100 personas", gratisNuevos).includes("nvidia"),
     "pero para una cuenta suelta, sin datos, los tres sí pueden");
 
+  // GitHub Models: no entrena (según GitHub), puede ver datos de clientes; va tras Cloudflare
+  const conGithub = ["gemini", "cloudflare", "github"];
+  ok(candidatos("que eventos tengo en septiembre", conGithub).includes("github"),
+    "github no entrena: puede ver datos de clientes");
+  ok(ORDEN.indexOf("github") > ORDEN.indexOf("cloudflare") && !SIN_DATOS_DE_CLIENTES.includes("github"),
+    "github va de respaldo, tras los gratis sin cupo bajo");
+
   // El respaldo: qué merece reintentar con otro y qué no
   ["429 Too Many Requests", "quota exceeded", "RESOURCE_HAS_BEEN_EXHAUSTED", "503 unavailable", "overloaded"]
     .forEach(m => ok(mereceOtroIntento(m), `"${m.slice(0, 28)}" merece probar con otro`));
@@ -1992,7 +1999,7 @@ console.log("\n══ Quién elige la voz de Gemini (vozGemini.js + vozElegida) 
   let llamadas = 0;
   globalThis.fetch = async () => { llamadas++; throw new Error("no debería llamar a nadie"); };
   const sinNada = await salud({});
-  ok(sinNada.pings.length === 11 && sinNada.pings.every(p => p.estado === "sin configurar"),
+  ok(sinNada.pings.length === ORDEN.length && sinNada.pings.every(p => p.estado === "sin configurar"),
     "sin claves, dice qué falta en cada proveedor sin gastar ni un token");
   ok(llamadas === 0, "y de verdad no llamó a nadie");
 

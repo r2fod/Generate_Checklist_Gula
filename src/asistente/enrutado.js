@@ -26,7 +26,7 @@
 import { sinTildes } from "../texto.js";
 
 // El orden por defecto: primero lo gratis, luego lo bueno, luego lo limitado.
-export const ORDEN = ["gemini", "groq", "cerebras", "zai", "cloudflare", "claude", "openai", "mistral", "openrouter", "nvidia", "compatible"];
+export const ORDEN = ["gemini", "groq", "cerebras", "zai", "cloudflare", "github", "claude", "openai", "mistral", "openrouter", "nvidia", "compatible"];
 
 // Los que NO pueden ver datos de clientes. Es la misma regla que ya aplica el catálogo
 // de herramientas; aquí se usa para no mandarles ni la pregunta.
