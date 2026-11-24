@@ -8,6 +8,11 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **`GUIA_DISENO.md`**: destilado de UI UX Pro Max (reglas de diseño y checklist), Ponytail (escalera de "escribir poco") y RTK (salida de comandos compacta) adaptado a las reglas de Gula, para no instalar los tres plugins. Enlazada desde `PLAYBOOK_AGENTES.md` (PB-B) y `GEMINI.md`. Solo documentación, sin código.
+  - **`diseno/`**: copia de la base de datos de UI UX Pro Max (MIT, licencia incluida) reordenada por sector: 194 tipos de negocio en 9 sectores, 89 estilos, tipografías, landing, gráficos, movimiento y UX. Un `INDICE.md` dice qué sector leer para no cargar todo (Gula → `comida-eventos` + `gestion-herramientas`). Sin iconos ni Google Fonts (librerías) ni columna GSAP.
+  - **Laboratorio y Figma**: `diseno/lab/` (variantes HTML con tokens reales, solo en `npm run dev`) + `scripts/lab-captura.mjs` (Playwright a 320/1280, claro/oscuro) y `scripts/figma.mjs` (API REST de Figma con token en variable de entorno → frame comprimido y traducido a tokens). Sustituye instalar el conector de Figma.
+  - **`ub-mode` (unclebob, MIT) adaptado**: solo lo nuevo para Gula, como bloque "Disciplina al cambiar código" en `GUIA_DISENO.md` §2 (frontera, idempotencia, atacar la premisa, palanca, test de comportamiento, proteger contexto). No se adopta su "push a main" ni Crapper/Dryer/Mutator. Test `figma.test.mjs` con datos inventados de forma documentada: falta frame real.
+
 - **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
   - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
     (`aVistaProxima` → `enCurso`, "en curso"), y en la vista Equipo sale en CADA día que

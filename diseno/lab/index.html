@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laboratorio de diseño (solo desarrollo)</title>
+  <!-- Solo se sirve con `npm run dev`: no está en el build ni se publica.
+       Usa los tokens reales de la app. ?v=<variante>&tema=claro|oscuro -->
+  <link rel="stylesheet" href="/src/index.css">
+  <style>body { margin: 0; padding: 16px; background: var(--bg-color); color: var(--text-main); }</style>
+</head>
+<body>
+  <main id="lienzo"></main>
+  <script type="module">
+    const q = new URLSearchParams(location.search)
+    const v = (q.get('v') || '').replace(/[^a-z0-9-]/gi, '')
+    document.documentElement.dataset.tema = q.get('tema') === 'oscuro' ? 'oscuro' : 'claro'
+    const lienzo = document.getElementById('lienzo')
+    if (!v) {
+      const r = await fetch('variantes/indice.json').then((x) => x.json())
+      lienzo.innerHTML = '<h1>Variantes</h1><ul>' + r.map((n) => `<li><a href="?v=${n}">${n}</a> · <a href="?v=${n}&tema=oscuro">oscuro</a></li>`).join('') + '</ul>'
+    } else {
+      lienzo.innerHTML = await fetch(`variantes/${v}.html`).then((x) => x.text())
+    }
+    document.body.dataset.listo = '1'
+  </script>
+</body>
+</html>

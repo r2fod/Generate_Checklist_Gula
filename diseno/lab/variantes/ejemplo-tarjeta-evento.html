@@ -1,0 +1,13 @@
+<!-- Variante de ejemplo con datos inventados. Una variante = un fragmento HTML con CSS nativo y SOLO tokens de index.css. -->
+<style>
+  .lab-tarjeta { display: grid; gap: 8px; max-width: 420px; padding: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--card-bg); box-shadow: var(--shadow-sm); }
+  .lab-tarjeta h2 { margin: 0; font-size: var(--fs-xl); }
+  .lab-tarjeta p { margin: 0; font-size: var(--fs-md); color: var(--text-muted); }
+  .lab-tarjeta button { min-height: 44px; border: 0; border-radius: var(--radius-sm); background: var(--accent); color: #fff; font-size: var(--fs-base); cursor: pointer; }
+  .lab-tarjeta button:focus-visible { outline: 3px solid var(--accent-hover); outline-offset: 2px; }
+</style>
+<article class="lab-tarjeta">
+  <h2>Evento de prueba</h2>
+  <p>120 comensales · sábado 13:00</p>
+  <button type="button">Abrir checklist</button>
+</article>
