@@ -39,7 +39,7 @@
   4. `revisor (N2 · ecc-verification-loop)` → ejecuta las 6 fases del Verification Gate.
   5. `Coordinador` → registra instinto en `CONTEXTO.md` y hace commit/PR/merge.
 - **PB-B · Interfaz / CSS (`src/App.jsx`, `src/index.css`, `calendario/`, `asistente/`)**:
-  1. `buscador (N1)` → localiza JSX y selector CSS.
+  1. `buscador (N1)` → localiza JSX y selector CSS. Rediseños: seguir `GUIA_DISENO.md` §1 (prioridades + checklist).
   2. `implementador (N2)` → usa tokens `--fs-*`/`--radius-*`, CSS nativo, sin quitar datos/paneles.
   3. `implementador (N2)` → captura real 320px y escritorio, claro y oscuro (`animations: "disabled"`).
   4. `revisor (N2)` → `lint` + `tipos` + `test:rapido`.

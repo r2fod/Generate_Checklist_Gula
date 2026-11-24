@@ -8,6 +8,8 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **`GUIA_DISENO.md`**: destilado de UI UX Pro Max (reglas de diseño y checklist), Ponytail (escalera de "escribir poco") y RTK (salida de comandos compacta) adaptado a las reglas de Gula, para no instalar los tres plugins. Enlazada desde `PLAYBOOK_AGENTES.md` (PB-B) y `GEMINI.md`. Solo documentación, sin código.
+
 - **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
   - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
     (`aVistaProxima` → `enCurso`, "en curso"), y en la vista Equipo sale en CADA día que

@@ -23,6 +23,7 @@ React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 ## Orden de lectura e Índice Rápido por Líneas (para IA — no leer el archivo entero)
 
 > **Regla de eficiencia**: lee solo el rango `StartLine`–`EndLine` que necesites o delega la búsqueda en un subagente N1 (`flash_lite` / `haiku`, ver `PLAYBOOK_AGENTES.md`). `HISTORIAL.md` (>130 KB) se consulta solo con `grep`.
+> **Diseño/código/salida de comandos**: `GUIA_DISENO.md` (reglas de UI, escalera "escribir poco", comandos compactos). Sustituye instalar UI UX Pro Max, Ponytail y RTK.
 
 - **`L1–L155` · Arranque rápido**: Mapa del repo (`L35`), Revisión visual/Playwright (`L60`), Estilo de código y tokens CSS (`L75`), Comandos, CI y Proceso (`L98`).
 - **`L156–L265` · Arquitectura e Invariantes**: Firestore (`L160`), Identidad de ítem/apunte (`L188`), Cadena de datos (`L196`), Service Worker (`L207`).
