@@ -58,6 +58,18 @@ Scroll horizontal · anchos fijos en px · zoom deshabilitado · cambios de esta
 **Revisión** (equivale a `/ponytail-review`): leer el diff **y** el código que toca; por hallazgo → qué hace, qué sale mal, cómo arreglarlo, qué pasa si no. Buscar: bugs, seguridad, carga real, código de riesgo sin test, rutas lentas, qué recortar. **Auditoría** (`/ponytail-audit`): igual sobre todo el repo, empezando por mapa (entradas, flujo de datos, carga) y ordenado por importancia (arreglar ya / debería / opcional).
 **No aplicar** en `src/nube.js`, `firestore.rules`, `worker/` ni migraciones: ahí manda `PLAYBOOK_AGENTES.md` (N3) y la corrección va antes que la brevedad.
 
+**Disciplina al cambiar código** (de `ub-mode`, MIT; solo lo que Gula aún no tenía):
+- **Primero funciona, luego bien, luego práctica.** Una unidad pequeña cada vez, comprobada antes de la siguiente.
+- **Forma de los datos antes que la lógica** y una decisión en un solo sitio (ya es la regla de IDs y `estadoInicial.X ?? default`).
+- **Frontera**: validar donde entra el dato (JSON importado, formularios, `worker/`), dentro confiar; la lógica de negocio en funciones puras.
+- **Idempotente**: repetir una operación, o repetirla tras un fallo a medias, deja el mismo estado (migraciones, `nube.js`, "Traer" del calendario).
+- **Atacar la premisa**: si dos arreglos con la misma idea fallan en la misma prueba, escribir la premisa en una frase y quitarla antes de intentar un tercero.
+- **Construir la palanca**: si la tarea no es obvia, hacer una unidad a mano y luego un script que la repita igual (como `figma.mjs`, `lab-captura.mjs`).
+- **Test de comportamiento**: llama al código como lo usa la persona y mira lo que ve; si pasaría aunque todas las funciones devolvieran vacío, se tira.
+- **Proteger el contexto**: hilo principal pequeño; lo voluminoso (búsquedas, logs, lecturas largas) a un subagente y se queda solo el resumen.
+- **Log**: al terminar, lista breve de lo hecho y por qué.
+- **No adoptado**: "push a la rama principal al final" (aquí manda PR y la regla de fusión de `CLAUDE.md`) y las herramientas Crapper/Dryer/Mutator (no verificadas para este JS).
+
 ## 3. Menos tokens en la salida de comandos (de RTK)
 RTK es un binario; aquí se replica la idea a mano. Principios: solo fallos, agrupar, recortar, avisar de qué se cortó, **nunca ocultar el error** y conservar el código de salida.
 
