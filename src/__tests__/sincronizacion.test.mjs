@@ -613,7 +613,7 @@ console.log("\n══ Alquileres de producción y segundo camión ══");
     "el segundo camión se propone en bodas a partir de 81 invitados, con niños y sin staff");
 
   const nuevo = aRespuestasDeLaApp(produccion);
-  const material = estado => buildChecklist("produccion", 40, 0, 0, 0, estado).flatMap(c => c.items.filter(Boolean));
+  const material = estado => buildChecklist("produccion", 40, 0, 0, 0, estado).flatMap(c => c.items.filter(([, cantidad]) => cantidad != null));
   ok(!material(nuevo).some(([label]) => /Generador|Garrafa gasolina/.test(label)) && recogidasConAlquileres(nuevo).length === 0,
     "BUG evitado: un rodaje nuevo sin decidir no genera material ni recogidas de alquiler");
   const rodaje = aRespuestasDeLaApp({ ...produccion, furgoAlquiler: primero, generador: "si" });

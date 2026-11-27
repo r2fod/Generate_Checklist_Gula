@@ -22,7 +22,8 @@ import { colorPorDefecto } from "./manteles.js";
 import { calcPaella } from "./paella.js";
 import {
   DIAS_ANTES_RECOGIDA, DIAS_DESPUES_DEVOLUCION,
-  sumaDias, conceptoAlquiler, recogidasConAlquileres,
+  sumaDias, conceptoAlquiler, conceptoVehiculo, decisionGenerador, proponeSegundoCamion,
+  PROVEEDORES_VEHICULO, SIN_ALQUILER_VEHICULO, recogidasConAlquileres, sincronizaRecogidaAlquiler,
 } from "./alquileres.js";
 import {
   nubeActiva, nuevoIdEvento, guardarEventoNube, borrarEventoNube, suscribirEventoNube,
@@ -574,7 +575,9 @@ export default function App({ onCerrarSesion } = {}) {
   // que empiezan apagadas: nadie que abra una boda de antes de esta pregunta se
   // encuentra carpas que no pidió.
   const [llevaCarpas, setLlevaCarpas]               = useState(estadoInicial.llevaCarpas ?? ((estadoInicial.evento ?? "boda") === "produccion"));
-  const [llevaGenerador, setLlevaGenerador]         = useState(estadoInicial.llevaGenerador ?? true);
+  const [llevaGenerador, setLlevaGenerador]         = useState(decisionGenerador(estadoInicial));
+  const [furgoAlquiler, setFurgoAlquiler] = useState(estadoInicial.furgoAlquiler ?? null);
+  const [segundoCamion, setSegundoCamion] = useState(estadoInicial.segundoCamion ?? null);
   // Mobiliario de alquiler (Event Style): mesas altas, sofás, muebles de barra... No es
   // material nuestro, así que además de salir en la carga hay que ir a por él y devolverlo.
   const [llevaMobiliarioAlquiler, setLlevaMobiliarioAlquiler] = useState(estadoInicial.llevaMobiliarioAlquiler ?? false);
@@ -985,7 +988,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaArmarioCaliente, llevaMesasCalientes, llevaPlanchaGas, numPlanchasGas, llevaPlatos, llevaPlatosPostre, llevaCubiertos, numCamareros, paxPorCamarero, numStaff, tipoBandejas, numGastros, numMesasBuffet, platosBuffet, numTronas, llevaCornerVermut, llevaCornerAperol,
     tipoHorno, tipoBBQ, barbacoasLadrillo, barbacoasRedondas, barbacoasRectangular, estacion, mesVerano,
     tieneFrituras, numFrituras, fuerzaTextilTela, llevaChillOut, numChillOut,
-    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador,
+    llevaPalomitera, llevaJarrasCristal, llevaCristaleria, llevaHielo, llevaBebida, tipoCafetera, cafeParaInvitados, llevaCarpas, llevaGenerador, furgoAlquiler, segundoCamion,
     llevaMobiliarioAlquiler, proveedorMobiliarioAlquiler, archivosAlquiler,
     alquilaCarpas, numCarpas, llevaParabanes, numParabanes, numBarras, tieneBrindisCava, colorManteles, porcentajeBeige,
     extraBandejasMadera, extraBandejasPlata, llevaJamonero, llevaTarta,
@@ -1100,6 +1103,7 @@ export default function App({ onCerrarSesion } = {}) {
     llevaPalomitera: setLlevaPalomitera, llevaJarrasCristal: setLlevaJarrasCristal, llevaCristaleria: setLlevaCristaleria, llevaHielo: setLlevaHielo, llevaBebida: setLlevaBebida, tipoCafetera: setTipoCafetera,
     cafeParaInvitados: setCafeParaInvitados,
     llevaCarpas: setLlevaCarpas, llevaGenerador: setLlevaGenerador,
+    furgoAlquiler: setFurgoAlquiler, segundoCamion: setSegundoCamion,
     llevaMobiliarioAlquiler: setLlevaMobiliarioAlquiler, proveedorMobiliarioAlquiler: setProveedorMobiliarioAlquiler,
     archivosAlquiler: setArchivosAlquiler,
     alquilaCarpas: setAlquilaCarpas, numCarpas: setNumCarpas,
@@ -1282,34 +1286,14 @@ export default function App({ onCerrarSesion } = {}) {
   // para lo mismo. Sin esto, la de las sillas salía DUPLICADA en los eventos donde ya
   // había una a mano ("Recoger sillas Dealde"): la automática no la reconocía como
   // suya y creaba otra al lado, con otra fecha. Dos avisos para una sola cosa.
-  const sincronizaAlquiler = (clave, activo, concepto, yaEscritaAMano = null) => {
-    setRecogidas(prev => {
-      const i = prev.findIndex(r => r.auto === clave);
-      if (activo && i === -1 && yaEscritaAMano
-          && prev.some(r => !r.auto && yaEscritaAMano.test(String(r.concepto || "")))) {
-        return prev; // ya hay una escrita a mano para esto: manda la suya
-      }
-      if (activo) {
-        // Ya existe: se refresca el nombre (p. ej. al cambiar de proveedor) y, si las
-        // fechas seguían en automático, se mueven con la nueva fecha del evento.
-        if (i !== -1) return prev.map((r, idx) => idx === i ? {
-          ...r,
-          concepto,
-          ...(r.fechasAuto ? {
-            fecha: sumaDias(fechaEvento, -DIAS_ANTES_RECOGIDA),
-            fechaDevolucion: sumaDias(fechaEvento, DIAS_DESPUES_DEVOLUCION),
-          } : {}),
-        } : r);
-        return [...prev, {
-          concepto, hora: "",
-          fecha: sumaDias(fechaEvento, -DIAS_ANTES_RECOGIDA),
-          fechaDevolucion: sumaDias(fechaEvento, DIAS_DESPUES_DEVOLUCION),
-          auto: clave, fechasAuto: true,
-        }];
-      }
-      if (i === -1 || prev[i].recogido || prev[i].devuelto) return prev;
-      return prev.filter((_, idx) => idx !== i);
-    });
+  const sincronizaAlquiler = (clave, activo, concepto, patronManual) => {
+    setRecogidas(prev => sincronizaRecogidaAlquiler(prev, clave, activo ? concepto : null, fechaEvento, patronManual));
+  };
+  const cambiarVehiculoAlquiler = (clave, guardar, valor) => {
+    const decision = valor === "No hace falta" ? SIN_ALQUILER_VEHICULO : valor;
+    const concepto = conceptoVehiculo(clave, decision);
+    guardar(decision);
+    sincronizaAlquiler(clave, Boolean(concepto), concepto);
   };
   // Las sillas son alquiler POR DEFECTO ("Dealde"), pero su recogida solo se creaba si
   // alguien tocaba el selector con el dedo. Un evento nuevo, o uno que llega del
@@ -1349,24 +1333,25 @@ export default function App({ onCerrarSesion } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proveedorMobiliarioAlquiler]);
 
-  // El generador de las producciones viene marcado de serie (siempre se lleva uno), así
-  // que su recogida se crea al elegir el tipo de evento, que es cuando entra en juego —
-  // si no, el único alquiler que nadie llega a pulsar sería justo el que más se olvida.
+  // Al cambiar el tipo se actualizan solo los alquileres propios de ese tipo.
   // Al salir de producción se retiran el generador y las carpas de alquiler, que solo
   // existen ahí.
   // Si las carpas las encendió solas el paso a producción (no alguien a mano)
   const carpasDeProduccionRef = React.useRef(false);
   const handleCambiarTipoEvento = (tipo) => {
     setEvento(tipo);
+    if (tipo !== "boda") sincronizaAlquiler("segundoCamion", false);
     if (tipo === "produccion") {
       // Un rodaje es casi siempre al aire libre: si nadie las ha tocado, las carpas
-      // empiezan activadas al entrar en producción, igual que el generador — el
+      // empiezan activadas al entrar en producción. El
       // interruptor sigue estando para el sitio puntual que ya tiene sombra propia.
       // Fuera de producción empiezan apagadas (estado inicial de llevaCarpas), así que
       // sin este empujón un evento que arrancó boda y cambia a rodaje se quedaría sin
       // ellas aunque siempre las llevara.
       if (!llevaCarpas) { setLlevaCarpas(true); carpasDeProduccionRef.current = true; }
       if (llevaGenerador) sincronizaAlquiler("generador", true, conceptoAlquiler("generador"));
+      const furgo = conceptoVehiculo("furgoAlquiler", furgoAlquiler);
+      if (furgo) sincronizaAlquiler("furgoAlquiler", true, furgo);
       // En un rodaje no se alquila mobiliario: si venía marcado, se apaga con su recogida
       if (llevaMobiliarioAlquiler) {
         setLlevaMobiliarioAlquiler(false);
@@ -1375,6 +1360,9 @@ export default function App({ onCerrarSesion } = {}) {
       return;
     }
     sincronizaAlquiler("generador", false);
+    sincronizaAlquiler("furgoAlquiler", false);
+    const camion = conceptoVehiculo("segundoCamion", segundoCamion);
+    if (tipo === "boda" && camion) sincronizaAlquiler("segundoCamion", true, camion);
     if (alquilaCarpas) { setAlquilaCarpas(false); sincronizaAlquiler("carpas", false); }
     // Las carpas que puso solas la producción se van con ella: una boda que pasó por
     // "Producción" sin querer se quedaba con carpas, paredes y pesas. Las que alguien
@@ -4557,18 +4545,31 @@ export default function App({ onCerrarSesion } = {}) {
                 }}
                 options={Object.keys(TIPOS_MESA)}
               />
-              {/* El generador de las producciones siempre es alquilado (SOS), así que su
-                  interruptor vive aquí y no en Equipamiento: al marcarlo hay que ir a
-                  buscarlo y devolverlo, no solo cargarlo. */}
               {evento === "produccion" && (
+                <>
+                  <SegmentedControl
+                    label={furgoAlquiler == null ? "¿Alquilar furgoneta? · Por revisar" : "Furgoneta de alquiler"}
+                    value={furgoAlquiler === SIN_ALQUILER_VEHICULO ? "No hace falta" : furgoAlquiler}
+                    onChange={valor => cambiarVehiculoAlquiler("furgoAlquiler", setFurgoAlquiler, valor)}
+                    options={[...PROVEEDORES_VEHICULO, "No hace falta"]}
+                  />
+                  <SegmentedControl
+                    label={llevaGenerador == null ? "¿Alquilar generador a SOS? · Por revisar" : "Generador · Support On Set (SOS)"}
+                    value={llevaGenerador == null ? "" : llevaGenerador ? "Lleva" : "No lleva"}
+                    onChange={v => {
+                      setLlevaGenerador(v === "Lleva");
+                      sincronizaAlquiler("generador", v === "Lleva", conceptoAlquiler("generador"));
+                    }}
+                    options={["Lleva", "No lleva"]}
+                  />
+                </>
+              )}
+              {(proponeSegundoCamion(evento, pax, ninos) || (evento === "boda" && segundoCamion != null)) && (
                 <SegmentedControl
-                  label="Generador"
-                  value={llevaGenerador ? "Lleva" : "No lleva"}
-                  onChange={v => {
-                    setLlevaGenerador(v === "Lleva");
-                    sincronizaAlquiler("generador", v === "Lleva", conceptoAlquiler("generador"));
-                  }}
-                  options={["Lleva", "No lleva"]}
+                  label={segundoCamion == null ? "Segundo camión · Por revisar" : "Segundo camión de alquiler"}
+                  value={segundoCamion === SIN_ALQUILER_VEHICULO ? "No hace falta" : segundoCamion}
+                  onChange={valor => cambiarVehiculoAlquiler("segundoCamion", setSegundoCamion, valor)}
+                  options={[...PROVEEDORES_VEHICULO, "No hace falta"]}
                 />
               )}
               <label className="checkbox-label-normal">

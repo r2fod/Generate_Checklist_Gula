@@ -138,21 +138,8 @@ export const PREGUNTAS = [
     soloEn: ["produccion"],
   },
 
-  {
-    id: "segundoCamion", tipo: "opciones", texto: "¿Alquilar un segundo camión?",
-    nota: "Para bodas de más de 80 invitados, valora si hará falta otro camión.",
-    opciones: OPCIONES_VEHICULO,
-    soloEn: ["boda"],
-    si: r => proponeSegundoCamion("boda", r.adultos, r.ninos),
-  },
 
   // ── El sitio y su mobiliario de exterior ──────────────────────────────────
-  {
-    id: "furgoAlquiler", tipo: "opciones", texto: "¿Alquilar una furgoneta?",
-    nota: "Al elegir proveedor, se prepara la recogida y la devolución.",
-    opciones: OPCIONES_VEHICULO,
-    soloEn: ["produccion"],
-  },
   {
     // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
     // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
@@ -986,6 +973,20 @@ export const PREGUNTAS = [
     // ejemplos: tienen su propia pantalla justo antes.
     nota: "Peticiones del cliente, alguna bebida que haya que añadir, con quién hablar en el sitio...",
     noSe: false,
+  },
+  // Los borradores guardan el número de paso: las preguntas nuevas van al final.
+  {
+    id: "segundoCamion", tipo: "opciones", texto: "¿Alquilar un segundo camión?",
+    nota: "Para bodas de más de 80 invitados, valora si hará falta otro camión.",
+    opciones: OPCIONES_VEHICULO,
+    soloEn: ["boda"],
+    si: r => proponeSegundoCamion("boda", r.adultos, r.ninos),
+  },
+  {
+    id: "furgoAlquiler", tipo: "opciones", texto: "¿Alquilar una furgoneta?",
+    nota: "Al elegir proveedor, se prepara la recogida y la devolución.",
+    opciones: OPCIONES_VEHICULO,
+    soloEn: ["produccion"],
   },
 ];
 
