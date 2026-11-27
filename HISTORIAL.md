@@ -8,6 +8,8 @@ Una entrada nueva va **arriba de "Lo hecho"**, corta y con el porqué.
 
 ## Lo hecho
 
+- **Alquileres por evento**. Checklist y formulario proponen furgoneta y generador en producción, y segundo camión en bodas con más de 80 invitados. La recogida automática se crea al elegir el alquiler. Las preguntas nuevas preservan el paso de los borradores antiguos.
+
 - **Calendario: la auditoría E1 de PLAN_MEJORAS**, revisada el 26/10 (los cinco vivos):
   - **Un evento de varios días** (`hasta`) sigue en "Lo que viene" mientras dura
     (`aVistaProxima` → `enCurso`, "en curso"), y en la vista Equipo sale en CADA día que

@@ -2302,7 +2302,9 @@ async function main() {
       // que una de las tres opciones siempre coincide con lo que hay puesto. Además su
       // etiqueta cambia al elegir ("Temporada · ahora verano" → "Temporada"). Tiene su
       // propia comprobación, más completa, en la sección de temporada.
-      if (/^Temporada/.test(g.label)) continue;
+      // Los alquileres opcionales parten pendientes y se verifican en su propio bloque,
+      // que comprueba las recogidas además del material que se carga.
+      if (/^Temporada|^Segundo camión|^¿Alquilar (?:furgoneta|generador)/.test(g.label)) continue;
       const boton = (txt) => page.locator(".segment-group", { hasText: g.label }).first()
         .locator(".segment-btn", { hasText: new RegExp(`^${escapa(txt)}$`) }).first();
       for (const op of g.opciones) {
@@ -5168,12 +5170,18 @@ async function main() {
     ok(await p.locator(".item-row").filter({ hasText: "Mobiliario (alquiler Event Style)" }).count() === 1,
       "y el mobiliario alquilado sale en la carga");
 
-    // En producción el generador (marcado de serie) y las carpas que falten van a SOS,
-    // y el mobiliario extra ni se ofrece
+    // El generador de una producción se propone. Solo se añade tras elegirlo,
+    // y el mobiliario extra deja de ofrecerse.
     await p.locator("select.form-select").first().selectOption("produccion");
     await p.waitForTimeout(1000);
     ok(await p.locator(".checkbox-label-normal", { hasText: "Mobiliario extra" }).count() === 0,
       "en un rodaje no se ofrece mobiliario de Event Style");
+    ok(!(await tarjetas()).some(x => x.concepto === "Generador (Support On Set)"),
+      "BUG evitado: entrar en producción no crea el alquiler del generador hasta confirmarlo");
+    await p.locator(".segment-group", { hasText: "¿Alquilar generador a SOS?" }).getByRole("button", { name: "Lleva", exact: true }).click();
+    const grupoFurgo = p.locator(".segment-group", { hasText: "¿Alquilar furgoneta?" });
+    const proveedorFurgo = (await grupoFurgo.getByRole("button").first().innerText()).trim();
+    await grupoFurgo.getByRole("button", { name: proveedorFurgo, exact: true }).click();
     await casilla("Carpas de alquiler").check();
     await p.waitForTimeout(700);
     t = await tarjetas();
@@ -5183,6 +5191,9 @@ async function main() {
       `las carpas de alquiler van a SOS → ${JSON.stringify(t.map(x => x.concepto))}`);
     ok(t.some(x => x.concepto === "Generador (Support On Set)" && x.fechas[0] === "2027-09-19"),
       `el generador de producción crea su recogida en SOS → ${JSON.stringify(t.map(x => x.concepto))}`);
+
+    ok(t.some(x => x.concepto === `Furgoneta (${proveedorFurgo})`),
+      "elegir proveedor crea la recogida de la furgoneta en producción");
 
     // Separar los alquileres en el formulario NO los saca de la lista: se cargan y se
     // devuelven como todo lo demás, así que tienen que estar en Modo carga para marcarlos

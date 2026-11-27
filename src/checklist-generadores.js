@@ -943,7 +943,7 @@ function buildChecklistProduccion(pax, horasCoctel, horasCopas, ninos, opts) {
     tipoPaella, numPaellas = 0, numCamareros, numStaff = 0, fuerzaTextilTela, origenSillas = "",
     tipoMesa = TIPO_MESA_POR_DEFECTO,
     llevaChillOut, numChillOut = 1, tipoHorno = "pequeño",
-    llevaCarpas = true, llevaGenerador = true, mesVerano = true, llevaParabanes = false, numParabanes,
+    llevaCarpas = true, llevaGenerador = false, mesVerano = true, llevaParabanes = false, numParabanes,
     numMesasBuffet = 0, llevaHielo = true,
   } = opts;
   const { label: labelSillas, esAlquiler: esAlquilerSillas } = sillasAlquiler(origenSillas);

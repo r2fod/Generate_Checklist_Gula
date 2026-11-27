@@ -592,6 +592,60 @@ console.log("\n══ Alquileres → recogidas, sin pantalla ══");
     `cambiar de proveedor renombra y respeta la fecha puesta a mano → ${JSON.stringify(cambiado[0])}`);
 }
 
+// ── Decisiones de alquiler para producciones y bodas ──────────────────────────
+console.log("\n══ Alquileres de producción y segundo camión ══");
+{
+  const { recogidasConAlquileres } = await import("../alquileres.js");
+  const { buildChecklist } = await import("../checklist-generadores.js");
+  const { aRespuestasDeLaApp, preguntasDe } = await import("../formulario/preguntas.js");
+  const { resumirParaOficina } = await import("../formulario/envios.js");
+  const fecha = "2027-09-05";
+  const produccion = { tipo: "produccion", fecha };
+  const boda = { tipo: "boda", fecha, adultos: 79, ninos: 2 };
+  const pregunta = (r, id) => preguntasDe(r.tipo, r).find(p => p.id === id);
+  const proveedores = pregunta(produccion, "furgoAlquiler")?.opciones.filter(o => o.valor !== "no") || [];
+  const [primero, segundo] = proveedores.map(o => o.valor);
+  ok(proveedores.length === 2 && !pregunta(boda, "furgoAlquiler") && !pregunta(boda, "generador"),
+    "la furgo admite dos proveedores en producción y solo producción pregunta por furgo y generador");
+  ok(pregunta(boda, "segundoCamion")?.opciones.some(o => o.valor === segundo)
+    && !pregunta({ ...boda, ninos: 1, staff: 10 }, "segundoCamion")
+    && !pregunta({ ...boda, tipo: "corporativo" }, "segundoCamion"),
+    "el segundo camión se propone en bodas a partir de 81 invitados, con niños y sin staff");
+
+  const nuevo = aRespuestasDeLaApp(produccion);
+  const material = estado => buildChecklist("produccion", 40, 0, 0, 0, estado).flatMap(c => c.items.filter(([, cantidad]) => cantidad != null));
+  ok(!material(nuevo).some(([label]) => /Generador|Garrafa gasolina/.test(label)) && recogidasConAlquileres(nuevo).length === 0,
+    "BUG evitado: un rodaje nuevo sin decidir no genera material ni recogidas de alquiler");
+  const rodaje = aRespuestasDeLaApp({ ...produccion, furgoAlquiler: primero, generador: "si" });
+  const recogidas = recogidasConAlquileres(rodaje);
+  ok(recogidas.some(r => r.auto === "furgoAlquiler" && r.fecha === "2027-09-04" && r.fechaDevolucion === "2027-09-06")
+    && recogidas.some(r => r.auto === "generador") && material(rodaje).some(([label]) => label === "Generador"),
+    "confirmar los alquileres crea las recogidas existentes con sus fechas");
+  const sinRespuesta = aRespuestasDeLaApp({ ...produccion, furgoAlquiler: null, generador: null });
+  ok(!("furgoAlquiler" in sinRespuesta) && !("llevaGenerador" in sinRespuesta)
+    && recogidasConAlquileres({ ...rodaje, ...sinRespuesta, recogidas }).length === 2,
+    "un segundo envío con respuestas pendientes conserva las decisiones y recogidas guardadas");
+
+  const manual = { concepto: "Recoger furgoneta", fecha: "2027-09-03", hora: "12:00" };
+  const conManual = recogidasConAlquileres({ ...rodaje, recogidas: [manual] });
+  ok(conManual.includes(manual) && !conManual.some(r => r.auto === "furgoAlquiler"),
+    "una reserva manual de furgo conserva sus datos y evita otra recogida");
+  const confirmado = aRespuestasDeLaApp({ ...boda, segundoCamion: segundo });
+  ok(recogidasConAlquileres({ ...confirmado, recogidas: [{ concepto: "Camión" }] }).length === 2,
+    "el camión principal apuntado a mano no ocupa el lugar del segundo");
+  ok(!("segundoCamion" in aRespuestasDeLaApp({ ...boda, ninos: 1, segundoCamion: segundo })),
+    "una respuesta oculta y residual no se aplica en una boda de 80 invitados");
+  ok(recogidasConAlquileres({ ...rodaje, ...aRespuestasDeLaApp({ ...produccion, furgoAlquiler: "no", generador: "no" }), recogidas }).length === 0,
+    "decir que no los necesita retira las recogidas automáticas pendientes");
+
+  const [oficina] = resumirParaOficina({
+    "Rodaje de prueba": { ...rodaje, formularioRespuestas: { generador: "no", furgoAlquiler: segundo, notas: "privadas" } },
+  }, "2027-01-01");
+  ok(oficina?.respuestasPrevias?.generador === "si" && oficina.respuestasPrevias.furgoAlquiler === primero
+    && !("notas" in oficina.respuestasPrevias),
+    "la oficina recupera las decisiones guardadas del evento aunque sean posteriores al último envío");
+}
+
 // ── Un envío, leído en la bandeja ─────────────────────────────────────────────
 // Quien revisa el envío tiene que leer lo mismo que vio quien lo mandó, y sobre todo
 // tiene que distinguir "han dicho que no" de "no lo saben": lo segundo es lo que hay

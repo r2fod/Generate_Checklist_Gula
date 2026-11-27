@@ -1,6 +1,6 @@
 # Playbook de Agentes y Enrutado Automático (`PLAYBOOK_AGENTES.md`)
 > Orquestación híbrida **Coordinador + ECC (Everything Claude Code) + Karpathy** para **Antigravity** y **Claude Code**.
-> Espejo global en `~/.gemini/GEMINI.md`, plugin nativo `~/.gemini/config/plugins/ecc-coordinador-plugin/` y `~/.claude/` (`CLAUDE.md` + `agents/`).
+> Espejo global en `~/.gemini/GEMINI.md`, skill compartida `protocolo-ingenieria` y `~/.claude/` (`CLAUDE.md` + `agents/`).
 
 ## 1. COORDINADOR (Sesión Principal)
 - **Flujo**: **Think Before Coding** → Clasificar subtarea (N1/N2/N3) → delegar al modelo mínimo viable (`invoke_subagent` en Antigravity / `Task` en Claude) → pasar **Verification Gate de 6 fases (ECC)** → **único que hace commit/merge/push**.
@@ -24,19 +24,19 @@
   - **Uso**: `grep`/búsquedas, localizar `archivo:línea` en ficheros `>200L` (`src/App.jsx`, `CONTEXTO.md`, `HISTORIAL.md`), cruzar calendario Drive↔App, resumir `test.log`, auditar que no haya secretos ni datos reales en `git diff`.
 - **N2 · Medio (`$$`) — `implementador` (TDD Quirúrgico) y `revisor` (Verification Gate)**
   - **Modelos**: Antigravity `Model: "flash"` o `"inherit"` (`TypeName: "self"`) | Claude `subagent_type: "implementador"` / `"revisor"` (`model: "sonnet"`).
-  - **Skills Antigravity asociadas**: `ecc-tdd-surgical`, `ecc-verification-loop`.
+  - **Skills Antigravity asociadas**: `protocolo-ingenieria` (TDD y verificación).
   - **Uso**: desduplicar funciones (`src/checklist-generadores.js`), fórmulas en `src/calculos.js` + `calculos.test.mjs`, UI con tokens `--fs-*`/`--radius-*`, herramientas en `src/asistente/`, capturas Playwright, correr `lint` + `tipos` + `test:rapido` (respetando **File Lock**: nadie edita mientras corre).
 - **N3 · Caro (`$$$`) — `arquitecto` (Arquitectura / Sincronización / Seguridad OWASP)**
   - **Modelos**: Antigravity `Model: "pro"` (`TypeName: "self"`) | Claude `subagent_type: "arquitecto"` (`model: "opus"`) + 2ª opinión MCP `google-gemini`.
-  - **Skills Antigravity asociadas**: `ecc-security-architect`, `ecc-instinct-learning`.
+  - **Skills Antigravity asociadas**: `protocolo-ingenieria` (seguridad y lecciones).
   - **Uso**: `src/nube.js` (las 3 guardias: `archivoListo`, `id` determinista, escritura única en lote), migración de claves (`${categoría}::${labelOriginal}`), seguridad (`firestore.rules`, SSRF + `::ffff:` + redirects en `worker/`, DOM XSS, Prototype Pollution en JSON importado), diseño de `PLAN_COCINA.md` y `PLAN_INVENTARIO.md`.
 
 ## 4. PLAYBOOKS (Recetas de Ejecución)
 - **PB-A · Cálculo o Refactor (`src/calculos.js`, `checklist-generadores.js`)**:
   1. `buscador (N1)` → localiza líneas en código y `src/__tests__/calculos.test.mjs`.
   2. `Coordinador` → confirma criterio de negocio con el dueño si cambia cantidades de carga.
-  3. `implementador (N2 · ecc-tdd-surgical)` → edita función compartida (0 duplicación, inmutable) + añade/actualiza test unitario.
-  4. `revisor (N2 · ecc-verification-loop)` → ejecuta las 6 fases del Verification Gate.
+  3. `implementador (N2 · protocolo-ingenieria)` → edita función compartida (0 duplicación, inmutable) + añade/actualiza test unitario.
+  4. `revisor (N2 · protocolo-ingenieria)` → ejecuta las 6 fases del Verification Gate.
   5. `Coordinador` → registra instinto en `CONTEXTO.md` y hace commit/PR/merge.
 - **PB-B · Interfaz / CSS (`src/App.jsx`, `src/index.css`, `calendario/`, `asistente/`)**:
   1. `buscador (N1)` → localiza JSX y selector CSS.
@@ -45,12 +45,12 @@
   4. `revisor (N2)` → `lint` + `tipos` + `test:rapido`.
 - **PB-C · Plan Grande (`PLAN_COCINA.md`, `PLAN_INVENTARIO.md`)**:
   1. `buscador (N1)` → extrae puntos de unión con `nube.js`, `precios.js`, `checklist-generadores.js`.
-  2. `arquitecto (N3 · ecc-security-architect)` → define esquema Firestore, IDs y divide en PRs pequeños.
+  2. `arquitecto (N3 · protocolo-ingenieria)` → define esquema Firestore, IDs y divide en PRs pequeños.
   3. `implementador (N2)` → implementa cada entrega con TDD.
 - **PB-D · Datos de Calendario (Drive ↔ App)**:
   1. `buscador (N1)` → cruza por `fecha` + título normalizado (`sinTildes`/`claveDeTexto`).
   2. `Coordinador` → entrega JSON al dueño en el chat. **Jamás en git**.
 - **PB-E · Seguridad / `nube.js` / `worker/` / `firestore.rules`**:
-  1. `arquitecto (N3 · ecc-security-architect)` → audita y parchea SSRF (`::ffff:`, redirects), XSS, `__proto__` y guardias de Firestore.
+  1. `arquitecto (N3 · protocolo-ingenieria)` → audita y parchea SSRF (`::ffff:`, redirects), XSS, `__proto__` y guardias de Firestore.
   2. `implementador (N2)` → si toca `worker/`, corre `npm run worker:build` (`worker/pegar.js`) + test de regresión.
   3. `Coordinador` → **NO fusiona a `main` sin revisión humana del dueño**.
