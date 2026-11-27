@@ -8,10 +8,44 @@ export const ALQUILERES = {
   mesas:           { etiqueta: "Mesas redondas" }, // solo si se eligen redondas: las rectangulares son nuestras
   armarioCaliente: { etiqueta: "Armario caliente", proveedor: "Dealde" },
   mobiliario:      { etiqueta: "Mobiliario", proveedor: "Event Style" },
+  segundoCamion:  { etiqueta: "Segundo camión" },
   // Solo en producciones
+  furgoAlquiler:   { etiqueta: "Furgoneta" },
   generador:       { etiqueta: "Generador", proveedor: "Support On Set" },
   carpas:          { etiqueta: "Carpas", proveedor: "Support On Set" },
 };
+export const PROVEEDORES_VEHICULO = ["Albacar", "Covey"];
+export const SIN_ALQUILER_VEHICULO = "no";
+
+/** @param {unknown} valor */
+export function esDecisionVehiculo(valor) {
+  return valor === SIN_ALQUILER_VEHICULO || PROVEEDORES_VEHICULO.some(proveedor => proveedor === valor);
+}
+
+/** @param {string} evento @param {string|number} pax @param {string|number} [ninos] */
+export function proponeSegundoCamion(evento, pax, ninos = 0) {
+  return evento === "boda" && (Number(pax) || 0) + (Number(ninos) || 0) > 80;
+}
+
+/** @param {string} clave @param {string|null} [decision] */
+export function conceptoVehiculo(clave, decision) {
+  return decision && PROVEEDORES_VEHICULO.includes(decision) ? conceptoAlquiler(clave, decision) : null;
+}
+
+/** @param {Record<string, any>} [estado] */
+export function decisionGenerador(estado = {}) {
+  if (typeof estado.llevaGenerador === "boolean") return estado.llevaGenerador;
+  return estado.recogidas?.some?.((/** @type {Record<string, any>} */ r) => r?.auto === "generador") ? true : null;
+}
+
+// Las reservas previas pueden estar escritas a mano. Un camión sin más es el
+// principal y no sirve para dar por reservado el segundo.
+const RESERVAS_A_MANO = {
+  furgoAlquiler: /\bfurgo(?:neta)?\b/i,
+  generador: /\bgenerador\b/i,
+  segundoCamion: /(?:segundo cami[oó]n|cami[oó]n\s*(?:n[º°.]?\s*)?(?:2\b|extra\b|adicional\b))/i,
+};
+
 // Cuántos días antes se recoge y cuántos después se devuelve
 export const DIAS_ANTES_RECOGIDA = 1, DIAS_DESPUES_DEVOLUCION = 1;
 
@@ -43,49 +77,46 @@ function alquileresDe(estado = {}) {
     armarioCaliente: estado.llevaArmarioCaliente ? conceptoAlquiler("armarioCaliente") : null,
     // Mobiliario de Event Style no se lleva a rodajes; generador y carpas son solo de rodaje
     mobiliario: (!esProduccion && estado.llevaMobiliarioAlquiler) ? conceptoAlquiler("mobiliario", estado.proveedorMobiliarioAlquiler) : null,
-    generador: (esProduccion && estado.llevaGenerador) ? conceptoAlquiler("generador") : null,
+    furgoAlquiler: esProduccion ? conceptoVehiculo("furgoAlquiler", estado.furgoAlquiler) : null,
+    generador: esProduccion && decisionGenerador(estado) ? conceptoAlquiler("generador") : null,
+    segundoCamion: estado.evento === "boda" ? conceptoVehiculo("segundoCamion", estado.segundoCamion) : null,
     carpas: (esProduccion && estado.llevaCarpas && estado.alquilaCarpas) ? conceptoAlquiler("carpas") : null,
   };
 }
 
-// Deja las recogidas de un evento a juego con sus alquileres, sin tocar la pantalla.
-// sincronizaAlquiler() hace esto mismo interruptor a interruptor; esta versión lo hace
-// de una vez sobre un estado suelto, que es lo que hace falta al aplicar un envío del
-// formulario: configura varios alquileres a la vez sobre un evento que ni siquiera está
-// abierto, y sin esto la app cargaría el material pero nadie iría a buscarlo.
-// Las escritas a mano no se tocan nunca, y las automáticas ya recogidas o devueltas
-// tampoco se quitan: eso ya ha pasado.
+// Sirve tanto al pulsar un alquiler como al aplicar un envío del formulario. Los
+// apuntes manuales mandan y los alquileres que ya pasaron conservan su historial.
 /**
- * @param {Record<string, any>} [estado]
- * @returns {Array<Record<string, any>>} las recogidas del evento, a juego con sus alquileres
+ * @param {Array<Record<string, any>>} previas
+ * @param {string} clave
+ * @param {string|null} concepto
+ * @param {string} fechaEvento
+ * @param {RegExp} [patronManual]
  */
+export function sincronizaRecogidaAlquiler(previas, clave, concepto, fechaEvento, patronManual) {
+  if (!concepto) return previas.filter(r => r.auto !== clave || r.recogido || r.devuelto);
+
+  const fechas = {
+    fecha: sumaDias(fechaEvento, -DIAS_ANTES_RECOGIDA),
+    fechaDevolucion: sumaDias(fechaEvento, DIAS_DESPUES_DEVOLUCION),
+  };
+  if (previas.some(r => r.auto === clave)) {
+    return previas.map(r => r.auto === clave
+      ? { ...r, concepto, ...(fechaEvento && r.fechasAuto ? fechas : {}) }
+      : r);
+  }
+  const patron = patronManual || RESERVAS_A_MANO[/** @type {keyof typeof RESERVAS_A_MANO} */ (clave)];
+  if (patron && previas.some(r => !r.auto && patron.test(String(r.concepto || "")))) return previas;
+  return [...previas, { concepto, hora: "", ...fechas, auto: clave, fechasAuto: true }];
+}
+
+/** @param {Record<string, any>} [estado] */
 export function recogidasConAlquileres(estado = {}) {
   const previas = Array.isArray(estado.recogidas) ? estado.recogidas : [];
-  const quiere = alquileresDe(estado);
-  const fecha = estado.fechaEvento || "";
-  const resultado = previas.filter(r => !r.auto || quiere[r.auto] || r.recogido || r.devuelto)
-    .map(r => {
-      if (!r.auto || !quiere[r.auto]) return r;
-      const actualizada = { ...r, concepto: quiere[r.auto] };
-      // Si el envío trae otra fecha del evento, las recogidas automáticas se mueven con
-      // ella, igual que al cambiar la fecha a mano en la pantalla. Las que tengan la
-      // fecha puesta a mano (fechasAuto: false) no se tocan: alguien ya lo decidió.
-      if (fecha && r.fechasAuto) {
-        actualizada.fecha = sumaDias(fecha, -DIAS_ANTES_RECOGIDA);
-        actualizada.fechaDevolucion = sumaDias(fecha, DIAS_DESPUES_DEVOLUCION);
-      }
-      return actualizada;
-    });
-  Object.entries(quiere).forEach(([clave, concepto]) => {
-    if (!concepto || resultado.some(r => r.auto === clave)) return;
-    resultado.push({
-      concepto, hora: "",
-      fecha: sumaDias(fecha, -DIAS_ANTES_RECOGIDA),
-      fechaDevolucion: sumaDias(fecha, DIAS_DESPUES_DEVOLUCION),
-      auto: clave, fechasAuto: true,
-    });
-  });
-  return resultado;
+  return Object.entries(alquileresDe(estado)).reduce(
+    (recogidas, [clave, concepto]) => sincronizaRecogidaAlquiler(recogidas, clave, concepto, estado.fechaEvento || ""),
+    previas,
+  );
 }
 
 /** @param {string} clave @param {string} [proveedor] @returns {string} */

@@ -27,6 +27,9 @@
 
 import { carpasRecomendadas, carpasPorAlquilar, paxDelDiaGrande, CARPAS_EN_ALMACEN } from "../carpas.js";
 import { paellasPorPax, tallaPorPax } from "../paella.js";
+import {
+  ALQUILERES, PROVEEDORES_VEHICULO, SIN_ALQUILER_VEHICULO, esDecisionVehiculo, proponeSegundoCamion,
+} from "../alquileres.js";
 
 // La gente que manda para el material. En un rodaje es el día de más gente (el equipo
 // se monta una vez); en el resto, los adultos. Sirve para proponer números, no para
@@ -43,6 +46,10 @@ export const TIPOS_EVENTO = [
 ];
 
 const CON_BARRA = ["boda", "comunion", "corporativo", "cumpleanos"];
+const OPCIONES_VEHICULO = [
+  { valor: SIN_ALQUILER_VEHICULO, texto: "No hace falta" },
+  ...PROVEEDORES_VEHICULO.map(proveedor => ({ valor: proveedor, texto: `Alquilar con ${proveedor}` })),
+];
 
 // Si van platos: ni comiendo de pie todo en bandeja, ni con "no llevamos platos".
 // Sin contestar, sí (es lo normal).
@@ -131,7 +138,21 @@ export const PREGUNTAS = [
     soloEn: ["produccion"],
   },
 
+  {
+    id: "segundoCamion", tipo: "opciones", texto: "¿Alquilar un segundo camión?",
+    nota: "Para bodas de más de 80 invitados, valora si hará falta otro camión.",
+    opciones: OPCIONES_VEHICULO,
+    soloEn: ["boda"],
+    si: r => proponeSegundoCamion("boda", r.adultos, r.ninos),
+  },
+
   // ── El sitio y su mobiliario de exterior ──────────────────────────────────
+  {
+    id: "furgoAlquiler", tipo: "opciones", texto: "¿Alquilar una furgoneta?",
+    nota: "Al elegir proveedor, se prepara la recogida y la devolución.",
+    opciones: OPCIONES_VEHICULO,
+    soloEn: ["produccion"],
+  },
   {
     // Antes se preguntaba si había sombra, que es preguntar por el problema en vez de
     // por lo que hay que cargar. Ahora se pregunta por las carpas y se propone el
@@ -175,7 +196,7 @@ export const PREGUNTAS = [
   },
   {
     id: "generador", tipo: "opciones", texto: "¿Alquilar generador?",
-    nota: "Se pide a Support On Set, con su recogida y su devolución.",
+    nota: `Si hace falta, pídelo a ${ALQUILERES.generador.proveedor} (SOS), con su recogida y devolución.`,
     opciones: [{ valor: "si", texto: "Sí" }, { valor: "no", texto: "No hace falta" }],
     soloEn: ["produccion"],
   },
@@ -1263,7 +1284,8 @@ export function aRespuestasDeLaApp(respuestas = {}) {
 
   if (tipo === "produccion") {
     if (Array.isArray(r.dias) && r.dias.length) estado.diasProduccion = r.dias.map(String);
-    if (puesto(r.generador)) estado.llevaGenerador = r.generador === "si";
+    if (r.generador === "si" || r.generador === "no") estado.llevaGenerador = r.generador === "si";
+    if (esDecisionVehiculo(r.furgoAlquiler)) estado.furgoAlquiler = r.furgoAlquiler;
     if (puesto(r.aguaPequena)) estado.tipoAguaPequena = r.aguaPequena;
     // Las sillas de un rodaje se preguntan igual que en el resto. Antes se forzaban a
     // "Nuestras" sin preguntar, y eso PISABA lo que hubiera en la app: si tenías un
@@ -1280,6 +1302,9 @@ export function aRespuestasDeLaApp(respuestas = {}) {
     pon("ninos", r.ninos);
     pon("numTronas", r.tronas);
     pon("numStaff", r.staff);
+    if (proponeSegundoCamion(tipo, r.adultos, r.ninos) && esDecisionVehiculo(r.segundoCamion)) {
+      estado.segundoCamion = r.segundoCamion;
+    }
     if (puesto(r.coctel)) { estado.barraCoctel = r.coctel > 0; estado.horasCoctel = r.coctel || 0; }
     if (puesto(r.copas)) { estado.barraCopas = r.copas > 0; estado.horasCopas = r.copas || 0; }
     if (puesto(r.servicio)) {

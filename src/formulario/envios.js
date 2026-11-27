@@ -14,6 +14,7 @@
 import { getDb, nubeActiva, suscribir } from "../firestore.js";
 import { hoyISO } from "../fecha.js";
 import { blancaConGemela } from "../repetidos.js";
+import { decisionGenerador, esDecisionVehiculo } from "../alquileres.js";
 
 export { nubeActiva };
 
@@ -109,7 +110,16 @@ export function resumirParaOficina(eventosGuardados = {}, hoy = hoyISO(), apunte
     // en vez de preguntarlo todo de cero en un evento que dice "Ya configurado".
     .map(([nombre, e]) => {
       const base = { nombre, fecha: e?.fechaEvento || "", sitio: e?.ubicacion || "", tipo: e?.evento || "boda", configurado: !e?.sinConfigurar };
-      const previas = respuestasParaOficina(e?.formularioRespuestas);
+      // Estas decisiones pueden cambiar también en Checklist. Solo viajan las
+      // opciones cerradas del formulario: ni las fechas ni las notas de la reserva.
+      const decisiones = {};
+      if (base.tipo === "produccion") {
+        const generador = decisionGenerador(e);
+        if (generador !== null) decisiones.generador = generador ? "si" : "no";
+        if (esDecisionVehiculo(e?.furgoAlquiler)) decisiones.furgoAlquiler = e.furgoAlquiler;
+      }
+      if (base.tipo === "boda" && esDecisionVehiculo(e?.segundoCamion)) decisiones.segundoCamion = e.segundoCamion;
+      const previas = respuestasParaOficina({ ...e?.formularioRespuestas, ...decisiones });
       return previas ? { ...base, respuestasPrevias: previas } : base;
     })
     .filter(e => e.fecha >= hoy)
