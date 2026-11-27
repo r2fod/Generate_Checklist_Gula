@@ -1,5 +1,7 @@
 # Generate_Checklist_Gula — contexto para retomar
 
+- Checklist y formulario proponen furgoneta y generador en producción, y segundo camión en bodas de más de 80 invitados. Se pueden dejar pendientes. Al elegir un alquiler, Checklist propone la recogida y la devolución.
+
 App interna de **Gula Catering** para montar la checklist de material de cada evento.
 React 19 + Vite + Firebase Firestore, publicada en GitHub Pages.
 

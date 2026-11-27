@@ -5168,12 +5168,15 @@ async function main() {
     ok(await p.locator(".item-row").filter({ hasText: "Mobiliario (alquiler Event Style)" }).count() === 1,
       "y el mobiliario alquilado sale en la carga");
 
-    // En producción el generador (marcado de serie) y las carpas que falten van a SOS,
-    // y el mobiliario extra ni se ofrece
+    // El generador de una producción se propone. Solo se añade tras elegirlo,
+    // y el mobiliario extra deja de ofrecerse.
     await p.locator("select.form-select").first().selectOption("produccion");
     await p.waitForTimeout(1000);
     ok(await p.locator(".checkbox-label-normal", { hasText: "Mobiliario extra" }).count() === 0,
       "en un rodaje no se ofrece mobiliario de Event Style");
+    ok(!(await tarjetas()).some(x => x.concepto === "Generador (Support On Set)"),
+      "BUG evitado: entrar en producción no crea el alquiler del generador hasta confirmarlo");
+    await p.locator(".segment-group", { hasText: "¿Alquilar generador a SOS?" }).getByRole("button", { name: "Lleva", exact: true }).click();
     await casilla("Carpas de alquiler").check();
     await p.waitForTimeout(700);
     t = await tarjetas();
